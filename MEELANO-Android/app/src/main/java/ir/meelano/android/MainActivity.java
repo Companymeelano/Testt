@@ -259,6 +259,8 @@ public class MainActivity extends Activity {
     private TextView subtitle;
     private TextView connectionIndicator;
     private LinearLayout content;
+    private ScrollView contentScroll; // Phase-7D: parallax source
+    private View parallaxHero;        // Phase-7D: hero card that lags the scroll
     private LinearLayout navStrip;
     private boolean dockHiddenByKeyboard = false;
     private boolean iconHookInstalled = false;
@@ -2534,6 +2536,32 @@ public class MainActivity extends Activity {
     /** Phase-7A: synthetic display weight for hero/KPI figures (no extra font asset needed). */
     private void displayWeight(TextView t) { t.setPaintFlags(t.getPaintFlags() | android.graphics.Paint.FAKE_BOLD_TEXT_FLAG); }
 
+    /** Phase-7D: a chip of the tapped card's colour flies toward the page top — shared-element handoff. */
+    private void flyGhost(int fromX, int fromY, int accent) {
+        if (stage == null) return;
+        int[] sl = new int[2]; stage.getLocationOnScreen(sl);
+        final View ghost = new View(this);
+        ghost.setBackground(rounded(accent, 999));
+        ghost.setAlpha(0.9f);
+        int size = dp(46);
+        FrameLayout.LayoutParams gp = new FrameLayout.LayoutParams(size, size);
+        gp.leftMargin = fromX - sl[0] - size / 2;
+        gp.topMargin = fromY - sl[1] - size / 2;
+        stage.addView(ghost, gp);
+        ghost.bringToFront();
+        float dx = (stage.getWidth() / 2f) - (fromX - sl[0]);
+        float dy = dp(120) - (fromY - sl[1]);
+        ghost.animate().translationX(dx).translationY(dy).scaleX(0.5f).scaleY(0.5f).alpha(0f)
+                .setDuration(420).setInterpolator(new android.view.animation.AccelerateInterpolator(1.4f))
+                .withEndAction(() -> { try { stage.removeView(ghost); } catch (Exception ignored) { } }).start();
+    }
+
+    /** Phase-7D: tablets / landscape get a readable centered column instead of edge-to-edge stretch. */
+    private boolean isWideScreen() {
+        android.util.DisplayMetrics m = getResources().getDisplayMetrics();
+        return m.widthPixels / m.density >= 600f;
+    }
+
     /** Phase-7B: cards rise in with a stagger — the page feels assembled, not swapped. */
     private void staggerIn(LinearLayout host) {
         if (host == null || !motionAllowed()) return;
@@ -3557,7 +3585,19 @@ public class MainActivity extends Activity {
         content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         content.setPadding(dp(VISITOR_EDITION ? 24 : 14), dp(VISITOR_EDITION ? 10 : 8), dp(VISITOR_EDITION ? 24 : 14), dp(VISITOR_EDITION ? 62 : 34));
-        scroll.addView(content, new ScrollView.LayoutParams(-1, -2));
+        if (isWideScreen()) { // Phase-7D: readable centered column on tablets / landscape
+            ScrollView.LayoutParams clp = new ScrollView.LayoutParams(dp(660), -2);
+            clp.gravity = Gravity.CENTER_HORIZONTAL;
+            scroll.addView(content, clp);
+        } else {
+            scroll.addView(content, new ScrollView.LayoutParams(-1, -2));
+        }
+        contentScroll = scroll;
+        scroll.setOnScrollChangeListener((sv, x, y, oldx, oldy) -> { // Phase-7D: hero parallax
+            if (!motionAllowed()) return;
+            View h = parallaxHero;
+            if (h != null) h.setTranslationY(Math.min(y * 0.22f, dp(90)));
+        });
         shell.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1f));
 
         // Fixed bar above the bottom menu (used by the cart: total + send button always visible).
@@ -4341,6 +4381,12 @@ public class MainActivity extends Activity {
         hero.addView(row, new LinearLayout.LayoutParams(-1, -2));
         addHeroBeautyChips(hero, title, accent);
         addLuxuryRoad(hero, accent);
+        parallaxHero = hero; // Phase-7D
+        hero.setTranslationY(0f);
+        if (motionAllowed()) { // Phase-7D: hero icon pops with overshoot — the page's shared-element moment
+            img.setScaleX(0.6f); img.setScaleY(0.6f);
+            img.animate().scaleX(1f).scaleY(1f).setDuration(380).setInterpolator(new android.view.animation.OvershootInterpolator(2.2f)).start();
+        }
         LinearLayout.LayoutParams hp = new LinearLayout.LayoutParams(-1, -2);
         hp.setMargins(0, 0, 0, dp(12));
         content.addView(hero, hp);
@@ -13756,7 +13802,13 @@ public class MainActivity extends Activity {
         r.addView(tt, tp);
         r.addView(text("‹", 14, tc(accent), Typeface.BOLD), new LinearLayout.LayoutParams(-2, -2));
         r.setClickable(true); applyTouchFeedback(r);
-        r.setOnClickListener(v -> showApp(target));
+        r.setOnClickListener(v -> {
+            if (motionAllowed()) { // Phase-7D: shared-element handoff — the card's colour flies to the new page
+                int[] loc = new int[2]; v.getLocationOnScreen(loc);
+                flyGhost(loc[0] + v.getWidth() / 2, loc[1] + v.getHeight() / 2, accent);
+            }
+            showApp(target);
+        });
         r.setContentDescription(title + " — باز کردن بخش");
         LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, -2); rp.setMargins(0, dp(7), 0, 0);
         parent.addView(r, rp);

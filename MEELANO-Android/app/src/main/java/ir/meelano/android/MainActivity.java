@@ -2301,8 +2301,13 @@ public class MainActivity extends Activity {
         applyTouchFeedback(hit);
 
         TextView b = new TextView(this);
-        b.setText(glyph == null ? "" : glyph);
-        b.setTextSize(fs(glyph != null && glyph.length() > 1 ? 12.0f : 16.4f));
+        android.graphics.drawable.Drawable hd = tintedGlyph(glyph, tc(accent), 20);
+        if (hd != null) {
+            b.setCompoundDrawables(hd, null, null, null); // monochrome brand vector, theme-tinted
+        } else {
+            b.setText(glyph == null ? "" : glyph);
+            b.setTextSize(fs(glyph != null && glyph.length() > 1 ? 12.0f : 16.4f));
+        }
         b.setGravity(Gravity.CENTER);
         b.setSingleLine(true);
         // Unified header tool: tonal circle + monochrome SVG icon in the brand colour (danger only for logout).
@@ -2514,6 +2519,21 @@ public class MainActivity extends Activity {
     // ---------------------------------------------------------------------------------------
     private static final float BUTTON_RADIUS = 14f;
 
+    // Phase-7A typographic scale (sp, pre-fs() lift): one rhythm across the whole app.
+    private static final float T_CAPTION = 10.5f;
+    private static final float T_BODY = 12.5f;
+    private static final float T_SECTION = 17f;
+    private static final float T_HEADLINE = 22f;
+
+    /** Phase-7A: brand-tinted soft shadows instead of the default grey (API 28+, graceful below). */
+    private void coloredShadow(View v, int color, float elevDp) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) v.setElevation(dp(elevDp));
+        if (Build.VERSION.SDK_INT >= 28) { v.setOutlineAmbientShadowColor(color); v.setOutlineSpotShadowColor(color); }
+    }
+
+    /** Phase-7A: synthetic display weight for hero/KPI figures (no extra font asset needed). */
+    private void displayWeight(TextView t) { t.setPaintFlags(t.getPaintFlags() | android.graphics.Paint.FAKE_BOLD_TEXT_FLAG); }
+
     private boolean isDestructiveLabel(String label) {
         String t = label == null ? "" : label;
         return t.contains("حذف") || t.contains("خروج") || t.contains("پاک کردن") || t.contains("لغو سفارش") || t.contains("خالی کردن");
@@ -2568,7 +2588,11 @@ public class MainActivity extends Activity {
         b.setTextDirection(View.TEXT_DIRECTION_FIRST_STRONG_RTL);
         b.setGravity(Gravity.CENTER);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            b.setElevation(primary ? dp(2) : 0);
+            b.setElevation(primary ? dp(3) : 0);
+            if (primary && Build.VERSION.SDK_INT >= 28) { // glow of the button's own tone, not grey
+                b.setOutlineAmbientShadowColor(alpha(tone, 110));
+                b.setOutlineSpotShadowColor(alpha(tone, 110));
+            }
             b.setLetterSpacing(0f);
             android.animation.StateListAnimator sla = new android.animation.StateListAnimator();
             android.animation.ObjectAnimator down = android.animation.ObjectAnimator.ofPropertyValuesHolder(b,
@@ -3756,7 +3780,7 @@ public class MainActivity extends Activity {
         if (active) {
             if (MANAGER_EDITION) {
                 bubbleView.setBackground(gradient(new int[]{alpha(GOLD_2, 96), alpha(GOLD, 72)}, GradientDrawable.Orientation.TOP_BOTTOM, 999));
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) bubbleView.setElevation(dp(3));
+                coloredShadow(bubbleView, alpha(GOLD, 120), 3); // warm gold halo under the active tab
                 if (motionAllowed()) { bubbleView.setScaleX(0.85f); bubbleView.setScaleY(0.85f); bubbleView.animate().scaleX(1f).scaleY(1f).setDuration(150).start(); }
             } else bubbleView.setBackground(rounded(alpha(accent, isLightTheme() ? 40 : 64), 999));
         }
@@ -4290,8 +4314,9 @@ public class MainActivity extends Activity {
         LinearLayout copy = new LinearLayout(this);
         copy.setOrientation(LinearLayout.VERTICAL);
         copy.setPadding(dp(10), 0, dp(10), 0);
-        TextView h = this.text(title, 22, TEXT, Typeface.BOLD);
-        TextView s = this.text(text, 12, MUTED, Typeface.NORMAL);
+        TextView h = this.text(title, T_HEADLINE, TEXT, Typeface.BOLD);
+        displayWeight(h); // display-weight headline: the visual anchor of every page
+        TextView s = this.text(text, T_BODY, MUTED, Typeface.NORMAL);
         s.setLineSpacing(dp(2), 1.05f);
         copy.addView(h, new LinearLayout.LayoutParams(-1, -2));
         copy.addView(s, new LinearLayout.LayoutParams(-1, -2));
@@ -12021,14 +12046,18 @@ public class MainActivity extends Activity {
         t.setOrientation(LinearLayout.VERTICAL);
         t.setPadding(dp(10), dp(12), dp(10), dp(12));
         t.setBackground(gradient(grad, GradientDrawable.Orientation.TL_BR, 22));
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) t.setElevation(dp(4));
-        TextView g = text(glyph, 15, 0xFFFFFFFF, Typeface.BOLD);
+        coloredShadow(t, alpha(grad[1], 120), 4); // brand-tinted depth, not grey
+        android.graphics.drawable.Drawable gd = tintedGlyph(glyph, 0xFFFFFFFF, 18);
+        TextView g;
+        if (gd != null) { g = text("", 15, 0xFFFFFFFF, Typeface.BOLD); g.setCompoundDrawables(gd, null, null, null); }
+        else { g = text(glyph, 15, 0xFFFFFFFF, Typeface.BOLD); }
         t.addView(g, new LinearLayout.LayoutParams(-1, -2));
-        TextView v = text(value, 12.6f, 0xFFFFFFFF, Typeface.BOLD);
+        TextView v = text(value, 13.4f, 0xFFFFFFFF, Typeface.BOLD);
+        displayWeight(v); // synthetic display weight: KPI figures read as the strongest type on screen
         v.setSingleLine(true); v.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
         LinearLayout.LayoutParams vp = new LinearLayout.LayoutParams(-1, -2); vp.setMargins(0, dp(4), 0, 0);
         t.addView(v, vp);
-        TextView tt = text(title, 9.4f, 0xE6FFFFFF, Typeface.BOLD);
+        TextView tt = text(title, T_CAPTION, 0xE6FFFFFF, Typeface.BOLD);
         tt.setSingleLine(true);
         t.addView(tt, new LinearLayout.LayoutParams(-1, -2));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -2, 1f); lp.setMargins(dp(3), 0, dp(3), 0);
@@ -14569,7 +14598,10 @@ public class MainActivity extends Activity {
     }
 
     private TextView visitorSectionTitle(String title, String glyph, int accent) {
-        TextView t = text((glyph == null ? "" : glyph + "  ") + title, 18.0f, tc(GOLD_2), Typeface.BOLD);
+        TextView t = text(title, T_SECTION, tc(GOLD_2), Typeface.BOLD);
+        android.graphics.drawable.Drawable d = tintedGlyph(glyph, tc(accent), 20);
+        if (d != null) t.setCompoundDrawables(null, null, d, null); // brand vector at the RTL start (right)
+        t.setCompoundDrawablePadding(dp(8));
         t.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
         t.setPadding(dp(4), 0, dp(4), dp(8));
         return t;
@@ -21941,8 +21973,82 @@ public class MainActivity extends Activity {
         content.addView(c, lp);
     }
 
+    /** Phase-7A unified icon system: every text/emoji glyph used anywhere in the UI is mapped to a
+        monochrome brand vector so icons render identically on all devices and always carry the
+        theme tint. Unmapped glyphs (initials, «CEO», …) fall back to text. */
+    private int iconResForGlyph(String g) {
+        if (g == null) return 0;
+        switch (g) {
+            case "↗": return R.drawable.lux_trending_up;
+            case "↘": case "⇩": return R.drawable.mi_trending_down;
+            case "▲": return R.drawable.mi_trending_up;
+            case "✓": return R.drawable.lux_check_circle;
+            case "★": return R.drawable.lux_star_fill;
+            case "✨": case "✦": return R.drawable.lux_star_shine;
+            case "\ud83c\udfc6": return R.drawable.mi_military_tech;
+            case "⌛": return R.drawable.mi_hourglass_top;
+            case "☀": return R.drawable.mi_light_mode;
+            case "☾": return R.drawable.mi_bedtime;
+            case "⛅": return R.drawable.mi_wb_twilight;
+            case "◉": case "◎": return R.drawable.mi_track_changes;
+            case "◷": return R.drawable.mi_schedule;
+            case "⏱": return R.drawable.mi_timer;
+            case "!": return R.drawable.lux_warning;
+            case "♜": return R.drawable.lux_group;
+            case "♟": return R.drawable.lux_person;
+            case "♙": return R.drawable.lux_account_balance_wallet;
+            case "◆": return R.drawable.lux_diamond;
+            case "◈": return R.drawable.mi_inventory_2;
+            case "≡": return R.drawable.mi_receipt_long;
+            case "↯": return R.drawable.mi_bolt;
+            case "⇅": return R.drawable.mi_compare_arrows;
+            case "⟳": return R.drawable.lux_refresh;
+            case "↩": return R.drawable.mi_assignment_return;
+            case "٪": return R.drawable.mi_percent;
+            case "\ud83d\udca1": return R.drawable.mi_lightbulb;
+            case "\ud83c\udff7": case "\ud83c\udff7\ufe0f": return R.drawable.mi_sell;
+            case "⌂": return R.drawable.mi_home;
+            case "☰": return R.drawable.mi_apps;
+            case "⚙": case "⚙️": return R.drawable.lux_admin_panel_settings;
+            case "⌕": return R.drawable.lux_search;
+            case "✺": return R.drawable.mi_palette;
+            case "♛": return R.drawable.mi_verified_user;
+            case "⎋": return R.drawable.mi_logout;
+            case "⊕": return R.drawable.mi_add_shopping_cart;
+            case "●": return R.drawable.mi_fiber_manual_record_fill;
+            case "›": return R.drawable.mi_chevron_left;
+            case "‹": return R.drawable.mi_arrow_forward;
+            case "☝": return R.drawable.mi_fingerprint;
+            case "\ud83d\ude9a": return R.drawable.lux_local_shipping;
+            case "\ud83d\udcb5": return R.drawable.lux_payments;
+            case "\ud83d\udd10": return R.drawable.mi_lock;
+            case "⌖": return R.drawable.mi_pin_drop;
+            case "\ud83d\uddbc": case "\ud83d\uddbc\ufe0f": return R.drawable.mi_image;
+            case "\ud83d\udcc4": return R.drawable.mi_description;
+            default: return 0;
+        }
+    }
+
+    private android.graphics.drawable.Drawable tintedGlyph(String glyph, int tint, int sizeDp) {
+        int res = iconResForGlyph(glyph);
+        if (res == 0) return null;
+        android.graphics.drawable.Drawable d = getDrawable(res);
+        if (d == null) return null;
+        d = d.mutate();
+        d.setTint(tint);
+        d.setBounds(0, 0, dp(sizeDp), dp(sizeDp));
+        return d;
+    }
+
     private TextView report3dIcon(String glyph, int accent) {
-        TextView icon = text(glyph, glyph != null && glyph.length() > 2 ? 12.8f : 19.5f, onColorFor(accent), Typeface.BOLD);
+        android.graphics.drawable.Drawable d = tintedGlyph(glyph, onColorFor(accent), 24);
+        TextView icon;
+        if (d != null) {
+            icon = text("", 19.5f, onColorFor(accent), Typeface.BOLD);
+            icon.setCompoundDrawables(d, null, null, null);
+        } else {
+            icon = text(glyph, glyph != null && glyph.length() > 2 ? 12.8f : 19.5f, onColorFor(accent), Typeface.BOLD);
+        }
         icon.setGravity(Gravity.CENTER);
         icon.setSingleLine(true);
         icon.setBackground(rounded(accent, 14));

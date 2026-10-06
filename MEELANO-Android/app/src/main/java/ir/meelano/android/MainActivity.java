@@ -2534,6 +2534,17 @@ public class MainActivity extends Activity {
     /** Phase-7A: synthetic display weight for hero/KPI figures (no extra font asset needed). */
     private void displayWeight(TextView t) { t.setPaintFlags(t.getPaintFlags() | android.graphics.Paint.FAKE_BOLD_TEXT_FLAG); }
 
+    /** Phase-7B: cards rise in with a stagger — the page feels assembled, not swapped. */
+    private void staggerIn(LinearLayout host) {
+        if (host == null || !motionAllowed()) return;
+        for (int i = 0; i < host.getChildCount(); i++) {
+            final View ch = host.getChildAt(i);
+            ch.setAlpha(0f);
+            ch.setTranslationY(dp(14));
+            ch.animate().alpha(1f).translationY(0f).setStartDelay(50L * Math.min(i, 14)).setDuration(260).start();
+        }
+    }
+
     private boolean isDestructiveLabel(String label) {
         String t = label == null ? "" : label;
         return t.contains("حذف") || t.contains("خروج") || t.contains("پاک کردن") || t.contains("لغو سفارش") || t.contains("خالی کردن");
@@ -3883,6 +3894,12 @@ public class MainActivity extends Activity {
 
     private void renderActivePage() {
         clearPageDock();
+        // Phase-7B: soft page-transition — content settles in instead of hard-swapping.
+        if (motionAllowed() && content != null) {
+            content.setAlpha(0.75f);
+            content.setTranslationY(dp(6));
+            content.animate().alpha(1f).translationY(0f).setDuration(200).start();
+        }
         updateBackCallback();
         if (!canOpenPage(activePage)) { activePage = firstAllowedPage(); buildNav(); if (!canOpenPage(activePage)) { content.removeAllViews(); addEmptyTo(content, "بخشی برای نمایش در دسترس نیست."); return; } }
         switch (activePage) {
@@ -11968,19 +11985,34 @@ public class MainActivity extends Activity {
         managerApprovalsRow = null;
         addHero("گزارش‌های مدیریت", "تحلیل دسته‌بندی‌شدهٔ فروش، خرید، چک‌ها، مشتریان و پرسنل — ارقام مستقیم از آتیران.");
         int range = dash.optInt("range", 0);
-        LinearLayout filters = new LinearLayout(this);
-        filters.setOrientation(LinearLayout.HORIZONTAL);
+        // Phase-7B: segmented control with a gold sliding pill instead of four loose buttons.
+        LinearLayout seg = new LinearLayout(this);
+        seg.setOrientation(LinearLayout.HORIZONTAL);
+        seg.setGravity(Gravity.CENTER_VERTICAL);
+        seg.setPadding(dp(4), dp(4), dp(4), dp(4));
+        GradientDrawable segBg = rounded(alpha(SURFACE, isLightTheme() ? 235 : 60), 16);
+        segBg.setStroke(dp(1), alpha(mix(GOLD, TEXT, 0.25f), 90));
+        seg.setBackground(segBg);
         String[] labels = {"امروز", "۷ روز", "۳۰ روز", "۱۲ ماه"};
         for (int i = 0; i < labels.length; i++) {
             final int rr = i;
-            Button b = i == range ? primaryButton(labels[i]) : secondaryButton(labels[i]);
-            b.setMinimumWidth(dp(84));
-            b.setOnClickListener(v -> { managerReportRange = rr; prefs.edit().putInt("mgr_range", rr).apply(); loadManagerReports(); });
-            filters.addView(b, weightedButtonLp());
+            TextView tab = text(labels[i], 12f, i == range ? onColorFor(GOLD) : tc(mix(GOLD, TEXT, 0.45f)), i == range ? Typeface.BOLD : Typeface.NORMAL);
+            tab.setGravity(Gravity.CENTER);
+            tab.setSingleLine(true);
+            tab.setPadding(dp(6), dp(8), dp(6), dp(8));
+            tab.setClickable(true);
+            tab.setFocusable(true);
+            applyTouchFeedback(tab);
+            if (i == range) {
+                tab.setBackground(gradient(new int[]{mix(GOLD, Color.WHITE, isLightTheme() ? 0.22f : 0.12f), GOLD, mix(GOLD, GOLD_2, 0.25f)}, GradientDrawable.Orientation.TOP_BOTTOM, 12));
+                coloredShadow(tab, alpha(GOLD, 110), 2);
+                if (motionAllowed()) { tab.setScaleX(0.9f); tab.setScaleY(0.9f); tab.animate().scaleX(1f).scaleY(1f).setDuration(180).start(); }
+            }
+            tab.setOnClickListener(v -> { managerReportRange = rr; prefs.edit().putInt("mgr_range", rr).apply(); loadManagerReports(); });
+            seg.addView(tab, new LinearLayout.LayoutParams(0, -2, 1f));
         }
         LinearLayout.LayoutParams fp = new LinearLayout.LayoutParams(-1, -2); fp.setMargins(0, 0, 0, dp(12));
-        HorizontalScrollView fhs = hScrollWrap(filters);
-        content.addView(fhs, fp);
+        content.addView(seg, fp);
         Button diagBtn = secondaryButton("\ud83d\udd27 \u062a\u0634\u062e\u06cc\u0635 \u0627\u062a\u0635\u0627\u0644");
         diagBtn.setOnClickListener(v -> showApp("diagnostics"));
         LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(-1, -2); dlp.setMargins(0, 0, 0, dp(12));
@@ -12020,6 +12052,7 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams ap = new LinearLayout.LayoutParams(-1, -2); ap.setMargins(0, 0, 0, dp(12));
         content.addView(actions, ap);
         addDeveloperCredit(content);
+        staggerIn(content); // Phase-7B
     }
 
     // ================= round-12 presentation: KPI strip + creative report cards =================
@@ -12033,15 +12066,26 @@ public class MainActivity extends Activity {
         if (debtors != null) for (int i = 0; i < debtors.length(); i++) owed += debtors.optJSONObject(i) == null ? 0 : debtors.optJSONObject(i).optDouble("amount", 0);
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
-        addKpiTile(row, "\u0641\u0631\u0648\u0634 \u0628\u0627\u0632\u0647", money(Math.round(sold)), "\u2197", new int[]{0xFF3060B0, 0xFF1F3A68});
-        addKpiTile(row, "\u0627\u0633\u0646\u0627\u062f \u062b\u0628\u062a\u200c\u0634\u062f\u0647", faDigits(formatNumber(docs)), "\u2261", new int[]{0xFFA87A2C, 0xFF7A5618});
-        addKpiTile(row, "\u0648\u0635\u0648\u0644 \u0628\u0627\u0632\u0647", money(Math.round(paid)), sold > 0 ? faDigits(String.format(java.util.Locale.US, "%.0f", paid / sold * 100)) + "\u066a" : "\u2014", new int[]{0xFF2E8B57, 0xFF1D6B41});
-        addKpiTile(row, "\u0628\u062f\u0647\u06cc \u0645\u0634\u062a\u0631\u06cc\u0627\u0646", money(Math.round(owed)), "\u26a0", new int[]{0xFFC0564F, 0xFF8E3A34});
+        JSONArray trend = dash.optJSONArray("trend");
+        double[] spark = null;
+        if (trend != null && trend.length() > 1) {
+            spark = new double[trend.length()];
+            for (int i = 0; i < trend.length(); i++) spark[trend.length() - 1 - i] = trend.optJSONObject(i) == null ? 0 : trend.optJSONObject(i).optDouble("value", 0);
+        }
+        addKpiTile(row, "\u0641\u0631\u0648\u0634 \u0628\u0627\u0632\u0647", money(Math.round(sold)), "\u2197", new int[]{0xFF3060B0, 0xFF1F3A68}, sold, 1, spark);
+        addKpiTile(row, "\u0627\u0633\u0646\u0627\u062f \u062b\u0628\u062a\u200c\u0634\u062f\u0647", faDigits(formatNumber(docs)), "\u2261", new int[]{0xFFA87A2C, 0xFF7A5618}, docs, 2, null);
+        addKpiTile(row, "\u0648\u0635\u0648\u0644 \u0628\u0627\u0632\u0647", money(Math.round(paid)), sold > 0 ? faDigits(String.format(java.util.Locale.US, "%.0f", paid / sold * 100)) + "\u066a" : "\u2014", new int[]{0xFF2E8B57, 0xFF1D6B41}, sold > 0 ? paid / sold * 100 : 0, 3, null);
+        addKpiTile(row, "\u0628\u062f\u0647\u06cc \u0645\u0634\u062a\u0631\u06cc\u0627\u0646", money(Math.round(owed)), "\u26a0", new int[]{0xFFC0564F, 0xFF8E3A34}, owed, 1, null);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2); lp.setMargins(0, 0, 0, dp(14));
         content.addView(row, lp);
     }
 
     private void addKpiTile(LinearLayout row, String title, String value, String glyph, int[] grad) {
+        addKpiTile(row, title, value, glyph, grad, 0, 0, null);
+    }
+
+    /** Phase-7B: KPI tile with count-up figure and micro sparkline. fmt: 1=money, 2=count, 3=percent. */
+    private void addKpiTile(LinearLayout row, String title, String value, String glyph, int[] grad, double target, int fmt, double[] spark) {
         LinearLayout t = new LinearLayout(this);
         t.setOrientation(LinearLayout.VERTICAL);
         t.setPadding(dp(10), dp(12), dp(10), dp(12));
@@ -12052,16 +12096,67 @@ public class MainActivity extends Activity {
         if (gd != null) { g = text("", 15, 0xFFFFFFFF, Typeface.BOLD); g.setCompoundDrawables(gd, null, null, null); }
         else { g = text(glyph, 15, 0xFFFFFFFF, Typeface.BOLD); }
         t.addView(g, new LinearLayout.LayoutParams(-1, -2));
-        TextView v = text(value, 13.4f, 0xFFFFFFFF, Typeface.BOLD);
+        final TextView v = text(value, 13.4f, 0xFFFFFFFF, Typeface.BOLD);
         displayWeight(v); // synthetic display weight: KPI figures read as the strongest type on screen
         v.setSingleLine(true); v.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
         LinearLayout.LayoutParams vp = new LinearLayout.LayoutParams(-1, -2); vp.setMargins(0, dp(4), 0, 0);
         t.addView(v, vp);
+        if (spark != null && spark.length > 1) {
+            View sp = new SparkLine(this, spark, alpha(Color.WHITE, 150));
+            LinearLayout.LayoutParams spp = new LinearLayout.LayoutParams(-1, dp(14)); spp.setMargins(0, dp(5), 0, 0);
+            t.addView(sp, spp);
+        }
         TextView tt = text(title, T_CAPTION, 0xE6FFFFFF, Typeface.BOLD);
         tt.setSingleLine(true);
         t.addView(tt, new LinearLayout.LayoutParams(-1, -2));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -2, 1f); lp.setMargins(dp(3), 0, dp(3), 0);
         row.addView(t, lp);
+        if (fmt > 0 && target > 0 && motionAllowed()) {
+            android.animation.ValueAnimator va = android.animation.ValueAnimator.ofFloat(0f, (float) target);
+            va.setDuration(800);
+            va.setInterpolator(new android.view.animation.DecelerateInterpolator(2.2f));
+            va.addUpdateListener(a -> v.setText(fmtKpi(((Float) a.getAnimatedValue()).doubleValue(), fmt)));
+            va.start();
+        }
+    }
+
+    private String fmtKpi(double x, int fmt) {
+        if (fmt == 1) return money(Math.round(x));
+        if (fmt == 2) return faDigits(formatNumber(Math.round(x)));
+        if (fmt == 3) return faDigits(String.format(java.util.Locale.US, "%.0f", x)) + "٪";
+        return String.valueOf(Math.round(x));
+    }
+
+    /** Phase-7B: micro sparkline for KPI tiles — a rounded polyline of the 7-day sales trend. */
+    private static class SparkLine extends View {
+        private final double[] vals;
+        private final android.graphics.Paint p = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        SparkLine(android.content.Context ctx, double[] vals, int color) {
+            super(ctx);
+            this.vals = vals;
+            p.setStyle(android.graphics.Paint.Style.STROKE);
+            p.setStrokeWidth(ctx.getResources().getDisplayMetrics().density * 2f);
+            p.setStrokeCap(android.graphics.Paint.Cap.ROUND);
+            p.setColor(color);
+        }
+        @Override protected void onDraw(android.graphics.Canvas c) {
+            try {
+                if (vals == null || vals.length < 2) return;
+                double mn = vals[0], mx = vals[0];
+                for (double x : vals) { mn = Math.min(mn, x); mx = Math.max(mx, x); }
+                float pad = p.getStrokeWidth();
+                float w = getWidth() - pad * 2, h = getHeight() - pad * 2;
+                if (w <= 0 || h <= 0) return;
+                android.graphics.Path path = new android.graphics.Path();
+                for (int i = 0; i < vals.length; i++) {
+                    float x = pad + w * i / (vals.length - 1);
+                    double n = mx > mn ? (vals[i] - mn) / (mx - mn) : 0.5;
+                    float y = pad + h * (1f - (float) n);
+                    if (i == 0) path.moveTo(x, y); else path.lineTo(x, y);
+                }
+                c.drawPath(path, p);
+            } catch (Exception ignored) { }
+        }
     }
 
     private void addTodayYesterdayCard(JSONArray daily) {
@@ -13594,6 +13689,7 @@ public class MainActivity extends Activity {
             for (int i = 0; i < errs.length(); i++) addReportLine(c, "بدون داده", errs.optString(i, "—"), DANGER);
         }
         addDeveloperCredit(content);
+        staggerIn(content); // Phase-7B
     }
 
     private void addLegendRow(LinearLayout parent, int color, String label, double value, JSONObject src) {
@@ -21982,6 +22078,8 @@ public class MainActivity extends Activity {
             case "↗": return R.drawable.lux_trending_up;
             case "↘": case "⇩": return R.drawable.mi_trending_down;
             case "▲": return R.drawable.mi_trending_up;
+            case "▼": return R.drawable.mi_trending_down;
+            case "⚠": case "⚠️": return R.drawable.lux_warning;
             case "✓": return R.drawable.lux_check_circle;
             case "★": return R.drawable.lux_star_fill;
             case "✨": case "✦": return R.drawable.lux_star_shine;

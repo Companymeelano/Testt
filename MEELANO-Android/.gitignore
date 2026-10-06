@@ -1,0 +1,20 @@
+# Gradle / Android build output
+.gradle/
+build/
+app/build/
+local.properties
+
+# Keystores — never commit signing material.
+# (signing/meelano-install.p12 is already in history; see SECURITY note in BUILD-fa.md)
+*.jks
+*.keystore
+*.p12
+
+# Shipped APKs are produced by .github/workflows/android.yml, not stored here.
+*.apk
+
+# Python helper cache
+__pycache__/
+
+# Legacy archives that lived in this folder
+Modirat.zip

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Manager edition: on API 26+ the launcher uses this adaptive icon so the new
+     «pistachio-growth» emblem (drawable-nodpi/manager_icon_master.png) wins over the
+     visitor edition's vector launcher art defined in src/main. The bitmap mipmaps
+     (mdpi..xxxhdpi) still serve launchers and Android versions below 26. -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/meelano_navy" />
+    <foreground android:drawable="@drawable/manager_icon_master" />
+</adaptive-icon>

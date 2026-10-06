@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">مدیریت</string>
+    <string name="web_url_hint">ورود مدیر</string>
+    <string name="android_subtitle">نسخه ویژه مدیرکل و مدیر</string>
+</resources>

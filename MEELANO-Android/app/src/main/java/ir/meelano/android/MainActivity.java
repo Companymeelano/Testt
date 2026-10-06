@@ -12030,6 +12030,7 @@ public class MainActivity extends Activity {
             LinearLayout c = addReportCard("روند فروش ۷ روز اخیر", "↯", navAccent("reports"));
             ManagerTrendChartView chart = new ManagerTrendChartView(this, trend);
             c.addView(chart, new LinearLayout.LayoutParams(-1, dp(150)));
+            addExpandButton(c, "روند فروش ۷ روز اخیر", trend);
         }
         addReportCheckBucketsCard(dash.optJSONObject("checkBuckets"));
         addReportVisitorShareCard(dash.optJSONArray("visitorShare"), dash.optJSONObject("sales"));
@@ -12185,6 +12186,7 @@ public class MainActivity extends Activity {
             chart.put(p);
         }
         c.addView(new ManagerTrendChartView(this, chart), new LinearLayout.LayoutParams(-1, dp(140)));
+        addExpandButton(c, "روند فروش ۱۲ ماه", chart);
     }
 
     private void addBigNumber(LinearLayout row, String title, String value, int color) {
@@ -12262,6 +12264,35 @@ public class MainActivity extends Activity {
 
     private int getWidthOrScreen() {
         try { return Math.max(content.getWidth(), getResources().getDisplayMetrics().widthPixels); } catch (Exception e) { return getResources().getDisplayMetrics().widthPixels; }
+    }
+
+    /** Phase-7C: fullscreen interactive chart dialog. */
+    private void addExpandButton(LinearLayout c, final String title, final JSONArray data) {
+        Button ex = secondaryButton("⛶ نمایش تمام‌صفحه");
+        ex.setTextSize(fs(10f));
+        ex.setOnClickListener(v -> showFullscreenChart(title, data));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, dp(40)); lp.setMargins(0, dp(8), 0, 0);
+        c.addView(ex, lp);
+    }
+
+    private void showFullscreenChart(String title, JSONArray data) {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(10), dp(6), dp(10), dp(4));
+        box.addView(text(title, 16, TEXT, Typeface.BOLD), new LinearLayout.LayoutParams(-1, -2));
+        ManagerTrendChartView chart = new ManagerTrendChartView(this, data);
+        LinearLayout.LayoutParams chp = new LinearLayout.LayoutParams(-1, dp(300)); chp.setMargins(0, dp(8), 0, dp(8));
+        box.addView(chart, chp);
+        if (data != null) for (int i = 0; i < data.length(); i++) {
+            JSONObject o = data.optJSONObject(i);
+            if (o == null) continue;
+            addReportLine(box, o.optString("label", "—"), MeelanoCharts.compact(o.optDouble("value", 0)), TEXT);
+        }
+        ScrollView sv = new ScrollView(this);
+        sv.addView(box, new FrameLayout.LayoutParams(-1, -2));
+        AlertDialog dlg = new MeelanoDialogBuilder().setView(sv).setNegativeButton("بستن", null).create();
+        styleMeelanoDialog(dlg, GOLD);
+        dlg.show();
     }
 
     private void addAgingCard(JSONArray buckets) {
@@ -12419,7 +12450,15 @@ public class MainActivity extends Activity {
         TextView l = text(label, 10.8f, MUTED, Typeface.NORMAL);
         l.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
         TextView v = text(value, 11.4f, valueColor, Typeface.BOLD);
-        v.setSingleLine(true); v.setEllipsize(TextUtils.TruncateAt.START);
+        boolean wrap = value != null && value.length() > 48; // long error notes stay readable, not head-truncated
+        if (wrap) {
+            l.setLayoutParams(new LinearLayout.LayoutParams(-2, -2));
+            v.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
+            v.setMaxLines(8);
+            row.setGravity(Gravity.TOP);
+        } else {
+            v.setSingleLine(true); v.setEllipsize(TextUtils.TruncateAt.START);
+        }
         row.addView(l); row.addView(v);
         LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, -2); rp.setMargins(0, dp(2), 0, dp(2));
         parent.addView(row, rp);
@@ -24526,6 +24565,15 @@ public class MainActivity extends Activity {
         try (PreparedStatement ps = c.prepareStatement("SELECT c.name FROM sys.columns c JOIN sys.objects o ON o.object_id=c.object_id JOIN sys.schemas s ON s.schema_id=o.schema_id WHERE s.name=N'dbo' AND o.type IN (N'U',N'V') AND o.name=? ORDER BY c.column_id")) {
             ps.setString(1, table);
             try (ResultSet r = ps.executeQuery()) { while (r.next()) set.add(r.getString(1)); }
+        } catch (Exception meta) {
+            // Hardening: catalog query rejected/timed out → ResultSetMetaData fallback.
+            set.clear();
+            try (PreparedStatement ps = c.prepareStatement("SELECT TOP 0 * FROM dbo.[" + table + "]")) {
+                try (ResultSet r = ps.executeQuery()) {
+                    java.sql.ResultSetMetaData md = r.getMetaData();
+                    for (int i = 1; i <= md.getColumnCount(); i++) set.add(md.getColumnName(i));
+                }
+            }
         }
         return set;
     }
@@ -24535,6 +24583,14 @@ public class MainActivity extends Activity {
         try (PreparedStatement ps = c.prepareStatement("SELECT c.name, ty.name FROM sys.columns c JOIN sys.objects o ON o.object_id=c.object_id JOIN sys.schemas s ON s.schema_id=o.schema_id JOIN sys.types ty ON ty.user_type_id=c.user_type_id WHERE s.name=N'dbo' AND o.type IN (N'U',N'V') AND o.name=?")) {
             ps.setString(1, table);
             try (ResultSet r = ps.executeQuery()) { while (r.next()) map.put(r.getString(1).toLowerCase(Locale.US), r.getString(2).toLowerCase(Locale.US)); }
+        } catch (Exception meta) {
+            map.clear();
+            try (PreparedStatement ps = c.prepareStatement("SELECT TOP 0 * FROM dbo.[" + table + "]")) {
+                try (ResultSet r = ps.executeQuery()) {
+                    java.sql.ResultSetMetaData md = r.getMetaData();
+                    for (int i = 1; i <= md.getColumnCount(); i++) map.put(md.getColumnName(i).toLowerCase(Locale.US), String.valueOf(md.getColumnTypeName(i)).toLowerCase(Locale.US));
+                }
+            }
         }
         return map;
     }

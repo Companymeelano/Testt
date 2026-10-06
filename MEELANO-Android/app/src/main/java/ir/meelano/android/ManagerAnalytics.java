@@ -53,6 +53,16 @@ final class ManagerAnalytics {
         try (PreparedStatement ps = timed(c, "SELECT c.name FROM sys.columns c JOIN sys.objects o ON o.object_id=c.object_id JOIN sys.schemas s ON s.schema_id=o.schema_id WHERE s.name=N'dbo' AND o.type IN (N'U',N'V') AND o.name=? ORDER BY c.column_id")) {
             ps.setString(1, table);
             try (ResultSet r = ps.executeQuery()) { while (r.next()) set.add(r.getString(1)); }
+        } catch (Exception meta) {
+            // Hardening: if the catalog query is ever rejected/times out on the customer
+            // server, derive the column list from ResultSetMetaData over an empty projection.
+            set.clear();
+            try (PreparedStatement ps = timed(c, "SELECT TOP 0 * FROM dbo.[" + table + "]")) {
+                try (ResultSet r = ps.executeQuery()) {
+                    java.sql.ResultSetMetaData md = r.getMetaData();
+                    for (int i = 1; i <= md.getColumnCount(); i++) set.add(md.getColumnName(i));
+                }
+            }
         }
         return set;
     }

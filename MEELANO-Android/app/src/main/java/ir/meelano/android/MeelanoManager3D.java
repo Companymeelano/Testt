@@ -85,12 +85,28 @@ final class MeelanoManager3D {
         private final Paint txt = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint small = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Path face = new Path();
+        private int picked = -1; // Phase-7C: tapped bar index
 
         IsoBars(Context ctx) {
             super(ctx);
             line.setStyle(Paint.Style.STROKE);
             txt.setTextAlign(Paint.Align.CENTER);
             small.setTextAlign(Paint.Align.CENTER);
+            setClickable(true);
+        }
+
+        @Override
+        public boolean onTouchEvent(android.view.MotionEvent ev) {
+            int n = norm.length;
+            if (n == 0 || getWidth() == 0) return super.onTouchEvent(ev);
+            int act = ev.getAction();
+            if (act == android.view.MotionEvent.ACTION_DOWN || act == android.view.MotionEvent.ACTION_UP) {
+                float pad = getWidth() * 0.05f;
+                float slot = (getWidth() - pad * 2) / n;
+                int idx = (int) ((ev.getX() - pad) / slot);
+                if (idx >= 0 && idx < n) { picked = idx; invalidate(); return true; }
+            }
+            return super.onTouchEvent(ev);
         }
 
         void setData(String[] labels, String[] values, float[] norm, int[] colors) {
@@ -168,9 +184,24 @@ final class MeelanoManager3D {
                         lit(col, 0.18f), shade(col, 0.18f), Shader.TileMode.CLAMP));
                 cv.drawRect(new RectF(x0, top, x0 + bw, base), fill);
                 fill.setShader(null);
+
+                // Phase-7C: showroom reflection — a faded mirror of the bar under the floor line
+                float rh = Math.min(bh * 0.30f, h * 0.09f);
+                if (rh > 2) {
+                    fill.setShader(new LinearGradient(x0, base, x0, base + rh,
+                            Color.argb(55, Color.red(col), Color.green(col), Color.blue(col)), Color.TRANSPARENT, Shader.TileMode.CLAMP));
+                    cv.drawRect(new RectF(x0, base + 1f, x0 + bw, base + rh), fill);
+                    fill.setShader(null);
+                }
+
                 line.setColor(Color.argb(60, 255, 255, 255));
                 line.setStrokeWidth(1.5f);
                 cv.drawRect(new RectF(x0, top, x0 + bw, base), line);
+                if (i == picked) { // tapped bar gets a bright outline
+                    line.setColor(Color.argb(210, 255, 255, 255));
+                    line.setStrokeWidth(3f);
+                    cv.drawRect(new RectF(x0 - 2f, top - 2f, x0 + bw + 2f, base + 2f), line);
+                }
 
                 // value pill above the bar
                 String vv = values[i];
@@ -181,6 +212,21 @@ final class MeelanoManager3D {
                 cv.drawRoundRect(new RectF(cx - tw / 2 - h * 0.03f, py - h * 0.05f, cx + tw / 2 + h * 0.03f, py + h * 0.045f), h * 0.04f, h * 0.04f, fill);
                 txt.setColor(Color.WHITE);
                 cv.drawText(vv, cx, py + h * 0.015f, txt);
+
+                if (i == picked) { // Phase-7C: tooltip bubble with label + exact value on tap
+                    String tip = labels[i] + " • " + values[i];
+                    float tw2 = txt.measureText(tip);
+                    float ty = Math.max(h * 0.10f, py - h * 0.12f);
+                    float half = Math.min(tw2 / 2 + h * 0.04f, w / 2 - 2);
+                    float tcx = Math.max(half + 2, Math.min(w - half - 2, cx));
+                    fill.setColor(Color.argb(215, 18, 22, 32));
+                    cv.drawRoundRect(new RectF(tcx - half, ty - h * 0.062f, tcx + half, ty + h * 0.052f), h * 0.045f, h * 0.045f, fill);
+                    line.setColor(Color.argb(140, 231, 177, 90));
+                    line.setStrokeWidth(1.5f);
+                    cv.drawRoundRect(new RectF(tcx - half, ty - h * 0.062f, tcx + half, ty + h * 0.052f), h * 0.045f, h * 0.045f, line);
+                    txt.setColor(Color.WHITE);
+                    cv.drawText(tip, tcx, ty + h * 0.016f, txt);
+                }
 
                 small.setColor(Color.argb(200, 255, 255, 255));
                 cv.drawText(labels[i], cx, base + h * 0.12f, small);

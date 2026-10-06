@@ -3035,7 +3035,8 @@ public class MainActivity extends Activity {
         stage.removeAllViews();
 
         FrameLayout backdrop = new FrameLayout(this);
-        backdrop.setBackground(gradient(new int[]{HEADER_START, mix(NAVY, GOLD, 0.10f), mix(NAVY, INFO, 0.16f), NAVY}, GradientDrawable.Orientation.TL_BR, 0));
+        int loginBase = MANAGER_EDITION ? SURFACE : NAVY;
+        backdrop.setBackground(gradient(new int[]{MANAGER_EDITION ? mix(SURFACE, GOLD, isLightTheme() ? 0.14f : 0.06f) : HEADER_START, mix(loginBase, GOLD, 0.10f), mix(loginBase, MANAGER_EDITION ? GOLD_2 : INFO, 0.16f), loginBase}, GradientDrawable.Orientation.TL_BR, 0));
         backdrop.addView(new DiamondPatternView(this), new FrameLayout.LayoutParams(-1, -1));
 
         View glow1 = new View(this);
@@ -3050,7 +3051,7 @@ public class MainActivity extends Activity {
         View glow2 = new View(this);
         GradientDrawable g2 = new GradientDrawable();
         g2.setShape(GradientDrawable.OVAL);
-        g2.setColor(alpha(INFO, 28));
+        g2.setColor(alpha(MANAGER_EDITION ? GOLD_2 : INFO, 28));
         glow2.setBackground(g2);
         FrameLayout.LayoutParams g2p = new FrameLayout.LayoutParams(dp(270), dp(270), Gravity.BOTTOM | Gravity.LEFT);
         g2p.setMargins(dp(-100), 0, 0, dp(-90));
@@ -3738,7 +3739,7 @@ public class MainActivity extends Activity {
         iconWrap.setClipToPadding(false);
         int iconRes = visitorDockIconResource(key, active);
         View bubbleView;
-        int iconColor = active ? tc(accent) : (MANAGER_EDITION ? tc(INFO) : MUTED);
+        int iconColor = active ? tc(accent) : (MANAGER_EDITION ? tc(mix(GOLD_2, MUTED, 0.42f)) : MUTED);
         if (iconRes != 0) {
             ImageView iv = new ImageView(this);
             iv.setImageResource(iconRes);
@@ -3780,7 +3781,7 @@ public class MainActivity extends Activity {
         }
         item.addView(iconWrap, new LinearLayout.LayoutParams(wrapW, wrapH));
         String dockLabel = label;
-        TextView title = text(dockLabel, 9.0f * dockScale, active ? tc(accent) : (MANAGER_EDITION ? tc(INFO) : MUTED), active ? Typeface.BOLD : Typeface.NORMAL);
+        TextView title = text(dockLabel, 9.0f * dockScale, active ? tc(accent) : (MANAGER_EDITION ? tc(mix(GOLD_2, MUTED, 0.42f)) : MUTED), active ? Typeface.BOLD : Typeface.NORMAL);
         title.setGravity(Gravity.CENTER);
         title.setSingleLine(true);
         LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(-1, -2);
@@ -7614,11 +7615,12 @@ public class MainActivity extends Activity {
         preloadState.clear(); preloadStartedAt.clear(); loginLoadingRows.clear();
         FrameLayout overlay = new FrameLayout(this);
         overlay.setClickable(true); overlay.setFocusable(true);
-        overlay.setBackground(gradient(new int[]{mix(NAVY, GOLD, isLightTheme() ? 0.10f : 0.16f), NAVY, mix(NAVY, INFO, isLightTheme() ? 0.06f : 0.10f)}, GradientDrawable.Orientation.TL_BR, 0));
+        int oBase = MANAGER_EDITION ? SURFACE : NAVY;
+        overlay.setBackground(gradient(new int[]{mix(oBase, GOLD, isLightTheme() ? 0.10f : 0.16f), oBase, mix(oBase, MANAGER_EDITION ? GOLD_2 : INFO, isLightTheme() ? 0.06f : 0.10f)}, GradientDrawable.Orientation.TL_BR, 0));
         ScrollView scroll = new ScrollView(this); scroll.setFillViewport(true);
         LinearLayout col = new LinearLayout(this); col.setOrientation(LinearLayout.VERTICAL); col.setGravity(Gravity.CENTER_HORIZONTAL);
         col.setPadding(dp(24), dp(40), dp(24), dp(28));
-        MeelanoLoadingView ring = new MeelanoLoadingView(this, GOLD, mix(GOLD, INFO, 0.45f), alpha(TEXT, isLightTheme() ? 24 : 34), TEXT, MUTED, MEELANO_BOLD, MEELANO_REGULAR);
+        MeelanoLoadingView ring = new MeelanoLoadingView(this, GOLD, mix(GOLD, MANAGER_EDITION ? WARNING : INFO, 0.45f), alpha(TEXT, isLightTheme() ? 24 : 34), TEXT, MUTED, MEELANO_BOLD, MEELANO_REGULAR);
         try { ring.setIcon(BitmapFactory.decodeResource(getResources(), R.drawable.meelano_3d)); } catch (Throwable ignored) { }
         col.addView(ring, new LinearLayout.LayoutParams(dp(210), dp(210)));
         TextView title = text("در حال آماده‌سازی اطلاعات", 17f, TEXT, Typeface.BOLD); title.setGravity(Gravity.CENTER);
@@ -13554,7 +13556,7 @@ public class MainActivity extends Activity {
         addCatRow(cat, "فروش و اسناد", GOLD, "فروش بازه: " + (sv > 0 ? MeelanoCharts.rial(sv) : "—") + " • خرید: " + (pv > 0 ? MeelanoCharts.compact(pv) : "—") + " • حاشیه: " + MeelanoCharts.compact(sv - pv), "mgr_cockpit");
         long soonC = bsoon == null ? 0 : bsoon.optLong("count", bsoon.optLong("docs", 0));
         addCatRow(cat, "وصول و چک‌ها", WARNING, "مطالبات: " + (recv != null && recv.optDouble("total", 0) > 0 ? MeelanoCharts.compact(recv.optDouble("total", 0)) : "—") + " • چک نزدیک سررسید: " + faDigits(String.valueOf(soonC)) + " فقره", "mgr_collection");
-        addCatRow(cat, "مشتریان و میدان", INFO, "مشتریان بدهکار: " + (recv != null ? faDigits(String.valueOf(recv.optLong("count", 0))) : "—") + " • ویزیتورها: " + faDigits(String.valueOf(m.optJSONArray("visitors") == null ? 0 : m.optJSONArray("visitors").length())), "mgr_credit");
+        addCatRow(cat, "مشتریان و میدان", GOLD, "مشتریان بدهکار: " + (recv != null ? faDigits(String.valueOf(recv.optLong("count", 0))) : "—") + " • ویزیتورها: " + faDigits(String.valueOf(m.optJSONArray("visitors") == null ? 0 : m.optJSONArray("visitors").length())), "mgr_credit");
         content.addView(cat, new LinearLayout.LayoutParams(-1, -2));
 
         JSONArray errs = m.optJSONArray("errors");

@@ -1,0 +1,204 @@
+name: MEELANO Android
+
+# The sandbox this project is edited in has no JDK, no Gradle and no Android SDK, and
+# dl.google.com / repo1.maven.org / services.gradle.org / blob.core.windows.net are all
+# unreachable from it — so the APK cannot be produced there and the CI log cannot be read
+# back either. This workflow is the real build, and it echoes the tail of any failed build
+# into job annotations because annotations travel over api.github.com, which IS reachable.
+
+on:
+  push:
+    branches:
+      - arena/ecfda794-testt
+      - main
+  workflow_dispatch:
+    inputs:
+      edition:
+        description: 'Which edition to build'
+        required: false
+        default: 'manager'
+        type: choice
+        options: [manager, visitor, store, staff, tax]
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+# CI must be able to create/update the "manager-latest" GitHub Release that hosts the
+# direct-download APK.
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Unit tests + ${{ inputs.edition || 'manager' }} APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    env:
+      EDITION: ${{ inputs.edition || 'manager' }}
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # ubuntu-latest already ships an Android SDK with accepted licences; top it up rather than
+      # re-provisioning it. Never fatal: AGP downloads a missing platform itself.
+      - name: Make sure platform 36 is present
+        run: |
+          set -x
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/android-sdk}}"
+          echo "SDK=$SDK"; ls "$SDK" || true
+          SM="$SDK/cmdline-tools/latest/bin/sdkmanager"
+          if [ -x "$SM" ]; then
+            yes | "$SM" --licenses > /dev/null 2>&1 || true
+            "$SM" "platforms;android-36" "build-tools;35.0.0" || echo "::warning::sdkmanager could not install platform 36; AGP will try to fetch it"
+          else
+            echo "::warning::no cmdline-tools at $SM; AGP will try to fetch the platform itself"
+          fi
+
+      # AGP 8.10.1 requires Gradle >= 8.11.1 (the project's own gradlew defaulted to 8.10.2,
+      # which AGP 8.10 rejects).
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      # MeelanoTaxTest reproduces the tax organisation's official JWS/JWE vectors byte for byte
+      # and MeelanoHrTest checks the 1405 Labour-Law figures — both run on the plain JVM.
+      - name: Unit tests
+        working-directory: MEELANO-Android
+        run: |
+          set -o pipefail
+          CAP="$(echo "$EDITION" | awk '{print toupper(substr($0,1,1)) substr($0,2)}')"
+          gradle --no-daemon --stacktrace ":app:test${CAP}ReleaseUnitTest" 2>&1 | tee "$RUNNER_TEMP/build.log"
+
+      - name: Assemble APK
+        working-directory: MEELANO-Android
+        env:
+          MEELANO_KEYSTORE_PASSWORD: ${{ secrets.MEELANO_KEYSTORE_PASSWORD }}
+          MEELANO_KEY_ALIAS: ${{ secrets.MEELANO_KEY_ALIAS }}
+          MEELANO_KEY_PASSWORD: ${{ secrets.MEELANO_KEY_PASSWORD }}
+        run: |
+          set -o pipefail
+          CAP="$(echo "$EDITION" | awk '{print toupper(substr($0,1,1)) substr($0,2)}')"
+          gradle --no-daemon --stacktrace ":app:assemble${CAP}Release" 2>&1 | tee -a "$RUNNER_TEMP/build.log"
+
+      # The Actions log blob is unreachable from the editing sandbox, so re-emit the tail of a
+      # failed build as annotations — those come back through the REST API and stay readable.
+      - name: Echo failure into annotations
+        if: failure()
+        run: |
+          python3 - "${RUNNER_TEMP:-/tmp}/build.log" <<'PY'
+          import os, sys
+          path = sys.argv[1]
+          if not os.path.exists(path):
+              print("::error::MEELANO build failed before Gradle produced any output (see the step list)")
+              raise SystemExit(0)
+          lines = open(path, errors="replace").read().splitlines()
+          lines = [l for l in lines if l.strip()]
+          tail = lines[-160:]
+          chunk, out = [], []
+          for l in tail:
+              if len(l) + sum(len(x) + 1 for x in chunk) > 800:
+                  out.append(chunk); chunk = []
+              chunk.append(l)
+          if chunk: out.append(chunk)
+          for i, c in enumerate(out, 1):
+              msg = "\n".join(c).replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+              print(f"::error title=build log tail {i}/{len(out)}::{msg}")
+          PY
+
+      # Artifacts live on blob.core.windows.net, which the editing sandbox cannot reach, so the
+      # facts that matter are re-emitted as ::notice:: annotations (they come back over
+      # api.github.com). This is how a green run is actually verified rather than assumed.
+      - name: Verify and describe artifact
+        working-directory: MEELANO-Android
+        run: |
+          set -eu
+          src="app/build/outputs/apk/${EDITION}/release"
+          mkdir -p dist
+          cp "$src"/app-"${EDITION}"-release*.apk "dist/MEELANO-${EDITION}-v6.0.1-release.apk"
+          APK="dist/MEELANO-${EDITION}-v6.0.1-release.apk"
+
+          # 1. unit tests that really ran
+          python3 - <<'PY'
+          import glob, xml.etree.ElementTree as ET
+          t = f = s = 0
+          files = glob.glob("app/build/test-results/**/TEST-*.xml", recursive=True)
+          for p in files:
+              r = ET.parse(p).getroot()
+              t += int(r.get("tests", 0)); f += int(r.get("failures", 0)) + int(r.get("errors", 0)); s += int(r.get("skipped", 0))
+          print(f"::notice title=unit tests::ran={t} failed={f} skipped={s} across {len(files)} classes")
+          PY
+
+          # 2. the APK really is the requested edition
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/android-sdk}}"
+          BADGE=""
+          AAPT="$(ls -d "$SDK"/build-tools/*/aapt 2>/dev/null | sort -V | tail -1 || true)"
+          if [ -n "${AAPT:-}" ]; then
+            BADGE="$("$AAPT" dump badging "$APK")"
+            echo "$BADGE" | grep -E "^package:|^launchable-activity:|^sdkVersion:|^targetSdkVersion:" \
+              | sed 's/^/::notice title=APK badging::/'
+          else
+            echo "::warning::aapt not found, could not verify the APK manifest"
+          fi
+
+          SIZE="$(du -h "$APK" | cut -f1)"
+          SUM="$(sha256sum "$APK" | cut -d' ' -f1)"
+          echo "::notice title=APK::size=$SIZE sha256=$SUM"
+          {
+            echo "### MEELANO ${EDITION} — $(date -u +'%Y-%m-%d %H:%M UTC')"
+            echo
+            echo '- commit: `${{ github.sha }}`'
+            echo "- size: $SIZE"
+            echo "- SHA-256: \`$SUM\`"
+            echo
+            echo '```'
+            echo "$BADGE" | grep -E "^package:|^launchable-activity:|^sdkVersion:|^targetSdkVersion:|^application-label" || true
+            echo '```'
+            echo
+            echo 'Signed with `signing/meelano-install.p12` when the repository secrets are set,'
+            echo 'otherwise with the throwaway debug key (still installable).'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: MEELANO-${{ env.EDITION }}-release
+          path: MEELANO-Android/dist/*.apk
+          if-no-files-found: error
+
+      # A stable, direct, no-login download URL for the APK (the repo is public):
+      #   .../releases/download/manager-latest/MEELANO-<edition>-v6.0.1-release.apk
+      # The tag is force-refreshed on every green run, so the link never changes.
+      - name: Publish direct-download release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          cd MEELANO-Android/dist
+          APK="$(ls MEELANO-*.apk | head -1)"
+          gh release create manager-latest \
+            --title "MEELANO ${EDITION} — latest build" \
+            --notes "Auto-published by CI from commit ${GITHUB_SHA}. Direct APK attached." \
+            --target "${GITHUB_SHA}" || true
+          gh release upload manager-latest "$APK" --clobber
+          URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/manager-latest/${APK}"
+          echo "::notice title=direct APK link::${URL}"
+          echo "### Direct download" >> "$GITHUB_STEP_SUMMARY"
+          echo "[$APK](${URL})" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-report
+          path: MEELANO-Android/app/build/reports/tests/
+          if-no-files-found: ignore

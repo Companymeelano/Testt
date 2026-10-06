@@ -150,6 +150,7 @@ public class MainActivity extends Activity {
     private static final String DEFAULT_THEME = "azure_diamond";
     private static final String KEY_LAST_USER = "last_meelano_user";
     private static final String KEY_THEME = "meelano_theme_palette";
+    private static final String KEY_OLED = "meelano_oled_true_black"; // Phase-7E
     private static final String KEY_FIRST_NAME = "assistant_first_name";
     private static final String KEY_NAME_ASKED = "assistant_name_asked";
     private static final String KEY_AI_PROVIDER = "assistant_ai_provider";
@@ -1566,6 +1567,16 @@ public class MainActivity extends Activity {
                 ON_PRIMARY = Color.rgb(20, 16, 10);
             }
         }
+        // Phase-7E: optional true-black surfaces for AMOLED panels (dark palettes only).
+        if (!isLightTheme() && prefs != null && prefs.getBoolean(KEY_OLED, false)) {
+            NAVY = Color.BLACK;
+            SURFACE = Color.rgb(10, 10, 12);
+            SURFACE_2 = Color.rgb(15, 15, 18);
+            HEADER_START = Color.BLACK;
+            HEADER_END = Color.rgb(6, 6, 8);
+            HERO_START = Color.rgb(12, 12, 15);
+            HERO_END = Color.BLACK;
+        }
         // One accent per theme (G4): the second accent is a lighter shade of the main colour instead of
         // a different hue (Dark 3 used purple titles on turquoise buttons; Emerald used green on brown).
         GOLD_2 = mix(GOLD, Color.WHITE, 0.32f);
@@ -1963,15 +1974,16 @@ public class MainActivity extends Activity {
         sk.setPadding(dp(16), dp(14), dp(16), dp(10));
         int[] ws = new int[]{0, 40, 110};
         for (int i = 0; i < 3; i++) {
-            View bar = new View(this);
-            bar.setBackground(rounded(alpha(MUTED, 60), 12));
+            View bar;
+            if (motionAllowed()) {
+                bar = new ShimmerBar(this, alpha(MUTED, 55), alpha(isLightTheme() ? Color.BLACK : Color.WHITE, isLightTheme() ? 22 : 64));
+            } else {
+                bar = new View(this);
+                bar.setBackground(rounded(alpha(MUTED, 60), 12));
+            }
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, dp(i == 0 ? 26 : 15));
             lp.setMargins(dp(ws[i]), dp(9), 0, 0);
             sk.addView(bar, lp);
-            if (motionAllowed()) {
-                bar.setAlpha(0.9f);
-                bar.animate().alpha(0.35f).setDuration(450).withEndAction(() -> bar.animate().alpha(0.9f).setDuration(450).start()).start();
-            }
         }
         return sk;
     }
@@ -2446,6 +2458,26 @@ public class MainActivity extends Activity {
         addThemeOption(box, dialog, "onyx_gold", "دارک ۱", "اونیکس طلایی", new int[]{Color.rgb(8, 9, 10), Color.rgb(204, 153, 65), Color.rgb(91, 197, 151)});
         addThemeOption(box, dialog, "royal_amethyst", "دارک ۲", "آمتیست سلطنتی", new int[]{Color.rgb(11, 9, 25), Color.rgb(154, 108, 224), Color.rgb(218, 133, 194)});
         addThemeOption(box, dialog, "noir_aurora", "دارک ۳", "نوآر شفق", new int[]{Color.rgb(5, 8, 18), Color.rgb(36, 190, 186), Color.rgb(113, 103, 229)});
+        // Phase-7E: true-black OLED switch
+        LinearLayout oledRow = new LinearLayout(this);
+        oledRow.setOrientation(LinearLayout.HORIZONTAL);
+        oledRow.setGravity(Gravity.CENTER_VERTICAL);
+        oledRow.setPadding(dp(10), dp(11), dp(10), dp(9));
+        final TextView oledState = text(prefs.getBoolean(KEY_OLED, false) ? "✓" : "○", 15, GOLD, Typeface.BOLD);
+        oledRow.addView(oledState, new LinearLayout.LayoutParams(-2, -2));
+        TextView oledLabel = text("مشکی خالص OLED — سطح‌های تیره کاملاً مشکی (مناسب AMOLED)", 11.5f, TEXT, Typeface.BOLD);
+        LinearLayout.LayoutParams olp = new LinearLayout.LayoutParams(0, -2, 1f); olp.setMargins(dp(8), 0, 0, 0);
+        oledRow.addView(oledLabel, olp);
+        oledRow.setClickable(true);
+        oledRow.setFocusable(true);
+        applyTouchFeedback(oledRow);
+        oledRow.setOnClickListener(v -> {
+            boolean on = !prefs.getBoolean(KEY_OLED, false);
+            prefs.edit().putBoolean(KEY_OLED, on).apply();
+            oledState.setText(on ? "✓" : "○");
+            applyTheme(currentThemeId());
+        });
+        box.addView(oledRow, new LinearLayout.LayoutParams(-1, -2));
         styleMeelanoDialog(dialog, GOLD_2);
         dialog.show();
     }
@@ -2554,6 +2586,20 @@ public class MainActivity extends Activity {
         ghost.animate().translationX(dx).translationY(dy).scaleX(0.5f).scaleY(0.5f).alpha(0f)
                 .setDuration(420).setInterpolator(new android.view.animation.AccelerateInterpolator(1.4f))
                 .withEndAction(() -> { try { stage.removeView(ghost); } catch (Exception ignored) { } }).start();
+    }
+
+    /** Phase-7E: tiled micro-noise to break gradient banding on dark backdrops. */
+    private android.graphics.drawable.BitmapDrawable noiseTile(int maxAlpha) {
+        int s = 96;
+        android.graphics.Bitmap b = android.graphics.Bitmap.createBitmap(s, s, android.graphics.Bitmap.Config.ARGB_8888);
+        java.util.Random rnd = new java.util.Random(7);
+        for (int y = 0; y < s; y++) for (int x = 0; x < s; x++) {
+            int v = 96 + rnd.nextInt(120);
+            b.setPixel(x, y, Color.argb(rnd.nextInt(maxAlpha), v, v, v));
+        }
+        android.graphics.drawable.BitmapDrawable d = new android.graphics.drawable.BitmapDrawable(getResources(), b);
+        d.setTileModeXY(android.graphics.Shader.TileMode.REPEAT, android.graphics.Shader.TileMode.REPEAT);
+        return d;
     }
 
     /** Phase-7D: tablets / landscape get a readable centered column instead of edge-to-edge stretch. */
@@ -3101,6 +3147,11 @@ public class MainActivity extends Activity {
         int loginBase = MANAGER_EDITION ? SURFACE : NAVY;
         backdrop.setBackground(gradient(new int[]{MANAGER_EDITION ? mix(SURFACE, GOLD, isLightTheme() ? 0.14f : 0.06f) : HEADER_START, mix(loginBase, GOLD, 0.10f), mix(loginBase, MANAGER_EDITION ? GOLD_2 : INFO, 0.16f), loginBase}, GradientDrawable.Orientation.TL_BR, 0));
         backdrop.addView(new DiamondPatternView(this), new FrameLayout.LayoutParams(-1, -1));
+        if (!isLightTheme()) { // Phase-7E: micro-noise kills gradient banding on dark login
+            View nz = new View(this);
+            nz.setBackground(noiseTile(14));
+            backdrop.addView(nz, new FrameLayout.LayoutParams(-1, -1));
+        }
 
         View glow1 = new View(this);
         GradientDrawable g1 = new GradientDrawable();
@@ -3183,6 +3234,18 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams logoLp = new LinearLayout.LayoutParams(dp(112), dp(112));
         logoLp.setMargins(0, 0, 0, dp(8));
         loginCard.addView(logo, logoLp);
+        if (motionAllowed()) { // Phase-7E: the brand logo breathes — a slow cradle tilt
+            logo.setRotation(-3f);
+            final Runnable[] loop = new Runnable[1];
+            loop[0] = new Runnable() {
+                @Override public void run() {
+                    if (!logo.isAttachedToWindow()) return;
+                    float to = logo.getRotation() < 0 ? 3f : -3f;
+                    logo.animate().rotation(to).setDuration(2600).setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator()).withEndAction(loop[0]).start();
+                }
+            };
+            loop[0].run();
+        }
 
         TextView h = text(STAFF_EDITION ? "ورود پرسنل" : STORE_EDITION ? "ورود کارکنان فروشگاه" : VISITOR_EDITION ? "ورود ویزیتور" : "ورود پخش درخشان", 23, TEXT, Typeface.BOLD);
         h.setGravity(Gravity.CENTER);
@@ -7656,7 +7719,21 @@ public class MainActivity extends Activity {
             View[] row = loginLoadingRows.get(key);
             if (row != null) {
                 TextView mark = (TextView) row[0], sub = (TextView) row[2];
-                if ("ok".equals(state)) { mark.setText("✓"); mark.setTextColor(onColorFor(SUCCESS)); mark.setBackground(roundedStroke(SUCCESS, 999, SUCCESS)); }
+                if ("ok".equals(state)) {
+                    mark.setTextColor(onColorFor(SUCCESS));
+                    mark.setBackground(roundedStroke(SUCCESS, 999, SUCCESS));
+                    android.graphics.drawable.Drawable tick = getDrawable(R.drawable.avd_check_draw); // Phase-7E: the check draws itself
+                    if (tick != null) {
+                        mark.setText("");
+                        tick = tick.mutate();
+                        int s = dp(18);
+                        tick.setBounds(0, 0, s, s);
+                        mark.setCompoundDrawables(tick, null, null, null);
+                        if (tick instanceof android.graphics.drawable.Animatable) ((android.graphics.drawable.Animatable) tick).start();
+                    } else {
+                        mark.setText("✓");
+                    }
+                }
                 else if ("fail".equals(state)) { mark.setText("!"); mark.setTextColor(onColorFor(WARNING)); mark.setBackground(roundedStroke(WARNING, 999, WARNING)); }
                 else { mark.setText("…"); mark.setTextColor(tc(GOLD)); mark.setBackground(roundedStroke(alpha(GOLD, 26), 999, alpha(GOLD, 120))); }
                 sub.setText(detail == null || detail.isEmpty() ? ("run".equals(state) ? "در حال دریافت…" : "") : detail);
@@ -7705,6 +7782,11 @@ public class MainActivity extends Activity {
         overlay.setClickable(true); overlay.setFocusable(true);
         int oBase = MANAGER_EDITION ? SURFACE : NAVY;
         overlay.setBackground(gradient(new int[]{mix(oBase, GOLD, isLightTheme() ? 0.10f : 0.16f), oBase, mix(oBase, MANAGER_EDITION ? GOLD_2 : INFO, isLightTheme() ? 0.06f : 0.10f)}, GradientDrawable.Orientation.TL_BR, 0));
+        if (!isLightTheme()) { // Phase-7E
+            View nz = new View(this);
+            nz.setBackground(noiseTile(12));
+            overlay.addView(nz, new FrameLayout.LayoutParams(-1, -1));
+        }
         ScrollView scroll = new ScrollView(this); scroll.setFillViewport(true);
         LinearLayout col = new LinearLayout(this); col.setOrientation(LinearLayout.VERTICAL); col.setGravity(Gravity.CENTER_HORIZONTAL);
         col.setPadding(dp(24), dp(40), dp(24), dp(28));
@@ -12059,8 +12141,18 @@ public class MainActivity extends Activity {
         }
         LinearLayout.LayoutParams fp = new LinearLayout.LayoutParams(-1, -2); fp.setMargins(0, 0, 0, dp(12));
         content.addView(seg, fp);
-        Button diagBtn = secondaryButton("\ud83d\udd27 \u062a\u0634\u062e\u06cc\u0635 \u0627\u062a\u0635\u0627\u0644");
-        diagBtn.setOnClickListener(v -> showApp("diagnostics"));
+        Button diagBtn = secondaryButton("تشخیص اتصال");
+        final android.graphics.drawable.Drawable spin = getDrawable(R.drawable.avd_refresh_spin); // Phase-7E: spinning refresh while checking
+        if (spin != null) {
+            int ss = dp(16);
+            spin.setBounds(0, 0, ss, ss);
+            diagBtn.setCompoundDrawables(spin, null, null, null);
+            diagBtn.setCompoundDrawablePadding(dp(6));
+        }
+        diagBtn.setOnClickListener(v -> {
+            if (spin instanceof android.graphics.drawable.Animatable) ((android.graphics.drawable.Animatable) spin).start();
+            showApp("diagnostics");
+        });
         LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(-1, -2); dlp.setMargins(0, 0, 0, dp(12));
         content.addView(diagBtn, dlp);
         addManagerKpiStrip(dash);
@@ -12172,6 +12264,38 @@ public class MainActivity extends Activity {
         if (fmt == 2) return faDigits(formatNumber(Math.round(x)));
         if (fmt == 3) return faDigits(String.format(java.util.Locale.US, "%.0f", x)) + "٪";
         return String.valueOf(Math.round(x));
+    }
+
+    /** Phase-7E: material shimmer sweep for skeleton bars while data loads. */
+    private static class ShimmerBar extends View {
+        private final Paint base = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint glow = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private float t = 0f;
+        private final int glowColor;
+        ShimmerBar(android.content.Context ctx, int baseColor, int glowColor) {
+            super(ctx);
+            base.setColor(baseColor);
+            this.glowColor = glowColor;
+            android.animation.ValueAnimator va = android.animation.ValueAnimator.ofFloat(0f, 1f);
+            va.setDuration(1100);
+            va.setRepeatCount(android.animation.ValueAnimator.INFINITE);
+            va.addUpdateListener(a -> { t = (Float) a.getAnimatedValue(); postInvalidateOnAnimation(); });
+            va.start();
+        }
+        @Override protected void onDraw(android.graphics.Canvas c) {
+            try {
+                float w = getWidth(), h = getHeight();
+                if (w == 0 || h == 0) return;
+                float r = 12 * getResources().getDisplayMetrics().density;
+                c.drawRoundRect(0, 0, w, h, r, r, base);
+                float band = w * 0.4f;
+                float x = -band + (w + band * 2) * t;
+                glow.setShader(new android.graphics.LinearGradient(x - band / 2, 0, x + band / 2, 0,
+                        new int[]{glowColor & 0x00FFFFFF, glowColor, glowColor & 0x00FFFFFF}, null, android.graphics.Shader.TileMode.CLAMP));
+                c.drawRoundRect(0, 0, w, h, r, r, glow);
+                glow.setShader(null);
+            } catch (Exception ignored) { }
+        }
     }
 
     /** Phase-7B: micro sparkline for KPI tiles — a rounded polyline of the 7-day sales trend. */

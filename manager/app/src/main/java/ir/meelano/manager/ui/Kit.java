@@ -188,7 +188,7 @@ public final class Kit {
             TextView more = text("مشاهده جزئیات ›", 9.5f, Theme.MUTED, true);
             t.addView(more, lp(-1, -2));
             Theme.pressable(t);
-            t.setOnClickListener(v -> k.action.run());
+            t.setOnClickListener(vw -> k.action.run());
         }
         return t;
     }

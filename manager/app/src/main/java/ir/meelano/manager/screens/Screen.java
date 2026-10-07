@@ -1,0 +1,93 @@
+package ir.meelano.manager.screens;
+
+import android.view.View;
+import android.widget.LinearLayout;
+
+import ir.meelano.manager.MainActivity;
+import ir.meelano.manager.core.Filter;
+import ir.meelano.manager.core.Queries;
+import ir.meelano.manager.data.Atiran;
+import ir.meelano.manager.ui.FilterSheet;
+import ir.meelano.manager.ui.Theme;
+
+import java.util.Map;
+
+/** Base of every management section. */
+public abstract class Screen {
+    protected final MainActivity a;
+
+    public Screen(MainActivity a) {
+        this.a = a;
+    }
+
+    public abstract String id();
+
+    public abstract String title();
+
+    public abstract String glyph();
+
+    public abstract int accent();
+
+    public String subtitle() {
+        Filter f = filter();
+        if (f == null) return "";
+        String s = f.rangeFa();
+        if (f.search != null && !f.search.trim().isEmpty()) s += " • «" + f.search.trim() + "»";
+        return s;
+    }
+
+    /** The screen's filter, or null when the screen has none. */
+    public Filter filter() {
+        return null;
+    }
+
+    /** Filter sheet configuration, or null for no filter button. */
+    public FilterSheet.Config filterConfig() {
+        return null;
+    }
+
+    public void applyFilter(Filter f) {
+        Filter mine = filter();
+        if (mine != null) mine.copyFrom(f);
+    }
+
+    /** Full render into the shell's content column. */
+    public abstract void render(LinearLayout content);
+
+    /** Return true when the screen consumed the back press (and re-rendered itself). */
+    public boolean onBack() {
+        return false;
+    }
+
+    // ---------------- soft parts ----------------
+    public interface Soft<T> {
+        T run() throws Exception;
+    }
+
+    /** Run one part; on failure record a Persian note and return null (screen keeps working). */
+    protected <T> T soft(Map<String, String> notes, String key, Soft<T> t) {
+        try {
+            return t.run();
+        } catch (Queries.Missing m) {
+            notes.put(key, m.getMessage());
+            return null;
+        } catch (Exception e) {
+            notes.put(key, Atiran.diagnose(e));
+            return null;
+        }
+    }
+
+    protected void renderNotes(LinearLayout content, Map<String, String> notes) {
+        if (notes == null || notes.isEmpty()) return;
+        LinearLayout c = a.kit.card(Theme.WARNING);
+        c.addView(a.kit.text("⚠ بخش‌های در دسترس نیست", 13f, Theme.TEXT, true),
+                a.kit.lp(-1, -2));
+        for (Map.Entry<String, String> e : notes.entrySet())
+            c.addView(a.kit.kv(e.getKey(), e.getValue(), Theme.WARNING), a.kit.lp(-1, -2));
+        a.kit.addCard(content, c);
+    }
+
+    protected View heroCard() {
+        return a.kit.hero(glyph(), title(), subtitle(), accent());
+    }
+}

@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Reserved for stable view ids if ever needed. -->
+    <item name="meelano_icon_scan" type="id" />
 </resources>

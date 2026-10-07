@@ -25,7 +25,7 @@ public class ShareProvider extends ContentProvider {
     static String authority(Context c) { return c.getPackageName() + ".share"; }
 
     /** Folder where files to be shared must be written. */
-    static File shareDir(Context c) {
+    public static File shareDir(Context c) {
         File d = new File(c.getCacheDir(), SHARE_DIR);
         if (!d.exists()) //noinspection ResultOfMethodCallIgnored
             d.mkdirs();

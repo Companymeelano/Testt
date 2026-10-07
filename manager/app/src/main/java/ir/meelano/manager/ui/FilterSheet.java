@@ -18,7 +18,6 @@ import ir.meelano.manager.data.Meta;
 import ir.meelano.manager.data.Repo;
 import ir.meelano.manager.data.Row;
 
-import java.sql.Connection;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -254,10 +253,9 @@ public final class FilterSheet {
 
     private static final String[] pendingSearch = {""};
     private static final AlertDialog[] dlg = {null};
-    private static final Connection[] connHolder = {null};
 
     private interface LookupQuery {
-        Queries.Q build() throws Exception;
+        Queries.Q build(Meta m) throws Exception;
     }
 
     private interface LookupPick {
@@ -273,14 +271,7 @@ public final class FilterSheet {
         root.addView(box, kit.lp(-1, -2));
         root.addView(kit.gap(8));
         final int[] sel = {selected};
-        repo.run(c -> {
-            connHolder[0] = c;
-            try {
-                return Repo.exec(c, lq.build());
-            } finally {
-                connHolder[0] = null;
-            }
-        }, new Repo.Cb<List<Row>>() {
+        repo.run(c -> Repo.exec(c, lq.build(new Meta(c))), new Repo.Cb<List<Row>>() {
             @Override
             public void ok(List<Row> rows) {
                 box.removeAllViews();

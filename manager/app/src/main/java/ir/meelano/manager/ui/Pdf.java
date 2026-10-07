@@ -47,7 +47,7 @@ public final class Pdf {
         int rowsPerPage = Math.max(5, (H - 210 - headH) / rowH);
         int pages = Math.max(1, (n + rowsPerPage - 1) / rowsPerPage);
         for (int pg = 0; pg < pages; pg++) {
-            PdfDocument.PageInfo info = new PdfDocument.PageInfo.Builder(W, H, pg + 1).build();
+            PdfDocument.PageInfo info = new PdfDocument.PageInfo.Builder(W, H, pg + 1).create();
             PdfDocument.Page page = doc.startPage(info);
             android.graphics.Canvas g = page.getCanvas();
             g.drawColor(0xFFFFFFFF);

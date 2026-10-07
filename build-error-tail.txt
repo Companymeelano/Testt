@@ -13,8 +13,8 @@ Starting a Gradle Daemon (subsequent builds will be faster)
 > Task :app:preDebugBuild UP-TO-DATE
 > Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
 > Task :app:javaPreCompileDebug
-> Task :app:generateDebugResValues
 > Task :app:checkDebugAarMetadata
+> Task :app:generateDebugResValues
 > Task :app:mapDebugSourceSetPaths
 > Task :app:generateDebugResources
 > Task :app:packageDebugResources
@@ -26,34 +26,25 @@ Starting a Gradle Daemon (subsequent builds will be faster)
 > Task :app:processDebugManifest
 > Task :app:mergeDebugShaders
 > Task :app:compileDebugShaders NO-SOURCE
+> Task :app:processDebugManifestForPackage
 > Task :app:generateDebugAssets UP-TO-DATE
 > Task :app:mergeDebugAssets
-> Task :app:processDebugManifestForPackage
-> Task :app:compressDebugAssets
 > Task :app:processDebugJavaRes NO-SOURCE
+> Task :app:compressDebugAssets
 > Task :app:processDebugResources
-> Task :app:desugarDebugFileDependencies
 > Task :app:checkDebugDuplicateClasses
 > Task :app:mergeDebugJavaResource
 
+> Task :app:compileDebugJavaWithJavac
+/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/ui/Kit.java:191: error: variable v is already defined in method kpiTile(Kpi)
+            t.setOnClickListener(v -> k.action.run());
+                                 ^
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+1 error
+
 > Task :app:compileDebugJavaWithJavac FAILED
-/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/ui/Charts.java:541: error: class, interface, or enum expected
-        g.drawText("تحقق هدف", cx, cy - Theme.dp(4), paint);
-        ^
-/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/ui/Charts.java:542: error: class, interface, or enum expected
-        }
-        ^
-/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/core/MoneyQueries.java:564: error: class, interface, or enum expected
- " + Sql.num("h", c.amount) + " AS amount"
- ^
-/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/core/MoneyQueries.java:564: error: unclosed string literal
- " + Sql.num("h", c.amount) + " AS amount"
-                                         ^
-/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/core/MoneyQueries.java:570: error: class, interface, or enum expected
-    }
-    ^
-5 errors
-gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1791415612446.json
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1791415881460.json
 [Incubating] Problems report is available at: file:///home/runner/work/Testt/Testt/manager/build/reports/problems/problems-report.html
 
 FAILURE: Build failed with an exception.
@@ -61,22 +52,12 @@ FAILURE: Build failed with an exception.
 * What went wrong:
 Execution failed for task ':app:compileDebugJavaWithJavac'.
 > Compilation failed; see the compiler output below.
-  /home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/ui/Charts.java:541: error: class, interface, or enum expected
-          g.drawText("تحقق هدف", cx, cy - Theme.dp(4), paint);
-          ^
-  /home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/ui/Charts.java:542: error: class, interface, or enum expected
-          }
-          ^
-  /home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/core/MoneyQueries.java:564: error: class, interface, or enum expected
-   " + Sql.num("h", c.amount) + " AS amount"
-   ^
-  /home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/core/MoneyQueries.java:570: error: class, interface, or enum expected
-      }
-      ^
-  /home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/core/MoneyQueries.java:564: error: unclosed string literal
-   " + Sql.num("h", c.amount) + " AS amount"
-                                           ^
-  5 errors
+  Note: Recompile with -Xlint:deprecation for details.
+  Note: Some input files use or override a deprecated API.
+  /home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/ui/Kit.java:191: error: variable v is already defined in method kpiTile(Kpi)
+              t.setOnClickListener(v -> k.action.run());
+                                   ^
+  1 error
 
 * Try:
 > Check your code and dependencies to fix the compilation error(s)
@@ -145,22 +126,12 @@ org.gradle.api.tasks.TaskExecutionException: Execution failed for task ':app:com
 	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)
 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:48)
 Caused by: org.gradle.api.internal.tasks.compile.CompilationFailedException: Compilation failed; see the compiler output below.
-/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/ui/Charts.java:541: error: class, interface, or enum expected
-        g.drawText("تحقق هدف", cx, cy - Theme.dp(4), paint);
-        ^
-/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/ui/Charts.java:542: error: class, interface, or enum expected
-        }
-        ^
-/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/core/MoneyQueries.java:564: error: class, interface, or enum expected
- " + Sql.num("h", c.amount) + " AS amount"
- ^
-/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/core/MoneyQueries.java:570: error: class, interface, or enum expected
-    }
-    ^
-/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/core/MoneyQueries.java:564: error: unclosed string literal
- " + Sql.num("h", c.amount) + " AS amount"
-                                         ^
-5 errors
+Note: Recompile with -Xlint:deprecation for details.
+Note: Some input files use or override a deprecated API.
+/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/ui/Kit.java:191: error: variable v is already defined in method kpiTile(Kpi)
+            t.setOnClickListener(v -> k.action.run());
+                                 ^
+1 error
 	at org.gradle.api.internal.tasks.compile.JdkJavaCompiler.execute(JdkJavaCompiler.java:84)
 	at org.gradle.api.internal.tasks.compile.JdkJavaCompiler.execute(JdkJavaCompiler.java:46)
 	at org.gradle.api.internal.tasks.compile.NormalizingJavaCompiler.delegateAndHandleErrors(NormalizingJavaCompiler.java:98)
@@ -343,5 +314,5 @@ Caused by: org.gradle.api.internal.tasks.compile.CompilationFailedException: Com
 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:48)
 
 
-BUILD FAILED in 38s
-21 actionable tasks: 21 executed
+BUILD FAILED in 28s
+20 actionable tasks: 20 executed

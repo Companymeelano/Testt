@@ -58,6 +58,16 @@ jobs:
             Needs a real Atiran SQL Server connection (set it in Settings).
           files: meelano-manager-v7-debug.apk
 
+      - name: Commit APK to dist/ (in-chat delivery)
+        run: |
+          mkdir -p dist
+          cp meelano-manager-v7-debug.apk dist/
+          git config user.name "arena-ci"
+          git config user.email "arena-ci@local"
+          git add -f dist/meelano-manager-v7-debug.apk
+          git commit -m "dist: debug APK (auto-updated by CI)" || true
+          git push origin HEAD:arena/ba83e93c-testt || true
+
       - name: Save error tail to branch (diagnostics, on failure)
         if: failure()
         run: |

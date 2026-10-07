@@ -228,7 +228,13 @@ jobs:
             --title "MEELANO ${EDITION} — latest build" \
             --notes "Auto-published by CI from commit ${GITHUB_SHA}. Direct APK attached." \
             --target "${GITHUB_SHA}" || true
-          gh release upload manager-latest "$APK" --clobber
+          # Phase-7H: transient GitHub API hiccups must not red the run — retry the upload.
+          for i in 1 2 3 4 5; do
+            if gh release upload manager-latest "$APK" --clobber; then break; fi
+            echo "publish attempt $i failed; retrying in $((i*10))s"
+            sleep $((i*10))
+            if [ "$i" = 5 ]; then exit 1; fi
+          done
           URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/manager-latest/${APK}"
           echo "::notice title=direct APK link::${URL}"
           echo "### Direct download" >> "$GITHUB_STEP_SUMMARY"

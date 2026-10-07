@@ -1976,7 +1976,7 @@ public class MainActivity extends Activity {
         for (int i = 0; i < 3; i++) {
             View bar;
             if (motionAllowed()) {
-                bar = new ShimmerBar(this, alpha(MUTED, 55), alpha(isLightTheme() ? Color.BLACK : Color.WHITE, isLightTheme() ? 22 : 64));
+                bar = new MeelanoDesignKit.ShimmerBar(this, alpha(MUTED, 55), alpha(isLightTheme() ? Color.BLACK : Color.WHITE, isLightTheme() ? 22 : 64));
             } else {
                 bar = new View(this);
                 bar.setBackground(rounded(alpha(MUTED, 60), 12));
@@ -2558,6 +2558,14 @@ public class MainActivity extends Activity {
     private static final float T_BODY = 12.5f;
     private static final float T_SECTION = 17f;
     private static final float T_HEADLINE = 22f;
+    private static final float T_LINE = 11.4f;
+    // Phase-7H: named KPI gradients (no scattered hex)
+    private static final int[] KPI_SALES = {0xFF3060B0, 0xFF1F3A68};
+    private static final int[] KPI_BRONZE = {0xFFA87A2C, 0xFF7A5618};
+    private static final int[] KPI_GREEN = {0xFF2E8B57, 0xFF1D6B41};
+    private static final int[] KPI_RED = {0xFFC0564F, 0xFF8E3A34};
+    private static final int[] KPI_RED2 = {0xFFC0564F, 0xFF7E322C};
+    private static final int[] KPI_GOLD = {0xFF8E6A1F, 0xFF5C4312};
 
     /** Phase-7A: brand-tinted soft shadows instead of the default grey (API 28+, graceful below). */
     private void coloredShadow(View v, int color, float elevDp) {
@@ -4708,6 +4716,7 @@ public class MainActivity extends Activity {
     }
 
     private void showPageError(String title, Exception error, Runnable retry) {
+        MeelanoLog.err("page:" + title, error);
         content.removeAllViews();
         addHero(title, "ارتباط امن با داده‌ها برقرار نشد");
         LinearLayout c = card();
@@ -4751,6 +4760,7 @@ public class MainActivity extends Activity {
         final Handler h = new Handler(Looper.getMainLooper());
         final Runnable watchdog = () -> {
             if (!settled.compareAndSet(false, true)) return;
+            MeelanoLog.warn("db-watchdog", "timeout after " + DB_WATCHDOG_MS + "ms");
             setConnectionStatus("offline");
             deliverToRequestPage(requestPage, () -> callback.fail(
                     new DbException("پاسخ سرور بیش از حد طول کشید و صفحه از حالت بارگذاری خارج شد. دوباره تلاش کنید.")));
@@ -4768,6 +4778,7 @@ public class MainActivity extends Activity {
                     deliverToRequestPage(requestPage, () -> callback.ok(body));
                 });
             } catch (Exception e) {
+                MeelanoLog.err("db", e);
                 if (prefs != null) prefs.edit().putString(KEY_LAST_CONNECTION_ERROR, nowText() + " • " + shortError(e)).apply();
                 runOnUiThread(() -> {
                     h.removeCallbacks(watchdog);
@@ -12065,6 +12076,11 @@ public class MainActivity extends Activity {
         LinearLayout card = card();
         LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(-1, -2); clp.setMargins(0, 0, 0, dp(12));
         content.addView(card, clp);
+        java.util.List<String> recentLogs = MeelanoLog.snapshot();
+        if (!recentLogs.isEmpty()) {
+            LinearLayout lc = addReportCard("رویدادنگار خطاهای اخیر", "!", WARNING);
+            for (String ln : recentLogs) addReportLine(lc, "•", ln, MUTED);
+        }
         TextView ver = text("\u0646\u0633\u062e\u0647 \u0646\u0635\u0628\u200c\u0634\u062f\u0647: " + BuildConfigSafe.versionName(this) + "  \u2022  \u0633\u0631\u0648\u0631: " + hidden(S_HOST) + ":" + SQL_PORT + "  \u2022  \u062f\u06cc\u062a\u0627\u0628\u06cc\u0633: " + hidden(S_DB), 10.4f, MUTED, Typeface.BOLD);
         card.addView(ver, new LinearLayout.LayoutParams(-1, -2));
         final String host = hidden(S_HOST);
@@ -12240,10 +12256,10 @@ public class MainActivity extends Activity {
             spark = new double[trend.length()];
             for (int i = 0; i < trend.length(); i++) spark[trend.length() - 1 - i] = trend.optJSONObject(i) == null ? 0 : trend.optJSONObject(i).optDouble("value", 0);
         }
-        addKpiTile(row, "\u0641\u0631\u0648\u0634 \u0628\u0627\u0632\u0647", money(Math.round(sold)), "\u2197", new int[]{0xFF3060B0, 0xFF1F3A68}, sold, 1, spark);
-        addKpiTile(row, "\u0627\u0633\u0646\u0627\u062f \u062b\u0628\u062a\u200c\u0634\u062f\u0647", faDigits(formatNumber(docs)), "\u2261", new int[]{0xFFA87A2C, 0xFF7A5618}, docs, 2, null);
-        addKpiTile(row, "\u0648\u0635\u0648\u0644 \u0628\u0627\u0632\u0647", money(Math.round(paid)), sold > 0 ? faDigits(String.format(java.util.Locale.US, "%.0f", paid / sold * 100)) + "\u066a" : "\u2014", new int[]{0xFF2E8B57, 0xFF1D6B41}, sold > 0 ? paid / sold * 100 : 0, 3, null);
-        addKpiTile(row, "\u0628\u062f\u0647\u06cc \u0645\u0634\u062a\u0631\u06cc\u0627\u0646", money(Math.round(owed)), "\u26a0", new int[]{0xFFC0564F, 0xFF8E3A34}, owed, 1, null);
+        addKpiTile(row, "\u0641\u0631\u0648\u0634 \u0628\u0627\u0632\u0647", money(Math.round(sold)), "\u2197", KPI_SALES, sold, 1, spark);
+        addKpiTile(row, "\u0627\u0633\u0646\u0627\u062f \u062b\u0628\u062a\u200c\u0634\u062f\u0647", faDigits(formatNumber(docs)), "\u2261", KPI_BRONZE, docs, 2, null);
+        addKpiTile(row, "\u0648\u0635\u0648\u0644 \u0628\u0627\u0632\u0647", money(Math.round(paid)), sold > 0 ? faDigits(String.format(java.util.Locale.US, "%.0f", paid / sold * 100)) + "\u066a" : "\u2014", KPI_GREEN, sold > 0 ? paid / sold * 100 : 0, 3, null);
+        addKpiTile(row, "\u0628\u062f\u0647\u06cc \u0645\u0634\u062a\u0631\u06cc\u0627\u0646", money(Math.round(owed)), "\u26a0", KPI_RED, owed, 1, null);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2); lp.setMargins(0, 0, 0, dp(14));
         content.addView(row, lp);
     }
@@ -12270,7 +12286,7 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams vp = new LinearLayout.LayoutParams(-1, -2); vp.setMargins(0, dp(4), 0, 0);
         t.addView(v, vp);
         if (spark != null && spark.length > 1) {
-            View sp = new SparkLine(this, spark, alpha(Color.WHITE, 150));
+            View sp = new MeelanoDesignKit.SparkLine(this, spark, alpha(Color.WHITE, 150));
             LinearLayout.LayoutParams spp = new LinearLayout.LayoutParams(-1, dp(14)); spp.setMargins(0, dp(5), 0, 0);
             t.addView(sp, spp);
         }
@@ -12293,70 +12309,6 @@ public class MainActivity extends Activity {
         if (fmt == 2) return faDigits(formatNumber(Math.round(x)));
         if (fmt == 3) return faDigits(String.format(java.util.Locale.US, "%.0f", x)) + "٪";
         return String.valueOf(Math.round(x));
-    }
-
-    /** Phase-7E: material shimmer sweep for skeleton bars while data loads. */
-    private static class ShimmerBar extends View {
-        private final Paint base = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final Paint glow = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private float t = 0f;
-        private final int glowColor;
-        ShimmerBar(android.content.Context ctx, int baseColor, int glowColor) {
-            super(ctx);
-            base.setColor(baseColor);
-            this.glowColor = glowColor;
-            android.animation.ValueAnimator va = android.animation.ValueAnimator.ofFloat(0f, 1f);
-            va.setDuration(1100);
-            va.setRepeatCount(android.animation.ValueAnimator.INFINITE);
-            va.addUpdateListener(a -> { t = (Float) a.getAnimatedValue(); postInvalidateOnAnimation(); });
-            va.start();
-        }
-        @Override protected void onDraw(android.graphics.Canvas c) {
-            try {
-                float w = getWidth(), h = getHeight();
-                if (w == 0 || h == 0) return;
-                float r = 12 * getResources().getDisplayMetrics().density;
-                c.drawRoundRect(0, 0, w, h, r, r, base);
-                float band = w * 0.4f;
-                float x = -band + (w + band * 2) * t;
-                glow.setShader(new android.graphics.LinearGradient(x - band / 2, 0, x + band / 2, 0,
-                        new int[]{glowColor & 0x00FFFFFF, glowColor, glowColor & 0x00FFFFFF}, null, android.graphics.Shader.TileMode.CLAMP));
-                c.drawRoundRect(0, 0, w, h, r, r, glow);
-                glow.setShader(null);
-            } catch (Exception ignored) { }
-        }
-    }
-
-    /** Phase-7B: micro sparkline for KPI tiles — a rounded polyline of the 7-day sales trend. */
-    private static class SparkLine extends View {
-        private final double[] vals;
-        private final android.graphics.Paint p = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
-        SparkLine(android.content.Context ctx, double[] vals, int color) {
-            super(ctx);
-            this.vals = vals;
-            p.setStyle(android.graphics.Paint.Style.STROKE);
-            p.setStrokeWidth(ctx.getResources().getDisplayMetrics().density * 2f);
-            p.setStrokeCap(android.graphics.Paint.Cap.ROUND);
-            p.setColor(color);
-        }
-        @Override protected void onDraw(android.graphics.Canvas c) {
-            try {
-                if (vals == null || vals.length < 2) return;
-                double mn = vals[0], mx = vals[0];
-                for (double x : vals) { mn = Math.min(mn, x); mx = Math.max(mx, x); }
-                float pad = p.getStrokeWidth();
-                float w = getWidth() - pad * 2, h = getHeight() - pad * 2;
-                if (w <= 0 || h <= 0) return;
-                android.graphics.Path path = new android.graphics.Path();
-                for (int i = 0; i < vals.length; i++) {
-                    float x = pad + w * i / (vals.length - 1);
-                    double n = mx > mn ? (vals[i] - mn) / (mx - mn) : 0.5;
-                    float y = pad + h * (1f - (float) n);
-                    if (i == 0) path.moveTo(x, y); else path.lineTo(x, y);
-                }
-                c.drawPath(path, p);
-            } catch (Exception ignored) { }
-        }
     }
 
     private void addTodayYesterdayCard(JSONArray daily) {
@@ -12646,9 +12598,9 @@ public class MainActivity extends Activity {
         View dot = new View(this); dot.setBackgroundColor(valueColor);
         LinearLayout.LayoutParams ddp = new LinearLayout.LayoutParams(dp(6), dp(6)); ddp.setMargins(0, 0, dp(7), 0);
         row.addView(dot, ddp);
-        TextView l = text(label, 10.8f, MUTED, Typeface.NORMAL);
+        TextView l = text(label, T_CAPTION, MUTED, Typeface.NORMAL);
         l.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
-        TextView v = text(value, 11.4f, valueColor, Typeface.BOLD);
+        TextView v = text(value, T_LINE, valueColor, Typeface.BOLD);
         boolean wrap = value != null && value.length() > 48; // long error notes stay readable, not head-truncated
         if (wrap) {
             l.setLayoutParams(new LinearLayout.LayoutParams(-2, -2));
@@ -13182,9 +13134,9 @@ public class MainActivity extends Activity {
         double inTotal = in[0] + in[1] + in[2] + in[3], outTotal = out[0] + out[1] + out[2] + out[3];
         double net30 = (in[1] + in[2]) - (out[1] + out[2]);
         LinearLayout band = new LinearLayout(this); band.setOrientation(LinearLayout.HORIZONTAL);
-        addKpiTile(band, "ورودی چک‌ها", inTotal > 0 ? MeelanoCharts.compact(inTotal) : "—", "▼", new int[]{0xFF2E8B57, 0xFF1D6B41});
-        addKpiTile(band, "خروجی چک‌ها", outTotal > 0 ? MeelanoCharts.compact(outTotal) : "—", "▲", new int[]{0xFFC0564F, 0xFF7E322C});
-        addKpiTile(band, "خالص ۳۰ روز", MeelanoCharts.compact(net30), "◆", net30 >= 0 ? new int[]{0xFF2E8B57, 0xFF1D6B41} : new int[]{0xFFC0564F, 0xFF7E322C});
+        addKpiTile(band, "ورودی چک‌ها", inTotal > 0 ? MeelanoCharts.compact(inTotal) : "—", "▼", KPI_GREEN);
+        addKpiTile(band, "خروجی چک‌ها", outTotal > 0 ? MeelanoCharts.compact(outTotal) : "—", "▲", KPI_RED2);
+        addKpiTile(band, "خالص ۳۰ روز", MeelanoCharts.compact(net30), "◆", net30 >= 0 ? KPI_GREEN : KPI_RED2);
         LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(-1, -2); blp.setMargins(0, 0, 0, dp(14));
         content.addView(band, blp);
 
@@ -13609,9 +13561,9 @@ public class MainActivity extends Activity {
 
         // KPI band with brushed-metal gradient tiles
         LinearLayout band = new LinearLayout(this); band.setOrientation(LinearLayout.HORIZONTAL);
-        addKpiTile(band, "کل مطالبات باز", total > 0 ? MeelanoCharts.compact(total) : "—", "☷", new int[]{0xFF8E6A1F, 0xFF5C4312});
-        addKpiTile(band, "معوق", overdue > 0 ? MeelanoCharts.compact(overdue) : "بدون معوقی", "⚠", new int[]{0xFFC0564F, 0xFF7E322C});
-        addKpiTile(band, "فاکتور باز", formatNumber(docs), "♙", new int[]{0xFF3060B0, 0xFF1F3A68});
+        addKpiTile(band, "کل مطالبات باز", total > 0 ? MeelanoCharts.compact(total) : "—", "☷", KPI_GOLD);
+        addKpiTile(band, "معوق", overdue > 0 ? MeelanoCharts.compact(overdue) : "بدون معوقی", "⚠", KPI_RED2);
+        addKpiTile(band, "فاکتور باز", formatNumber(docs), "♙", KPI_SALES);
         LinearLayout.LayoutParams bandLp = new LinearLayout.LayoutParams(-1, -2); bandLp.setMargins(0, 0, 0, dp(14));
         content.addView(band, bandLp);
 
@@ -14222,9 +14174,9 @@ public class MainActivity extends Activity {
 
         LinearLayout band = new LinearLayout(this);
         band.setOrientation(LinearLayout.HORIZONTAL);
-        addKpiTile(band, "ویزیتورهای فعال", ranked.size() > 0 ? faDigits(String.valueOf(ranked.size())) : "—", "♜", new int[]{0xFF3060B0, 0xFF1F3A68});
-        addKpiTile(band, "میانگین بازده", effN > 0 ? faDigits(String.format(java.util.Locale.US, "%.0f", sumEff / effN)) + "٪" : "—", "↗", new int[]{0xFFA87A2C, 0xFF7A5618});
-        addKpiTile(band, "جمع فروش تحقق‌یافته", sumDone > 0 ? MeelanoCharts.compact(sumDone) : "—", "★", new int[]{0xFF2E8B57, 0xFF1D6B41});
+        addKpiTile(band, "ویزیتورهای فعال", ranked.size() > 0 ? faDigits(String.valueOf(ranked.size())) : "—", "♜", KPI_SALES);
+        addKpiTile(band, "میانگین بازده", effN > 0 ? faDigits(String.format(java.util.Locale.US, "%.0f", sumEff / effN)) + "٪" : "—", "↗", KPI_BRONZE);
+        addKpiTile(band, "جمع فروش تحقق‌یافته", sumDone > 0 ? MeelanoCharts.compact(sumDone) : "—", "★", KPI_GREEN);
         LinearLayout.LayoutParams bandLp = new LinearLayout.LayoutParams(-1, -2); bandLp.setMargins(0, 0, 0, dp(14));
         content.addView(band, bandLp);
 
@@ -14344,8 +14296,8 @@ public class MainActivity extends Activity {
 
         LinearLayout band = new LinearLayout(this);
         band.setOrientation(LinearLayout.HORIZONTAL);
-        addKpiTile(band, "سود ۱۰ مشتری برتر", total > 0 ? MeelanoCharts.compact(total) : "—", "◆", new int[]{0xFFA87A2C, 0xFF7A5618});
-        addKpiTile(band, "مشتریان سودده", cp == null ? "—" : faDigits(String.valueOf(cp.length())), "♙", new int[]{0xFF3060B0, 0xFF1F3A68});
+        addKpiTile(band, "سود ۱۰ مشتری برتر", total > 0 ? MeelanoCharts.compact(total) : "—", "◆", KPI_BRONZE);
+        addKpiTile(band, "مشتریان سودده", cp == null ? "—" : faDigits(String.valueOf(cp.length())), "♙", KPI_SALES);
         LinearLayout.LayoutParams bandLp = new LinearLayout.LayoutParams(-1, -2); bandLp.setMargins(0, 0, 0, dp(14));
         content.addView(band, bandLp);
 
@@ -14447,9 +14399,9 @@ public class MainActivity extends Activity {
 
         LinearLayout band = new LinearLayout(this);
         band.setOrientation(LinearLayout.HORIZONTAL);
-        addKpiTile(band, "مطالبات باز", total > 0 ? MeelanoCharts.compact(total) : "—", "☷", new int[]{0xFF2E8B57, 0xFF1D6B41});
-        addKpiTile(band, "مشتریان بدهکار", count > 0 ? faDigits(String.valueOf(count)) : "—", "♙", new int[]{0xFF3060B0, 0xFF1F3A68});
-        addKpiTile(band, "چک سررسیدگذشته", vover > 0 ? MeelanoCharts.compact(vover) : "—", "⚠", new int[]{0xFFC0564F, 0xFF8E3A34});
+        addKpiTile(band, "مطالبات باز", total > 0 ? MeelanoCharts.compact(total) : "—", "☷", KPI_GREEN);
+        addKpiTile(band, "مشتریان بدهکار", count > 0 ? faDigits(String.valueOf(count)) : "—", "♙", KPI_SALES);
+        addKpiTile(band, "چک سررسیدگذشته", vover > 0 ? MeelanoCharts.compact(vover) : "—", "⚠", KPI_RED);
         LinearLayout.LayoutParams bandLp = new LinearLayout.LayoutParams(-1, -2); bandLp.setMargins(0, 0, 0, dp(14));
         content.addView(band, bandLp);
 
@@ -14559,9 +14511,9 @@ public class MainActivity extends Activity {
         if (profit != null) for (int i = 0; i < profit.length(); i++) { JSONObject o = profit.optJSONObject(i); if (o != null) totalProfit += o.optDouble("profit", 0); }
         LinearLayout band = new LinearLayout(this);
         band.setOrientation(LinearLayout.HORIZONTAL);
-        addKpiTile(band, "سود ناخالص ۱۰ کالای برتر", totalProfit > 0 ? MeelanoCharts.compact(totalProfit) : "—", "◆", new int[]{0xFFA87A2C, 0xFF7A5618});
-        addKpiTile(band, "اقلام سودده", profit == null ? "—" : faDigits(String.valueOf(profit.length())), "≡", new int[]{0xFF3060B0, 0xFF1F3A68});
-        addKpiTile(band, "انبارهای فعال", warehouses == null ? "—" : faDigits(String.valueOf(warehouses.length())), "▤", new int[]{0xFF2E8B57, 0xFF1D6B41});
+        addKpiTile(band, "سود ناخالص ۱۰ کالای برتر", totalProfit > 0 ? MeelanoCharts.compact(totalProfit) : "—", "◆", KPI_BRONZE);
+        addKpiTile(band, "اقلام سودده", profit == null ? "—" : faDigits(String.valueOf(profit.length())), "≡", KPI_SALES);
+        addKpiTile(band, "انبارهای فعال", warehouses == null ? "—" : faDigits(String.valueOf(warehouses.length())), "▤", KPI_GREEN);
         LinearLayout.LayoutParams bandLp = new LinearLayout.LayoutParams(-1, -2); bandLp.setMargins(0, 0, 0, dp(14));
         content.addView(band, bandLp);
 
@@ -22368,73 +22320,11 @@ public class MainActivity extends Activity {
         content.addView(c, lp);
     }
 
-    /** Phase-7A unified icon system: every text/emoji glyph used anywhere in the UI is mapped to a
-        monochrome brand vector so icons render identically on all devices and always carry the
-        theme tint. Unmapped glyphs (initials, «CEO», …) fall back to text. */
-    private int iconResForGlyph(String g) {
-        if (g == null) return 0;
-        switch (g) {
-            case "↗": return R.drawable.lux_trending_up;
-            case "↘": case "⇩": return R.drawable.mi_trending_down;
-            case "▲": return R.drawable.mi_trending_up;
-            case "▼": return R.drawable.mi_trending_down;
-            case "⚠": case "⚠️": return R.drawable.lux_warning;
-            case "✓": return R.drawable.lux_check_circle;
-            case "★": return R.drawable.lux_star_fill;
-            case "✨": case "✦": return R.drawable.lux_star_shine;
-            case "\ud83c\udfc6": return R.drawable.mi_military_tech;
-            case "⌛": return R.drawable.mi_hourglass_top;
-            case "☀": return R.drawable.mi_light_mode;
-            case "☾": return R.drawable.mi_bedtime;
-            case "⛅": return R.drawable.mi_wb_twilight;
-            case "◉": case "◎": return R.drawable.mi_track_changes;
-            case "◷": return R.drawable.mi_schedule;
-            case "⏱": return R.drawable.mi_timer;
-            case "!": return R.drawable.lux_warning;
-            case "♜": return R.drawable.lux_group;
-            case "♟": return R.drawable.lux_person;
-            case "♙": return R.drawable.lux_account_balance_wallet;
-            case "◆": return R.drawable.lux_diamond;
-            case "◈": return R.drawable.mi_inventory_2;
-            case "≡": return R.drawable.mi_receipt_long;
-            case "↯": return R.drawable.mi_bolt;
-            case "⇅": return R.drawable.mi_compare_arrows;
-            case "⟳": return R.drawable.lux_refresh;
-            case "↩": return R.drawable.mi_assignment_return;
-            case "٪": return R.drawable.mi_percent;
-            case "\ud83d\udca1": return R.drawable.mi_lightbulb;
-            case "\ud83c\udff7": case "\ud83c\udff7\ufe0f": return R.drawable.mi_sell;
-            case "⌂": return R.drawable.mi_home;
-            case "☰": return R.drawable.mi_apps;
-            case "⚙": case "⚙️": return R.drawable.lux_admin_panel_settings;
-            case "⌕": return R.drawable.lux_search;
-            case "✺": return R.drawable.mi_palette;
-            case "♛": return R.drawable.mi_verified_user;
-            case "⎋": return R.drawable.mi_logout;
-            case "⊕": return R.drawable.mi_add_shopping_cart;
-            case "●": return R.drawable.mi_fiber_manual_record_fill;
-            case "›": return R.drawable.mi_chevron_left;
-            case "‹": return R.drawable.mi_arrow_forward;
-            case "☝": return R.drawable.mi_fingerprint;
-            case "\ud83d\ude9a": return R.drawable.lux_local_shipping;
-            case "\ud83d\udcb5": return R.drawable.lux_payments;
-            case "\ud83d\udd10": return R.drawable.mi_lock;
-            case "⌖": return R.drawable.mi_pin_drop;
-            case "\ud83d\uddbc": case "\ud83d\uddbc\ufe0f": return R.drawable.mi_image;
-            case "\ud83d\udcc4": return R.drawable.mi_description;
-            default: return 0;
-        }
-    }
+    /** Phase-7H: the glyph→vector mapping lives in MeelanoDesignKit (unit-tested there). */
+    private int iconResForGlyph(String g) { return MeelanoDesignKit.iconRes(g); }
 
     private android.graphics.drawable.Drawable tintedGlyph(String glyph, int tint, int sizeDp) {
-        int res = iconResForGlyph(glyph);
-        if (res == 0) return null;
-        android.graphics.drawable.Drawable d = getDrawable(res);
-        if (d == null) return null;
-        d = d.mutate();
-        d.setTint(tint);
-        d.setBounds(0, 0, dp(sizeDp), dp(sizeDp));
-        return d;
+        return MeelanoDesignKit.tinted(this, glyph, tint, dp(sizeDp));
     }
 
     private TextView report3dIcon(String glyph, int accent) {

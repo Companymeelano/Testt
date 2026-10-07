@@ -914,6 +914,7 @@ final class ManagerAnalytics {
         try {
             out.put(key, body.run(c, range));
         } catch (Exception e) {
+            MeelanoLog.err("section:" + key, e);
             String sql = LAST_SQL.get();
             String note = key + ": " + String.valueOf(e.getMessage());
             if (sql != null && !sql.isEmpty()) note += " | SQL: " + (sql.length() > 380 ? sql.substring(0, 380) + "…" : sql);

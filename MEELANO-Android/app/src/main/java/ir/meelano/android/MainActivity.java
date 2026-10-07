@@ -4091,6 +4091,7 @@ public class MainActivity extends Activity {
             case "mgr_cash": loadManagerCash(); break;
             case "mgr_perf": loadManagerPerf(); break;
             case "mgr_custp": loadManagerCustProfit(); break;
+            case "mgr_tables": loadAllTablesPage(); break;
             default: loadDashboard(); break;
         }
     }
@@ -7135,6 +7136,7 @@ public class MainActivity extends Activity {
         if ("manager_more".equals(page)) return "settings";
         if ("manager_approvals".equals(page)) return "management_access";
         if ("mgr_profit".equals(page) || "mgr_cash".equals(page) || "mgr_perf".equals(page) || "mgr_custp".equals(page) || "mgr_cashflow".equals(page)) return "reports";
+        if ("mgr_tables".equals(page)) return "reports";
         if ("settings".equals(page)) return "settings";
         return page == null ? "" : page;
     }
@@ -12148,6 +12150,16 @@ public class MainActivity extends Activity {
         catch (Exception e) { MeelanoLog.err("health:" + name, e); return new String[]{"ERR", name + ": " + shortError(e)}; }
     }
 
+    /** Same probe, but the value the query returns is shown too — used where the count IS the answer. */
+    private String[] healthProbeInfo(String name, HealthFn fn) {
+        long t = System.currentTimeMillis();
+        try {
+            Object d = fn.f();
+            String extra = d == null ? "" : String.valueOf(d);
+            return new String[]{"OK", name + (extra.isEmpty() ? "" : " • " + extra) + " • " + (System.currentTimeMillis() - t) + "ms"};
+        } catch (Exception e) { MeelanoLog.err("health:" + name, e); return new String[]{"ERR", name + ": " + shortError(e)}; }
+    }
+
     /** Final build: one tap runs every manager section's real query against Atiran2 and lists the
         verdict per section, so "بدون کوچکترین خطا" is verifiable on the device itself. */
     private void addSectionHealthCard() {
@@ -12181,6 +12193,17 @@ public class MainActivity extends Activity {
                     rows.add(healthProbe("کالاهای پرفروش", () -> queryTopProducts(c2, 30)));
                     rows.add(healthProbe("سنین مطالبات", () -> queryAgingBuckets(c2)));
                     rows.add(healthProbe("جریان نقدینگی", () -> ManagerAnalytics.cashflow(c2)));
+                    rows.add(healthProbeInfo("کاتالوگ جداول", () -> {
+                        JSONArray cat = new JSONObject(queryDatabaseCatalog()).optJSONArray("objects");
+                        int t = 0;
+                        int v = 0;
+                        for (int i = 0; cat != null && i < cat.length(); i++) {
+                            JSONObject o = cat.optJSONObject(i);
+                            if (o != null && "V".equals(o.optString("t", ""))) v++; else t++;
+                        }
+                        return t + " جدول و " + v + " نما در Atiran2";
+                    }));
+                    rows.add(healthProbeInfo("خواندن تک‌تک جداول", this::sweepAllTables));
                 } catch (Exception e) {
                     MeelanoLog.err("health", e);
                     rows.add(new String[]{"ERR", "اتصال: " + shortError(e)});
@@ -12197,6 +12220,379 @@ public class MainActivity extends Activity {
         });
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2); lp.setMargins(0, 0, 0, dp(12));
         content.addView(c, lp);
+    }
+
+    // =================== فاز ۷‑م: اتصال کامل پایگاه‌داده — تک‌تک جدول‌های Atiran2 ===================
+
+    private String catalogQuery = "";
+    private JSONObject tableExplorerCache;
+    private String tableExplorerName = "";
+
+    /** Live catalogue of Atiran2: every user table and view with its column and row counts. */
+    private String queryDatabaseCatalog() throws Exception {
+        try (Connection c = openConnection()) {
+            JSONArray arr;
+            try {
+                arr = catalogRows(c, "SELECT o.name, o.type,"
+                        + " ISNULL((SELECT COUNT(*) FROM sys.columns sc WHERE sc.object_id = o.object_id), 0),"
+                        + " ISNULL((SELECT SUM(p.rows) FROM sys.partitions p WHERE p.object_id = o.object_id AND p.index_id IN (0,1)), -1)"
+                        + " FROM sys.objects o WHERE o.type IN ('U','V') AND o.is_ms_shipped = 0 ORDER BY o.name");
+            } catch (Exception first) {
+                MeelanoLog.warn("catalog", "sys.partitions unavailable: " + first.getMessage());
+                arr = catalogRows(c, "SELECT o.name, o.type,"
+                        + " ISNULL((SELECT COUNT(*) FROM sys.columns sc WHERE sc.object_id = o.object_id), 0), -1"
+                        + " FROM sys.objects o WHERE o.type IN ('U','V') AND o.is_ms_shipped = 0 ORDER BY o.name");
+            }
+            JSONObject out = new JSONObject();
+            out.put("objects", arr);
+            return out.toString();
+        }
+    }
+
+    private JSONArray catalogRows(Connection c, String sql) throws Exception {
+        JSONArray arr = new JSONArray();
+        try (Statement st = c.createStatement()) {
+            st.setQueryTimeout(45);
+            try (ResultSet r = st.executeQuery(sql)) {
+                while (r.next()) {
+                    JSONObject o = new JSONObject();
+                    o.put("n", r.getString(1));
+                    o.put("t", r.getString(2));
+                    o.put("c", r.getInt(3));
+                    o.put("r", r.getLong(4));
+                    arr.put(o);
+                }
+            }
+        }
+        return arr;
+    }
+
+    /** Reads any table or view of Atiran2. The name is checked against the live catalogue first,
+        so only an object that really exists in sys.objects can ever reach the statement. */
+    private String queryAnyTable(String table) throws Exception {
+        if (!MeelanoSqlNames.isSafeIdentifier(table)) throw new DbException("نام جدول معتبر نیست.");
+        try (Connection c = openConnection()) {
+            try (PreparedStatement chk = c.prepareStatement(
+                    "SELECT COUNT(*) FROM sys.objects WHERE name = ? AND type IN ('U','V') AND is_ms_shipped = 0")) {
+                chk.setString(1, table);
+                try (ResultSet r = chk.executeQuery()) {
+                    if (!r.next() || r.getInt(1) == 0) throw new DbException("جدول «" + table + "» در Atiran2 وجود ندارد.");
+                }
+            }
+            List<String> cols = new ArrayList<>();
+            try (PreparedStatement ps = c.prepareStatement(
+                    "SELECT name FROM sys.columns WHERE object_id = OBJECT_ID(?) ORDER BY column_id")) {
+                ps.setString(1, table);
+                try (ResultSet r = ps.executeQuery()) {
+                    while (r.next()) {
+                        String n = r.getString(1);
+                        if (n != null && !isSensitiveColumn(n)) cols.add(n);
+                    }
+                }
+            }
+            if (cols.isEmpty()) throw new DbException("ستون قابل نمایشی در این جدول نیست.");
+            StringBuilder sel = new StringBuilder();
+            for (int i = 0; i < cols.size(); i++) {
+                if (i > 0) sel.append(',');
+                sel.append('[').append(cols.get(i)).append(']');
+            }
+            long total = -1;
+            try (Statement st = c.createStatement()) {
+                st.setQueryTimeout(25);
+                try (ResultSet r = st.executeQuery("SELECT COUNT_BIG(1) FROM dbo.[" + table + "]")) {
+                    if (r.next()) total = r.getLong(1);
+                }
+            } catch (Exception e) { MeelanoLog.warn("count:" + table, shortError(e)); }
+            try (Statement st = c.createStatement()) {
+                st.setQueryTimeout(45);
+                try (ResultSet r = st.executeQuery("SELECT TOP (150) " + sel + " FROM dbo.[" + table + "]")) {
+                    JSONObject out = new JSONObject();
+                    JSONArray cj = new JSONArray();
+                    for (String s : cols) cj.put(s);
+                    out.put("columns", cj);
+                    out.put("total", total);
+                    out.put("rows", rowsToJson(r));
+                    return out.toString();
+                }
+            }
+        }
+    }
+
+    /** The literal proof of «تمامی جداول متصل»: touches every table and view of Atiran2. */
+    private String sweepAllTables() throws Exception {
+        JSONArray cat = new JSONObject(queryDatabaseCatalog()).optJSONArray("objects");
+        int total = 0;
+        int ok = 0;
+        List<String> failed = new ArrayList<>();
+        try (Connection c = openConnection()) {
+            for (int i = 0; cat != null && i < cat.length() && i < 500; i++) {
+                JSONObject o = cat.optJSONObject(i);
+                if (o == null) continue;
+                String n = o.optString("n", "");
+                if (!MeelanoSqlNames.isSafeIdentifier(n)) continue;
+                total++;
+                try (Statement st = c.createStatement()) {
+                    st.setQueryTimeout(8);
+                    try (ResultSet r = st.executeQuery("SELECT TOP (1) 1 FROM dbo.[" + n + "]")) { r.next(); ok++; }
+                } catch (Exception e) {
+                    failed.add(n);
+                    MeelanoLog.err("table:" + n, e);
+                }
+            }
+        }
+        StringBuilder sb = new StringBuilder(ok + " از " + total + " جدول/نما بدون خطا خوانده شد");
+        if (!failed.isEmpty()) {
+            sb.append(" • خطا: ").append(join(failed.subList(0, Math.min(6, failed.size())), "، "));
+        }
+        return sb.toString();
+    }
+
+    private void loadAllTablesPage() {
+        content.removeAllViews();
+        addHero("همهٔ جداول آتیران", "کاتالوگ زندهٔ Atiran2 — تک‌تک جدول‌ها و نماها با تعداد رکورد و ستون، به‌همراه نمای رکوردها و خروجی PDF و CSV.");
+        addSearchBox("جستجوی نام جدول…", catalogQuery, q -> { catalogQuery = q == null ? "" : q.trim(); loadAllTablesPage(); });
+        final LinearLayout list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        content.addView(list, new LinearLayout.LayoutParams(-1, -2));
+        addLoading(list, "در حال خواندن کاتالوگ Atiran2…");
+        runDb(this::queryDatabaseCatalog, new DbCallback() {
+            @Override public void ok(String body) {
+                try { renderCatalog(list, new JSONObject(body)); }
+                catch (Exception e) { showPageError("کاتالوگ جداول", e, () -> loadAllTablesPage()); }
+            }
+            @Override public void fail(Exception e) { showPageError("کاتالوگ جداول", e, () -> loadAllTablesPage()); }
+        });
+    }
+
+    private void renderCatalog(LinearLayout list, JSONObject j) {
+        JSONArray arr = j.optJSONArray("objects");
+        list.removeAllViews();
+        java.util.List<JSONObject> shown = new ArrayList<>();
+        int tables = 0;
+        int views = 0;
+        long rowSum = 0;
+        String needle = catalogQuery == null ? "" : catalogQuery.toLowerCase(Locale.US);
+        for (int i = 0; arr != null && i < arr.length(); i++) {
+            JSONObject o = arr.optJSONObject(i);
+            if (o == null) continue;
+            boolean isView = "V".equals(o.optString("t", ""));
+            if (isView) views++;
+            else {
+                tables++;
+                if (o.optLong("r", -1) > 0) rowSum += o.optLong("r", 0);
+            }
+            String n = o.optString("n", "");
+            if (needle.isEmpty() || n.toLowerCase(Locale.US).contains(needle)) shown.add(o);
+        }
+        LinearLayout head = card();
+        head.setBackground(themedSectionBg("reports", 26));
+        head.addView(visitorSectionTitle("کاتالوگ Atiran2", "☰", SUCCESS), new LinearLayout.LayoutParams(-1, -2));
+        addReportLine(head, "جدول‌ها", formatNumber(tables), SUCCESS);
+        addReportLine(head, "نماها", formatNumber(views), INFO);
+        addReportLine(head, "مجموع رکوردها", formatNumber(rowSum), MUTED);
+        addReportLine(head, "در این نما", formatNumber(shown.size()) + " مورد", MUTED);
+        LinearLayout.LayoutParams hlp = new LinearLayout.LayoutParams(-1, -2);
+        hlp.setMargins(0, 0, 0, dp(12));
+        list.addView(head, hlp);
+        if (shown.isEmpty()) { addEmptyTo(list, "جدولی با این نام در Atiran2 نیست."); return; }
+        int rendered = 0;
+        for (JSONObject o : shown) {
+            if (rendered >= 300) {
+                list.addView(text("برای دیدن بقیه، نام جدول را جستجو کنید.", T_CAPTION, MUTED, Typeface.NORMAL),
+                        new LinearLayout.LayoutParams(-1, -2));
+                break;
+            }
+            rendered++;
+            final String nm = o.optString("n", "");
+            boolean isView = "V".equals(o.optString("t", ""));
+            LinearLayout row = card();
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            LinearLayout col = new LinearLayout(this);
+            col.setOrientation(LinearLayout.VERTICAL);
+            col.addView(text((isView ? "▣ " : "▤ ") + nm, 12.4f, TEXT, Typeface.BOLD), new LinearLayout.LayoutParams(-1, -2));
+            long rows = o.optLong("r", -1);
+            col.addView(text((isView ? "نما" : "جدول") + "  •  " + o.optInt("c", 0) + " ستون  •  "
+                    + (rows < 0 ? "—" : formatNumber(rows)) + " رکورد", 10.2f, MUTED, Typeface.NORMAL),
+                    new LinearLayout.LayoutParams(-1, -2));
+            row.addView(col, new LinearLayout.LayoutParams(0, -2, 1f));
+            row.addView(text("◀", 12f, MUTED, Typeface.BOLD), new LinearLayout.LayoutParams(-2, -2));
+            row.setOnClickListener(v -> loadTableExplorer(nm));
+            row.setClickable(true);
+            row.setFocusable(true);
+            LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(-1, -2);
+            rlp.setMargins(0, 0, 0, dp(8));
+            list.addView(row, rlp);
+        }
+    }
+
+    private void loadTableExplorer(String table) {
+        tableExplorerName = table;
+        tableExplorerCache = null;
+        content.removeAllViews();
+        addHero(table, "نمای مستقیم از Atiran2 — ساختار، رکوردها و خروجی PDF و CSV.");
+        LinearLayout bar = new LinearLayout(this);
+        bar.setOrientation(LinearLayout.HORIZONTAL);
+        Button back = secondaryButton(withIcon("↩", "کاتالوگ"));
+        Button pdf = secondaryButton(withIcon("⎙", "PDF"));
+        Button csv = primaryButton(withIcon("▤", "CSV"));
+        back.setTextSize(fs(9.8f)); pdf.setTextSize(fs(9.8f)); csv.setTextSize(fs(9.8f));
+        back.setOnClickListener(v -> loadAllTablesPage());
+        pdf.setOnClickListener(v -> {
+            if (tableExplorerCache != null) exportTablePdf(tableExplorerName, tableExplorerCache);
+            else showNotice("ابتدا صبر کنید تا داده‌های جدول بارگذاری شود.", false);
+        });
+        csv.setOnClickListener(v -> {
+            if (tableExplorerCache != null) exportTableCsv(tableExplorerName, tableExplorerCache);
+            else showNotice("ابتدا صبر کنید تا داده‌های جدول بارگذاری شود.", false);
+        });
+        bar.addView(back, weightedButtonLp());
+        bar.addView(pdf, weightedButtonLp());
+        bar.addView(csv, weightedButtonLp());
+        LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(-1, -2);
+        blp.setMargins(0, 0, 0, dp(12));
+        content.addView(bar, blp);
+        final LinearLayout list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        content.addView(list, new LinearLayout.LayoutParams(-1, -2));
+        addLoading(list, "در حال خواندن «" + table + "»…");
+        runDb(() -> queryAnyTable(table), new DbCallback() {
+            @Override public void ok(String body) {
+                try {
+                    JSONObject j = new JSONObject(body);
+                    tableExplorerCache = j;
+                    JSONArray cols = j.optJSONArray("columns");
+                    JSONArray rows = j.optJSONArray("rows");
+                    list.removeAllViews();
+                    LinearLayout info = card();
+                    info.setBackground(themedSectionBg("reports", 26));
+                    info.addView(visitorSectionTitle("ساختار جدول", "≡", INFO), new LinearLayout.LayoutParams(-1, -2));
+                    addReportLine(info, "ستون‌ها", cols == null ? "0" : String.valueOf(cols.length()), INFO);
+                    addReportLine(info, "رکوردها", j.optLong("total", -1) < 0 ? "—" : formatNumber(j.optLong("total", 0)), SUCCESS);
+                    addReportLine(info, "نمایش", (rows == null ? 0 : rows.length()) + " ردیف نخست", MUTED);
+                    LinearLayout.LayoutParams ilp = new LinearLayout.LayoutParams(-1, -2);
+                    ilp.setMargins(0, 0, 0, dp(12));
+                    list.addView(info, ilp);
+                    if (rows == null || rows.length() == 0) { addEmptyTo(list, "این جدول رکوردی ندارد."); return; }
+                    for (int i = 0; i < rows.length(); i++) addGenericRow(list, cols, rows.optJSONObject(i));
+                } catch (Exception e) { showPageError(table, e, () -> loadTableExplorer(table)); }
+            }
+            @Override public void fail(Exception e) { showPageError(table, e, () -> loadTableExplorer(table)); }
+        });
+    }
+
+    private void exportTableCsv(String table, JSONObject j) {
+        try {
+            JSONArray cols = j.optJSONArray("columns");
+            JSONArray rows = j.optJSONArray("rows");
+            StringBuilder b = new StringBuilder();
+            for (int i = 0; cols != null && i < cols.length(); i++) {
+                if (i > 0) b.append(',');
+                b.append(csvSafe(cols.optString(i, "")));
+            }
+            b.append('\n');
+            for (int i = 0; rows != null && i < rows.length(); i++) {
+                JSONObject r = rows.optJSONObject(i);
+                if (r == null) continue;
+                for (int k = 0; cols != null && k < cols.length(); k++) {
+                    if (k > 0) b.append(',');
+                    Object v = r.opt(cols.optString(k, ""));
+                    b.append(csvSafe(v == null || v == JSONObject.NULL ? "" : String.valueOf(v)));
+                }
+                b.append('\n');
+            }
+            File dir = getExternalFilesDir(null);
+            if (dir == null) dir = getFilesDir();
+            File file = new File(dir, "MEELANO-" + table + "-v" + BuildConfigSafe.versionName(this) + ".csv");
+            FileOutputStream fos = new FileOutputStream(file);
+            fos.write(b.toString().getBytes(StandardCharsets.UTF_8));
+            fos.close();
+            showNotice("CSV ساخته شد: " + file.getAbsolutePath(), true);
+        } catch (Exception ex) { showNotice("ساخت CSV ممکن نشد: " + shortError(ex), false); }
+    }
+
+    private int drawTablePdfHeader(Canvas cv, Paint p, String table, int pageNo) {
+        p.setStyle(Paint.Style.FILL);
+        p.setColor(Color.rgb(248, 251, 255));
+        cv.drawRect(0, 0, 595, 842, p);
+        p.setColor(Color.rgb(22, 68, 123));
+        cv.drawRoundRect(new RectF(28, 22, 567, 94), 22, 22, p);
+        p.setColor(Color.rgb(243, 190, 97));
+        cv.drawCircle(540, 58, 20, p);
+        p.setColor(Color.rgb(22, 68, 123));
+        p.setTextAlign(Paint.Align.CENTER);
+        p.setTypeface(MEELANO_BOLD);
+        p.setTextSize(19);
+        cv.drawText("M", 540, 66, p);
+        p.setTextAlign(Paint.Align.RIGHT);
+        p.setColor(Color.WHITE);
+        p.setTextSize(17);
+        cv.drawText(table, 508, 52, p);
+        p.setTypeface(MEELANO_REGULAR);
+        p.setTextSize(9.6f);
+        cv.drawText("MEELANO  •  Atiran2  •  صفحه " + pageNo + "  •  " + nowText(), 508, 76, p);
+        return 126;
+    }
+
+    private void exportTablePdf(String table, JSONObject j) {
+        PdfDocument doc = null;
+        try {
+            JSONArray cols = j.optJSONArray("columns");
+            JSONArray rows = j.optJSONArray("rows");
+            doc = new PdfDocument();
+            int pageNo = 1;
+            PdfDocument.Page page = doc.startPage(new PdfDocument.PageInfo.Builder(595, 842, pageNo).create());
+            Canvas cv = page.getCanvas();
+            Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+            int y = drawTablePdfHeader(cv, p, table, pageNo);
+            for (int i = 0; rows != null && i < rows.length(); i++) {
+                JSONObject r = rows.optJSONObject(i);
+                if (r == null) continue;
+                java.util.List<String> lines = new ArrayList<>();
+                for (int k = 0; cols != null && k < cols.length(); k++) {
+                    String cn = cols.optString(k, "");
+                    Object v = r.opt(cn);
+                    lines.add(cn + ": " + (v == null || v == JSONObject.NULL ? "—" : String.valueOf(v)));
+                }
+                int need = 30 + lines.size() * 14;
+                if (y + need > 800) {
+                    doc.finishPage(page);
+                    pageNo++;
+                    page = doc.startPage(new PdfDocument.PageInfo.Builder(595, 842, pageNo).create());
+                    cv = page.getCanvas();
+                    y = drawTablePdfHeader(cv, p, table, pageNo);
+                }
+                p.setStyle(Paint.Style.FILL);
+                p.setColor(Color.WHITE);
+                cv.drawRoundRect(new RectF(30, y - 16, 565, y + need - 20), 14, 14, p);
+                p.setStyle(Paint.Style.STROKE);
+                p.setStrokeWidth(1.1f);
+                p.setColor(Color.argb(70, 168, 122, 44));
+                cv.drawRoundRect(new RectF(30, y - 16, 565, y + need - 20), 14, 14, p);
+                p.setStyle(Paint.Style.FILL);
+                p.setTextAlign(Paint.Align.RIGHT);
+                p.setTypeface(MEELANO_BOLD);
+                p.setTextSize(11.5f);
+                p.setColor(Color.rgb(22, 68, 123));
+                cv.drawText("ردیف " + (i + 1), 552, y + 2, p);
+                p.setTypeface(MEELANO_REGULAR);
+                p.setTextSize(9.6f);
+                p.setColor(Color.rgb(52, 70, 95));
+                int ly = y + 18;
+                for (String ln : lines) {
+                    for (String w : wrapPdfLine(ln, 74)) { cv.drawText(w, 552, ly, p); ly += 13; }
+                }
+                y += need;
+            }
+            doc.finishPage(page);
+            File dir = getExternalFilesDir(null);
+            if (dir == null) dir = getFilesDir();
+            File file = new File(dir, "MEELANO-" + table + "-v" + BuildConfigSafe.versionName(this) + ".pdf");
+            try (FileOutputStream fos = new FileOutputStream(file)) { doc.writeTo(fos); }
+            showNotice("PDF ساخته شد: " + file.getAbsolutePath(), true);
+        } catch (Exception ex) {
+            showNotice("ساخت PDF ممکن نشد: " + shortError(ex), false);
+        } finally { if (doc != null) doc.close(); }
     }
 
     private void loadManagerReports() {
@@ -14846,6 +15242,12 @@ public class MainActivity extends Activity {
                 new VisitorToolSpec("ارزیابی ویزیتور", "فروش در برابر هدف + بازده", "♜", 0xFF3060B0, () -> showApp("mgr_perf"), true),
                 new VisitorToolSpec("سود مشتریان", "رتبه‌بندی سود واقعی مشتری", "🏆", 0xFFA87A2C, () -> showApp("mgr_custp"), true),
                 new VisitorToolSpec("جریان نقدینگی", "پیش‌بینی ورود/خروج چک‌ها — فاز ۶", "◆", 0xFF2E8B57, () -> showApp("mgr_cashflow"), true)
+        });
+        addVisitorMoreGroup("پایگاه‌دادهٔ آتیران", "اتصال مستقیم به تک‌تک جدول‌ها و نماها", new VisitorToolSpec[]{
+                new VisitorToolSpec("همهٔ جداول", "کاتالوگ زنده + PDF و CSV هر جدول", "☰", navAccent("mgr_tables"), () -> showApp("mgr_tables"), canOpenPage("mgr_tables")),
+                new VisitorToolSpec("آزمون جامع اتصال", "کوئری واقعی هر بخش + هر جدول", "⚕", SUCCESS, () -> showApp("diagnostics"), canOpenPage("diagnostics")),
+                new VisitorToolSpec("جدول فروش", "نمای مستقیم sailfact", "↗", navAccent("reports"), () -> showApp("sales"), true),
+                new VisitorToolSpec("جدول چک‌ها", "نمای مستقیم getchk", "✓", navAccent("checks"), () -> showApp("checks"), true)
         });
         addDeveloperCredit(content);
     }

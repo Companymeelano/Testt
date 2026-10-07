@@ -12195,13 +12195,13 @@ public class MainActivity extends Activity {
                     rows.add(healthProbe("جریان نقدینگی", () -> ManagerAnalytics.cashflow(c2)));
                     rows.add(healthProbeInfo("کاتالوگ جداول", () -> {
                         JSONArray cat = new JSONObject(queryDatabaseCatalog()).optJSONArray("objects");
-                        int t = 0;
-                        int v = 0;
+                        int tbl = 0;
+                        int viw = 0;
                         for (int i = 0; cat != null && i < cat.length(); i++) {
                             JSONObject o = cat.optJSONObject(i);
-                            if (o != null && "V".equals(o.optString("t", ""))) v++; else t++;
+                            if (o != null && "V".equals(o.optString("t", ""))) viw++; else tbl++;
                         }
-                        return t + " جدول و " + v + " نما در Atiran2";
+                        return tbl + " جدول و " + viw + " نما در Atiran2";
                     }));
                     rows.add(healthProbeInfo("خواندن تک‌تک جداول", this::sweepAllTables));
                 } catch (Exception e) {

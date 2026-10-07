@@ -12081,6 +12081,7 @@ public class MainActivity extends Activity {
             LinearLayout lc = addReportCard("رویدادنگار خطاهای اخیر", "!", WARNING);
             for (String ln : recentLogs) addReportLine(lc, "•", ln, MUTED);
         }
+        addSectionHealthCard(); // final build: one-tap per-section proof against Atiran2
         TextView ver = text("\u0646\u0633\u062e\u0647 \u0646\u0635\u0628\u200c\u0634\u062f\u0647: " + BuildConfigSafe.versionName(this) + "  \u2022  \u0633\u0631\u0648\u0631: " + hidden(S_HOST) + ":" + SQL_PORT + "  \u2022  \u062f\u06cc\u062a\u0627\u0628\u06cc\u0633: " + hidden(S_DB), 10.4f, MUTED, Typeface.BOLD);
         card.addView(ver, new LinearLayout.LayoutParams(-1, -2));
         final String host = hidden(S_HOST);
@@ -12138,6 +12139,66 @@ public class MainActivity extends Activity {
     }
 
     // =============================== Phase 4+: smart categorized manager reports ===============================
+
+    private interface HealthFn { Object f() throws Exception; }
+
+    private String[] healthProbe(String name, HealthFn fn) {
+        long t = System.currentTimeMillis();
+        try { fn.f(); return new String[]{"OK", name + " • " + (System.currentTimeMillis() - t) + "ms"}; }
+        catch (Exception e) { MeelanoLog.err("health:" + name, e); return new String[]{"ERR", name + ": " + shortError(e)}; }
+    }
+
+    /** Final build: one tap runs every manager section's real query against Atiran2 and lists the
+        verdict per section, so "بدون کوچکترین خطا" is verifiable on the device itself. */
+    private void addSectionHealthCard() {
+        LinearLayout c = addReportCard("آزمون جامع بخش‌های مدیریت", "✓", SUCCESS);
+        c.addView(text("تک‌تک کوئری‌های بخش‌های مدیر روی Atiran2 اجرا و نتیجهٔ هر بخش همین‌جا فهرست می‌شود.", T_CAPTION, MUTED, Typeface.NORMAL), new LinearLayout.LayoutParams(-1, -2));
+        Button run = primaryButton("اجرای آزمون همهٔ بخش‌ها");
+        LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(-1, dp(46)); bp.setMargins(0, dp(8), 0, 0);
+        c.addView(run, bp);
+        LinearLayout results = new LinearLayout(this); results.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, -2); rp.setMargins(0, dp(8), 0, 0);
+        c.addView(results, rp);
+        run.setOnClickListener(v -> {
+            run.setEnabled(false);
+            results.removeAllViews();
+            addReportLine(results, "…", "در حال اجرای آزمون روی Atiran2", INFO);
+            new Thread(() -> {
+                java.util.List<String[]> rows = new java.util.ArrayList<>();
+                long t0 = System.currentTimeMillis();
+                try (Connection c2 = openConnection()) {
+                    rows.add(healthProbe("فروش بازه", () -> queryRangeBlock(c2, true, 30)));
+                    rows.add(healthProbe("خرید بازه", () -> queryRangeBlock(c2, false, 30)));
+                    rows.add(healthProbe("روند ۷ روز", () -> querySalesTrend(c2)));
+                    rows.add(healthProbe("سررسید چک‌ها", () -> queryCheckBuckets(c2)));
+                    rows.add(healthProbe("سهم ویزیتورها", () -> queryVisitorShare(c2, 30)));
+                    rows.add(healthProbe("بدهکاران برتر", () -> queryTopDebtors(c2)));
+                    rows.add(healthProbe("فاکتورهای معوق", () -> queryOverdueInvoices(c2)));
+                    rows.add(healthProbe("خلاصه پرسنل", () -> queryCollaborationBrief(c2)));
+                    rows.add(healthProbe("فروش روزانه", () -> queryDailySeries(c2)));
+                    rows.add(healthProbe("روند ۱۲ ماه", () -> queryMonthlySeries(c2)));
+                    rows.add(healthProbe("مشتریان برتر", () -> queryTopCustomers(c2, 30)));
+                    rows.add(healthProbe("کالاهای پرفروش", () -> queryTopProducts(c2, 30)));
+                    rows.add(healthProbe("سنین مطالبات", () -> queryAgingBuckets(c2)));
+                    rows.add(healthProbe("جریان نقدینگی", () -> ManagerAnalytics.cashflow(c2)));
+                } catch (Exception e) {
+                    MeelanoLog.err("health", e);
+                    rows.add(new String[]{"ERR", "اتصال: " + shortError(e)});
+                }
+                long ms = System.currentTimeMillis() - t0;
+                runOnUiThread(() -> {
+                    results.removeAllViews();
+                    int ok = 0;
+                    for (String[] r2 : rows) { if ("OK".equals(r2[0])) ok++; addReportLine(results, r2[0], r2[1], "OK".equals(r2[0]) ? SUCCESS : DANGER); }
+                    addReportLine(results, "نتیجه نهایی", ok + " از " + rows.size() + " بخش سالم • " + ms + "ms", ok == rows.size() ? SUCCESS : WARNING);
+                    run.setEnabled(true);
+                });
+            }).start();
+        });
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2); lp.setMargins(0, 0, 0, dp(12));
+        content.addView(c, lp);
+    }
+
     private void loadManagerReports() {
         content.removeAllViews();
         addHero("گزارش‌های مدیریت", "تحلیل دسته‌بندی‌شدهٔ فروش، خرید، چک‌ها، مشتریان و پرسنل — ارقام مستقیم از آتیران.");

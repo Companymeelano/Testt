@@ -34,8 +34,8 @@ android {
         applicationId 'ir.meelano.android'
         minSdk 24
         targetSdk 36
-        versionCode 108
-        versionName '6.0.1'
+        versionCode 109
+        versionName '6.1.0'
     }
 
     // The app is built entirely in code; the only layout is the home-screen widget.

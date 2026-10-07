@@ -2,7 +2,7 @@ plugins { id 'com.android.application' }
 
 android {
     namespace 'ir.meelano.manager'
-    compileSdk 34
+    compileSdk 35
 
     defaultConfig {
         applicationId 'ir.meelano.manager'

@@ -23,11 +23,9 @@ jobs:
 
       - name: Install Android platform + build-tools
         run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          ls "$ANDROID_HOME"
           SDKMAN="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           yes | "$SDKMAN" --licenses > /dev/null || true
-          "$SDKMAN" "platforms;android-34" "build-tools;35.0.0" "platform-tools"
+          "$SDKMAN" "platforms;android-34" "platforms;android-35" "build-tools;35.0.0" "platform-tools"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -36,7 +34,9 @@ jobs:
 
       - name: Build debug APK
         working-directory: manager
-        run: gradle :app:assembleDebug --stacktrace
+        run: |
+          set -o pipefail
+          gradle :app:assembleDebug --stacktrace 2>&1 | tee ../build-full.log | tail -40
 
       - name: Rename APK
         run: cp manager/app/build/outputs/apk/debug/app-debug.apk meelano-manager-v7-debug.apk
@@ -57,3 +57,13 @@ jobs:
             Debug build — installs directly on the phone.
             Needs a real Atiran SQL Server connection (set it in Settings).
           files: meelano-manager-v7-debug.apk
+
+      - name: Save error tail to branch (diagnostics, on failure)
+        if: failure()
+        run: |
+          tail -c 60000 build-full.log > build-error-tail.txt || echo "no log" > build-error-tail.txt
+          git config user.name "arena-ci"
+          git config user.email "arena-ci@local"
+          git add -f build-error-tail.txt
+          git commit -m "CI diagnostics (temporary, will be removed)" || true
+          git push origin HEAD:arena/ba83e93c-testt || true

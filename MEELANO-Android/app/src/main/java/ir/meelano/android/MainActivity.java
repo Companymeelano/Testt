@@ -252,6 +252,8 @@ public class MainActivity extends Activity {
     private LinearLayout managerApprovalsRow;
     private TextView managerAppTitle;
     private int managerReportRange = 2; // default 30 days — "today" often has no sales yet and looked like empty reports
+    /** Accounting desk time window; shared by sales, purchases and executive KPIs. */
+    private int accountingDeskDays = 30;
     private String managerExecCacheJson;
     private String managerDrillKind = "sales";
     private int managerReportListCap = 5;
@@ -12735,9 +12737,9 @@ public class MainActivity extends Activity {
         JSONArray cat = new JSONObject(queryDatabaseCatalog()).optJSONArray("objects");
         out.put("objects", cat == null ? new JSONArray() : cat);
         try (Connection c = openConnection()) {
-            try { out.put("sales", queryRangeBlock(c, true, 30)); }
+            try { out.put("sales", queryRangeBlock(c, true, accountingDeskDays)); }
             catch (Exception e) { errs.put("sales", shortError(e)); MeelanoLog.err("desk:sales", e); }
-            try { out.put("purchases", queryRangeBlock(c, false, 30)); }
+            try { out.put("purchases", queryRangeBlock(c, false, accountingDeskDays)); }
             catch (Exception e) { errs.put("purchases", shortError(e)); MeelanoLog.err("desk:purchases", e); }
             try { out.put("checks", queryCheckBuckets(c)); }
             catch (Exception e) { errs.put("checks", shortError(e)); MeelanoLog.err("desk:checks", e); }
@@ -12753,6 +12755,25 @@ public class MainActivity extends Activity {
     private void loadAccountingDesk() {
         content.removeAllViews();
         addHero("میز حسابداری آتیران", "چیدمان دفتر کل، معین، تفضیلی، چک و بانک، انبار، مشتری و پرسنل به سبک نرم‌افزار حسابداری.");
+        // یک فیلتر واحد برای تمام ارقام میز؛ مدیر با یک انتخاب، فروش و خرید را هم‌زمان عوض می‌کند.
+        LinearLayout range = new LinearLayout(this);
+        range.setOrientation(LinearLayout.HORIZONTAL);
+        range.setPadding(dp(3), dp(3), dp(3), dp(3));
+        range.setBackground(rounded(alpha(SURFACE, isLightTheme() ? 235 : 60), 18));
+        final int[] days = {7, 30, 90, 365};
+        final String[] labels = {"۷ روز", "۳۰ روز", "۹۰ روز", "امسال"};
+        for (int i = 0; i < days.length; i++) {
+            final int selected = days[i];
+            TextView chip = text(labels[i], 11f, selected == accountingDeskDays ? onColorFor(GOLD) : tc(MUTED), selected == accountingDeskDays ? Typeface.BOLD : Typeface.NORMAL);
+            chip.setGravity(Gravity.CENTER);
+            chip.setPadding(dp(4), dp(9), dp(4), dp(9));
+            if (selected == accountingDeskDays) chip.setBackground(rounded(GOLD, 14));
+            chip.setOnClickListener(v -> { accountingDeskDays = selected; loadAccountingDesk(); });
+            range.addView(chip, new LinearLayout.LayoutParams(0, -2, 1f));
+        }
+        LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, -2);
+        rp.setMargins(0, 0, 0, dp(12));
+        content.addView(range, rp);
         content.addView(managerSkeleton(), new LinearLayout.LayoutParams(-1, -2));
         runDb(this::queryAccountingDesk, new DbCallback() {
             @Override public void ok(String body) {

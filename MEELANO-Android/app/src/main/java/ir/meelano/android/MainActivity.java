@@ -4092,6 +4092,7 @@ public class MainActivity extends Activity {
             case "mgr_perf": loadManagerPerf(); break;
             case "mgr_custp": loadManagerCustProfit(); break;
             case "mgr_tables": loadAllTablesPage(); break;
+            case "mgr_accounting": loadAccountingDesk(); break;
             default: loadDashboard(); break;
         }
     }
@@ -7137,6 +7138,7 @@ public class MainActivity extends Activity {
         if ("manager_approvals".equals(page)) return "management_access";
         if ("mgr_profit".equals(page) || "mgr_cash".equals(page) || "mgr_perf".equals(page) || "mgr_custp".equals(page) || "mgr_cashflow".equals(page)) return "reports";
         if ("mgr_tables".equals(page)) return "reports";
+        if ("mgr_accounting".equals(page)) return "reports";
         if ("settings".equals(page)) return "settings";
         return page == null ? "" : page;
     }
@@ -12349,8 +12351,33 @@ public class MainActivity extends Activity {
 
     private void loadAllTablesPage() {
         content.removeAllViews();
-        addHero("همهٔ جداول آتیران", "کاتالوگ زندهٔ Atiran2 — تک‌تک جدول‌ها و نماها با تعداد رکورد و ستون، به‌همراه نمای رکوردها و خروجی PDF و CSV.");
+        String scope = catalogCategory == null || catalogCategory.isEmpty() ? "" : schemaCategoryLabel(catalogCategory);
+        addHero(scope.isEmpty() ? "همهٔ جداول آتیران" : scope,
+                "کاتالوگ زندهٔ Atiran2 با نام فارسی و دستهٔ حسابداری — هر جدول با نمای رکوردها و خروجی PDF و CSV.");
         addSearchBox("جستجوی نام جدول…", catalogQuery, q -> { catalogQuery = q == null ? "" : q.trim(); loadAllTablesPage(); });
+        HorizontalScrollView scroll = new HorizontalScrollView(this);
+        scroll.setHorizontalScrollBarEnabled(false);
+        LinearLayout chips = new LinearLayout(this);
+        chips.setOrientation(LinearLayout.HORIZONTAL);
+        java.util.List<String> order = schemaCategoryOrder();
+        java.util.List<String> keys = new ArrayList<>();
+        keys.add("");
+        for (String k : order) keys.add(k);
+        for (final String k : keys) {
+            String label = k.isEmpty() ? "همه" : schemaCategoryLabel(k);
+            boolean active = k.equals(catalogCategory == null ? "" : catalogCategory);
+            Button b = active ? primaryButton(label) : secondaryButton(label);
+            b.setTextSize(fs(9.6f));
+            b.setOnClickListener(v -> { catalogCategory = k; loadAllTablesPage(); });
+            LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(-2, dp(40));
+            blp.setMargins(0, 0, dp(8), 0);
+            chips.addView(b, blp);
+        }
+        scroll.addView(chips);
+        styleHorizontalScroll(scroll);
+        LinearLayout.LayoutParams scp = new LinearLayout.LayoutParams(-1, -2);
+        scp.setMargins(0, 0, 0, dp(12));
+        content.addView(scroll, scp);
         final LinearLayout list = new LinearLayout(this);
         list.setOrientation(LinearLayout.VERTICAL);
         content.addView(list, new LinearLayout.LayoutParams(-1, -2));
@@ -12367,11 +12394,14 @@ public class MainActivity extends Activity {
     private void renderCatalog(LinearLayout list, JSONObject j) {
         JSONArray arr = j.optJSONArray("objects");
         list.removeAllViews();
-        java.util.List<JSONObject> shown = new ArrayList<>();
+        java.util.Map<String, java.util.List<JSONObject>> groups = new java.util.LinkedHashMap<>();
+        for (String k : schemaCategoryOrder()) groups.put(k, new ArrayList<JSONObject>());
         int tables = 0;
         int views = 0;
         long rowSum = 0;
+        int shownCount = 0;
         String needle = catalogQuery == null ? "" : catalogQuery.toLowerCase(Locale.US);
+        String scope = catalogCategory == null ? "" : catalogCategory;
         for (int i = 0; arr != null && i < arr.length(); i++) {
             JSONObject o = arr.optJSONObject(i);
             if (o == null) continue;
@@ -12382,47 +12412,64 @@ public class MainActivity extends Activity {
                 if (o.optLong("r", -1) > 0) rowSum += o.optLong("r", 0);
             }
             String n = o.optString("n", "");
-            if (needle.isEmpty() || n.toLowerCase(Locale.US).contains(needle)) shown.add(o);
+            if (!needle.isEmpty() && !n.toLowerCase(Locale.US).contains(needle)) continue;
+            String key = schemaCategory(n);
+            if (!scope.isEmpty() && !scope.equals(key)) continue;
+            java.util.List<JSONObject> g = groups.get(key);
+            if (g == null) { g = groups.get("other"); }
+            if (g != null) { g.add(o); shownCount++; }
         }
         LinearLayout head = card();
         head.setBackground(themedSectionBg("reports", 26));
-        head.addView(visitorSectionTitle("کاتالوگ Atiran2", "☰", SUCCESS), new LinearLayout.LayoutParams(-1, -2));
+        head.addView(visitorSectionTitle(scope.isEmpty() ? "کاتالوگ Atiran2" : schemaCategoryLabel(scope), "☰", SUCCESS),
+                new LinearLayout.LayoutParams(-1, -2));
         addReportLine(head, "جدول‌ها", formatNumber(tables), SUCCESS);
         addReportLine(head, "نماها", formatNumber(views), INFO);
         addReportLine(head, "مجموع رکوردها", formatNumber(rowSum), MUTED);
-        addReportLine(head, "در این نما", formatNumber(shown.size()) + " مورد", MUTED);
+        addReportLine(head, "در این نما", formatNumber(shownCount) + " مورد", MUTED);
         LinearLayout.LayoutParams hlp = new LinearLayout.LayoutParams(-1, -2);
         hlp.setMargins(0, 0, 0, dp(12));
         list.addView(head, hlp);
-        if (shown.isEmpty()) { addEmptyTo(list, "جدولی با این نام در Atiran2 نیست."); return; }
+        if (shownCount == 0) { addEmptyTo(list, "جدولی با این نام در Atiran2 نیست."); return; }
         int rendered = 0;
-        for (JSONObject o : shown) {
-            if (rendered >= 300) {
-                list.addView(text("برای دیدن بقیه، نام جدول را جستجو کنید.", T_CAPTION, MUTED, Typeface.NORMAL),
+        for (String key : schemaCategoryOrder()) {
+            java.util.List<JSONObject> g = groups.get(key);
+            if (g == null || g.isEmpty()) continue;
+            TextView h = text(schemaCategoryGlyph(key) + "  " + schemaCategoryLabel(key) + "   (" + g.size() + ")",
+                    13.2f, GOLD, Typeface.BOLD);
+            LinearLayout.LayoutParams thp = new LinearLayout.LayoutParams(-1, -2);
+            thp.setMargins(0, dp(6), 0, dp(8));
+            list.addView(h, thp);
+            for (JSONObject o : g) {
+                if (rendered >= 300) {
+                    list.addView(text("برای دیدن بقیه، نام جدول را جستجو کنید.", T_CAPTION, MUTED, Typeface.NORMAL),
+                            new LinearLayout.LayoutParams(-1, -2));
+                    return;
+                }
+                rendered++;
+                final String nm = o.optString("n", "");
+                boolean isView = "V".equals(o.optString("t", ""));
+                LinearLayout row = card();
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                row.setGravity(Gravity.CENTER_VERTICAL);
+                LinearLayout col = new LinearLayout(this);
+                col.setOrientation(LinearLayout.VERTICAL);
+                String fa = schemaLabel(nm);
+                col.addView(text((isView ? "▣ " : "▤ ") + (fa.equals(nm) ? nm : fa + "  (" + nm + ")"), 12.4f, TEXT, Typeface.BOLD),
                         new LinearLayout.LayoutParams(-1, -2));
-                break;
+                long rows = o.optLong("r", -1);
+                col.addView(text((isView ? "نما" : "جدول") + "  •  " + o.optInt("c", 0) + " ستون  •  "
+                                + (rows < 0 ? "—" : formatNumber(rows)) + " رکورد", 10.2f, MUTED, Typeface.NORMAL),
+                        new LinearLayout.LayoutParams(-1, -2));
+                row.addView(col, new LinearLayout.LayoutParams(0, -2, 1f));
+                row.addView(text("◀", 12f, MUTED, Typeface.BOLD), new LinearLayout.LayoutParams(-2, -2));
+                row.setOnClickListener(v -> loadTableExplorer(nm));
+                row.setClickable(true);
+                row.setFocusable(true);
+                LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(-1, -2);
+                rlp.setMargins(0, 0, 0, dp(8));
+                list.addView(row, rlp);
             }
-            rendered++;
-            final String nm = o.optString("n", "");
-            boolean isView = "V".equals(o.optString("t", ""));
-            LinearLayout row = card();
-            row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setGravity(Gravity.CENTER_VERTICAL);
-            LinearLayout col = new LinearLayout(this);
-            col.setOrientation(LinearLayout.VERTICAL);
-            col.addView(text((isView ? "▣ " : "▤ ") + nm, 12.4f, TEXT, Typeface.BOLD), new LinearLayout.LayoutParams(-1, -2));
-            long rows = o.optLong("r", -1);
-            col.addView(text((isView ? "نما" : "جدول") + "  •  " + o.optInt("c", 0) + " ستون  •  "
-                    + (rows < 0 ? "—" : formatNumber(rows)) + " رکورد", 10.2f, MUTED, Typeface.NORMAL),
-                    new LinearLayout.LayoutParams(-1, -2));
-            row.addView(col, new LinearLayout.LayoutParams(0, -2, 1f));
-            row.addView(text("◀", 12f, MUTED, Typeface.BOLD), new LinearLayout.LayoutParams(-2, -2));
-            row.setOnClickListener(v -> loadTableExplorer(nm));
-            row.setClickable(true);
-            row.setFocusable(true);
-            LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(-1, -2);
-            rlp.setMargins(0, 0, 0, dp(8));
-            list.addView(row, rlp);
         }
     }
 
@@ -12430,7 +12477,9 @@ public class MainActivity extends Activity {
         tableExplorerName = table;
         tableExplorerCache = null;
         content.removeAllViews();
-        addHero(table, "نمای مستقیم از Atiran2 — ساختار، رکوردها و خروجی PDF و CSV.");
+        String fa = schemaLabel(table);
+        addHero(fa.equals(table) ? table : fa + "  (" + table + ")",
+                schemaCategoryLabel(schemaCategory(table)) + " — نمای مستقیم از Atiran2 با ساختار، رکوردها و خروجی PDF و CSV.");
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         Button back = secondaryButton(withIcon("↩", "کاتالوگ"));
@@ -12593,6 +12642,244 @@ public class MainActivity extends Activity {
         } catch (Exception ex) {
             showNotice("ساخت PDF ممکن نشد: " + shortError(ex), false);
         } finally { if (doc != null) doc.close(); }
+    }
+
+    // =================== فاز ۷‑ن: میز حسابداری + اسکیما از بکاپ Atiran2 ===================
+
+    private JSONObject atiranSchemaCache;
+    private String catalogCategory = "";
+
+    /** Schema reference decoded from the attached Atiran2 backup: a Persian label and an accounting
+        category for every known table. The live database stays the source of truth for what exists;
+        this file only decides how tables are named and grouped for the manager. */
+    private JSONObject atiranSchema() {
+        if (atiranSchemaCache != null) return atiranSchemaCache;
+        JSONObject parsed = new JSONObject();
+        try {
+            java.io.InputStream in = getAssets().open("atiran_schema.json");
+            java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) > 0) bos.write(buf, 0, n);
+            in.close();
+            parsed = new JSONObject(new String(bos.toByteArray(), StandardCharsets.UTF_8));
+        } catch (Exception e) { MeelanoLog.warn("schema", "atiran_schema.json: " + shortError(e)); }
+        atiranSchemaCache = parsed;
+        return parsed;
+    }
+
+    private String schemaLabel(String table) {
+        if (table == null) return "";
+        JSONObject labels = atiranSchema().optJSONObject("labels");
+        if (labels == null) return table;
+        String direct = labels.optString(table, "");
+        if (!direct.isEmpty()) return direct;
+        java.util.Iterator<String> it = labels.keys();
+        while (it.hasNext()) {
+            String k = it.next();
+            if (k.equalsIgnoreCase(table)) return labels.optString(k, table);
+        }
+        return table;
+    }
+
+    private String schemaCategory(String table) {
+        if (table == null) return "other";
+        JSONObject cat = atiranSchema().optJSONObject("category");
+        if (cat == null) return "other";
+        String direct = cat.optString(table, "");
+        if (!direct.isEmpty()) return direct;
+        java.util.Iterator<String> it = cat.keys();
+        while (it.hasNext()) {
+            String k = it.next();
+            if (k.equalsIgnoreCase(table)) return cat.optString(k, "other");
+        }
+        return "other";
+    }
+
+    private JSONObject schemaCategoryMeta(String key) {
+        JSONArray cats = atiranSchema().optJSONArray("categories");
+        for (int i = 0; cats != null && i < cats.length(); i++) {
+            JSONObject c = cats.optJSONObject(i);
+            if (c != null && key.equals(c.optString("key", ""))) return c;
+        }
+        return null;
+    }
+
+    private String schemaCategoryLabel(String key) {
+        JSONObject c = schemaCategoryMeta(key);
+        if (c != null) return c.optString("fa", key);
+        return "other".equals(key) ? "سایر جدول‌ها" : key;
+    }
+
+    private String schemaCategoryGlyph(String key) {
+        JSONObject c = schemaCategoryMeta(key);
+        return c == null ? "▤" : c.optString("glyph", "▤");
+    }
+
+    private java.util.List<String> schemaCategoryOrder() {
+        java.util.List<String> order = new ArrayList<>();
+        JSONArray cats = atiranSchema().optJSONArray("categories");
+        for (int i = 0; cats != null && i < cats.length(); i++) {
+            JSONObject c = cats.optJSONObject(i);
+            if (c != null && !c.optString("key", "").isEmpty()) order.add(c.optString("key"));
+        }
+        if (!order.contains("other")) order.add("other");
+        return order;
+    }
+
+    /** Live figures for the accounting desk — each block is isolated so one bad query cannot
+        take the page down; whatever failed is reported instead of hidden. */
+    private String queryAccountingDesk() throws Exception {
+        JSONObject out = new JSONObject();
+        JSONObject errs = new JSONObject();
+        JSONArray cat = new JSONObject(queryDatabaseCatalog()).optJSONArray("objects");
+        out.put("objects", cat == null ? new JSONArray() : cat);
+        try (Connection c = openConnection()) {
+            try { out.put("sales", queryRangeBlock(c, true, 30)); }
+            catch (Exception e) { errs.put("sales", shortError(e)); MeelanoLog.err("desk:sales", e); }
+            try { out.put("purchases", queryRangeBlock(c, false, 30)); }
+            catch (Exception e) { errs.put("purchases", shortError(e)); MeelanoLog.err("desk:purchases", e); }
+            try { out.put("checks", queryCheckBuckets(c)); }
+            catch (Exception e) { errs.put("checks", shortError(e)); MeelanoLog.err("desk:checks", e); }
+            try { out.put("aging", queryAgingBuckets(c)); }
+            catch (Exception e) { errs.put("aging", shortError(e)); MeelanoLog.err("desk:aging", e); }
+            try { out.put("cashflow", ManagerAnalytics.cashflow(c)); }
+            catch (Exception e) { errs.put("cashflow", shortError(e)); MeelanoLog.err("desk:cashflow", e); }
+        }
+        out.put("errors", errs);
+        return out.toString();
+    }
+
+    private void loadAccountingDesk() {
+        content.removeAllViews();
+        addHero("میز حسابداری آتیران", "چیدمان دفتر کل، معین، تفضیلی، چک و بانک، انبار، مشتری و پرسنل به سبک نرم‌افزار حسابداری.");
+        content.addView(managerSkeleton(), new LinearLayout.LayoutParams(-1, -2));
+        runDb(this::queryAccountingDesk, new DbCallback() {
+            @Override public void ok(String body) {
+                try { renderAccountingDesk(new JSONObject(body)); }
+                catch (Exception e) { showPageError("میز حسابداری", e, () -> loadAccountingDesk()); }
+            }
+            @Override public void fail(Exception e) { showPageError("میز حسابداری", e, () -> loadAccountingDesk()); }
+        });
+    }
+
+    private String moduleFigure(String key, JSONObject desk) {
+        JSONObject sales = desk.optJSONObject("sales");
+        JSONObject buys = desk.optJSONObject("purchases");
+        JSONObject checks = desk.optJSONObject("checks");
+        if ("sales".equals(key) && sales != null) {
+            return money(Math.round(sales.optDouble("total", 0))) + "   •   "
+                    + formatNumber(sales.optLong("docs", 0)) + " سند   •   "
+                    + formatNumber(sales.optLong("parties", 0)) + " مشتری";
+        }
+        if ("purchase".equals(key) && buys != null) {
+            return money(Math.round(buys.optDouble("total", 0))) + "   •   "
+                    + formatNumber(buys.optLong("docs", 0)) + " سند";
+        }
+        if ("checks".equals(key) && checks != null) {
+            JSONObject over = checks.optJSONObject("over");
+            JSONObject soon = checks.optJSONObject("soon");
+            JSONObject live = checks.optJSONObject("ok");
+            return "سررسیده " + (over == null ? formatNumber(0) : formatNumber(over.optLong("count", 0)))
+                    + "   •   هفت‌روزه " + (soon == null ? formatNumber(0) : formatNumber(soon.optLong("count", 0)))
+                    + "   •   جاری " + (live == null ? formatNumber(0) : formatNumber(live.optLong("count", 0)));
+        }
+        return null;
+    }
+
+    private void addAccountingModule(String fa, String glyph, String key, java.util.List<String> sample,
+                                     int count, long rows, JSONObject desk) {
+        LinearLayout c = card();
+        c.setBackground(themedSectionBg("reports", 26));
+        c.addView(visitorSectionTitle(fa, glyph, GOLD), new LinearLayout.LayoutParams(-1, -2));
+        String figure = moduleFigure(key, desk);
+        if (figure != null) addReportLine(c, "عدد زنده", figure, SUCCESS);
+        addReportLine(c, "جدول‌ها", formatNumber(count) + (rows > 0 ? "  •  " + formatNumber(rows) + " رکورد" : ""), MUTED);
+        StringBuilder chips = new StringBuilder();
+        for (String t : sample) {
+            if (chips.length() > 0) chips.append("   •   ");
+            chips.append(schemaLabel(t));
+        }
+        if (chips.length() > 0) {
+            c.addView(text(chips.toString(), T_CAPTION, MUTED, Typeface.NORMAL), new LinearLayout.LayoutParams(-1, -2));
+        }
+        Button open = secondaryButton("باز کردن جدول‌های این بخش");
+        open.setTextSize(fs(10.2f));
+        open.setOnClickListener(v -> { catalogCategory = key; catalogQuery = ""; loadAllTablesPage(); });
+        LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(-1, dp(44));
+        bp.setMargins(0, dp(8), 0, 0);
+        c.addView(open, bp);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+        lp.setMargins(0, 0, 0, dp(12));
+        content.addView(c, lp);
+    }
+
+    private void renderAccountingDesk(JSONObject j) {
+        content.removeAllViews();
+        addHero("میز حسابداری آتیران", "دفتر کل، معین، تفضیلی، چک و بانک، انبار، مشتری و پرسنل — هر عدد از جدول خودش خوانده می‌شود.");
+        JSONArray cat = j.optJSONArray("objects");
+        java.util.Map<String, Integer> catCount = new java.util.LinkedHashMap<>();
+        java.util.Map<String, Long> catRows = new java.util.HashMap<>();
+        java.util.Map<String, java.util.List<String>> catSample = new java.util.LinkedHashMap<>();
+        int tables = 0;
+        int views = 0;
+        long rowSum = 0;
+        for (int i = 0; cat != null && i < cat.length(); i++) {
+            JSONObject o = cat.optJSONObject(i);
+            if (o == null) continue;
+            String n = o.optString("n", "");
+            if ("V".equals(o.optString("t", ""))) views++; else tables++;
+            long r = o.optLong("r", -1);
+            if (r > 0) rowSum += r;
+            String key = schemaCategory(n);
+            Integer prev = catCount.get(key);
+            catCount.put(key, prev == null ? 1 : prev + 1);
+            Long pr = catRows.get(key);
+            catRows.put(key, (pr == null ? 0 : pr) + (r > 0 ? r : 0));
+            java.util.List<String> sample = catSample.get(key);
+            if (sample == null) { sample = new ArrayList<>(); catSample.put(key, sample); }
+            if (sample.size() < 6) sample.add(n);
+        }
+        JSONObject sales = j.optJSONObject("sales");
+        JSONObject buys = j.optJSONObject("purchases");
+        JSONObject checks = j.optJSONObject("checks");
+        LinearLayout kpi = new LinearLayout(this);
+        kpi.setOrientation(LinearLayout.HORIZONTAL);
+        addKpiTile(kpi, "فروش ۳۰ روز", sales == null ? "—" : money(Math.round(sales.optDouble("total", 0))), "↗", KPI_SALES);
+        addKpiTile(kpi, "خرید ۳۰ روز", buys == null ? "—" : money(Math.round(buys.optDouble("total", 0))), "↘", KPI_BRONZE);
+        JSONObject over = checks == null ? null : checks.optJSONObject("over");
+        addKpiTile(kpi, "چک سررسیده", over == null ? "—" : money(Math.round(over.optDouble("total", 0))), "!", KPI_RED);
+        LinearLayout.LayoutParams kp = new LinearLayout.LayoutParams(-1, -2);
+        kp.setMargins(0, 0, 0, dp(14));
+        content.addView(kpi, kp);
+
+        LinearLayout sum = card();
+        sum.setBackground(themedSectionBg("reports", 26));
+        sum.addView(visitorSectionTitle("پایگاه‌دادهٔ Atiran2", "☰", SUCCESS), new LinearLayout.LayoutParams(-1, -2));
+        addReportLine(sum, "جدول‌ها", formatNumber(tables), SUCCESS);
+        addReportLine(sum, "نماها", formatNumber(views), INFO);
+        addReportLine(sum, "مجموع رکوردها", formatNumber(rowSum), MUTED);
+        JSONObject errs = j.optJSONObject("errors");
+        boolean clean = errs == null || errs.length() == 0;
+        addReportLine(sum, "خطای کوئری", clean ? "ندارد" : errs.length() + " مورد", clean ? SUCCESS : WARNING);
+        LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(-1, -2);
+        slp.setMargins(0, 0, 0, dp(12));
+        content.addView(sum, slp);
+
+        for (String key : schemaCategoryOrder()) {
+            Integer cnt = catCount.get(key);
+            if (cnt == null || cnt == 0) continue;
+            java.util.List<String> sample = catSample.get(key);
+            Long rows = catRows.get(key);
+            addAccountingModule(schemaCategoryLabel(key), schemaCategoryGlyph(key), key,
+                    sample == null ? new ArrayList<String>() : sample, cnt, rows == null ? 0 : rows, j);
+        }
+        Button all = primaryButton("همهٔ جداول آتیران");
+        all.setOnClickListener(v -> { catalogCategory = ""; catalogQuery = ""; loadAllTablesPage(); });
+        LinearLayout.LayoutParams alp = new LinearLayout.LayoutParams(-1, dp(48));
+        alp.setMargins(0, 0, 0, dp(12));
+        content.addView(all, alp);
+        addDeveloperCredit(content);
     }
 
     private void loadManagerReports() {
@@ -14384,6 +14671,7 @@ public class MainActivity extends Activity {
         long soonC = bsoon == null ? 0 : bsoon.optLong("count", bsoon.optLong("docs", 0));
         addCatRow(cat, "وصول و چک‌ها", WARNING, "مطالبات: " + (recv != null && recv.optDouble("total", 0) > 0 ? MeelanoCharts.compact(recv.optDouble("total", 0)) : "—") + " • چک نزدیک سررسید: " + faDigits(String.valueOf(soonC)) + " فقره", "mgr_collection");
         addCatRow(cat, "مشتریان و میدان", GOLD, "مشتریان بدهکار: " + (recv != null ? faDigits(String.valueOf(recv.optLong("count", 0))) : "—") + " • ویزیتورها: " + faDigits(String.valueOf(m.optJSONArray("visitors") == null ? 0 : m.optJSONArray("visitors").length())), "mgr_credit");
+        addCatRow(cat, "میز حسابداری", SUCCESS, "دفتر کل، معین، تفضیلی، چک، انبار — همهٔ جدول‌های Atiran2 با PDF و CSV", "mgr_accounting");
         content.addView(cat, new LinearLayout.LayoutParams(-1, -2));
 
         JSONArray errs = m.optJSONArray("errors");
@@ -15243,7 +15531,8 @@ public class MainActivity extends Activity {
                 new VisitorToolSpec("سود مشتریان", "رتبه‌بندی سود واقعی مشتری", "🏆", 0xFFA87A2C, () -> showApp("mgr_custp"), true),
                 new VisitorToolSpec("جریان نقدینگی", "پیش‌بینی ورود/خروج چک‌ها — فاز ۶", "◆", 0xFF2E8B57, () -> showApp("mgr_cashflow"), true)
         });
-        addVisitorMoreGroup("پایگاه‌دادهٔ آتیران", "اتصال مستقیم به تک‌تک جدول‌ها و نماها", new VisitorToolSpec[]{
+        addVisitorMoreGroup("حسابداری و پایگاه‌داده", "میز حسابداری و اتصال مستقیم به تک‌تک جدول‌ها", new VisitorToolSpec[]{
+                new VisitorToolSpec("میز حسابداری", "دفتر کل، معین، تفضیلی، چک، انبار", "≣", GOLD, () -> showApp("mgr_accounting"), canOpenPage("mgr_accounting")),
                 new VisitorToolSpec("همهٔ جداول", "کاتالوگ زنده + PDF و CSV هر جدول", "☰", navAccent("mgr_tables"), () -> showApp("mgr_tables"), canOpenPage("mgr_tables")),
                 new VisitorToolSpec("آزمون جامع اتصال", "کوئری واقعی هر بخش + هر جدول", "⚕", SUCCESS, () -> showApp("diagnostics"), canOpenPage("diagnostics")),
                 new VisitorToolSpec("جدول فروش", "نمای مستقیم sailfact", "↗", navAccent("reports"), () -> showApp("sales"), true),

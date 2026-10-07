@@ -119,9 +119,7 @@ public final class Pdf {
             return Money.fa(String.format(java.util.Locale.US, "%.1f", v).replace('.', '٫').replace('-', '−'));
         }
         if (col.type == ReportCatalog.T_DATE) {
-            String d = r.s(col.key);
-            if (d.length() >= 10) d = d.substring(0, 10);
-            return Money.fa(Jalali.faDate(d));
+            return Jalali.dispFa(r.s(col.key));
         }
         String t = r.s(col.key, "—");
         return "—".equals(t) ? t : Money.fa(Jalali.faDate(t));

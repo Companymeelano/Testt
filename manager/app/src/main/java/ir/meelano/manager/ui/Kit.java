@@ -151,12 +151,18 @@ public final class Kit {
         public final String value;
         public final String sub;
         public final int accent;
+        public final Runnable action;
 
         public Kpi(String label, String value, String sub, int accent) {
+            this(label, value, sub, accent, null);
+        }
+
+        public Kpi(String label, String value, String sub, int accent, Runnable action) {
             this.label = label;
             this.value = value;
             this.sub = sub;
             this.accent = accent;
+            this.action = action;
         }
     }
 
@@ -177,6 +183,12 @@ public final class Kit {
             s.setSingleLine(true);
             s.setEllipsize(TextUtils.TruncateAt.END);
             t.addView(s, lp(-1, -2));
+        }
+        if (k.action != null) {
+            TextView more = text("مشاهده جزئیات ›", 9.5f, Theme.MUTED, true);
+            t.addView(more, lp(-1, -2));
+            Theme.pressable(t);
+            t.setOnClickListener(v -> k.action.run());
         }
         return t;
     }
@@ -543,9 +555,7 @@ public final class Kit {
             return Money.fa(String.format(java.util.Locale.US, "%.1f", v).replace('.', '٫').replace('-', '−'));
         }
         if (col.type == ReportCatalog.T_DATE) {
-            String d = r.s(col.key);
-            if (d.length() >= 10) d = d.substring(0, 10);
-            return Money.fa(Jalali.faDate(d));
+            return Jalali.dispFa(r.s(col.key));
         }
         String t = r.s(col.key, "—");
         // Gregorian datetimes (logins, change log) → Jalali; anything else passes through.

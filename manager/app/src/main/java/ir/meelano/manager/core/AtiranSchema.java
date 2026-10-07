@@ -31,8 +31,8 @@ public final class AtiranSchema {
             {"PardakhtMultiFactor", "تسویه چند فاکتوره پرداخت"},
             {"TemplateDaryaftCheque", "چک‌های داخل قبض دریافت"},
             {"TemplatePardakhtCheque", "چک‌های داخل قبض پرداخت"},
-            {"getchk", "چک‌های دریافتی"},          // 76 — chk_satus: 0 صندوق، 1 وصول، 2 برگشتی، 3 خرج‌شده
-            {"putchk", "چک‌های پرداختی"},          // 202 — putchk_status: 0 جاری، 1 پاس، 2 برگشتی، 3 انتقال، 4 سفید
+            {"getchk", "چک‌های دریافتی"},          // 76 — chk_satus (از سورس پروسیجرها): 1 صندوق، 2 نزد بانک، 3 وصول، 4 استرداد، 5 خرج‌شده؛ back='t' یعنی برگشتی
+            {"putchk", "چک‌های پرداختی"},          // 202 — putchk_status (از سورس پروسیجرها): 0 سفید، 1 جاری، 2 پاس‌شده
             {"NGetchk", "چک دریافتی سنوات قبل"},   // 438
             {"NPutchk", "چک پرداختی سنوات قبل"},   // 1026
             {"CheckTypes", "انواع چک"},            // 2 — ID/Desciption
@@ -129,30 +129,77 @@ public final class AtiranSchema {
     // =====================================================================================
     // Status code maps (validated against friendlyCheckStatus + Atiran behaviour).
     // =====================================================================================
-    /** getchk.chk_satus → Persian. */
-    public static String chequeInStatusFa(String raw) {
-        String s = raw == null ? "" : raw.trim();
-        if (s.equals("0")) return "موجود در صندوق";
-        if (s.equals("1")) return "وصول / پاس‌شده";
-        if (s.equals("2")) return "برگشتی / استرداد";
-        if (s.equals("3")) return "خرج‌شده";
+    // =====================================================================================
+    // Cheque status codes — VALIDATED against Atiran's own stored-procedure source
+    // (extracted from the 1405/07/14 backup). The client labels below are ours; the
+    // CODE meanings come from the procedures that SET them:
+    //   getchk: sabt_chk_bargashti → 1+back='t' (برگشتی) • vosol_chk_bank/sandogh → 3 (وصول)
+    //           esterdade_chk_daryafti → 4 (استرداد) • kharj flows → 5 (خرج‌شده)
+    //           bank deposit sets our_bankrdf with 2 (نزد بانک) • 1 = موجود نزد ما
+    //   putchk: issue → 1 (جاری) • clear/ban_act-75 → 2 (پاس) • void resets to 0 (سفید)
+    // Codes 6/7/8 are excluded from EVERY Atiran view (void/deleted) — shown as «سایر».
+    // =====================================================================================
+    /** True when a getchk «back» flag means bounced (sabt_chk_bargashti sets back='t'). */
+    public static boolean chequeInBounced(String back) {
+        String b = back == null ? "" : back.trim().toUpperCase(java.util.Locale.US);
+        return b.equals("T") || b.equals("1") || b.equals("TRUE") || b.equals("بله");
+    }
+
+    /** getchk (chk_satus + back flag) → bucket key used by ChequesScreen. */
+    public static String chequeInBucket(String st, String back) {
+        if (chequeInBounced(back)) return "bargashti";
+        String s = st == null ? "" : st.trim();
+        if (s.equals("1")) return "sandogh";
+        if (s.equals("2")) return "bank";
+        if (s.equals("3")) return "vosool";
+        if (s.equals("4")) return "esterdad";
+        if (s.equals("5")) return "kharj";
+        return "sayer";
+    }
+
+    /** putchk (putchk_status) → bucket key used by ChequesScreen. */
+    public static String chequeOutBucket(String st) {
+        String s = st == null ? "" : st.trim();
+        if (s.equals("0")) return "sefid";
+        if (s.equals("1")) return "jari";
+        if (s.equals("2")) return "pas";
+        return "sayer";
+    }
+
+    /** getchk.chk_satus (+back flag) → Persian. Single source for every screen. */
+    public static String chequeInStatusFa(String st, String back) {
+        if (chequeInBounced(back)) return "برگشتی";
+        String s = st == null ? "" : st.trim();
+        if (s.equals("1")) return "موجود در صندوق";
+        if (s.equals("2")) return "نزد بانک";
+        if (s.equals("3")) return "وصول‌شده";
+        if (s.equals("4")) return "استردادشده";
+        if (s.equals("5")) return "خرج‌شده";
+        if (s.equals("6")) return "باطل‌شده";
+        if (s.equals("8")) return "حذف‌شده";
         String l = s.toLowerCase(java.util.Locale.US);
-        if (l.contains("وصول") || l.contains("پاس")) return "وصول / پاس‌شده";
-        if (l.contains("برگشت") || l.contains("استرد")) return "برگشتی / استرداد";
-        if (l.contains("خرج") || l.contains("انتقال")) return "خرج‌شده";
+        if (l.contains("وصول") || l.contains("پاس")) return "وصول‌شده";
+        if (l.contains("برگشت")) return "برگشتی";
+        if (l.contains("استرد")) return "استردادشده";
+        if (l.contains("خرج")) return "خرج‌شده";
         if (l.contains("بانک")) return "نزد بانک";
         if (l.contains("صندوق")) return "موجود در صندوق";
         return s.isEmpty() ? "نامشخص" : s;
     }
 
-    /** putchk.putchk_status → Persian. */
+    /** getchk.chk_satus → Persian (no back flag available). */
+    public static String chequeInStatusFa(String raw) {
+        return chequeInStatusFa(raw, "");
+    }
+
+    /** putchk.putchk_status → Persian. Single source for every screen. */
     public static String chequeOutStatusFa(String raw) {
         String s = raw == null ? "" : raw.trim();
-        if (s.equals("0")) return "در راه / جاری";
-        if (s.equals("1")) return "پاس‌شده";
-        if (s.equals("2")) return "برگشتی / رد شده";
-        if (s.equals("3")) return "انتقال‌یافته";
-        if (s.equals("4")) return "سفید / استفاده‌نشده";
+        if (s.equals("0")) return "سفید / استفاده‌نشده";
+        if (s.equals("1")) return "جاری / در جریان";
+        if (s.equals("2")) return "پاس‌شده";
+        if (s.equals("6") || s.equals("7")) return "باطل‌شده";
+        if (s.equals("8")) return "حذف‌شده";
         return s.isEmpty() ? "نامشخص" : s;
     }
 

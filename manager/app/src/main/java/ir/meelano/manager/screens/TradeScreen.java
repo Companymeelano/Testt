@@ -389,7 +389,7 @@ public class TradeScreen extends Screen {
         final List<Row> fLines = dt.lines;
         final String fNo = head.s("no");
         final String fParty = head.s("customer");
-        final String fDate = head.s("date");
+        final String fDate = Jalali.dispFa(head.s("date"));
         LinearLayout footer = a.kit.h();
         footer.addView(a.kit.btn("اشتراک PDF", v -> {
             ReportCatalog.Col[] cols = new ReportCatalog.Col[]{

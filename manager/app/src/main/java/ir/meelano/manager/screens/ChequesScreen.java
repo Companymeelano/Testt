@@ -6,6 +6,7 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 
 import ir.meelano.manager.MainActivity;
+import ir.meelano.manager.core.AtiranSchema;
 import ir.meelano.manager.core.Filter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.Money;
@@ -58,12 +59,14 @@ public class ChequesScreen extends Screen {
     }
 
     private String[][] buckets() {
+        // Keys mirror AtiranSchema.chequeIn/OutBucket (codes validated against Atiran's procedures).
         if (incoming) return new String[][]{
                 {"", "همه"}, {"sandogh", "صندوق"}, {"bank", "در بانک"}, {"vosool", "وصول‌شده"},
-                {"kharj", "خرج‌شده"}, {"bargashti", "برگشتی"}, {"due", "⌛ سررسید ۳۰ روز"}};
+                {"kharj", "خرج‌شده"}, {"esterdad", "استرداد"}, {"bargashti", "برگشتی"},
+                {"sayer", "سایر"}, {"due", "⌛ سررسید ۳۰ روز"}};
         return new String[][]{
-                {"", "همه"}, {"jari", "جاری"}, {"pas", "پاس‌شده"}, {"bargashti", "برگشتی"},
-                {"enteghal", "انتقال"}, {"sefid", "سفید"}, {"due", "⌛ سررسید ۳۰ روز"}};
+                {"", "همه"}, {"jari", "جاری"}, {"pas", "پاس‌شده"}, {"sefid", "سفید"},
+                {"sayer", "سایر"}, {"due", "⌛ سررسید ۳۰ روز"}};
     }
 
     private String bucketLabel(String b) {
@@ -73,40 +76,14 @@ public class ChequesScreen extends Screen {
 
     /** Map a raw (st,back,hasBank) group row to our bucket key. */
     private String groupBucket(boolean inc, String st, String back, long hasBank) {
-        String s = st == null ? "" : st.trim();
-        String bk = back == null ? "" : back.trim().toUpperCase();
-        boolean isBack = "T".equals(bk) || "1".equals(bk);
-        if (isBack || "2".equals(s)) return "bargashti";
-        if (inc) {
-            if ("1".equals(s)) return "vosool";
-            if ("3".equals(s)) return "kharj";
-            if ("0".equals(s)) return hasBank == 1 ? "bank" : "sandogh";
-            return "";
-        }
-        if ("0".equals(s)) return "jari";
-        if ("1".equals(s)) return "pas";
-        if ("3".equals(s)) return "enteghal";
-        if ("4".equals(s)) return "sefid";
-        return "";
+        return inc ? AtiranSchema.chequeInBucket(st, back) : AtiranSchema.chequeOutBucket(st);
     }
 
     /** Persian label for one cheque row (prefers the DB status label when present). */
     private String rowLabel(boolean inc, Row r) {
         if (!r.s("statusLabel").isEmpty()) return r.s("statusLabel");
-        String s = r.s("st").trim();
-        String bk = r.s("back").trim().toUpperCase();
-        if ("T".equals(bk) || "1".equals(bk) || "2".equals(s)) return "برگشتی";
-        if (inc) {
-            if ("1".equals(s)) return "وصول‌شده";
-            if ("3".equals(s)) return "خرج‌شده";
-            if ("0".equals(s)) return "صندوق";
-        } else {
-            if ("0".equals(s)) return "جاری";
-            if ("1".equals(s)) return "پاس‌شده";
-            if ("3".equals(s)) return "انتقال";
-            if ("4".equals(s)) return "سفید";
-        }
-        return s.isEmpty() ? "—" : s;
+        return inc ? AtiranSchema.chequeInStatusFa(r.s("st"), r.s("back"))
+                : AtiranSchema.chequeOutStatusFa(r.s("st"));
     }
 
     private static final class Data {
@@ -253,7 +230,7 @@ public class ChequesScreen extends Screen {
         LinearLayout body = a.kit.v();
         body.addView(a.kit.kv("شماره", Money.fa(r.s("num")), Theme.TEXT), a.kit.lp(-1, -2));
         body.addView(a.kit.kv("مبلغ", Money.rial(r.d("amount")), Theme.GOLD_SOFT), a.kit.lp(-1, -2));
-        body.addView(a.kit.kv("سررسید", Money.fa(r.s("sardate")), Theme.TEXT), a.kit.lp(-1, -2));
+        body.addView(a.kit.kv("سررسید", Jalali.dispFa(r.s("sardate")), Theme.TEXT), a.kit.lp(-1, -2));
         int dd = daysUntil(r.s("sardate"));
         if (dd != Integer.MIN_VALUE) {
             String t = dd < 0 ? "گذشته (" + Money.fa(String.valueOf(-dd)) + " روز)" : (dd == 0 ? "امروز" : Money.fa(String.valueOf(dd)) + " روز مانده");
@@ -264,8 +241,8 @@ public class ChequesScreen extends Screen {
         if (!r.s("branch").isEmpty()) body.addView(a.kit.kv(incoming ? "شعبه" : "گیرنده", r.s("branch"), Theme.TEXT), a.kit.lp(-1, -2));
         body.addView(a.kit.kv("وضعیت", rowLabel(incoming, r), Theme.TEXT), a.kit.lp(-1, -2));
         if (!r.s("sayad").isEmpty()) body.addView(a.kit.kv("شناسه صیادی", Money.fa(r.s("sayad")), Theme.TEXT), a.kit.lp(-1, -2));
-        if (!r.s("getdate").isEmpty())
-            body.addView(a.kit.kv(incoming ? "تاریخ دریافت" : "تاریخ صدور", Money.fa(r.s("getdate")), Theme.TEXT), a.kit.lp(-1, -2));
+        if (!Jalali.disp(r.s("getdate")).isEmpty())
+            body.addView(a.kit.kv(incoming ? "تاریخ دریافت" : "تاریخ صدور", Jalali.dispFa(r.s("getdate")), Theme.TEXT), a.kit.lp(-1, -2));
         if (!r.s("descrip").isEmpty()) body.addView(a.kit.kv("شرح", r.s("descrip"), Theme.MUTED), a.kit.lp(-1, -2));
         body.addView(a.kit.text("مبلغ به حروف: " + Money.words(r.d("amount")), 11f, Theme.MUTED, false), a.kit.lp(-1, -2));
 
@@ -300,9 +277,10 @@ public class ChequesScreen extends Screen {
     }
 
     private int daysUntil(String due) {
-        if (due == null || due.length() < 8) return Integer.MIN_VALUE;
+        String norm = Jalali.disp(due);
+        if (norm.isEmpty()) return Integer.MIN_VALUE;
         int td = Jalali.parse(Jalali.todayStr());
-        int bd = Jalali.parse(due);
+        int bd = Jalali.parse(norm);
         if (td < 0 || bd < 0) return Integer.MIN_VALUE;
         return bd - td;
     }

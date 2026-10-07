@@ -7,6 +7,7 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 
 import ir.meelano.manager.MainActivity;
+import ir.meelano.manager.core.AtiranSchema;
 import ir.meelano.manager.core.Filter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.Money;
@@ -256,7 +257,7 @@ public class MoneyScreen extends Screen {
         final AlertDialog[] dlgHolder = new AlertDialog[1];
         LinearLayout body = a.kit.v();
         body.addView(a.kit.kv("شماره قبض", Money.fa(head.s("ghno")), Theme.TEXT), a.kit.lp(-1, -2));
-        body.addView(a.kit.kv("تاریخ", Money.fa(head.s("date")), Theme.TEXT), a.kit.lp(-1, -2));
+        body.addView(a.kit.kv("تاریخ", Jalali.dispFa(head.s("date")), Theme.TEXT), a.kit.lp(-1, -2));
         body.addView(a.kit.kv("طرف‌حساب", head.s("customer"), Theme.TEXT), a.kit.lp(-1, -2));
         if (!head.s("kind").isEmpty()) body.addView(a.kit.kv("نوع", head.s("kind"), Theme.TEXT), a.kit.lp(-1, -2));
         if (head.d("cash") > 0) body.addView(a.kit.kv("نقد", Money.rial(head.d("cash")), Theme.TEXT), a.kit.lp(-1, -2));
@@ -267,9 +268,9 @@ public class MoneyScreen extends Screen {
         body.addView(a.kit.kv("جمع", Money.rial(head.d("total")), Theme.GOLD_SOFT), a.kit.lp(-1, -2));
         if (!head.s("descrip").isEmpty()) body.addView(a.kit.kv("شرح", head.s("descrip"), Theme.MUTED), a.kit.lp(-1, -2));
         if (!head.s("username").isEmpty()) body.addView(a.kit.kv("کاربر", head.s("username"), Theme.MUTED), a.kit.lp(-1, -2));
-        String doneDate = head.s("doneDate");
-        if (!doneDate.isEmpty() && !doneDate.equals(head.s("date")))
-            body.addView(a.kit.kv("تاریخ ثبت", Money.fa(doneDate), Theme.MUTED), a.kit.lp(-1, -2));
+        String doneDate = Jalali.disp(head.s("doneDate"));
+        if (!doneDate.isEmpty() && !doneDate.equals(Jalali.disp(head.s("date"))))
+            body.addView(a.kit.kv("تاریخ ثبت", Jalali.dispFa(doneDate), Theme.MUTED), a.kit.lp(-1, -2));
         body.addView(a.kit.text("مبلغ به حروف: " + Money.words(head.d("total")), 11f, Theme.MUTED, false), a.kit.lp(-1, -2));
         if (!head.s("linkNo").isEmpty()) {
             final String linkNo = head.s("linkNo");
@@ -277,7 +278,7 @@ public class MoneyScreen extends Screen {
             body.addView(a.kit.btnGhost("🧾 فاکتور مرتبط " + Money.fa(linkNo), accent(), v -> {
                 if (dlgHolder[0] != null) dlgHolder[0].dismiss();
                 Screen s = a.screen(target);
-                if (s != null) {
+                if (s != null && s.filter() != null) {
                     Filter nf = s.filter().copy();
                     nf.search = linkNo;
                     nf.page = 0;
@@ -298,10 +299,15 @@ public class MoneyScreen extends Screen {
         }
         if (!dt.chqs.isEmpty()) {
             body.addView(a.kit.text("چک‌های این قبض", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
+            final boolean inChq = p == 0;
+            for (Row r : dt.chqs)
+                r.put("stLabel", inChq ? AtiranSchema.chequeInStatusFa(r.s("st"), r.s("back"))
+                        : AtiranSchema.chequeOutStatusFa(r.s("st")));
             ReportCatalog.Col[] cols = new ReportCatalog.Col[]{
                     new ReportCatalog.Col("num", "شماره", ReportCatalog.T_TEXT),
                     new ReportCatalog.Col("amount", "مبلغ", ReportCatalog.T_MONEY),
                     new ReportCatalog.Col("sardate", "سررسید", ReportCatalog.T_DATE),
+                    new ReportCatalog.Col("stLabel", "وضعیت", ReportCatalog.T_TEXT),
             };
             body.addView(a.kit.dataTable(cols, dt.chqs, null), a.kit.lp(-1, -2));
         }

@@ -6,6 +6,7 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 
 import ir.meelano.manager.MainActivity;
+import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.ReportCatalog;
@@ -98,7 +99,7 @@ public class UsersScreen extends Screen {
             final Row row = r;
             boolean on = isOn(row.s("active"));
             String sub = row.s("role");
-            if (!row.s("lastLogin").isEmpty()) sub += (sub.isEmpty() ? "" : " • ") + "آخرین ورود " + Money.fa(row.s("lastLogin"));
+            if (!row.s("lastLogin").isEmpty()) sub += (sub.isEmpty() ? "" : " • ") + "آخرین ورود " + Money.fa(Jalali.faDate(row.s("lastLogin")));
             View v = a.kit.personRow(row.s("name"), sub.isEmpty() ? "—" : sub,
                     row.l("todayN") > 0 ? Money.fa(String.valueOf(row.l("todayN"))) + " اقدام امروز" : "—",
                     on ? "فعال" : "غیرفعال", on ? Theme.SUCCESS : Theme.MUTED,

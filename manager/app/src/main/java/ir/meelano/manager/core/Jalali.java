@@ -94,13 +94,80 @@ public final class Jalali {
             else if (ch >= '٠' && ch <= '٩') b.append((char) ('0' + (ch - '٠')));
             else b.append(ch);
         }
-        String[] p = b.toString().split("[/\\-]");
+        String t = b.toString().trim();
+        // Bare «YYYYMMDD» (some Atiran columns store dates without separators).
+        if (t.length() >= 8 && isDigit8(t.substring(0, 8)) && (t.length() == 8 || !Character.isDigit(t.charAt(8)))) {
+            try {
+                return new int[]{Integer.parseInt(t.substring(0, 4)), Integer.parseInt(t.substring(4, 6)), Integer.parseInt(t.substring(6, 8))};
+            } catch (Exception e) { return null; }
+        }
+        String[] p = t.split("[/\\-]");
         if (p.length < 3) return null;
         try {
             String dd = p[2].trim();
             if (dd.length() > 2) dd = dd.substring(0, 2);
             return new int[]{Integer.parseInt(p[0].trim()), Integer.parseInt(p[1].trim()), Integer.parseInt(dd)};
         } catch (Exception e) { return null; }
+    }
+
+    private static boolean isDigit8(String s) {
+        if (s == null || s.length() != 8) return false;
+        for (int i = 0; i < 8; i++) if (!Character.isDigit(s.charAt(i))) return false;
+        return true;
+    }
+
+    // =====================================================================================
+    // Central display normalizer — EVERY date shown in the UI must go through disp().
+    // Atiran stores dates as Jalali text («1405/07/06»), bare digits («14050706»),
+    // Gregorian datetimes («2026-10-07 10:30:00») or placeholders («--», «1499/12/29»).
+    // disp() folds all of them into «YYYY/MM/DD», or "" when there is no real date.
+    // =====================================================================================
+    /** Years beyond today+8 are Atiran placeholders (e.g. putchk «1499/12/29»), not real dates. */
+    public static boolean isPlaceholderYear(int jy) {
+        int[] now = fromDay(today());
+        return jy < 1300 || jy > now[0] + 8;
+    }
+
+    /** Normalize ANY Atiran date representation to Jalali «YYYY/MM/DD»; "" when none. */
+    public static String disp(String raw) {
+        if (raw == null) return "";
+        String t = raw.trim();
+        if (t.isEmpty() || t.startsWith("--")) return "";
+        // Gregorian leading date («2026-10-07…») → Jalali; time suffix dropped.
+        String head = t.length() >= 10 ? t.substring(0, 10) : t;
+        if (head.length() == 10 && head.charAt(4) == '-' && head.charAt(7) == '-') {
+            boolean greg = true;
+            for (int i = 0; i < 10; i++) {
+                if (i == 4 || i == 7) continue;
+                char ch = head.charAt(i);
+                if (ch < '0' || ch > '9') { greg = false; break; }
+            }
+            if (greg) {
+                try {
+                    int y = Integer.parseInt(head.substring(0, 4));
+                    int mo = Integer.parseInt(head.substring(5, 7));
+                    int d = Integer.parseInt(head.substring(8, 10));
+                    if (mo < 1 || mo > 12 || d < 1 || d > 31) return "";
+                    return format(g2d(y, mo, d));
+                } catch (Exception e) {
+                    return "";
+                }
+            }
+            return "";
+        }
+        // Jalali text (any separator, optional time suffix, fa/ar digits, YYYYMMDD).
+        String tok = t.split("[\\sT]")[0];
+        int[] ymd = splitYmd(tok);
+        if (ymd == null) return "";
+        int y = ymd[0], mo = ymd[1], d = ymd[2];
+        if (isPlaceholderYear(y) || mo < 1 || mo > 12 || d < 1 || d > daysInMonth(y, mo)) return "";
+        return String.format(Locale.US, "%04d/%02d/%02d", y, mo, d);
+    }
+
+    /** disp() with Persian digits, or «—» when there is no real date. Never "". */
+    public static String dispFa(String raw) {
+        String d = disp(raw);
+        return d.isEmpty() ? "—" : Money.fa(d);
     }
 
     /** Days in a Jalali month (leap Esfand handled via day arithmetic, no leap tables). */
@@ -137,10 +204,10 @@ public final class Jalali {
     }
 
     /** "1405/07/14" for today. */
-    /** Days from a to b (b − a); −1 when either side is unparseable. */
+    /** Days from a to b (b − a); −1 when either side is unparseable. Accepts any Atiran date form. */
     public static int diffDays(String a, String b) {
-        int da = parse(a);
-        int db = parse(b);
+        int da = parse(disp(a));
+        int db = parse(disp(b));
         return da < 0 || db < 0 ? -1 : db - da;
     }
 
@@ -171,9 +238,10 @@ public final class Jalali {
         return MONTHS[j[1] - 1];
     }
 
-    /** Short label for charts: "۶ مهر". */
+    /** Short label for charts: "۶ مهر". Accepts any Atiran date form (incl. Gregorian). */
     public static String shortLabel(String date) {
-        int d = parse(date);
+        String norm = disp(date);
+        int d = norm.isEmpty() ? -1 : parse(norm);
         if (d < 0) return date == null ? "" : date;
         int[] j = fromDay(d);
         return j[2] + " " + MONTHS[j[1] - 1];

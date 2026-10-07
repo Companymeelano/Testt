@@ -412,12 +412,9 @@ public final class MoneyQueries {
 
     private static String chqStatusLabel(Meta m, Chq c, String a) {
         if (c.statusLabel != null) return "COALESCE(" + Sql.txt(a, c.statusLabel, 120) + ",N'')";
-        // CheckTypes(ID, Desciption) joined on the raw status (legacy behaviour).
-        String id = m.col("CheckTypes", "ID", "id");
-        String nm = m.col("CheckTypes", "Desciption", "Description", "name");
-        if (id != null && nm != null && m.table("CheckTypes"))
-            return "COALESCE((SELECT TOP (1) " + Sql.txt("t", nm, 120) + " FROM dbo.CheckTypes t"
-                    + " WHERE TRY_CONVERT(nvarchar(50),t.[" + id + "])=TRY_CONVERT(nvarchar(50)," + a + ".[" + c.st + "])),N'')";
+        // NOTE: CheckTypes holds cheque TYPES (keyed by CheckTypeID, 2 rows) — never statuses.
+        // Joining it on the status code produced wrong labels, so there is no DB fallback:
+        // the UI maps codes via AtiranSchema (validated against Atiran's procedures).
         return "N''";
     }
 
@@ -463,23 +460,28 @@ public final class MoneyQueries {
         }
         String st = "LTRIM(RTRIM(TRY_CONVERT(nvarchar(40),h.[" + c.st + "])))";
         String back = c.back == null ? null : "UPPER(LTRIM(RTRIM(TRY_CONVERT(nvarchar(10),h.[" + c.back + "]))))";
-        String banked = c.ourBank == null ? null : "ISNULL(TRY_CONVERT(int,h.[" + c.ourBank + "]),0)>0";
         String b = bucket == null ? "" : bucket;
+        String backIsT = back == null ? null : back + " IN (N'T',N'1',N'TRUE')";
+        String backNotT = back == null ? null : "(" + back + " NOT IN (N'T',N'1',N'TRUE') OR " + back + " IS NULL)";
         if (incoming) {
-            if ("sandogh".equals(b)) { conds.add(st + "=N'0'"); if (banked != null) conds.add("NOT (" + banked + ")"); if (back != null) conds.add(back + " NOT IN (N'T',N'1')"); }
-            else if ("bank".equals(b)) {
-                if (banked == null) throw new Queries.Missing("ستون بانک ما در «چک‌های دریافتی» پیدا نشد");
-                conds.add(banked); conds.add(st + "=N'0'");
+            // Proc truth: 1 in-hand • 2 at bank • 3 collected • 4 returned • 5 spent • back='t' bounced.
+            if ("sandogh".equals(b)) { conds.add(st + "=N'1'"); if (backNotT != null) conds.add(backNotT); }
+            else if ("bank".equals(b)) conds.add(st + "=N'2'");
+            else if ("vosool".equals(b)) conds.add(st + "=N'3'");
+            else if ("esterdad".equals(b)) conds.add(st + "=N'4'");
+            else if ("kharj".equals(b)) conds.add(st + "=N'5'");
+            else if ("bargashti".equals(b)) {
+                if (backIsT == null) throw new Queries.Missing("ستون برگشتی در «چک‌های دریافتی» پیدا نشد");
+                conds.add(backIsT);
+            } else if ("sayer".equals(b)) {
+                conds.add("(" + st + " NOT IN (N'1',N'2',N'3',N'4',N'5')" + (backIsT == null ? "" : " AND NOT (" + backIsT + ")") + ")");
             }
-            else if ("vosool".equals(b)) conds.add(st + "=N'1'");
-            else if ("kharj".equals(b)) conds.add(st + "=N'3'");
-            else if ("bargashti".equals(b)) conds.add("(" + st + "=N'2'" + (back == null ? "" : " OR " + back + " IN (N'T',N'1')") + ")");
         } else {
-            if ("jari".equals(b)) conds.add(st + "=N'0'");
-            else if ("pas".equals(b)) conds.add(st + "=N'1'");
-            else if ("bargashti".equals(b)) conds.add("(" + st + "=N'2'" + (back == null ? "" : " OR " + back + " IN (N'T',N'1')") + ")");
-            else if ("enteghal".equals(b)) conds.add(st + "=N'3'");
-            else if ("sefid".equals(b)) conds.add(st + "=N'4'");
+            // Proc truth: 0 blank • 1 issued • 2 cleared. (No bounce flow exists for putchk.)
+            if ("jari".equals(b)) conds.add(st + "=N'1'");
+            else if ("pas".equals(b)) conds.add(st + "=N'2'");
+            else if ("sefid".equals(b)) conds.add(st + "=N'0'");
+            else if ("sayer".equals(b)) conds.add(st + " NOT IN (N'0',N'1',N'2')");
         }
         if (f.bank >= 0 && c.ourBank != null) { conds.add("TRY_CONVERT(int,h.[" + c.ourBank + "])=?"); binds.add(f.bank); }
         if (f.search != null && !f.search.trim().isEmpty()) {
@@ -539,8 +541,12 @@ public final class MoneyQueries {
         String d1 = Sql.dateCond(sar, today, until, binds);
         String d2 = Sql.dateCond(sar, Jalali.todayGregorian(), Jalali.toGregorian(until), binds);
         conds.add("(" + d1 + " OR " + d2 + ")");
-        conds.add(st + "=N'0'");
-        if (c.back != null) conds.add("UPPER(LTRIM(RTRIM(TRY_CONVERT(nvarchar(10),h.[" + c.back + "])))) NOT IN (N'T',N'1')");
+        // Outstanding = still with us: incoming 1/2 (not bounced), outgoing 1 (issued).
+        conds.add(incoming ? st + " IN (N'1',N'2')" : st + "=N'1'");
+        if (incoming && c.back != null)
+            conds.add("(UPPER(LTRIM(RTRIM(TRY_CONVERT(nvarchar(10),h.[" + c.back + "])))) NOT IN (N'T',N'1',N'TRUE'))");
+        // Skip placeholder due dates («--», «1499/12/29» on blank cheques).
+        conds.add("(" + sar + " NOT LIKE N'--%' AND " + sar + " NOT LIKE N'149%' AND " + sar + " NOT LIKE N'15%' AND " + sar + " NOT LIKE N'16%')");
         boolean needCust = !c.isView && c.shmo != null;
         String join = needCust ? Queries.custJoin(m, "h", c.shmo, "cu") : "";
         String custExpr = c.custName != null ? "COALESCE(" + Sql.txt("h", c.custName, 250) + ",N'—')"
@@ -548,6 +554,14 @@ public final class MoneyQueries {
         return new Queries.Q("SELECT " + (c.num == null ? "N'—'" : "COALESCE(" + Sql.txt("h", c.num, 80) + ",N'—')") + " AS num"
                 + ", " + (c.bank == null ? "N''" : "COALESCE(" + Sql.txt("h", c.bank, 150) + ",N'')") + " AS bank"
                 + ", " + Sql.num("h", c.amount) + " AS amount"
+                + ", " + Sql.date10("h", c.sardate) + " AS sardate"
+                + ", " + custExpr + " AS customer"
+                + ", COALESCE(" + Sql.txt("h", c.st, 40) + ",N'') AS st"
+                + " FROM dbo.[" + c.table + "] h" + join + " WHERE " + Sql.join(conds, " AND ")
+                + " ORDER BY h.[" + c.sardate + "]", binds);
+    }
+}
+ " + Sql.num("h", c.amount) + " AS amount"
                 + ", " + Sql.date10("h", c.sardate) + " AS sardate"
                 + ", " + custExpr + " AS customer"
                 + ", COALESCE(" + Sql.txt("h", c.st, 40) + ",N'') AS st"

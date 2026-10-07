@@ -6,6 +6,7 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 
 import ir.meelano.manager.MainActivity;
+import ir.meelano.manager.core.AtiranSchema;
 import ir.meelano.manager.core.Filter;
 import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.Money;
@@ -289,12 +290,12 @@ public class CustomersScreen extends Screen {
             body.addView(darTable(dz.darsOut), a.kit.lp(-1, -2));
         }
         if (!dz.chqIn.isEmpty()) {
-            for (Row r : dz.chqIn) r.put("stLabel", inLabel(r.s("st")));
+            for (Row r : dz.chqIn) r.put("stLabel", inLabel(r));
             body.addView(a.kit.text("چک‌های دریافتی (" + Money.fa(String.valueOf(dz.chqIn.size())) + ")", 13.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
             body.addView(chqTable(dz.chqIn), a.kit.lp(-1, -2));
         }
         if (!dz.chqOut.isEmpty()) {
-            for (Row r : dz.chqOut) r.put("stLabel", outLabel(r.s("st")));
+            for (Row r : dz.chqOut) r.put("stLabel", outLabel(r));
             body.addView(a.kit.text("چک‌های پرداختی (" + Money.fa(String.valueOf(dz.chqOut.size())) + ")", 13.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
             body.addView(chqTable(dz.chqOut), a.kit.lp(-1, -2));
         }
@@ -365,22 +366,11 @@ public class CustomersScreen extends Screen {
         return a.kit.dataTable(cols, cap(rows0, 30), null);
     }
 
-    private String inLabel(String st) {
-        String s = st == null ? "" : st.trim();
-        if ("0".equals(s)) return "صندوق";
-        if ("1".equals(s)) return "وصول‌شده";
-        if ("2".equals(s)) return "برگشتی";
-        if ("3".equals(s)) return "خرج‌شده";
-        return s.isEmpty() ? "—" : s;
+    private String inLabel(Row r) {
+        return AtiranSchema.chequeInStatusFa(r.s("st"), r.s("back"));
     }
 
-    private String outLabel(String st) {
-        String s = st == null ? "" : st.trim();
-        if ("0".equals(s)) return "جاری";
-        if ("1".equals(s)) return "پاس‌شده";
-        if ("2".equals(s)) return "برگشتی";
-        if ("3".equals(s)) return "انتقال";
-        if ("4".equals(s)) return "سفید";
-        return s.isEmpty() ? "—" : s;
+    private String outLabel(Row r) {
+        return AtiranSchema.chequeOutStatusFa(r.s("st"));
     }
 }

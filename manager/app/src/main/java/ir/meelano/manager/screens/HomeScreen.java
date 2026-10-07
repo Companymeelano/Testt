@@ -121,16 +121,20 @@ public class HomeScreen extends Screen {
         content.addView(greetingHero(), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(12));
 
-        // ---- day KPIs ----
+        // ---- day KPIs (tap a tile → that day's detail list) ----
         List<Kit.Kpi> kpis = new ArrayList<>();
         kpis.add(new Kit.Kpi("فروش " + dayOf(d.salesDay), Money.compactRial(d.salesDay.d("total")),
-                Money.fa(String.valueOf(d.salesDay.l("docs"))) + " فاکتور", Theme.GOLD));
+                Money.fa(String.valueOf(d.salesDay.l("docs"))) + " فاکتور", Theme.GOLD,
+                () -> gotoDay("sales", d.salesDay)));
         kpis.add(new Kit.Kpi("خرید " + dayOf(d.buyDay), Money.compactRial(d.buyDay.d("total")),
-                Money.fa(String.valueOf(d.buyDay.l("docs"))) + " فاکتور", Theme.INFO));
+                Money.fa(String.valueOf(d.buyDay.l("docs"))) + " فاکتور", Theme.INFO,
+                () -> gotoDay("buy", d.buyDay)));
         kpis.add(new Kit.Kpi("دریافت " + dayOf(d.inDay), Money.compactRial(d.inDay.d("total")),
-                Money.fa(String.valueOf(d.inDay.l("count"))) + " قبض", Theme.SUCCESS));
+                Money.fa(String.valueOf(d.inDay.l("count"))) + " قبض", Theme.SUCCESS,
+                () -> gotoDay("dar_in", d.inDay)));
         kpis.add(new Kit.Kpi("پرداخت " + dayOf(d.outDay), Money.compactRial(d.outDay.d("total")),
-                Money.fa(String.valueOf(d.outDay.l("count"))) + " قبض", Theme.WARNING));
+                Money.fa(String.valueOf(d.outDay.l("count"))) + " قبض", Theme.WARNING,
+                () -> gotoDay("dar_out", d.outDay)));
         content.addView(a.kit.kpiGrid(kpis, 2), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(12));
 
@@ -277,12 +281,27 @@ public class HomeScreen extends Screen {
 
     private String dayOf(Row day) {
         if (day == null) return "";
-        String d = day.s("d");
+        String d = Jalali.disp(day.s("d"));
         if (d.isEmpty()) return "";
         String today = Jalali.todayStr();
         if (d.equals(today)) return "امروز";
         if (d.equals(Jalali.addDays(today, -1))) return "دیروز";
         return Jalali.shortLabel(d);
+    }
+
+    /** Open a section narrowed to the KPI day (custom 1-day range). */
+    private void gotoDay(String target, Row day) {
+        String d = day == null ? "" : Jalali.disp(day.s("d"));
+        Screen s = a.screen(target);
+        if (s != null && s.filter() != null && !d.isEmpty()) {
+            Filter nf = s.filter().copy();
+            nf.preset = Filter.P_CUSTOM;
+            nf.from = d;
+            nf.to = d;
+            nf.page = 0;
+            s.applyFilter(nf);
+        }
+        a.nav(target);
     }
 
     private double sum(List<Row> rows) {
@@ -294,7 +313,10 @@ public class HomeScreen extends Screen {
     /** Fill missing days with 0 for a smooth 14-day chart. */
     private List<Charts.Point> filled(List<Row> rows) {
         Map<String, Double> map = new HashMap<>();
-        if (rows != null) for (Row r : rows) map.put(r.s("day"), r.d("total"));
+        if (rows != null) for (Row r : rows) {
+            String k = Jalali.disp(r.s("day"));
+            if (!k.isEmpty()) map.put(k, r.d("total"));
+        }
         List<Charts.Point> out = new ArrayList<>();
         String to = Jalali.todayStr();
         String from = Jalali.addDays(to, -13);

@@ -141,6 +141,18 @@ public class ReportsScreen extends Screen {
         });
     }
 
+    /** Without dif_date_alan the server sends days=−1: derive the delay from the due date. */
+    private void mapUnsettled(List<Row> rows) {
+        if (rows == null) return;
+        String today = Jalali.todayStr();
+        for (Row r : rows) {
+            if (r.l("days") < 0) {
+                int dd = Jalali.diffDays(r.s("dueDate"), today);
+                r.put("days", dd < 0 ? 0 : dd);
+            }
+        }
+    }
+
     /** Normalize aging rows (k-based or month-based) into bucket/amount/count. */
     private void mapAging(List<Row> rows, Meta m) {
         boolean useK = m.function("dif_date_alan");

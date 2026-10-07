@@ -218,7 +218,7 @@ public final class Charts {
                 float best = Float.MAX_VALUE;
                 int idx = 0;
                 for (int i = 0; i < n; i++) {
-                    float x = n == 1 ? plot.centerX() : plot.left + plot.width() * i / (n - 1);
+                    float x = n == 1 ? plot.centerX() : plot.right - plot.width() * i / (n - 1);
                     float d = Math.abs(x - e.getX());
                     if (d < best) { best = d; idx = i; }
                 }
@@ -291,7 +291,8 @@ public final class Charts {
                 Point p = data.get(i);
                 int col = p.color != 0 ? p.color : (p.value < 0 ? Theme.DANGER : palette(i));
                 if (selected >= 0 && i != selected) col = Theme.alpha(col, 90);
-                float cx = plot.left + slot * i + slot / 2f;
+                // RTL: first (top-ranked) bar at the right.
+                float cx = plot.right - slot * i - slot / 2f;
                 float yv = (float) (plot.bottom - plot.height() * ((p.value - mn) / (mx - mn)) * progress);
                 float top = Math.min(yv, zeroY);
                 float bot = Math.max(yv, zeroY);
@@ -312,7 +313,7 @@ public final class Charts {
             if ((e.getAction() == MotionEvent.ACTION_DOWN || e.getAction() == MotionEvent.ACTION_MOVE) && !data.isEmpty()) {
                 int n = data.size();
                 float slot = plot.width() / n;
-                int idx = (int) ((e.getX() - plot.left) / slot);
+                int idx = (int) ((plot.right - e.getX()) / slot);
                 if (idx < 0) idx = 0;
                 if (idx >= n) idx = n - 1;
                 if (idx != selected) {
@@ -534,6 +535,10 @@ public final class Charts {
             paint.setColor(Theme.MUTED);
             paint.setTextSize(Theme.dp(10.5f));
             g.drawText("تحقق هدف", cx, cy - Theme.dp(4), paint);
+        }
+    }
+}
+        g.drawText("تحقق هدف", cx, cy - Theme.dp(4), paint);
         }
     }
 }

@@ -404,6 +404,7 @@ public final class MasterQueries {
                 + ", " + Sql.num("h", c.amount) + " AS amount"
                 + ", " + (c.sardate == null ? "CAST(NULL AS nvarchar(10))" : Sql.date10("h", c.sardate)) + " AS sardate"
                 + ", COALESCE(" + Sql.txt("h", c.st, 40) + ",N'') AS st"
+                + ", " + (c.back == null ? "N''" : "COALESCE(" + Sql.txt("h", c.back, 10) + ",N'')") + " AS back"
                 + " FROM dbo.[" + c.table + "] h WHERE TRY_CONVERT(nvarchar(100),h.[" + c.shmo + "])=?"
                 + " ORDER BY " + order, binds);
     }

@@ -114,7 +114,8 @@ public final class FilterSheet {
             });
             root.addView(search, kit.lp(-1, -2));
             root.addView(kit.gap(10));
-            pendingSearch[0] = "";
+            // NOTE: pendingSearch keeps f.search — clearing it here would wipe the
+            // search text whenever the user applies any other filter change.
             search.addTextChangedListener(new SimpleWatcher() {
                 @Override
                 public void onText(String s) {
@@ -352,7 +353,7 @@ public final class FilterSheet {
         }
         LinearLayout r = kit.h();
         r.setGravity(Gravity.CENTER);
-        final NumberPicker y = picker(kit, 1350, 1480, j[0]);
+        final NumberPicker y = picker(kit, 1350, 1500, j[0]);
         final NumberPicker mo = picker(kit, 1, 12, j[1]);
         final NumberPicker d = picker(kit, 1, 31, j[2]);
         // Day count follows the selected month (no "Esfand 31st").

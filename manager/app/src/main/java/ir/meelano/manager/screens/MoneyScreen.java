@@ -120,14 +120,15 @@ public class MoneyScreen extends Screen {
         content.removeAllViews();
         content.addView(heroCard(), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(12));
+        addSearchRow(content);
 
         Row s = d.summary == null ? new Row() : d.summary;
         List<Kit.Kpi> kpis = new ArrayList<>();
-        kpis.add(new Kit.Kpi("جمع", Money.compact(s.d("total")), Money.fa(String.valueOf(s.l("count"))) + " قبض", accent()));
-        kpis.add(new Kit.Kpi("نقد", Money.compact(s.d("cash")), "", Theme.SUCCESS));
-        kpis.add(new Kit.Kpi("کارت", Money.compact(s.d("pos")), "", Theme.INFO));
-        kpis.add(new Kit.Kpi("حواله", Money.compact(s.d("havaleh")), "", Theme.VIOLET));
-        kpis.add(new Kit.Kpi("چک", Money.compact(s.d("cheque")), "", Theme.GOLD));
+        kpis.add(new Kit.Kpi("جمع", Money.compactRial(s.d("total")), Money.fa(String.valueOf(s.l("count"))) + " قبض", accent()));
+        kpis.add(new Kit.Kpi("نقد", Money.compactRial(s.d("cash")), "", Theme.SUCCESS));
+        kpis.add(new Kit.Kpi("کارت", Money.compactRial(s.d("pos")), "", Theme.INFO));
+        kpis.add(new Kit.Kpi("حواله", Money.compactRial(s.d("havaleh")), "", Theme.VIOLET));
+        kpis.add(new Kit.Kpi("چک", Money.compactRial(s.d("cheque")), "", Theme.GOLD));
         content.addView(a.kit.kpiGrid(kpis, 2), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(12));
 
@@ -169,7 +170,7 @@ public class MoneyScreen extends Screen {
             if (pill.isEmpty()) pill = "—";
             View v = a.kit.docRow("قبض " + Money.fa(ghno), r.s("customer"),
                     Jalali.shortLabel(r.s("date")), Money.rial(r.d("total")),
-                    pill, v2 -> openDetail(ghno));
+                    pill, accent(), v2 -> openDetail(ghno));
             LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
             p.setMargins(0, 0, 0, Theme.dp(10));
             content.addView(v, p);
@@ -193,7 +194,7 @@ public class MoneyScreen extends Screen {
             pts.add(new Charts.Point(d.banks.get(i).s("bank"), d.banks.get(i).d("total"), PALETTE[i % PALETTE.length]));
         double sum = 0;
         for (Row r : d.banks) sum += r.d("total");
-        dn.setData(pts, "جمع گردش", Money.compact(sum));
+        dn.setData(pts, "جمع گردش", Money.compactRial(sum));
         c.addView(dn, new LinearLayout.LayoutParams(-1, Theme.dp(300)));
         ReportCatalog.Col[] cols = new ReportCatalog.Col[]{
                 new ReportCatalog.Col("bank", "بانک", ReportCatalog.T_TEXT),
@@ -252,6 +253,7 @@ public class MoneyScreen extends Screen {
 
     private void showDetail(Detail dt) {
         Row head = dt.head;
+        final AlertDialog[] dlgHolder = new AlertDialog[1];
         LinearLayout body = a.kit.v();
         body.addView(a.kit.kv("شماره قبض", Money.fa(head.s("ghno")), Theme.TEXT), a.kit.lp(-1, -2));
         body.addView(a.kit.kv("تاریخ", Money.fa(head.s("date")), Theme.TEXT), a.kit.lp(-1, -2));
@@ -265,7 +267,25 @@ public class MoneyScreen extends Screen {
         body.addView(a.kit.kv("جمع", Money.rial(head.d("total")), Theme.GOLD_SOFT), a.kit.lp(-1, -2));
         if (!head.s("descrip").isEmpty()) body.addView(a.kit.kv("شرح", head.s("descrip"), Theme.MUTED), a.kit.lp(-1, -2));
         if (!head.s("username").isEmpty()) body.addView(a.kit.kv("کاربر", head.s("username"), Theme.MUTED), a.kit.lp(-1, -2));
+        String doneDate = head.s("doneDate");
+        if (!doneDate.isEmpty() && !doneDate.equals(head.s("date")))
+            body.addView(a.kit.kv("تاریخ ثبت", Money.fa(doneDate), Theme.MUTED), a.kit.lp(-1, -2));
         body.addView(a.kit.text("مبلغ به حروف: " + Money.words(head.d("total")), 11f, Theme.MUTED, false), a.kit.lp(-1, -2));
+        if (!head.s("linkNo").isEmpty()) {
+            final String linkNo = head.s("linkNo");
+            final String target = p == 0 ? "sales" : "buy";
+            body.addView(a.kit.btnGhost("🧾 فاکتور مرتبط " + Money.fa(linkNo), accent(), v -> {
+                if (dlgHolder[0] != null) dlgHolder[0].dismiss();
+                Screen s = a.screen(target);
+                if (s != null) {
+                    Filter nf = s.filter().copy();
+                    nf.search = linkNo;
+                    nf.page = 0;
+                    s.applyFilter(nf);
+                }
+                a.nav(target);
+            }), a.kit.lp(-1, -2));
+        }
 
         if (!dt.pos.isEmpty()) {
             body.addView(a.kit.text("کارت / حواله", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
@@ -277,7 +297,7 @@ public class MoneyScreen extends Screen {
             body.addView(a.kit.dataTable(cols, dt.pos, null), a.kit.lp(-1, -2));
         }
         if (!dt.chqs.isEmpty()) {
-            body.addView(a.kit.text(p == 0 ? "چک‌های این قبض" : "چک‌های این قبض", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
+            body.addView(a.kit.text("چک‌های این قبض", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
             ReportCatalog.Col[] cols = new ReportCatalog.Col[]{
                     new ReportCatalog.Col("num", "شماره", ReportCatalog.T_TEXT),
                     new ReportCatalog.Col("amount", "مبلغ", ReportCatalog.T_MONEY),
@@ -299,6 +319,7 @@ public class MoneyScreen extends Screen {
         sv.addView(body);
         AlertDialog dlg = new AlertDialog.Builder(a, android.R.style.Theme_Material_Dialog_NoActionBar)
                 .setView(sv).create();
+        dlgHolder[0] = dlg;
         if (dlg.getWindow() != null)
             dlg.getWindow().setBackgroundDrawable(Theme.dialogBg());
         body.addView(a.kit.gap(8));

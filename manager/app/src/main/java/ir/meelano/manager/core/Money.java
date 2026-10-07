@@ -32,7 +32,7 @@ public final class Money {
 
     private static String group(long v) {
         DecimalFormat f = new DecimalFormat("#,##0", DecimalFormatSymbols.getInstance(Locale.US));
-        return f.format(v).replace(',', '٬');
+        return f.format(v).replace(',', '٬').replace('-', '−');
     }
 
     /** «۱۲٬۴۵۰٬۰۰۰ ریال» */
@@ -69,7 +69,7 @@ public final class Money {
             if (i > 0 && (n - i) % 3 == 0) b.append('٬');
             b.append(ip.charAt(i));
         }
-        return neg ? "-" + b : b.toString();
+        return neg ? "−" + b : b.toString();
     }
 
     /** Compact amount for chart axes: «۱۲٫۴ میلیون». */
@@ -84,10 +84,22 @@ public final class Money {
         return fa(s);
     }
 
+    /** Compact amount WITH the Rial unit for tiles/cards: «۱۲٫۴ میلیون ریال». */
+    public static String compactRial(double v) {
+        double a = Math.abs(v);
+        String s;
+        if (a >= 1e12) s = trim(v / 1e12) + " هزار میلیارد ریال";
+        else if (a >= 1e9) s = trim(v / 1e9) + " میلیارد ریال";
+        else if (a >= 1e6) s = trim(v / 1e6) + " میلیون ریال";
+        else if (a >= 1e3) s = trim(v / 1e3) + " هزار ریال";
+        else s = trim(v) + " ریال";
+        return fa(s);
+    }
+
     private static String trim(double v) {
         String s = String.format(Locale.US, Math.abs(v) >= 100 ? "%.0f" : "%.1f", v);
         if (s.endsWith(".0")) s = s.substring(0, s.length() - 2);
-        return s.replace('.', '٫');
+        return s.replace('.', '٫').replace('-', '−');
     }
 
     /** «٪۱۲٫۵» */

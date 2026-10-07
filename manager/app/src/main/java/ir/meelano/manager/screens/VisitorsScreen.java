@@ -100,6 +100,7 @@ public class VisitorsScreen extends Screen {
         content.removeAllViews();
         content.addView(heroCard(), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
+        addSearchRow(content);
 
         double sales = 0, collected = 0;
         long invoices = 0;
@@ -111,8 +112,8 @@ public class VisitorsScreen extends Screen {
             }
         }
         List<Kit.Kpi> kpis = new ArrayList<>();
-        kpis.add(new Kit.Kpi("فروش بازه", Money.compact(sales), "", accent()));
-        kpis.add(new Kit.Kpi("وصول فاکتور", Money.compact(collected), "", Theme.SUCCESS));
+        kpis.add(new Kit.Kpi("فروش بازه", Money.compactRial(sales), "", accent()));
+        kpis.add(new Kit.Kpi("وصول فاکتور", Money.compactRial(collected), "", Theme.SUCCESS));
         kpis.add(new Kit.Kpi("فاکتورها", Money.fa(String.valueOf(invoices)), "", Theme.INFO));
         kpis.add(new Kit.Kpi("ویزیتورها", Money.fa(String.valueOf(d.perf == null ? 0 : d.perf.size())), "نفر", Theme.VIOLET));
         content.addView(a.kit.kpiGrid(kpis, 2), a.kit.lp(-1, -2));
@@ -136,11 +137,11 @@ public class VisitorsScreen extends Screen {
         for (Row r : d.perf) {
             final Row row = r;
             double goals = r.d("goals");
-            String side = goals > 0 ? Money.pct(r.d("sales") * 100.0 / goals) : Money.compact(r.d("sales"));
+            String side = goals > 0 ? Money.pct(r.d("sales") * 100.0 / goals) : Money.compactRial(r.d("sales"));
             String pill = goals > 0 ? "تحقق هدف" : "فروش";
             boolean off = isOff(r.s("active"));
             View v = a.kit.personRow(row.s("name"),
-                    "فروش " + Money.compact(row.d("sales")) + " • " + Money.fa(String.valueOf(row.l("invoices"))) + " فاکتور • " + Money.fa(String.valueOf(row.l("customers"))) + " مشتری"
+                    "فروش " + Money.compactRial(row.d("sales")) + " • " + Money.fa(String.valueOf(row.l("invoices"))) + " فاکتور • " + Money.fa(String.valueOf(row.l("customers"))) + " مشتری"
                             + (off ? " • غیرفعال" : ""),
                     side, pill, goals > 0 && row.d("sales") >= goals ? Theme.SUCCESS : accent(),
                     v2 -> openDetail(row));
@@ -224,8 +225,9 @@ public class VisitorsScreen extends Screen {
         if (h.d("goals") > 0) {
             body.addView(a.kit.kv("هدف", Money.rial(h.d("goals")), Theme.TEXT), a.kit.lp(-1, -2));
             double ach = h.d("sales") / h.d("goals");
-            body.addView(a.kit.progressLine("تحقق هدف", Money.pct(ach * 100), ach,
-                    ach >= 1 ? Theme.SUCCESS : ach >= 0.7 ? Theme.WARNING : Theme.DANGER), a.kit.lp(-1, -2));
+            Charts.Gauge gg = new Charts.Gauge(a);
+            gg.set(ach, Money.pct(ach * 100));
+            body.addView(gg, new LinearLayout.LayoutParams(-1, Theme.dp(170)));
         }
         if (!dt.trend.isEmpty()) {
             body.addView(a.kit.text("روند فروش روزانه", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
@@ -259,10 +261,12 @@ public class VisitorsScreen extends Screen {
             footer.addView(a.kit.btn("فاکتورها", v -> {
                 dlg.dismiss();
                 Screen s = a.screen("sales");
-                Filter nf = s.filter().copy();
-                nf.visitor = visId;
-                nf.page = 0;
-                s.applyFilter(nf);
+                if (s != null && s.filter() != null) {
+                    Filter nf = s.filter().copy();
+                    nf.visitor = visId;
+                    nf.page = 0;
+                    s.applyFilter(nf);
+                }
                 a.nav("sales");
             }), a.kit.wlp(1f));
             footer.addView(a.kit.space(8));

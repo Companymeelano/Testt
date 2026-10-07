@@ -7,6 +7,7 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 
 import ir.meelano.manager.MainActivity;
+import ir.meelano.manager.core.AtiranSchema;
 import ir.meelano.manager.core.Filter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.Money;
@@ -151,13 +152,14 @@ public class TradeScreen extends Screen {
         content.removeAllViews();
         content.addView(heroCard(), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(12));
+        addSearchRow(content);
 
         Row s = d.summary == null ? new Row() : d.summary;
         List<Kit.Kpi> kpis = new ArrayList<>();
-        kpis.add(new Kit.Kpi("جمع", Money.compact(s.d("total")), Money.fa(String.valueOf(s.l("docs"))) + " سند", accent()));
-        kpis.add(new Kit.Kpi(sales ? "دریافتی" : "پرداختی", Money.compact(s.d("paid")), pct(s.d("paid"), s.d("total")) + " وصول", Theme.SUCCESS));
-        kpis.add(new Kit.Kpi("تخفیف", Money.compact(s.d("discount")), "", Theme.WARNING));
-        kpis.add(new Kit.Kpi("مانده", Money.compact(Math.max(0, s.d("remain"))), "", Theme.DANGER));
+        kpis.add(new Kit.Kpi("جمع", Money.compactRial(s.d("total")), Money.fa(String.valueOf(s.l("docs"))) + " سند", accent()));
+        kpis.add(new Kit.Kpi(sales ? "دریافتی" : "پرداختی", Money.compactRial(s.d("paid")), pct(s.d("paid"), s.d("total")) + " وصول", Theme.SUCCESS));
+        kpis.add(new Kit.Kpi("تخفیف", Money.compactRial(s.d("discount")), "", Theme.WARNING));
+        kpis.add(new Kit.Kpi("مانده", Money.compactRial(Math.max(0, s.d("remain"))), "", Theme.DANGER));
         content.addView(a.kit.kpiGrid(kpis, 2), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(12));
 
@@ -200,7 +202,9 @@ public class TradeScreen extends Screen {
         }
         for (Row r : d.list) {
             final String no = r.s("no");
-            String status = Math.abs(r.d("remain")) < 0.5 ? "settled" : "unsettled";
+            boolean settled = Math.abs(r.d("remain")) <= AtiranSchema.SETTLE_TOLERANCE
+                    || "t".equalsIgnoreCase(r.s("tasvieh").trim());
+            String status = settled ? "settled" : "unsettled";
             View v = a.kit.invoiceRow("فاکتور " + Money.fa(no), r.s("customer"),
                     Jalali.shortLabel(r.s("date")), Money.rial(r.d("total")),
                     status, v2 -> openDetailByNo(no));
@@ -227,7 +231,10 @@ public class TradeScreen extends Screen {
         a.kit.addCard(content, c);
         for (Row r : d.overdue) {
             final String no = r.s("invoice");
-            String days = r.l("days") >= 0 ? "تأخیر " + Money.fa(String.valueOf(r.l("days"))) + " روز • " : "";
+            long dd = r.l("days");
+            // Without dif_date_alan the server sends −1: derive the delay from the due date.
+            if (dd < 0) dd = Jalali.diffDays(r.s("dueDate"), Jalali.todayStr());
+            String days = dd >= 0 ? "تأخیر " + Money.fa(String.valueOf(dd)) + " روز • " : "";
             View v = a.kit.alertRow("فاکتور " + Money.fa(no), days + r.s("party") + " • " + Money.rial(r.d("amount")),
                     Theme.DANGER, v2 -> openDetailByNo(no));
             LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
@@ -338,8 +345,14 @@ public class TradeScreen extends Screen {
             body.addView(a.kit.kv("مالیات", Money.rial(head.d("tax")), Theme.TEXT), a.kit.lp(-1, -2));
         body.addView(a.kit.kv("جمع", Money.rial(head.d("total")), Theme.GOLD_SOFT), a.kit.lp(-1, -2));
         body.addView(a.kit.kv(sales ? "دریافتی" : "پرداختی", Money.rial(head.d("paid")), Theme.SUCCESS), a.kit.lp(-1, -2));
+        String tasvieh = head.has("tasvieh") ? AtiranSchema.tasviehFa(head.s("tasvieh")) : "نامشخص";
+        if (!"نامشخص".equals(tasvieh))
+            body.addView(a.kit.kv("وضعیت تسویه", tasvieh,
+                    "تسویه‌شده".equals(tasvieh) ? Theme.SUCCESS : Theme.WARNING), a.kit.lp(-1, -2));
+        double remain = head.d("total") - head.d("paid");
+        if (Math.abs(remain) > AtiranSchema.SETTLE_TOLERANCE)
+            body.addView(a.kit.kv("مانده", Money.rial(remain), remain > 0 ? Theme.DANGER : Theme.INFO), a.kit.lp(-1, -2));
         body.addView(a.kit.text("مبلغ به حروف: " + Money.words(head.d("total")), 11f, Theme.MUTED, false), a.kit.lp(-1, -2));
-
         if (!dt.lines.isEmpty()) {
             body.addView(a.kit.text("اقلام فاکتور", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
             for (Row r : dt.lines) {

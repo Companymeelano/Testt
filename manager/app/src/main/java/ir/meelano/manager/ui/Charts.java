@@ -99,6 +99,12 @@ public final class Charts {
             for (Point p : data) m = Math.max(m, p.value);
             return m <= 0 ? 1 : m;
         }
+
+        double min() {
+            double m = 0;
+            for (Point p : data) m = Math.min(m, p.value);
+            return m;
+        }
     }
 
     static String ellipsize(String s, int n) {
@@ -138,14 +144,17 @@ public final class Charts {
                 g.drawText("داده‌ای برای نمایش نیست", w / 2f, h / 2f, paint);
                 return;
             }
-            double mx = max();
+            double mx = Math.max(0, max());
+            double mn = Math.min(0, min());
+            if (mx - mn <= 0) mx = mn + 1;
             int n = data.size();
             float[] xs = new float[n];
             float[] ys = new float[n];
             for (int i = 0; i < n; i++) {
                 xs[i] = n == 1 ? plot.centerX() : plot.left + plot.width() * i / (n - 1);
-                ys[i] = (float) (plot.bottom - plot.height() * (data.get(i).value / mx) * progress);
+                ys[i] = (float) (plot.bottom - plot.height() * ((data.get(i).value - mn) / (mx - mn)) * progress);
             }
+            float zeroY = (float) (plot.bottom - plot.height() * ((0 - mn) / (mx - mn)) * progress);
             // grid + y labels
             paint.setStyle(Paint.Style.STROKE);
             paint.setStrokeWidth(1);
@@ -155,13 +164,18 @@ public final class Charts {
             for (int k = 0; k <= 3; k++) {
                 float y = plot.bottom - plot.height() * k / 3f;
                 g.drawLine(plot.left, y, plot.right, y, paint);
-                g.drawText(Money.fa(fmt.format(mx * k / 3.0)), plot.left - Theme.dp(4), y + Theme.dp(4), text);
+                g.drawText(Money.fa(fmt.format(mn + (mx - mn) * k / 3.0)), plot.left - Theme.dp(4), y + Theme.dp(4), text);
+            }
+            if (mn < 0) {
+                paint.setColor(Theme.alpha(Theme.TEXT, 80));
+                g.drawLine(plot.left, zeroY, plot.right, zeroY, paint);
+                paint.setColor(Theme.alpha(Theme.TEXT, 22));
             }
             // area
             Path area = new Path();
-            area.moveTo(xs[0], plot.bottom);
+            area.moveTo(xs[0], zeroY);
             for (int i = 0; i < n; i++) area.lineTo(xs[i], ys[i]);
-            area.lineTo(xs[n - 1], plot.bottom);
+            area.lineTo(xs[n - 1], zeroY);
             area.close();
             paint.setStyle(Paint.Style.FILL);
             paint.setShader(new LinearGradient(0, plot.top, 0, plot.bottom,
@@ -249,7 +263,9 @@ public final class Charts {
                 g.drawText("داده‌ای برای نمایش نیست", w / 2f, h / 2f, paint);
                 return;
             }
-            double mx = max();
+            double mx = Math.max(0, max());
+            double mn = Math.min(0, min());
+            if (mx - mn <= 0) mx = mn + 1;
             int n = data.size();
             paint.setStyle(Paint.Style.STROKE);
             paint.setStrokeWidth(1);
@@ -259,24 +275,35 @@ public final class Charts {
             for (int k = 0; k <= 3; k++) {
                 float y = plot.bottom - plot.height() * k / 3f;
                 g.drawLine(plot.left, y, plot.right, y, paint);
-                g.drawText(Money.fa(fmt.format(mx * k / 3.0)), plot.left - Theme.dp(4), y + Theme.dp(4), text);
+                g.drawText(Money.fa(fmt.format(mn + (mx - mn) * k / 3.0)), plot.left - Theme.dp(4), y + Theme.dp(4), text);
+            }
+            float zeroY = (float) (plot.bottom - plot.height() * ((0 - mn) / (mx - mn)) * progress);
+            if (mn < 0) {
+                paint.setColor(Theme.alpha(Theme.TEXT, 80));
+                g.drawLine(plot.left, zeroY, plot.right, zeroY, paint);
             }
             float slot = plot.width() / n;
             float bw = Math.min(slot * 0.52f, Theme.dp(34));
             paint.setStyle(Paint.Style.FILL);
             text.setTextAlign(Paint.Align.CENTER);
+            int step = Math.max(1, (n + 5) / 6);
             for (int i = 0; i < n; i++) {
                 Point p = data.get(i);
-                int col = p.color != 0 ? p.color : palette(i);
+                int col = p.color != 0 ? p.color : (p.value < 0 ? Theme.DANGER : palette(i));
                 if (selected >= 0 && i != selected) col = Theme.alpha(col, 90);
                 float cx = plot.left + slot * i + slot / 2f;
-                float top = (float) (plot.bottom - plot.height() * (p.value / mx) * progress);
-                RectF r = new RectF(cx - bw / 2f, top, cx + bw / 2f, plot.bottom);
-                paint.setShader(new LinearGradient(0, top, 0, plot.bottom, col, Theme.alpha(col, 120), Shader.TileMode.CLAMP));
+                float yv = (float) (plot.bottom - plot.height() * ((p.value - mn) / (mx - mn)) * progress);
+                float top = Math.min(yv, zeroY);
+                float bot = Math.max(yv, zeroY);
+                if (bot - top < Theme.dp(3)) bot = top + Theme.dp(3);
+                RectF r = new RectF(cx - bw / 2f, top, cx + bw / 2f, bot);
+                paint.setShader(new LinearGradient(0, top, 0, bot, col, Theme.alpha(col, 120), Shader.TileMode.CLAMP));
                 g.drawRoundRect(r, Theme.dp(6), Theme.dp(6), paint);
                 paint.setShader(null);
-                text.setColor(Theme.MUTED);
-                g.drawText(Money.fa(ellipsize(p.label, 7)), cx, plot.bottom + Theme.dp(16), text);
+                if (i % step == 0) {
+                    text.setColor(Theme.MUTED);
+                    g.drawText(Money.fa(ellipsize(p.label, 7)), cx, plot.bottom + Theme.dp(16), text);
+                }
             }
         }
 
@@ -365,9 +392,13 @@ public final class Charts {
             paint.setTypeface(Theme.face(false));
             g.drawText(Money.fa(centerTop), cx, cy - Theme.dp(2), paint);
             paint.setColor(Theme.TEXT);
-            paint.setTextSize(Theme.dp(15));
             paint.setTypeface(Theme.face(true));
-            g.drawText(Money.fa(centerBottom), cx, cy + Theme.dp(17), paint);
+            String cb = Money.fa(centerBottom);
+            float holeW = radius * 1.15f;
+            float ts = Theme.dp(15);
+            paint.setTextSize(ts);
+            while (ts > Theme.dp(9) && paint.measureText(cb) > holeW) { ts -= 1; paint.setTextSize(ts); }
+            g.drawText(cb, cx, cy + Theme.dp(17), paint);
             paint.setTypeface(Theme.face(false));
             // legend (two columns, up to 8)
             float ly = cy + radius + Theme.dp(20);
@@ -382,9 +413,10 @@ public final class Charts {
                 if (row > h - Theme.dp(2)) break;
                 paint.setColor(col);
                 g.drawCircle(lx - Theme.dp(5), row - Theme.dp(3.5f), Theme.dp(4), paint);
-                paint.setColor(Theme.MUTED);
+                paint.setColor(Theme.TEXT);
                 paint.setTextAlign(Paint.Align.RIGHT);
-                g.drawText(Money.fa(ellipsize(p.label, 14)), lx - Theme.dp(13), row, paint);
+                String leg = ellipsize(p.label, 12) + "  " + Money.pct(sum > 0 ? Math.max(0, p.value) * 100.0 / sum : 0);
+                g.drawText(Money.fa(leg), lx - Theme.dp(13), row, paint);
             }
         }
     }
@@ -402,10 +434,12 @@ public final class Charts {
             animateIn();
         }
 
+        private static final int ROW_H = 56;
+
         @Override
         protected void onMeasure(int wSpec, int hSpec) {
             int rows = Math.max(1, data.size());
-            int want = rows * Theme.dp(40) + Theme.dp(8);
+            int want = rows * Theme.dp(ROW_H) + Theme.dp(10);
             super.onMeasure(wSpec, MeasureSpec.makeMeasureSpec(want, MeasureSpec.EXACTLY));
         }
 
@@ -414,39 +448,45 @@ public final class Charts {
             super.onDraw(g);
             int w = getWidth();
             if (w <= 0 || data.isEmpty()) return;
-            double mx = max();
-            float labelW = Theme.dp(104);
-            float valW = Theme.dp(78);
-            float barL = Theme.dp(8);
-            float barR = w - labelW - valW - Theme.dp(16);
+            double mx = Math.max(0, max());
+            double mn = Math.min(0, min());
+            if (mx - mn <= 0) mx = mn + 1;
+            float barH = Theme.dp(15);
             for (int i = 0; i < data.size(); i++) {
                 Point p = data.get(i);
-                float top = Theme.dp(6) + i * Theme.dp(40);
-                float mid = top + Theme.dp(13);
-                // label (right)
-                text.setColor(Theme.TEXT);
-                text.setTextSize(Theme.dp(10.5f));
-                text.setTextAlign(Paint.Align.RIGHT);
+                float top = Theme.dp(8) + i * Theme.dp(ROW_H);
+                // line 1: label (right) + value (left) — never overlapping the bar
+                text.setTextSize(Theme.dp(11));
                 text.setTypeface(Theme.face(true));
-                g.drawText(Money.fa(ellipsize(p.label, 15)), w - Theme.dp(8), mid + Theme.dp(1), text);
+                text.setTextAlign(Paint.Align.RIGHT);
+                text.setColor(Theme.TEXT);
+                g.drawText(Money.fa(ellipsize(p.label, 24)), w - Theme.dp(8), top + Theme.dp(12), text);
+                text.setTextAlign(Paint.Align.LEFT);
+                text.setColor(Theme.GOLD_SOFT);
+                g.drawText(Money.fa(fmt.format(p.value)), Theme.dp(8), top + Theme.dp(12), text);
                 text.setTypeface(Theme.face(false));
-                // track
+                // line 2: full-width track + fill
+                float bTop = top + Theme.dp(19);
+                RectF track = new RectF(Theme.dp(8), bTop, w - Theme.dp(8), bTop + barH);
                 paint.setStyle(Paint.Style.FILL);
-                paint.setColor(Theme.alpha(Theme.TEXT, 18));
-                RectF track = new RectF(barL + valW, top, barR + valW, top + Theme.dp(22));
+                paint.setColor(Theme.alpha(Theme.TEXT, 46));
                 g.drawRoundRect(track, Theme.dp(7), Theme.dp(7), paint);
-                // fill from right
-                int col = p.color != 0 ? p.color : palette(i);
-                float frac = (float) (p.value / mx * progress);
-                float fw = Math.max(Theme.dp(8), track.width() * frac);
-                RectF fill = new RectF(track.right - fw, top, track.right, top + Theme.dp(22));
-                paint.setShader(new LinearGradient(track.right, 0, track.left, 0, col, Theme.alpha(col, 130), Shader.TileMode.CLAMP));
+                // fill from the zero line (right edge when all values are >= 0, as before)
+                float zx = track.right - track.width() * (float) ((0 - mn) / (mx - mn));
+                float xv = track.right - track.width() * (float) ((p.value - mn) / (mx - mn));
+                xv = zx + (xv - zx) * progress;
+                int col = p.color != 0 ? p.color : (p.value < 0 ? Theme.DANGER : palette(i));
+                float fl = Math.max(track.left, Math.min(xv, zx));
+                float fr = Math.min(track.right, Math.max(xv, zx));
+                if (p.value != 0 && fr - fl < Theme.dp(8)) {
+                    float mid = (fl + fr) / 2f;
+                    fl = Math.max(track.left, mid - Theme.dp(4));
+                    fr = Math.min(track.right, mid + Theme.dp(4));
+                }
+                RectF fill = new RectF(fl, bTop, fr, bTop + barH);
+                paint.setShader(new LinearGradient(track.right, 0, track.left, 0, col, Theme.alpha(col, 140), Shader.TileMode.CLAMP));
                 g.drawRoundRect(fill, Theme.dp(7), Theme.dp(7), paint);
                 paint.setShader(null);
-                // value (left)
-                text.setColor(Theme.MUTED);
-                text.setTextAlign(Paint.Align.LEFT);
-                g.drawText(Money.fa(fmt.format(p.value)), Theme.dp(8), mid + Theme.dp(1), text);
             }
         }
     }
@@ -495,26 +535,5 @@ public final class Charts {
             paint.setTextSize(Theme.dp(10.5f));
             g.drawText("تحقق هدف", cx, cy - Theme.dp(4), paint);
         }
-    }
-
-    // ================= helpers =================
-    public static List<Point> points(List<ir.meelano.manager.data.Row> rows, String xKey, String yKey) {
-        return points(rows, xKey, yKey, null);
-    }
-
-    public interface Labeler {
-        String label(String raw);
-    }
-
-    public static List<Point> points(List<ir.meelano.manager.data.Row> rows, String xKey, String yKey, Labeler lb) {
-        List<Point> out = new ArrayList<>();
-        if (rows == null) return out;
-        for (int i = 0; i < rows.size(); i++) {
-            ir.meelano.manager.data.Row r = rows.get(i);
-            String x = r.s(xKey);
-            if (lb != null) x = lb.label(x);
-            out.add(new Point(x, r.d(yKey), palette(i)));
-        }
-        return out;
     }
 }

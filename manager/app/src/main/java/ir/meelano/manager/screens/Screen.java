@@ -87,6 +87,15 @@ public abstract class Screen {
         a.kit.addCard(content, c);
     }
 
+    /** In-content search row that opens the filter sheet (no-op when the screen has no filter). */
+    protected void addSearchRow(LinearLayout content) {
+        FilterSheet.Config cfg = filterConfig();
+        if (cfg == null || !cfg.search) return;
+        String hint = cfg.searchHint == null || cfg.searchHint.isEmpty() ? "جستجو…" : cfg.searchHint;
+        content.addView(a.kit.searchBar(hint, v -> a.openFilter()), a.kit.lp(-1, -2));
+        content.addView(a.kit.gap(10));
+    }
+
     protected View heroCard() {
         return a.kit.hero(glyph(), title(), subtitle(), accent());
     }

@@ -36,7 +36,7 @@ public class UsersScreen extends Screen {
     public String glyph() { return "⛉"; }
 
     @Override
-    public int accent() { return Theme.MUTED; }
+    public int accent() { return Theme.STEEL; }
 
     private static final class Data {
         List<Row> users = new ArrayList<>();
@@ -114,6 +114,9 @@ public class UsersScreen extends Screen {
     private boolean isOn(String active) {
         if (active == null || active.trim().isEmpty()) return true;
         String t = active.trim().toUpperCase();
+        // usersList already returns «✓ فعال» / «✕ غیرفعال»; still accept raw flags.
+        if (t.contains("غیرفعال")) return false;
+        if (t.contains("فعال")) return true;
         return !"F".equals(t) && !"0".equals(t) && !"FALSE".equals(t) && !"N".equals(t);
     }
 

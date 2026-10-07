@@ -78,6 +78,8 @@ public final class Atiran {
         if (l.contains("refused") || l.contains("unreachable") || l.contains("no route") || l.contains("network"))
             return "مسیر شبکه به سرور در دسترس نیست";
         if (l.contains("login failed") || l.contains("logon failed")) return "نام کاربری یا رمز دیتابیس اشتباه است";
+        if (l.contains("cannot open database")) return "دیتابیس روی سرور پیدا نشد؛ نام دیتابیس را بررسی کنید";
+        if (l.contains("unknown server host") || l.contains("unknown host") || l.contains("no such host")) return "آدرس سرور اشتباه است یا در شبکه یافت نشد";
         if (l.contains("invalid object name")) {
             String o = m.replaceAll("(?i).*invalid object name\\s*'?dbo\\.?\\.?", "").replace("'", "").trim();
             if (o.length() > 40) o = o.substring(0, 40);

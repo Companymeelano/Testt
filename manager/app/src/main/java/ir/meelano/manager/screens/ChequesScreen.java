@@ -169,6 +169,7 @@ public class ChequesScreen extends Screen {
         content.addView(heroCard(), a.kit.lp(-1, -2));
         content.addView(a.kit.hint("مبنای بازه تاریخی: تاریخ " + (incoming ? "دریافت" : "صدور") + " چک"), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
+        addSearchRow(content);
 
         content.addView(a.kit.chips(new String[]{"↓ دریافتی", "↑ پرداختی"}, incoming ? 0 : 1, idx -> {
             incoming = idx == 0;
@@ -279,12 +280,15 @@ public class ChequesScreen extends Screen {
             final String ghno = r.s("ghno");
             footer.addView(a.kit.btn("مشاهده در قبوض", v -> {
                 dlg.dismiss();
-                Screen s = a.screen(incoming ? "dar_in" : "dar_out");
-                Filter nf = s.filter().copy();
-                nf.search = ghno;
-                nf.page = 0;
-                s.applyFilter(nf);
-                a.nav(incoming ? "dar_in" : "dar_out");
+                String target = incoming ? "dar_in" : "dar_out";
+                Screen s = a.screen(target);
+                if (s != null && s.filter() != null) {
+                    Filter nf = s.filter().copy();
+                    nf.search = ghno;
+                    nf.page = 0;
+                    s.applyFilter(nf);
+                }
+                a.nav(target);
             }), a.kit.wlp(1f));
             footer.addView(a.kit.space(8));
         }

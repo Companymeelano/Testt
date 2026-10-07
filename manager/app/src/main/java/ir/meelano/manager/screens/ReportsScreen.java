@@ -76,6 +76,7 @@ public class ReportsScreen extends Screen {
         if ("ویزیتورها".equals(section)) return Theme.WARNING;
         if ("سود و زیان".equals(section)) return Theme.GOLD;
         if ("بانک و صندوق".equals(section)) return Theme.INFO;
+        if ("کاربران و نظارت".equals(section)) return Theme.STEEL;
         return Theme.MUTED;
     }
 
@@ -208,7 +209,7 @@ public class ReportsScreen extends Screen {
                 Charts.Donut dn = new Charts.Donut(a);
                 double sum = 0;
                 for (Row r : rows) sum += r.d(spec.chartY);
-                dn.setData(pts, "جمع", Money.compact(sum));
+                dn.setData(pts, "جمع", Money.compactRial(sum));
                 c.addView(dn, new LinearLayout.LayoutParams(-1, Theme.dp(300)));
             }
             a.kit.addCard(content, c);

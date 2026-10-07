@@ -24,25 +24,21 @@ public class MoreScreen extends Screen {
     @Override
     public int accent() { return Theme.GOLD; }
 
+    /** Section id → description. Glyph/title/accent always mirror the destination screen. */
     private static final String[][] ITEMS = {
-            {"home", "⌂", "خانه", "داشبورد مدیریتی و هشدارها"},
-            {"sales", "🧾", "فروش", "فاکتورها، معوق‌ها و تحلیل فروش"},
-            {"buy", "🧺", "خرید", "فاکتورهای خرید و طرف‌حساب‌ها"},
-            {"dar_in", "↓", "دریافت‌ها", "قبوض دریافت و ترکیب آن‌ها"},
-            {"dar_out", "↑", "پرداخت‌ها", "قبوض پرداخت و گردش کارت"},
-            {"cheques", "◉", "چک‌ها", "دریافتی، پرداختی و سررسیدها"},
-            {"products", "▦", "کالاها", "موجودی، کم‌موجودی و گردش کالا"},
-            {"customers", "♙", "مشتریان", "پرونده کامل و گردش حساب"},
-            {"visitors", "♟", "ویزیتورها", "عملکرد، وصول و اهداف"},
-            {"users", "⛉", "کاربران", "کاربران سیستم و ورودها"},
-            {"profit", "↗", "سود و زیان", "حاشیه سود و هزینه‌ها"},
-            {"reports", "▤", "گزارشات", "مرکز گزارش‌های مدیریتی"},
-            {"settings", "⚙", "تنظیمات", "اتصال، قفل و درباره"},
-    };
-
-    private static final int[] ACCENTS = {
-            Theme.GOLD, Theme.GOLD, Theme.INFO, Theme.SUCCESS, Theme.WARNING, Theme.INFO,
-            Theme.VIOLET, Theme.SUCCESS, Theme.WARNING, Theme.MUTED, Theme.GOLD, Theme.GOLD, Theme.MUTED,
+            {"home", "داشبورد مدیریتی و هشدارها"},
+            {"sales", "فاکتورها، معوق‌ها و تحلیل فروش"},
+            {"buy", "فاکتورهای خرید و طرف‌حساب‌ها"},
+            {"dar_in", "قبوض دریافت و ترکیب آن‌ها"},
+            {"dar_out", "قبوض پرداخت و گردش کارت"},
+            {"cheques", "دریافتی، پرداختی و سررسیدها"},
+            {"products", "موجودی، کم‌موجودی و گردش کالا"},
+            {"customers", "پرونده کامل و گردش حساب"},
+            {"visitors", "عملکرد، وصول و اهداف"},
+            {"users", "کاربران سیستم و ورودها"},
+            {"profit", "حاشیه سود و هزینه‌ها"},
+            {"reports", "مرکز گزارش‌های مدیریتی"},
+            {"settings", "اتصال، قفل و درباره"},
     };
 
     @Override
@@ -52,7 +48,9 @@ public class MoreScreen extends Screen {
         content.addView(a.kit.gap(12));
         for (int i = 0; i < ITEMS.length; i++) {
             final String id = ITEMS[i][0];
-            View r = a.kit.navRow(ITEMS[i][1], ITEMS[i][2], ITEMS[i][3], ACCENTS[i], v -> a.nav(id));
+            Screen s = a.screen(id);
+            if (s == null) continue;
+            View r = a.kit.navRow(s.glyph(), s.title(), ITEMS[i][1], s.accent(), v -> a.nav(id));
             LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
             p.setMargins(0, 0, 0, Theme.dp(10));
             content.addView(r, p);

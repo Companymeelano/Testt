@@ -143,11 +143,12 @@ public class ProductsScreen extends Screen {
         content.addView(heroCard(), a.kit.lp(-1, -2));
         content.addView(a.kit.hint("آستانه کم‌موجودی: ۵ واحد • گردش کالا بر اساس بازه فیلتر"), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
+        addSearchRow(content);
 
         Row s = d.summary == null ? new Row() : d.summary;
         List<Kit.Kpi> kpis = new ArrayList<>();
         kpis.add(new Kit.Kpi("اقلام", Money.fa(String.valueOf(s.l("count"))), "", accent()));
-        kpis.add(new Kit.Kpi("ارزش موجودی", Money.compact(s.d("value")), "به قیمت خرید", Theme.GOLD));
+        kpis.add(new Kit.Kpi("ارزش موجودی", Money.compactRial(s.d("value")), "به قیمت خرید", Theme.GOLD));
         kpis.add(new Kit.Kpi("ناموجود", Money.fa(String.valueOf(s.l("out"))), "قلم", Theme.DANGER));
         kpis.add(new Kit.Kpi("کم‌موجودی", Money.fa(String.valueOf(s.l("low"))), "قلم", Theme.WARNING));
         content.addView(a.kit.kpiGrid(kpis, 2), a.kit.lp(-1, -2));
@@ -225,7 +226,7 @@ public class ProductsScreen extends Screen {
             pts.add(new Charts.Point(d.groups.get(i).s("label"), d.groups.get(i).d("value"), PALETTE[i % PALETTE.length]));
         double sum = 0;
         for (Row r : d.groups) sum += r.d("value");
-        dn.setData(pts, "ارزش کل", Money.compact(sum));
+        dn.setData(pts, "ارزش کل", Money.compactRial(sum));
         c.addView(dn, new LinearLayout.LayoutParams(-1, Theme.dp(300)));
         ReportCatalog.Col[] cols = new ReportCatalog.Col[]{
                 new ReportCatalog.Col("label", "گروه", ReportCatalog.T_TEXT),

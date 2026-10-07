@@ -22,6 +22,8 @@ public final class Theme {
     public static final int WARNING = 0xFFF5A524;
     public static final int INFO = 0xFF4FA3FF;
     public static final int VIOLET = 0xFF9A7BFF;
+    public static final int TEAL = 0xFF3ED6C5;
+    public static final int STEEL = 0xFF7C8DA6;
 
     private static float density = 3f;
     private static Typeface regular;
@@ -147,5 +149,14 @@ public final class Theme {
     public static void pressable(View v) {
         v.setClickable(true);
         v.setFocusable(true);
+        try {
+            // Touch feedback: wrap the current background in a ripple (minSdk 26, always available).
+            android.graphics.drawable.Drawable bg = v.getBackground();
+            android.content.res.ColorStateList csl =
+                    android.content.res.ColorStateList.valueOf(alpha(TEXT, 64));
+            android.graphics.drawable.Drawable mask =
+                    bg == null ? new android.graphics.drawable.ColorDrawable(0xFFFFFFFF) : null;
+            v.setBackground(new android.graphics.drawable.RippleDrawable(csl, bg, mask));
+        } catch (Exception ignored) { }
     }
 }

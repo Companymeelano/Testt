@@ -29,7 +29,7 @@ import java.util.Set;
  * text, so {@code getText().toString()} keeps working for code that reads labels back; only the
  * rendering changes.  Icons take the text colour and size of the TextView they live in.
  */
-final class MeelanoIcons {
+public final class MeelanoIcons {
     private MeelanoIcons() {}
 
     /** Glyph → drawable, replaced wherever it appears. */
@@ -87,14 +87,20 @@ final class MeelanoIcons {
         any("🚗", R.drawable.mi_directions_car); any("🏁", R.drawable.mi_flag); any("☝", R.drawable.mi_fingerprint);
         any("⧗", R.drawable.mi_assignment_late); any("⌛", R.drawable.mi_work_history);
         any("🚚", R.drawable.mi_local_shipping); any("✍", R.drawable.mi_edit); any("📞", R.drawable.mi_call); any("🗺", R.drawable.mi_location_on);
-        any("⇆", R.drawable.mi_swap_horiz); any("📦", R.drawable.mi_inventory_2); any("💳", R.drawable.mi_payments); any("⊗", R.drawable.mi_cancel); any("⇪", R.drawable.mi_share);
+        any("⇆", R.drawable.mi_swap_horiz);
+        any("⛔", R.drawable.mi_block); any("⛉", R.drawable.mi_group);
+        any("♟", R.drawable.mi_person_search); any("🧺", R.drawable.mi_add_shopping_cart);
+        any("⌫", R.drawable.mi_backspace); any("›", R.drawable.mi_chevron_left); any("📦", R.drawable.mi_inventory_2); any("💳", R.drawable.mi_payments); any("⊗", R.drawable.mi_cancel); any("⇪", R.drawable.mi_share);
 
         lead("×", R.drawable.mi_close); lead("−", R.drawable.mi_remove); lead("+", R.drawable.mi_add); lead("＋", R.drawable.mi_add);
         lead("›", R.drawable.mi_chevron_left); lead("●", R.drawable.mi_fiber_manual_record_fill); lead("▲", R.drawable.mi_trending_up);
         lead("▼", R.drawable.mi_trending_down); lead("!", R.drawable.mi_priority_high); lead("٪", R.drawable.mi_percent);
+        lead("↑", R.drawable.mi_upload); lead("↓", R.drawable.mi_download);
+        // Back/previous affordance. Mirrored vector: spans never trigger autoMirrored.
+        lead("‹", R.drawable.mi_chevron_right);
 
         for (String g : new String[]{"✓", "✔", "✅", "❌", "⚠", "△", "!", "●", "◌", "○", "◐", "★", "⏱", "◷", "▲", "▼", "×", "−", "+", "＋", "›", "٪",
-                "☀", "☾", "🌅", "🌙", "🎉", "😊", "🏅"}) STATUS.add(g);
+                "☀", "☾", "🌅", "🌙", "🎉", "😊", "🏅", "↑", "↓", "‹", "⛔"}) STATUS.add(g);
     }
 
     private static void any(String g, int res) { ANYWHERE.put(g, res); }

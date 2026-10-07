@@ -156,14 +156,6 @@ public final class AtiranSchema {
         return s.isEmpty() ? "نامشخص" : s;
     }
 
-    /** dar.p → Persian. */
-    public static String darKindFa(String raw) {
-        String s = raw == null ? "" : raw.trim();
-        if (s.equals("0")) return "دریافت";
-        if (s.equals("1")) return "پرداخت";
-        return s.isEmpty() ? "—" : s;
-    }
-
     /** sailfact.tasvieh ('t'/'f') → Persian. */
     public static String tasviehFa(String raw) {
         String s = raw == null ? "" : raw.trim().toLowerCase(java.util.Locale.US);

@@ -107,6 +107,7 @@ public class ProfitScreen extends Screen {
         content.addView(heroCard(), a.kit.lp(-1, -2));
         content.addView(a.kit.hint("مبنای بهای تمام‌شده: قیمت خرید روز کالا • سود خالص تقریبی است"), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
+        addSearchRow(content);
 
         double sales = d.sales == null ? 0 : d.sales.d("total");
         double discount = d.sales == null ? 0 : d.sales.d("discount");
@@ -117,10 +118,10 @@ public class ProfitScreen extends Screen {
         double net = gross - discount - costs;
 
         List<Kit.Kpi> kpis = new ArrayList<>();
-        kpis.add(new Kit.Kpi("فروش", Money.compact(sales), "", Theme.GOLD));
-        kpis.add(new Kit.Kpi("بهای تمام‌شده", Money.compact(cogs), "", Theme.INFO));
-        kpis.add(new Kit.Kpi("سود ناویژه", Money.compact(gross), sales > 0 ? Money.pct(gross * 100.0 / sales) + " حاشیه" : "", gross >= 0 ? Theme.SUCCESS : Theme.DANGER));
-        kpis.add(new Kit.Kpi("سود خالص ≈", Money.compact(net), "پس از تخفیف و هزینه‌ها", net >= 0 ? Theme.SUCCESS : Theme.DANGER));
+        kpis.add(new Kit.Kpi("فروش", Money.compactRial(sales), "", Theme.GOLD));
+        kpis.add(new Kit.Kpi("بهای تمام‌شده", Money.compactRial(cogs), "", Theme.INFO));
+        kpis.add(new Kit.Kpi("سود ناویژه", Money.compactRial(gross), sales > 0 ? Money.pct(gross * 100.0 / sales) + " حاشیه" : "", gross >= 0 ? Theme.SUCCESS : Theme.DANGER));
+        kpis.add(new Kit.Kpi("سود خالص ≈", Money.compactRial(net), "پس از تخفیف و هزینه‌ها", net >= 0 ? Theme.SUCCESS : Theme.DANGER));
         content.addView(a.kit.kpiGrid(kpis, 2), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(12));
 

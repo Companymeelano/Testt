@@ -31,6 +31,7 @@ import ir.meelano.manager.screens.UsersScreen;
 import ir.meelano.manager.screens.VisitorsScreen;
 import ir.meelano.manager.ui.FilterSheet;
 import ir.meelano.manager.ui.Kit;
+import ir.meelano.manager.ui.MeelanoIcons;
 import ir.meelano.manager.ui.Pdf;
 import ir.meelano.manager.ui.Theme;
 
@@ -67,7 +68,7 @@ public class MainActivity extends Activity {
         Theme.init(this);
         kit = new Kit(this);
         settings = new Settings(this);
-        repo = new Repo(settings);
+        repo = new Repo(this, settings);
         if (settings.pinEnabled()) pinGate();
         else {
             unlocked = true;
@@ -108,6 +109,7 @@ public class MainActivity extends Activity {
                 b.append(i < pin.length() ? "●" : "○");
             }
             dots.setText(b.toString());
+            MeelanoIcons.iconize(dots);
         };
         int[][] keys = {{1, 2, 3}, {4, 5, 6}, {7, 8, 9}, {-1, 0, -2}};
         for (int[] rowKeys : keys) {
@@ -167,7 +169,7 @@ public class MainActivity extends Activity {
         rangeLine = kit.text(kit.todayLine(), 10.5f, Theme.MUTED, false);
         titleBox.addView(rangeLine, kit.lp(-1, -2));
         header.addView(titleBox, kit.wlp(1f));
-        filterBtn = kit.text("⚙ فیلتر", 12, Theme.GOLD_SOFT, true);
+        filterBtn = kit.text("⌕ جستجو", 12, Theme.GOLD_SOFT, true);
         filterBtn.setPadding(Theme.dp(12), Theme.dp(8), Theme.dp(12), Theme.dp(8));
         filterBtn.setBackground(Theme.ghostButton(Theme.GOLD));
         Theme.pressable(filterBtn);
@@ -182,11 +184,15 @@ public class MainActivity extends Activity {
         header.addView(refresh, kit.lp(-2, -2));
         root.addView(header, kit.lp(-1, -2));
 
-        // content
+        // content (centered max-width column on tablets / wide screens)
         scroll = new ScrollView(this);
+        LinearLayout centerWrap = kit.h();
+        centerWrap.setGravity(Gravity.CENTER_HORIZONTAL);
         content = kit.v();
         content.setPadding(Theme.dp(12), Theme.dp(4), Theme.dp(12), Theme.dp(16));
-        scroll.addView(content, new ScrollView.LayoutParams(-1, -2));
+        scroll.addView(centerWrap, new ScrollView.LayoutParams(-1, -2));
+        int sw = getResources().getDisplayMetrics().widthPixels;
+        centerWrap.addView(content, new LinearLayout.LayoutParams(sw > Theme.dp(720) ? Theme.dp(640) : -1, -2));
         root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1f));
 
         // bottom bar
@@ -260,6 +266,7 @@ public class MainActivity extends Activity {
             ((TextView) b.getChildAt(0)).setTextColor(on ? Theme.GOLD_SOFT : Theme.MUTED);
             ((TextView) b.getChildAt(1)).setTextColor(col);
             b.setBackground(on ? Theme.pill(Theme.GOLD) : null);
+            Theme.pressable(b); // setBackground replaced the ripple — wrap it again
         }
     }
 
@@ -294,16 +301,17 @@ public class MainActivity extends Activity {
         filterBtn.setVisibility(s.filterConfig() == null ? View.GONE : View.VISIBLE);
         Filter f = s.filter();
         if (f != null && !f.isDefault()) {
-            filterBtn.setText("⚙ فیلتر •");
+            filterBtn.setText("⌕ جستجو •");
             filterBtn.setTextColor(Theme.GOLD);
         } else {
-            filterBtn.setText("⚙ فیلتر");
+            filterBtn.setText("⌕ جستجو");
             filterBtn.setTextColor(Theme.GOLD_SOFT);
         }
+        MeelanoIcons.iconize(filterBtn);
         rangeLine.setText(kit.todayLine() + "  •  " + s.title());
     }
 
-    private void openFilter() {
+    public void openFilter() {
         final Screen s = screens.get(currentId);
         if (s == null || s.filterConfig() == null || s.filter() == null) return;
         FilterSheet.show(kit, repo, s.filter(), s.filterConfig(), f -> {
@@ -327,7 +335,7 @@ public class MainActivity extends Activity {
     }
 
     // ================= helpers for screens =================
-    private void checkConn() {
+    public void checkConn() {
         repo.run(c -> Repo.one(c, new Queries.Q("SELECT 1 AS ok")), new Repo.Cb<Row>() {
             @Override
             public void ok(Row v) {
@@ -342,7 +350,12 @@ public class MainActivity extends Activity {
     }
 
     public void testConnection(final Repo.Cb<String> cb) {
-        repo.run(c -> {
+        testConnection(settings.effHost(), settings.effPort(), settings.effDb(), settings.effUser(), settings.effPass(), cb);
+    }
+
+    /** Probe explicit (possibly unsaved) connection values. */
+    public void testConnection(String host, int port, String db, String user, String pass, final Repo.Cb<String> cb) {
+        repo.runWith(host, port, db, user, pass, c -> {
             Meta m = new Meta(c);
             int n = 0;
             for (String t : new String[]{"sailfact", "buyfact", "dar", "getchk", "putchk", "CUSTOMERS", "inventory", "visitors"})

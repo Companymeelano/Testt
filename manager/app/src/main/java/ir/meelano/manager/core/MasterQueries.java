@@ -10,6 +10,12 @@ import java.util.Set;
 public final class MasterQueries {
     private MasterQueries() { }
 
+    /** True-expression for Atiran boolean columns ('t'/'f', 1/0, yes/no …). */
+    private static String boolTrue(String field) {
+        String n = "UPPER(LTRIM(RTRIM(TRY_CONVERT(nvarchar(20)," + field + "))))";
+        return "(" + n + " IN (N'T',N'TRUE',N'Y',N'YES',N'1') OR TRY_CONVERT(int," + field + ")=1)";
+    }
+
     // =====================================================================================
     // PRODUCTS — inventory / inventory_anbars / ka_act.
     // =====================================================================================
@@ -19,7 +25,7 @@ public final class MasterQueries {
         String active = m.col("inventory", "active", "Active");
         String vah = m.must("inventory", "موجودی", "mojkavah", "MojKavah");
         String buy = m.col("inventory", "buy_price", "pure_buy_price", "ImPureBuyPrice");
-        String actCond = active == null ? "" : " AND (UPPER(LTRIM(RTRIM(TRY_CONVERT(nvarchar(20),[" + active + "])))) IN (N'T',N'1',N'TRUE',N'Y'))";
+        String actCond = active == null ? "" : " AND " + boolTrue("[" + active + "]");
         return new Queries.Q("SELECT COUNT_BIG(1) AS count"
                 + ", SUM(CASE WHEN 1=1" + actCond + " THEN 1 ELSE 0 END) AS active"
                 + ", SUM(CASE WHEN TRY_CONVERT(decimal(19,3),[" + vah + "])>0 AND TRY_CONVERT(decimal(19,3),[" + vah + "])<=" + AtiranSchema.LOW_STOCK_VAH + " THEN 1 ELSE 0 END) AS low"
@@ -187,7 +193,7 @@ public final class MasterQueries {
                 + ", SUM(CASE WHEN " + b + "<0 THEN 1 ELSE 0 END) AS creditorsN"
                 + ", ISNULL(SUM(CASE WHEN " + b + "<0 THEN -(" + b + ") ELSE 0 END),0) AS creditorsSum"
                 + ", SUM(CASE WHEN ABS(COALESCE(" + b + ",0))<=1 THEN 1 ELSE 0 END) AS settledN"
-                + ", " + (blocked == null ? "CAST(0 AS bigint)" : "SUM(CASE WHEN TRY_CONVERT(int,[" + blocked + "])<>0 THEN 1 ELSE 0 END)") + " AS blockedN"
+                + ", " + (blocked == null ? "CAST(0 AS bigint)" : "SUM(CASE WHEN " + boolTrue("[" + blocked + "]") + " THEN 1 ELSE 0 END)") + " AS blockedN"
                 + " FROM dbo.CUSTOMERS");
     }
 
@@ -237,7 +243,7 @@ public final class MasterQueries {
         if ("debt".equals(f.status)) conds.add(b + ">0");
         if ("credit".equals(f.status)) conds.add(b + "<0");
         if ("settled".equals(f.status)) conds.add("ABS(COALESCE(" + b + ",0))<=1");
-        if ("blocked".equals(f.status) && blocked != null) conds.add("TRY_CONVERT(int,c.[" + blocked + "])<>0");
+        if ("blocked".equals(f.status) && blocked != null) conds.add(boolTrue("c.[" + blocked + "]"));
         if ("no_buy".equals(f.status) && canSales) conds.add("ISNULL(sf.cnt,0)=0");
         if (f.visitor >= 0 && vis != null) { conds.add("TRY_CONVERT(int,c.[" + vis + "])=?"); binds.add(f.visitor); }
         if (f.route >= 0 && route != null) { conds.add("TRY_CONVERT(int,c.[" + route + "])=?"); binds.add(f.route); }
@@ -286,7 +292,8 @@ public final class MasterQueries {
         String shmo = m.must("CUSTOMERS", "کد", "SHMO", "shmo");
         String name = m.col("CUSTOMERS", "MONAME", "Name", "CusName");
         String bal = m.must("CUSTOMERS", "مانده", "man", "Balance", "Mandeh");
-        String[] flex = {"cell", "tell1", "tell2", "addre", "cred", "code", "c_mel", "c_egh", "date", "sharh",
+        // NOTE: "code" is intentionally absent — shmo is already aliased AS code above.
+        String[] flex = {"cell", "tell1", "tell2", "addre", "cred", "c_mel", "c_egh", "date", "sharh",
                 "vis_rdf", "RDF_masir", "group_rdf", "hesab_status", "black_list", "check_eteb", "MaxManFactor"};
         StringBuilder sb = new StringBuilder("SELECT TOP (1) ");
         sb.append(Sql.txt("c", shmo, 100)).append(" AS code, ");
@@ -563,14 +570,16 @@ public final class MasterQueries {
         // Today's actions (best-effort).
         String logUser = m.colFlex("Log", "user_id", "userid", "username", "user_name");
         String logDate = m.colFlex("Log", "date", "event_time", "time", "logdate");
+        // Log dates may be Jalali text or Gregorian datetime — accept today's date in both.
+        String todayBoth = logDate == null ? "" : "(" + Sql.date10("lo", logDate) + " IN (" + Sql.lit(Jalali.todayStr()) + "," + Sql.lit(Jalali.todayGregorian()) + "))";
         String logApply = logUser != null && logDate != null && m.table("Log")
-                ? "OUTER APPLY (SELECT COUNT_BIG(1) n FROM dbo.Log lo WHERE " + Sql.date10("lo", logDate) + "=" + Sql.lit(Jalali.todayStr())
+                ? "OUTER APPLY (SELECT COUNT_BIG(1) n FROM dbo.Log lo WHERE " + todayBoth
                 + " AND TRY_CONVERT(nvarchar(100),lo.[" + logUser + "]) IN (TRY_CONVERT(nvarchar(100),u.[" + id + "])"
                 + (uname == null ? "" : ",TRY_CONVERT(nvarchar(100),u.[" + uname + "])") + ")) la"
                 : "OUTER APPLY (SELECT CAST(0 AS bigint) n) la";
         return new Queries.Q("SELECT " + Sql.txt("u", id, 60) + " AS id, " + nm + " AS name"
                 + ", " + roleExpr + " AS role"
-                + ", " + (active == null ? "N''" : "COALESCE(" + Sql.txt("u", active, 10) + ",N'')") + " AS active"
+                + ", " + (active == null ? "N''" : "CASE WHEN " + boolTrue("u.[" + active + "]") + " THEN N'✓ فعال' ELSE N'✕ غیرفعال' END") + " AS active"
                 + ", " + (phone == null ? "N''" : "COALESCE(" + Sql.txt("u", phone, 100) + ",N'')") + " AS phone"
                 + ", ll.lastDay AS lastLogin, ISNULL(la.n,0) AS todayN"
                 + " FROM dbo.sys_users u" + roleJoin + " " + loginApply + " " + logApply + " ORDER BY 2");
@@ -602,6 +611,13 @@ public final class MasterQueries {
         return buy;
     }
 
+    /** Resolved inventory key for COGS joins (never a hardcoded column name). */
+    private static String cogsShka(Meta m) throws Queries.Missing {
+        String shka = m.col("inventory", "SHKA", "shka");
+        if (shka == null) throw new Queries.Missing("ستون کد کالا در «کالاها» پیدا نشد؛ بهای تمام‌شده قابل محاسبه نیست");
+        return shka;
+    }
+
     /** COGS + qty in range: cogs,qty. */
     public static Queries.Q profitCogs(Meta m, Filter f) throws Queries.Missing {
         Set<String> cols = m.columns("sailfact");
@@ -611,6 +627,7 @@ public final class MasterQueries {
         String shka = m.must("subsailfact", "کد کالا", "SHKA", "shka");
         String qty = m.must("subsailfact", "تعداد", "TEDVAH", "tedvah");
         String buy = cogsBuyCol(m);
+        String invShka = cogsShka(m);
         List<Object> binds = new ArrayList<>();
         List<String> conds = new ArrayList<>();
         String dc = Sql.dateCond(Sql.date10("x", dateCol), f.from, f.to, binds);
@@ -620,7 +637,7 @@ public final class MasterQueries {
                 + ", ISNULL(SUM(TRY_CONVERT(decimal(19,3),d.[" + qty + "])),0) AS qty"
                 + " FROM " + Sql.dedupe("sailfact", numberCol, "h", inner)
                 + " JOIN dbo.subsailfact d ON TRY_CONVERT(nvarchar(100),d.[" + linkCol + "])=TRY_CONVERT(nvarchar(100),h.[" + numberCol + "])"
-                + " LEFT JOIN dbo.inventory i ON TRY_CONVERT(nvarchar(100),i.[shka])=TRY_CONVERT(nvarchar(100),d.[" + shka + "])", binds);
+                + " LEFT JOIN dbo.inventory i ON TRY_CONVERT(nvarchar(100),i.[" + invShka + "])=TRY_CONVERT(nvarchar(100),d.[" + shka + "])", binds);
     }
 
     /** Daily sales vs COGS: day,sales,cogs. */
@@ -633,6 +650,7 @@ public final class MasterQueries {
         String shka = m.must("subsailfact", "کد کالا", "SHKA", "shka");
         String qty = m.must("subsailfact", "تعداد", "TEDVAH", "tedvah");
         String buy = cogsBuyCol(m);
+        String invShka = cogsShka(m);
         List<Object> binds = new ArrayList<>();
         List<String> conds = new ArrayList<>();
         String dc = Sql.dateCond(Sql.date10("x", dateCol), f.from, f.to, binds);
@@ -640,14 +658,15 @@ public final class MasterQueries {
         String inner = "WHERE " + (conds.isEmpty() ? "1=1" : Sql.join(conds, " AND ")) + Sql.activeAnd(cols, "x") + Sql.softAnd(cols, "x");
         String day = Sql.date10("h", dateCol);
         // Sales per day from the header; COGS per day from the lines (avoid fan-out by aggregating separately).
-        String sql = "SELECT day AS day, ISNULL(SUM(sales),0) AS sales, ISNULL(SUM(cogs),0) AS cogs FROM ("
+        String sql = "SELECT day AS day, ISNULL(SUM(sales),0) AS sales, ISNULL(SUM(cogs),0) AS cogs"
+                + ", ISNULL(SUM(sales),0)-ISNULL(SUM(cogs),0) AS profit FROM ("
                 + "SELECT " + day + " AS day, " + Sql.num("h", amountCol) + " AS sales, CAST(0 AS decimal(19,2)) AS cogs"
                 + " FROM " + Sql.dedupe("sailfact", numberCol, "h", inner)
                 + " UNION ALL SELECT " + day + " AS day, CAST(0 AS decimal(19,2)) AS sales"
                 + ", TRY_CONVERT(decimal(19,3),d.[" + qty + "])*COALESCE(TRY_CONVERT(decimal(19,2),i.[" + buy + "]),0) AS cogs"
                 + " FROM " + Sql.dedupe("sailfact", numberCol, "h", inner)
                 + " JOIN dbo.subsailfact d ON TRY_CONVERT(nvarchar(100),d.[" + linkCol + "])=TRY_CONVERT(nvarchar(100),h.[" + numberCol + "])"
-                + " LEFT JOIN dbo.inventory i ON TRY_CONVERT(nvarchar(100),i.[shka])=TRY_CONVERT(nvarchar(100),d.[" + shka + "])"
+                + " LEFT JOIN dbo.inventory i ON TRY_CONVERT(nvarchar(100),i.[" + invShka + "])=TRY_CONVERT(nvarchar(100),d.[" + shka + "])"
                 + ") u GROUP BY day ORDER BY day";
         List<Object> binds2 = new ArrayList<>(binds);
         binds2.addAll(binds);
@@ -664,6 +683,7 @@ public final class MasterQueries {
         String qty = m.must("subsailfact", "تعداد", "TEDVAH", "tedvah");
         String sum = m.must("subsailfact", "جمع ردیف", "LINESUM", "linesum");
         String buy = cogsBuyCol(m);
+        String invShka = cogsShka(m);
         String invName = m.col("inventory", "naka", "NAKA");
         List<Object> binds = new ArrayList<>();
         List<String> conds = new ArrayList<>();
@@ -678,7 +698,7 @@ public final class MasterQueries {
                 + ", " + sales + " AS sales, " + cogs + " AS cogs, (" + sales + "-" + cogs + ") AS profit"
                 + " FROM " + Sql.dedupe("sailfact", numberCol, "h", inner)
                 + " JOIN dbo.subsailfact d ON TRY_CONVERT(nvarchar(100),d.[" + linkCol + "])=TRY_CONVERT(nvarchar(100),h.[" + numberCol + "])"
-                + " LEFT JOIN dbo.inventory i ON TRY_CONVERT(nvarchar(100),i.[shka])=TRY_CONVERT(nvarchar(100),d.[" + shka + "])"
+                + " LEFT JOIN dbo.inventory i ON TRY_CONVERT(nvarchar(100),i.[" + invShka + "])=TRY_CONVERT(nvarchar(100),d.[" + shka + "])"
                 + " GROUP BY " + label + " ORDER BY 5 DESC", binds);
     }
 
@@ -788,33 +808,6 @@ public final class MasterQueries {
                 + " FROM " + src + " GROUP BY " + mon + " ORDER BY " + mon + " DESC");
     }
 
-    /** Collection: sales total + receipts total in range (one row). */
-    public static Queries.Q collection(Meta m, Filter f) throws Queries.Missing {
-        Set<String> cols = m.columns("sailfact");
-        String dateCol = m.must("sailfact", "تاریخ", "date");
-        String amountCol = m.must("sailfact", "مبلغ", "all");
-        String numberCol = m.col("sailfact", "shfacfo");
-        List<Object> binds = new ArrayList<>();
-        String dc = Sql.dateCond(Sql.date10("x", dateCol), f.from, f.to, binds);
-        String inner = "WHERE " + (dc.isEmpty() ? "1=1" : dc) + Sql.activeAnd(cols, "x") + Sql.softAnd(cols, "x");
-        String salesExpr = "(SELECT ISNULL(SUM(" + Sql.num("h", amountCol) + "),0) FROM " + Sql.dedupe("sailfact", numberCol, "h", inner) + ")";
-        String darDate = m.col("dar", "date", "DATE");
-        String cash = m.col("dar", "MabNaghdi", "mabNaghdi");
-        String pos = m.col("dar", "MabPos", "mabPos");
-        String hav = m.col("dar", "MabHavaleh", "mabHavaleh");
-        String chq = m.col("dar", "SumMabcheck", "sumMabcheck");
-        String darExpr = "CAST(0 AS decimal(19,2))";
-        if (m.table("dar") && darDate != null) {
-            List<String> conds = new ArrayList<>();
-            conds.add("h.[p]=0");
-            String d2 = Sql.dateCond(Sql.date10("h", darDate), f.from, f.to, binds);
-            if (!d2.isEmpty()) conds.add(d2);
-            darExpr = "(SELECT ISNULL(SUM(" + Sql.num("h", cash) + "+" + Sql.num("h", pos) + "+" + Sql.num("h", hav) + "+" + Sql.num("h", chq) + "),0)"
-                    + " FROM dbo.dar h WHERE " + Sql.join(conds, " AND ") + ")";
-        }
-        return new Queries.Q("SELECT " + salesExpr + " AS sales, " + darExpr + " AS receipts", binds);
-    }
-
     /** Bank turnover (best-effort): bank,in,out,count. */
     public static Queries.Q bankTurnover(Meta m, Filter f) throws Queries.Missing {
         if (!m.table("ban_act")) throw new Queries.Missing("«گردش بانک» در دیتابیس پیدا نشد");
@@ -869,8 +862,12 @@ public final class MasterQueries {
         List<Object> binds = new ArrayList<>();
         List<String> conds = new ArrayList<>();
         if (date != null) {
+            // The change log may store Jalali text or Gregorian datetime — match the range in both.
             String dc = Sql.dateCond(Sql.date10("t", date), f.from, f.to, binds);
-            if (!dc.isEmpty()) conds.add(dc);
+            String dg = Sql.dateCond(Sql.date10("t", date), Jalali.toGregorian(f.from), Jalali.toGregorian(f.to), binds);
+            if (!dc.isEmpty() && !dg.isEmpty()) conds.add("(" + dc + " OR " + dg + ")");
+            else if (!dc.isEmpty()) conds.add(dc);
+            else if (!dg.isEmpty()) conds.add(dg);
         }
         String where = conds.isEmpty() ? "" : " WHERE " + Sql.join(conds, " AND ");
         String order = date == null ? "1" : "t.[" + date + "] DESC";

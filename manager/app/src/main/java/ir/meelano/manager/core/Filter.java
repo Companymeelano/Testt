@@ -88,6 +88,10 @@ public final class Filter {
             case P_ALL: return "همه تاریخ‌ها";
             default:
                 if (!hasRange()) return "همه تاریخ‌ها";
+                boolean f = from != null && !from.trim().isEmpty();
+                boolean t = to != null && !to.trim().isEmpty();
+                if (f && !t) return "از " + Money.fa(from);
+                if (t && !f) return "تا " + Money.fa(to);
                 return Money.fa(from) + " تا " + Money.fa(to);
         }
     }

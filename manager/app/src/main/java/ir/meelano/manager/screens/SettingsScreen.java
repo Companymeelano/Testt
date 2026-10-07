@@ -5,6 +5,8 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 
 import ir.meelano.manager.MainActivity;
+import ir.meelano.manager.core.Money;
+import ir.meelano.manager.data.NetRoute;
 import ir.meelano.manager.data.Repo;
 import ir.meelano.manager.ui.Theme;
 
@@ -24,7 +26,7 @@ public class SettingsScreen extends Screen {
     public String glyph() { return "⚙"; }
 
     @Override
-    public int accent() { return Theme.MUTED; }
+    public int accent() { return Theme.TEAL; }
 
     @Override
     public void render(final LinearLayout content) {
@@ -36,7 +38,7 @@ public class SettingsScreen extends Screen {
         LinearLayout c = a.kit.card(Theme.GOLD);
         c.addView(a.kit.text("اتصال به آتیران", 14.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
         final EditText host = a.kit.edit("آدرس سرور", a.settings.effHost());
-        final EditText port = a.kit.edit("پورت", String.valueOf(a.settings.effPort()));
+        final EditText port = a.kit.editNum("پورت", String.valueOf(a.settings.effPort()));
         final EditText db = a.kit.edit("نام دیتابیس", a.settings.effDb());
         final EditText user = a.kit.edit("نام کاربری", a.settings.effUser());
         final EditText pass = a.kit.edit("رمز عبور", a.settings.effPass(), true);
@@ -50,11 +52,26 @@ public class SettingsScreen extends Screen {
             a.settings.saveConnection(host.getText().toString(), port.getText().toString(),
                     db.getText().toString(), user.getText().toString(), pass.getText().toString());
             a.kit.toast("تنظیمات ذخیره شد");
+            a.checkConn();
         }), a.kit.wlp(1f));
         row.addView(a.kit.space(8));
         row.addView(a.kit.btnGhost("تست اتصال", Theme.SUCCESS, v -> {
+            String h = host.getText().toString().trim();
+            if (h.isEmpty()) {
+                a.kit.toast("آدرس سرور را وارد کنید");
+                return;
+            }
+            int tp;
+            try {
+                tp = Integer.parseInt(Money.en(port.getText().toString()).trim());
+            } catch (Exception e) {
+                a.kit.toast("پورت معتبر نیست");
+                return;
+            }
             a.kit.toast("در حال تست اتصال…");
-            a.testConnection(new Repo.Cb<String>() {
+            // Tests the on-screen values — no need to save first.
+            a.testConnection(h, tp, db.getText().toString().trim(), user.getText().toString().trim(),
+                    pass.getText().toString(), new Repo.Cb<String>() {
                 @Override
                 public void ok(String v2) {
                     a.kit.toast(v2);
@@ -67,6 +84,15 @@ public class SettingsScreen extends Screen {
             });
         }), a.kit.wlp(1f));
         c.addView(row, a.kit.lp(-1, -2));
+        boolean vpn = NetRoute.isVpnActive(a);
+        c.addView(a.kit.kv("فیلترشکن", vpn ? "فعال" : "غیرفعال", vpn ? Theme.WARNING : Theme.SUCCESS), a.kit.lp(-1, -2));
+        final boolean direct = a.settings.directConn();
+        c.addView(a.kit.btnGhost("◉ اتصال مستقیم: " + (direct ? "روشن" : "خاموش"), Theme.INFO, v -> {
+            a.settings.setDirectConn(!direct);
+            a.kit.toast(direct ? "اتصال مستقیم خاموش شد" : "اتصال مستقیم روشن شد");
+            render(content);
+        }), a.kit.lp(-1, -2));
+        c.addView(a.kit.hint("اگر فیلترشکن مسیر سرور را می‌بندد، «اتصال مستقیم» را روشن کنید تا برنامه از شبکه عادی عبور کند."), a.kit.lp(-1, -2));
         a.kit.addCard(content, c);
 
         // ---- PIN ----
@@ -90,7 +116,7 @@ public class SettingsScreen extends Screen {
         // ---- about ----
         LinearLayout ab = a.kit.card(Theme.VIOLET);
         ab.addView(a.kit.text("درباره", 14.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
-        ab.addView(a.kit.kv("نسخه", "۷ • ویرایش مدیریت", Theme.TEXT), a.kit.lp(-1, -2));
+        ab.addView(a.kit.kv("نسخه", appVersion() + " • ویرایش مدیریت", Theme.TEXT), a.kit.lp(-1, -2));
         ab.addView(a.kit.kv("منبع داده", "SQL Server آتیران (اتصال مستقیم)", Theme.TEXT), a.kit.lp(-1, -2));
         ab.addView(a.kit.hint("همه بخش‌ها داده زنده نمایش می‌دهند؛ بدون اتصال، اطلاع‌رسانی می‌شود."), a.kit.lp(-1, -2));
         a.kit.addCard(content, ab);
@@ -100,8 +126,8 @@ public class SettingsScreen extends Screen {
         LinearLayout body = a.kit.v();
         body.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(16));
         body.addView(a.kit.text("رمز ۴ رقمی", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
-        final EditText e1 = a.kit.edit("رمز جدید", "", true);
-        final EditText e2 = a.kit.edit("تکرار رمز", "", true);
+        final EditText e1 = a.kit.editPin("رمز جدید", "");
+        final EditText e2 = a.kit.editPin("تکرار رمز", "");
         body.addView(e1, a.kit.lp(-1, -2));
         body.addView(a.kit.gap(8));
         body.addView(e2, a.kit.lp(-1, -2));
@@ -120,5 +146,14 @@ public class SettingsScreen extends Screen {
         }), a.kit.lp(-1, -2));
         box[0] = a.kit.dialog("قفل مدیریتی", body, true);
         box[0].show();
+    }
+
+    private String appVersion() {
+        try {
+            String v = a.getPackageManager().getPackageInfo(a.getPackageName(), 0).versionName;
+            return Money.fa(v == null || v.isEmpty() ? "—" : v);
+        } catch (Exception e) {
+            return "—";
+        }
     }
 }

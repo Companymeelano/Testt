@@ -1,5 +1,6 @@
 package ir.meelano.manager.data;
 
+import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
 
@@ -32,22 +33,37 @@ public final class Repo {
     private final ExecutorService pool = Executors.newFixedThreadPool(3);
     private final Handler main = new Handler(Looper.getMainLooper());
     private final Settings settings;
+    private final Context appCtx;
 
-    public Repo(Settings settings) {
+    public Repo(Context ctx, Settings settings) {
+        this.appCtx = ctx == null ? null : ctx.getApplicationContext();
         this.settings = settings;
     }
 
     public <T> void run(final Task<T> t, final Cb<T> cb) {
+        runWith(settings.effHost(), settings.effPort(), settings.effDb(), settings.effUser(), settings.effPass(), t, cb);
+    }
+
+    /** Same as {@link #run}, but against explicit connection values (tests unsaved settings). */
+    public <T> void runWith(final String host, final int port, final String db,
+                            final String user, final String pass, final Task<T> t, final Cb<T> cb) {
         pool.execute(() -> {
             Object out = null;
             String err = null;
-            try (Connection c = Atiran.open(settings.effHost(), settings.effPort(), settings.effDb(),
-                    settings.effUser(), settings.effPass())) {
-                out = t.run(c);
+            boolean direct = settings.directConn();
+            boolean bound = direct && NetRoute.bindDirect(appCtx);
+            try {
+                try (Connection c = Atiran.open(host, port, db, user, pass)) {
+                    out = t.run(c);
+                }
             } catch (Queries.Missing m) {
                 err = m.getMessage();
             } catch (Exception e) {
                 err = Atiran.diagnose(e);
+                if (!direct && NetRoute.isVpnActive(appCtx) && NetRoute.looksLikeNetwork(e))
+                    err += "؛ فیلترشکن فعال است — «اتصال مستقیم» را در تنظیمات روشن کنید";
+            } finally {
+                if (bound) NetRoute.unbind(appCtx);
             }
             final Object res = out;
             final String e2 = err;

@@ -67,9 +67,15 @@ public final class Queries {
         List<String> parts = new ArrayList<>();
         for (String e : exprs) {
             if (e == null || e.isEmpty()) continue;
-            for (String v : vars) { parts.add(e + " LIKE N'%' + ? + N'%'"); binds.add(v); }
+            for (String v : vars) { parts.add(e + " LIKE N'%' + ? + N'%' ESCAPE N'\\'"); binds.add(escapeLike(v)); }
         }
         return parts.isEmpty() ? "" : "(" + Sql.join(parts, " OR ") + ")";
+    }
+
+    /** Escape LIKE wildcards so a literal % _ [ \ typed by the user matches itself. */
+    private static String escapeLike(String v) {
+        if (v == null) return "";
+        return v.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_").replace("[", "\\[");
     }
 
     /** LEFT JOIN CUSTOMERS name expression (falls back to the raw code). */
@@ -311,7 +317,7 @@ public final class Queries {
     }
 
     /**
-     * Invoice list: no,date,code,customer,visitor,total,paid,remain,settled,tasvieh,dueDate,desc.
+     * Invoice list: no,date,code,customer,visitor,total,paid,remain,tasvieh,dueDate,descrip.
      * status filter: "" all | "settled" | "unsettled".
      */
     public static Q factorList(Meta m, boolean sales, Filter f) throws Missing {
@@ -343,8 +349,9 @@ public final class Queries {
             { conds.add("TRY_CONVERT(int,cu.[" + custGroup + "])=?"); binds.add(f.custGroup); needCust = true; }
         String totalExpr = Sql.num("h", amountCol);
         String paidExpr = Sql.num("h", paidCol);
-        if ("settled".equals(f.status)) conds.add("(ABS((" + totalExpr + ")-(" + paidExpr + "))<=1" + (tasviehCol == null ? "" : " OR h.[" + tasviehCol + "]='t'") + ")");
-        if ("unsettled".equals(f.status)) conds.add("(ABS((" + totalExpr + ")-(" + paidExpr + "))>1" + (tasviehCol == null ? "" : " AND ISNULL(h.[" + tasviehCol + "],'f')<>'t'") + ")");
+        String tol = String.valueOf(AtiranSchema.SETTLE_TOLERANCE);
+        if ("settled".equals(f.status)) conds.add("(ABS((" + totalExpr + ")-(" + paidExpr + "))<=" + tol + (tasviehCol == null ? "" : " OR h.[" + tasviehCol + "]='t'") + ")");
+        if ("unsettled".equals(f.status)) conds.add("(ABS((" + totalExpr + ")-(" + paidExpr + "))>" + tol + (tasviehCol == null ? "" : " AND ISNULL(h.[" + tasviehCol + "],'f')<>'t'") + ")");
         if (f.search != null && !f.search.trim().isEmpty()) {
             List<String> exprs = new ArrayList<>();
             exprs.add(Sql.txt("h", numberCol, 80));
@@ -354,6 +361,8 @@ public final class Queries {
             if (!sc.isEmpty()) conds.add(sc);
         }
         String where = conds.isEmpty() ? "" : " WHERE " + Sql.join(conds, " AND ");
+        String extra = Sql.activeAnd(cols, "h") + Sql.softAnd(cols, "h");
+        if (!extra.isEmpty()) extra = extra.replaceFirst(" AND ", conds.isEmpty() ? " WHERE " : " AND ");
         String orderBy = "h.[" + dateCol + "] DESC, h.[" + numberCol + "] DESC";
         if ("total_desc".equals(f.sort)) orderBy = totalExpr + " DESC";
         if ("remain_desc".equals(f.sort)) orderBy = "((" + totalExpr + ")-(" + paidExpr + ")) DESC";
@@ -369,7 +378,7 @@ public final class Queries {
                 + ", " + (dueCol == null ? "CAST(NULL AS nvarchar(10))" : Sql.date10("h", dueCol)) + " AS dueDate"
                 + ", " + (descCol == null ? "CAST(NULL AS nvarchar(500))" : Sql.txt("h", descCol, 500)) + " AS descrip"
                 + " FROM " + Sql.dedupe(table, numberCol, "h", "") + join
-                + where + Sql.activeAnd(cols, "h").replaceFirst(" AND ", conds.isEmpty() ? " WHERE " : " AND ")
+                + where + extra
                 + " ORDER BY " + orderBy
                 + pageClause(binds, f.page, f.top);
         return new Q(sql, binds);
@@ -435,6 +444,7 @@ public final class Queries {
         String shka = Sql.pick(cols, "SHKA", "shka");
         String lineName = Sql.pick(cols, "naka", "NAKA");
         String invName = m.col("inventory", "naka", "NAKA");
+        String invShka = m.col("inventory", "SHKA", "shka");
         String qtyV = Sql.pick(cols, "TEDVAH", "tedvah");
         String qtyJ = Sql.pick(cols, "TEDJOZ", "tedjoz");
         String vp = Sql.pick(cols, "VAHPRICE", "vahprice");
@@ -457,8 +467,8 @@ public final class Queries {
                 + ", " + Sql.num("d", disc) + " AS discount"
                 + ", " + Sql.num("d", tax) + " AS tax"
                 + " FROM dbo.[" + line + "] d"
-                + (shka != null && invName != null && m.table("inventory")
-                ? " LEFT JOIN dbo.inventory i ON TRY_CONVERT(nvarchar(100),i.[shka])=TRY_CONVERT(nvarchar(100),d.[" + shka + "])" : "")
+                + (shka != null && invName != null && invShka != null
+                ? " LEFT JOIN dbo.inventory i ON TRY_CONVERT(nvarchar(100),i.[" + invShka + "])=TRY_CONVERT(nvarchar(100),d.[" + shka + "])" : "")
                 + " WHERE TRY_CONVERT(nvarchar(80),d.[" + linkCol + "])=?"
                 + " ORDER BY d.[" + linkCol + "]";
         return new Q(sql, binds);
@@ -550,6 +560,7 @@ public final class Queries {
         String sum = Sql.pick(sub, "LINESUM", "linesum");
         String qty = Sql.pick(sub, "TEDVAH", "tedvah");
         String invName = m.col("inventory", "naka", "NAKA");
+        String invShka = m.col("inventory", "SHKA", "shka");
         List<Object> binds = new ArrayList<>();
         List<String> conds = new ArrayList<>();
         String dc = Sql.dateCond(Sql.date10("x", dateCol), f.from, f.to, binds);
@@ -557,13 +568,14 @@ public final class Queries {
         String inner = "WHERE " + (conds.isEmpty() ? "1=1" : Sql.join(conds, " AND "))
                 + Sql.activeAnd(cols, "x") + Sql.softAnd(cols, "x");
         String src = Sql.dedupe(head, numberCol, "h", inner);
-        String label = "COALESCE(" + (invName == null ? "" : Sql.txt("i", invName, 250) + ",") + Sql.txt("d", shka, 120) + ",N'—')";
+        boolean useInv = invName != null && invShka != null;
+        String label = "COALESCE(" + (useInv ? Sql.txt("i", invName, 250) + "," : "") + Sql.txt("d", shka, 120) + ",N'—')";
         return new Q("SELECT TOP (" + clampTop(top) + ") " + label + " AS label"
                 + ", ISNULL(SUM(" + numNull("d", qty, "decimal(19,3)") + "),0) AS qty"
                 + ", ISNULL(SUM(" + Sql.num("d", sum) + "),0) AS total, COUNT_BIG(1) AS docs"
                 + " FROM " + src
-                + " JOIN dbo.[" + line + "] d ON TRY_CONVERT(nvarchar(100),d.[" + linkCol + "])=TRY_CONVERT(nvarchar(100),h.[" + (numberCol == null ? linkCol : numberCol) + "])"
-                + (invName == null ? "" : " LEFT JOIN dbo.inventory i ON TRY_CONVERT(nvarchar(100),i.[shka])=TRY_CONVERT(nvarchar(100),d.[" + shka + "])")
+                + " JOIN dbo.[" + line + "] d ON TRY_CONVERT(nvarchar(100),d.[" + linkCol + "])=TRY_CONVERT(nvarchar(100),h.[" + numberCol + "])"
+                + (useInv ? " LEFT JOIN dbo.inventory i ON TRY_CONVERT(nvarchar(100),i.[" + invShka + "])=TRY_CONVERT(nvarchar(100),d.[" + shka + "])" : "")
                 + " GROUP BY " + label + " ORDER BY 3 DESC", binds);
     }
 }

@@ -124,12 +124,13 @@ public class CustomersScreen extends Screen {
         content.removeAllViews();
         content.addView(heroCard(), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
+        addSearchRow(content);
 
         Row s = d.summary == null ? new Row() : d.summary;
         List<Kit.Kpi> kpis = new ArrayList<>();
         kpis.add(new Kit.Kpi("مشتریان", Money.fa(String.valueOf(s.l("total"))), "", accent()));
-        kpis.add(new Kit.Kpi("مانده بدهی", Money.compact(s.d("debtorsSum")), Money.fa(String.valueOf(s.l("debtorsN"))) + " نفر", Theme.DANGER));
-        kpis.add(new Kit.Kpi("مانده بستانکاری", Money.compact(s.d("creditorsSum")), Money.fa(String.valueOf(s.l("creditorsN"))) + " نفر", Theme.SUCCESS));
+        kpis.add(new Kit.Kpi("مانده بدهی", Money.compactRial(s.d("debtorsSum")), Money.fa(String.valueOf(s.l("debtorsN"))) + " نفر", Theme.DANGER));
+        kpis.add(new Kit.Kpi("مانده بستانکاری", Money.compactRial(s.d("creditorsSum")), Money.fa(String.valueOf(s.l("creditorsN"))) + " نفر", Theme.SUCCESS));
         kpis.add(new Kit.Kpi("مسدود", Money.fa(String.valueOf(s.l("blockedN"))), "نفر", Theme.WARNING));
         content.addView(a.kit.kpiGrid(kpis, 2), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(12));
@@ -155,7 +156,7 @@ public class CustomersScreen extends Screen {
                 double bal = r.d("balance");
                 int col = bal > 0.5 ? Theme.DANGER : (bal < -0.5 ? Theme.SUCCESS : Theme.MUTED);
                 String side = bal > 0.5 ? Money.rial(bal) : (bal < -0.5 ? Money.rial(-bal) : "تسویه");
-                String sub = "کد " + Money.fa(code) + " • فروش " + Money.compact(r.d("salesTotal"));
+                String sub = "کد " + Money.fa(code) + " • فروش " + Money.compactRial(r.d("salesTotal"));
                 if (!r.s("route").isEmpty()) sub += " • " + r.s("route");
                 View v = a.kit.personRow(r.s("name"), sub, side,
                         bal > 0.5 ? "بدهکار" : (bal < -0.5 ? "بستانکار" : "مانده"), col, v2 -> openDossier(code));
@@ -324,10 +325,12 @@ public class CustomersScreen extends Screen {
         footer.addView(a.kit.btn("فاکتورها", v -> {
             dlg.dismiss();
             Screen s = a.screen("sales");
-            Filter nf = s.filter().copy();
-            nf.search = fCode2;
-            nf.page = 0;
-            s.applyFilter(nf);
+            if (s != null && s.filter() != null) {
+                Filter nf = s.filter().copy();
+                nf.search = fCode2;
+                nf.page = 0;
+                s.applyFilter(nf);
+            }
             a.nav("sales");
         }), a.kit.wlp(1f));
         footer.addView(a.kit.space(8));

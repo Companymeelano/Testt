@@ -9,6 +9,7 @@ import android.widget.NumberPicker;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
+import ir.meelano.manager.R;
 import ir.meelano.manager.core.Filter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.MasterQueries;
@@ -58,6 +59,25 @@ public final class FilterSheet {
 
     public static void show(final Kit kit, final Repo repo, final Filter current, final Config cfg, final Done done) {
         final Filter f = current.copy();
+        // Method-local on purpose: static holders would leak the dialog across sheets.
+        final String[] pendingSearch = {f.search == null ? "" : f.search};
+        final AlertDialog[] dlg = {null};
+        final Runnable applyAll = () -> {
+            if (dlg[0] != null) dlg[0].dismiss();
+            if (cfg.search) f.search = pendingSearch[0] == null ? "" : pendingSearch[0].trim();
+            // Clamp custom dates to real calendar days (empty stays unbounded) and keep from<=to.
+            if (cfg.range && f.preset == Filter.P_CUSTOM) {
+                if (!f.from.isEmpty()) f.from = Jalali.normalizeDate(f.from);
+                if (!f.to.isEmpty()) f.to = Jalali.normalizeDate(f.to);
+                if (!f.from.isEmpty() && !f.to.isEmpty() && f.from.compareTo(f.to) > 0) {
+                    String x = f.from;
+                    f.from = f.to;
+                    f.to = x;
+                }
+            }
+            f.page = 0;
+            done.onApply(f);
+        };
         LinearLayout root = kit.v();
         root.setPadding(Theme.dp(16), Theme.dp(14), Theme.dp(16), Theme.dp(10));
 
@@ -71,8 +91,27 @@ public final class FilterSheet {
             search.setHintTextColor(Theme.MUTED);
             search.setTypeface(Theme.face(false));
             search.setBackground(Theme.searchBar());
+            try {
+                android.graphics.drawable.Drawable ic = kit.a.getDrawable(R.drawable.mi_search);
+                if (ic != null) {
+                    ic = ic.mutate();
+                    ic.setTint(Theme.GOLD);
+                    int sz = Theme.dp(20);
+                    ic.setBounds(0, 0, sz, sz);
+                    search.setCompoundDrawablesRelative(ic, null, null, null);
+                    search.setCompoundDrawablePadding(Theme.dp(8));
+                }
+            } catch (Exception ignored) { }
             search.setPadding(Theme.dp(14), Theme.dp(10), Theme.dp(14), Theme.dp(10));
             search.setSingleLine(true);
+            search.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
+            search.setOnEditorActionListener((v, actionId, ev) -> {
+                if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) {
+                    applyAll.run();
+                    return true;
+                }
+                return false;
+            });
             root.addView(search, kit.lp(-1, -2));
             root.addView(kit.gap(10));
             pendingSearch[0] = "";
@@ -108,8 +147,6 @@ public final class FilterSheet {
                 }
             };
             // chips (manual, to control re-render)
-            LinearLayout chips = kit.h();
-            chips.setGravity(Gravity.CENTER_VERTICAL);
             android.widget.HorizontalScrollView sv = new android.widget.HorizontalScrollView(kit.a);
             sv.setHorizontalScrollBarEnabled(false);
             final LinearLayout[] rowHolder = {kit.h()};
@@ -158,8 +195,6 @@ public final class FilterSheet {
         if (cfg.status != null && cfg.status.length > 0) {
             root.addView(kit.text(cfg.statusTitle, 12.5f, Theme.GOLD_SOFT, true), kit.lp(-1, -2));
             root.addView(kit.gap(6));
-            LinearLayout box = kit.h();
-            box.setGravity(Gravity.CENTER_VERTICAL);
             android.widget.HorizontalScrollView s2 = new android.widget.HorizontalScrollView(kit.a);
             s2.setHorizontalScrollBarEnabled(false);
             final LinearLayout rr = kit.h();
@@ -222,22 +257,11 @@ public final class FilterSheet {
 
         // ---- actions ----
         LinearLayout actions = kit.h();
-        actions.addView(kit.btnGold("✓ اعمال فیلتر", v -> {
-            dlg[0].dismiss();
-            if (cfg.search) f.search = pendingSearch[0] == null ? "" : pendingSearch[0].trim();
-            if (cfg.range && f.preset == Filter.P_CUSTOM && !f.from.isEmpty() && !f.to.isEmpty() && f.from.compareTo(f.to) > 0) {
-                String x = f.from;
-                f.from = f.to;
-                f.to = x;
-            }
-            f.page = 0;
-            done.onApply(f);
-        }), kit.wlp(1f));
+        actions.addView(kit.btnGold("✓ اعمال فیلتر", v -> applyAll.run()), kit.wlp(1f));
         actions.addView(kit.space(8));
         actions.addView(kit.btnGhost("پاک‌سازی", Theme.MUTED, v -> {
-            dlg[0].dismiss();
-            Filter d = new Filter();
-            done.onApply(d);
+            if (dlg[0] != null) dlg[0].dismiss();
+            done.onApply(new Filter());
         }), kit.lp(-2, -2));
         root.addView(actions, kit.lp(-1, -2));
 
@@ -245,14 +269,12 @@ public final class FilterSheet {
         sv.addView(root, new ScrollView.LayoutParams(-1, -2));
         LinearLayout wrap = kit.v();
         wrap.setPadding(Theme.dp(4), Theme.dp(4), Theme.dp(4), Theme.dp(4));
-        wrap.addView(sv, kit.lp(-1, Theme.dp(460)));
+        int maxH = (int) (kit.a.getResources().getDisplayMetrics().heightPixels * 0.72);
+        wrap.addView(sv, kit.lp(-1, Math.min(Theme.dp(520), maxH)));
         final AlertDialog[] d = {kit.dialog("فیلتر پیشرفته", wrap, true)};
         dlg[0] = d[0];
         d[0].show();
     }
-
-    private static final String[] pendingSearch = {""};
-    private static final AlertDialog[] dlg = {null};
 
     private interface LookupQuery {
         Queries.Q build(Meta m) throws Exception;
@@ -333,7 +355,21 @@ public final class FilterSheet {
         final NumberPicker y = picker(kit, 1350, 1480, j[0]);
         final NumberPicker mo = picker(kit, 1, 12, j[1]);
         final NumberPicker d = picker(kit, 1, 31, j[2]);
+        // Day count follows the selected month (no "Esfand 31st").
+        final Runnable clampDay = () -> {
+            int max = Jalali.daysInMonth(y.getValue(), mo.getValue());
+            if (d.getMaxValue() != max) {
+                d.setDisplayedValues(null);
+                d.setMaxValue(max);
+                String[] disp = new String[max];
+                for (int i = 0; i < max; i++) disp[i] = Money.fa(String.valueOf(i + 1));
+                d.setDisplayedValues(disp);
+            }
+            if (d.getValue() > max) d.setValue(max);
+        };
+        clampDay.run();
         NumberPicker.OnValueChangeListener sync = (p, oldV, newV) -> {
+            clampDay.run();
             String v = String.format(Locale.US, "%04d/%02d/%02d", y.getValue(), mo.getValue(), d.getValue());
             if (isFrom) f.from = v;
             else f.to = v;

@@ -170,7 +170,7 @@ public final class Kit {
         t.addView(l, lp(-1, -2));
         TextView v = text(k.value, 16.5f, Theme.TEXT, true);
         v.setSingleLine(true);
-        v.setEllipsize(TextUtils.TruncateAt.START);
+        v.setEllipsize(TextUtils.TruncateAt.END);
         t.addView(v, lp(-1, -2));
         if (k.sub != null && !k.sub.isEmpty()) {
             TextView s = text(k.sub, 10f, k.accent, true);
@@ -354,6 +354,7 @@ public final class Kit {
         b.setOnClickListener(onClick);
         b.setAllCaps(false);
         MeelanoIcons.iconize(b);
+        Theme.pressable(b);
         return b;
     }
 
@@ -368,6 +369,7 @@ public final class Kit {
         b.setOnClickListener(onClick);
         b.setAllCaps(false);
         MeelanoIcons.iconize(b);
+        Theme.pressable(b);
         return b;
     }
 
@@ -445,10 +447,26 @@ public final class Kit {
     }
 
     // ---------------- states ----------------
+    /** Fake search field (gold loupe + hint) that opens the filter sheet. */
+    public View searchBar(String hint, View.OnClickListener onClick) {
+        LinearLayout r = h();
+        r.setGravity(Gravity.CENTER_VERTICAL);
+        r.setBackground(Theme.searchBar());
+        r.setPadding(Theme.dp(14), Theme.dp(11), Theme.dp(14), Theme.dp(11));
+        r.addView(text("⌕", 17, Theme.GOLD, true), lp(-2, -2));
+        r.addView(space(8));
+        TextView t = text(hint == null || hint.isEmpty() ? "جستجو…" : hint, 12f, Theme.MUTED, false);
+        r.addView(t, wlp(1f));
+        Theme.pressable(r);
+        r.setOnClickListener(onClick);
+        return r;
+    }
+
     public View loading(String msg) {
         LinearLayout c = card();
         c.setGravity(Gravity.CENTER);
         ProgressBar p = new ProgressBar(a);
+        try { p.getIndeterminateDrawable().setTint(Theme.GOLD); } catch (Exception ignored) { }
         c.addView(p, new LinearLayout.LayoutParams(Theme.dp(40), Theme.dp(40)));
         TextView t = text(msg, 12f, Theme.MUTED, false);
         t.setGravity(Gravity.CENTER);
@@ -522,14 +540,16 @@ public final class Kit {
         if (col.type == ReportCatalog.T_NUM) {
             double v = r.d(col.key);
             if (Math.abs(v - Math.round(v)) < 0.001) return Money.num(Math.round(v));
-            return Money.fa(String.format(java.util.Locale.US, "%.1f", v).replace('.', '٫'));
+            return Money.fa(String.format(java.util.Locale.US, "%.1f", v).replace('.', '٫').replace('-', '−'));
         }
         if (col.type == ReportCatalog.T_DATE) {
             String d = r.s(col.key);
             if (d.length() >= 10) d = d.substring(0, 10);
-            return Money.fa(d);
+            return Money.fa(Jalali.faDate(d));
         }
-        return r.s(col.key, "—");
+        String t = r.s(col.key, "—");
+        // Gregorian datetimes (logins, change log) → Jalali; anything else passes through.
+        return "—".equals(t) ? t : Money.fa(Jalali.faDate(t));
     }
 
     /** Scrollable table with a sticky-feel header. */
@@ -759,7 +779,21 @@ public final class Kit {
         e.setBackground(Theme.searchBar());
         e.setPadding(Theme.dp(12), Theme.dp(10), Theme.dp(12), Theme.dp(10));
         e.setSingleLine(true);
-        if (password) e.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
+        if (password) e.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        return e;
+    }
+
+    /** Numeric PIN field (the 4-digit lock code). */
+    public EditText editPin(String hint, String value) {
+        EditText e = edit(hint, value, false);
+        e.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
+        return e;
+    }
+
+    /** Plain numeric field (port …). */
+    public EditText editNum(String hint, String value) {
+        EditText e = edit(hint, value, false);
+        e.setInputType(InputType.TYPE_CLASS_NUMBER);
         return e;
     }
 }

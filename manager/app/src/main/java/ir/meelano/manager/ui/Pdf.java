@@ -116,14 +116,15 @@ public final class Pdf {
         if (col.type == ReportCatalog.T_NUM) {
             double v = r.d(col.key);
             if (Math.abs(v - Math.round(v)) < 0.001) return Money.num(Math.round(v));
-            return Money.fa(String.format(java.util.Locale.US, "%.1f", v).replace('.', '٫'));
+            return Money.fa(String.format(java.util.Locale.US, "%.1f", v).replace('.', '٫').replace('-', '−'));
         }
         if (col.type == ReportCatalog.T_DATE) {
             String d = r.s(col.key);
             if (d.length() >= 10) d = d.substring(0, 10);
-            return Money.fa(d);
+            return Money.fa(Jalali.faDate(d));
         }
-        return r.s(col.key, "—");
+        String t = r.s(col.key, "—");
+        return "—".equals(t) ? t : Money.fa(Jalali.faDate(t));
     }
 
     private static String safe(String s) {

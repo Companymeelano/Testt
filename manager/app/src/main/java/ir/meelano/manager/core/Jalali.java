@@ -78,7 +78,16 @@ public final class Jalali {
 
     /** Day number of "1405/07/06" (digits may be Persian); -1 when the text is not a date. */
     public static int parse(String text) {
-        if (text == null) return -1;
+        int[] ymd = splitYmd(text);
+        if (ymd == null) return -1;
+        int y = ymd[0], m = ymd[1], d = ymd[2];
+        if (y < 1300 || y > 1600 || m < 1 || m > 12 || d < 1 || d > daysInMonth(y, m)) return -1;
+        return toDay(y, m, d);
+    }
+
+    /** Split digits out of a date-like text (fa/ar digits accepted); null when unparsable. */
+    private static int[] splitYmd(String text) {
+        if (text == null) return null;
         StringBuilder b = new StringBuilder();
         for (char ch : text.trim().toCharArray()) {
             if (ch >= '۰' && ch <= '۹') b.append((char) ('0' + (ch - '۰')));
@@ -86,12 +95,30 @@ public final class Jalali {
             else b.append(ch);
         }
         String[] p = b.toString().split("[/\\-]");
-        if (p.length < 3) return -1;
+        if (p.length < 3) return null;
         try {
-            int y = Integer.parseInt(p[0].trim()), m = Integer.parseInt(p[1].trim()), d = Integer.parseInt(p[2].trim().length() > 2 ? p[2].trim().substring(0, 2) : p[2].trim());
-            if (y < 1300 || y > 1600 || m < 1 || m > 12 || d < 1 || d > 31) return -1;
-            return toDay(y, m, d);
-        } catch (Exception e) { return -1; }
+            String dd = p[2].trim();
+            if (dd.length() > 2) dd = dd.substring(0, 2);
+            return new int[]{Integer.parseInt(p[0].trim()), Integer.parseInt(p[1].trim()), Integer.parseInt(dd)};
+        } catch (Exception e) { return null; }
+    }
+
+    /** Days in a Jalali month (leap Esfand handled via day arithmetic, no leap tables). */
+    public static int daysInMonth(int jy, int jm) {
+        if (jm <= 0) return 30;
+        if (jm <= 6) return 31;
+        if (jm <= 11) return 30;
+        return toDay(jy + 1, 1, 1) - toDay(jy, 12, 1) == 30 ? 30 : 29;
+    }
+
+    /** Clamp any date-like text to a valid Jalali «YYYY/MM/DD» (today when unparsable). */
+    public static String normalizeDate(String text) {
+        int[] ymd = splitYmd(text);
+        if (ymd == null) return todayStr();
+        int y = Math.max(1300, Math.min(1600, ymd[0]));
+        int m = Math.max(1, Math.min(12, ymd[1]));
+        int d = Math.max(1, Math.min(daysInMonth(y, m), ymd[2]));
+        return String.format(Locale.US, "%04d/%02d/%02d", y, m, d);
     }
 
     public static String format(int day) {
@@ -110,6 +137,13 @@ public final class Jalali {
     }
 
     /** "1405/07/14" for today. */
+    /** Days from a to b (b − a); −1 when either side is unparseable. */
+    public static int diffDays(String a, String b) {
+        int da = parse(a);
+        int db = parse(b);
+        return da < 0 || db < 0 ? -1 : db - da;
+    }
+
     public static String todayStr() {
         return format(today());
     }
@@ -152,5 +186,46 @@ public final class Jalali {
         if (d < 0) return "";
         // Julian day 0 was a Monday; Saturday is the first day of the Persian week.
         return WEEKDAYS[((d + 2) % 7 + 7) % 7];
+    }
+
+    /**
+     * Display helper: converts a leading Gregorian date («2026-10-07…», as stored by
+     * datetime columns) to Jalali; Jalali text passes through untouched. Any suffix
+     * (e.g. a time part) is kept. Never throws.
+     */
+    public static String faDate(String raw) {
+        if (raw == null) return "";
+        String t = raw.trim();
+        if (t.length() < 10) return t;
+        String head = t.substring(0, 10);
+        if (head.length() != 10 || head.charAt(4) != '-' || head.charAt(7) != '-') return t;
+        for (int i = 0; i < 10; i++) {
+            if (i == 4 || i == 7) continue;
+            char ch = head.charAt(i);
+            if (ch < '0' || ch > '9') return t;
+        }
+        try {
+            int y = Integer.parseInt(head.substring(0, 4));
+            int m = Integer.parseInt(head.substring(5, 7));
+            int d = Integer.parseInt(head.substring(8, 10));
+            if (m < 1 || m > 12 || d < 1 || d > 31) return t;
+            return format(g2d(y, m, d)) + t.substring(10);
+        } catch (Exception e) {
+            return t;
+        }
+    }
+
+    /** Jalali «YYYY/MM/DD» → Gregorian «YYYY-MM-DD» (for datetime columns); "" when invalid. */
+    public static String toGregorian(String jalali) {
+        int day = parse(jalali);
+        if (day < 0) return "";
+        int[] g = d2g(day);
+        return String.format(Locale.US, "%04d-%02d-%02d", g[0], g[1], g[2]);
+    }
+
+    /** Today's Gregorian date «YYYY-MM-DD». */
+    public static String todayGregorian() {
+        Calendar c = Calendar.getInstance();
+        return String.format(Locale.US, "%04d-%02d-%02d", c.get(Calendar.YEAR), c.get(Calendar.MONTH) + 1, c.get(Calendar.DAY_OF_MONTH));
     }
 }

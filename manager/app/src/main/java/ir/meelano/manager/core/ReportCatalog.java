@@ -168,8 +168,9 @@ public final class ReportCatalog {
                     C_NONE, "", ""),
             // ---- سود ----
             s("profit_daily", "سود روزانه", "سود و زیان", "فروش و بهای تمام‌شده هر روز (مبنای قیمت خرید)", true,
-                    new Col[]{c("day", "روز", T_DATE), c("sales", "فروش", T_MONEY), c("cogs", "بهای تمام‌شده", T_MONEY)},
-                    C_LINE, "day", "sales"),
+                    new Col[]{c("day", "روز", T_DATE), c("sales", "فروش", T_MONEY), c("cogs", "بهای تمام‌شده", T_MONEY),
+                            c("profit", "سود", T_MONEY)},
+                    C_LINE, "day", "profit"),
             s("profit_by_product", "سود کالاها", "سود و زیان", "حاشیه سود هر کالا (مبنای قیمت خرید)", true,
                     new Col[]{c("label", "کالا", T_TEXT), c("qty", "مقدار", T_NUM), c("sales", "فروش", T_MONEY),
                             c("cogs", "بهای تمام‌شده", T_MONEY), c("profit", "سود", T_MONEY)},

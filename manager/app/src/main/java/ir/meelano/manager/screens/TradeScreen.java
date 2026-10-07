@@ -333,7 +333,7 @@ public class TradeScreen extends Screen {
         Row head = dt.head;
         LinearLayout body = a.kit.v();
         body.addView(a.kit.kv("شماره", Money.fa(head.s("no")), Theme.TEXT), a.kit.lp(-1, -2));
-        body.addView(a.kit.kv("تاریخ", Money.fa(head.s("date")), Theme.TEXT), a.kit.lp(-1, -2));
+        body.addView(a.kit.kv("تاریخ", Jalali.dispFa(head.s("date")), Theme.TEXT), a.kit.lp(-1, -2));
         body.addView(a.kit.kv(sales ? "مشتری" : "طرف‌حساب", head.s("customer"), Theme.TEXT), a.kit.lp(-1, -2));
         if (sales && !head.s("visitor").isEmpty() && !"بدون ویزیتور".equals(head.s("visitor")))
             body.addView(a.kit.kv("ویزیتور", head.s("visitor"), Theme.TEXT), a.kit.lp(-1, -2));

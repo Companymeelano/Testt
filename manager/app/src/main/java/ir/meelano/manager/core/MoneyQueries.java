@@ -224,6 +224,7 @@ public final class MoneyQueries {
         String bank = m.col(table, incoming ? "getchbank" : "bankrdf");
         String sar = m.col(table, "sardate");
         String st = m.col(table, incoming ? "chk_satus" : "putchk_status", "status");
+        String back = incoming ? m.col(table, "back") : null;
         List<Object> binds = new ArrayList<>();
         binds.add(ghno);
         return new Queries.Q("SELECT " + (num == null ? "N'—'" : "COALESCE(" + Sql.txt("c", num, 80) + ",N'—')") + " AS num"
@@ -231,6 +232,7 @@ public final class MoneyQueries {
                 + ", " + Sql.num("c", amount) + " AS amount"
                 + ", " + (sar == null ? "CAST(NULL AS nvarchar(10))" : Sql.date10("c", sar)) + " AS sardate"
                 + ", " + (st == null ? "N''" : "COALESCE(" + Sql.txt("c", st, 40) + ",N'')") + " AS st"
+                + ", " + (back == null ? "N''" : "COALESCE(" + Sql.txt("c", back, 10) + ",N'')") + " AS back"
                 + " FROM dbo.[" + table + "] c WHERE TRY_CONVERT(nvarchar(60),c.[" + gh + "])=?", binds);
     }
 
@@ -443,8 +445,8 @@ public final class MoneyQueries {
     }
 
     /**
-     * Cheque list. bucket: "" all; incoming: sandogh/bank/vosool/kharj/bargashti;
-     * outgoing: jari/pas/bargashti/enteghal/sefid.
+     * Cheque list. bucket: "" all; incoming: sandogh/bank/vosool/esterdad/kharj/bargashti/sayer;
+     * outgoing: jari/pas/sefid/sayer. Codes follow Atiran's own procedures (see AtiranSchema).
      */
     public static Queries.Q chequeList(Meta m, boolean incoming, Filter f, String bucket) throws Queries.Missing {
         Chq c = chq(m, incoming);
@@ -554,14 +556,6 @@ public final class MoneyQueries {
         return new Queries.Q("SELECT " + (c.num == null ? "N'—'" : "COALESCE(" + Sql.txt("h", c.num, 80) + ",N'—')") + " AS num"
                 + ", " + (c.bank == null ? "N''" : "COALESCE(" + Sql.txt("h", c.bank, 150) + ",N'')") + " AS bank"
                 + ", " + Sql.num("h", c.amount) + " AS amount"
-                + ", " + Sql.date10("h", c.sardate) + " AS sardate"
-                + ", " + custExpr + " AS customer"
-                + ", COALESCE(" + Sql.txt("h", c.st, 40) + ",N'') AS st"
-                + " FROM dbo.[" + c.table + "] h" + join + " WHERE " + Sql.join(conds, " AND ")
-                + " ORDER BY h.[" + c.sardate + "]", binds);
-    }
-}
- " + Sql.num("h", c.amount) + " AS amount"
                 + ", " + Sql.date10("h", c.sardate) + " AS sardate"
                 + ", " + custExpr + " AS customer"
                 + ", COALESCE(" + Sql.txt("h", c.st, 40) + ",N'') AS st"

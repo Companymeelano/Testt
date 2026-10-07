@@ -151,7 +151,8 @@ public final class Charts {
             float[] xs = new float[n];
             float[] ys = new float[n];
             for (int i = 0; i < n; i++) {
-                xs[i] = n == 1 ? plot.centerX() : plot.left + plot.width() * i / (n - 1);
+                // RTL: first (oldest) point at the right, time flows right → left.
+                xs[i] = n == 1 ? plot.centerX() : plot.right - plot.width() * i / (n - 1);
                 ys[i] = (float) (plot.bottom - plot.height() * ((data.get(i).value - mn) / (mx - mn)) * progress);
             }
             float zeroY = (float) (plot.bottom - plot.height() * ((0 - mn) / (mx - mn)) * progress);
@@ -535,10 +536,6 @@ public final class Charts {
             paint.setColor(Theme.MUTED);
             paint.setTextSize(Theme.dp(10.5f));
             g.drawText("تحقق هدف", cx, cy - Theme.dp(4), paint);
-        }
-    }
-}
-        g.drawText("تحقق هدف", cx, cy - Theme.dp(4), paint);
         }
     }
 }

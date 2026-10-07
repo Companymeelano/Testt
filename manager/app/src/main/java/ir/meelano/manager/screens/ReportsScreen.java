@@ -121,6 +121,7 @@ public class ReportsScreen extends Screen {
             Meta m = new Meta(c);
             List<Row> rows = Repo.exec(c, ReportCatalog.query(m, spec.id, f));
             if ("aging".equals(spec.id)) mapAging(rows, m);
+            if ("unsettled".equals(spec.id)) mapUnsettled(rows);
             return rows;
         }, new Repo.Cb<List<Row>>() {
             @Override

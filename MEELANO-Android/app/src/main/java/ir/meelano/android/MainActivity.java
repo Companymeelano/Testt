@@ -12180,7 +12180,7 @@ public class MainActivity extends Activity {
                 coloredShadow(tab, alpha(GOLD, 110), 2);
                 if (motionAllowed()) { tab.setScaleX(0.9f); tab.setScaleY(0.9f); tab.animate().scaleX(1f).scaleY(1f).setDuration(180).start(); }
             }
-            tab.setOnClickListener(v -> { managerReportRange = rr; prefs.edit().putInt("mgr_range", rr).apply(); loadManagerReports(); });
+            tab.setOnClickListener(v -> { haptic(v, false); managerReportRange = rr; prefs.edit().putInt("mgr_range", rr).apply(); loadManagerReports(); });
             seg.addView(tab, new LinearLayout.LayoutParams(0, -2, 1f));
         }
         LinearLayout.LayoutParams fp = new LinearLayout.LayoutParams(-1, -2); fp.setMargins(0, 0, 0, dp(12));
@@ -12282,6 +12282,7 @@ public class MainActivity extends Activity {
         t.addView(g, new LinearLayout.LayoutParams(-1, -2));
         final TextView v = text(value, 13.4f, 0xFFFFFFFF, Typeface.BOLD);
         displayWeight(v); // synthetic display weight: KPI figures read as the strongest type on screen
+        if (Build.VERSION.SDK_INT >= 26) v.setFontFeatureSettings("tnum"); // Phase-7T
         v.setSingleLine(true); v.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
         LinearLayout.LayoutParams vp = new LinearLayout.LayoutParams(-1, -2); vp.setMargins(0, dp(4), 0, 0);
         t.addView(v, vp);
@@ -12610,6 +12611,7 @@ public class MainActivity extends Activity {
         } else {
             v.setSingleLine(true); v.setEllipsize(TextUtils.TruncateAt.START);
         }
+        if (Build.VERSION.SDK_INT >= 26) v.setFontFeatureSettings("tnum"); // Phase-7T: tabular figures keep money columns aligned
         row.addView(l); row.addView(v);
         LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, -2); rp.setMargins(0, dp(2), 0, dp(2));
         parent.addView(row, rp);
@@ -12631,7 +12633,7 @@ public class MainActivity extends Activity {
         JSONArray inactive = dash.optJSONArray("inactiveCustomers");
         int cap = managerReportListCap;
         if ((debtors == null || debtors.length() == 0) && (overdue == null || overdue.length() == 0)) {
-            c.addView(text("مورد فوری وصول وجود ندارد. ✨", 10.8f, MUTED, Typeface.NORMAL), new LinearLayout.LayoutParams(-1, -2));
+            c.addView(text("مورد فوری وصول وجود ندارد.", T_CAPTION, MUTED, Typeface.NORMAL), new LinearLayout.LayoutParams(-1, -2));
         }
         if (overdue != null && overdue.length() > 0) {
             TextView h = text("فاکتورهای سررسیده (" + formatNumber(overdue.length()) + "):", 10.8f, DANGER, Typeface.BOLD);
@@ -13963,6 +13965,7 @@ public class MainActivity extends Activity {
         r.addView(text("‹", 14, tc(accent), Typeface.BOLD), new LinearLayout.LayoutParams(-2, -2));
         r.setClickable(true); applyTouchFeedback(r);
         r.setOnClickListener(v -> {
+            haptic(v, false); // Phase-7T: tactile tick on category navigation
             if (motionAllowed()) { // Phase-7D: shared-element handoff — the card's colour flies to the new page
                 int[] loc = new int[2]; v.getLocationOnScreen(loc);
                 flyGhost(loc[0] + v.getWidth() / 2, loc[1] + v.getHeight() / 2, accent);

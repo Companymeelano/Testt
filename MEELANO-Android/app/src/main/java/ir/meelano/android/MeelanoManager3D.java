@@ -246,11 +246,41 @@ final class MeelanoManager3D {
         private final Paint txt = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Path front = new Path();
         private final Path top = new Path();
+        private int picked = -1; // Phase-7Y: point under the finger
 
         IsoArea(Context ctx) {
             super(ctx);
             stroke.setStyle(Paint.Style.STROKE);
             txt.setTextAlign(Paint.Align.CENTER);
+            setClickable(true);
+        }
+
+        @Override
+        public boolean onTouchEvent(android.view.MotionEvent ev) {
+            int n = norm.length;
+            if (n < 2 || getWidth() == 0) return super.onTouchEvent(ev);
+            int act = ev.getAction();
+            if (act == android.view.MotionEvent.ACTION_DOWN || act == android.view.MotionEvent.ACTION_MOVE) {
+                android.view.ViewParent vp = getParent();
+                if (vp != null) vp.requestDisallowInterceptTouchEvent(true);
+                float w = getWidth(), h = getHeight();
+                float pad = w * 0.06f;
+                int best = 0; float bd = Float.MAX_VALUE;
+                for (int i = 0; i < n; i++) {
+                    float x = w - pad - (w - pad * 2) * i / (n - 1f);
+                    float d = Math.abs(x - ev.getX());
+                    if (d < bd) { bd = d; best = i; }
+                }
+                picked = best;
+                invalidate();
+                return true;
+            }
+            if (act == android.view.MotionEvent.ACTION_UP || act == android.view.MotionEvent.ACTION_CANCEL) {
+                android.view.ViewParent vp = getParent();
+                if (vp != null) vp.requestDisallowInterceptTouchEvent(false);
+                return true;
+            }
+            return super.onTouchEvent(ev);
         }
 
         void setData(String[] labels, String[] values, float[] norm, int color) {
@@ -337,6 +367,26 @@ final class MeelanoManager3D {
             cv.drawRoundRect(new RectF(xs[n - 1] - tw / 2 - h * 0.03f, ys[n - 1] - h * 0.14f, xs[n - 1] + tw / 2 + h * 0.03f, ys[n - 1] - h * 0.05f), h * 0.04f, h * 0.04f, fill);
             txt.setColor(Color.WHITE);
             cv.drawText(pv, xs[n - 1], ys[n - 1] - h * 0.08f, txt);
+
+            if (picked >= 0 && picked < n) { // Phase-7Y: magnifier dot + tooltip on the ridge
+                float px = xs[picked], py = ys[picked];
+                stroke.setColor(Color.WHITE);
+                stroke.setStrokeWidth(3f);
+                cv.drawCircle(px, py, h * 0.026f, stroke);
+                String tip = labels[picked] + " • " + values[picked];
+                float tw2 = txt.measureText(tip);
+                float half = Math.min(tw2 / 2 + h * 0.04f, w / 2 - 2);
+                float tx = Math.max(half + 2, Math.min(w - half - 2, px));
+                float ty = Math.max(h * 0.10f, py - h * 0.16f);
+                fill.setStyle(Paint.Style.FILL);
+                fill.setColor(Color.argb(215, 18, 22, 32));
+                cv.drawRoundRect(new RectF(tx - half, ty - h * 0.06f, tx + half, ty + h * 0.05f), h * 0.045f, h * 0.045f, fill);
+                stroke.setColor(Color.argb(140, 231, 177, 90));
+                stroke.setStrokeWidth(1.5f);
+                cv.drawRoundRect(new RectF(tx - half, ty - h * 0.06f, tx + half, ty + h * 0.05f), h * 0.045f, h * 0.045f, stroke);
+                txt.setColor(Color.WHITE);
+                cv.drawText(tip, tx, ty + h * 0.015f, txt);
+            }
         }
     }
 
@@ -346,6 +396,7 @@ final class MeelanoManager3D {
         private float[] norm = new float[0];
         private int[] colors = new int[0];
         private String center = "";
+        private int picked = -1; // Phase-7Y: segment under the finger
         private final java.util.concurrent.atomic.AtomicReference<float[]> prog = new java.util.concurrent.atomic.AtomicReference<>(new float[]{0f});
         private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint txt = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -353,6 +404,35 @@ final class MeelanoManager3D {
         Donut3D(Context ctx) {
             super(ctx);
             txt.setTextAlign(Paint.Align.CENTER);
+            setClickable(true);
+        }
+
+        @Override
+        public boolean onTouchEvent(android.view.MotionEvent ev) {
+            int n = norm.length;
+            if (n == 0 || getWidth() == 0) return super.onTouchEvent(ev);
+            int act = ev.getAction();
+            if (act == android.view.MotionEvent.ACTION_DOWN || act == android.view.MotionEvent.ACTION_UP) {
+                float w = getWidth(), h = getHeight();
+                float cx = w / 2f, cy = h / 2f;
+                float rx = Math.min(w, h) * 0.42f, ry = rx * 0.62f;
+                float dx = ev.getX() - cx, dy = ev.getY() - cy;
+                double rr = (dx / rx) * (dx / rx) + (dy / ry) * (dy / ry);
+                if (rr > 1.25f) { picked = -1; invalidate(); return true; }
+                double deg = Math.toDegrees(Math.atan2(dy / ry, dx / rx));
+                double a = (deg + 90f + 360f) % 360f; // arcs start at -90°
+                double total = 0; for (float f : norm) total += Math.max(0, f);
+                if (total <= 0) return true;
+                double acc = 0;
+                for (int i = 0; i < n; i++) {
+                    acc += Math.max(0, norm[i]) / total * 360f;
+                    if (a <= acc) { picked = i; invalidate(); return true; }
+                }
+                picked = n - 1;
+                invalidate();
+                return true;
+            }
+            return super.onTouchEvent(ev);
         }
 
         void setData(String[] labels, float[] norm, int[] colors, String center) {
@@ -413,6 +493,32 @@ final class MeelanoManager3D {
             txt.setTextSize(Math.max(8f, rx * 0.11f));
             txt.setColor(Color.argb(200, 255, 255, 255));
             cv.drawText("جمع", cx, cy + ts * 0.2f + rx * 0.16f, txt);
+
+            if (picked >= 0 && picked < n) { // Phase-7Y: brighten the picked segment + tooltip
+                float start = -90f;
+                float pickStart = -90f, pickSweep = 0f;
+                for (int i = 0; i < n; i++) {
+                    float sweep = (float) (Math.max(0, norm[i]) / total * 360f) * pr;
+                    if (i == picked) { pickStart = start; pickSweep = sweep; }
+                    start += sweep;
+                }
+                fill.setStyle(Paint.Style.STROKE);
+                fill.setStrokeWidth(th * 1.12f);
+                fill.setColor(Color.argb(70, 255, 255, 255));
+                cv.drawArc(new RectF(cx - rx, cy - ry, cx + rx, cy + ry), pickStart, Math.max(0.5f, pickSweep - 1.5f), false, fill);
+                double pct = Math.max(0, norm[picked]) / total * 100;
+                String tip = labels[picked] + " • " + Math.round(pct) + "٪";
+                txt.setTextSize(Math.max(9f, rx * 0.13f));
+                float tw2 = txt.measureText(tip);
+                float half = tw2 / 2 + rx * 0.08f;
+                float tx = Math.max(half + 2, Math.min(w - half - 2, cx));
+                float ty = h * 0.10f;
+                fill.setStyle(Paint.Style.FILL);
+                fill.setColor(Color.argb(215, 18, 22, 32));
+                cv.drawRoundRect(new RectF(tx - half, ty - rx * 0.09f, tx + half, ty + rx * 0.08f), rx * 0.07f, rx * 0.07f, fill);
+                txt.setColor(Color.WHITE);
+                cv.drawText(tip, tx, ty + rx * 0.03f, txt);
+            }
         }
     }
 }

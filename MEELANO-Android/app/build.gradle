@@ -88,7 +88,7 @@ android {
             applicationIdSuffix '.debug'
         }
         release {
-            minifyEnabled false
+            minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             def storePw = System.getenv('MEELANO_KEYSTORE_PASSWORD')
             signingConfig = (storePw != null && !storePw.isEmpty()) ? signingConfigs.meelano : signingConfigs.debug

@@ -2602,6 +2602,30 @@ public class MainActivity extends Activity {
         return d;
     }
 
+    /** Phase-7F: on wide screens, reflow the page cards into two balanced columns
+        (the first `fullSpan` children — hero, filters, KPI strip — stay full-width). */
+    private void twoColumnIfWide(int fullSpan) {
+        if (!isWideScreen() || content == null) return;
+        if (content.getChildCount() <= fullSpan + 2) return;
+        android.view.ViewGroup.LayoutParams wl = content.getLayoutParams();
+        if (wl != null) { wl.width = dp(1000); content.setLayoutParams(wl); } // room for two columns
+        java.util.List<View> kids = new java.util.ArrayList<>();
+        while (content.getChildCount() > 0) { View v = content.getChildAt(0); content.removeViewAt(0); kids.add(v); }
+        LinearLayout col1 = new LinearLayout(this); col1.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout col2 = new LinearLayout(this); col2.setOrientation(LinearLayout.VERTICAL);
+        for (int i = 0; i < kids.size(); i++) {
+            View v = kids.get(i);
+            android.view.ViewGroup.LayoutParams lp = v.getLayoutParams() != null ? v.getLayoutParams() : new LinearLayout.LayoutParams(-1, -2);
+            if (i < fullSpan) { content.addView(v, lp); continue; }
+            (((i - fullSpan) % 2 == 0) ? col1 : col2).addView(v, lp);
+        }
+        LinearLayout row = new LinearLayout(this); row.setOrientation(LinearLayout.HORIZONTAL);
+        row.addView(col1, new LinearLayout.LayoutParams(0, -2, 1f));
+        LinearLayout.LayoutParams g2 = new LinearLayout.LayoutParams(0, -2, 1f); g2.setMargins(dp(10), 0, 0, 0);
+        row.addView(col2, g2);
+        content.addView(row, new LinearLayout.LayoutParams(-1, -2));
+    }
+
     /** Phase-7D: tablets / landscape get a readable centered column instead of edge-to-edge stretch. */
     private boolean isWideScreen() {
         android.util.DisplayMetrics m = getResources().getDisplayMetrics();
@@ -4002,6 +4026,10 @@ public class MainActivity extends Activity {
             content.setAlpha(0.75f);
             content.setTranslationY(dp(6));
             content.animate().alpha(1f).translationY(0f).setDuration(200).start();
+        }
+        if (isWideScreen() && content != null) { // Phase-7F: readable single column by default; two-column pages widen themselves
+            android.view.ViewGroup.LayoutParams wl = content.getLayoutParams();
+            if (wl != null && wl.width != dp(660)) { wl.width = dp(660); content.setLayoutParams(wl); }
         }
         updateBackCallback();
         if (!canOpenPage(activePage)) { activePage = firstAllowedPage(); buildNav(); if (!canOpenPage(activePage)) { content.removeAllViews(); addEmptyTo(content, "بخشی برای نمایش در دسترس نیست."); return; } }
@@ -12191,6 +12219,7 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams ap = new LinearLayout.LayoutParams(-1, -2); ap.setMargins(0, 0, 0, dp(12));
         content.addView(actions, ap);
         addDeveloperCredit(content);
+        twoColumnIfWide(4); // Phase-7F: hero+filters+KPI full-width, cards in two columns
         staggerIn(content); // Phase-7B
     }
 
@@ -12957,7 +12986,34 @@ public class MainActivity extends Activity {
     private class ManagerTrendChartView extends View {
         private final JSONArray data;
         private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        ManagerTrendChartView(Context ctx, JSONArray data) { super(ctx); this.data = data; }
+        private int pick = -1; // Phase-7F: magnifier — the bar under the finger
+
+        ManagerTrendChartView(Context ctx, JSONArray data) { super(ctx); this.data = data; setClickable(true); }
+
+        @Override public boolean onTouchEvent(android.view.MotionEvent ev) {
+            if (data == null || data.length() == 0) return super.onTouchEvent(ev);
+            int act = ev.getAction();
+            if (act == android.view.MotionEvent.ACTION_DOWN || act == android.view.MotionEvent.ACTION_MOVE) {
+                android.view.ViewParent vp = getParent();
+                if (vp != null) vp.requestDisallowInterceptTouchEvent(true); // drag across bars without scrolling
+                int w = getWidth();
+                if (w <= 0) return true;
+                float bw = (float) w / data.length();
+                int idx = (int) ((w - ev.getX()) / bw); // RTL: index 0 sits at the right edge
+                if (idx < 0) idx = 0;
+                if (idx > data.length() - 1) idx = data.length() - 1;
+                pick = idx;
+                invalidate();
+                return true;
+            }
+            if (act == android.view.MotionEvent.ACTION_UP || act == android.view.MotionEvent.ACTION_CANCEL) {
+                android.view.ViewParent vp = getParent();
+                if (vp != null) vp.requestDisallowInterceptTouchEvent(false);
+                return true;
+            }
+            return super.onTouchEvent(ev);
+        }
+
         @Override protected void onDraw(Canvas canvas) { try { doDraw(canvas); } catch (Throwable ignored) { } }
         private void doDraw(Canvas canvas) {
             super.onDraw(canvas);
@@ -12986,6 +13042,33 @@ public class MainActivity extends Activity {
                     p.setColor(tc(TEXT));
                     p.setTextSize(dp(8f));
                     canvas.drawText(formatNumber(Math.round(v / 1000000.0)) + " م", x + barW / 2, h * 0.72f - bh - dp(4), p);
+                }
+            }
+            // Phase-7F magnifier: guideline + tooltip bubble for the bar under the finger
+            if (pick >= 0 && pick < n) {
+                JSONObject o = data.optJSONObject(pick);
+                if (o != null) {
+                    double v = o.optDouble("value", 0);
+                    float bw2 = (float) w / n;
+                    float cx = w - bw2 * (pick + 1) + bw2 * 0.5f;
+                    p.setStyle(Paint.Style.STROKE);
+                    p.setColor(alpha(GOLD, 160));
+                    p.setStrokeWidth(dp(1.2f));
+                    canvas.drawLine(cx, h * 0.06f, cx, h * 0.72f, p);
+                    String tip = faDigits(o.optString("label", "")) + " • " + MeelanoCharts.compact(v) + " ریال";
+                    p.setTextSize(dp(9.5f));
+                    float tw = p.measureText(tip);
+                    float half = tw / 2 + dp(8);
+                    float tx = Math.max(half + 2, Math.min(w - half - 2, cx));
+                    p.setStyle(Paint.Style.FILL);
+                    p.setColor(Color.argb(225, 18, 22, 32));
+                    canvas.drawRoundRect(new android.graphics.RectF(tx - half, dp(2), tx + half, dp(2) + h * 0.16f), dp(8), dp(8), p);
+                    p.setColor(alpha(GOLD, 200));
+                    p.setStrokeWidth(1.5f);
+                    canvas.drawRoundRect(new android.graphics.RectF(tx - half, dp(2), tx + half, dp(2) + h * 0.16f), dp(8), dp(8), p);
+                    p.setColor(Color.WHITE);
+                    p.setTextAlign(Paint.Align.CENTER);
+                    canvas.drawText(tip, tx, dp(2) + h * 0.115f, p);
                 }
             }
         }
@@ -13898,6 +13981,7 @@ public class MainActivity extends Activity {
             for (int i = 0; i < errs.length(); i++) addReportLine(c, "بدون داده", errs.optString(i, "—"), DANGER);
         }
         addDeveloperCredit(content);
+        twoColumnIfWide(1); // Phase-7F: hero full-width, cards in two columns on tablets
         staggerIn(content); // Phase-7B
     }
 

@@ -17,8 +17,8 @@ Starting a Gradle Daemon (subsequent builds will be faster)
 > Task :licensing:classes
 > Task :licensing:jar
 > Task :app:javaPreCompileDebug
-> Task :app:checkDebugAarMetadata
 > Task :app:generateDebugResValues
+> Task :app:checkDebugAarMetadata
 > Task :app:mapDebugSourceSetPaths
 > Task :app:generateDebugResources
 > Task :app:packageDebugResources
@@ -32,75 +32,131 @@ Starting a Gradle Daemon (subsequent builds will be faster)
 > Task :app:compileDebugShaders NO-SOURCE
 > Task :app:generateDebugAssets UP-TO-DATE
 > Task :app:mergeDebugAssets
-> Task :app:processDebugManifestForPackage
 > Task :app:processDebugJavaRes NO-SOURCE
 > Task :app:compressDebugAssets
 > Task :app:desugarDebugFileDependencies
 > Task :app:checkDebugDuplicateClasses
 > Task :app:mergeDebugJniLibFolders
-> Task :app:processDebugResources
 > Task :app:mergeDebugJavaResource
+> Task :app:mergeDebugNativeLibs NO-SOURCE
+> Task :app:processDebugManifestForPackage
+> Task :app:mergeLibDexDebug
 > Task :app:mergeExtDexDebug
+> Task :app:stripDebugDebugSymbols NO-SOURCE
+> Task :app:processDebugResources
+> Task :app:validateSigningDebug
 
 > Task :app:compileDebugJavaWithJavac
 Note: Some input files use or override a deprecated API.
 Note: Recompile with -Xlint:deprecation for details.
 
-> Task :app:mergeLibDexDebug
 > Task :app:dexBuilderDebug
-> Task :app:mergeDebugNativeLibs NO-SOURCE
-> Task :app:stripDebugDebugSymbols NO-SOURCE
-> Task :app:mergeProjectDexDebug
-> Task :app:validateSigningDebug
 > Task :app:writeDebugAppMetadata
 > Task :app:writeDebugSigningConfigVersions
 > Task :admin:preBuild UP-TO-DATE
 > Task :admin:preDebugBuild UP-TO-DATE
 > Task :admin:mergeDebugNativeDebugMetadata NO-SOURCE
-> Task :admin:javaPreCompileDebug
-> Task :admin:checkDebugAarMetadata
 > Task :admin:generateDebugResValues
 > Task :admin:mapDebugSourceSetPaths
 > Task :admin:generateDebugResources
+> Task :admin:javaPreCompileDebug
+> Task :admin:checkDebugAarMetadata
+> Task :app:mergeProjectDexDebug
 > Task :admin:packageDebugResources
-> Task :app:packageDebug
 > Task :admin:mergeDebugResources
-> Task :app:createDebugApkListingFileRedirect
-> Task :app:assembleDebug
 > Task :admin:createDebugCompatibleScreenManifests
 > Task :admin:extractDeepLinksDebug
 > Task :admin:processDebugMainManifest
+> Task :admin:parseDebugLocalResources
 > Task :admin:processDebugManifest
-> Task :admin:processDebugManifestForPackage
 > Task :admin:mergeDebugShaders
 > Task :admin:compileDebugShaders NO-SOURCE
-> Task :admin:parseDebugLocalResources
 > Task :admin:generateDebugAssets UP-TO-DATE
 > Task :admin:mergeDebugAssets
-> Task :admin:processDebugJavaRes NO-SOURCE
+> Task :admin:processDebugManifestForPackage
 > Task :admin:compressDebugAssets
+> Task :admin:processDebugJavaRes NO-SOURCE
+> Task :admin:mergeDebugJavaResource
+> Task :app:packageDebug
+> Task :app:createDebugApkListingFileRedirect
+> Task :app:assembleDebug
 > Task :admin:checkDebugDuplicateClasses
 > Task :admin:desugarDebugFileDependencies
-> Task :admin:mergeDebugJavaResource
 > Task :admin:mergeExtDexDebug
 > Task :admin:mergeDebugJniLibFolders
 > Task :admin:mergeDebugNativeLibs NO-SOURCE
 > Task :admin:stripDebugDebugSymbols NO-SOURCE
+> Task :admin:mergeLibDexDebug
 > Task :admin:validateSigningDebug
 > Task :admin:writeDebugAppMetadata
-> Task :admin:mergeLibDexDebug
 > Task :admin:writeDebugSigningConfigVersions
 > Task :admin:processDebugResources
 
 > Task :admin:compileDebugJavaWithJavac FAILED
-/home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:356: error: ';' expected
-        });
-         ^
-/home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:489: error: ')' expected
-            ctx.city = AdminKit.txt(ft.txt(fPhone);
-                                                  ^
-2 errors
-gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1791435633859.json
+/home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:67: error: cannot find symbol
+            if (smsPing == null) {
+                ^
+  symbol:   variable smsPing
+  location: class AdminActivity
+/home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:68: error: cannot find symbol
+                smsPing = new BroadcastReceiver() {
+                ^
+  symbol:   variable smsPing
+  location: class AdminActivity
+/home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:77: error: cannot find symbol
+                registerReceiver(smsPing, ff, Context.RECEIVER_NOT_EXPORTED);
+                                 ^
+  symbol:   variable smsPing
+  location: class AdminActivity
+/home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:79: error: cannot find symbol
+                registerReceiver(smsPing, ff);
+                                 ^
+  symbol:   variable smsPing
+  location: class AdminActivity
+/home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:88: error: cannot find symbol
+            unregisterReceiver(smsPing);
+                               ^
+  symbol:   variable smsPing
+  location: class AdminActivity
+/home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:100: error: cannot find symbol
+                String d = pendingSmsPhone;
+                           ^
+  symbol:   variable pendingSmsPhone
+  location: class AdminActivity
+/home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:101: error: cannot find symbol
+                String t = pendingSmsText;
+                           ^
+  symbol:   variable pendingSmsText
+  location: class AdminActivity
+/home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:102: error: cannot find symbol
+                pendingSmsPhone = "";
+                ^
+  symbol:   variable pendingSmsPhone
+  location: class AdminActivity
+/home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:103: error: cannot find symbol
+                pendingSmsText = "";
+                ^
+  symbol:   variable pendingSmsText
+  location: class AdminActivity
+/home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:118: error: cannot find symbol
+            pendingSmsPhone = dest;
+            ^
+  symbol:   variable pendingSmsPhone
+  location: class AdminActivity
+/home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:119: error: cannot find symbol
+            pendingSmsText = text;
+            ^
+  symbol:   variable pendingSmsText
+  location: class AdminActivity
+/home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:143: error: cannot find symbol
+                requestPermissions(new String[]{android.Manifest.permission.RECEIVE_SMS}, REQ_RECV);
+                                                                                          ^
+  symbol:   variable REQ_RECV
+  location: class AdminActivity
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+12 errors
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1791435983643.json
 [Incubating] Problems report is available at: file:///home/runner/work/Testt/Testt/manager/build/reports/problems/problems-report.html
 
 FAILURE: Build failed with an exception.
@@ -108,13 +164,69 @@ FAILURE: Build failed with an exception.
 * What went wrong:
 Execution failed for task ':admin:compileDebugJavaWithJavac'.
 > Compilation failed; see the compiler output below.
-  /home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:356: error: ';' expected
-          });
-           ^
-  /home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:489: error: ')' expected
-              ctx.city = AdminKit.txt(ft.txt(fPhone);
-                                                    ^
-  2 errors
+  Note: Recompile with -Xlint:deprecation for details.
+  Note: Some input files use or override a deprecated API.
+  /home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:67: error: cannot find symbol
+              if (smsPing == null) {
+                  ^
+    symbol:   variable smsPing
+    location: class AdminActivity
+  /home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:68: error: cannot find symbol
+                  smsPing = new BroadcastReceiver() {
+                  ^
+    symbol:   variable smsPing
+    location: class AdminActivity
+  /home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:77: error: cannot find symbol
+                  registerReceiver(smsPing, ff, Context.RECEIVER_NOT_EXPORTED);
+                                   ^
+    symbol:   variable smsPing
+    location: class AdminActivity
+  /home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:79: error: cannot find symbol
+                  registerReceiver(smsPing, ff);
+                                   ^
+    symbol:   variable smsPing
+    location: class AdminActivity
+  /home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:88: error: cannot find symbol
+              unregisterReceiver(smsPing);
+                                 ^
+    symbol:   variable smsPing
+    location: class AdminActivity
+  /home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:100: error: cannot find symbol
+                  String d = pendingSmsPhone;
+                             ^
+    symbol:   variable pendingSmsPhone
+    location: class AdminActivity
+  /home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:101: error: cannot find symbol
+                  String t = pendingSmsText;
+                             ^
+    symbol:   variable pendingSmsText
+    location: class AdminActivity
+  /home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:102: error: cannot find symbol
+                  pendingSmsPhone = "";
+                  ^
+    symbol:   variable pendingSmsPhone
+    location: class AdminActivity
+  /home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:103: error: cannot find symbol
+                  pendingSmsText = "";
+                  ^
+    symbol:   variable pendingSmsText
+    location: class AdminActivity
+  /home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:118: error: cannot find symbol
+              pendingSmsPhone = dest;
+              ^
+    symbol:   variable pendingSmsPhone
+    location: class AdminActivity
+  /home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:119: error: cannot find symbol
+              pendingSmsText = text;
+              ^
+    symbol:   variable pendingSmsText
+    location: class AdminActivity
+  /home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:143: error: cannot find symbol
+                  requestPermissions(new String[]{android.Manifest.permission.RECEIVE_SMS}, REQ_RECV);
+                                                                                            ^
+    symbol:   variable REQ_RECV
+    location: class AdminActivity
+  12 errors
 
 * Try:
 > Check your code and dependencies to fix the compilation error(s)
@@ -154,13 +266,69 @@ org.gradle.api.tasks.TaskExecutionException: Execution failed for task ':admin:c
 	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)
 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:48)
 Caused by: org.gradle.api.internal.tasks.compile.CompilationFailedException: Compilation failed; see the compiler output below.
-/home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:356: error: ';' expected
-        });
-         ^
-/home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:489: error: ')' expected
-            ctx.city = AdminKit.txt(ft.txt(fPhone);
-                                                  ^
-2 errors
+Note: Recompile with -Xlint:deprecation for details.
+Note: Some input files use or override a deprecated API.
+/home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:67: error: cannot find symbol
+            if (smsPing == null) {
+                ^
+  symbol:   variable smsPing
+  location: class AdminActivity
+/home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:68: error: cannot find symbol
+                smsPing = new BroadcastReceiver() {
+                ^
+  symbol:   variable smsPing
+  location: class AdminActivity
+/home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:77: error: cannot find symbol
+                registerReceiver(smsPing, ff, Context.RECEIVER_NOT_EXPORTED);
+                                 ^
+  symbol:   variable smsPing
+  location: class AdminActivity
+/home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:79: error: cannot find symbol
+                registerReceiver(smsPing, ff);
+                                 ^
+  symbol:   variable smsPing
+  location: class AdminActivity
+/home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:88: error: cannot find symbol
+            unregisterReceiver(smsPing);
+                               ^
+  symbol:   variable smsPing
+  location: class AdminActivity
+/home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:100: error: cannot find symbol
+                String d = pendingSmsPhone;
+                           ^
+  symbol:   variable pendingSmsPhone
+  location: class AdminActivity
+/home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:101: error: cannot find symbol
+                String t = pendingSmsText;
+                           ^
+  symbol:   variable pendingSmsText
+  location: class AdminActivity
+/home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:102: error: cannot find symbol
+                pendingSmsPhone = "";
+                ^
+  symbol:   variable pendingSmsPhone
+  location: class AdminActivity
+/home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:103: error: cannot find symbol
+                pendingSmsText = "";
+                ^
+  symbol:   variable pendingSmsText
+  location: class AdminActivity
+/home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:118: error: cannot find symbol
+            pendingSmsPhone = dest;
+            ^
+  symbol:   variable pendingSmsPhone
+  location: class AdminActivity
+/home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:119: error: cannot find symbol
+            pendingSmsText = text;
+            ^
+  symbol:   variable pendingSmsText
+  location: class AdminActivity
+/home/runner/work/Testt/Testt/manager/admin/src/main/java/ir/meelano/admin/AdminActivity.java:143: error: cannot find symbol
+                requestPermissions(new String[]{android.Manifest.permission.RECEIVE_SMS}, REQ_RECV);
+                                                                                          ^
+  symbol:   variable REQ_RECV
+  location: class AdminActivity
+12 errors
 	at org.gradle.api.internal.tasks.compile.JdkJavaCompiler.execute(JdkJavaCompiler.java:84)
 	at org.gradle.api.internal.tasks.compile.JdkJavaCompiler.execute(JdkJavaCompiler.java:46)
 	at org.gradle.api.internal.tasks.compile.NormalizingJavaCompiler.delegateAndHandleErrors(NormalizingJavaCompiler.java:98)
@@ -314,5 +482,5 @@ Caused by: org.gradle.api.internal.tasks.compile.CompilationFailedException: Com
 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:48)
 
 
-BUILD FAILED in 49s
+BUILD FAILED in 51s
 60 actionable tasks: 60 executed

@@ -26,11 +26,13 @@ public final class MasterQueries {
         String vah = m.must("inventory", "موجودی", "mojkavah", "MojKavah");
         String buy = m.col("inventory", "buy_price", "pure_buy_price", "ImPureBuyPrice");
         String actCond = active == null ? "" : " AND " + boolTrue("[" + active + "]");
+        String reo = m.col("inventory", "reopoint", "reorder_point");
         return new Queries.Q("SELECT COUNT_BIG(1) AS count"
                 + ", SUM(CASE WHEN 1=1" + actCond + " THEN 1 ELSE 0 END) AS active"
                 + ", SUM(CASE WHEN TRY_CONVERT(decimal(19,3),[" + vah + "])>0 AND TRY_CONVERT(decimal(19,3),[" + vah + "])<=" + AtiranSchema.LOW_STOCK_VAH + " THEN 1 ELSE 0 END) AS low"
                 + ", SUM(CASE WHEN TRY_CONVERT(decimal(19,3),[" + vah + "])<=0 THEN 1 ELSE 0 END) AS out"
                 + ", ISNULL(SUM(TRY_CONVERT(decimal(19,3),[" + vah + "])*COALESCE(TRY_CONVERT(decimal(19,2)," + (buy == null ? "NULL" : "[" + buy + "]") + "),0)),0) AS value"
+                + (reo == null ? ", CAST(0 AS bigint) AS reorderN" : ", SUM(CASE WHEN TRY_CONVERT(decimal(19,2),[" + reo + "])>0 AND TRY_CONVERT(decimal(19,3),[" + vah + "])<=TRY_CONVERT(decimal(19,2),[" + reo + "]) THEN 1 ELSE 0 END) AS reorderN")
                 + " FROM dbo.inventory");
     }
 
@@ -45,6 +47,7 @@ public final class MasterQueries {
         String joz = m.col("inventory", "mojkajoz", "MojKajoz");
         String buy = m.col("inventory", "buy_price", "pure_buy_price", "ImPureBuyPrice");
         String sale = m.col("inventory", "FinalSalePrice", "sale_price", "forosh_price");
+        String reo = m.col("inventory", "reopoint", "reorder_point");
         String active = m.col("inventory", "active", "Active");
         String grpName = m.col("kagroup", "group_name");
         String grpKey = m.col("kagroup", "group_rdf");
@@ -60,6 +63,11 @@ public final class MasterQueries {
             if ("low".equals(f.status)) conds.add("(TRY_CONVERT(decimal(19,3),i.[" + vah + "])>0 AND TRY_CONVERT(decimal(19,3),i.[" + vah + "])<=" + AtiranSchema.LOW_STOCK_VAH + ")");
             if ("out".equals(f.status)) conds.add("TRY_CONVERT(decimal(19,3),i.[" + vah + "])<=0");
             if ("ok".equals(f.status)) conds.add("TRY_CONVERT(decimal(19,3),i.[" + vah + "])>" + AtiranSchema.LOW_STOCK_VAH);
+            if ("reorder".equals(f.status)) {
+                if (vah == null || reo == null)
+                    throw new Queries.Missing("ستون نقطه سفارش در «کالاها» پیدا نشد");
+                conds.add("(TRY_CONVERT(decimal(19,2),i.[" + reo + "])>0 AND TRY_CONVERT(decimal(19,3),i.[" + vah + "])<=TRY_CONVERT(decimal(19,2),i.[" + reo + "]))");
+            }
         }
         if ("inactive".equals(f.status) && active != null)
             conds.add("UPPER(LTRIM(RTRIM(TRY_CONVERT(nvarchar(20),i.[" + active + "])))) NOT IN (N'T',N'1',N'TRUE',N'Y')");
@@ -913,5 +921,70 @@ public final class MasterQueries {
                 + ", " + (descCol == null ? "N''" : "COALESCE(" + Sql.txt("h", descCol, 500) + ",N'')") + " AS descrip"
                 + " FROM " + src + " ORDER BY h.[" + dateCol + "] DESC"
                 + Queries.pageClause(binds, f.page, f.top), binds);
+    }
+
+    /** Dead stock: stocked active items with no sale for `days` (or never sold): label,shka,vah,buyValue,lastSale. */
+    public static Queries.Q deadStock(Meta m, int days, int top) throws Queries.Missing {
+        String shka = m.must("inventory", "کد کالا", "shka");
+        String naka = m.must("inventory", "نام کالا", "naka", "NAKA");
+        String vah = m.must("inventory", "موجودی", "mojkavah", "MojKavah");
+        String buy = m.col("inventory", "buy_price", "pure_buy_price", "ImPureBuyPrice");
+        String active = m.col("inventory", "active", "Active");
+        Set<String> cols = m.columns("sailfact");
+        String dateCol = m.must("sailfact", "تاریخ", "date");
+        String numberCol = m.must("sailfact", "شماره فاکتور", "shfacfo");
+        String linkCol = m.must("subsailfact", "شماره فاکتور", "shfacfo");
+        String lineShka = m.must("subsailfact", "کد کالا", "SHKA", "shka");
+        String cutoff = Jalali.addDays(Jalali.todayStr(), -Math.max(1, days));
+        String inner = "WHERE 1=1" + Sql.activeAnd(cols, "x") + Sql.softAnd(cols, "x");
+        String agg = "(SELECT TRY_CONVERT(nvarchar(100),d2.[" + lineShka + "]) AS k, MAX(" + Sql.date10("h2", dateCol) + ") AS lastSale"
+                + " FROM " + Sql.dedupe("sailfact", numberCol, "h2", inner)
+                + " JOIN dbo.subsailfact d2 ON TRY_CONVERT(nvarchar(100),d2.[" + linkCol + "])=TRY_CONVERT(nvarchar(100),h2.[" + numberCol + "])"
+                + " GROUP BY TRY_CONVERT(nvarchar(100),d2.[" + lineShka + "])) s";
+        List<Object> binds = new ArrayList<>();
+        binds.add(cutoff);
+        return new Queries.Q("SELECT TOP (" + Queries.clampTop(top) + ") " + Sql.txt("i", naka, 250) + " AS label"
+                + ", " + Sql.txt("i", shka, 60) + " AS shka"
+                + ", TRY_CONVERT(decimal(19,3),i.[" + vah + "]) AS vah"
+                + ", TRY_CONVERT(decimal(19,3),i.[" + vah + "])*COALESCE(TRY_CONVERT(decimal(19,2)," + (buy == null ? "NULL" : "i.[" + buy + "]") + "),0) AS buyValue"
+                + ", s.lastSale AS lastSale"
+                + " FROM dbo.inventory i LEFT JOIN " + agg
+                + " ON s.k=TRY_CONVERT(nvarchar(100),i.[" + shka + "])"
+                + " WHERE TRY_CONVERT(decimal(19,3),i.[" + vah + "])>0"
+                + (active == null ? "" : " AND " + boolTrue("i.[" + active + "]"))
+                + " AND (s.lastSale IS NULL OR s.lastSale<?)"
+                + " ORDER BY 4 DESC", binds);
+    }
+
+    /** Profit by customer: label,code,docs,sales,cogs,profit (buy-price basis, like profitByProduct). */
+    public static Queries.Q profitByCustomer(Meta m, Filter f, int top) throws Queries.Missing {
+        Set<String> cols = m.columns("sailfact");
+        String dateCol = m.must("sailfact", "تاریخ", "date");
+        String numberCol = m.must("sailfact", "شماره فاکتور", "shfacfo");
+        String partyCol = m.must("sailfact", "طرف‌حساب", "shmo", "SHMO");
+        String linkCol = m.must("subsailfact", "شماره فاکتور", "shfacfo");
+        String shka = m.must("subsailfact", "کد کالا", "SHKA", "shka");
+        String qty = m.must("subsailfact", "تعداد", "TEDVAH", "tedvah");
+        String sum = m.must("subsailfact", "جمع ردیف", "LINESUM", "linesum");
+        String buy = cogsBuyCol(m);
+        String invShka = cogsShka(m);
+        List<Object> binds = new ArrayList<>();
+        List<String> conds = new ArrayList<>();
+        String dc = Sql.dateCond(Sql.date10("x", dateCol), f.from, f.to, binds);
+        if (!dc.isEmpty()) conds.add(dc);
+        String inner = "WHERE " + (conds.isEmpty() ? "1=1" : Sql.join(conds, " AND ")) + Sql.activeAnd(cols, "x") + Sql.softAnd(cols, "x");
+        String label = Queries.custNameExpr(m, "h", partyCol);
+        String code = "TRY_CONVERT(nvarchar(100),h.[" + partyCol + "])";
+        String join = Queries.custJoin(m, "h", partyCol);
+        String sales = "ISNULL(SUM(" + Sql.num("d", sum) + "),0)";
+        String cogs = "ISNULL(SUM(TRY_CONVERT(decimal(19,3),d.[" + qty + "])*COALESCE(TRY_CONVERT(decimal(19,2),i.[" + buy + "]),0)),0)";
+        return new Queries.Q("SELECT TOP (" + Queries.clampTop(top) + ") " + label + " AS label"
+                + ", MIN(" + code + ") AS code, COUNT(DISTINCT h.[" + numberCol + "]) AS docs"
+                + ", " + sales + " AS sales, " + cogs + " AS cogs, (" + sales + "-" + cogs + ") AS profit"
+                + " FROM " + Sql.dedupe("sailfact", numberCol, "h", inner)
+                + " JOIN dbo.subsailfact d ON TRY_CONVERT(nvarchar(100),d.[" + linkCol + "])=TRY_CONVERT(nvarchar(100),h.[" + numberCol + "])"
+                + " LEFT JOIN dbo.inventory i ON TRY_CONVERT(nvarchar(100),i.[" + invShka + "])=TRY_CONVERT(nvarchar(100),d.[" + shka + "])"
+                + join
+                + " GROUP BY " + label + " ORDER BY 6 DESC", binds);
     }
 }

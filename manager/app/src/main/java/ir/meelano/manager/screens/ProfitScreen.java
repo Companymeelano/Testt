@@ -59,6 +59,7 @@ public class ProfitScreen extends Screen {
         Row cogs = new Row();
         List<Row> daily = new ArrayList<>();
         List<Row> byProduct = new ArrayList<>();
+        List<Row> byCust = new ArrayList<>();
         List<Row> costs = new ArrayList<>();
         Map<String, String> notes = new LinkedHashMap<>();
     }
@@ -78,6 +79,7 @@ public class ProfitScreen extends Screen {
             d.cogs = soft(d.notes, "بهای تمام‌شده", () -> Repo.one(c, MasterQueries.profitCogs(m, f)));
             d.daily = soft(d.notes, "روند", () -> Repo.exec(c, MasterQueries.profitDaily(m, f)));
             d.byProduct = soft(d.notes, "سود کالاها", () -> Repo.exec(c, MasterQueries.profitByProduct(m, f, 30)));
+            d.byCust = soft(d.notes, "سود مشتریان", () -> Repo.exec(c, MasterQueries.profitByCustomer(m, f, 20)));
             d.costs = soft(d.notes, "هزینه‌ها", () -> Repo.exec(c, MasterQueries.profitCosts(m, f)));
             if (d.sales == null && d.cogs == null) throw new Exception(firstNote(d.notes));
             return d;
@@ -156,6 +158,30 @@ public class ProfitScreen extends Screen {
                     new ReportCatalog.Col("profit", "سود", ReportCatalog.T_MONEY),
             };
             c.addView(a.kit.dataTable(cols, d.byProduct, null), a.kit.lp(-1, -2));
+            a.kit.addCard(content, c);
+        }
+
+        if (d.byCust != null && !d.byCust.isEmpty()) {
+            for (Row r : d.byCust) {
+                double sl = r.d("sales");
+                r.put("margin", sl > 0 ? Money.pct(r.d("profit") * 100.0 / sl) : "—");
+            }
+            LinearLayout c = a.kit.card(Theme.SUCCESS);
+            c.addView(a.kit.text("سود به تفکیک مشتری", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
+            Charts.HBars hb = new Charts.HBars(a);
+            List<Charts.Point> pts = new ArrayList<>();
+            for (int i = 0; i < Math.min(12, d.byCust.size()); i++)
+                pts.add(new Charts.Point(d.byCust.get(i).s("label"), d.byCust.get(i).d("profit")));
+            hb.setData(pts, Charts.COMPACT);
+            c.addView(hb, a.kit.lp(-1, -2));
+            ReportCatalog.Col[] cols = new ReportCatalog.Col[]{
+                    new ReportCatalog.Col("label", "مشتری", ReportCatalog.T_TEXT),
+                    new ReportCatalog.Col("docs", "فاکتور", ReportCatalog.T_NUM),
+                    new ReportCatalog.Col("sales", "فروش", ReportCatalog.T_MONEY),
+                    new ReportCatalog.Col("profit", "سود", ReportCatalog.T_MONEY),
+                    new ReportCatalog.Col("margin", "حاشیه", ReportCatalog.T_TEXT),
+            };
+            c.addView(a.kit.dataTable(cols, d.byCust, null), a.kit.lp(-1, -2));
             a.kit.addCard(content, c);
         }
 

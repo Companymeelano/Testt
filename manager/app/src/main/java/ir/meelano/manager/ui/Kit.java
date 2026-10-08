@@ -660,8 +660,13 @@ public final class Kit {
     }
 
     public AlertDialog dialog(String title, View body, boolean cancelable) {
+        // Custom title view: the stock dialog title is unreadable in the light theme.
+        TextView tv = text(title == null ? "" : title, 15f, Theme.TEXT, true);
+        tv.setGravity(Gravity.CENTER);
+        int pad = Theme.dp(14);
+        tv.setPadding(pad, pad, pad, Theme.dp(4));
         AlertDialog d = new AlertDialog.Builder(a)
-                .setTitle(title)
+                .setCustomTitle(tv)
                 .setView(body)
                 .setCancelable(cancelable)
                 .create();
@@ -878,5 +883,74 @@ public final class Kit {
         EditText e = edit(hint, value, false);
         e.setInputType(InputType.TYPE_CLASS_NUMBER);
         return e;
+    }
+
+    // ---------------- Jalali date picker ----------------
+    public interface DateCb {
+        void onPick(String ymd);
+    }
+
+    /** Jalali date picker dialog (year/month/day wheels, current values pre-selected). */
+    public AlertDialog dateDialog(String title, String initial, final DateCb cb) {
+        String norm = Jalali.normalizeDate(initial == null || initial.isEmpty() ? Jalali.todayStr() : initial);
+        int y0, m0, d0;
+        try {
+            y0 = Integer.parseInt(norm.substring(0, 4));
+            m0 = Integer.parseInt(norm.substring(5, 7));
+            d0 = Integer.parseInt(norm.substring(8, 10));
+        } catch (Exception e) {
+            y0 = 1405; m0 = 1; d0 = 1;
+        }
+        LinearLayout root = v();
+        root.setPadding(Theme.dp(16), Theme.dp(8), Theme.dp(16), Theme.dp(8));
+        LinearLayout row = h();
+        row.setGravity(Gravity.CENTER);
+        final android.widget.NumberPicker y = numPicker(1350, 1500, y0);
+        final android.widget.NumberPicker mo = numPicker(1, 12, m0);
+        final android.widget.NumberPicker d = numPicker(1, 31, d0);
+        row.addView(wrapNumPicker(y, "سال"), wlp(1f));
+        row.addView(space(6));
+        row.addView(wrapNumPicker(mo, "ماه"), wlp(1f));
+        row.addView(space(6));
+        row.addView(wrapNumPicker(d, "روز"), wlp(1f));
+        root.addView(row, lp(-1, -2));
+        root.addView(gap(10));
+        final AlertDialog[] box = new AlertDialog[1];
+        root.addView(btnGold("✓ ثبت", v -> {
+            int yy = y.getValue();
+            int mm = mo.getValue();
+            int dd = Math.min(d.getValue(), Jalali.daysInMonth(yy, mm));
+            if (box[0] != null) box[0].dismiss();
+            cb.onPick(String.format(java.util.Locale.US, "%04d/%02d/%02d", yy, mm, dd));
+        }), lp(-1, -2));
+        box[0] = dialog(title, root, true);
+        box[0].show();
+        return box[0];
+    }
+
+    private android.widget.NumberPicker numPicker(int min, int max, int val) {
+        android.widget.NumberPicker p = new android.widget.NumberPicker(a);
+        p.setMinValue(min);
+        p.setMaxValue(max);
+        p.setValue(Math.max(min, Math.min(max, val)));
+        p.setDescendantFocusability(android.widget.NumberPicker.FOCUS_BLOCK_DESCENDANTS);
+        try {
+            String[] disp = new String[max - min + 1];
+            for (int i = 0; i < disp.length; i++) disp[i] = Money.fa(String.valueOf(min + i));
+            p.setDisplayedValues(disp);
+            for (int i = 0; i < p.getChildCount(); i++) {
+                View ch = p.getChildAt(i);
+                if (ch instanceof EditText) ((EditText) ch).setTextColor(Theme.TEXT);
+            }
+        } catch (Exception ignored) { }
+        return p;
+    }
+
+    private View wrapNumPicker(android.widget.NumberPicker p, String label) {
+        LinearLayout c = v();
+        c.setGravity(Gravity.CENTER);
+        c.addView(text(label, 10f, Theme.MUTED, true), lp(-2, -2));
+        c.addView(p, lp(-2, Theme.dp(110)));
+        return c;
     }
 }

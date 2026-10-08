@@ -8,6 +8,8 @@ import android.widget.ScrollView;
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.core.AtiranSchema;
 import ir.meelano.manager.core.Filter;
+import ir.meelano.manager.core.FollowUps;
+import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.ReportCatalog;
@@ -234,6 +236,7 @@ public class CustomersScreen extends Screen {
     }
 
     private void showDossier(Dossier dz) {
+        final AlertDialog[] dlgH = new AlertDialog[1];
         Row h = dz.header;
         LinearLayout body = a.kit.v();
         body.addView(a.kit.kv("مشتری", h.s("name").isEmpty() ? "—" : h.s("name"), Theme.TEXT), a.kit.lp(-1, -2));
@@ -256,6 +259,32 @@ public class CustomersScreen extends Screen {
         boolean blocked = h.l("black_list") != 0;
         body.addView(a.kit.kv("وضعیت", blocked ? "⛔ مسدود" : "✓ فعال", blocked ? Theme.DANGER : Theme.SUCCESS), a.kit.lp(-1, -2));
         if (!h.s("addre").isEmpty()) body.addView(a.kit.kv("آدرس", h.s("addre"), Theme.MUTED), a.kit.lp(-1, -2));
+
+        // ---- follow-up notes ----
+        final String folCode = dz.code;
+        final String folName = h.s("name");
+        List<FollowUps.Note> folNotes = FollowUps.list(a, folCode);
+        LinearLayout fc = a.kit.card(Theme.VIOLET);
+        fc.addView(a.kit.text("یادداشت پیگیری", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        if (folNotes.isEmpty()) {
+            fc.addView(a.kit.hint("یادداشتی ثبت نشده است"), a.kit.lp(-1, -2));
+        } else {
+            for (int i = 0; i < folNotes.size(); i++) {
+                final int fIdx = i;
+                FollowUps.Note fn = folNotes.get(i);
+                LinearLayout nr = a.kit.h();
+                nr.addView(a.kit.text(Jalali.dispFa(fn.date) + " • " + fn.text, 12f, Theme.TEXT, false), a.kit.wlp(1f));
+                nr.addView(a.kit.btnGhost("✕", Theme.DANGER, v -> {
+                    FollowUps.remove(a, folCode, fIdx);
+                    if (dlgH[0] != null) dlgH[0].dismiss();
+                    openDossier(folCode);
+                }), a.kit.lp(-2, -2));
+                fc.addView(nr, a.kit.lp(-1, -2));
+            }
+        }
+        fc.addView(a.kit.btnGhost("+ یادداشت جدید", Theme.VIOLET, v -> noteDialog(folCode, folName, dlgH)), a.kit.lp(-1, -2));
+        body.addView(fc, a.kit.lp(-1, -2));
+        body.addView(a.kit.gap(6));
 
         // ---- credit score (0..100 gauge + breakdown) ----
         int score = 100;
@@ -305,6 +334,8 @@ public class CustomersScreen extends Screen {
         body.addView(a.kit.gap(6));
 
         if (!dz.ledger.isEmpty()) {
+            for (Row r : dz.ledger)
+                if (r.s("opLabel").isEmpty()) r.put("opLabel", AtiranSchema.actNameFallback(r.s("op")));
             body.addView(a.kit.text("گردش حساب (" + Money.fa(String.valueOf(dz.ledger.size())) + " سند)", 13.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
             ReportCatalog.Col[] cols = new ReportCatalog.Col[]{
                     new ReportCatalog.Col("date", "تاریخ", ReportCatalog.T_DATE),
@@ -351,6 +382,7 @@ public class CustomersScreen extends Screen {
         sv.addView(body);
         AlertDialog dlg = new AlertDialog.Builder(a, android.R.style.Theme_Material_Dialog_NoActionBar)
                 .setView(sv).create();
+        dlgH[0] = dlg;
         if (dlg.getWindow() != null)
             dlg.getWindow().setBackgroundDrawable(Theme.dialogBg());
         LinearLayout footer = a.kit.h();
@@ -387,6 +419,38 @@ public class CustomersScreen extends Screen {
         body.addView(footer, a.kit.lp(-1, -2));
         body.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(16));
         dlg.show();
+    }
+
+    private void noteDialog(final String code, final String name, final AlertDialog[] dlgH) {
+        LinearLayout nb = a.kit.v();
+        nb.setPadding(Theme.dp(16), Theme.dp(8), Theme.dp(16), Theme.dp(8));
+        final android.widget.EditText te = a.kit.edit("متن یادداشت…", "");
+        nb.addView(te, a.kit.lp(-1, -2));
+        nb.addView(a.kit.gap(8));
+        final String[] date = {Jalali.todayStr()};
+        final android.widget.TextView dl = a.kit.text("یادآوری: " + Jalali.dispFa(date[0]), 12.5f, Theme.TEXT, true);
+        nb.addView(dl, a.kit.lp(-1, -2));
+        nb.addView(a.kit.btnGhost("انتخاب تاریخ یادآوری", Theme.VIOLET, v ->
+                a.kit.dateDialog("تاریخ یادآوری", date[0], picked -> {
+                    date[0] = picked;
+                    dl.setText("یادآوری: " + Jalali.dispFa(picked));
+                })), a.kit.lp(-1, -2));
+        nb.addView(a.kit.gap(8));
+        final AlertDialog[] box = new AlertDialog[1];
+        nb.addView(a.kit.btn("ثبت یادداشت", v -> {
+            String t = te.getText().toString().trim();
+            if (t.isEmpty()) {
+                a.kit.toast("متن یادداشت را وارد کنید");
+                return;
+            }
+            FollowUps.add(a, code, date[0], name, t);
+            a.kit.toast("یادداشت ثبت شد");
+            box[0].dismiss();
+            if (dlgH[0] != null) dlgH[0].dismiss();
+            openDossier(code);
+        }), a.kit.lp(-1, -2));
+        box[0] = a.kit.dialog("یادداشت پیگیری", nb, true);
+        box[0].show();
     }
 
     private List<Row> cap(List<Row> rows, int n) {

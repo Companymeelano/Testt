@@ -114,4 +114,35 @@ public final class Settings {
     public void saveHomeCache(String json) {
         p.edit().putString("home_cache", json == null ? "" : json).apply();
     }
+
+    // ---------------- morning report + backup reminder ----------------
+    public boolean morningOn() { return p.getBoolean("morning_on", true); }
+
+    public void setMorningOn(boolean on) { p.edit().putBoolean("morning_on", on).apply(); }
+
+    public boolean backupOn() { return p.getBoolean("backup_on", true); }
+
+    public void setBackupOn(boolean on) { p.edit().putBoolean("backup_on", on).apply(); }
+
+    /** Last seen bounced-cheque count (-1 = never checked): only increases notify. */
+    public long lastBouncedN() { return p.getLong("last_bounced_n", -1); }
+
+    public void setLastBouncedN(long n) { p.edit().putLong("last_bounced_n", n).apply(); }
+
+    // ---------------- fingerprint ----------------
+    public boolean fpOn() { return p.getBoolean("fp_on", false); }
+
+    public void setFpOn(boolean on) { p.edit().putBoolean("fp_on", on).apply(); }
+
+    // ---------------- home dashboard order ----------------
+    public static final String HOME_ORDER_DEFAULT = "kpis,alerts,trend,donut,debtors,visitors,due,shortcuts";
+
+    public String homeOrder() {
+        String v = p.getString("home_order", HOME_ORDER_DEFAULT);
+        return v == null || v.trim().isEmpty() ? HOME_ORDER_DEFAULT : v;
+    }
+
+    public void setHomeOrder(String csv) {
+        p.edit().putString("home_order", csv == null ? HOME_ORDER_DEFAULT : csv).apply();
+    }
 }

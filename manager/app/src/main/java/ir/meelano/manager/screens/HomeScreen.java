@@ -6,6 +6,7 @@ import android.widget.TextView;
 
 import ir.meelano.manager.core.AtiranSchema;
 import ir.meelano.manager.core.Filter;
+import ir.meelano.manager.core.FollowUps;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.Money;
@@ -222,7 +223,34 @@ public class HomeScreen extends Screen {
         content.removeAllViews();
         content.addView(greetingHero(), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(12));
+        for (String key : orderedKeys()) {
+            if ("kpis".equals(key)) secKpis(content, d);
+            else if ("alerts".equals(key)) secAlerts(content, d);
+            else if ("trend".equals(key)) secTrend(content, d);
+            else if ("donut".equals(key)) secDonut(content, d);
+            else if ("debtors".equals(key)) secDebtors(content, d);
+            else if ("visitors".equals(key)) secVisitors(content, d);
+            else if ("due".equals(key)) secDue(content, d);
+            else if ("shortcuts".equals(key)) secShortcuts(content, d);
+        }
+        renderNotes(content, d.notes);
+    }
 
+    /** Dashboard order from settings; unknown keys dropped, missing sections appended. */
+    private List<String> orderedKeys() {
+        List<String> out = new ArrayList<>();
+        String[] known = {"kpis", "alerts", "trend", "donut", "debtors", "visitors", "due", "shortcuts"};
+        for (String k : a.settings.homeOrder().split(",")) {
+            String t = k == null ? "" : k.trim();
+            if (!t.isEmpty() && !out.contains(t)) {
+                for (String k2 : known) if (k2.equals(t)) { out.add(t); break; }
+            }
+        }
+        for (String k2 : known) if (!out.contains(k2)) out.add(k2);
+        return out;
+    }
+
+    private void secKpis(LinearLayout content, Data d) {
         // ---- day KPIs (tap a tile → that day's detail list) ----
         List<Kit.Kpi> kpis = new ArrayList<>();
         kpis.add(new Kit.Kpi("فروش " + dayOf(d.salesDay), Money.compactRial(d.salesDay.d("total")),
@@ -239,15 +267,27 @@ public class HomeScreen extends Screen {
                 () -> gotoDay("dar_out", d.outDay)));
         content.addView(a.kit.kpiGrid(kpis, 2), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(12));
+    }
 
+    private void secAlerts(LinearLayout content, Data d) {
         // ---- alerts ----
         LinearLayout alerts = a.kit.card(Theme.DANGER);
         alerts.addView(a.kit.text("هشدار امروز", 14.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
         int n = 0;
         n += alert(alerts, d, n);
+        List<FollowUps.Due> dues = FollowUps.dueToday(a);
+        if (!dues.isEmpty()) {
+            final FollowUps.Due fd = dues.get(0);
+            String who = dues.size() == 1 ? fd.note.name : Money.fa(String.valueOf(dues.size())) + " یادداشت";
+            alerts.addView(a.kit.alertRow("پیگیری مشتری", who + " • سررسید یادداشت",
+                    Theme.VIOLET, v -> gotoCustomer(fd.code)), padTop(n));
+            n++;
+        }
         if (n == 0) alerts.addView(a.kit.text("فعلاً هشدار مهمی وجود ندارد.", 11.5f, Theme.MUTED, false), a.kit.lp(-1, -2));
         a.kit.addCard(content, alerts);
+    }
 
+    private void secTrend(LinearLayout content, Data d) {
         // ---- 14-day sales trend ----
         if (d.salesDaily != null && !d.salesDaily.isEmpty()) {
             LinearLayout c = a.kit.card(Theme.GOLD);
@@ -261,7 +301,9 @@ public class HomeScreen extends Screen {
             c.addView(cap, a.kit.lp(-1, -2));
             a.kit.addCard(content, c);
         }
+    }
 
+    private void secDonut(LinearLayout content, Data d) {
         // ---- receipts mix donut ----
         if (d.inDay != null && d.inDay.d("total") > 0) {
             LinearLayout c = a.kit.card(Theme.SUCCESS);
@@ -276,7 +318,9 @@ public class HomeScreen extends Screen {
             c.addView(dn, new LinearLayout.LayoutParams(-1, Theme.dp(300)));
             a.kit.addCard(content, c);
         }
+    }
 
+    private void secDebtors(LinearLayout content, Data d) {
         // ---- debtors ----
         if (d.debtors != null && !d.debtors.isEmpty()) {
             content.addView(a.kit.sectionHead("بدهکاران اولویت‌دار", "مشتریان ›", v -> gotoDebtors()), a.kit.lp(-1, -2));
@@ -289,7 +333,9 @@ public class HomeScreen extends Screen {
                 content.addView(row, p);
             }
         }
+    }
 
+    private void secVisitors(LinearLayout content, Data d) {
         // ---- visitors ----
         if (d.visitors != null && !d.visitors.isEmpty()) {
             LinearLayout c = a.kit.card(Theme.WARNING);
@@ -304,7 +350,9 @@ public class HomeScreen extends Screen {
             c.addView(hb, a.kit.lp(-1, -2));
             a.kit.addCard(content, c);
         }
+    }
 
+    private void secDue(LinearLayout content, Data d) {
         // ---- due cheques ----
         double dueInSum = sum(d.dueIn);
         double dueOutSum = sum(d.dueOut);
@@ -317,7 +365,9 @@ public class HomeScreen extends Screen {
                 c.addView(a.kit.kv("پرداختی (" + Money.fa(String.valueOf(d.dueOut.size())) + " فقره)", Money.rial(dueOutSum), Theme.DANGER), a.kit.lp(-1, -2));
             a.kit.addCard(content, c);
         }
+    }
 
+    private void secShortcuts(LinearLayout content, Data d) {
         // ---- shortcuts (glyph/title/accent always mirror the destination screen) ----
         content.addView(a.kit.sectionHead("دسترسی سریع", null, null), a.kit.lp(-1, -2));
         String[][] links = {
@@ -336,8 +386,6 @@ public class HomeScreen extends Screen {
             p.setMargins(0, 0, 0, Theme.dp(10));
             content.addView(r, p);
         }
-
-        renderNotes(content, d.notes);
     }
 
     private int alert(LinearLayout box, Data d, int n) {

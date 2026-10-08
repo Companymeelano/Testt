@@ -276,7 +276,9 @@ public final class FilterSheet {
         actions.addView(kit.space(8));
         actions.addView(kit.btnGhost("پاک‌سازی", Theme.MUTED, v -> {
             if (dlg[0] != null) dlg[0].dismiss();
-            done.onApply(new Filter());
+            Filter nf = new Filter();
+            nf.top = Math.max(1, f.top);
+            done.onApply(nf);
         }), kit.lp(-2, -2));
         root.addView(actions, kit.lp(-1, -2));
 
@@ -411,6 +413,13 @@ public final class FilterSheet {
             String[] disp = new String[count];
             for (int i = 0; i < count; i++) disp[i] = Money.fa(String.valueOf(min + i));
             p.setDisplayedValues(disp);
+        } catch (Exception ignored) { }
+        try {
+            for (int i = 0; i < p.getChildCount(); i++) {
+                android.view.View ch = p.getChildAt(i);
+                if (ch instanceof android.widget.EditText)
+                    ((android.widget.EditText) ch).setTextColor(Theme.TEXT);
+            }
         } catch (Exception ignored) { }
         return p;
     }

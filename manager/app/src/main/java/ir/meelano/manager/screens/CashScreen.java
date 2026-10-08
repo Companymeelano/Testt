@@ -25,6 +25,7 @@ import java.util.TreeMap;
 public class CashScreen extends Screen {
     private static final int[] HORIZONS = {7, 14, 30, 60};
     private int horizonIdx = 2;
+    private int shownIdx = 2;
 
     public CashScreen(MainActivity a) {
         super(a);
@@ -44,10 +45,11 @@ public class CashScreen extends Screen {
 
     @Override
     public String subtitle() {
-        return "پیش‌بینی " + Money.fa(String.valueOf(HORIZONS[horizonIdx])) + " روز آینده";
+        return "پیش‌بینی " + Money.fa(String.valueOf(HORIZONS[shownIdx])) + " روز آینده";
     }
 
     private static final class Data {
+        int snapIdx;
         List<Row> inDaily = new ArrayList<>();
         List<Row> outDaily = new ArrayList<>();
         Map<String, String> notes = new LinkedHashMap<>();
@@ -67,10 +69,12 @@ public class CashScreen extends Screen {
         content.addView(a.kit.gap(10));
         content.addView(a.kit.loading("در حال محاسبه پیش‌بینی نقدینگی…"), a.kit.lp(-1, -2));
         final int h = HORIZONS[horizonIdx];
+        final int myIdx = horizonIdx;
 
         a.repo.run(c -> {
             Meta m = new Meta(c);
             Data d = new Data();
+            d.snapIdx = myIdx;
             d.inDaily = soft(d.notes, "سررسیدهای دریافتی", () -> Repo.exec(c, MoneyQueries.chequeDueDaily(m, true, h)));
             d.outDaily = soft(d.notes, "سررسیدهای پرداختی", () -> Repo.exec(c, MoneyQueries.chequeDueDaily(m, false, h)));
             if (d.inDaily == null && d.outDaily == null) {
@@ -99,11 +103,12 @@ public class CashScreen extends Screen {
 
     private void build(LinearLayout content, Data d) {
         content.removeAllViews();
+        shownIdx = d.snapIdx;
         content.addView(heroCard(), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(12));
         String[] names = new String[HORIZONS.length];
         for (int i = 0; i < HORIZONS.length; i++) names[i] = Money.fa(String.valueOf(HORIZONS[i])) + " روزه";
-        content.addView(a.kit.chips(names, horizonIdx, idx -> {
+        content.addView(a.kit.chips(names, d.snapIdx, idx -> {
             horizonIdx = idx;
             render(content);
         }), a.kit.lp(-1, -2));

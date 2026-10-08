@@ -39,6 +39,8 @@ public class MoreScreen extends Screen {
             {"users", "کاربران سیستم و ورودها"},
             {"profit", "حاشیه سود و هزینه‌ها"},
             {"reports", "مرکز گزارش‌های مدیریتی"},
+            {"search", "جستجو در همه بخش‌ها"},
+            {"tv", "داشبورد تمام‌صفحه فروشگاه"},
             {"settings", "اتصال، قفل و درباره"},
     };
 
@@ -49,6 +51,13 @@ public class MoreScreen extends Screen {
         content.addView(a.kit.gap(12));
         for (int i = 0; i < ITEMS.length; i++) {
             final String id = ITEMS[i][0];
+            if ("tv".equals(id)) {
+                View r = a.kit.navRow("📺", "تلویزیون فروشگاه", ITEMS[i][1], Theme.TEAL, v -> a.startTv());
+                LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
+                p.setMargins(0, 0, 0, Theme.dp(10));
+                content.addView(r, p);
+                continue;
+            }
             Screen s = a.screen(id);
             if (s == null) continue;
             View r = a.kit.navRow(s.glyph(), s.title(), ITEMS[i][1], s.accent(), v -> a.nav(id));

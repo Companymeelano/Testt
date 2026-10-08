@@ -21,6 +21,7 @@ import ir.meelano.manager.ui.Kit;
 import ir.meelano.manager.ui.Theme;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -134,6 +135,32 @@ public class VisitorsScreen extends Screen {
         c.addView(hb, a.kit.lp(-1, -2));
         a.kit.addCard(content, c);
 
+        // ---- leaderboard: goal achievement first, then sales ----
+        List<Row> rank = new ArrayList<>(d.perf);
+        Collections.sort(rank, (x, y) -> {
+            double ax = x.d("goals") > 0 ? x.d("sales") / x.d("goals") : -1;
+            double ay = y.d("goals") > 0 ? y.d("sales") / y.d("goals") : -1;
+            if (ax != ay) return Double.compare(ay, ax);
+            return Double.compare(y.d("sales"), x.d("sales"));
+        });
+        LinearLayout lb = a.kit.card(Theme.GOLD);
+        lb.addView(a.kit.text("جدول امتیاز ویزیتورها", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        String[] medals = {"1", "2", "3"};
+        for (int i = 0; i < Math.min(10, rank.size()); i++) {
+            final Row rr = rank.get(i);
+            String medal = i < 3 ? medals[i] : String.valueOf(i + 1);
+            String ach = rr.d("goals") > 0 ? Money.pct(rr.d("sales") * 100.0 / rr.d("goals")) : "—";
+            View rv = a.kit.personRow(Money.fa(medal) + " • " + rr.s("name"),
+                    "فروش " + Money.compactRial(rr.d("sales")) + " • تحقق هدف " + ach,
+                    Money.fa(String.valueOf(rr.l("invoices"))) + " فاکتور",
+                    "رتبه " + Money.fa(String.valueOf(i + 1)),
+                    i == 0 ? Theme.GOLD : accent(), v2 -> openDetail(rr));
+            LinearLayout.LayoutParams rp = a.kit.lp(-1, -2);
+            rp.setMargins(0, 0, 0, Theme.dp(8));
+            lb.addView(rv, rp);
+        }
+        a.kit.addCard(content, lb);
+
         for (Row r : d.perf) {
             final Row row = r;
             double goals = r.d("goals");
@@ -155,7 +182,7 @@ public class VisitorsScreen extends Screen {
 
     private boolean isOff(String active) {
         if (active == null) return false;
-        String t = active.trim().toUpperCase();
+        String t = active.trim().toUpperCase(java.util.Locale.US);
         return "F".equals(t) || "0".equals(t) || "FALSE".equals(t) || "N".equals(t);
     }
 

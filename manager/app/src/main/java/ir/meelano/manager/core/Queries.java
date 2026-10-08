@@ -151,6 +151,11 @@ public final class Queries {
         return factorDay(m, false, null);
     }
 
+    /** Day block for an explicit Atiran «YYYY/MM/DD» (morning report). */
+    public static Q salesOn(Meta m, boolean sales, String day) throws Missing {
+        return factorDay(m, sales, day);
+    }
+
     private static Q factorDay(Meta m, boolean sales, String day) throws Missing {
         String table = sales ? "sailfact" : "buyfact";
         Set<String> cols = m.columns(table);

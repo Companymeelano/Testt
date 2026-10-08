@@ -9,6 +9,7 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 
 import ir.meelano.manager.core.Filter;
+import ir.meelano.manager.core.Finger;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.Notify;
 import ir.meelano.manager.core.Queries;
@@ -27,6 +28,7 @@ import ir.meelano.manager.screens.ProductsScreen;
 import ir.meelano.manager.screens.ProfitScreen;
 import ir.meelano.manager.screens.ReportsScreen;
 import ir.meelano.manager.screens.Screen;
+import ir.meelano.manager.screens.SearchScreen;
 import ir.meelano.manager.screens.SettingsScreen;
 import ir.meelano.manager.screens.TradeScreen;
 import ir.meelano.manager.screens.UsersScreen;
@@ -187,6 +189,20 @@ public class MainActivity extends Activity {
             dots.setText(b.toString());
             MeelanoIcons.iconize(dots);
         };
+        final Runnable submit = () -> {
+            if (pin.length() < 4) {
+                kit.toast("رمز ۴ رقمی را کامل وارد کنید");
+                return;
+            }
+            if (settings.checkPin(pin.toString())) {
+                unlocked = true;
+                shell();
+            } else {
+                kit.toast("رمز اشتباه است");
+                pin.setLength(0);
+                paint.run();
+            }
+        };
         int[][] keys = {{1, 2, 3}, {4, 5, 6}, {7, 8, 9}, {-1, 0, -2}};
         for (int[] rowKeys : keys) {
             LinearLayout row = kit.h();
@@ -203,19 +219,12 @@ public class MainActivity extends Activity {
                     if (key >= 0 && pin.length() < 4) {
                         pin.append((char) ('0' + key));
                         paint.run();
-                        if (pin.length() == 4) {
-                            if (settings.checkPin(pin.toString())) {
-                                unlocked = true;
-                                shell();
-                            } else {
-                                kit.toast("رمز اشتباه است");
-                                pin.setLength(0);
-                                paint.run();
-                            }
-                        }
+                        if (pin.length() == 4) submit.run();
                     } else if (key == -1 && pin.length() > 0) {
                         pin.setLength(pin.length() - 1);
                         paint.run();
+                    } else if (key == -2) {
+                        submit.run();
                     }
                 });
                 LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(Theme.dp(88), -2);
@@ -224,7 +233,29 @@ public class MainActivity extends Activity {
             }
             root.addView(row, kit.lp(-1, -2));
         }
+        if (settings.fpOn() && Finger.supported(this)) {
+            android.widget.Button fp = kit.btnGhost("◉ ورود با اثر انگشت", Theme.GOLD, v -> fingerLogin());
+            LinearLayout.LayoutParams flp = kit.lp(-1, -2);
+            flp.setMargins(Theme.dp(28), Theme.dp(14), Theme.dp(28), 0);
+            root.addView(fp, flp);
+            root.post(() -> fingerLogin());
+        }
         setContentView(root);
+    }
+
+    private void fingerLogin() {
+        Finger.auth(this, new Finger.Cb() {
+            @Override
+            public void ok() {
+                unlocked = true;
+                shell();
+            }
+
+            @Override
+            public void fail(String msg) {
+                kit.toast(msg == null || msg.isEmpty() ? "اثر انگشت تأیید نشد" : msg);
+            }
+        });
     }
 
     // ================= shell =================
@@ -245,12 +276,19 @@ public class MainActivity extends Activity {
         rangeLine = kit.text(kit.todayLine(), 10.5f, Theme.MUTED, false);
         titleBox.addView(rangeLine, kit.lp(-1, -2));
         header.addView(titleBox, kit.wlp(1f));
-        filterBtn = kit.text("⌕ جستجو", 12, Theme.GOLD_SOFT, true);
+        filterBtn = kit.text("◈ فیلتر", 12, Theme.GOLD_SOFT, true);
         filterBtn.setPadding(Theme.dp(12), Theme.dp(8), Theme.dp(12), Theme.dp(8));
         filterBtn.setBackground(Theme.ghostButton(Theme.GOLD));
         Theme.pressable(filterBtn);
         filterBtn.setOnClickListener(v -> openFilter());
         header.addView(filterBtn, kit.lp(-2, -2));
+        header.addView(kit.space(8));
+        TextView gsearch = kit.text("⌕", 19, Theme.GOLD_SOFT, true);
+        gsearch.setPadding(Theme.dp(10), Theme.dp(4), Theme.dp(10), Theme.dp(4));
+        gsearch.setBackground(Theme.ghostButton(Theme.GOLD));
+        Theme.pressable(gsearch);
+        gsearch.setOnClickListener(v -> nav("search"));
+        header.addView(gsearch, kit.lp(-2, -2));
         header.addView(kit.space(8));
         TextView refresh = kit.text("⟳", 19, Theme.GOLD_SOFT, true);
         refresh.setPadding(Theme.dp(10), Theme.dp(4), Theme.dp(10), Theme.dp(4));
@@ -296,6 +334,7 @@ public class MainActivity extends Activity {
         reg(new ReportsScreen(this));
         reg(new SettingsScreen(this));
         reg(new MoreScreen(this));
+        reg(new SearchScreen(this));
 
         buildBottom();
         nav(screens.containsKey(currentId) ? currentId : "home");
@@ -380,10 +419,10 @@ public class MainActivity extends Activity {
         filterBtn.setVisibility(s.filterConfig() == null ? View.GONE : View.VISIBLE);
         Filter f = s.filter();
         if (f != null && !f.isDefault()) {
-            filterBtn.setText("⌕ جستجو •");
+            filterBtn.setText("◈ فیلتر •");
             filterBtn.setTextColor(Theme.GOLD);
         } else {
-            filterBtn.setText("⌕ جستجو");
+            filterBtn.setText("◈ فیلتر");
             filterBtn.setTextColor(Theme.GOLD_SOFT);
         }
         MeelanoIcons.iconize(filterBtn);
@@ -397,6 +436,15 @@ public class MainActivity extends Activity {
             s.applyFilter(f);
             renderCurrent();
         });
+    }
+
+    /** Open the shop TV dashboard (landscape). */
+    public void startTv() {
+        try {
+            startActivity(new android.content.Intent(this, TvActivity.class));
+        } catch (Exception e) {
+            kit.toast("حالت تلویزیون ممکن نشد");
+        }
     }
 
     // ================= Persian voice search =================
@@ -517,10 +565,10 @@ public class MainActivity extends Activity {
                 File dir = new File(getCacheDir(), "share");
                 if (!dir.exists()) dir.mkdirs();
                 File f = new File(dir, "shop-card.png");
-                java.io.FileOutputStream out = new java.io.FileOutputStream(f);
-                bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out);
-                out.flush();
-                out.close();
+                try (java.io.FileOutputStream out = new java.io.FileOutputStream(f)) {
+                    bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out);
+                    out.flush();
+                }
                 runOnUiThread(() -> {
                     try {
                         ShareProvider.share(this, f, "image/png", title);

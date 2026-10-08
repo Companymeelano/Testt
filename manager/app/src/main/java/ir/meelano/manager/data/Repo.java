@@ -47,7 +47,7 @@ public final class Repo {
     /** Same as {@link #run}, but against explicit connection values (tests unsaved settings). */
     public <T> void runWith(final String host, final int port, final String db,
                             final String user, final String pass, final Task<T> t, final Cb<T> cb) {
-        pool.execute(() -> {
+        final Runnable job = () -> {
             Object out = null;
             String err = null;
             boolean direct = settings.directConn();
@@ -75,7 +75,12 @@ public final class Repo {
                     cb.ok(v);
                 }
             });
-        });
+        };
+        try {
+            pool.execute(job);
+        } catch (java.util.concurrent.RejectedExecutionException rej) {
+            main.post(() -> cb.fail("برنامه در حال بستن است؛ دوباره تلاش کنید"));
+        }
     }
 
     /** Execute one SELECT query → rows. */

@@ -114,7 +114,7 @@ public class UsersScreen extends Screen {
 
     private boolean isOn(String active) {
         if (active == null || active.trim().isEmpty()) return true;
-        String t = active.trim().toUpperCase();
+        String t = active.trim().toUpperCase(java.util.Locale.US);
         // usersList already returns «✓ فعال» / «✕ غیرفعال»; still accept raw flags.
         if (t.contains("غیرفعال")) return false;
         if (t.contains("فعال")) return true;

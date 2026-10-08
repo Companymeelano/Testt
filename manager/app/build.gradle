@@ -1,5 +1,14 @@
 plugins { id 'com.android.application' }
 
+// ---- Release signing (v11) ----
+// Copy manager/keystore.properties.template → manager/keystore.properties (git-ignored)
+// and point it at your release keystore. Env vars override the file.
+// Without it, `assembleRelease` builds unsigned; CI keeps shipping debug.
+def keystoreProps = new Properties()
+def keystoreFile = rootProject.file('keystore.properties')
+if (keystoreFile.exists()) keystoreFile.withInputStream { keystoreProps.load(it) }
+def hasSigning = keystoreFile.exists() || System.getenv('MEELANO_KEYSTORE') != null
+
 android {
     namespace 'ir.meelano.manager'
     compileSdk 35
@@ -8,14 +17,26 @@ android {
         applicationId 'ir.meelano.manager'
         minSdk 26
         targetSdk 34
-        versionCode 3
-        versionName '10.0.0'
+        versionCode 4
+        versionName '11.0.0'
+    }
+
+    signingConfigs {
+        release {
+            if (hasSigning) {
+                storeFile file(keystoreProps.getProperty('storeFile', System.getenv('MEELANO_KEYSTORE') ?: 'meelano-release.jks'))
+                storePassword keystoreProps.getProperty('storePassword', System.getenv('MEELANO_STORE_PASS') ?: '')
+                keyAlias keystoreProps.getProperty('keyAlias', System.getenv('MEELANO_KEY_ALIAS') ?: 'meelano')
+                keyPassword keystoreProps.getProperty('keyPassword', System.getenv('MEELANO_KEY_PASS') ?: '')
+            }
+        }
     }
 
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (hasSigning) signingConfig signingConfigs.release
         }
         debug {
             applicationIdSuffix '.debug'

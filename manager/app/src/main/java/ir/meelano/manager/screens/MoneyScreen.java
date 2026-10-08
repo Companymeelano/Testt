@@ -28,10 +28,6 @@ import java.util.Map;
 
 /** Receipts (dar p=0) and Payments (dar p=1). */
 public class MoneyScreen extends Screen {
-    private static final int[] PALETTE = {
-            Theme.GOLD, Theme.SUCCESS, Theme.INFO, Theme.VIOLET, Theme.WARNING, Theme.DANGER,
-    };
-
     private final int p;
     private final Filter filter = new Filter();
     private int tab;
@@ -66,6 +62,7 @@ public class MoneyScreen extends Screen {
     }
 
     private static final class Data {
+        int snapTab;
         Row summary = new Row();
         List<Row> daily = new ArrayList<>();
         List<Row> list = new ArrayList<>();
@@ -85,6 +82,7 @@ public class MoneyScreen extends Screen {
         a.repo.run(c -> {
             Meta m = new Meta(c);
             Data d = new Data();
+            d.snapTab = myTab;
             d.summary = soft(d.notes, "خلاصه", () -> Repo.one(c, MoneyQueries.darSummary(m, f, p)));
             final String from = f.hasRange() ? f.from : Jalali.addDays(Jalali.todayStr(), -29);
             final String to = f.hasRange() ? f.to : Jalali.todayStr();
@@ -147,14 +145,14 @@ public class MoneyScreen extends Screen {
             a.kit.addCard(content, c);
         }
 
-        content.addView(a.kit.chips(new String[]{"فهرست", "گردش کارت بانک‌ها"}, tab, idx -> {
+        content.addView(a.kit.chips(new String[]{"فهرست", "گردش کارت بانک‌ها"}, d.snapTab, idx -> {
             tab = idx;
             filter.page = 0;
             render(content);
         }), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
 
-        if (tab == 0) buildList(content, d);
+        if (d.snapTab == 0) buildList(content, d);
         else buildBanks(content, d);
 
         renderNotes(content, d.notes);
@@ -192,7 +190,7 @@ public class MoneyScreen extends Screen {
         Charts.Donut dn = new Charts.Donut(a);
         List<Charts.Point> pts = new ArrayList<>();
         for (int i = 0; i < Math.min(8, d.banks.size()); i++)
-            pts.add(new Charts.Point(d.banks.get(i).s("bank"), d.banks.get(i).d("total"), PALETTE[i % PALETTE.length]));
+            pts.add(new Charts.Point(d.banks.get(i).s("bank"), d.banks.get(i).d("total"), Charts.palette(i)));
         double sum = 0;
         for (Row r : d.banks) sum += r.d("total");
         dn.setData(pts, "جمع گردش", Money.compactRial(sum));

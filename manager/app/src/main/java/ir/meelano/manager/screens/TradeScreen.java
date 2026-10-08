@@ -80,11 +80,13 @@ public class TradeScreen extends Screen {
     }
 
     private String[] tabs() {
-        if (sales) return new String[]{"فهرست", "معوق", "ویزیتور", "مشتری", "مسیر", "گروه", "کالا"};
+        if (sales) return new String[]{"فهرست", "معوق", "ویزیتور", "مشتری", "مسیر", "گروه", "کالا", "پیش‌بینی"};
         return new String[]{"فهرست", "طرف‌حساب", "کالا"};
     }
 
     private static final class Data {
+        int snapTab;
+        List<Row> forecast = new ArrayList<>();
         Row summary = new Row();
         List<Row> daily = new ArrayList<>();
         List<Row> list = new ArrayList<>();
@@ -106,6 +108,7 @@ public class TradeScreen extends Screen {
         a.repo.run(c -> {
             Meta m = new Meta(c);
             Data d = new Data();
+            d.snapTab = myTab;
             d.summary = soft(d.notes, "خلاصه", () -> Repo.one(c, Queries.factorSummary(m, sales, f)));
             final String from = f.hasRange() ? f.from : Jalali.addDays(Jalali.todayStr(), -29);
             final String to = f.hasRange() ? f.to : Jalali.todayStr();
@@ -122,6 +125,9 @@ public class TradeScreen extends Screen {
                 d.group = soft(d.notes, "مسیر", () -> Repo.exec(c, Queries.factorByRoute(m, sales, f, 50)));
             } else if (sales && myTab == 5) {
                 d.group = soft(d.notes, "گروه", () -> Repo.exec(c, Queries.factorByCustGroup(m, sales, f, 50)));
+            } else if (sales && myTab == 7) {
+                final String fcastTo = Jalali.todayStr();
+                d.forecast = soft(d.notes, "پیش‌بینی", () -> Repo.exec(c, Queries.factorDaily(m, true, Jalali.addDays(fcastTo, -59), fcastTo)));
             } else {
                 d.topProducts = soft(d.notes, "کالا", () -> Repo.exec(c, Queries.factorTopProducts(m, sales, f, 50)));
             }
@@ -177,22 +183,103 @@ public class TradeScreen extends Screen {
             a.kit.addCard(content, c);
         }
 
-        content.addView(a.kit.chips(tabs(), tab, idx -> {
+        content.addView(a.kit.chips(tabs(), d.snapTab, idx -> {
             tab = idx;
             filter.page = 0;
             render(content);
         }), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
 
-        if (tab == 0) buildList(content, d);
-        else if (sales && tab == 1) buildOverdue(content, d);
-        else if ((!sales && tab == 1) || (sales && tab == 3)) buildGroup(content, d, "طرف‌حساب");
-        else if (sales && tab == 2) buildGroup(content, d, "ویزیتور");
-        else if (sales && tab == 4) buildGroup(content, d, "مسیر");
-        else if (sales && tab == 5) buildGroup(content, d, "گروه مشتری");
+        if (d.snapTab == 0) buildList(content, d);
+        else if (sales && d.snapTab == 1) buildOverdue(content, d);
+        else if ((!sales && d.snapTab == 1) || (sales && d.snapTab == 3)) buildGroup(content, d, "طرف‌حساب");
+        else if (sales && d.snapTab == 2) buildGroup(content, d, "ویزیتور");
+        else if (sales && d.snapTab == 4) buildGroup(content, d, "مسیر");
+        else if (sales && d.snapTab == 5) buildGroup(content, d, "گروه مشتری");
+        else if (sales && d.snapTab == 7) buildForecast(content, d);
         else buildTopProducts(content, d);
 
         renderNotes(content, d.notes);
+    }
+
+    /** F1: 7-day sales forecast = 30-day average × per-weekday factor. */
+    private void buildForecast(LinearLayout content, Data d) {
+        if (d.forecast == null || d.forecast.isEmpty()) {
+            content.addView(a.kit.empty("داده‌ای برای پیش‌بینی وجود ندارد", null), a.kit.lp(-1, -2));
+            return;
+        }
+        java.util.Map<String, Double> map = new java.util.HashMap<>();
+        for (Row r : d.forecast) {
+            String k = Jalali.disp(r.s("day"));
+            if (!k.isEmpty()) map.put(k, r.d("total"));
+        }
+        String today = Jalali.todayStr();
+        double[] hist = new double[30];
+        for (int i = 0; i < 30; i++) {
+            Double v = map.get(Jalali.addDays(today, i - 29));
+            hist[i] = v == null ? 0 : v;
+        }
+        double sum = 0;
+        for (double v : hist) sum += v;
+        double avg = sum / 30.0;
+        double[] wSum = new double[7];
+        int[] wN = new int[7];
+        for (int i = 0; i < 30; i++) {
+            int w = Jalali.weekdayIndex(Jalali.addDays(today, i - 29));
+            if (w < 0) continue;
+            wSum[w] += hist[i];
+            wN[w]++;
+        }
+        double[] proj = new double[7];
+        double p7 = 0;
+        for (int i = 1; i <= 7; i++) {
+            int w = Jalali.weekdayIndex(Jalali.addDays(today, i));
+            double f = 1.0;
+            if (w >= 0 && wN[w] > 0 && avg > 0) f = (wSum[w] / wN[w]) / avg;
+            proj[i - 1] = avg * f;
+            p7 += proj[i - 1];
+        }
+        double last7 = 0, prev7 = 0;
+        for (int i = 0; i < 7; i++) last7 += hist[23 + i];
+        for (int i = 0; i < 7; i++) prev7 += hist[16 + i];
+        double trend = prev7 > 0 ? (last7 - prev7) * 100.0 / prev7 : 0;
+        List<Kit.Kpi> kpis = new ArrayList<>();
+        kpis.add(new Kit.Kpi("پیش‌بینی ۷ روز", Money.compactRial(p7), "مدل رفتار روز هفته", Theme.GOLD));
+        kpis.add(new Kit.Kpi("پیش‌بینی ۳۰ روز", Money.compactRial(avg * 30.0), "میانگین روزانه " + Money.compactRial(avg), Theme.INFO));
+        kpis.add(new Kit.Kpi("روند هفته", (trend >= 0 ? "+" : "") + Money.pct(trend), "نسبت به هفته قبل", trend >= 0 ? Theme.SUCCESS : Theme.DANGER));
+        kpis.add(new Kit.Kpi("فروش ۳۰ روز", Money.compactRial(sum), "مبنای مدل", accent()));
+        content.addView(a.kit.kpiGrid(kpis, 2), a.kit.lp(-1, -2));
+        content.addView(a.kit.gap(12));
+
+        LinearLayout c = a.kit.card(accent());
+        c.addView(a.kit.text("پیش‌بینی ۷ روز آینده", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        Charts.Bars bars = new Charts.Bars(a);
+        List<Charts.Point> pts = new ArrayList<>();
+        for (int i = 1; i <= 7; i++)
+            pts.add(new Charts.Point(Jalali.shortLabel(Jalali.addDays(today, i)), proj[i - 1]));
+        bars.setData(pts, Charts.COMPACT);
+        c.addView(bars, new LinearLayout.LayoutParams(-1, Theme.dp(200)));
+        a.kit.addCard(content, c);
+
+        LinearLayout t = a.kit.card(Theme.GOLD);
+        t.addView(a.kit.text("جزئیات پیش‌بینی", 13.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        List<Row> rows = new ArrayList<>();
+        for (int i = 1; i <= 7; i++) {
+            String day = Jalali.addDays(today, i);
+            Row r = new Row();
+            r.put("day", day);
+            r.put("wd", Jalali.weekday(day));
+            r.put("amount", proj[i - 1]);
+            rows.add(r);
+        }
+        ReportCatalog.Col[] cols = new ReportCatalog.Col[]{
+                new ReportCatalog.Col("day", "روز", ReportCatalog.T_DATE),
+                new ReportCatalog.Col("wd", "روز هفته", ReportCatalog.T_TEXT),
+                new ReportCatalog.Col("amount", "پیش‌بینی فروش", ReportCatalog.T_MONEY),
+        };
+        t.addView(a.kit.dataTable(cols, rows, null), a.kit.lp(-1, -2));
+        t.addView(a.kit.hint("مدل ساده: میانگین ۳۰ روز × ضریب رفتار هر روز هفته"), a.kit.lp(-1, -2));
+        a.kit.addCard(content, t);
     }
 
     private void buildList(LinearLayout content, Data d) {
@@ -307,6 +394,10 @@ public class TradeScreen extends Screen {
         }, new Repo.Cb<Detail>() {
             @Override
             public void ok(Detail dt) {
+                if (dt == null || dt.head == null || dt.head.s("no").isEmpty()) {
+                    a.kit.toast("فاکتور یافت نشد");
+                    return;
+                }
                 showDetail(dt);
             }
 

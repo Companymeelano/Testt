@@ -7,6 +7,7 @@ import android.widget.ScrollView;
 
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.core.Filter;
+import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.Queries;
@@ -26,10 +27,6 @@ import java.util.Map;
 
 /** Products: catalogue, stock, low/zero alerts, group value, turnover dossier. */
 public class ProductsScreen extends Screen {
-    private static final int[] PALETTE = {
-            Theme.GOLD, Theme.SUCCESS, Theme.INFO, Theme.VIOLET, Theme.WARNING, Theme.DANGER,
-    };
-
     private final Filter filter = new Filter();
     private int tab;
 
@@ -67,6 +64,7 @@ public class ProductsScreen extends Screen {
                 new FilterSheet.Opt("out", "ناموجود"),
                 new FilterSheet.Opt("ok", "موجودی سالم"),
                 new FilterSheet.Opt("inactive", "غیرفعال"),
+                new FilterSheet.Opt("reorder", "زیر نقطه سفارش"),
         };
         c.sortTitle = "مرتب‌سازی";
         c.sort = new FilterSheet.Opt[]{
@@ -79,11 +77,13 @@ public class ProductsScreen extends Screen {
     }
 
     private static final class Data {
+        int snapTab;
         Row summary = new Row();
         List<Row> list = new ArrayList<>();
         List<Row> low = new ArrayList<>();
         List<Row> groups = new ArrayList<>();
         List<Row> top = new ArrayList<>();
+        List<Row> dead = new ArrayList<>();
         Map<String, String> notes = new LinkedHashMap<>();
     }
 
@@ -100,6 +100,7 @@ public class ProductsScreen extends Screen {
         a.repo.run(c -> {
             Meta m = new Meta(c);
             Data d = new Data();
+            d.snapTab = myTab;
             d.summary = soft(d.notes, "خلاصه", () -> Repo.one(c, MasterQueries.productsSummary(m)));
             if (myTab == 0) {
                 d.list = soft(d.notes, "فهرست", () -> Repo.exec(c, MasterQueries.productsList(m, f)));
@@ -112,8 +113,10 @@ public class ProductsScreen extends Screen {
                 d.low = soft(d.notes, "کم‌موجودی", () -> Repo.exec(c, MasterQueries.productsList(m, lf)));
             } else if (myTab == 2) {
                 d.groups = soft(d.notes, "ارزش گروه‌ها", () -> Repo.exec(c, MasterQueries.stockValueByGroup(m)));
-            } else {
+            } else if (myTab == 3) {
                 d.top = soft(d.notes, "پرفروش‌ها", () -> Repo.exec(c, Queries.factorTopProducts(m, true, f, 50)));
+            } else {
+                d.dead = soft(d.notes, "راکد", () -> Repo.exec(c, MasterQueries.deadStock(m, 90, 100)));
             }
             if (d.summary == null && d.list == null) throw new Exception(firstNote(d.notes));
             return d;
@@ -154,17 +157,18 @@ public class ProductsScreen extends Screen {
         content.addView(a.kit.kpiGrid(kpis, 2), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(12));
 
-        content.addView(a.kit.chips(new String[]{"فهرست", "کم‌موجودی", "ارزش گروه‌ها", "پرفروش‌ها"}, tab, idx -> {
+        content.addView(a.kit.chips(new String[]{"فهرست", "کم‌موجودی", "ارزش گروه‌ها", "پرفروش‌ها", "راکد"}, d.snapTab, idx -> {
             tab = idx;
             filter.page = 0;
             render(content);
         }), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
 
-        if (tab == 0) buildList(content, d);
-        else if (tab == 1) buildLow(content, d);
-        else if (tab == 2) buildGroups(content, d);
-        else buildTop(content, d);
+        if (d.snapTab == 0) buildList(content, d);
+        else if (d.snapTab == 1) buildLow(content, d);
+        else if (d.snapTab == 2) buildGroups(content, d);
+        else if (d.snapTab == 3) buildTop(content, d);
+        else buildDead(content, d);
 
         renderNotes(content, d.notes);
     }
@@ -182,7 +186,7 @@ public class ProductsScreen extends Screen {
             String extra = r.s("groupName");
             if (!r.s("unit").isEmpty()) extra += (extra.isEmpty() ? "" : " • ") + r.s("unit");
             View v = a.kit.invRow(r.s("naka"), "کد " + Money.fa(r.s("code").isEmpty() ? shka : r.s("code")),
-                    extra, stock, Money.rial(r.d("sale")), v2 -> openDetail(shka));
+                    extra, stock, Money.rial(r.d("sale")), v2 -> openProduct(shka));
             LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
             p.setMargins(0, 0, 0, Theme.dp(10));
             content.addView(v, p);
@@ -194,6 +198,12 @@ public class ProductsScreen extends Screen {
     }
 
     private void buildLow(LinearLayout content, Data d) {
+        if (d.summary != null && d.summary.l("reorderN") > 0) {
+            LinearLayout rc = a.kit.card(Theme.WARNING);
+            rc.addView(a.kit.kv("زیر نقطه سفارش", Money.fa(String.valueOf(d.summary.l("reorderN"))) + " قلم", Theme.WARNING), a.kit.lp(-1, -2));
+            rc.addView(a.kit.hint("فهرست کامل را با فیلتر «زیر نقطه سفارش» در تب فهرست ببینید"), a.kit.lp(-1, -2));
+            a.kit.addCard(content, rc);
+        }
         if (d.low == null || d.low.isEmpty()) {
             content.addView(a.kit.empty("کالای کم‌موجودی وجود ندارد", "موجودی همه اقلام بالای آستانه است"), a.kit.lp(-1, -2));
             return;
@@ -204,7 +214,7 @@ public class ProductsScreen extends Screen {
             final String shka = r.s("shka");
             boolean zero = r.d("vah") <= 0;
             View v = a.kit.alertRow(r.s("naka"), "کد " + Money.fa(shka) + " • موجودی " + Money.qty(r.d("vah")),
-                    zero ? Theme.DANGER : Theme.WARNING, v2 -> openDetail(shka));
+                    zero ? Theme.DANGER : Theme.WARNING, v2 -> openProduct(shka));
             LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
             p.setMargins(0, 0, 0, Theme.dp(10));
             content.addView(v, p);
@@ -223,7 +233,7 @@ public class ProductsScreen extends Screen {
         Charts.Donut dn = new Charts.Donut(a);
         List<Charts.Point> pts = new ArrayList<>();
         for (int i = 0; i < Math.min(8, d.groups.size()); i++)
-            pts.add(new Charts.Point(d.groups.get(i).s("label"), d.groups.get(i).d("value"), PALETTE[i % PALETTE.length]));
+            pts.add(new Charts.Point(d.groups.get(i).s("label"), d.groups.get(i).d("value"), Charts.palette(i)));
         double sum = 0;
         for (Row r : d.groups) sum += r.d("value");
         dn.setData(pts, "ارزش کل", Money.compactRial(sum));
@@ -259,8 +269,35 @@ public class ProductsScreen extends Screen {
         a.kit.addCard(content, c);
     }
 
+    private void buildDead(LinearLayout content, Data d) {
+        if (d.dead == null || d.dead.isEmpty()) {
+            content.addView(a.kit.empty("کالای راکدی وجود ندارد", "همه اقلام موجود در ۹۰ روز گذشته فروش داشته‌اند"), a.kit.lp(-1, -2));
+            return;
+        }
+        double stuck = 0;
+        for (Row r : d.dead) stuck += r.d("buyValue");
+        LinearLayout c = a.kit.card(Theme.WARNING);
+        c.addView(a.kit.kv("اقلام راکد (۹۰ روز بدون فروش)", Money.fa(String.valueOf(d.dead.size())) + " قلم", Theme.TEXT), a.kit.lp(-1, -2));
+        c.addView(a.kit.kv("سرمایه خوابیده ≈", Money.rial(stuck), Theme.WARNING), a.kit.lp(-1, -2));
+        a.kit.addCard(content, c);
+        int cap = Math.min(d.dead.size(), 120);
+        for (int i = 0; i < cap; i++) {
+            Row r = d.dead.get(i);
+            final String shka = r.s("shka");
+            String last = r.s("lastSale");
+            String sub = "کد " + Money.fa(shka) + " • موجودی " + Money.qty(r.d("vah"))
+                    + (last.isEmpty() ? " • هرگز فروش نرفته" : " • آخرین فروش " + Jalali.shortLabel(last));
+            View v = a.kit.alertRow(r.s("label"), sub, last.isEmpty() ? Theme.DANGER : Theme.WARNING, v2 -> openProduct(shka));
+            LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
+            p.setMargins(0, 0, 0, Theme.dp(10));
+            content.addView(v, p);
+        }
+        if (d.dead.size() > cap)
+            content.addView(a.kit.hint("+" + Money.fa(String.valueOf(d.dead.size() - cap)) + " قلم دیگر…"), a.kit.lp(-1, -2));
+    }
+
     // ---------------- product dossier ----------------
-    private void openDetail(final String shka) {
+    public void openProduct(final String shka) {
         a.kit.toast("در حال دریافت پرونده کالا…");
         final Filter f = filter.copy();
         a.repo.run(c -> {
@@ -319,6 +356,9 @@ public class ProductsScreen extends Screen {
         if (dt.turnover.isEmpty()) {
             body.addView(a.kit.hint("گردش ثبت‌شده‌ای برای این کالا در بازه فیلتر یافت نشد"), a.kit.lp(-1, -2));
         } else {
+            for (Row r : dt.turnover)
+                if (r.s("opLabel").isEmpty())
+                    r.put("opLabel", ir.meelano.manager.core.AtiranSchema.actNameFallback(r.s("op")));
             body.addView(a.kit.text("گردش کالا (" + Money.fa(String.valueOf(dt.turnover.size())) + " سند)", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
             ReportCatalog.Col[] cols = new ReportCatalog.Col[]{
                     new ReportCatalog.Col("date", "تاریخ", ReportCatalog.T_DATE),

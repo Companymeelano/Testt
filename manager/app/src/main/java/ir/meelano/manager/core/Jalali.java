@@ -203,7 +203,6 @@ public final class Jalali {
         return d < 0 ? date : format(d + days);
     }
 
-    /** "1405/07/14" for today. */
     /** Days from a to b (b − a); −1 when either side is unparseable. Accepts any Atiran date form. */
     public static int diffDays(String a, String b) {
         int da = parse(disp(a));
@@ -211,6 +210,7 @@ public final class Jalali {
         return da < 0 || db < 0 ? -1 : db - da;
     }
 
+    /** "1405/07/14" for today. */
     public static String todayStr() {
         return format(today());
     }
@@ -244,7 +244,7 @@ public final class Jalali {
         int d = norm.isEmpty() ? -1 : parse(norm);
         if (d < 0) return date == null ? "" : date;
         int[] j = fromDay(d);
-        return j[2] + " " + MONTHS[j[1] - 1];
+        return Money.fa(String.valueOf(j[2])) + " " + MONTHS[j[1] - 1];
     }
 
     private static final String[] WEEKDAYS = {"شنبه", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه"};
@@ -254,6 +254,13 @@ public final class Jalali {
         if (d < 0) return "";
         // Julian day 0 was a Monday; Saturday is the first day of the Persian week.
         return WEEKDAYS[((d + 2) % 7 + 7) % 7];
+    }
+
+    /** Weekday index of any Atiran date form: 0=Saturday … 6=Friday; −1 when unparseable. */
+    public static int weekdayIndex(String date) {
+        int d = parse(disp(date));
+        if (d < 0) return -1;
+        return ((d + 2) % 7 + 7) % 7;
     }
 
     /**

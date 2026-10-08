@@ -35,7 +35,7 @@ public final class Atiran {
     public static Connection open(String host, int port, String db, String user, String pass) throws Exception {
         Class.forName("net.sourceforge.jtds.jdbc.Driver");
         String url = "jdbc:jtds:sqlserver://" + host + ":" + port + "/" + db
-                + ";loginTimeout=8;socketTimeout=30;appName=MEELANO-Manager7;";
+                + ";loginTimeout=8;socketTimeout=75;appName=MEELANO-Manager7;";
         Properties p = new Properties();
         p.setProperty("user", user);
         p.setProperty("password", pass);

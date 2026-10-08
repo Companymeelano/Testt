@@ -152,6 +152,20 @@ public class SettingsScreen extends Screen {
             }
             render(content);
         }), a.kit.lp(-1, -2));
+        final boolean mon = a.settings.morningOn();
+        nt.addView(a.kit.btnGhost("☀ گزارش صبحگاهی: " + (mon ? "روشن" : "خاموش"), Theme.GOLD, v -> {
+            a.settings.setMorningOn(!mon);
+            a.kit.toast(!mon ? "گزارش صبحگاهی روشن شد" : "گزارش صبحگاهی خاموش شد");
+            render(content);
+        }), a.kit.lp(-1, -2));
+        final boolean bkp = a.settings.backupOn();
+        nt.addView(a.kit.btnGhost("⛁ یادآوری پشتیبان‌گیری هفتگی: " + (bkp ? "روشن" : "خاموش"), Theme.TEAL, v -> {
+            a.settings.setBackupOn(!bkp);
+            if (!bkp) ir.meelano.manager.core.Notify.scheduleWeekly(a);
+            else ir.meelano.manager.core.Notify.cancelWeekly(a);
+            a.kit.toast(!bkp ? "یادآوری هفتگی روشن شد (جمعه‌ها ساعت ۹)" : "یادآوری هفتگی خاموش شد");
+            render(content);
+        }), a.kit.lp(-1, -2));
         final android.widget.EditText shop = a.kit.edit("نام فروشگاه (برای کارت ویزیت دیجیتال)", a.settings.shopName());
         LinearLayout.LayoutParams shp = a.kit.lp(-1, -2);
         shp.setMargins(0, Theme.dp(6), 0, 0);
@@ -162,7 +176,8 @@ public class SettingsScreen extends Screen {
             a.kit.toast(nm.isEmpty() ? "نام فروشگاه را وارد کنید" : "نام فروشگاه ذخیره شد");
             if (!nm.isEmpty()) ShopCard.show(a);
         }), a.kit.lp(-1, -2));
-        nt.addView(a.kit.hint("هشدار هوشمند هر روز صبح سررسید ۳ روز آینده چک‌ها و فاکتورهای معوق را اعلان می‌کند."), a.kit.lp(-1, -2));
+        nt.addView(a.kit.btnGhost("📺 حالت تلویزیون فروشگاه", Theme.SUCCESS, v -> a.startTv()), a.kit.lp(-1, -2));
+        nt.addView(a.kit.hint("هشدار هوشمند هر روز ساعت ۸ سررسیدها، معوق‌ها و چک‌های برگشتی تازه را اعلان می‌کند؛ گزارش صبحگاهی خلاصه فروش و دریافت دیروز را اضافه می‌کند."), a.kit.lp(-1, -2));
         a.kit.addCard(content, nt);
 
         // ---- PIN ----
@@ -181,7 +196,49 @@ public class SettingsScreen extends Screen {
             }), a.kit.wlp(1f));
         }
         p.addView(prow, a.kit.lp(-1, -2));
+        if (ir.meelano.manager.core.Finger.supported(a)) {
+            final boolean fp = a.settings.fpOn();
+            p.addView(a.kit.btnGhost("◉ ورود با اثر انگشت: " + (fp ? "روشن" : "خاموش"), Theme.GOLD, v -> {
+                a.settings.setFpOn(!fp);
+                a.kit.toast(!fp ? "ورود با اثر انگشت روشن شد" : "ورود با اثر انگشت خاموش شد");
+                render(content);
+            }), a.kit.lp(-1, -2));
+            p.addView(a.kit.hint("اثر انگشت فقط وقتی کار می‌کند که قفل ۴ رقمی هم فعال باشد"), a.kit.lp(-1, -2));
+        }
         a.kit.addCard(content, p);
+
+        // ---- home dashboard order ----
+        LinearLayout ho = a.kit.card(Theme.GOLD);
+        ho.addView(a.kit.text("ترتیب داشبورد خانه", 14.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        final String[][] secs = {
+                {"kpis", "شاخص‌های روز"},
+                {"alerts", "هشدار امروز"},
+                {"trend", "روند ۱۴ روزه فروش"},
+                {"donut", "ترکیب دریافت"},
+                {"debtors", "بدهکاران اولویت‌دار"},
+                {"visitors", "عملکرد ویزیتورها"},
+                {"due", "سررسید چک‌ها"},
+                {"shortcuts", "دسترسی سریع"},
+        };
+        final java.util.List<String> order = new java.util.ArrayList<>();
+        for (String k : a.settings.homeOrder().split(","))
+            if (k != null && !k.trim().isEmpty() && !order.contains(k.trim())) order.add(k.trim());
+        for (String[] s2 : secs) if (!order.contains(s2[0])) order.add(s2[0]);
+        for (int i = 0; i < order.size(); i++) {
+            final int idx = i;
+            String ot = order.get(i);
+            for (String[] s2 : secs) if (s2[0].equals(ot)) ot = s2[1];
+            LinearLayout orow = a.kit.h();
+            orow.addView(a.kit.text(Money.fa(String.valueOf(i + 1)) + " • " + ot, 12.5f, Theme.TEXT, true), a.kit.wlp(1f));
+            orow.addView(a.kit.btnGhost("↑", Theme.GOLD, v -> moveHome(order, idx, -1, content)), a.kit.lp(Theme.dp(52), -2));
+            orow.addView(a.kit.btnGhost("↓", Theme.GOLD, v -> moveHome(order, idx, 1, content)), a.kit.lp(Theme.dp(52), -2));
+            ho.addView(orow, a.kit.lp(-1, -2));
+        }
+        ho.addView(a.kit.btnGhost("بازنشانی ترتیب پیش‌فرض", Theme.MUTED, v -> {
+            a.settings.setHomeOrder(ir.meelano.manager.data.Settings.HOME_ORDER_DEFAULT);
+            render(content);
+        }), a.kit.lp(-1, -2));
+        a.kit.addCard(content, ho);
 
         // ---- about + developer signature ----
         LinearLayout ab = a.kit.card(Theme.VIOLET);
@@ -201,6 +258,21 @@ public class SettingsScreen extends Screen {
         ab.addView(a.kit.kv("منبع داده", "SQL Server آتیران (اتصال مستقیم)", Theme.TEXT), a.kit.lp(-1, -2));
         ab.addView(a.kit.hint("همه بخش‌ها داده زنده نمایش می‌دهند؛ بدون اتصال، اطلاع‌رسانی می‌شود."), a.kit.lp(-1, -2));
         a.kit.addCard(content, ab);
+    }
+
+    private void moveHome(java.util.List<String> order, int idx, int delta, LinearLayout content) {
+        int j = idx + delta;
+        if (idx < 0 || idx >= order.size() || j < 0 || j >= order.size()) return;
+        String t = order.get(idx);
+        order.set(idx, order.get(j));
+        order.set(j, t);
+        StringBuilder b = new StringBuilder();
+        for (String k : order) {
+            if (b.length() > 0) b.append(',');
+            b.append(k);
+        }
+        a.settings.setHomeOrder(b.toString());
+        render(content);
     }
 
     private void pinDialog() {

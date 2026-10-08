@@ -21,10 +21,6 @@ import java.util.List;
 
 /** Reports center: 34 management reports with charts, tables and PDF sharing. */
 public class ReportsScreen extends Screen {
-    private static final int[] PALETTE = {
-            Theme.GOLD, Theme.SUCCESS, Theme.INFO, Theme.VIOLET, Theme.WARNING, Theme.DANGER,
-    };
-
     private final Filter filter = new Filter();
     private ReportCatalog.Spec sel;
     private LinearLayout contentRef;
@@ -248,7 +244,7 @@ public class ReportsScreen extends Screen {
                 Row r = rows.get(i);
                 String x = chartLabel(spec, r.s(spec.chartX));
                 if (spec.chart == ReportCatalog.C_DONUT)
-                    pts.add(new Charts.Point(x, r.d(spec.chartY), PALETTE[i % PALETTE.length]));
+                    pts.add(new Charts.Point(x, r.d(spec.chartY), Charts.palette(i)));
                 else pts.add(new Charts.Point(x, r.d(spec.chartY)));
             }
             c.addView(a.kit.chartHead("نمودار", () -> {

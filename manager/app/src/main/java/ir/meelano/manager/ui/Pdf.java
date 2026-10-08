@@ -106,10 +106,13 @@ public final class Pdf {
         }
         File dir = ShareProvider.shareDir(c);
         File out = new File(dir, "report-" + System.currentTimeMillis() + ".pdf");
-        try (FileOutputStream fos = new FileOutputStream(out)) {
-            doc.writeTo(fos);
+        try {
+            try (FileOutputStream fos = new FileOutputStream(out)) {
+                doc.writeTo(fos);
+            }
+        } finally {
+            try { doc.close(); } catch (Exception ignored) { }
         }
-        try { doc.close(); } catch (Exception ignored) { }
         return out;
     }
 

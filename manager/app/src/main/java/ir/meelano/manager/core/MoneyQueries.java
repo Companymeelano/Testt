@@ -79,6 +79,30 @@ public final class MoneyQueries {
         return new Queries.Q(sql, binds);
     }
 
+    /** Day block for an explicit Atiran «YYYY/MM/DD» (morning report): d,total,count. */
+    public static Queries.Q darOn(Meta m, int p, String day) throws Queries.Missing {
+        Dar d = darCols(m);
+        Set<String> cols = m.columns("dar");
+        List<Object> binds = new ArrayList<>();
+        binds.add(p);
+        binds.add(day == null ? "" : day);
+        String sql = "SELECT " + Sql.lit(day == null ? "" : day) + " AS d, ISNULL(SUM(" + darTotal("h", d) + "),0) AS total"
+                + ", COUNT_BIG(1) AS count FROM dbo.dar h WHERE h.[p]=?"
+                + " AND " + Sql.date10("h", d.date) + "=?"
+                + Sql.activeAnd(cols, "h") + Sql.softAnd(cols, "h");
+        return new Queries.Q(sql, binds);
+    }
+
+    /** Currently bounced incoming cheques (all-time): count,total. Notify diffs the count. */
+    public static Queries.Q bouncedTotal(Meta m) throws Queries.Missing {
+        Chq c = chq(m, true);
+        if (c.back == null) throw new Queries.Missing("ستون برگشتی در «چک‌های دریافتی» پیدا نشد");
+        String back = "UPPER(LTRIM(RTRIM(TRY_CONVERT(nvarchar(10),h.[" + c.back + "]))))";
+        return new Queries.Q("SELECT COUNT_BIG(1) AS count, ISNULL(SUM(" + Sql.num("h", c.amount) + "),0) AS total"
+                + " FROM dbo.[" + c.table + "] h WHERE " + back + " IN (N'T',N'1',N'TRUE')",
+                new ArrayList<>());
+    }
+
     /** Per-day totals in a range: day,total,count. */
     public static Queries.Q darDaily(Meta m, int p, String from, String to) throws Queries.Missing {
         Dar d = darCols(m);
@@ -554,8 +578,11 @@ public final class MoneyQueries {
         x.conds.add("(" + d1 + " OR " + d2 + ")");
         // Outstanding = still with us: incoming 1/2 (not bounced), outgoing 1 (issued).
         x.conds.add(incoming ? st + " IN (N'1',N'2')" : st + "=N'1'");
-        if (incoming && x.c.back != null)
-            x.conds.add("(UPPER(LTRIM(RTRIM(TRY_CONVERT(nvarchar(10),h.[" + x.c.back + "])))) NOT IN (N'T',N'1',N'TRUE'))");
+        if (incoming && x.c.back != null) {
+            String bk = "UPPER(LTRIM(RTRIM(TRY_CONVERT(nvarchar(10),h.[" + x.c.back + "]))))";
+            // NULL back flags (legacy rows) must stay visible: NOT IN alone would drop them.
+            x.conds.add("(" + bk + " NOT IN (N'T',N'1',N'TRUE') OR " + bk + " IS NULL)");
+        }
         // Skip placeholder due dates («--», «1499/12/29» on blank cheques).
         x.conds.add("(" + x.sar + " NOT LIKE N'--%' AND " + x.sar + " NOT LIKE N'149%' AND " + x.sar + " NOT LIKE N'15%' AND " + x.sar + " NOT LIKE N'16%')");
         return x;

@@ -69,7 +69,7 @@ public class ShareProvider extends ContentProvider {
     }
 
     @Override public String getType(Uri uri) {
-        String n = uri == null || uri.getLastPathSegment() == null ? "" : uri.getLastPathSegment().toLowerCase();
+        String n = uri == null || uri.getLastPathSegment() == null ? "" : uri.getLastPathSegment().toLowerCase(java.util.Locale.US);
         if (n.endsWith(".pdf")) return "application/pdf";
         if (n.endsWith(".png")) return "image/png";
         if (n.endsWith(".jpg") || n.endsWith(".jpeg")) return "image/jpeg";

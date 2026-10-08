@@ -32,6 +32,9 @@ public final class Notify {
     private static final String CH = "meelano_due";
     private static final int ALARM_REQ = 7001;
     private static final int NOTIF_ID = 7002;
+    static final String ACT_BACKUP = "ir.meelano.manager.BACKUP";
+    private static final int BACKUP_REQ = 7003;
+    private static final int BACKUP_NOTIF_ID = 7004;
     private static boolean launched = false;
 
     /** Create channel, schedule the daily alarm, ask permission, run one launch check. */
@@ -41,6 +44,7 @@ public final class Notify {
             if (!s.notifOn()) return;
             channel(a);
             scheduleDaily(a);
+            if (s.backupOn()) scheduleWeekly(a);
             if (Build.VERSION.SDK_INT >= 33
                     && a.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
                     != android.content.pm.PackageManager.PERMISSION_GRANTED) {
@@ -91,8 +95,43 @@ public final class Notify {
         } catch (Exception ignored) { }
     }
 
+    /** Every Friday at 9:00 (inexact, battery-friendly). */
+    public static void scheduleWeekly(Context c) {
+        try {
+            AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
+            if (am == null) return;
+            Intent i = new Intent(c, NotifyReceiver.class);
+            i.setAction(ACT_BACKUP);
+            PendingIntent pi = PendingIntent.getBroadcast(c, BACKUP_REQ, i,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            Calendar cal = Calendar.getInstance();
+            cal.set(Calendar.DAY_OF_WEEK, Calendar.FRIDAY);
+            cal.set(Calendar.HOUR_OF_DAY, 9);
+            cal.set(Calendar.MINUTE, 0);
+            cal.set(Calendar.SECOND, 0);
+            if (cal.getTimeInMillis() <= System.currentTimeMillis()) cal.add(Calendar.DAY_OF_YEAR, 7);
+            am.setInexactRepeating(AlarmManager.RTC_WAKEUP, cal.getTimeInMillis(),
+                    AlarmManager.INTERVAL_DAY * 7, pi);
+        } catch (Exception ignored) { }
+    }
+
+    public static void cancelWeekly(Context c) {
+        try {
+            AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
+            Intent i = new Intent(c, NotifyReceiver.class);
+            i.setAction(ACT_BACKUP);
+            PendingIntent pi = PendingIntent.getBroadcast(c, BACKUP_REQ, i,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            if (am != null) am.cancel(pi);
+        } catch (Exception ignored) { }
+    }
+
     /** Query Atiran in background; notify only when there is something to warn about. */
     public static void checkNow(final Context appCtx) {
+        checkNow(appCtx, null);
+    }
+
+    public static void checkNow(final Context appCtx, final Runnable onDone) {
         final Context c = appCtx.getApplicationContext();
         try {
             Settings s = new Settings(c);
@@ -117,15 +156,39 @@ public final class Notify {
                     odN = od.size();
                     for (Row r : od) odSum += r.d("amount");
                 } catch (Exception ignored) { }
-                return new long[]{(long) inSum, (long) outSum, (long) odSum, inN, outN, odN};
+                double ySales = 0, yIn = 0;
+                try {
+                    Row ys = Repo.one(conn, Queries.salesOn(m, true, Jalali.addDays(Jalali.todayStr(), -1)));
+                    ySales = ys.d("total");
+                } catch (Exception ignored) { }
+                try {
+                    Row yi = Repo.one(conn, MoneyQueries.darOn(m, 0, Jalali.addDays(Jalali.todayStr(), -1)));
+                    yIn = yi.d("total");
+                } catch (Exception ignored) { }
+                long bN = 0;
+                double bSum = 0;
+                try {
+                    Row bb = Repo.one(conn, MoneyQueries.bouncedTotal(m));
+                    bN = bb.l("count");
+                    bSum = bb.d("total");
+                } catch (Exception ignored) { }
+                return new long[]{(long) inSum, (long) outSum, (long) odSum, inN, outN, odN,
+                        (long) ySales, (long) yIn, bN, (long) bSum};
             }, new Repo.Cb<long[]>() {
                 @Override
                 public void ok(long[] v) {
                     try {
                         repo.close();
                     } catch (Exception ignored) { }
-                    if (v == null || (v[3] == 0 && v[4] == 0 && v[5] == 0)) return;
-                    show(c, v[3], v[0], v[4], v[1], v[5], v[2]);
+                    finishCb(onDone);
+                    if (v == null || v.length < 10) return;
+                    Settings s2 = new Settings(c);
+                    long lastB = s2.lastBouncedN();
+                    long bNew = lastB < 0 ? 0 : Math.max(0, v[8] - lastB);
+                    s2.setLastBouncedN(v[8]);
+                    boolean morning = s2.morningOn() && (v[6] > 0 || v[7] > 0);
+                    if (v[3] == 0 && v[4] == 0 && v[5] == 0 && bNew == 0 && !morning) return;
+                    show(c, v, bNew, morning);
                 }
 
                 @Override
@@ -133,31 +196,46 @@ public final class Notify {
                     try {
                         repo.close();
                     } catch (Exception ignored) { }
+                    finishCb(onDone);
                 }
             });
         } catch (Exception ignored) { }
     }
 
-    private static void show(Context c, long inN, long inSum, long outN, long outSum, long odN, long odSum) {
+    private static void finishCb(Runnable r) {
+        try {
+            if (r != null) r.run();
+        } catch (Exception ignored) { }
+    }
+
+    private static void show(Context c, long[] v, long bNew, boolean morning) {
         try {
             channel(c);
+            long inN = v[3], outN = v[4], odN = v[5];
+            java.util.List<String> parts = new java.util.ArrayList<>();
+            if (morning)
+                parts.add("☀ فروش دیروز " + Money.compactRial(v[6]) + " • دریافت دیروز " + Money.compactRial(v[7]));
+            if (inN > 0)
+                parts.add(Money.fa(String.valueOf(inN)) + " فقره چک دریافتی (" + Money.compactRial(v[0]) + ")");
+            if (outN > 0)
+                parts.add(Money.fa(String.valueOf(outN)) + " فقره چک پرداختی (" + Money.compactRial(v[1]) + ")");
+            if (odN > 0)
+                parts.add(Money.fa(String.valueOf(odN)) + " فاکتور معوق (" + Money.compactRial(v[2]) + ")");
+            if (bNew > 0)
+                parts.add(Money.fa(String.valueOf(bNew)) + " چک برگشتی تازه");
             StringBuilder b = new StringBuilder();
-            if (inN > 0) b.append(Money.fa(String.valueOf(inN))).append(" فقره چک دریافتی (").append(Money.compactRial(inSum)).append(")");
-            if (outN > 0) {
+            for (String p : parts) {
                 if (b.length() > 0) b.append(" • ");
-                b.append(Money.fa(String.valueOf(outN))).append(" فقره چک پرداختی (").append(Money.compactRial(outSum)).append(")");
-            }
-            if (odN > 0) {
-                if (b.length() > 0) b.append(" • ");
-                b.append(Money.fa(String.valueOf(odN))).append(" فاکتور معوق (").append(Money.compactRial(odSum)).append(")");
+                b.append(p);
             }
             b.append("؛ برای جزئیات لمس کنید.");
+            boolean onlyMorning = morning && inN == 0 && outN == 0 && odN == 0 && bNew == 0;
             Intent open = new Intent(c, MainActivity.class);
             open.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
             PendingIntent pi = PendingIntent.getActivity(c, NOTIF_ID, open,
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             Notification n = new Notification.Builder(c, CH)
-                    .setContentTitle("⚠ هشدار سررسید میلانو")
+                    .setContentTitle(onlyMorning ? "☀ گزارش صبحگاهی میلانو" : "⚠ هشدار سررسید میلانو")
                     .setContentText(b.toString())
                     .setStyle(new Notification.BigTextStyle().bigText(b.toString()))
                     .setSmallIcon(R.mipmap.ic_launcher)
@@ -169,17 +247,66 @@ public final class Notify {
             if (nm != null) nm.notify(NOTIF_ID, n);
         } catch (Exception ignored) { }
     }
+
+    /** Weekly backup reminder (no database access needed). */
+    static void showBackup(Context c) {
+        try {
+            channel(c);
+            Intent open = new Intent(c, MainActivity.class);
+            open.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            PendingIntent pi = PendingIntent.getActivity(c, BACKUP_NOTIF_ID, open,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            String msg = "امروز جمعه است؛ از دیتابیس آتیران نسخه پشتیبان بگیرید تا داده فروشگاه امن بماند.";
+            Notification n = new Notification.Builder(c, CH)
+                    .setContentTitle("⛁ یادآوری پشتیبان‌گیری میلانو")
+                    .setContentText(msg)
+                    .setStyle(new Notification.BigTextStyle().bigText(msg))
+                    .setSmallIcon(R.mipmap.ic_launcher)
+                    .setContentIntent(pi)
+                    .setAutoCancel(true)
+                    .setColor(0xFF3ED6C5)
+                    .build();
+            NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm != null) nm.notify(BACKUP_NOTIF_ID, n);
+        } catch (Exception ignored) { }
+    }
 }
 
 /** AlarmManager + boot receiver: reschedule + run the due check. Top-level so the manifest can see it. */
 final class NotifyReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context c, Intent intent) {
+        final PendingResult pr;
+        try {
+            pr = goAsync();
+        } catch (Exception e) {
+            return;
+        }
         try {
             Settings s = new Settings(c);
-            if (!s.notifOn()) return;
+            String act = intent == null || intent.getAction() == null ? "" : intent.getAction();
+            if (Notify.ACT_BACKUP.equals(act)) {
+                if (s.backupOn()) {
+                    Notify.scheduleWeekly(c);
+                    Notify.showBackup(c);
+                }
+                finishPr(pr);
+                return;
+            }
+            if (!s.notifOn()) {
+                finishPr(pr);
+                return;
+            }
             Notify.scheduleDaily(c);
-            Notify.checkNow(c);
+            Notify.checkNow(c, () -> finishPr(pr));
+        } catch (Exception ignored) {
+            finishPr(pr);
+        }
+    }
+
+    private void finishPr(PendingResult pr) {
+        try {
+            pr.finish();
         } catch (Exception ignored) { }
     }
 }

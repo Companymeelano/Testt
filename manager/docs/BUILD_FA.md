@@ -66,3 +66,19 @@ app/src/main/java/ir/meelano/manager/
 کاربر نهایی باید حتماً مشخصات سرور خودش را در تنظیمات اپ وارد کند.
 رمزها در `SharedPreferences` خصوصی اپ ذخیره می‌شوند (root‌نشده امن است)؛
 برای محیط‌های حساس، رمز را در اپ ذخیره نکنید و هربار دستی وارد کنید.
+
+## امضای نسخه انتشار (v11)
+
+۱. یک‌بار کلید بسازید:
+```
+keytool -genkeypair -v -keystore meelano-release.jks -alias meelano \
+  -keyalg RSA -keysize 2048 -validity 10000
+```
+۲. فایل `manager/keystore.properties.template` را به `manager/keystore.properties` کپی کنید
+(این فایل در گیت نادیده گرفته می‌شود) و مسیر/رمزها را وارد کنید.
+۳. بیلد انتشار:
+```
+cd manager && ./gradlew assembleRelease
+```
+خروجی امضاشده: `app/build/outputs/apk/release/app-release.apk`
+بدون فایل keystore، بیلد release بدون امضا ساخته می‌شود (CI همچنان نسخه debug می‌سازد).

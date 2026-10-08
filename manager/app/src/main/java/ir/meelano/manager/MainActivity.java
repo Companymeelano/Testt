@@ -58,7 +58,7 @@ public class MainActivity extends Activity {
     private ScrollView scroll;
     private LinearLayout bottomBar;
     private TextView connDot;
-    private TextView filterBtn;
+    private TextView backFab;
     private TextView rangeLine;
 
     private final Map<String, Screen> screens = new LinkedHashMap<>();
@@ -262,6 +262,7 @@ public class MainActivity extends Activity {
     private void shell() {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
+        root.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         root.setBackgroundColor(Theme.BG);
 
         // header
@@ -276,26 +277,37 @@ public class MainActivity extends Activity {
         rangeLine = kit.text(kit.todayLine(), 10.5f, Theme.MUTED, false);
         titleBox.addView(rangeLine, kit.lp(-1, -2));
         header.addView(titleBox, kit.wlp(1f));
-        filterBtn = kit.text("◈ فیلتر", 12, Theme.GOLD_SOFT, true);
-        filterBtn.setPadding(Theme.dp(12), Theme.dp(8), Theme.dp(12), Theme.dp(8));
-        filterBtn.setBackground(Theme.ghostButton(Theme.GOLD));
-        Theme.pressable(filterBtn);
-        filterBtn.setOnClickListener(v -> openFilter());
-        header.addView(filterBtn, kit.lp(-2, -2));
-        header.addView(kit.space(8));
-        TextView gsearch = kit.text("⌕", 19, Theme.GOLD_SOFT, true);
-        gsearch.setPadding(Theme.dp(10), Theme.dp(4), Theme.dp(10), Theme.dp(4));
-        gsearch.setBackground(Theme.ghostButton(Theme.GOLD));
+        LinearLayout tools = kit.h();
+        tools.setGravity(Gravity.CENTER_VERTICAL);
+        tools.setBackground(Theme.ghostButton(Theme.GOLD));
+        tools.setPadding(Theme.dp(2), Theme.dp(2), Theme.dp(2), Theme.dp(2));
+        TextView gsearch = kit.text("⌕", 18, Theme.GOLD_SOFT, true);
+        gsearch.setPadding(Theme.dp(11), Theme.dp(6), Theme.dp(11), Theme.dp(6));
         Theme.pressable(gsearch);
         gsearch.setOnClickListener(v -> nav("search"));
-        header.addView(gsearch, kit.lp(-2, -2));
-        header.addView(kit.space(8));
-        TextView refresh = kit.text("⟳", 19, Theme.GOLD_SOFT, true);
-        refresh.setPadding(Theme.dp(10), Theme.dp(4), Theme.dp(10), Theme.dp(4));
-        refresh.setBackground(Theme.ghostButton(Theme.GOLD));
+        MeelanoIcons.iconize(gsearch);
+        tools.addView(gsearch, kit.lp(-2, -2));
+        tools.addView(vdiv(), kit.lp(Theme.dp(1), Theme.dp(22)));
+        TextView themeBtn = kit.text("◐", 18, Theme.GOLD, true);
+        themeBtn.setPadding(Theme.dp(11), Theme.dp(6), Theme.dp(11), Theme.dp(6));
+        themeBtn.setContentDescription("تغییر تم روشن / تیره");
+        Theme.pressable(themeBtn);
+        themeBtn.setOnClickListener(v -> {
+            boolean toLight = !"light".equals(settings.themeMode());
+            settings.setThemeMode(toLight ? "light" : "dark");
+            kit.toast(toLight ? "تم روشن فعال شد" : "تم تیره فعال شد");
+            refreshTheme();
+        });
+        MeelanoIcons.iconize(themeBtn);
+        tools.addView(themeBtn, kit.lp(-2, -2));
+        tools.addView(vdiv(), kit.lp(Theme.dp(1), Theme.dp(22)));
+        TextView refresh = kit.text("⟳", 18, Theme.GOLD_SOFT, true);
+        refresh.setPadding(Theme.dp(11), Theme.dp(6), Theme.dp(11), Theme.dp(6));
         Theme.pressable(refresh);
         refresh.setOnClickListener(v -> renderCurrent());
-        header.addView(refresh, kit.lp(-2, -2));
+        MeelanoIcons.iconize(refresh);
+        tools.addView(refresh, kit.lp(-2, -2));
+        header.addView(tools, kit.lp(-2, -2));
         root.addView(header, kit.lp(-1, -2));
 
         // content (centered max-width column on tablets / wide screens)
@@ -312,6 +324,7 @@ public class MainActivity extends Activity {
         // bottom bar
         bottomBar = new LinearLayout(this);
         bottomBar.setOrientation(LinearLayout.HORIZONTAL);
+        bottomBar.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         bottomBar.setBackground(Theme.bottomBar());
         bottomBar.setPadding(Theme.dp(6), Theme.dp(8), Theme.dp(6), Theme.dp(10));
         root.addView(bottomBar, kit.lp(-1, -2));
@@ -341,6 +354,14 @@ public class MainActivity extends Activity {
         styleBars();
         checkConn();
         Notify.boot(this);
+        syncBackFab();
+    }
+
+    /** Hairline divider between header tool buttons. */
+    private View vdiv() {
+        View d = new View(this);
+        d.setBackgroundColor(Theme.alpha(Theme.GOLD, 70));
+        return d;
     }
 
     private void reg(Screen s) {
@@ -352,7 +373,7 @@ public class MainActivity extends Activity {
     }
 
     // ================= navigation =================
-    private static final String[] TABS = {"home", "sales", "cheques", "customers", "more"};
+    private static final String[] TABS = {"home", "sales", "products", "customers", "reports", "more"};
 
     private void buildBottom() {
         bottomBar.removeAllViews();
@@ -361,11 +382,12 @@ public class MainActivity extends Activity {
             LinearLayout b = kit.v();
             b.setGravity(Gravity.CENTER);
             b.setPadding(0, Theme.dp(4), 0, Theme.dp(2));
-            TextView g = kit.text(s.glyph(), 21, Theme.MUTED, true);
+            TextView g = kit.text(s.glyph(), 19, Theme.MUTED, true);
             g.setGravity(Gravity.CENTER);
             b.addView(g, kit.lp(-1, -2));
-            TextView l = kit.text(s.id().equals("sales") ? "فروش" : s.title(), 10f, Theme.MUTED, true);
+            TextView l = kit.text(s.id().equals("sales") ? "فروش" : s.title(), 9.5f, Theme.MUTED, true);
             l.setGravity(Gravity.CENTER);
+            l.setSingleLine(true);
             b.addView(l, kit.lp(-1, -2));
             b.setTag(id);
             Theme.pressable(b);
@@ -416,16 +438,7 @@ public class MainActivity extends Activity {
         Screen s = screens.get(currentId);
         if (s == null) return;
         paintBottom();
-        filterBtn.setVisibility(s.filterConfig() == null ? View.GONE : View.VISIBLE);
-        Filter f = s.filter();
-        if (f != null && !f.isDefault()) {
-            filterBtn.setText("◈ فیلتر •");
-            filterBtn.setTextColor(Theme.GOLD);
-        } else {
-            filterBtn.setText("◈ فیلتر");
-            filterBtn.setTextColor(Theme.GOLD_SOFT);
-        }
-        MeelanoIcons.iconize(filterBtn);
+        if (backFab != null) backFab.setVisibility("home".equals(currentId) ? View.GONE : View.VISIBLE);
         rangeLine.setText(kit.todayLine() + "  •  " + s.title());
     }
 
@@ -445,6 +458,43 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             kit.toast("حالت تلویزیون ممکن نشد");
         }
+    }
+
+    /** Shared back logic for the system back key and the golden back FAB. */
+    public void goBack() {
+        Screen s = screens.get(currentId);
+        if (s != null && s.onBack()) return;
+        if (!history.isEmpty()) {
+            currentId = history.remove(history.size() - 1);
+            renderCurrent();
+        } else nav("home");
+    }
+
+    /** Golden circular back button, floating above the bottom bar on every section but Home. */
+    private void syncBackFab() {
+        try {
+            if (backFab != null && backFab.getParent() instanceof android.view.ViewGroup)
+                ((android.view.ViewGroup) backFab.getParent()).removeView(backFab);
+        } catch (Exception ignored) {
+        }
+        backFab = null;
+        TextView f = kit.text("\u2192", 26, 0xFFFFFFFF, true);
+        f.setGravity(Gravity.CENTER);
+        f.setBackground(Theme.avatar(Theme.GOLD));
+        f.setElevation(Theme.dp(6));
+        f.setContentDescription("برگشت");
+        Theme.pressable(f);
+        f.setOnClickListener(v -> goBack());
+        android.widget.FrameLayout.LayoutParams p = new android.widget.FrameLayout.LayoutParams(
+                Theme.dp(58), Theme.dp(58), Gravity.BOTTOM | Gravity.LEFT);
+        p.setMargins(Theme.dp(16), 0, 0, Theme.dp(100));
+        try {
+            addContentView(f, p);
+        } catch (Exception ignored) {
+            return;
+        }
+        backFab = f;
+        backFab.setVisibility("home".equals(currentId) ? View.GONE : View.VISIBLE);
     }
 
     // ================= Persian voice search =================

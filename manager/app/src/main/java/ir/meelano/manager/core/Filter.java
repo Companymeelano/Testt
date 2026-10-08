@@ -96,6 +96,24 @@ public final class Filter {
         }
     }
 
+    /** One-line summary for the in-content filter bar, e.g. «۳۰ روز گذشته • «احمد» • ۲ فیلتر». */
+    public String describeFa() {
+        StringBuilder b = new StringBuilder(rangeFa());
+        if (search != null && !search.trim().isEmpty()) b.append(" • «").append(search.trim()).append("»");
+        int n = 0;
+        if (visitor >= 0) n++;
+        if (route >= 0) n++;
+        if (custGroup >= 0) n++;
+        if (kalaGroup >= 0) n++;
+        if (warehouse >= 0) n++;
+        if (bank >= 0) n++;
+        if (user >= 0) n++;
+        if (status != null && !status.isEmpty()) n++;
+        if (sort != null && !sort.isEmpty()) n++;
+        if (n > 0) b.append(" • ").append(Money.fa(String.valueOf(n))).append(" فیلتر");
+        return b.toString();
+    }
+
     public static String presetName(int p) {
         switch (p) {
             case P_TODAY: return "امروز";

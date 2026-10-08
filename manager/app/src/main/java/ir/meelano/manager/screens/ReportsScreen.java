@@ -104,11 +104,21 @@ public class ReportsScreen extends Screen {
         }
     }
 
+    /** In-content filter bar under the report hero (v12: filters live inside each report). */
+    private void filterBarInto(LinearLayout content, ReportCatalog.Spec spec) {
+        if (!spec.needsRange || filter() == null) return;
+        Filter f = filter();
+        content.addView(a.kit.filterBar(f.describeFa(), !f.isDefault(), v -> a.openFilter()), a.kit.lp(-1, -2));
+        content.addView(a.kit.gap(10));
+    }
+
     private void renderReport(final LinearLayout content, final ReportCatalog.Spec spec) {
         content.removeAllViews();
         content.addView(a.kit.btnGhost("‹ بازگشت به فهرست", Theme.GOLD, v -> onBack()), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
         content.addView(a.kit.hero("▤", spec.title, spec.needsRange ? filter.rangeFa() : spec.desc, sectionAccent(spec.section)), a.kit.lp(-1, -2));
+        content.addView(a.kit.gap(8));
+        filterBarInto(content, spec);
         content.addView(a.kit.gap(12));
         content.addView(a.kit.loading("در حال تهیه گزارش…"), a.kit.lp(-1, -2));
         final Filter f = filter.copy();
@@ -132,6 +142,8 @@ public class ReportsScreen extends Screen {
                 content.addView(a.kit.btnGhost("‹ بازگشت به فهرست", Theme.GOLD, v -> onBack()), a.kit.lp(-1, -2));
                 content.addView(a.kit.gap(10));
                 content.addView(a.kit.hero("▤", spec.title, spec.desc, sectionAccent(spec.section)), a.kit.lp(-1, -2));
+            content.addView(a.kit.gap(8));
+            filterBarInto(content, spec);
                 content.addView(a.kit.gap(12));
                 String msg = faError == null || faError.isEmpty() ? "گزارش قابل تهیه نیست" : faError;
                 content.addView(a.kit.error(msg, () -> render(content)), a.kit.lp(-1, -2));
@@ -229,6 +241,8 @@ public class ReportsScreen extends Screen {
         content.addView(a.kit.btnGhost("‹ بازگشت به فهرست", Theme.GOLD, v -> onBack()), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
         content.addView(a.kit.hero("▤", spec.title, spec.needsRange ? filter.rangeFa() : spec.desc, sectionAccent(spec.section)), a.kit.lp(-1, -2));
+        content.addView(a.kit.gap(8));
+        filterBarInto(content, spec);
         content.addView(a.kit.gap(12));
 
         if (rows == null || rows.isEmpty()) {

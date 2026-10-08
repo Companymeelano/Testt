@@ -97,6 +97,13 @@ public abstract class Screen {
     }
 
     protected View heroCard() {
-        return a.kit.hero(glyph(), title(), subtitle(), accent());
+        LinearLayout w = a.kit.v();
+        w.addView(a.kit.hero(glyph(), title(), subtitle(), accent()), a.kit.lp(-1, -2));
+        if (filterConfig() != null && filter() != null) {
+            w.addView(a.kit.gap(8));
+            Filter f = filter();
+            w.addView(a.kit.filterBar(f.describeFa(), !f.isDefault(), v -> a.openFilter()), a.kit.lp(-1, -2));
+        }
+        return w;
     }
 }

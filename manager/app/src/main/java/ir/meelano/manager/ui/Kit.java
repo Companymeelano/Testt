@@ -219,11 +219,21 @@ public final class Kit {
         return t;
     }
 
+    /** True on tablets / wide screens (smallest width 600dp+): grids open up. */
+    public boolean isWide() {
+        try {
+            return a.getResources().getConfiguration().smallestScreenWidthDp >= 600;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     public View kpiGrid(List<Kpi> kpis, int cols) {
+        int span = isWide() ? Math.max(cols, 4) : cols;
         LinearLayout root = v();
         LinearLayout row = null;
         for (int i = 0; i < kpis.size(); i++) {
-            if (i % cols == 0) {
+            if (i % span == 0) {
                 row = h();
                 LinearLayout.LayoutParams rp = lp(-1, -2);
                 if (i > 0) rp.setMargins(0, Theme.dp(10), 0, 0);
@@ -231,7 +241,7 @@ public final class Kit {
             }
             View tile = kpiTile(kpis.get(i));
             LinearLayout.LayoutParams p = wlp(1f);
-            if (i % cols != cols - 1) p.setMarginEnd(Theme.dp(10));
+            if (i % span != span - 1) p.setMarginEnd(Theme.dp(10));
             row.addView(tile, p);
         }
         return root;
@@ -493,6 +503,29 @@ public final class Kit {
             InputMethodManager imm = (InputMethodManager) a.getSystemService(Activity.INPUT_METHOD_SERVICE);
             if (imm != null) imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
         } catch (Exception ignored) { }
+    }
+
+    /** In-content filter bar: live summary of the section's filters, opens the sheet. */
+    public View filterBar(String summary, boolean active, View.OnClickListener onTap) {
+        LinearLayout r = h();
+        r.setGravity(Gravity.CENTER_VERTICAL);
+        r.setBackground(active ? Theme.cardAccent(Theme.GOLD) : Theme.card());
+        r.setPadding(Theme.dp(12), Theme.dp(9), Theme.dp(12), Theme.dp(9));
+        TextView ic = text("◈", 17, active ? Theme.GOLD : Theme.MUTED, true);
+        r.addView(ic, lp(-2, -2));
+        r.addView(space(8));
+        LinearLayout copy = v();
+        copy.addView(text("فیلترها" + (active ? " • فعال" : ""), 10f, active ? Theme.GOLD_SOFT : Theme.MUTED, true), lp(-1, -2));
+        TextView sm = text(summary == null || summary.isEmpty() ? "همه" : summary, 12f, Theme.TEXT, false);
+        sm.setSingleLine(true);
+        sm.setEllipsize(TextUtils.TruncateAt.END);
+        copy.addView(sm, lp(-1, -2));
+        r.addView(copy, wlp(1f));
+        r.addView(space(8));
+        r.addView(text("‹", 20, Theme.GOLD_SOFT, true), lp(-2, -2));
+        Theme.pressable(r);
+        r.setOnClickListener(onTap);
+        return r;
     }
 
     // ---------------- states ----------------

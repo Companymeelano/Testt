@@ -84,8 +84,8 @@ public final class Theme {
             String t = Jalali.todayStr();
             int m = Integer.parseInt(t.substring(5, 7));
             int d = Integer.parseInt(t.substring(8, 10));
-            if ((m == 12 && d >= 29) || (m == 1 && d <= 1)) return "ruby";   // شب یلدا 🍉
-            if (m == 1 && d <= 13) return "gold";                             // نوروز 🌸
+            if ((m == 9 && d == 30) || (m == 10 && d == 1)) return "ruby"; // شب یلدا 🍉 (۳۰ آذر)
+            if ((m == 12 && d >= 29) || (m == 1 && d <= 13)) return "gold"; // نوروز 🌸
             if (m >= 1 && m <= 3) return "emerald";                           // بهار
             if (m >= 4 && m <= 6) return "teal";                              // تابستان
             if (m >= 7 && m <= 9) return "ruby";                              // پاییز
@@ -328,6 +328,8 @@ public final class Theme {
         v.setClickable(true);
         v.setFocusable(true);
         try {
+            // Never nest ripples: repaint passes (e.g. the bottom bar) call this repeatedly.
+            if (v.getBackground() instanceof android.graphics.drawable.RippleDrawable) return;
             // Touch feedback: wrap the current background in a ripple (minSdk 26, always available).
             android.graphics.drawable.Drawable bg = v.getBackground();
             android.content.res.ColorStateList csl =

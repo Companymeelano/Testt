@@ -1118,7 +1118,7 @@ public final class MasterQueries {
                 + ", ISNULL(SUM(CASE WHEN " + isB + " THEN " + amt + " ELSE 0 END),0) AS bouncedAmt"
                 + ", ISNULL(SUM(" + amt + "),0) AS totalAmt"
                 + ", CASE WHEN COUNT_BIG(1)=0 THEN 0 ELSE ROUND(SUM(CASE WHEN " + isB + " THEN 1.0 ELSE 0 END)*100.0/COUNT_BIG(1),1) END AS rate"
-                + ", CASE WHEN COUNT_BIG(1)<2 THEN N'سابقه کم' WHEN " + nBounced + "=0 THEN N'★ خوش‌قول'"
+                + ", CASE WHEN " + nBounced + "=0 AND COUNT_BIG(1)<2 THEN N'سابقه کم' WHEN " + nBounced + "=0 THEN N'★ خوش‌قول'"
                 + " WHEN SUM(CASE WHEN " + isB + " THEN 1.0 ELSE 0 END)/COUNT_BIG(1)<=0.2 THEN N'متوسط' ELSE N'⚠ پرخطر' END AS grade"
                 + " FROM dbo.[" + c.table + "] h" + join + where
                 + " GROUP BY " + custExpr + " ORDER BY 7 DESC, 5 DESC", binds);

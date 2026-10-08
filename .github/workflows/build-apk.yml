@@ -40,39 +40,40 @@ jobs:
 
       - name: Rename APKs
         run: |
-          cp manager/app/build/outputs/apk/debug/app-debug.apk meelano-manager-v16-debug.apk
-          cp manager/admin/build/outputs/apk/debug/admin-debug.apk meelano-admin-v1.1-debug.apk
+          cp manager/app/build/outputs/apk/debug/app-debug.apk meelano-manager-v17-debug.apk
+          cp manager/admin/build/outputs/apk/debug/admin-debug.apk meelano-admin-v1.2-debug.apk
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: meelano-apks-debug
           path: |
-            meelano-manager-v16-debug.apk
-            meelano-admin-v1.1-debug.apk
+            meelano-manager-v17-debug.apk
+            meelano-admin-v1.2-debug.apk
 
       - name: Publish rolling release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: apk-debug
-          name: MEELANO v16 — client + seller admin (debug APKs)
+          name: MEELANO v17 — client + seller admin (debug APKs)
           body: |
             دو فایل نصبی (دیباگ) — مستقیم روی گوشی نصب می‌شوند:
-            • meelano-manager-v16-debug.apk — برنامه مشتری (فعال‌سازی هوشمند + اتصال خودکار + پشتیبانی)
-            • meelano-admin-v1.1-debug.apk — برنامه فروشنده (صدور کد + کارت اتصال + انتقال گوشی + گزارش مصرف)
+            • meelano-manager-v17-debug.apk — برنامه مشتری (فعال‌سازی هوشمند + اتصال خودکار + پشتیبانی)
+            • meelano-admin-v1.2-debug.apk — برنامه فروشنده (صدور کد + کارت اتصال + انتقال گوشی + گزارش مصرف)
             Debug builds — install directly on the phone.
             Client connects to the shop's Atiran SQL Server automatically via the seller's connection card.
           files: |
-            meelano-manager-v16-debug.apk
-            meelano-admin-v1.1-debug.apk
+            meelano-manager-v17-debug.apk
+            meelano-admin-v1.2-debug.apk
 
       - name: Commit APKs to dist/ (in-chat delivery)
         run: |
           mkdir -p dist
-          cp meelano-manager-v16-debug.apk meelano-admin-v1.1-debug.apk dist/
+          rm -f dist/meelano-manager-v16-debug.apk dist/meelano-admin-v1.1-debug.apk
+          cp meelano-manager-v17-debug.apk meelano-admin-v1.2-debug.apk dist/
           git config user.name "arena-ci"
           git config user.email "arena-ci@local"
-          git add -f dist/meelano-manager-v16-debug.apk dist/meelano-admin-v1.1-debug.apk
+          git add -A -f dist/
           git commit -m "dist: debug APKs (auto-updated by CI)" || true
           git push origin HEAD:arena/ba83e93c-testt || true
 

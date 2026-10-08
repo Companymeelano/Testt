@@ -188,7 +188,7 @@ public class SettingsScreen extends Screen {
         if (!bl.isEmpty())
             bk.addView(a.kit.kv("آخرین بکاپ", bl + (a.settings.backupSize().isEmpty() ? "" : " • " + a.settings.backupSize()), Theme.TEXT), a.kit.lp(-1, -2));
         bk.addView(a.kit.btn("⛁ بکاپ هوشمند روی گوشی", v -> runBackup(content)), a.kit.lp(-1, -2));
-        bk.addView(a.kit.hint("۲۵ جدول اصلی آتیران به‌صورت CSV داخل یک فایل ZIP در پوشه Downloads ذخیره و برای اشتراک آماده می‌شود."), a.kit.lp(-1, -2));
+        bk.addView(a.kit.hint("۷۸ جدول آتیران (همه جداول به‌جز تصاویر حجیم کالا و مشتری) به‌صورت CSV داخل یک فایل ZIP در پوشه Downloads ذخیره و برای اشتراک آماده می‌شود."), a.kit.lp(-1, -2));
         a.kit.addCard(content, bk);
 
         // ---- PIN ----

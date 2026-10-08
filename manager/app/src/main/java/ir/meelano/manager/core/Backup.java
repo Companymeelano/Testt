@@ -49,34 +49,22 @@ public final class Backup {
         void onFail(String faError);
     }
 
-    /** Table → Persian title. Order = zip order. */
-    public static final String[][] TABLES = {
-            {"company", "مشخصات شرکت"},
-            {"CUSTOMERS", "مشتریان"},
-            {"cust_act", "گردش مشتری"},
-            {"inventory", "کالاها"},
-            {"ka_act", "گردش کالا"},
-            {"sailfact", "فاکتور فروش"},
-            {"subsailfact", "اقلام فروش"},
-            {"buyfact", "فاکتور خرید"},
-            {"subbuyfact", "اقلام خرید"},
-            {"dar", "قبوض"},
-            {"PosDetails", "جزئیات کارت"},
-            {"getchk", "چک دریافتی"},
-            {"putchk", "چک پرداختی"},
-            {"visitors", "ویزیتورها"},
-            {"masir", "مسیرها"},
-            {"BANK", "بانک‌ها"},
-            {"ban_act", "گردش بانک"},
-            {"COW", "صندوق‌ها"},
-            {"havaleh", "حواله‌ها"},
-            {"sys_users", "کاربران"},
-            {"back_sanad", "اسناد برگشتی"},
-            {"b_az_mosh_sanad", "برگشت از مشتری"},
-            {"kasr_e_sanad", "کسری انبار"},
-            {"ExternalCosts", "هزینه‌های جانبی"},
-            {"IndirectCost", "هزینه غیرمستقیم"},
-    };
+    /**
+     * Table → Persian title, derived from the single source of truth
+     * ({@link AtiranSchema#TABLES}). Order = zip order. The two product/customer
+     * photo tables are skipped — their blobs would balloon a phone backup.
+     */
+    public static final String[][] TABLES = buildTables();
+
+    private static String[][] buildTables() {
+        java.util.List<String[]> out = new java.util.ArrayList<>();
+        for (String[] t : AtiranSchema.TABLES) {
+            if (t == null || t.length < 2) continue;
+            if ("ka_image".equalsIgnoreCase(t[0]) || "cus_image".equalsIgnoreCase(t[0])) continue;
+            out.add(t);
+        }
+        return out.toArray(new String[0][]);
+    }
 
     private static final int MAX_ROWS = 20000;
 

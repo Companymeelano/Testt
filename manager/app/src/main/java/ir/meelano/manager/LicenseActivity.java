@@ -1,11 +1,15 @@
 package ir.meelano.manager;
 
 import android.app.Activity;
+import android.content.BroadcastReceiver;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.graphics.Typeface;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
@@ -20,21 +24,29 @@ import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.LicenseStore;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.Net;
+import ir.meelano.manager.core.SmsIo;
+import ir.meelano.manager.core.SmsReceiver;
 import ir.meelano.manager.core.Tamper;
 import ir.meelano.manager.core.Usage;
 import ir.meelano.manager.data.Meta;
 import ir.meelano.manager.data.Repo;
 import ir.meelano.manager.data.Settings;
+import ir.meelano.manager.ui.Card3D;
 import ir.meelano.manager.ui.Kit;
 import ir.meelano.manager.ui.Theme;
 import ir.meelano.licensing.License;
 
 /**
- * Offline license gate, v16: Wi-Fi check → device code + request form →
- * activation pack → automatic server connection (seller's encrypted card) →
+ * Offline license gate, v17: 3D hero + Wi-Fi check → device code + request
+ * form with DIRECT SMS send → activation pack with SMS AUTO-APPLY → automatic
+ * server connection (seller's encrypted card, also SMS auto-applied) →
  * support footer. Blocks MainActivity until {@link LicenseStore#unlocked}.
+ * Zero copy/paste: the request flies straight to the seller and the reply
+ * applies itself the moment it lands.
  */
 public class LicenseActivity extends Activity {
+
+    private static final int REQ_RECV = 906;
 
     private Kit kit;
     private Settings settings;
@@ -44,6 +56,11 @@ public class LicenseActivity extends Activity {
     private TextView wifiDot;
     private TextView wifiTxt;
     private TextView connStatus;
+    private TextView actSmsHint;
+
+    private String pendingSmsPhone = "";
+    private String pendingSmsText = "";
+    private BroadcastReceiver smsPing;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -63,6 +80,7 @@ public class LicenseActivity extends Activity {
             device = "";
         }
         buildUi();
+        ensureRecvPerm();
     }
 
     @Override
@@ -72,6 +90,49 @@ public class LicenseActivity extends Activity {
         // dialer/browser) — refresh the Wi-Fi row in place (no rebuild, so
         // typed text in the form fields is never lost).
         updateWifiRow();
+        try {
+            if (smsPing == null) {
+                smsPing = new BroadcastReceiver() {
+                    @Override
+                    public void onReceive(Context c, Intent i) {
+                        consumeSms();
+                    }
+                };
+            }
+            IntentFilter ff = new IntentFilter(SmsReceiver.ACTION_INTERNAL);
+            if (Build.VERSION.SDK_INT >= 33) registerReceiver(smsPing, ff, Context.RECEIVER_NOT_EXPORTED);
+            else registerReceiver(smsPing, ff);
+        } catch (Exception ignored) { }
+        // A reply SMS may have landed while we were away — apply it instantly.
+        consumeSms();
+    }
+
+    @Override
+    protected void onPause() {
+        try {
+            unregisterReceiver(smsPing);
+        } catch (Exception ignored) { }
+        super.onPause();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int req, String[] perms, int[] grants) {
+        super.onRequestPermissionsResult(req, perms, grants);
+        try {
+            if (req == SmsIo.REQ_SEND) {
+                boolean g = grants != null && grants.length > 0
+                        && grants[0] == PackageManager.PERMISSION_GRANTED;
+                if (g && pendingSmsText != null && !pendingSmsText.isEmpty()) {
+                    doSmsSend(pendingSmsPhone, pendingSmsText);
+                } else if (!g) {
+                    kit.toast("بدون دسترسی پیامک، از «ارسال با برنامه دیگر» استفاده کنید");
+                }
+                pendingSmsPhone = "";
+                pendingSmsText = "";
+            } else if (req == REQ_RECV) {
+                updateActSmsHint();
+            }
+        } catch (Exception ignored) { }
     }
 
     // ---------- UI ----------
@@ -82,20 +143,14 @@ public class LicenseActivity extends Activity {
         int pad = Theme.dp(16);
         box.setPadding(pad, pad, pad, pad);
 
-        LinearLayout.LayoutParams llp =
-                new LinearLayout.LayoutParams(Theme.dp(76), Theme.dp(76));
-        llp.gravity = Gravity.CENTER;
-        box.addView(kit.logo(76), llp);
-        TextView title = kit.text("فعال‌سازی میلانو منیجر", 21, Theme.TEXT, true);
-        title.setGravity(Gravity.CENTER);
-        box.addView(title, kit.lp(-1, -2));
-        TextView sub = kit.text("کمتر از ۲ دقیقه • بدون نیاز به اینترنت", 12,
-                Theme.MUTED, false);
-        sub.setGravity(Gravity.CENTER);
-        box.addView(sub, kit.lp(-1, -2));
-        box.addView(kit.gap(10));
+        LicenseStore.Status s = LicenseStore.check(this);
+        Card3D.mount(box, Card3D.hero(this, kit, R.drawable.lic_shield, Theme.GOLD,
+                "فعال‌سازی میلانو منیجر",
+                "کمتر از ۲ دقیقه • بدون نیاز به اینترنت" + (s.ok ? "" : " • با پیامک مستقیم"),
+                s.ok ? "✓ لایسنس فعال است" : "نیاز به فعال‌سازی",
+                s.ok ? Theme.SUCCESS : Theme.WARNING));
 
-        buildStatusCard(box);
+        buildStatusCard(box, s);
         buildWifiCard(box);
         buildRequestCard(box);
         buildActivationCard(box);
@@ -116,11 +171,12 @@ public class LicenseActivity extends Activity {
 
     // ---- status ----
 
-    private void buildStatusCard(LinearLayout box) {
-        LicenseStore.Status s = LicenseStore.check(this);
-        LinearLayout c = kit.card(s.ok ? Theme.GOLD : Theme.DANGER);
+    private void buildStatusCard(LinearLayout box, LicenseStore.Status s) {
+        LinearLayout c = Card3D.card(this, s.ok ? Theme.SUCCESS : Theme.DANGER);
+        c.addView(Card3D.stepRow(this, kit, "✦", s.ok ? Theme.SUCCESS : Theme.DANGER,
+                s.ok ? "وضعیت لایسنس" : "فعال‌سازی لازم است"), kit.lp(-1, -2));
+        c.addView(kit.gap(6));
         if (s.ok) {
-            c.addView(kit.text("✓ لایسنس فعال است", 15, Theme.TEXT, true), kit.lp(-1, -2));
             c.addView(kit.kv("طرح", "«" + License.planFa(s.plan) + "»", Theme.GOLD_SOFT),
                     kit.lp(-1, -2));
             if (s.plan == License.P_PERM) {
@@ -142,13 +198,12 @@ public class LicenseActivity extends Activity {
             c.addView(kit.btnGhost("ارسال گزارش مصرف به فروشنده", Theme.TEAL, v -> shareUsage()),
                     kit.lp(-1, -2));
         } else {
-            c.addView(kit.text("فعال‌سازی لازم است", 15, Theme.TEXT, true), kit.lp(-1, -2));
             String msg = "none".equals(s.reason)
                     ? "برنامه هنوز فعال نشده — مراحل زیر را به ترتیب انجام دهید."
                     : s.fa;
             c.addView(kit.hint(msg), kit.lp(-1, -2));
         }
-        kit.addCard(box, c);
+        Card3D.mount(box, c);
     }
 
     private static int leftColor(long daysLeft) {
@@ -160,9 +215,10 @@ public class LicenseActivity extends Activity {
     // ---- Wi-Fi ----
 
     private void buildWifiCard(LinearLayout box) {
-        LinearLayout c = kit.card(Theme.TEAL);
-        c.addView(kit.text("۱) اتصال به وای‌فای فروشگاه", 14.5f, Theme.TEXT, true),
+        LinearLayout c = Card3D.card(this, Theme.TEAL);
+        c.addView(Card3D.stepRow(this, kit, "۱", Theme.TEAL, "اتصال به وای‌فای فروشگاه"),
                 kit.lp(-1, -2));
+        c.addView(kit.gap(6));
         LinearLayout row = kit.h();
         row.setGravity(Gravity.CENTER_VERTICAL);
         wifiDot = kit.text("●", 16, Theme.WARNING, true);
@@ -175,7 +231,7 @@ public class LicenseActivity extends Activity {
                 + "اگر به وای‌فای وصل نیستید، ابتدا وصل شوید و «بررسی مجدد» را بزنید."),
                 kit.lp(-1, -2));
         c.addView(kit.btnGhost("بررسی مجدد", Theme.TEAL, v -> updateWifiRow()), kit.lp(-1, -2));
-        kit.addCard(box, c);
+        Card3D.mount(box, c);
     }
 
     private void updateWifiRow() {
@@ -200,9 +256,14 @@ public class LicenseActivity extends Activity {
     // ---- request ----
 
     private void buildRequestCard(LinearLayout box) {
-        LinearLayout c = kit.card(Theme.GOLD);
-        c.addView(kit.text("۲) درخواست لایسنس از فروشنده", 14.5f, Theme.TEXT, true),
-                kit.lp(-1, -2));
+        LinearLayout c = Card3D.card(this, Theme.GOLD);
+        LinearLayout head = kit.h();
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        head.addView(Card3D.stepRow(this, kit, "۲", Theme.GOLD, "درخواست لایسنس از فروشنده"),
+                kit.wlp(1f));
+        head.addView(Card3D.glyph(this, R.drawable.lic_chat, Theme.VIOLET, 44));
+        c.addView(head, kit.lp(-1, -2));
+        c.addView(kit.gap(4));
         c.addView(kit.text("کد دستگاه شما", 12f, Theme.MUTED, true), kit.lp(-1, -2));
         TextView dev = kit.text(device.isEmpty() ? "—" : prettyDev(device), 26,
                 Theme.GOLD_SOFT, true);
@@ -221,7 +282,7 @@ public class LicenseActivity extends Activity {
             fPhone.setInputType(android.text.InputType.TYPE_CLASS_PHONE);
         } catch (Exception ignored) { }
         final EditText fCity = kit.edit("شهر", "");
-        final EditText fSeller = kit.edit("شماره فروشنده (اختیاری، برای ارسال سریع)", "");
+        final EditText fSeller = kit.edit("شماره فروشنده (برای ارسال مستقیم پیامک)", "");
         try {
             fSeller.setInputType(android.text.InputType.TYPE_CLASS_PHONE);
             fSeller.setText(LicenseStore.sellerPhone(this));
@@ -231,22 +292,66 @@ public class LicenseActivity extends Activity {
             p.setMargins(0, Theme.dp(4), 0, Theme.dp(4));
             c.addView(e, p);
         }
-        c.addView(kit.btnGold("ساخت و ارسال متن درخواست", v ->
+        c.addView(kit.btnGold("✦ ارسال مستقیم با پیامک", v ->
+                directSendRequest(txt(fName), txt(fFamily), txt(fShop), txt(fPhone),
+                        txt(fCity), txt(fSeller))), kit.lp(-1, -2));
+        c.addView(kit.gap(6));
+        c.addView(kit.btnGhost("ارسال با واتساپ / برنامه دیگر", Theme.MUTED, v ->
                 shareRequest(txt(fName), txt(fFamily), txt(fShop), txt(fPhone),
                         txt(fCity), txt(fSeller))), kit.lp(-1, -2));
-        kit.addCard(box, c);
+        Card3D.mount(box, c);
     }
 
-    private void shareRequest(String name, String family, String shop, String phone,
-                              String city, String seller) {
+    private String buildRequestMsg(String name, String family, String shop, String phone,
+                                   String city) {
         String line = License.requestLine(device, name, family, shop, phone, city);
-        LicenseStore.setSellerPhone(this, seller);
         String use = Usage.reportLine(this, device);
-        String msg = "درخواست فعال‌سازی میلانو منیجر\n" + line
+        return "درخواست فعال‌سازی میلانو منیجر\n" + line
                 + (use.isEmpty() ? "" : ("\n" + use))
                 + "\nنام: " + name + " " + family
                 + "\nفروشگاه: " + shop + " — " + city
                 + "\nموبایل: " + phone;
+    }
+
+    /** Zero-copy path: the request flies straight to the seller's phone. */
+    private void directSendRequest(String name, String family, String shop, String phone,
+                                   String city, String seller) {
+        String dest = SmsIo.cleanPhone(seller);
+        if (dest.length() < 10) {
+            kit.toast("برای ارسال مستقیم، شماره فروشنده را کامل وارد کنید");
+            return;
+        }
+        LicenseStore.setSellerPhone(this, seller);
+        String msg = buildRequestMsg(name, family, shop, phone, city);
+        if (!SmsIo.canSend(this)) {
+            pendingSmsPhone = dest;
+            pendingSmsText = msg;
+            kit.toast("برای ارسال مستقیم پیامک، دسترسی را تأیید کنید");
+            SmsIo.askSend(this);
+            return;
+        }
+        doSmsSend(dest, msg);
+    }
+
+    private void doSmsSend(String dest, String msg) {
+        kit.toast("در حال ارسال پیامک…");
+        SmsIo.send(this, dest, msg, new SmsIo.Cb() {
+            @Override
+            public void ok() {
+                kit.toast("✓ درخواست با پیامک ارسال شد؛ منتظر پاسخ فروشنده باشید");
+            }
+
+            @Override
+            public void fail(String fa) {
+                kit.toast(fa);
+            }
+        });
+    }
+
+    private void shareRequest(String name, String family, String shop, String phone,
+                              String city, String seller) {
+        LicenseStore.setSellerPhone(this, seller);
+        String msg = buildRequestMsg(name, family, shop, phone, city);
         copyText("درخواست فعال‌سازی", msg);
         try {
             String sms = seller.replaceAll("[^0-9+]", "");
@@ -291,9 +396,17 @@ public class LicenseActivity extends Activity {
     // ---- activation ----
 
     private void buildActivationCard(LinearLayout box) {
-        LinearLayout c = kit.card(Theme.VIOLET);
-        c.addView(kit.text("۳) وارد کردن کد فعال‌سازی", 14.5f, Theme.TEXT, true),
-                kit.lp(-1, -2));
+        LinearLayout c = Card3D.card(this, Theme.VIOLET);
+        LinearLayout head = kit.h();
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        head.addView(Card3D.stepRow(this, kit, "۳", Theme.VIOLET, "وارد کردن کد فعال‌سازی"),
+                kit.wlp(1f));
+        head.addView(Card3D.glyph(this, R.drawable.lic_bolt, Theme.TEAL, 44));
+        c.addView(head, kit.lp(-1, -2));
+        c.addView(kit.gap(4));
+        actSmsHint = kit.hint("");
+        c.addView(actSmsHint, kit.lp(-1, -2));
+        updateActSmsHint();
         final EditText fPack = kit.edit("کد ۳۹ حرفی فروشنده", "");
         try {
             fPack.setTypeface(Typeface.MONOSPACE);
@@ -302,7 +415,39 @@ public class LicenseActivity extends Activity {
         p.setMargins(0, Theme.dp(4), 0, Theme.dp(8));
         c.addView(fPack, p);
         c.addView(kit.btnGold("فعال‌سازی", v -> doActivate(txt(fPack))), kit.lp(-1, -2));
-        kit.addCard(box, c);
+        Card3D.mount(box, c);
+    }
+
+    private boolean recvGranted() {
+        try {
+            if (Build.VERSION.SDK_INT < 23) return true;
+            return checkSelfPermission(android.Manifest.permission.RECEIVE_SMS)
+                    == PackageManager.PERMISSION_GRANTED;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private void ensureRecvPerm() {
+        try {
+            if (!recvGranted()) {
+                kit.toast("برای اعمال خودکار کد فعال‌سازی، دسترسی پیامک را تأیید کنید");
+                requestPermissions(new String[]{android.Manifest.permission.RECEIVE_SMS}, REQ_RECV);
+            }
+        } catch (Exception ignored) { }
+    }
+
+    private void updateActSmsHint() {
+        if (actSmsHint == null) return;
+        try {
+            if (recvGranted()) {
+                actSmsHint.setText("✦ دریافت خودکار فعال است — پیامک فروشنده به‌محض رسیدن، خودش اعمال می‌شود؛ فقط منتظر بمانید.");
+                actSmsHint.setTextColor(Theme.TEAL);
+            } else {
+                actSmsHint.setText("برای اعمال خودکار پیامک فروشنده، دسترسی خواندن پیامک لازم است — یا کد را دستی وارد کنید.");
+                actSmsHint.setTextColor(Theme.MUTED);
+            }
+        } catch (Exception ignored) { }
     }
 
     private void doActivate(String in) {
@@ -322,14 +467,42 @@ public class LicenseActivity extends Activity {
         }
     }
 
+    // ---- SMS auto-apply ----
+
+    /**
+     * Apply whatever the seller's SMS staged (pack and/or connection card).
+     * Called on every resume + instantly while open via the internal ping.
+     */
+    private void consumeSms() {
+        try {
+            LicenseStore.SmsPending s = LicenseStore.takePendingSms(this);
+            boolean havePack = s.pack != null && !s.pack.isEmpty();
+            boolean haveCard = s.card != null && !s.card.isEmpty();
+            if (!havePack && !haveCard) return;
+            if (havePack) {
+                LicenseStore.Status st = LicenseStore.activate(this, s.pack);
+                if (st.ok) {
+                    kit.toast("✦ کد فعال‌سازی از پیامک اعمال شد!");
+                    buildUi();
+                } else {
+                    kit.toast(st.fa);
+                }
+            }
+            if (haveCard) applyCard(s.card);
+        } catch (Exception ignored) { }
+    }
+
     // ---- automatic server connection ----
 
     private void buildConnCard(LinearLayout box) {
-        LinearLayout c = kit.card(Theme.SUCCESS);
-        c.addView(kit.text("۴) اتصال خودکار به سرور فروشگاه", 14.5f, Theme.TEXT, true),
+        LinearLayout c = Card3D.card(this, Theme.SUCCESS);
+        c.addView(Card3D.stepRow(this, kit, "۴", Theme.SUCCESS, "اتصال خودکار به سرور فروشگاه"),
                 kit.lp(-1, -2));
+        c.addView(kit.gap(6));
         connStatus = kit.text(connSummary(), 13, connConfiguredColor(), false);
         c.addView(connStatus, kit.lp(-1, -2));
+        c.addView(kit.hint("✦ اگر فروشنده کارت اتصال را پیامک کند، خودکار ثبت و تست می‌شود — بدون چسباندن."),
+                kit.lp(-1, -2));
         final EditText fCard = kit.edit("کارت اتصال فروشنده (یک متن طولانی)…", "");
         fCard.setMinLines(3);
         try {
@@ -355,7 +528,7 @@ public class LicenseActivity extends Activity {
         c.addView(kit.hint("کارت اتصال را فروشنده برایتان می‌فرستد؛ با یک لمس، "
                 + "آدرس سرور و همه تنظیمات به‌صورت خودکار ثبت و تست می‌شود — "
                 + "نیازی به وارد کردن هیچ عددی نیست."), kit.lp(-1, -2));
-        kit.addCard(box, c);
+        Card3D.mount(box, c);
     }
 
     private String connSummary() {
@@ -431,8 +604,10 @@ public class LicenseActivity extends Activity {
     // ---- support ----
 
     private void buildSupportCard(LinearLayout box) {
-        LinearLayout c = kit.card(Theme.GOLD);
-        c.addView(kit.text("✦ پشتیبانی میلانو", 14.5f, Theme.TEXT, true), kit.lp(-1, -2));
+        LinearLayout c = Card3D.card(this, Theme.GOLD);
+        c.addView(Card3D.stepRow(this, kit, "✦", Theme.GOLD, "پشتیبانی میلانو"),
+                kit.lp(-1, -2));
+        c.addView(kit.gap(6));
         c.addView(kit.btnGhost("🌐  " + Brand.SITE_LABEL, Theme.GOLD,
                 v -> Brand.openSite(this)), kit.lp(-1, -2));
         for (String ph : Brand.PHONES) {
@@ -443,7 +618,7 @@ public class LicenseActivity extends Activity {
         TextView tag = kit.text(Brand.TAGLINE, 11.5f, Theme.MUTED, false);
         tag.setGravity(Gravity.CENTER);
         c.addView(tag, kit.lp(-1, -2));
-        kit.addCard(box, c);
+        Card3D.mount(box, c);
     }
 
     // ---------- misc ----------

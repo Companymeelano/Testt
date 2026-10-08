@@ -119,7 +119,9 @@ public class AdminDb extends SQLiteOpenHelper {
         } catch (Exception ignored) { }
         if (id < 0) {
             try {
-                db.update("customers", v, "dev=?", new String[]{s(dev)});
+                ContentValues u = new ContentValues(v);
+                u.remove("created"); // keep the original registration date on re-upsert
+                db.update("customers", u, "dev=?", new String[]{s(dev)});
             } catch (Exception ignored) { }
             Customer c = byDev(dev);
             return c == null ? -1 : c.id;

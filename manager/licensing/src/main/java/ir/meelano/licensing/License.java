@@ -261,10 +261,10 @@ public final class License {
             String line = raw.trim();
             if (!line.startsWith(REQ_PREFIX + "|")) continue;
             String[] p = line.split("\\|", -1);
-            if (p.length < 7) return null;
+            if (p.length < 7) continue;
             Req r = new Req();
             r.dev = normalize(p[1]);
-            if (r.dev.length() != 8) return null;
+            if (r.dev.length() != 8) continue;
             r.name = p[2].trim();
             r.family = p[3].trim();
             r.shop = p[4].trim();

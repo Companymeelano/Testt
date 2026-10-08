@@ -74,11 +74,36 @@ public final class Charts {
         Formatter fmt = COMPACT;
         PickListener listener;
 
+        float downX, downY;
+        boolean tracking;
+        int touchSlop;
+
         Base(Context c) {
             super(c);
             text.setTypeface(Theme.face(false));
             text.setTextSize(Theme.dp(10));
             setMinimumHeight(Theme.dp(120));
+            try {
+                touchSlop = android.view.ViewConfiguration.get(c).getScaledTouchSlop();
+            } catch (Exception e) {
+                touchSlop = Theme.dp(12);
+            }
+        }
+
+        /** True when the gesture is a horizontal scrub (selection); vertical drags scroll. */
+        boolean scrubbing(float x, float y) {
+            float dx = Math.abs(x - downX), dy = Math.abs(y - downY);
+            return dx > touchSlop && dx > dy;
+        }
+
+        boolean tapped(float x, float y) {
+            return Math.abs(x - downX) <= touchSlop && Math.abs(y - downY) <= touchSlop;
+        }
+
+        void holdParent() {
+            try {
+                if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(true);
+            } catch (Exception ignored) { }
         }
 
         void animateIn() {
@@ -245,23 +270,42 @@ public final class Charts {
 
         @Override
         public boolean onTouchEvent(MotionEvent e) {
-            if ((e.getAction() == MotionEvent.ACTION_DOWN || e.getAction() == MotionEvent.ACTION_MOVE) && !data.isEmpty()) {
-                int n = data.size();
-                float best = Float.MAX_VALUE;
-                int idx = 0;
-                for (int i = 0; i < n; i++) {
-                    float x = n == 1 ? plot.centerX() : plot.right - plot.width() * i / (n - 1);
-                    float d = Math.abs(x - e.getX());
-                    if (d < best) { best = d; idx = i; }
-                }
-                if (idx != selected) {
-                    selected = idx;
-                    invalidate();
-                    fire(idx);
+            int act = e.getAction();
+            if (act == MotionEvent.ACTION_DOWN && !data.isEmpty()) {
+                downX = e.getX();
+                downY = e.getY();
+                tracking = true;
+                return true;
+            }
+            if (act == MotionEvent.ACTION_MOVE && tracking && !data.isEmpty()) {
+                if (scrubbing(e.getX(), e.getY())) {
+                    holdParent();
+                    selectNear(e.getX());
                 }
                 return true;
             }
+            if (act == MotionEvent.ACTION_UP && tracking && !data.isEmpty() && tapped(e.getX(), e.getY())) {
+                selectNear(e.getX());
+            }
+            if (act == MotionEvent.ACTION_UP || act == MotionEvent.ACTION_CANCEL) tracking = false;
             return super.onTouchEvent(e);
+        }
+
+        private void selectNear(float x) {
+            int n = data.size();
+            if (n == 0 || plot.width() <= 0) return;
+            float best = Float.MAX_VALUE;
+            int idx = 0;
+            for (int i = 0; i < n; i++) {
+                float px = n == 1 ? plot.centerX() : plot.right - plot.width() * i / (n - 1);
+                float d = Math.abs(px - x);
+                if (d < best) { best = d; idx = i; }
+            }
+            if (idx != selected) {
+                selected = idx;
+                invalidate();
+                fire(idx);
+            }
         }
     }
 

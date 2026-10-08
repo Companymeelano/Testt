@@ -1,6 +1,11 @@
 package ir.meelano.admin;
 
 import android.app.Activity;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
@@ -50,6 +55,105 @@ public class AdminActivity extends Activity {
             }
         } catch (Exception ignored) { }
         show(this::showHome);
+        ensureRecvPerm();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // A customer request SMS may have landed while we were away — jump
+        // straight to issuing. registerReceiver: instant pickup while open.
+        try {
+            if (smsPing == null) {
+                smsPing = new BroadcastReceiver() {
+                    @Override
+                    public void onReceive(Context c, Intent i) {
+                        consumeSmsReq();
+                    }
+                };
+            }
+            IntentFilter ff = new IntentFilter(SmsReceiver.ACTION_INTERNAL);
+            if (android.os.Build.VERSION.SDK_INT >= 33) {
+                registerReceiver(smsPing, ff, Context.RECEIVER_NOT_EXPORTED);
+            } else {
+                registerReceiver(smsPing, ff);
+            }
+        } catch (Exception ignored) { }
+        consumeSmsReq();
+    }
+
+    @Override
+    protected void onPause() {
+        try {
+            unregisterReceiver(smsPing);
+        } catch (Exception ignored) { }
+        super.onPause();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int req, String[] perms, int[] grants) {
+        super.onRequestPermissionsResult(req, perms, grants);
+        try {
+            if (req == SmsIo.REQ_SEND) {
+                boolean g = grants != null && grants.length > 0
+                        && grants[0] == PackageManager.PERMISSION_GRANTED;
+                String d = pendingSmsPhone;
+                String t = pendingSmsText;
+                pendingSmsPhone = "";
+                pendingSmsText = "";
+                if (g && t != null && !t.isEmpty()) directSms(d, t);
+                else if (!g) AdminKit.toast(this, "بدون دسترسی پیامک، از «اشتراک‌گذاری» استفاده کنید");
+            }
+        } catch (Exception ignored) { }
+    }
+
+    /** Zero-copy path: pack / connection card flies straight to the customer. */
+    private void directSms(String rawPhone, String text) {
+        String dest = SmsIo.cleanPhone(rawPhone);
+        if (dest.length() < 10) {
+            AdminKit.toast(this, "شماره موبایل مشتری معتبر نیست");
+            return;
+        }
+        if (!SmsIo.canSend(this)) {
+            pendingSmsPhone = dest;
+            pendingSmsText = text;
+            AdminKit.toast(this, "برای ارسال مستقیم پیامک، دسترسی را تأیید کنید");
+            SmsIo.askSend(this);
+            return;
+        }
+        AdminKit.toast(this, "در حال ارسال پیامک…");
+        SmsIo.send(this, dest, text, new SmsIo.Cb() {
+            @Override
+            public void ok() {
+                AdminKit.toast(AdminActivity.this, "✓ با پیامک ارسال شد");
+            }
+
+            @Override
+            public void fail(String fa) {
+                AdminKit.toast(AdminActivity.this, fa);
+            }
+        });
+    }
+
+    private void ensureRecvPerm() {
+        try {
+            if (checkSelfPermission(android.Manifest.permission.RECEIVE_SMS)
+                    != PackageManager.PERMISSION_GRANTED) {
+                AdminKit.toast(this, "برای دریافت خودکار درخواست مشتری، دسترسی پیامک را تأیید کنید");
+                requestPermissions(new String[]{android.Manifest.permission.RECEIVE_SMS}, REQ_RECV);
+            }
+        } catch (Exception ignored) { }
+    }
+
+    /** Consume a staged customer-request SMS (once) and jump to issuing. */
+    private void consumeSmsReq() {
+        try {
+            String sms = SmsReceiver.takePendingReq(this);
+            if (sms == null || sms.isEmpty()) return;
+            final String f = sms;
+            AdminKit.toast(this, "✦ درخواست مشتری از پیامک رسید");
+            show(() -> showRequestSms(f));
+        } catch (Exception ignored) { }
     }
 
     @Override
@@ -204,7 +308,7 @@ public class AdminActivity extends Activity {
         LinearLayout out = AdminKit.vbox(this);
         box.addView(out);
 
-        bParse.setOnClickListener(v -> {
+        View.OnClickListener parse = v -> {
             out.removeAllViews();
             String pasted = AdminKit.txt(paste);
             License.Req req = License.parseRequest(pasted);
@@ -382,6 +486,7 @@ public class AdminActivity extends Activity {
             ctx.family = AdminKit.txt(fFamily);
             ctx.shop = AdminKit.txt(fShop);
             ctx.phone = AdminKit.txt(fPhone);
+            ctx.city = AdminKit.txt(ft.txt(fPhone);
             ctx.city = AdminKit.txt(fCity);
             ctx.note = AdminKit.txt(fNote);
             if (ctx.dev.length() != 8) {
@@ -480,6 +585,18 @@ public class AdminActivity extends Activity {
         bShare.setOnClickListener(v -> AdminKit.share(this, "ارسال کد فعال‌سازی",
                 shareText(l)));
         box.addView(bShare);
+
+        String smsPhone = "";
+        try {
+            AdminDb.Customer cc0 = l.customerId > 0 ? db.byId(l.customerId) : null;
+            if (cc0 != null) smsPhone = cc0.phone;
+        } catch (Exception ignored) { }
+        if (smsPhone != null && SmsIo.cleanPhone(smsPhone).length() >= 10) {
+            final String fphone = smsPhone;
+            Button bSms = AdminKit.btn(this, "✦ ارسال مستقیم با پیامک", true);
+            bSms.setOnClickListener(v -> directSms(fphone, shareText(l)));
+            box.addView(bSms);
+        }
 
         if (l.customerId > 0) {
             Button bCard = AdminKit.btn(this, "کارت اتصال برای همین مشتری", false);
@@ -758,9 +875,7 @@ public class AdminActivity extends Activity {
         AdminKit.infoRow(card, this, "انقضا", expText(l), false);
         AdminKit.infoRow(card, this, "کد دستگاه", prettyDev(l.dev), true);
         if (!l.note.isEmpty()) AdminKit.infoRow(card, this, "یادداشت", l.note, false);
-        box.addView(card);
-
-        Button bCopy = AdminKit.btn(this, "کپی کد", false);
+   nKit.btn(this, "کپی کد", false);
         bCopy.setOnClickListener(v -> {
             AdminKit.copy(this, "کد فعال‌سازی", l.pack);
             AdminKit.toast(this, "کد کپی شد");
@@ -953,11 +1068,17 @@ public class AdminActivity extends Activity {
                 AdminKit.toast(this, "کارت کپی شد");
             });
             out.addView(bCopy);
+            final String fmsg = "کارت اتصال میلانو منیجر (" + fname + ")\n" + fcard
+                    + "\nراهنما: در صفحه فعال‌سازی، بخش ۴، این متن را بچسبانید و «ثبت و تست اتصال» را بزنید.";
             Button bShare = AdminKit.btn(this, "اشتراک‌گذاری برای مشتری", false);
-            bShare.setOnClickListener(x -> AdminKit.share(this, "ارسال کارت اتصال",
-                    "کارت اتصال میلانو منیجر (" + fname + ")\n" + fcard
-                            + "\nراهنما: در صفحه فعال‌سازی، بخش ۴، این متن را بچسبانید و «ثبت و تست اتصال» را بزنید."));
+            bShare.setOnClickListener(x -> AdminKit.share(this, "ارسال کارت اتصال", fmsg));
             out.addView(bShare);
+            final String fphone = cc.phone;
+            if (fphone != null && SmsIo.cleanPhone(fphone).length() >= 10) {
+                Button bSms = AdminKit.btn(this, "✦ ارسال مستقیم با پیامک", true);
+                bSms.setOnClickListener(x -> directSms(fphone, fmsg));
+                out.addView(bSms);
+            }
         });
         box.addView(bMint);
         root(box);
@@ -990,7 +1111,7 @@ public class AdminActivity extends Activity {
 
         Button bGo = AdminKit.btn(this, "انتقال و صدور کد تازه", true);
         confirmStep(bGo, "تأیید انتقال؟ کدهای قبلی باطل می‌شوند", () -> {
-            String nd = AdminKit.txt(fDev).toUpperCase().replaceAll("[^A-Z0-9]", "");
+            String nd = License.normalize(AdminKit.txt(fDev));
             if (nd.length() != 8) {
                 AdminKit.toast(this, "کد دستگاه باید ۸ حرف باشد");
                 return;
@@ -1047,6 +1168,7 @@ public class AdminActivity extends Activity {
                     .append(csv(c.name)).append(',').append(csv(c.family)).append(',')
                     .append(csv(c.shop)).append(',').append(csv(c.phone)).append(',')
                     .append(csv(c.city)).append(',').append(csv(c.dev))
+                    .append(',')
                     .append(",,,,")
                     .append(c.lastUseDay > 0 ? csv(jalali(c.lastUseDay)) : "").append(',')
                     .append(c.totalMin).append(',').append(c.opens).append('\n');

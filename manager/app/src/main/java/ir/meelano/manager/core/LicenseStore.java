@@ -167,4 +167,40 @@ public final class LicenseStore {
             prefs(c).edit().putString("seller_phone", phone == null ? "" : phone.trim()).apply();
         } catch (Exception ignored) { }
     }
+
+    // ---------------- direct-SMS inbox (pack / connection card staging) ----------------
+    public static final class SmsPending {
+        public String pack = "";
+        public String card = "";
+    }
+
+    /** Stage an SMS-validated pack and/or card (merges with an already-staged half). */
+    public static void addPendingSms(Context c, String pack, String card) {
+        try {
+            android.content.SharedPreferences p = prefs(c);
+            String oldPack = p.getString("sms_pack", "");
+            String oldCard = p.getString("sms_card", "");
+            if (pack == null) pack = oldPack;
+            if (card == null) card = oldCard;
+            p.edit().putString("sms_pack", pack == null ? "" : pack)
+                    .putString("sms_card", card == null ? "" : card)
+                    .putLong("sms_at", System.currentTimeMillis()).apply();
+        } catch (Exception ignored) { }
+    }
+
+    /** Take + clear the staged SMS payload (empty strings when nothing arrived). */
+    public static SmsPending takePendingSms(Context c) {
+        SmsPending s = new SmsPending();
+        try {
+            android.content.SharedPreferences p = prefs(c);
+            s.pack = p.getString("sms_pack", "");
+            s.card = p.getString("sms_card", "");
+            if (s.pack == null) s.pack = "";
+            if (s.card == null) s.card = "";
+            if (!s.pack.isEmpty() || !s.card.isEmpty()) {
+                p.edit().remove("sms_pack").remove("sms_card").remove("sms_at").apply();
+            }
+        } catch (Exception ignored) { }
+        return s;
+    }
 }

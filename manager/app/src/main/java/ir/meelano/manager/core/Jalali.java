@@ -148,7 +148,12 @@ public final class Jalali {
                     int mo = Integer.parseInt(head.substring(5, 7));
                     int d = Integer.parseInt(head.substring(8, 10));
                     if (mo < 1 || mo > 12 || d < 1 || d > 31) return "";
-                    return format(g2d(y, mo, d));
+                    // Real Gregorian datetimes live in 1700–2300; earlier dash dates
+                    // («1405-07-06») are Jalali with dash separators — normalize as Jalali.
+                    if (y >= 1700 && y <= 2300) return format(g2d(y, mo, d));
+                    if (y >= 1300 && y <= 1600 && d <= daysInMonth(y, mo))
+                        return String.format(Locale.US, "%04d/%02d/%02d", y, mo, d);
+                    return "";
                 } catch (Exception e) {
                     return "";
                 }

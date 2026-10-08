@@ -12,6 +12,10 @@ Starting a Gradle Daemon (subsequent builds will be faster)
 > Task :app:preBuild UP-TO-DATE
 > Task :app:preDebugBuild UP-TO-DATE
 > Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :licensing:compileJava
+> Task :licensing:processResources NO-SOURCE
+> Task :licensing:classes
+> Task :licensing:jar
 > Task :app:javaPreCompileDebug
 > Task :app:checkDebugAarMetadata
 > Task :app:generateDebugResValues
@@ -26,28 +30,57 @@ Starting a Gradle Daemon (subsequent builds will be faster)
 > Task :app:processDebugManifest
 > Task :app:mergeDebugShaders
 > Task :app:compileDebugShaders NO-SOURCE
-> Task :app:processDebugManifestForPackage
 > Task :app:generateDebugAssets UP-TO-DATE
+> Task :app:processDebugManifestForPackage
 > Task :app:mergeDebugAssets
 > Task :app:processDebugJavaRes NO-SOURCE
 > Task :app:compressDebugAssets
-> Task :app:processDebugResources
+> Task :app:desugarDebugFileDependencies
+> Task :app:mergeDebugJniLibFolders
+> Task :app:mergeDebugNativeLibs NO-SOURCE
 > Task :app:checkDebugDuplicateClasses
+> Task :app:stripDebugDebugSymbols NO-SOURCE
+> Task :app:processDebugResources
 > Task :app:mergeDebugJavaResource
+> Task :app:mergeExtDexDebug
 
 > Task :app:compileDebugJavaWithJavac
-/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/ScanActivity.java:232: error: variable ignored is already defined in method decode(Image)
-            } catch (Exception ignored) { }
-                               ^
-/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/screens/SettingsScreen.java:331: error: share(Context,File,String,String) is not public in ShareProvider; cannot be accessed from outside package
-                    if (shared != null) ShareProvider.share(a, shared, "application/zip", "بکاپ هوشمند میلانو");
-                                                     ^
+/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/MainActivity.java:100: error: cannot find symbol
+            Intent i = new Intent(this, LicenseActivity.class);
+            ^
+  symbol:   class Intent
+  location: class MainActivity
+/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/MainActivity.java:100: error: cannot find symbol
+            Intent i = new Intent(this, LicenseActivity.class);
+                           ^
+  symbol:   class Intent
+  location: class MainActivity
+/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/MainActivity.java:101: error: cannot find symbol
+            i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
+                       ^
+  symbol:   variable Intent
+  location: class MainActivity
+/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/MainActivity.java:101: error: cannot find symbol
+            i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
+                                                         ^
+  symbol:   variable Intent
+  location: class MainActivity
+/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/LicenseActivity.java:119: error: cannot find symbol
+        if (Tamper.rooted()) {
+                  ^
+  symbol:   method rooted()
+  location: class Tamper
+/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/LicenseActivity.java:149: error: cannot find symbol
+        String line = License.requestLine(device,
+                             ^
+  symbol:   method requestLine(String,String,String,String,String,String)
+  location: class License
 Note: Some input files use or override a deprecated API.
 Note: Recompile with -Xlint:deprecation for details.
-2 errors
+6 errors
 
 > Task :app:compileDebugJavaWithJavac FAILED
-gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1791424672481.json
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1791426049149.json
 [Incubating] Problems report is available at: file:///home/runner/work/Testt/Testt/manager/build/reports/problems/problems-report.html
 
 FAILURE: Build failed with an exception.
@@ -55,15 +88,39 @@ FAILURE: Build failed with an exception.
 * What went wrong:
 Execution failed for task ':app:compileDebugJavaWithJavac'.
 > Compilation failed; see the compiler output below.
-  /home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/screens/SettingsScreen.java:331: error: share(Context,File,String,String) is not public in ShareProvider; cannot be accessed from outside package
-                      if (shared != null) ShareProvider.share(a, shared, "application/zip", "بکاپ هوشمند میلانو");
-                                                       ^
   Note: Recompile with -Xlint:deprecation for details.
   Note: Some input files use or override a deprecated API.
-  /home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/ScanActivity.java:232: error: variable ignored is already defined in method decode(Image)
-              } catch (Exception ignored) { }
-                                 ^
-  2 errors
+  /home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/LicenseActivity.java:119: error: cannot find symbol
+          if (Tamper.rooted()) {
+                    ^
+    symbol:   method rooted()
+    location: class Tamper
+  /home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/LicenseActivity.java:149: error: cannot find symbol
+          String line = License.requestLine(device,
+                               ^
+    symbol:   method requestLine(String,String,String,String,String,String)
+    location: class License
+  /home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/MainActivity.java:100: error: cannot find symbol
+              Intent i = new Intent(this, LicenseActivity.class);
+              ^
+    symbol:   class Intent
+    location: class MainActivity
+  /home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/MainActivity.java:100: error: cannot find symbol
+              Intent i = new Intent(this, LicenseActivity.class);
+                             ^
+    symbol:   class Intent
+    location: class MainActivity
+  /home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/MainActivity.java:101: error: cannot find symbol
+              i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
+                         ^
+    symbol:   variable Intent
+    location: class MainActivity
+  /home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/MainActivity.java:101: error: cannot find symbol
+              i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
+                                                           ^
+    symbol:   variable Intent
+    location: class MainActivity
+  6 errors
 
 * Try:
 > Check your code and dependencies to fix the compilation error(s)
@@ -100,18 +157,71 @@ org.gradle.api.tasks.TaskExecutionException: Execution failed for task ':app:com
 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:303)
 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.execute(DefaultPlanExecutor.java:459)
 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.run(DefaultPlanExecutor.java:376)
+	at org.gradle.execution.plan.DefaultPlanExecutor.process(DefaultPlanExecutor.java:111)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph.executeWithServices(DefaultTaskExecutionGraph.java:138)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph.execute(DefaultTaskExecutionGraph.java:123)
+	at org.gradle.execution.SelectedTaskExecutionAction.execute(SelectedTaskExecutionAction.java:35)
+	at org.gradle.execution.DryRunBuildExecutionAction.execute(DryRunBuildExecutionAction.java:51)
+	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor$ExecuteTasks.call(BuildOperationFiringBuildWorkerExecutor.java:54)
+	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor$ExecuteTasks.call(BuildOperationFiringBuildWorkerExecutor.java:43)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:209)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:204)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:66)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:59)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:166)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:59)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:53)
+	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor.execute(BuildOperationFiringBuildWorkerExecutor.java:40)
+	at org.gradle.internal.build.DefaultBuildLifecycleController.lambda$executeTasks$10(DefaultBuildLifecycleController.java:313)
+	at org.gradle.internal.model.StateTransitionController.doTransition(StateTransitionController.java:266)
+	at org.gradle.internal.model.StateTransitionController.lambda$tryTransition$8(StateTransitionController.java:177)
+	at org.gradle.internal.work.DefaultSynchronizer.withLock(DefaultSynchronizer.java:46)
+	at org.gradle.internal.model.StateTransitionController.tryTransition(StateTransitionController.java:177)
+	at org.gradle.internal.build.DefaultBuildLifecycleController.executeTasks(DefaultBuildLifecycleController.java:304)
+	at org.gradle.internal.build.DefaultBuildWorkGraphController$DefaultBuildWorkGraph.runWork(DefaultBuildWorkGraphController.java:220)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.withLocks(DefaultWorkerLeaseService.java:263)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.runAsWorkerThread(DefaultWorkerLeaseService.java:127)
+	at org.gradle.composite.internal.DefaultBuildController.doRun(DefaultBuildController.java:181)
+	at org.gradle.composite.internal.DefaultBuildController.access$000(DefaultBuildController.java:50)
+	at org.gradle.composite.internal.DefaultBuildController$BuildOpRunnable.lambda$run$0(DefaultBuildController.java:198)
+	at org.gradle.internal.operations.CurrentBuildOperationRef.with(CurrentBuildOperationRef.java:85)
+	at org.gradle.composite.internal.DefaultBuildController$BuildOpRunnable.run(DefaultBuildController.java:198)
 	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)
 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:48)
 Caused by: org.gradle.api.internal.tasks.compile.CompilationFailedException: Compilation failed; see the compiler output below.
-/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/screens/SettingsScreen.java:331: error: share(Context,File,String,String) is not public in ShareProvider; cannot be accessed from outside package
-                    if (shared != null) ShareProvider.share(a, shared, "application/zip", "بکاپ هوشمند میلانو");
-                                                     ^
 Note: Recompile with -Xlint:deprecation for details.
 Note: Some input files use or override a deprecated API.
-/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/ScanActivity.java:232: error: variable ignored is already defined in method decode(Image)
-            } catch (Exception ignored) { }
-                               ^
-2 errors
+/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/LicenseActivity.java:119: error: cannot find symbol
+        if (Tamper.rooted()) {
+                  ^
+  symbol:   method rooted()
+  location: class Tamper
+/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/LicenseActivity.java:149: error: cannot find symbol
+        String line = License.requestLine(device,
+                             ^
+  symbol:   method requestLine(String,String,String,String,String,String)
+  location: class License
+/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/MainActivity.java:100: error: cannot find symbol
+            Intent i = new Intent(this, LicenseActivity.class);
+            ^
+  symbol:   class Intent
+  location: class MainActivity
+/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/MainActivity.java:100: error: cannot find symbol
+            Intent i = new Intent(this, LicenseActivity.class);
+                           ^
+  symbol:   class Intent
+  location: class MainActivity
+/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/MainActivity.java:101: error: cannot find symbol
+            i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
+                       ^
+  symbol:   variable Intent
+  location: class MainActivity
+/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/MainActivity.java:101: error: cannot find symbol
+            i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
+                                                         ^
+  symbol:   variable Intent
+  location: class MainActivity
+6 errors
 	at org.gradle.api.internal.tasks.compile.JdkJavaCompiler.execute(JdkJavaCompiler.java:84)
 	at org.gradle.api.internal.tasks.compile.JdkJavaCompiler.execute(JdkJavaCompiler.java:46)
 	at org.gradle.api.internal.tasks.compile.NormalizingJavaCompiler.delegateAndHandleErrors(NormalizingJavaCompiler.java:98)
@@ -261,9 +371,38 @@ Note: Some input files use or override a deprecated API.
 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:303)
 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.execute(DefaultPlanExecutor.java:459)
 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.run(DefaultPlanExecutor.java:376)
+	at org.gradle.execution.plan.DefaultPlanExecutor.process(DefaultPlanExecutor.java:111)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph.executeWithServices(DefaultTaskExecutionGraph.java:138)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph.execute(DefaultTaskExecutionGraph.java:123)
+	at org.gradle.execution.SelectedTaskExecutionAction.execute(SelectedTaskExecutionAction.java:35)
+	at org.gradle.execution.DryRunBuildExecutionAction.execute(DryRunBuildExecutionAction.java:51)
+	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor$ExecuteTasks.call(BuildOperationFiringBuildWorkerExecutor.java:54)
+	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor$ExecuteTasks.call(BuildOperationFiringBuildWorkerExecutor.java:43)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:209)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:204)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:66)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:59)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:166)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:59)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:53)
+	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor.execute(BuildOperationFiringBuildWorkerExecutor.java:40)
+	at org.gradle.internal.build.DefaultBuildLifecycleController.lambda$executeTasks$10(DefaultBuildLifecycleController.java:313)
+	at org.gradle.internal.model.StateTransitionController.doTransition(StateTransitionController.java:266)
+	at org.gradle.internal.model.StateTransitionController.lambda$tryTransition$8(StateTransitionController.java:177)
+	at org.gradle.internal.work.DefaultSynchronizer.withLock(DefaultSynchronizer.java:46)
+	at org.gradle.internal.model.StateTransitionController.tryTransition(StateTransitionController.java:177)
+	at org.gradle.internal.build.DefaultBuildLifecycleController.executeTasks(DefaultBuildLifecycleController.java:304)
+	at org.gradle.internal.build.DefaultBuildWorkGraphController$DefaultBuildWorkGraph.runWork(DefaultBuildWorkGraphController.java:220)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.withLocks(DefaultWorkerLeaseService.java:263)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.runAsWorkerThread(DefaultWorkerLeaseService.java:127)
+	at org.gradle.composite.internal.DefaultBuildController.doRun(DefaultBuildController.java:181)
+	at org.gradle.composite.internal.DefaultBuildController.access$000(DefaultBuildController.java:50)
+	at org.gradle.composite.internal.DefaultBuildController$BuildOpRunnable.lambda$run$0(DefaultBuildController.java:198)
+	at org.gradle.internal.operations.CurrentBuildOperationRef.with(CurrentBuildOperationRef.java:85)
+	at org.gradle.composite.internal.DefaultBuildController$BuildOpRunnable.run(DefaultBuildController.java:198)
 	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)
 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:48)
 
 
-BUILD FAILED in 34s
-20 actionable tasks: 20 executed
+BUILD FAILED in 43s
+25 actionable tasks: 25 executed

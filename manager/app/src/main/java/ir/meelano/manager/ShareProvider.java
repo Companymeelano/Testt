@@ -37,7 +37,7 @@ public class ShareProvider extends ContentProvider {
     }
 
     /** Opens the system share sheet for a file that lives in {@link #shareDir(Context)}. */
-    static void share(Context c, File f, String mime, String title) {
+    public static void share(Context c, File f, String mime, String title) {
         Uri uri = uriFor(c, f);
         Intent send = new Intent(Intent.ACTION_SEND);
         send.setType(mime);

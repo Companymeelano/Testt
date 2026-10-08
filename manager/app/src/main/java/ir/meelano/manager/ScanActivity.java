@@ -217,7 +217,7 @@ public class ScanActivity extends Activity {
             Result res = decoder.decodeWithState(new BinaryBitmap(new HybridBinarizer(src)));
             try {
                 decoder.reset();
-            } catch (Exception ignored) { }
+            } catch (Exception ignore) { }
             if (res != null && res.getText() != null && !res.getText().trim().isEmpty()) {
                 final String code = res.getText().trim();
                 runOnUiThread(() -> finishWith(code));
@@ -225,11 +225,11 @@ public class ScanActivity extends Activity {
         } catch (com.google.zxing.NotFoundException nfe) {
             try {
                 decoder.reset();
-            } catch (Exception ignored) { }
+            } catch (Exception ignore) { }
         } catch (Exception ignored) {
             try {
                 decoder.reset();
-            } catch (Exception ignored) { }
+            } catch (Exception ignore) { }
         }
     }
 

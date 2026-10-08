@@ -269,13 +269,13 @@ public class SettingsScreen extends Screen {
                 final String rk = role[0];
                 final String rn = role[1];
                 boolean locked = ir.meelano.manager.core.RoleStore.pinSet(a, rk);
-                LinearLayout row = a.kit.h();
-                row.setGravity(android.view.Gravity.CENTER_VERTICAL);
-                row.addView(a.kit.text(rn + " • " + (locked ? "رمزدار \uD83D\uDD12" : "بدون رمز"),
+                LinearLayout rrow = a.kit.h();
+                rrow.setGravity(android.view.Gravity.CENTER_VERTICAL);
+                rrow.addView(a.kit.text(rn + " • " + (locked ? "رمزدار \uD83D\uDD12" : "بدون رمز"),
                         13f, Theme.TEXT, true), a.kit.wlp(1f));
-                row.addView(a.kit.btnGhost("تعیین رمز", Theme.GOLD,
+                rrow.addView(a.kit.btnGhost("تعیین رمز", Theme.GOLD,
                         v -> rolePinDialog(content, rk, rn)), a.kit.lp(-2, -2));
-                r.addView(row, a.kit.lp(-1, -2));
+                r.addView(rrow, a.kit.lp(-1, -2));
             }
             r.addView(a.kit.btnGhost("تعویض نقش", Theme.TEXT, v -> a.openRoleGate()), a.kit.lp(-1, -2));
             r.addView(a.kit.hint("رمز پیش‌فرض مدیر ۱۲۳۴ است؛ حتماً عوضش کنید. بخش‌های حساس (تنظیمات، کاربران و سود) فقط برای مدیر است؛ فروشنده بخش مالی و حسابدار بخش فروش را نمی‌بیند."), a.kit.lp(-1, -2));

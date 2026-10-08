@@ -1,6 +1,7 @@
 package ir.meelano.manager;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.Gravity;
@@ -12,6 +13,7 @@ import android.widget.TextView;
 import ir.meelano.manager.core.Filter;
 import ir.meelano.manager.core.Finger;
 import ir.meelano.manager.core.LicenseStore;
+import ir.meelano.manager.core.RoleStore;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.Notify;
 import ir.meelano.manager.core.Queries;
@@ -75,6 +77,7 @@ public class MainActivity extends Activity {
     private final Map<String, Screen> screens = new LinkedHashMap<>();
     private final List<String> history = new ArrayList<>();
     private String currentId = "home";
+    private boolean rolePicked;
     private boolean unlocked = false;
 
     @Override
@@ -321,6 +324,10 @@ public class MainActivity extends Activity {
 
     // ================= shell =================
     private void shell() {
+        if (RoleStore.enabled(this) && !rolePicked) {
+            roleGate(null);
+            return;
+        }
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
@@ -487,6 +494,7 @@ public class MainActivity extends Activity {
             l.setSingleLine(true);
             b.addView(l, kit.lp(-1, -2));
             b.setTag(id);
+            if (!RoleStore.allowed(this, id)) b.setAlpha(0.35f);
             Theme.pressable(b);
             b.setOnClickListener(v -> nav(id));
             bottomBar.addView(b, kit.wlp(1f));
@@ -515,6 +523,10 @@ public class MainActivity extends Activity {
 
     public void nav(String id) {
         if (!screens.containsKey(id)) return;
+        if (!RoleStore.allowed(this, id)) {
+            denyRole(id);
+            return;
+        }
         if (!id.equals(currentId)) {
             history.add(currentId);
             if (history.size() > 30) history.remove(0);
@@ -522,6 +534,100 @@ public class MainActivity extends Activity {
         currentId = id;
         renderCurrent();
         animateContent(true);
+    }
+
+    // ================= user roles =================
+    /** Open the role picker (role switch from Settings). No-op when roles are off. */
+    public void openRoleGate() {
+        if (RoleStore.enabled(this)) roleGate(null);
+    }
+
+    /** Full-screen role picker; thenNav is opened after the pick (when allowed). */
+    private void roleGate(final String thenNav) {
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setGravity(Gravity.CENTER);
+        root.setBackgroundColor(Theme.BG);
+        root.setPadding(Theme.dp(28), Theme.dp(28), Theme.dp(28), Theme.dp(28));
+        LinearLayout.LayoutParams llp = new LinearLayout.LayoutParams(Theme.dp(96), Theme.dp(96));
+        llp.gravity = Gravity.CENTER;
+        root.addView(kit.logo(96), llp);
+        TextView t = kit.text("ورود با نقش", 22, Theme.TEXT, true);
+        t.setGravity(Gravity.CENTER);
+        root.addView(t, kit.lp(-1, -2));
+        TextView sub = kit.text("نقش خود را انتخاب کنید", 12.5f, Theme.MUTED, false);
+        sub.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams sp = kit.lp(-1, -2);
+        sp.setMargins(0, Theme.dp(6), 0, Theme.dp(18));
+        root.addView(sub, sp);
+        String cur = RoleStore.current(this);
+        String[][] roles = {
+                {RoleStore.ADMIN, "مدیر", "دسترسی کامل به همه بخش‌ها"},
+                {RoleStore.SELLER, "فروشنده", "فروش، مشتریان، کالاها و چک‌ها"},
+                {RoleStore.ACCOUNTANT, "حسابدار", "چک‌ها، مطالبات و گزارش‌های مالی"}};
+        for (String[] r : roles) {
+            final String role = r[0];
+            String label = (RoleStore.pinSet(this, role) ? "\uD83D\uDD12 " : "") + r[1]
+                    + " — " + r[2] + (role.equals(cur) ? " (فعلی)" : "");
+            android.widget.Button b = role.equals(cur)
+                    ? kit.btn(label, v -> pickRole(role, thenNav))
+                    : kit.btnGhost(label, Theme.GOLD, v -> pickRole(role, thenNav));
+            LinearLayout.LayoutParams bp = kit.lp(-1, -2);
+            bp.setMargins(0, Theme.dp(5), 0, Theme.dp(5));
+            root.addView(b, bp);
+        }
+        setContentView(root);
+    }
+
+    private void pickRole(String role, String thenNav) {
+        if (RoleStore.pinSet(this, role)) rolePinDialog(role, thenNav);
+        else applyRole(role, thenNav);
+    }
+
+    private void rolePinDialog(final String role, final String thenNav) {
+        LinearLayout body = kit.v();
+        body.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(16));
+        body.addView(kit.text("رمز نقش «" + RoleStore.faName(role) + "»", 13f, Theme.TEXT, true),
+                kit.lp(-1, -2));
+        final android.widget.EditText e = kit.editPin("رمز ۴ رقمی", "");
+        body.addView(e, kit.lp(-1, -2));
+        body.addView(kit.gap(8));
+        final AlertDialog[] box = new AlertDialog[1];
+        body.addView(kit.btn("ورود", v -> {
+            if (RoleStore.checkRole(MainActivity.this, role, e.getText().toString())) {
+                box[0].dismiss();
+                applyRole(role, thenNav);
+            } else {
+                kit.toast("رمز اشتباه است");
+            }
+        }), kit.lp(-1, -2));
+        box[0] = kit.dialog("ورود با نقش", body, true);
+        box[0].show();
+    }
+
+    private void applyRole(String role, String thenNav) {
+        RoleStore.setCurrent(this, role);
+        rolePicked = true;
+        currentId = "home";
+        shell();
+        if (thenNav != null && RoleStore.allowed(this, thenNav)) nav(thenNav);
+    }
+
+    /** Access denied: explain + offer a role switch. */
+    private void denyRole(final String id) {
+        kit.toast("نقش «" + RoleStore.faName(RoleStore.current(this)) + "» به این بخش دسترسی ندارد");
+        LinearLayout body = kit.v();
+        body.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(16));
+        body.addView(kit.text("برای ورود به این بخش، به نقش دیگری بروید.", 13f, Theme.TEXT, false),
+                kit.lp(-1, -2));
+        body.addView(kit.gap(8));
+        final AlertDialog[] box = new AlertDialog[1];
+        body.addView(kit.btn("تعویض نقش", v -> {
+            box[0].dismiss();
+            roleGate(id);
+        }), kit.lp(-1, -2));
+        box[0] = kit.dialog("محدودیت نقش", body, true);
+        box[0].show();
     }
 
     /** Direction-aware content slide (RTL: forward enters from the left). */

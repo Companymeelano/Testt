@@ -592,6 +592,22 @@ public class AdminActivity extends Activity {
         pack.setGravity(Gravity.CENTER);
         pack.setPadding(0, AdminKit.dp(this, 10), 0, AdminKit.dp(this, 10));
         card.addView(pack);
+        android.graphics.Bitmap qr = QrShow.make(l.pack, 600);
+        if (qr != null) {
+            ImageView qv = new ImageView(this);
+            qv.setImageBitmap(qr);
+            qv.setBackgroundColor(0xFFFFFFFF);
+            int qpad = AdminKit.dp(this, 10);
+            qv.setPadding(qpad, qpad, qpad, qpad);
+            int qz = AdminKit.dp(this, 220);
+            LinearLayout.LayoutParams qp = new LinearLayout.LayoutParams(qz, qz);
+            qp.gravity = Gravity.CENTER_HORIZONTAL;
+            card.addView(qv, qp);
+            TextView qcap = AdminKit.text(this, "مشتری این QR را در بخش ۳ اسکن می‌کند", 12,
+                    AdminKit.MUTED, false);
+            qcap.setGravity(Gravity.CENTER);
+            card.addView(qcap);
+        }
         AdminKit.infoRow(card, this, "طرح",
                 "«" + License.planFa(planOf(l)) + "»", false);
         AdminKit.infoRow(card, this, "انقضا", expText(l), false);
@@ -1004,7 +1020,8 @@ public class AdminActivity extends Activity {
         box.addView(AdminKit.text(this,
                 "مشخصات SQL Server فروشگاه مشتری را یک‌بار اینجا ذخیره کنید؛ "
                         + "بعد هر وقت لازم بود «صدور کارت» را بزنید و متن را برای مشتری بفرستید. "
-                        + "کارت فقط روی همین گوشی (" + prettyDev(c.dev) + ") باز می‌شود.",
+                        + "کارت فقط روی همین گوشی (" + prettyDev(c.dev) + ") باز می‌شود. "
+                        + "اگر مشتری با اینترنت گوشی وصل می‌شود، آدرس عمومی (Public IP) سرور را وارد کنید؛ برای وای‌فای داخلی همان IP داخلی.",
                 13, AdminKit.MUTED, false));
         LinearLayout card = (LinearLayout) AdminKit.card(this);
         AdminKit.cardMargin(card, this);
@@ -1084,6 +1101,22 @@ public class AdminActivity extends Activity {
             } catch (Exception ignored) { }
             tv.setPadding(0, AdminKit.dp(this, 8), 0, AdminKit.dp(this, 8));
             rc.addView(tv);
+            android.graphics.Bitmap qrc = QrShow.make(cardText, 700);
+            if (qrc != null) {
+                ImageView qv = new ImageView(this);
+                qv.setImageBitmap(qrc);
+                qv.setBackgroundColor(0xFFFFFFFF);
+                int qpad = AdminKit.dp(this, 10);
+                qv.setPadding(qpad, qpad, qpad, qpad);
+                int qz = AdminKit.dp(this, 240);
+                LinearLayout.LayoutParams qp = new LinearLayout.LayoutParams(qz, qz);
+                qp.gravity = Gravity.CENTER_HORIZONTAL;
+                rc.addView(qv, qp);
+                TextView qcap = AdminKit.text(this, "مشتری این QR را در بخش ۴ اسکن می‌کند", 12,
+                        AdminKit.MUTED, false);
+                qcap.setGravity(Gravity.CENTER);
+                rc.addView(qcap);
+            }
             out.addView(rc);
             final String fcard = cardText;
             final String fname = cc.full();

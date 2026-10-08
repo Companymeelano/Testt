@@ -35,6 +35,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /** Barcode / QR scanner (Camera2 + ZXing core, no extra dependencies). */
 public class ScanActivity extends Activity {
     public static final String EXTRA_CODE = "code";
+    public static final String EXTRA_TITLE = "title";
+    public static final String EXTRA_HINT = "hint";
 
     private Kit kit;
     private TextureView preview;
@@ -58,10 +60,20 @@ public class ScanActivity extends Activity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(Theme.BG);
         root.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(16));
-        TextView t = kit.text("اسکن بارکد کالا", 17, Theme.TEXT, true);
+        String ttl = "اسکن بارکد کالا";
+        try {
+            String x = getIntent().getStringExtra(EXTRA_TITLE);
+            if (x != null && !x.isEmpty()) ttl = x;
+        } catch (Exception ignored) { }
+        TextView t = kit.text(ttl, 17, Theme.TEXT, true);
         t.setGravity(Gravity.CENTER);
         root.addView(t, kit.lp(-1, -2));
-        status = kit.text("بارکد را جلوی دوربین بگیرید…", 12f, Theme.MUTED, false);
+        String hnt = "بارکد را جلوی دوربین بگیرید…";
+        try {
+            String x = getIntent().getStringExtra(EXTRA_HINT);
+            if (x != null && !x.isEmpty()) hnt = x;
+        } catch (Exception ignored) { }
+        status = kit.text(hnt, 12f, Theme.MUTED, false);
         status.setGravity(Gravity.CENTER);
         root.addView(status, kit.lp(-1, -2));
         root.addView(kit.gap(10));

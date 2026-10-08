@@ -205,4 +205,27 @@ public final class Settings {
     public void setHomeOrder(String csv) {
         p.edit().putString("home_order", csv == null ? HOME_ORDER_DEFAULT : csv).apply();
     }
+
+    // ---------------- stock alerts + auto backup (v18) ----------------
+    public boolean stockOn() { return p.getBoolean("stock_on", true); }
+
+    public void setStockOn(boolean on) { p.edit().putBoolean("stock_on", on).apply(); }
+
+    public boolean abOn() { return p.getBoolean("ab_on", false); }
+
+    public void setAbOn(boolean on) { p.edit().putBoolean("ab_on", on).apply(); }
+
+    /** Nightly auto-backup hour, 0..23 (default 2 AM). */
+    public int abHour() {
+        try {
+            int h = p.getInt("ab_hour", 2);
+            return h < 0 || h > 23 ? 2 : h;
+        } catch (Exception e) {
+            return 2;
+        }
+    }
+
+    public void setAbHour(int h) {
+        p.edit().putInt("ab_hour", h < 0 ? 0 : (h > 23 ? 23 : h)).apply();
+    }
 }

@@ -25,7 +25,7 @@ public final class Net {
         }
     }
 
-    /** True when the phone is on Wi-Fi (the shop server is reachable only there). */
+    /** True when the phone is on Wi-Fi (activation step only — the app itself runs on any connection). */
     public static boolean wifi(Context c) {
         try {
             NetworkCapabilities nc = caps(c);

@@ -38,6 +38,9 @@
             </intent-filter>
         </receiver>
         <receiver
+            android:name=".core.AutoBackupReceiver"
+            android:exported="false" />
+        <receiver
             android:name=".core.SmsReceiver"
             android:exported="true"
             android:permission="android.permission.BROADCAST_SMS">

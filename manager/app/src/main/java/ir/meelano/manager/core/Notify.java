@@ -290,8 +290,14 @@ public final class Notify {
                     bN = bb.l("count");
                     bSum = bb.d("total");
                 } catch (Exception ignored) { }
+                long lowN = 0, zeroN = 0;
+                try {
+                    Row ps = Repo.one(conn, MasterQueries.productsSummary(m));
+                    lowN = ps.l("low");
+                    zeroN = ps.l("out");
+                } catch (Exception ignored) { }
                 return new long[]{(long) inSum, (long) outSum, (long) odSum, inN, outN, odN,
-                        (long) ySales, (long) yIn, bN, (long) bSum};
+                        (long) ySales, (long) yIn, bN, (long) bSum, lowN, zeroN};
             }, new Repo.Cb<long[]>() {
                 @Override
                 public void ok(long[] v) {
@@ -299,13 +305,14 @@ public final class Notify {
                         repo.close();
                     } catch (Exception ignored) { }
                     finishCb(onDone);
-                    if (v == null || v.length < 10) return;
+                    if (v == null || v.length < 12) return;
                     Settings s2 = new Settings(c);
                     long lastB = s2.lastBouncedN();
                     long bNew = lastB < 0 ? 0 : Math.max(0, v[8] - lastB);
                     s2.setLastBouncedN(v[8]);
                     boolean morning = s2.morningOn() && (v[6] > 0 || v[7] > 0);
-                    if (v[3] == 0 && v[4] == 0 && v[5] == 0 && bNew == 0 && !morning) return;
+                    boolean showStock = s2.stockOn() && v[10] + v[11] > 0;
+                    if (v[3] == 0 && v[4] == 0 && v[5] == 0 && bNew == 0 && !morning && !showStock) return;
                     show(c, v, bNew, morning);
                 }
 
@@ -341,13 +348,17 @@ public final class Notify {
                 parts.add(Money.fa(String.valueOf(odN)) + " فاکتور معوق (" + Money.compactRial(v[2]) + ")");
             if (bNew > 0)
                 parts.add(Money.fa(String.valueOf(bNew)) + " چک برگشتی تازه");
+            boolean stockOn = true;
+            try { stockOn = new Settings(c).stockOn(); } catch (Exception ignored) { }
+            if (stockOn && v.length >= 12 && v[10] + v[11] > 0)
+                parts.add(Money.fa(String.valueOf(v[10] + v[11])) + " کالا کم‌موجود/ناموجود");
             StringBuilder b = new StringBuilder();
             for (String p : parts) {
                 if (b.length() > 0) b.append(" • ");
                 b.append(p);
             }
             b.append("؛ برای جزئیات لمس کنید.");
-            boolean onlyMorning = morning && inN == 0 && outN == 0 && odN == 0 && bNew == 0;
+            boolean onlyMorning = morning && parts.size() == 1;
             Intent open = new Intent(c, MainActivity.class);
             open.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
             PendingIntent pi = PendingIntent.getActivity(c, NOTIF_ID, open,
@@ -423,6 +434,9 @@ final class NotifyReceiver extends BroadcastReceiver {
                 return;
             }
             Notify.scheduleDaily(c);
+            if (s.backupOn()) Notify.scheduleWeekly(c);
+            if (s.weeklyOn()) Notify.scheduleWeeklyReport(c);
+            AutoBackup.reschedule(c);
             Notify.checkNow(c, () -> finishPr(pr));
         } catch (Exception ignored) {
             finishPr(pr);

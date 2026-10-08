@@ -175,10 +175,16 @@ public class SettingsScreen extends Screen {
             a.kit.toast(!wk ? "گزارش هفتگی روشن شد" : "گزارش هفتگی خاموش شد");
             render(content);
         }), a.kit.lp(-1, -2));
+        final boolean stk = a.settings.stockOn();
+        nt.addView(a.kit.btnGhost("\uD83D\uDCE6 هشدار کالای کم‌موجود: " + (stk ? "روشن" : "خاموش"), Theme.WARNING, v -> {
+            a.settings.setStockOn(!stk);
+            a.kit.toast(!stk ? "هشدار کم‌موجودی روشن شد" : "هشدار کم‌موجودی خاموش شد");
+            render(content);
+        }), a.kit.lp(-1, -2));
         companyInfo(nt, content);
         nt.addView(a.kit.btnGhost("🪪 ساخت کارت ویزیت دیجیتال", Theme.VIOLET, v -> ShopCard.show(a)), a.kit.lp(-1, -2));
         nt.addView(a.kit.btnGhost("📺 حالت تلویزیون فروشگاه", Theme.SUCCESS, v -> a.startTv()), a.kit.lp(-1, -2));
-        nt.addView(a.kit.hint("هشدار هوشمند هر روز ساعت ۸ سررسیدها، معوق‌ها و چک‌های برگشتی تازه را اعلان می‌کند؛ گزارش صبحگاهی خلاصه فروش و دریافت دیروز را اضافه می‌کند."), a.kit.lp(-1, -2));
+        nt.addView(a.kit.hint("هشدار هوشمند هر روز ساعت ۸ سررسیدها، معوق‌ها، چک‌های برگشتی تازه و کالاهای کم‌موجود را اعلان می‌کند؛ گزارش صبحگاهی خلاصه فروش و دریافت دیروز را اضافه می‌کند."), a.kit.lp(-1, -2));
         a.kit.addCard(content, nt);
 
         // ---- smart backup ----
@@ -188,6 +194,34 @@ public class SettingsScreen extends Screen {
         if (!bl.isEmpty())
             bk.addView(a.kit.kv("آخرین بکاپ", bl + (a.settings.backupSize().isEmpty() ? "" : " • " + a.settings.backupSize()), Theme.TEXT), a.kit.lp(-1, -2));
         bk.addView(a.kit.btn("⛁ بکاپ هوشمند روی گوشی", v -> runBackup(content)), a.kit.lp(-1, -2));
+        final boolean abo = a.settings.abOn();
+        bk.addView(a.kit.btnGhost("⛁ بکاپ خودکار شبانه: " + (abo ? "روشن" : "خاموش"), Theme.TEAL, v -> {
+            a.settings.setAbOn(!abo);
+            if (!abo) ir.meelano.manager.core.AutoBackup.schedule(a);
+            else ir.meelano.manager.core.AutoBackup.cancel(a);
+            a.kit.toast(!abo ? "بکاپ خودکار روشن شد (هر شب ساعت " + Money.fa(String.valueOf(a.settings.abHour())) + ")"
+                    : "بکاپ خودکار خاموش شد");
+            render(content);
+        }), a.kit.lp(-1, -2));
+        if (abo) {
+            LinearLayout hrow = a.kit.h();
+            hrow.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            hrow.addView(a.kit.btnGhost("−", Theme.GOLD, v -> {
+                a.settings.setAbHour(a.settings.abHour() - 1);
+                ir.meelano.manager.core.AutoBackup.schedule(a);
+                render(content);
+            }), a.kit.lp(Theme.dp(56), -2));
+            android.widget.TextView ht = a.kit.text("ساعت " + Money.fa(String.valueOf(a.settings.abHour())), 15f, Theme.TEXT, true);
+            ht.setGravity(android.view.Gravity.CENTER);
+            hrow.addView(ht, a.kit.wlp(1f));
+            hrow.addView(a.kit.btnGhost("＋", Theme.GOLD, v -> {
+                a.settings.setAbHour(a.settings.abHour() + 1);
+                ir.meelano.manager.core.AutoBackup.schedule(a);
+                render(content);
+            }), a.kit.lp(Theme.dp(56), -2));
+            bk.addView(hrow, a.kit.lp(-1, -2));
+            bk.addView(a.kit.hint("هر شب سر ساعت، بکاپ کامل در Downloads ذخیره و نتیجه اعلان می‌شود؛ با وای‌فای یا اینترنت گوشی کار می‌کند."), a.kit.lp(-1, -2));
+        }
         bk.addView(a.kit.hint("۷۸ جدول آتیران (همه جداول به‌جز تصاویر حجیم کالا و مشتری) به‌صورت CSV داخل یک فایل ZIP در پوشه Downloads ذخیره و برای اشتراک آماده می‌شود."), a.kit.lp(-1, -2));
         a.kit.addCard(content, bk);
 
@@ -217,6 +251,36 @@ public class SettingsScreen extends Screen {
             p.addView(a.kit.hint("اثر انگشت فقط وقتی کار می‌کند که قفل ۴ رقمی هم فعال باشد"), a.kit.lp(-1, -2));
         }
         a.kit.addCard(content, p);
+
+        // ---- roles ----
+        LinearLayout r = a.kit.card(Theme.VIOLET);
+        r.addView(a.kit.text("نقش‌های کاربری", 14.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        final boolean ren = ir.meelano.manager.core.RoleStore.enabled(a);
+        r.addView(a.kit.kv("نقش فعلی", "«" + ir.meelano.manager.core.RoleStore.faName(
+                ir.meelano.manager.core.RoleStore.current(a)) + "»", Theme.TEXT), a.kit.lp(-1, -2));
+        r.addView(a.kit.btnGhost("◉ نقش‌ها: " + (ren ? "روشن" : "خاموش"), Theme.VIOLET, v -> {
+            ir.meelano.manager.core.RoleStore.setEnabled(a, !ren);
+            a.kit.toast(!ren ? "نقش‌ها روشن شد؛ ورود بعدی با انتخاب نقش است" : "نقش‌ها خاموش شد");
+            render(content);
+        }), a.kit.lp(-1, -2));
+        if (ren) {
+            String[][] rr = {{"admin", "مدیر"}, {"seller", "فروشنده"}, {"accountant", "حسابدار"}};
+            for (String[] role : rr) {
+                final String rk = role[0];
+                final String rn = role[1];
+                boolean locked = ir.meelano.manager.core.RoleStore.pinSet(a, rk);
+                LinearLayout row = a.kit.h();
+                row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+                row.addView(a.kit.text(rn + " • " + (locked ? "رمزدار \uD83D\uDD12" : "بدون رمز"),
+                        13f, Theme.TEXT, true), a.kit.wlp(1f));
+                row.addView(a.kit.btnGhost("تعیین رمز", Theme.GOLD,
+                        v -> rolePinDialog(content, rk, rn)), a.kit.lp(-2, -2));
+                r.addView(row, a.kit.lp(-1, -2));
+            }
+            r.addView(a.kit.btnGhost("تعویض نقش", Theme.TEXT, v -> a.openRoleGate()), a.kit.lp(-1, -2));
+            r.addView(a.kit.hint("رمز پیش‌فرض مدیر ۱۲۳۴ است؛ حتماً عوضش کنید. بخش‌های حساس (تنظیمات، کاربران و سود) فقط برای مدیر است؛ فروشنده بخش مالی و حسابدار بخش فروش را نمی‌بیند."), a.kit.lp(-1, -2));
+        }
+        a.kit.addCard(content, r);
 
         // ---- home dashboard order ----
         LinearLayout ho = a.kit.card(Theme.GOLD);
@@ -352,6 +416,29 @@ public class SettingsScreen extends Screen {
         }
         a.settings.setHomeOrder(b.toString());
         render(content);
+    }
+
+    private void rolePinDialog(final LinearLayout content, final String role, final String fa) {
+        LinearLayout body = a.kit.v();
+        body.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(16));
+        body.addView(a.kit.text("رمز نقش «" + fa + "»", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        final EditText e = a.kit.editPin("۴ رقم (خالی = بدون رمز)", "");
+        body.addView(e, a.kit.lp(-1, -2));
+        body.addView(a.kit.gap(8));
+        final AlertDialog[] box = new AlertDialog[1];
+        body.addView(a.kit.btn("ثبت", v -> {
+            String pin = e.getText().toString().trim();
+            if (!pin.isEmpty() && pin.length() != 4) {
+                a.kit.toast("رمز باید ۴ رقم باشد یا خالی بماند");
+                return;
+            }
+            ir.meelano.manager.core.RoleStore.setRolePin(a, role, pin.isEmpty() ? null : pin);
+            a.kit.toast("رمز نقش «" + fa + "» ثبت شد");
+            box[0].dismiss();
+            render(content);
+        }), a.kit.lp(-1, -2));
+        box[0] = a.kit.dialog("رمز نقش", body, true);
+        box[0].show();
     }
 
     private void pinDialog() {

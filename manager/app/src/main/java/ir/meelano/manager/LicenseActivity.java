@@ -47,6 +47,9 @@ import ir.meelano.licensing.License;
 public class LicenseActivity extends Activity {
 
     private static final int REQ_RECV = 906;
+    private static final int REQ_SCAN_PACK = 807;
+    private static final int REQ_SCAN_CARD = 808;
+    private static final int REQ_CAM = 809;
 
     private Kit kit;
     private Settings settings;
@@ -59,6 +62,8 @@ public class LicenseActivity extends Activity {
     private TextView actSmsHint;
 
     private String pendingSmsPhone = "";
+    private int pendingScan;
+    private long lastCardNag;
     private String pendingSmsText = "";
     private BroadcastReceiver smsPing;
 
@@ -131,6 +136,13 @@ public class LicenseActivity extends Activity {
                 pendingSmsText = "";
             } else if (req == REQ_RECV) {
                 updateActSmsHint();
+            } else if (req == REQ_CAM) {
+                boolean g = grants != null && grants.length > 0
+                        && grants[0] == PackageManager.PERMISSION_GRANTED;
+                int w = pendingScan;
+                pendingScan = 0;
+                if (g && w != 0) launchScan(w);
+                else if (!g) kit.toast("بدون دسترسی دوربین، کد را دستی وارد کنید");
             }
         } catch (Exception ignored) { }
     }
@@ -216,7 +228,7 @@ public class LicenseActivity extends Activity {
 
     private void buildWifiCard(LinearLayout box) {
         LinearLayout c = Card3D.card(this, Theme.TEAL);
-        c.addView(Card3D.stepRow(this, kit, "۱", Theme.TEAL, "اتصال به وای‌فای فروشگاه"),
+        c.addView(Card3D.stepRow(this, kit, "۱", Theme.TEAL, "اتصال به وای‌فای فروشگاه (فقط فعال‌سازی)"),
                 kit.lp(-1, -2));
         c.addView(kit.gap(6));
         LinearLayout row = kit.h();
@@ -227,8 +239,9 @@ public class LicenseActivity extends Activity {
         wifiTxt = kit.text("در حال بررسی…", 13.5f, Theme.TEXT, false);
         row.addView(wifiTxt, kit.wlp(1f));
         c.addView(row, kit.lp(-1, -2));
-        c.addView(kit.hint("سرور فروشگاه فقط از طریق وای‌فای داخلی در دسترس است؛ "
-                + "اگر به وای‌فای وصل نیستید، ابتدا وصل شوید و «بررسی مجدد» را بزنید."),
+        c.addView(kit.hint("فعال‌سازی اولیه فقط با وای‌فای فروشگاه انجام می‌شود؛ "
+                + "بعد از آن، برنامه با اینترنت گوشی هم کار می‌کند و دیگر نیازی به وای‌فای نیست. "
+                + "اگر وصل نیستید، وصل شوید و «بررسی مجدد» را بزنید."),
                 kit.lp(-1, -2));
         c.addView(kit.btnGhost("بررسی مجدد", Theme.TEAL, v -> updateWifiRow()), kit.lp(-1, -2));
         Card3D.mount(box, c);
@@ -415,6 +428,8 @@ public class LicenseActivity extends Activity {
         p.setMargins(0, Theme.dp(4), 0, Theme.dp(8));
         c.addView(fPack, p);
         c.addView(kit.btnGold("فعال‌سازی", v -> doActivate(txt(fPack))), kit.lp(-1, -2));
+        c.addView(kit.gap(6));
+        c.addView(kit.btnGhost("اسکن QR کد فعال‌سازی", Theme.VIOLET, v -> scanPack()), kit.lp(-1, -2));
         Card3D.mount(box, c);
     }
 
@@ -467,6 +482,64 @@ public class LicenseActivity extends Activity {
         }
     }
 
+    // ---- QR scan (offline pairing: seller shows, customer scans) ----
+
+    private void scanPack() {
+        if (!camGranted()) {
+            pendingScan = REQ_SCAN_PACK;
+            requestPermissions(new String[]{android.Manifest.permission.CAMERA}, REQ_CAM);
+            return;
+        }
+        launchScan(REQ_SCAN_PACK);
+    }
+
+    private void scanCard() {
+        if (!camGranted()) {
+            pendingScan = REQ_SCAN_CARD;
+            requestPermissions(new String[]{android.Manifest.permission.CAMERA}, REQ_CAM);
+            return;
+        }
+        launchScan(REQ_SCAN_CARD);
+    }
+
+    private boolean camGranted() {
+        try {
+            if (Build.VERSION.SDK_INT < 23) return true;
+            return checkSelfPermission(android.Manifest.permission.CAMERA)
+                    == PackageManager.PERMISSION_GRANTED;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private void launchScan(int which) {
+        try {
+            Intent i = new Intent(this, ScanActivity.class);
+            if (which == REQ_SCAN_PACK) {
+                i.putExtra(ScanActivity.EXTRA_TITLE, "اسکن QR کد فعال‌سازی");
+                i.putExtra(ScanActivity.EXTRA_HINT, "QR فروشنده را جلوی دوربین بگیرید…");
+            } else {
+                i.putExtra(ScanActivity.EXTRA_TITLE, "اسکن QR کارت اتصال");
+                i.putExtra(ScanActivity.EXTRA_HINT, "QR کارت اتصال را جلوی دوربین بگیرید…");
+            }
+            startActivityForResult(i, which);
+        } catch (Exception e) {
+            kit.toast("باز کردن دوربین ممکن نشد");
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int req, int res, Intent data) {
+        super.onActivityResult(req, res, data);
+        try {
+            if (res != RESULT_OK || data == null) return;
+            String code = data.getStringExtra(ScanActivity.EXTRA_CODE);
+            if (code == null || code.isEmpty()) return;
+            if (req == REQ_SCAN_PACK) doActivate(code);
+            else if (req == REQ_SCAN_CARD) applyCard(code);
+        } catch (Exception ignored) { }
+    }
+
     // ---- SMS auto-apply ----
 
     /**
@@ -488,7 +561,17 @@ public class LicenseActivity extends Activity {
                     kit.toast(st.fa);
                 }
             }
-            if (haveCard) applyCard(s.card);
+            if (haveCard) {
+                if (!Net.wifi(this)) {
+                    // Keep it staged: the next onResume retries automatically on Wi-Fi.
+                    LicenseStore.addPendingSms(this, null, s.card);
+                    long now = System.currentTimeMillis();
+                    if (now - lastCardNag > 60000) {
+                        lastCardNag = now;
+                        kit.toast("کارت اتصال رسید؛ برای ثبت خودکار به وای‌فای فروشگاه وصل شوید");
+                    }
+                } else applyCard(s.card);
+            }
         } catch (Exception ignored) { }
     }
 
@@ -525,6 +608,8 @@ public class LicenseActivity extends Activity {
         row.addView(kit.space(8));
         row.addView(kit.btnGold("ثبت و تست اتصال", v -> applyCard(txt(fCard))), kit.wlp(1f));
         c.addView(row, kit.lp(-1, -2));
+        c.addView(kit.gap(6));
+        c.addView(kit.btnGhost("اسکن QR کارت اتصال", Theme.SUCCESS, v -> scanCard()), kit.lp(-1, -2));
         c.addView(kit.hint("کارت اتصال را فروشنده برایتان می‌فرستد؛ با یک لمس، "
                 + "آدرس سرور و همه تنظیمات به‌صورت خودکار ثبت و تست می‌شود — "
                 + "نیازی به وارد کردن هیچ عددی نیست."), kit.lp(-1, -2));
@@ -537,7 +622,7 @@ public class LicenseActivity extends Activity {
                 return "✓ اتصال قبلاً تنظیم شده (سرور " + settings.maskedHost() + ")";
             }
         } catch (Exception ignored) { }
-        return "هنوز تنظیم نشده — کارت اتصال را از فروشنده بگیرید و بالا بچسبانید.";
+        return "هنوز تنظیم نشده — کارت را بالا بچسبانید یا QR آن را اسکن کنید.";
     }
 
     private int connConfiguredColor() {
@@ -549,6 +634,10 @@ public class LicenseActivity extends Activity {
     }
 
     private void applyCard(String pasted) {
+        if (!Net.wifi(this)) {
+            kit.toast("ثبت کارت اتصال فقط با وای‌فای فروشگاه ممکن است — به وای‌فای وصل شوید");
+            return;
+        }
         if (pasted.isEmpty()) {
             kit.toast("کارت اتصال را بچسبانید");
             return;

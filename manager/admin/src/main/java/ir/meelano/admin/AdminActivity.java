@@ -32,6 +32,13 @@ public class AdminActivity extends Activity {
     private int licFilter = 0;
     private String custQuery = "";
 
+    private static final int REQ_RECV = 906;
+
+    /** Queued direct-SMS send, flushed once SEND_SMS is granted. */
+    private String pendingSmsPhone = "";
+    private String pendingSmsText = "";
+    private BroadcastReceiver smsPing;
+
     /** Draft carried from «new request» / customer / extend into the mint screen. */
     private static final class MintCtx {
         long customerId;

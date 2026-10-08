@@ -107,7 +107,7 @@ public class AdminDb extends SQLiteOpenHelper {
         try (Cursor c = getReadableDatabase().query("customers", null,
                 "name LIKE ? OR family LIKE ? OR shop LIKE ? OR phone LIKE ? OR city LIKE ? OR dev LIKE ?",
                 new String[]{like, like, like, like, like, like},
-                "created DESC", "300")) {
+                null, null, "created DESC", "300")) {
             if (c != null) while (c.moveToNext()) out.add(rowCustomer(c));
         } catch (Exception ignored) { }
         return out;
@@ -219,7 +219,7 @@ public class AdminDb extends SQLiteOpenHelper {
         try (Cursor c = getReadableDatabase().query("licenses", null,
                 "revoked=0 AND exp>=? AND exp<=?",
                 new String[]{String.valueOf(today), String.valueOf(today + days)},
-                null, "exp ASC", "50")) {
+                null, null, "exp ASC", "50")) {
             if (c != null) while (c.moveToNext()) {
                 Lic l = rowLic(c);
                 attachCustomer(l);

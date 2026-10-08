@@ -40,7 +40,7 @@ jobs:
 
       - name: Rename APKs
         run: |
-          cp manager/app/build/outputs/apk/debug/app-debug.apk meelano-manager-v19-debug.apk
+          cp manager/app/build/outputs/apk/debug/app-debug.apk meelano-manager-v20-debug.apk
           cp manager/admin/build/outputs/apk/debug/admin-debug.apk meelano-admin-v1.3-debug.apk
 
       - name: Upload artifacts
@@ -48,29 +48,29 @@ jobs:
         with:
           name: meelano-apks-debug
           path: |
-            meelano-manager-v19-debug.apk
+            meelano-manager-v20-debug.apk
             meelano-admin-v1.3-debug.apk
 
       - name: Publish rolling release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: apk-debug
-          name: MEELANO v19 — client + seller admin (debug APKs)
+          name: MEELANO v20 — client + seller admin (debug APKs)
           body: |
             دو فایل نصبی (دیباگ) — مستقیم روی گوشی نصب می‌شوند:
-            • meelano-manager-v19-debug.apk — برنامه مشتری (فعال‌سازی ۳‌قدمه ساده + پیامک مستقیم + QR + نقش‌های کاربری + اینترنت گوشی)
+            • meelano-manager-v20-debug.apk — برنامه مشتری (فعال‌سازی با اینترنت گوشی + پیامک مستقیم + QR + نقش‌های کاربری)
             • meelano-admin-v1.3-debug.apk — برنامه فروشنده (نمایش QR کد و کارت + ارسال پیامکی + انتقال گوشی + گزارش مصرف)
             Debug builds — install directly on the phone.
             Client connects to the shop's Atiran SQL Server automatically via the seller's connection card.
           files: |
-            meelano-manager-v19-debug.apk
+            meelano-manager-v20-debug.apk
             meelano-admin-v1.3-debug.apk
 
       - name: Commit APKs to dist/ (in-chat delivery)
         run: |
           mkdir -p dist
           rm -f dist/meelano-manager-v1*-debug.apk dist/meelano-admin-v1.*-debug.apk
-          cp meelano-manager-v19-debug.apk meelano-admin-v1.3-debug.apk dist/
+          cp meelano-manager-v20-debug.apk meelano-admin-v1.3-debug.apk dist/
           git config user.name "arena-ci"
           git config user.email "arena-ci@local"
           git add -A -f dist/

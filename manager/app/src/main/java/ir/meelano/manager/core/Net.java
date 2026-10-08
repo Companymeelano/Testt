@@ -6,7 +6,8 @@ import android.net.Network;
 import android.net.NetworkCapabilities;
 
 /**
- * Network-state helpers for the «connect to your shop Wi-Fi first» step.
+ * Network-state helpers (activation works on any connection; only the server
+ * link may need the shop Wi-Fi when the seller's server is LAN-only).
  * No permissions beyond INTERNET/ACCESS_NETWORK_STATE (both install-time).
  */
 public final class Net {
@@ -25,7 +26,7 @@ public final class Net {
         }
     }
 
-    /** True when the phone is on Wi-Fi (activation step only — the app itself runs on any connection). */
+    /** True when the phone is on Wi-Fi (network status row). */
     public static boolean wifi(Context c) {
         try {
             NetworkCapabilities nc = caps(c);

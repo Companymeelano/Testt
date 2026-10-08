@@ -37,10 +37,13 @@ import ir.meelano.manager.ui.Theme;
 import ir.meelano.licensing.License;
 
 /**
- * Offline license gate, v19: three simple steps — ۱) shop Wi-Fi,
- * ۲) ONE-tap smart request (direct SMS when the seller number is filled,
- * share sheet otherwise), ۳) ONE smart receive box (paste or scan anything
- * the seller sends — pack or connection card — it detects and applies it).
+ * Offline license gate, v20: two simple steps — ۱) ONE-tap smart request
+ * (direct SMS when the seller number is filled, share sheet otherwise),
+ * ۲) ONE smart receive box (paste or scan anything the seller sends — pack
+ * or connection card — it detects and applies it). No Wi-Fi needed: the pack
+ * activates on any network (even fully offline); a connection card is tested
+ * live and, while the server is unreachable, staged and retried automatically
+ * (shop Wi-Fi only matters when the seller's server is LAN-only).
  * SMS auto-apply still works underneath, so most users just wait.
  * Blocks MainActivity until {@link LicenseStore#unlocked}.
  */
@@ -55,14 +58,14 @@ public class LicenseActivity extends Activity {
     private Repo repo;
     private String device = "";
 
-    private TextView wifiDot;
-    private TextView wifiTxt;
+    private TextView netDot;
+    private TextView netTxt;
     private TextView recvHint;
 
     private String pendingSmsPhone = "";
     private String pendingSmsText = "";
     private boolean wantScan;
-    private long lastCardNag;
+    private long lastCardTry;
     private BroadcastReceiver smsPing;
 
     @Override
@@ -89,10 +92,10 @@ public class LicenseActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        // The user may have just connected to Wi-Fi (or returned from the
-        // dialer/browser) — refresh the Wi-Fi row in place (no rebuild, so
+        // The network may have changed while away (or the user returned from the
+        // dialer/browser) — refresh the network row in place (no rebuild, so
         // typed text in the form fields is never lost).
-        updateWifiRow();
+        updateNetRow();
         try {
             if (smsPing == null) {
                 smsPing = new BroadcastReceiver() {
@@ -155,16 +158,16 @@ public class LicenseActivity extends Activity {
 
         LicenseStore.Status s = LicenseStore.check(this);
         boolean conn = connConfigured();
-        int done = (Net.wifi(this) ? 1 : 0) + (s.ok ? 1 : 0) + (conn ? 1 : 0);
-        String pill = done >= 3 ? "✓ آماده ورود"
-                : ("قدم " + Money.fa(String.valueOf(done + 1)) + " از ۳");
+        int done = (s.ok ? 1 : 0) + (conn ? 1 : 0);
+        String pill = done >= 2 ? "✓ آماده ورود"
+                : ("قدم " + Money.fa(String.valueOf(done + 1)) + " از ۲");
         Card3D.mount(box, Card3D.hero(this, kit, R.drawable.lic_shield, Theme.GOLD,
                 "فعال‌سازی میلانو منیجر",
-                "۳ قدم ساده • پیامک و QR خودکار",
-                pill, done >= 3 ? Theme.SUCCESS : Theme.WARNING));
+                "۲ قدم ساده • با اینترنت گوشی هم می‌شود",
+                pill, done >= 2 ? Theme.SUCCESS : Theme.WARNING));
 
         buildStatusCard(box, s);
-        buildWifiCard(box);
+        buildNetCard(box, conn);
         buildRequestCard(box, s.ok);
         buildReceiveCard(box, s.ok, conn);
         buildSupportCard(box);
@@ -178,7 +181,7 @@ public class LicenseActivity extends Activity {
         sv.setFillViewport(true);
         sv.addView(box);
         setContentView(sv);
-        updateWifiRow();
+        updateNetRow();
     }
 
     private boolean connConfigured() {
@@ -219,7 +222,7 @@ public class LicenseActivity extends Activity {
                     kit.lp(-1, -2));
         } else {
             String msg = "none".equals(s.reason)
-                    ? "برنامه هنوز فعال نشده — ۳ قدم زیر را به ترتیب انجام دهید."
+                    ? "برنامه هنوز فعال نشده — ۲ قدم زیر را به ترتیب انجام دهید."
                     : s.fa;
             c.addView(kit.hint(msg), kit.lp(-1, -2));
         }
@@ -232,54 +235,61 @@ public class LicenseActivity extends Activity {
         return Theme.SUCCESS;
     }
 
-    // ---- step 1: Wi-Fi ----
+    // ---- network helper (not a step: activation works on mobile data) ----
 
-    private void buildWifiCard(LinearLayout box) {
-        boolean on = Net.wifi(this);
+    private void buildNetCard(LinearLayout box, boolean connOk) {
+        boolean on = Net.online(this);
         LinearLayout c = Card3D.card(this, Theme.TEAL);
-        c.addView(Card3D.stepRow(this, kit, on ? "✓" : "۱", on ? Theme.SUCCESS : Theme.TEAL,
-                "اتصال به وای‌فای فروشگاه"), kit.lp(-1, -2));
+        c.addView(Card3D.stepRow(this, kit, on ? "✓" : "!", on ? Theme.SUCCESS : Theme.WARNING,
+                "وضعیت اینترنت"), kit.lp(-1, -2));
         c.addView(kit.gap(6));
         LinearLayout row = kit.h();
         row.setGravity(Gravity.CENTER_VERTICAL);
-        wifiDot = kit.text("●", 16, Theme.WARNING, true);
-        row.addView(wifiDot, kit.lp(-2, -2));
+        netDot = kit.text("●", 16, Theme.WARNING, true);
+        row.addView(netDot, kit.lp(-2, -2));
         row.addView(kit.space(8));
-        wifiTxt = kit.text("در حال بررسی…", 13.5f, Theme.TEXT, false);
-        row.addView(wifiTxt, kit.wlp(1f));
+        netTxt = kit.text("در حال بررسی…", 13.5f, Theme.TEXT, false);
+        row.addView(netTxt, kit.wlp(1f));
         c.addView(row, kit.lp(-1, -2));
-        c.addView(kit.hint("فقط برای همین فعال‌سازی لازم است؛ بعدش برنامه با اینترنت گوشی هم کار می‌کند."),
+        c.addView(kit.hint("فعال‌سازی با اینترنت گوشی هم انجام می‌شود؛ فقط اتصال به سرور ممکن است وای‌فای فروشگاه بخواهد (اگر فروشنده دسترسی اینترنتی نداده باشد)."),
                 kit.lp(-1, -2));
-        c.addView(kit.btnGhost("بررسی مجدد", Theme.TEAL, v -> updateWifiRow()), kit.lp(-1, -2));
+        if (!connOk) {
+            c.addView(kit.btnGold("↻ تلاش مجدد اتصال به سرور", v -> {
+                updateNetRow();
+                retryStagedCard();
+            }), kit.lp(-1, -2));
+        } else {
+            c.addView(kit.btnGhost("بررسی مجدد", Theme.TEAL, v -> updateNetRow()), kit.lp(-1, -2));
+        }
         Card3D.mount(box, c);
     }
 
-    private void updateWifiRow() {
-        if (wifiDot == null || wifiTxt == null) return;
+    private void updateNetRow() {
+        if (netDot == null || netTxt == null) return;
         try {
             if (Net.wifi(this)) {
-                wifiDot.setTextColor(Theme.SUCCESS);
-                wifiTxt.setText("متصل به وای‌فای ✓");
-                wifiTxt.setTextColor(Theme.SUCCESS);
+                netDot.setTextColor(Theme.SUCCESS);
+                netTxt.setText("متصل به وای‌فای ✓");
+                netTxt.setTextColor(Theme.SUCCESS);
             } else if (Net.online(this)) {
-                wifiDot.setTextColor(Theme.WARNING);
-                wifiTxt.setText("به وای‌فای وصل نیستید (اینترنت موبایل برای فعال‌سازی کافی نیست)");
-                wifiTxt.setTextColor(Theme.WARNING);
+                netDot.setTextColor(Theme.TEAL);
+                netTxt.setText("اینترنت گوشی ✓ — فعال‌سازی ممکن است");
+                netTxt.setTextColor(Theme.TEAL);
             } else {
-                wifiDot.setTextColor(Theme.DANGER);
-                wifiTxt.setText("هیچ اتصالی نیست — وای‌فای را روشن کنید");
-                wifiTxt.setTextColor(Theme.DANGER);
+                netDot.setTextColor(Theme.DANGER);
+                netTxt.setText("اینترنت قطع است — وصل شوید");
+                netTxt.setTextColor(Theme.DANGER);
             }
         } catch (Exception ignored) { }
     }
 
-    // ---- step 2: request (one smart send button) ----
+    // ---- step 1: request (one smart send button) ----
 
     private void buildRequestCard(LinearLayout box, boolean licOk) {
         LinearLayout c = Card3D.card(this, Theme.GOLD);
         LinearLayout head = kit.h();
         head.setGravity(Gravity.CENTER_VERTICAL);
-        head.addView(Card3D.stepRow(this, kit, licOk ? "✓" : "۲", licOk ? Theme.SUCCESS : Theme.GOLD,
+        head.addView(Card3D.stepRow(this, kit, licOk ? "✓" : "۱", licOk ? Theme.SUCCESS : Theme.GOLD,
                 "درخواست از فروشنده"), kit.wlp(1f));
         head.addView(Card3D.glyph(this, R.drawable.lic_chat, Theme.VIOLET, 44));
         c.addView(head, kit.lp(-1, -2));
@@ -424,14 +434,14 @@ public class LicenseActivity extends Activity {
         }
     }
 
-    // ---- step 3: receive (one smart box for pack OR card) ----
+    // ---- step 2: receive (one smart box for pack OR card) ----
 
     private void buildReceiveCard(LinearLayout box, boolean licOk, boolean connOk) {
         boolean allOk = licOk && connOk;
         LinearLayout c = Card3D.card(this, Theme.VIOLET);
         LinearLayout head = kit.h();
         head.setGravity(Gravity.CENTER_VERTICAL);
-        head.addView(Card3D.stepRow(this, kit, allOk ? "✓" : "۳", allOk ? Theme.SUCCESS : Theme.VIOLET,
+        head.addView(Card3D.stepRow(this, kit, allOk ? "✓" : "۲", allOk ? Theme.SUCCESS : Theme.VIOLET,
                 "دریافت پاسخ فروشنده"), kit.wlp(1f));
         head.addView(Card3D.glyph(this, R.drawable.lic_bolt, Theme.TEAL, 44));
         c.addView(head, kit.lp(-1, -2));
@@ -490,12 +500,7 @@ public class LicenseActivity extends Activity {
             return;
         }
         if (pack != null) doActivate(pack);
-        if (card != null) {
-            if (!Net.wifi(this)) {
-                LicenseStore.addPendingSms(this, null, card);
-                kit.toast("کارت پیدا شد؛ برای ثبتش به وای‌فای فروشگاه وصل شوید");
-            } else applyCard(card);
-        }
+        if (card != null) applyCard(card);
     }
 
     /** First verifiable 39-char M1… pack token in the text (dashes tolerated). */
@@ -572,6 +577,19 @@ public class LicenseActivity extends Activity {
         }
     }
 
+    /** Manual retry: take a staged card/pack and try it right now. */
+    private void retryStagedCard() {
+        try {
+            LicenseStore.SmsPending s = LicenseStore.takePendingSms(this);
+            boolean havePack = s.pack != null && !s.pack.isEmpty();
+            boolean haveCard = s.card != null && !s.card.isEmpty();
+            if (havePack) doActivate(s.pack);
+            if (haveCard) applyCard(s.card);
+            if (!havePack && !haveCard)
+                kit.toast("کارت اتصال هنوز ثبت نشده — از باکس «ثبت خودکار» استفاده کنید");
+        } catch (Exception ignored) { }
+    }
+
     // ---- QR scan (offline pairing: seller shows, customer scans) ----
 
     private void scanCode() {
@@ -637,15 +655,21 @@ public class LicenseActivity extends Activity {
                 }
             }
             if (haveCard) {
-                if (!Net.wifi(this)) {
-                    // Keep it staged: the next onResume retries automatically on Wi-Fi.
+                long now = System.currentTimeMillis();
+                if (!Net.online(this)) {
+                    // No internet at all: keep it staged; the next onResume retries.
                     LicenseStore.addPendingSms(this, null, s.card);
-                    long now = System.currentTimeMillis();
-                    if (now - lastCardNag > 60000) {
-                        lastCardNag = now;
-                        kit.toast("کارت اتصال رسید؛ برای ثبت خودکار به وای‌فای فروشگاه وصل شوید");
+                    if (now - lastCardTry > 60000) {
+                        lastCardTry = now;
+                        kit.toast("کارت اتصال رسید و ذخیره شد؛ با وصل شدن اینترنت خودکار ثبت می‌شود");
                     }
-                } else applyCard(s.card);
+                } else if (now - lastCardTry > 10000) {
+                    // Online: test it live (fails fast on LAN-only servers), throttled.
+                    lastCardTry = now;
+                    applyCard(s.card);
+                } else {
+                    LicenseStore.addPendingSms(this, null, s.card);
+                }
             }
         } catch (Exception ignored) { }
     }
@@ -653,11 +677,7 @@ public class LicenseActivity extends Activity {
     // ---- automatic server connection ----
 
     private void applyCard(String pasted) {
-        if (!Net.wifi(this)) {
-            kit.toast("ثبت کارت اتصال فقط با وای‌فای فروشگاه ممکن است — به وای‌فای وصل شوید");
-            return;
-        }
-        if (pasted.isEmpty()) {
+        if (pasted == null || pasted.isEmpty()) {
             kit.toast("کارت اتصال را بچسبانید");
             return;
         }
@@ -671,6 +691,12 @@ public class LicenseActivity extends Activity {
             port = Integer.parseInt(prof.port.trim());
         } catch (Exception e) {
             kit.toast("کارت خراب است؛ از فروشنده کارت تازه بخواهید");
+            return;
+        }
+        if (!Net.online(this)) {
+            // A valid card but no internet at all — stage it and retry automatically.
+            LicenseStore.addPendingSms(this, null, pasted);
+            kit.toast("کارت معتبر است و ذخیره شد؛ با وصل شدن اینترنت خودکار ثبت می‌شود");
             return;
         }
         kit.toast("در حال ثبت و تست اتصال…");
@@ -697,8 +723,11 @@ public class LicenseActivity extends Activity {
 
             @Override
             public void fail(String faError) {
+                // Server unreachable (often a LAN-only server while on mobile data):
+                // keep the card staged — every resume + the retry button try again.
+                LicenseStore.addPendingSms(LicenseActivity.this, null, pasted);
                 kit.toast(faError == null || faError.isEmpty()
-                        ? "اتصال برقرار نشد؛ به وای‌فای فروشگاه وصل شوید و دوباره تلاش کنید"
+                        ? "سرور در دسترس نیست؛ اگر سرور فقط روی وای‌فای داخلی است به وای‌فای فروشگاه وصل شوید — کارت ذخیره شد و خودکار تلاش می‌شود"
                         : faError);
             }
         });

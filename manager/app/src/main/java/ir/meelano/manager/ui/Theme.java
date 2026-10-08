@@ -6,6 +6,7 @@ import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.view.View;
 
+import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.data.Settings;
 
 /**
@@ -42,6 +43,7 @@ public final class Theme {
     /** Mirror of !light for call sites (charts, tables). */
     public static boolean DARK = true;
     private static String accentKey = "gold";
+    private static float fontScale = 1f;
     private static float density = 3f;
     private static Typeface regular;
     private static Typeface bold;
@@ -73,6 +75,44 @@ public final class Theme {
 
     public static String accentKey() { return accentKey; }
 
+    /** 1.0 normal, 1.3 large-text mode (applied in Kit.text). */
+    public static float fontScale() { return fontScale; }
+
+    /** Seasonal accent key from the Jalali date (v14 «تم مناسبتی»). */
+    public static String seasonAccentKey() {
+        try {
+            String t = Jalali.todayStr();
+            int m = Integer.parseInt(t.substring(5, 7));
+            int d = Integer.parseInt(t.substring(8, 10));
+            if ((m == 12 && d >= 29) || (m == 1 && d <= 1)) return "ruby";   // شب یلدا 🍉
+            if (m == 1 && d <= 13) return "gold";                             // نوروز 🌸
+            if (m >= 1 && m <= 3) return "emerald";                           // بهار
+            if (m >= 4 && m <= 6) return "teal";                              // تابستان
+            if (m >= 7 && m <= 9) return "ruby";                              // پاییز
+            return "sapphire";                                               // زمستان
+        } catch (Exception e) {
+            return "gold";
+        }
+    }
+
+    /** Seasonal glyph shown next to the company name (empty when seasonal mode is off). */
+    public static String seasonGlyph(android.content.Context c) {
+        try {
+            if (!new Settings(c).seasonalOn()) return "";
+            String t = Jalali.todayStr();
+            int m = Integer.parseInt(t.substring(5, 7));
+            int d = Integer.parseInt(t.substring(8, 10));
+            if ((m == 12 && d >= 29) || (m == 1 && d <= 1)) return "🍉";
+            if (m == 1 && d <= 13) return "🌸";
+            if (m >= 1 && m <= 3) return "🌸";
+            if (m >= 4 && m <= 6) return "☀";
+            if (m >= 7 && m <= 9) return "🍂";
+            return "❄";
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
     public static void init(Context c) {
         density = c.getResources().getDisplayMetrics().density;
         try {
@@ -90,7 +130,9 @@ public final class Theme {
         Settings s = new Settings(c);
         light = "light".equals(s.themeMode());
         DARK = !light;
+        fontScale = s.bigFont() ? 1.3f : 1f;
         accentKey = s.themeAccent();
+        if (s.seasonalOn() && "gold".equals(accentKey)) accentKey = seasonAccentKey();
         int dark = 0xFFD9AE5A, darkSoft = 0xFFF1D493, lite = 0xFFA86F14, liteSoft = 0xFF7A5410;
         for (String[] a : ACCENTS) {
             if (a[0].equals(accentKey)) {
@@ -101,20 +143,20 @@ public final class Theme {
             }
         }
         if (light) {
-            BG = 0xFFF5EFE3;
-            SURFACE = 0xFFFFFFFF;
-            SURFACE2 = 0xFFECE2CC;
+            BG = 0xFFF6F0E1;
+            SURFACE = 0xFFFFFDF6;
+            SURFACE2 = 0xFFF1E4C8;
             GOLD = lite;
             GOLD_SOFT = liteSoft;
-            TEXT = 0xFF1C2434;
-            MUTED = 0xFF6E7789;
-            SUCCESS = 0xFF189A55;
-            DANGER = 0xFFD63A40;
-            WARNING = 0xFFDD8A00;
-            INFO = 0xFF2B7DE0;
-            VIOLET = 0xFF7C5CFC;
-            TEAL = 0xFF0E9E8F;
-            STEEL = 0xFF64748B;
+            TEXT = 0xFF1B2333;
+            MUTED = 0xFF5C6678;
+            SUCCESS = 0xFF15924F;
+            DANGER = 0xFFCE363C;
+            WARNING = 0xFFD97E06;
+            INFO = 0xFF2A7BDC;
+            VIOLET = 0xFF7A5AF8;
+            TEAL = 0xFF0C9B8C;
+            STEEL = 0xFF5F6B82;
         } else {
             BG = 0xFF0C1220;
             SURFACE = 0xFF151D31;
@@ -168,7 +210,12 @@ public final class Theme {
 
     // ---------------- system bars ----------------
     public static int statusBar() {
-        return light ? 0xFFF5EFE3 : 0xFF0C1220;
+        return light ? 0xFFF6F0E1 : 0xFF0C1220;
+    }
+
+    /** Navigation-bar color: champagne in light mode so the dark system keys stay visible. */
+    public static int navBar() {
+        return light ? 0xFFEFE0C2 : 0xFF0C1220;
     }
 
     // ---------------- drawable factories ----------------
@@ -251,7 +298,7 @@ public final class Theme {
 
     public static GradientDrawable bottomBar() {
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                light ? new int[]{0xFFFFFFFF, 0xFFF1E8D6} : new int[]{0xFF101828, 0xFF0C1220});
+                light ? new int[]{0xFFFFFDF6, 0xFFF2E4C6} : new int[]{0xFF101828, 0xFF0C1220});
         d.setStroke(dp(1), alpha(GOLD, 44));
         return d;
     }

@@ -73,8 +73,8 @@ public final class ReportCatalog {
                     new Col[]{c("customer", "مشتری", T_TEXT), c("bought", "خریده", T_TEXT), c("missed", "نخریده", T_TEXT),
                             c("together", "همراه‌خرید", T_NUM), c("missedValue", "ارزش فرصت", T_MONEY)},
                     C_NONE, "", ""),
-            s("cheque_reliability", "خوش‌قولی چکی", "هوشمند", "رتبه‌بندی مشتریان بر اساس سابقه برگشتی چک", false,
-                    new Col[]{c("customer", "مشتری", T_TEXT), c("total", "چک‌ها", T_NUM), c("bounced", "برگشتی", T_NUM),
+            s("cheque_reliability", "خوش‌قولی چکی", "هوشمند", "رتبه‌بندی مشتریان بر اساس سابقه برگشتی چک (لمس ردیف: تماس)", false,
+                    new Col[]{c("customer", "مشتری", T_TEXT), c("cell", "همراه", T_TEXT), c("total", "چک‌ها", T_NUM), c("bounced", "برگشتی", T_NUM),
                             c("bouncedAmt", "مبلغ برگشتی", T_MONEY), c("totalAmt", "جمع چک‌ها", T_MONEY),
                             c("rate", "نرخ برگشتی ٪", T_NUM), c("grade", "رتبه", T_TEXT)},
                     C_BARS, "customer", "bouncedAmt"),
@@ -93,6 +93,10 @@ public final class ReportCatalog {
             s("stock_forecast", "پیش‌بینی اتمام موجودی", "هوشمند", "چند روز تا اتمام، بر اساس فروش روزانه ۶۰ روزه + هشدار سفارش", false,
                     new Col[]{c("label", "کالا", T_TEXT), c("vah", "موجودی", T_NUM), c("daily", "فروش روزانه", T_NUM),
                             c("daysLeft", "روز تا اتمام", T_NUM), c("status", "وضعیت", T_TEXT)},
+                    C_NONE, "", ""),
+            s("order_suggest", "فهرست سفارش پیشنهادی", "هوشمند", "مقدار پیشنهادی سفارش برای پوشش ۳۰ روزه + اشتراک PDF با تأمین‌کننده", false,
+                    new Col[]{c("label", "کالا", T_TEXT), c("vah", "موجودی", T_NUM), c("daily", "فروش روزانه", T_NUM),
+                            c("daysLeft", "روز تا اتمام", T_NUM), c("suggest", "پیشنهاد سفارش", T_NUM), c("status", "وضعیت", T_TEXT)},
                     C_NONE, "", ""),
             s("invoice_profit", "سود واقعی فاکتور", "هوشمند", "سود هر فاکتور با کسر تخفیف و بهای تمام‌شده (مبنای قیمت خرید)", true,
                     new Col[]{c("no", "فاکتور", T_TEXT), c("customer", "مشتری", T_TEXT), c("date", "تاریخ", T_DATE),
@@ -281,6 +285,7 @@ public final class ReportCatalog {
         if ("sleeping_capital".equals(id)) return MasterQueries.deadStock(m, 90, 200);
         if ("stock_forecast".equals(id)) return MasterQueries.stockForecast(m, ff);
         if ("invoice_profit".equals(id)) return MasterQueries.invoiceProfit(m, ff);
+        if ("order_suggest".equals(id)) return MasterQueries.orderSuggest(m, ff);
         throw new Queries.Missing("گزارش ناشناخته است");
     }
 }

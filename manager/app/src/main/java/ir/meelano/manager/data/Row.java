@@ -37,4 +37,13 @@ public final class Row extends LinkedHashMap<String, Object> {
     public int i(String key) { return (int) Math.round(d(key)); }
 
     public boolean has(String key) { return containsKey(key) && get(key) != null; }
+
+    /** Raw bytes (varbinary/image columns) or null. */
+    public byte[] bytes(String key) {
+        try {
+            Object o = get(key);
+            if (o instanceof byte[]) return (byte[]) o;
+        } catch (Exception ignored) { }
+        return null;
+    }
 }

@@ -19,7 +19,7 @@ import ir.meelano.manager.ui.Theme;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Reports center: 43 management reports with charts, tables and PDF sharing. */
+/** Reports center: 44 management reports with charts, tables and PDF sharing. */
 public class ReportsScreen extends Screen {
     private final Filter filter = new Filter();
     private ReportCatalog.Spec sel;
@@ -49,7 +49,7 @@ public class ReportsScreen extends Screen {
         if (sel == null) return null;
         boolean search = "fleeing_customers".equals(sel.id) || "lost_basket".equals(sel.id)
                 || "cheque_reliability".equals(sel.id) || "stock_forecast".equals(sel.id)
-                || "invoice_profit".equals(sel.id);
+                || "order_suggest".equals(sel.id) || "invoice_profit".equals(sel.id);
         if (!sel.needsRange && !search) return null;
         FilterSheet.Config c = new FilterSheet.Config();
         c.search = search;
@@ -323,7 +323,9 @@ public class ReportsScreen extends Screen {
             c.addView(a.kit.kv("جمع " + col.title, Money.rial(sum), Theme.GOLD_SOFT), a.kit.lp(-1, -2));
         }
         int show = Math.min(rows.size(), 300);
-        c.addView(a.kit.dataTable(spec.cols, new ArrayList<>(rows.subList(0, show)), null), a.kit.lp(-1, -2));
+        final boolean callable = "fleeing_customers".equals(spec.id) || "cheque_reliability".equals(spec.id);
+        c.addView(a.kit.dataTable(spec.cols, new ArrayList<>(rows.subList(0, show)),
+                callable ? this::contactDialog : null), a.kit.lp(-1, -2));
         if (rows.size() > show)
             c.addView(a.kit.hint("+" + Money.fa(String.valueOf(rows.size() - show)) + " ردیف دیگر در PDF…"), a.kit.lp(-1, -2));
         LinearLayout.LayoutParams fp = a.kit.lp(-1, -2);
@@ -331,6 +333,45 @@ public class ReportsScreen extends Screen {
         c.addView(a.kit.btn("اشتراک PDF گزارش", v ->
                 a.sharePdf(spec.title, spec.needsRange ? filter.rangeFa() : spec.desc, spec.cols, rows)), fp);
         a.kit.addCard(content, c);
+    }
+
+    /** Tap-to-call: phone + SMS actions for customer rows that carry a mobile number. */
+    private void contactDialog(Row r) {
+        String name = r.has("customer") ? r.s("customer") : r.s("name");
+        String cell = ir.meelano.manager.core.Money.en(r.s("cell")).replaceAll("[^0-9+]", "");
+        if (cell.isEmpty()) {
+            a.kit.toast("شماره همراهی برای این مشتری ثبت نشده است");
+            return;
+        }
+        android.widget.LinearLayout body = a.kit.v();
+        body.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(16));
+        body.addView(a.kit.text(name.isEmpty() ? "مشتری" : name, 15f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        body.addView(a.kit.text(ir.meelano.manager.core.Money.fa(cell), 13f, Theme.GOLD_SOFT, true), a.kit.lp(-1, -2));
+        body.addView(a.kit.gap(10));
+        final android.app.AlertDialog[] box = new android.app.AlertDialog[1];
+        android.widget.LinearLayout row = a.kit.h();
+        row.addView(a.kit.btn("📞 تماس", v -> {
+            box[0].dismiss();
+            try {
+                a.startActivity(new android.content.Intent(android.content.Intent.ACTION_DIAL,
+                        android.net.Uri.parse("tel:" + cell)));
+            } catch (Exception e) {
+                a.kit.toast("تماس ممکن نشد");
+            }
+        }), a.kit.wlp(1f));
+        row.addView(a.kit.space(8));
+        row.addView(a.kit.btnGhost("✉ پیامک", Theme.INFO, v -> {
+            box[0].dismiss();
+            try {
+                a.startActivity(new android.content.Intent(android.content.Intent.ACTION_SENDTO,
+                        android.net.Uri.parse("smsto:" + cell)));
+            } catch (Exception e) {
+                a.kit.toast("پیامک ممکن نشد");
+            }
+        }), a.kit.wlp(1f));
+        body.addView(row, a.kit.lp(-1, -2));
+        box[0] = a.kit.dialog("پیگیری مشتری", body, true);
+        box[0].show();
     }
 
     private String chartLabel(ReportCatalog.Spec spec, String x) {

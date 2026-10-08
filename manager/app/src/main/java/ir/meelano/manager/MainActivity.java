@@ -14,6 +14,7 @@ import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.Notify;
 import ir.meelano.manager.core.Queries;
 import ir.meelano.manager.core.ReportCatalog;
+import ir.meelano.manager.data.Company;
 import ir.meelano.manager.data.Meta;
 import ir.meelano.manager.data.Repo;
 import ir.meelano.manager.data.Row;
@@ -21,6 +22,7 @@ import ir.meelano.manager.data.Settings;
 import ir.meelano.manager.screens.CashScreen;
 import ir.meelano.manager.screens.ChequesScreen;
 import ir.meelano.manager.screens.CustomersScreen;
+import ir.meelano.manager.screens.DuesScreen;
 import ir.meelano.manager.screens.HomeScreen;
 import ir.meelano.manager.screens.MoneyScreen;
 import ir.meelano.manager.screens.MoreScreen;
@@ -35,6 +37,7 @@ import ir.meelano.manager.screens.UsersScreen;
 import ir.meelano.manager.screens.VisitorsScreen;
 import ir.meelano.manager.ui.FilterSheet;
 import ir.meelano.manager.ui.Kit;
+import ir.meelano.manager.ui.FisPrint;
 import ir.meelano.manager.ui.MeelanoIcons;
 import ir.meelano.manager.ui.Pdf;
 import ir.meelano.manager.ui.Theme;
@@ -59,7 +62,10 @@ public class MainActivity extends Activity {
     private LinearLayout bottomBar;
     private TextView connDot;
     private TextView backFab;
-    private TextView rangeLine;
+    private TextView companyName;
+    private android.widget.FrameLayout logoBox;
+    private android.widget.ImageView logoImg;
+    private TextView logoGlyph;
 
     private final Map<String, Screen> screens = new LinkedHashMap<>();
     private final List<String> history = new ArrayList<>();
@@ -157,10 +163,12 @@ public class MainActivity extends Activity {
     private void styleBars() {
         try {
             getWindow().setStatusBarColor(Theme.statusBar());
-            getWindow().setNavigationBarColor(Theme.statusBar());
+            getWindow().setNavigationBarColor(Theme.navBar());
             int vis = getWindow().getDecorView().getSystemUiVisibility();
-            if (Theme.isLight()) vis |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
-            else vis &= ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+            if (Theme.isLight())
+                vis |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+            else
+                vis &= ~(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
             getWindow().getDecorView().setSystemUiVisibility(vis);
         } catch (Exception ignored) { }
     }
@@ -283,18 +291,39 @@ public class MainActivity extends Activity {
         root.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         root.setBackgroundColor(Theme.BG);
 
-        // header
+        // header: connection dot + company logo (from Atiran) + company name + tools
         LinearLayout header = kit.h();
-        header.setPadding(Theme.dp(14), Theme.dp(12), Theme.dp(14), Theme.dp(8));
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setPadding(Theme.dp(14), Theme.dp(10), Theme.dp(14), Theme.dp(8));
         connDot = kit.text("●", 13, Theme.WARNING, true);
         header.addView(connDot, kit.lp(-2, -2));
         header.addView(kit.space(8));
-        LinearLayout titleBox = kit.v();
-        TextView app = kit.text("♛ مدیریت میلانو", 16, Theme.TEXT, true);
-        titleBox.addView(app, kit.lp(-1, -2));
-        rangeLine = kit.text(kit.todayLine(), 10.5f, Theme.MUTED, false);
-        titleBox.addView(rangeLine, kit.lp(-1, -2));
-        header.addView(titleBox, kit.wlp(1f));
+        logoBox = new android.widget.FrameLayout(this);
+        logoBox.setBackground(Theme.avatar(Theme.GOLD));
+        logoGlyph = kit.text("♛", 20, 0xFFFFFFFF, true);
+        logoGlyph.setGravity(Gravity.CENTER);
+        logoBox.addView(logoGlyph, new android.widget.FrameLayout.LayoutParams(-1, -1));
+        logoImg = new android.widget.ImageView(this);
+        logoImg.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
+        try {
+            logoImg.setClipToOutline(true);
+            logoImg.setOutlineProvider(new android.view.ViewOutlineProvider() {
+                @Override
+                public void getOutline(android.view.View v, android.graphics.Outline o) {
+                    o.setOval(0, 0, v.getWidth(), v.getHeight());
+                }
+            });
+        } catch (Exception ignored) { }
+        int lpad = Theme.dp(2);
+        logoImg.setPadding(lpad, lpad, lpad, lpad);
+        logoImg.setVisibility(View.GONE);
+        logoBox.addView(logoImg, new android.widget.FrameLayout.LayoutParams(-1, -1));
+        header.addView(logoBox, new LinearLayout.LayoutParams(Theme.dp(46), Theme.dp(46)));
+        header.addView(kit.space(8));
+        companyName = kit.text(companyTitle(), 16, Theme.TEXT, true);
+        companyName.setSingleLine(true);
+        companyName.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        header.addView(companyName, kit.wlp(1f));
         LinearLayout tools = kit.h();
         tools.setGravity(Gravity.CENTER_VERTICAL);
         tools.setBackground(Theme.ghostButton(Theme.GOLD));
@@ -362,6 +391,7 @@ public class MainActivity extends Activity {
         reg(new VisitorsScreen(this));
         reg(new UsersScreen(this));
         reg(new ProfitScreen(this));
+        reg(new DuesScreen(this));
         reg(new ReportsScreen(this));
         reg(new SettingsScreen(this));
         reg(new MoreScreen(this));
@@ -371,6 +401,7 @@ public class MainActivity extends Activity {
         nav(screens.containsKey(currentId) ? currentId : "home");
         styleBars();
         checkConn();
+        refreshCompany();
         Notify.boot(this);
         syncBackFab();
     }
@@ -445,6 +476,61 @@ public class MainActivity extends Activity {
         }
         currentId = id;
         renderCurrent();
+        animateContent(true);
+    }
+
+    /** Direction-aware content slide (RTL: forward enters from the left). */
+    private void animateContent(boolean forward) {
+        try {
+            if (content == null) return;
+            content.animate().cancel();
+            content.setTranslationX((forward ? -1 : 1) * Theme.dp(48));
+            content.setAlpha(0.35f);
+            content.animate().translationX(0f).alpha(1f).setDuration(220).start();
+        } catch (Exception ignored) { }
+    }
+
+    /** Paint the company header from cache, then refresh from Atiran in background. */
+    public void refreshCompany() {
+        refreshCompany(null);
+    }
+
+    public void refreshCompany(final Runnable after) {
+        paintCompany();
+        try {
+            Company.refresh(this, settings, repo, () -> {
+                paintCompany();
+                if (after != null) after.run();
+            });
+        } catch (Exception ignored) { }
+    }
+
+    private String companyTitle() {
+        String nm;
+        try {
+            nm = Company.get(this).displayName(this);
+        } catch (Exception e) {
+            nm = "مدیریت میلانو";
+        }
+        String g = Theme.seasonGlyph(this);
+        return g.isEmpty() ? nm : nm + " " + g;
+    }
+
+    private void paintCompany() {
+        try {
+            if (companyName != null) companyName.setText(companyTitle());
+            android.graphics.Bitmap b = Company.logo(this);
+            if (logoImg != null && logoGlyph != null) {
+                if (b != null) {
+                    logoImg.setImageBitmap(b);
+                    logoImg.setVisibility(View.VISIBLE);
+                    logoGlyph.setVisibility(View.GONE);
+                } else {
+                    logoImg.setVisibility(View.GONE);
+                    logoGlyph.setVisibility(View.VISIBLE);
+                }
+            }
+        } catch (Exception ignored) { }
     }
 
     private void renderCurrent() {
@@ -455,13 +541,12 @@ public class MainActivity extends Activity {
         s.render(content);
     }
 
-    /** Repaint bottom bar + filter button + title line (screens call this after internal state changes). */
+    /** Repaint bottom bar + back FAB (screens call this after internal state changes). */
     public void refreshChrome() {
         Screen s = screens.get(currentId);
         if (s == null) return;
         paintBottom();
         if (backFab != null) backFab.setVisibility("home".equals(currentId) ? View.GONE : View.VISIBLE);
-        rangeLine.setText(kit.todayLine() + "  •  " + s.title());
     }
 
     public void openFilter() {
@@ -489,6 +574,7 @@ public class MainActivity extends Activity {
         if (!history.isEmpty()) {
             currentId = history.remove(history.size() - 1);
             renderCurrent();
+            animateContent(false);
         } else nav("home");
     }
 
@@ -555,12 +641,65 @@ public class MainActivity extends Activity {
             }
         }
         voiceCb = null;
+        if (requestCode == SCAN_REQ && scanCb != null) {
+            try {
+                if (resultCode == Activity.RESULT_OK && data != null) {
+                    String code = data.getStringExtra(ScanActivity.EXTRA_CODE);
+                    if (code != null && !code.trim().isEmpty()) scanCb.accept(code.trim());
+                    else kit.toast("کدی خوانده نشد");
+                }
+            } catch (Exception e) {
+                kit.toast("اسکن ممکن نشد");
+            }
+            scanCb = null;
+        }
     }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         // Notification permission is best-effort; the app works fully without it.
+        boolean granted = grantResults != null && grantResults.length > 0
+                && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED;
+        if (requestCode == SCAN_PERM) {
+            if (granted && scanCb != null) launchScanner();
+            else {
+                kit.toast("برای اسکن بارکد دسترسی دوربین لازم است");
+                scanCb = null;
+            }
+        } else if (requestCode == FisPrint.BT_REQ) {
+            FisPrint.onPermissionResult(this, granted);
+        }
+    }
+
+    // ================= barcode scanner =================
+    private static final int SCAN_REQ = 902;
+    private static final int SCAN_PERM = 903;
+    private java.util.function.Consumer<String> scanCb;
+
+    /** Open the barcode scanner; the decoded text is delivered to cb. */
+    public void startScan(java.util.function.Consumer<String> cb) {
+        scanCb = cb;
+        try {
+            if (checkSelfPermission(android.Manifest.permission.CAMERA)
+                    == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                launchScanner();
+            } else {
+                requestPermissions(new String[]{android.Manifest.permission.CAMERA}, SCAN_PERM);
+            }
+        } catch (Exception e) {
+            kit.toast("دوربین در دسترس نیست");
+            scanCb = null;
+        }
+    }
+
+    private void launchScanner() {
+        try {
+            startActivityForResult(new android.content.Intent(this, ScanActivity.class), SCAN_REQ);
+        } catch (Exception e) {
+            kit.toast("اسکنر باز نشد");
+            scanCb = null;
+        }
     }
 
     @Override
@@ -574,6 +713,7 @@ public class MainActivity extends Activity {
         if (!history.isEmpty()) {
             currentId = history.remove(history.size() - 1);
             renderCurrent();
+            animateContent(false);
         } else super.onBackPressed();
     }
 

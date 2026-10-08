@@ -127,10 +127,33 @@ public final class Settings {
         p.edit().putString("home_cache", json == null ? "" : json).apply();
     }
 
+    // ---------------- font size + seasonal theme (v14) ----------------
+    public boolean bigFont() { return p.getBoolean("big_font", false); }
+
+    public void setBigFont(boolean on) { p.edit().putBoolean("big_font", on).apply(); }
+
+    public boolean seasonalOn() { return p.getBoolean("seasonal_on", true); }
+
+    public void setSeasonalOn(boolean on) { p.edit().putBoolean("seasonal_on", on).apply(); }
+
     // ---------------- morning report + backup reminder ----------------
     public boolean morningOn() { return p.getBoolean("morning_on", true); }
 
     public void setMorningOn(boolean on) { p.edit().putBoolean("morning_on", on).apply(); }
+
+    public boolean weeklyOn() { return p.getBoolean("weekly_on", true); }
+
+    public void setWeeklyOn(boolean on) { p.edit().putBoolean("weekly_on", on).apply(); }
+
+    /** Smart-export backup bookkeeping. */
+    public String backupLast() { return p.getString("backup_last", ""); }
+
+    public String backupSize() { return p.getString("backup_size", ""); }
+
+    public void saveBackupInfo(String whenFa, String sizeFa) {
+        p.edit().putString("backup_last", whenFa == null ? "" : whenFa)
+                .putString("backup_size", sizeFa == null ? "" : sizeFa).apply();
+    }
 
     public boolean backupOn() { return p.getBoolean("backup_on", true); }
 

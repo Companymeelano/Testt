@@ -40,7 +40,7 @@ public final class Kit {
     public TextView text(String s, float sp, int color, boolean bold) {
         TextView t = new TextView(a);
         t.setText(s == null ? "" : s);
-        t.setTextSize(sp);
+        t.setTextSize(sp * Theme.fontScale());
         t.setTextColor(color);
         t.setTypeface(Theme.face(bold));
         t.setLineSpacing(Theme.dp(1.5f), 1.0f);

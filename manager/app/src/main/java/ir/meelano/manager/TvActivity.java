@@ -17,6 +17,7 @@ import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.MoneyQueries;
 import ir.meelano.manager.core.Queries;
+import ir.meelano.manager.data.Company;
 import ir.meelano.manager.data.Meta;
 import ir.meelano.manager.data.Repo;
 import ir.meelano.manager.data.Row;
@@ -81,8 +82,8 @@ public class TvActivity extends Activity {
         head.setGravity(Gravity.CENTER_VERTICAL);
         head.addView(kit.logo(54), new LinearLayout.LayoutParams(Theme.dp(54), Theme.dp(54)));
         head.addView(kit.space(12));
-        String shop = settings.shopName();
-        TextView name = kit.text(shop.isEmpty() ? "فروشگاه میلانو" : shop, 22, Theme.TEXT, true);
+        String shop = Company.get(this).displayName(this);
+        TextView name = kit.text(shop, 22, Theme.TEXT, true);
         head.addView(name, kit.wlp(1f));
         clock = kit.text("", 20, Theme.GOLD_SOFT, true);
         head.addView(clock, kit.lp(-2, -2));
@@ -329,11 +330,11 @@ public class TvActivity extends Activity {
     }
 
     private void slideShop() {
-        String shop = settings.shopName();
+        String shop = Company.get(this).displayName(this);
         LinearLayout c = kit.card(Theme.GOLD);
         c.setGravity(Gravity.CENTER);
         c.addView(kit.logo(110), new LinearLayout.LayoutParams(Theme.dp(110), Theme.dp(110)));
-        TextView nm = kit.text(shop.isEmpty() ? "فروشگاه میلانو" : shop, 34, Theme.TEXT, true);
+        TextView nm = kit.text(shop, 34, Theme.TEXT, true);
         nm.setGravity(Gravity.CENTER);
         c.addView(nm, kit.lp(-1, -2));
         TextView t1 = kit.text("مدیریت میلانو • داشبورد مدیریتی آتیران", 16f, Theme.MUTED, true);

@@ -92,6 +92,11 @@ public class ProductsScreen extends Screen {
         content.removeAllViews();
         content.addView(heroCard(), a.kit.lp(-1, -2));
         content.addView(a.kit.hint("آستانه کم‌موجودی: ۵ واحد • گردش کالا بر اساس بازه فیلتر"), a.kit.lp(-1, -2));
+        content.addView(a.kit.btnGhost("▦ اسکن بارکد کالا", Theme.VIOLET, v -> a.startScan(code -> {
+            filter.search = code;
+            a.refreshChrome();
+            render(content);
+        })), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(12));
         content.addView(a.kit.loading("در حال دریافت کالاها…"), a.kit.lp(-1, -2));
         final int myTab = tab;

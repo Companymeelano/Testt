@@ -100,6 +100,7 @@ public final class AtiranSchema {
             {"TableChanges", "تغییرات ثبت‌شده"},   // 1035
             {"DeviceLocation", "موقعیت دستگاه‌ها"}, // 94
             {"TerminalCompanyPos", "پوزهای شرکت"}, // 8
+            {"company", "مشخصات شرکت + لوگو"},       // 1 — name/modir_amel/addre/tell1/tell2/cell/fax/C_meli/C_egh/C_pos/arm/logo
     };
 
     // =====================================================================================

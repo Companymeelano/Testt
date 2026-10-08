@@ -19,6 +19,7 @@ import ir.meelano.manager.data.Repo;
 import ir.meelano.manager.data.Row;
 import ir.meelano.manager.ui.Charts;
 import ir.meelano.manager.ui.FilterSheet;
+import ir.meelano.manager.ui.FisPrint;
 import ir.meelano.manager.ui.Kit;
 import ir.meelano.manager.ui.Theme;
 
@@ -491,6 +492,8 @@ public class TradeScreen extends Screen {
             };
             a.sharePdf("فاکتور " + fNo, fParty + " • " + fDate, cols, fLines);
         }), a.kit.wlp(1f));
+        footer.addView(a.kit.space(8));
+        footer.addView(a.kit.btnGhost("🖨 چاپ", Theme.GOLD, v -> FisPrint.print(a, head, fLines, sales)), a.kit.wlp(1f));
         footer.addView(a.kit.space(8));
         footer.addView(a.kit.btn("بستن", v -> dlg.dismiss()), a.kit.wlp(1f));
         body.addView(a.kit.gap(8));

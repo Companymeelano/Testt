@@ -5,7 +5,11 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 
 import ir.meelano.manager.MainActivity;
+import ir.meelano.manager.ShareProvider;
 import ir.meelano.manager.ShopCard;
+import ir.meelano.manager.core.Backup;
+import ir.meelano.manager.core.Jalali;
+import ir.meelano.manager.data.Company;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.data.NetRoute;
 import ir.meelano.manager.data.Repo;
@@ -134,6 +138,17 @@ public class SettingsScreen extends Screen {
             sw.addView(cell, a.kit.wlp(1f));
         }
         th.addView(sw, a.kit.lp(-1, -2));
+        final boolean bf = a.settings.bigFont();
+        th.addView(a.kit.btnGhost("🔍 درشت‌نمایی متن: " + (bf ? "روشن" : "خاموش"), Theme.GOLD, v -> {
+            a.settings.setBigFont(!bf);
+            a.refreshTheme();
+        }), a.kit.lp(-1, -2));
+        final boolean sn = a.settings.seasonalOn();
+        th.addView(a.kit.btnGhost("🌸 تم مناسبتی خودکار: " + (sn ? "روشن" : "خاموش"), Theme.TEAL, v -> {
+            a.settings.setSeasonalOn(!sn);
+            a.kit.toast(!sn ? "تم مناسبتی روشن شد" : "تم مناسبتی خاموش شد");
+            a.refreshTheme();
+        }), a.kit.lp(-1, -2));
         th.addView(a.kit.hint("قالب و رنگ انتخابی فوراً روی همه بخش‌ها، جدول‌ها، نمودارها و آیکن‌ها اعمال می‌شود."), a.kit.lp(-1, -2));
         a.kit.addCard(content, th);
 
@@ -166,29 +181,29 @@ public class SettingsScreen extends Screen {
             a.kit.toast(!bkp ? "یادآوری هفتگی روشن شد (جمعه‌ها ساعت ۹)" : "یادآوری هفتگی خاموش شد");
             render(content);
         }), a.kit.lp(-1, -2));
-        final android.widget.EditText shop = a.kit.edit("نام فروشگاه (برای کارت ویزیت دیجیتال)", a.settings.shopName());
-        LinearLayout.LayoutParams shp = a.kit.lp(-1, -2);
-        shp.setMargins(0, Theme.dp(6), 0, 0);
-        nt.addView(shop, shp);
-        final android.widget.EditText shopPhone = a.kit.edit("تلفن فروشگاه", a.settings.shopPhone());
-        LinearLayout.LayoutParams spp = a.kit.lp(-1, -2);
-        spp.setMargins(0, Theme.dp(6), 0, 0);
-        nt.addView(shopPhone, spp);
-        final android.widget.EditText shopAddr = a.kit.edit("آدرس فروشگاه", a.settings.shopAddr());
-        LinearLayout.LayoutParams sap = a.kit.lp(-1, -2);
-        sap.setMargins(0, Theme.dp(6), 0, 0);
-        nt.addView(shopAddr, sap);
-        nt.addView(a.kit.btnGhost("🪪 ساخت کارت ویزیت دیجیتال", Theme.VIOLET, v -> {
-            String nm = shop.getText().toString().trim();
-            if (!nm.isEmpty()) a.settings.setShopName(nm);
-            a.settings.setShopPhone(shopPhone.getText().toString());
-            a.settings.setShopAddr(shopAddr.getText().toString());
-            a.kit.toast(nm.isEmpty() ? "نام فروشگاه را وارد کنید" : "مشخصات فروشگاه ذخیره شد");
-            if (!nm.isEmpty()) ShopCard.show(a);
+        final boolean wk = a.settings.weeklyOn();
+        nt.addView(a.kit.btnGhost("📊 گزارش هفتگی (پنجشنبه‌ها ساعت ۲۰): " + (wk ? "روشن" : "خاموش"), Theme.VIOLET, v -> {
+            a.settings.setWeeklyOn(!wk);
+            if (!wk) ir.meelano.manager.core.Notify.scheduleWeeklyReport(a);
+            else ir.meelano.manager.core.Notify.cancelWeeklyReport(a);
+            a.kit.toast(!wk ? "گزارش هفتگی روشن شد" : "گزارش هفتگی خاموش شد");
+            render(content);
         }), a.kit.lp(-1, -2));
+        companyInfo(nt, content);
+        nt.addView(a.kit.btnGhost("🪪 ساخت کارت ویزیت دیجیتال", Theme.VIOLET, v -> ShopCard.show(a)), a.kit.lp(-1, -2));
         nt.addView(a.kit.btnGhost("📺 حالت تلویزیون فروشگاه", Theme.SUCCESS, v -> a.startTv()), a.kit.lp(-1, -2));
         nt.addView(a.kit.hint("هشدار هوشمند هر روز ساعت ۸ سررسیدها، معوق‌ها و چک‌های برگشتی تازه را اعلان می‌کند؛ گزارش صبحگاهی خلاصه فروش و دریافت دیروز را اضافه می‌کند."), a.kit.lp(-1, -2));
         a.kit.addCard(content, nt);
+
+        // ---- smart backup ----
+        LinearLayout bk = a.kit.card(Theme.TEAL);
+        bk.addView(a.kit.text("پشتیبان‌گیری هوشمند", 14.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        String bl = a.settings.backupLast();
+        if (!bl.isEmpty())
+            bk.addView(a.kit.kv("آخرین بکاپ", bl + (a.settings.backupSize().isEmpty() ? "" : " • " + a.settings.backupSize()), Theme.TEXT), a.kit.lp(-1, -2));
+        bk.addView(a.kit.btn("⛁ بکاپ هوشمند روی گوشی", v -> runBackup(content)), a.kit.lp(-1, -2));
+        bk.addView(a.kit.hint("۲۵ جدول اصلی آتیران به‌صورت CSV داخل یک فایل ZIP در پوشه Downloads ذخیره و برای اشتراک آماده می‌شود."), a.kit.lp(-1, -2));
+        a.kit.addCard(content, bk);
 
         // ---- PIN ----
         LinearLayout p = a.kit.card(Theme.INFO);
@@ -268,6 +283,66 @@ public class SettingsScreen extends Screen {
         ab.addView(a.kit.kv("منبع داده", "SQL Server آتیران (اتصال مستقیم)", Theme.TEXT), a.kit.lp(-1, -2));
         ab.addView(a.kit.hint("همه بخش‌ها داده زنده نمایش می‌دهند؛ بدون اتصال، اطلاع‌رسانی می‌شود."), a.kit.lp(-1, -2));
         a.kit.addCard(content, ab);
+    }
+
+    /** Company profile auto-loaded from Atiran (no manual entry needed). */
+    private void companyInfo(LinearLayout nt, LinearLayout content) {
+        Company.Info co = Company.get(a);
+        nt.addView(a.kit.text("مشخصات شرکت (خودکار از آتیران)", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        nt.addView(a.kit.kv("نام", co.displayName(a), Theme.TEXT), a.kit.lp(-1, -2));
+        if (co.director != null && !co.director.trim().isEmpty())
+            nt.addView(a.kit.kv("مدیرعامل", co.director.trim(), Theme.TEXT), a.kit.lp(-1, -2));
+        String ph = co.phonesLine(a);
+        if (!ph.isEmpty()) nt.addView(a.kit.kv("تلفن‌ها", Money.fa(ph), Theme.GOLD_SOFT), a.kit.lp(-1, -2));
+        String ad = co.displayAddr(a);
+        if (!ad.isEmpty()) nt.addView(a.kit.kv("آدرس", ad, Theme.TEXT), a.kit.lp(-1, -2));
+        if (co.meli != null && !co.meli.trim().isEmpty())
+            nt.addView(a.kit.kv("شناسه ملی", Money.fa(co.meli.trim()), Theme.MUTED), a.kit.lp(-1, -2));
+        if (co.egh != null && !co.egh.trim().isEmpty())
+            nt.addView(a.kit.kv("کد اقتصادی", Money.fa(co.egh.trim()), Theme.MUTED), a.kit.lp(-1, -2));
+        if (co.pos != null && !co.pos.trim().isEmpty())
+            nt.addView(a.kit.kv("کد پستی", Money.fa(co.pos.trim()), Theme.MUTED), a.kit.lp(-1, -2));
+        nt.addView(a.kit.btnGhost("⟳ به‌روزرسانی از آتیران", Theme.TEAL, v -> {
+            a.kit.toast("در حال به‌روزرسانی مشخصات…");
+            a.refreshCompany(() -> render(content));
+        }), a.kit.lp(-1, -2));
+    }
+
+    private void runBackup(LinearLayout content) {
+        final android.widget.TextView st = a.kit.text("آماده‌سازی…", 13f, Theme.TEXT, false);
+        st.setGravity(android.view.Gravity.CENTER);
+        LinearLayout body = a.kit.v();
+        body.setPadding(Theme.dp(20), Theme.dp(20), Theme.dp(20), Theme.dp(20));
+        body.addView(st, a.kit.lp(-1, -2));
+        final AlertDialog dlg = a.kit.dialog("بکاپ هوشمند", body, false);
+        dlg.show();
+        Backup.export(a, a.settings, (fa, doneN, total) ->
+                st.setText("در حال ذخیره " + fa + " (" + Money.fa(doneN + " از " + total) + ")"), new Backup.Done() {
+            @Override
+            public void onDone(java.io.File zip, long bytes, String notes) {
+                try {
+                    dlg.dismiss();
+                } catch (Exception ignored) { }
+                a.settings.saveBackupInfo(Jalali.faDate(Jalali.todayStr()), Backup.sizeFa(bytes));
+                a.kit.toast("بکاپ ساخته شد (" + Backup.sizeFa(bytes) + ") • " + notes);
+                render(content);
+                try {
+                    java.io.File shared = Backup.toShareDir(a, zip);
+                    if (shared != null) ShareProvider.share(a, shared, "application/zip", "بکاپ هوشمند میلانو");
+                    else a.kit.toast("فایل در پوشه Downloads ذخیره شد");
+                } catch (Exception e) {
+                    a.kit.toast("فایل در پوشه Downloads ذخیره شد");
+                }
+            }
+
+            @Override
+            public void onFail(String faError) {
+                try {
+                    dlg.dismiss();
+                } catch (Exception ignored) { }
+                a.kit.toast(faError == null ? "بکاپ ممکن نشد" : faError);
+            }
+        });
     }
 
     private void moveHome(java.util.List<String> order, int idx, int delta, LinearLayout content) {

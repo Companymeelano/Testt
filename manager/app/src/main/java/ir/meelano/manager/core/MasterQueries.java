@@ -1100,6 +1100,8 @@ public final class MasterQueries {
         String isB = backU + " IN (N'T',N'1',N'TRUE')";
         String amt = "TRY_CONVERT(decimal(19,2),h.[" + c.amount + "])";
         String join = (!c.isView && c.shmo != null) ? Queries.custJoin(m, "h", c.shmo, "cu") : "";
+        String cellCol = (!c.isView && c.shmo != null) ? m.col("CUSTOMERS", "cell", "mobile", "Mobile") : null;
+        String cellExpr = cellCol == null ? "N''" : "COALESCE(" + Sql.txt("cu", cellCol, 100) + ",N'')";
         String custExpr = c.custName != null ? "COALESCE(" + Sql.txt("h", c.custName, 250) + ",N'—')"
                 : Queries.custNameExpr(m, "h", c.shmo, "cu");
         List<Object> binds = new ArrayList<>();
@@ -1111,6 +1113,7 @@ public final class MasterQueries {
         String where = conds.isEmpty() ? "" : " WHERE " + Sql.join(conds, " AND ");
         String nBounced = "SUM(CASE WHEN " + isB + " THEN 1 ELSE 0 END)";
         return new Queries.Q("SELECT TOP (200) " + custExpr + " AS customer"
+                + ", MAX(" + cellExpr + ") AS cell"
                 + ", COUNT_BIG(1) AS total, " + nBounced + " AS bounced"
                 + ", ISNULL(SUM(CASE WHEN " + isB + " THEN " + amt + " ELSE 0 END),0) AS bouncedAmt"
                 + ", ISNULL(SUM(" + amt + "),0) AS totalAmt"
@@ -1118,7 +1121,7 @@ public final class MasterQueries {
                 + ", CASE WHEN COUNT_BIG(1)<2 THEN N'سابقه کم' WHEN " + nBounced + "=0 THEN N'★ خوش‌قول'"
                 + " WHEN SUM(CASE WHEN " + isB + " THEN 1.0 ELSE 0 END)/COUNT_BIG(1)<=0.2 THEN N'متوسط' ELSE N'⚠ پرخطر' END AS grade"
                 + " FROM dbo.[" + c.table + "] h" + join + where
-                + " GROUP BY " + custExpr + " ORDER BY 6 DESC, 4 DESC", binds);
+                + " GROUP BY " + custExpr + " ORDER BY 7 DESC, 5 DESC", binds);
     }
 
     /** Visitor yield: assigned / range-active / 90-day-churned customers + invoices per customer. */
@@ -1288,5 +1291,158 @@ public final class MasterQueries {
                 + " LEFT JOIN " + cogsAgg + " ON cg.no=" + no
                 + Queries.custJoin(m, "h", partyCol, "cu")
                 + where + " ORDER BY h.[" + dateCol + "] DESC, h.[" + numberCol + "] DESC", binds);
+    }
+
+    // =====================================================================================
+    // COMPANY (v14): profile + logo bytes from dbo.company (the «تغییر نام شرکت» section).
+    // =====================================================================================
+    /** Company profile text: name,director,addr,tell1,tell2,cell,fax,meli,egh,pos. */
+    public static Queries.Q companyProfile(Meta m) throws Queries.Missing {
+        if (!m.table("company")) throw new Queries.Missing("جدول مشخصات شرکت در دیتابیس پیدا نشد");
+        String[][] cols = {
+                {"name", "نام شرکت", "name", "Name", "moname", "company_name"},
+                {"director", "مدیرعامل", "modir_amel", "modir", "manager"},
+                {"addr", "آدرس", "addre", "address", "addr"},
+                {"tell1", "تلفن", "tell1", "tell", "phone"},
+                {"tell2", "تلفن ۲", "tell2", "phone2"},
+                {"cell", "همراه", "cell", "mobile", "Mobile"},
+                {"fax", "فکس", "fax", "Fax"},
+                {"meli", "شناسه ملی", "C_meli", "meli", "nationalcode"},
+                {"egh", "کد اقتصادی", "C_egh", "egh", "economiccode"},
+                {"pos", "کد پستی", "C_pos", "pos", "postalcode"},
+        };
+        StringBuilder sb = new StringBuilder("SELECT TOP (1) ");
+        for (int i = 0; i < cols.length; i++) {
+            if (i > 0) sb.append(", ");
+            String c = m.col("company", java.util.Arrays.copyOfRange(cols[i], 2, cols[i].length));
+            sb.append(c == null ? "CAST(NULL AS nvarchar(400))" : Sql.txt("c", c, 400)).append(" AS ").append(cols[i][0]);
+        }
+        sb.append(" FROM dbo.company c");
+        return new Queries.Q(sb.toString());
+    }
+
+    /** Logo byte-size (cheap change detection): len. Prefers logo, falls back to arm. */
+    public static Queries.Q companyLogoLen(Meta m) throws Queries.Missing {
+        String logo = companyLogoCol(m);
+        return new Queries.Q("SELECT TOP (1) ISNULL(DATALENGTH([" + logo + "]),0) AS len FROM dbo.company");
+    }
+
+    /** Logo bytes: logo. */
+    public static Queries.Q companyLogo(Meta m) throws Queries.Missing {
+        String logo = companyLogoCol(m);
+        return new Queries.Q("SELECT TOP (1) [" + logo + "] AS logo FROM dbo.company");
+    }
+
+    private static String companyLogoCol(Meta m) throws Queries.Missing {
+        if (!m.table("company")) throw new Queries.Missing("جدول مشخصات شرکت در دیتابیس پیدا نشد");
+        String logo = m.col("company", "logo", "Logo", "pic", "tasvir");
+        if (logo == null) logo = m.col("company", "arm", "Arm");
+        if (logo == null) throw new Queries.Missing("ستون لوگو در جدول شرکت پیدا نشد");
+        return logo;
+    }
+
+    // =====================================================================================
+    // DUES CALENDAR (v14): raw outstanding dues in a window; the screen buckets by day.
+    // =====================================================================================
+    /** Outstanding cheque dues (raw rows): kind,sardate,amount,num,party. */
+    public static Queries.Q duesRaw(Meta m, boolean incoming, String from, String to) throws Queries.Missing {
+        MoneyQueries.Chq c = MoneyQueries.chq(m, incoming);
+        if (c.sardate == null) throw new Queries.Missing("ستون سررسید در «چک‌ها» پیدا نشد");
+        if (c.amount == null) throw new Queries.Missing("ستون مبلغ در «چک‌ها» پیدا نشد");
+        List<Object> binds = new ArrayList<>();
+        List<String> conds = new ArrayList<>();
+        String dc = Sql.dateCond(Sql.date10("h", c.sardate), from, to, binds);
+        String dg = Sql.dateCond(Sql.date10("h", c.sardate), Jalali.toGregorian(from), Jalali.toGregorian(to), binds);
+        if (!dc.isEmpty() && !dg.isEmpty()) conds.add("(" + dc + " OR " + dg + ")");
+        else if (!dc.isEmpty()) conds.add(dc);
+        else if (!dg.isEmpty()) conds.add(dg);
+        else throw new Queries.Missing("بازه سررسید نامعتبر است");
+        String st = "LTRIM(RTRIM(TRY_CONVERT(nvarchar(40),h.[" + c.st + "])))";
+        if (incoming) {
+            conds.add(st + " IN (N'1',N'2')");
+            if (c.back != null) {
+                String back = "UPPER(LTRIM(RTRIM(TRY_CONVERT(nvarchar(10),h.[" + c.back + "]))))";
+                conds.add("(" + back + " NOT IN (N'T',N'1',N'TRUE') OR " + back + " IS NULL)");
+            }
+        } else {
+            conds.add(st + "=N'1'");
+        }
+        String join = (!c.isView && c.shmo != null) ? Queries.custJoin(m, "h", c.shmo, "cu") : "";
+        String custExpr = c.custName != null ? "COALESCE(" + Sql.txt("h", c.custName, 250) + ",N'—')"
+                : Queries.custNameExpr(m, "h", c.shmo, "cu");
+        return new Queries.Q("SELECT " + Sql.lit(incoming ? "in" : "out") + " AS kind"
+                + ", TRY_CONVERT(nvarchar(30),h.[" + c.sardate + "]) AS sardate"
+                + ", " + Sql.num("h", c.amount) + " AS amount"
+                + ", " + (c.num == null ? "N'—'" : "COALESCE(" + Sql.txt("h", c.num, 80) + ",N'—')") + " AS num"
+                + ", " + custExpr + " AS party"
+                + " FROM dbo.[" + c.table + "] h" + join + " WHERE " + Sql.join(conds, " AND ")
+                + " ORDER BY h.[" + c.sardate + "]", binds);
+    }
+
+    /** Unsettled-invoice dues (raw rows): kind,sardate,amount,num,party. */
+    public static Queries.Q duesInvRaw(Meta m, String from, String to) throws Queries.Missing {
+        m.must("sailfact", "وضعیت تسویه", "tasvieh");
+        m.must("sailfact", "تاریخ تسویه", "t_date");
+        String amountCol = m.must("sailfact", "مبلغ", "all");
+        String numberCol = m.must("sailfact", "شماره فاکتور", "shfacfo");
+        String partyCol = Sql.pick(m.columns("sailfact"), "shmo", "SHMO");
+        List<Object> binds = new ArrayList<>();
+        List<String> conds = new ArrayList<>();
+        conds.add("s.[tasvieh]='f'");
+        conds.add("NULLIF(s.[t_date],'') IS NOT NULL");
+        String dc = Sql.dateCond(Sql.date10("s", "t_date"), from, to, binds);
+        if (dc.isEmpty()) throw new Queries.Missing("بازه سررسید نامعتبر است");
+        conds.add(dc);
+        String numExpr = numberCol == null ? "N'—'" : "COALESCE(" + Sql.txt("s", numberCol, 80) + ",N'—')";
+        return new Queries.Q("SELECT " + Sql.lit("inv") + " AS kind"
+                + ", TRY_CONVERT(nvarchar(30),s.[t_date]) AS sardate"
+                + ", " + Sql.num("s", amountCol) + " AS amount, " + numExpr + " AS num"
+                + ", " + Queries.custNameExpr(m, "s", partyCol, "cu") + " AS party"
+                + " FROM dbo.sailfact s" + Queries.custJoin(m, "s", partyCol, "cu")
+                + " WHERE " + Sql.join(conds, " AND ") + " ORDER BY s.[t_date]", binds);
+    }
+
+    // =====================================================================================
+    // ORDER SUGGESTIONS (v14): 30-day cover qty per product.
+    // =====================================================================================
+    /** Suggested purchase list: label,vah,daily,daysLeft,suggest,status. */
+    public static Queries.Q orderSuggest(Meta m, Filter f) throws Queries.Missing {
+        String shka = m.must("inventory", "کد کالا", "shka");
+        String naka = m.must("inventory", "نام کالا", "naka", "NAKA");
+        String vah = m.must("inventory", "موجودی", "mojkavah", "MojKavah");
+        String active = m.col("inventory", "active", "Active");
+        String linkCol = m.must("subsailfact", "شماره فاکتور", "shfacfo");
+        String lineShka = m.must("subsailfact", "کد کالا", "SHKA", "shka");
+        String qty = m.must("subsailfact", "تعداد", "TEDVAH", "tedvah");
+        Set<String> sail = m.columns("sailfact");
+        String dateCol = m.must("sailfact", "تاریخ", "date");
+        String numberCol = m.must("sailfact", "شماره فاکتور", "shfacfo");
+        List<Object> binds = new ArrayList<>();
+        binds.add(Jalali.addDays(Jalali.todayStr(), -60));
+        String inner = "WHERE " + Sql.date10("x", dateCol) + ">=?" + Sql.activeAnd(sail, "x") + Sql.softAnd(sail, "x");
+        String agg = "(SELECT TRY_CONVERT(nvarchar(100),d2.[" + lineShka + "]) AS k"
+                + ", ISNULL(SUM(TRY_CONVERT(decimal(19,3),d2.[" + qty + "])),0)/60.0 AS daily"
+                + " FROM " + Sql.dedupe("sailfact", numberCol, "h2", inner)
+                + " JOIN dbo.subsailfact d2 ON TRY_CONVERT(nvarchar(100),d2.[" + linkCol + "])=TRY_CONVERT(nvarchar(100),h2.[" + numberCol + "])"
+                + " GROUP BY TRY_CONVERT(nvarchar(100),d2.[" + lineShka + "])) s";
+        String stock = "TRY_CONVERT(decimal(19,3),i.[" + vah + "])";
+        String days = "CASE WHEN ISNULL(s.daily,0)>0 THEN " + stock + "/s.daily ELSE NULL END";
+        String suggest = "CASE WHEN ISNULL(s.daily,0)>0 AND s.daily*30>" + stock
+                + " THEN s.daily*30-" + stock + " ELSE 0 END";
+        String status = "CASE WHEN ISNULL(s.daily,0)<=0 THEN N'بدون فروش' WHEN " + stock + "/s.daily<=7 THEN N'⚠ سفارش فوری'"
+                + " WHEN " + stock + "/s.daily<=21 THEN N'هشدار سفارش' ELSE N'عادی' END";
+        List<String> conds = new ArrayList<>();
+        conds.add(suggest + ">0");
+        if (active != null) conds.add(boolTrue("i.[" + active + "]"));
+        if (f.search != null && !f.search.trim().isEmpty()) {
+            String sc = Queries.searchCond(binds, f.search, Sql.txt("i", naka, 250));
+            if (!sc.isEmpty()) conds.add(sc);
+        }
+        return new Queries.Q("SELECT TOP (300) " + Sql.txt("i", naka, 250) + " AS label"
+                + ", " + stock + " AS vah, ISNULL(s.daily,0) AS daily, " + days + " AS daysLeft"
+                + ", " + suggest + " AS suggest, " + status + " AS status"
+                + " FROM dbo.inventory i LEFT JOIN " + agg + " ON s.k=TRY_CONVERT(nvarchar(100),i.[" + shka + "])"
+                + " WHERE " + Sql.join(conds, " AND ")
+                + " ORDER BY CASE WHEN ISNULL(s.daily,0)>0 THEN (" + stock + "/s.daily) ELSE 999999 END", binds);
     }
 }

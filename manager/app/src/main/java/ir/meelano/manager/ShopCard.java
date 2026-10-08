@@ -12,6 +12,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import ir.meelano.manager.core.Jalali;
+import ir.meelano.manager.data.Company;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.ui.Kit;
 import ir.meelano.manager.ui.Qr;
@@ -47,8 +48,7 @@ public final class ShopCard {
         c.setPadding(pad, pad, pad, pad);
         int ink = Theme.onAccent();
         int inkSoft = Theme.alpha(ink, 200);
-        String shop = a.settings.shopName();
-        if (shop.isEmpty()) shop = "فروشگاه میلانو";
+        String shop = Company.get(a).displayName(a);
 
         ImageView logo = k.logo(hiRes ? 0 : 76);
         if (hiRes) logo.setLayoutParams(new LinearLayout.LayoutParams(216, 216));
@@ -74,8 +74,8 @@ public final class ShopCard {
         if (hiRes) t2.setTextSize(TypedValue.COMPLEX_UNIT_PX, 30);
         t2.setGravity(Gravity.CENTER);
         c.addView(t2, k.lp(-1, -2));
-        String phone = a.settings.shopPhone();
-        String addr = a.settings.shopAddr();
+        String phone = Company.get(a).phonesLine(a);
+        String addr = Company.get(a).displayAddr(a);
         if (!phone.isEmpty()) {
             TextView tp = k.text(phone, hiRes ? 32 : 12f, ink, true);
             if (hiRes) tp.setTextSize(TypedValue.COMPLEX_UNIT_PX, 32);

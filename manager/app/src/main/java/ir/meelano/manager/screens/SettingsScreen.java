@@ -41,42 +41,19 @@ public class SettingsScreen extends Screen {
 
         // ---- connection ----
         LinearLayout c = a.kit.card(Theme.GOLD);
-        c.addView(a.kit.text("اتصال به آتیران", 14.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
-        final EditText host = a.kit.edit("آدرس سرور", a.settings.effHost());
-        final EditText port = a.kit.editNum("پورت", String.valueOf(a.settings.effPort()));
-        final EditText db = a.kit.edit("نام دیتابیس", a.settings.effDb());
-        final EditText user = a.kit.edit("نام کاربری", a.settings.effUser());
-        final EditText pass = a.kit.edit("رمز عبور", a.settings.effPass(), true);
-        for (EditText e : new EditText[]{host, port, db, user, pass}) {
-            LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
-            p.setMargins(0, Theme.dp(5), 0, Theme.dp(5));
-            c.addView(e, p);
+        c.addView(a.kit.text("🔒 اتصال به آتیران", 14.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        // Locked by design: the server address and credentials live only inside the
+        // seller's encrypted connection card and are never shown or typed here.
+        final boolean cfg = a.settings.connConfigured();
+        c.addView(a.kit.kv("وضعیت", cfg ? "✓ تنظیم‌شده توسط فروشنده" : "✕ هنوز تنظیم نشده",
+                cfg ? Theme.SUCCESS : Theme.DANGER), a.kit.lp(-1, -2));
+        if (cfg) {
+            c.addView(a.kit.kv("سرور", a.settings.maskedHost(), Theme.MUTED), a.kit.lp(-1, -2));
         }
         LinearLayout row = a.kit.h();
-        row.addView(a.kit.btn("ذخیره", v -> {
-            a.settings.saveConnection(host.getText().toString(), port.getText().toString(),
-                    db.getText().toString(), user.getText().toString(), pass.getText().toString());
-            a.kit.toast("تنظیمات ذخیره شد");
-            a.checkConn();
-        }), a.kit.wlp(1f));
-        row.addView(a.kit.space(8));
-        row.addView(a.kit.btnGhost("تست اتصال", Theme.SUCCESS, v -> {
-            String h = host.getText().toString().trim();
-            if (h.isEmpty()) {
-                a.kit.toast("آدرس سرور را وارد کنید");
-                return;
-            }
-            int tp;
-            try {
-                tp = Integer.parseInt(Money.en(port.getText().toString()).trim());
-            } catch (Exception e) {
-                a.kit.toast("پورت معتبر نیست");
-                return;
-            }
+        row.addView(a.kit.btn("تست اتصال", v -> {
             a.kit.toast("در حال تست اتصال…");
-            // Tests the on-screen values — no need to save first.
-            a.testConnection(h, tp, db.getText().toString().trim(), user.getText().toString().trim(),
-                    pass.getText().toString(), new Repo.Cb<String>() {
+            a.testConnection(new Repo.Cb<String>() {
                 @Override
                 public void ok(String v2) {
                     a.kit.toast(v2);
@@ -87,6 +64,15 @@ public class SettingsScreen extends Screen {
                     a.kit.toast(faError);
                 }
             });
+        }), a.kit.wlp(1f));
+        row.addView(a.kit.space(8));
+        row.addView(a.kit.btnGhost("تنظیم با کارت فروشنده", Theme.GOLD, v -> {
+            try {
+                a.startActivity(new android.content.Intent(a,
+                        ir.meelano.manager.LicenseActivity.class));
+            } catch (Exception e) {
+                a.kit.toast("ممکن نشد");
+            }
         }), a.kit.wlp(1f));
         c.addView(row, a.kit.lp(-1, -2));
         boolean vpn = NetRoute.isVpnActive(a);
@@ -281,6 +267,14 @@ public class SettingsScreen extends Screen {
         ab.addView(a.kit.gap(4));
         ab.addView(a.kit.kv("نسخه", appVersion() + " • ویرایش مدیریت", Theme.TEXT), a.kit.lp(-1, -2));
         ab.addView(a.kit.kv("منبع داده", "SQL Server آتیران (اتصال مستقیم)", Theme.TEXT), a.kit.lp(-1, -2));
+        ab.addView(a.kit.text("✦ پشتیبانی میلانو", 13f, Theme.GOLD_SOFT, true), a.kit.lp(-1, -2));
+        ab.addView(a.kit.btnGhost("🌐  " + ir.meelano.manager.core.Brand.SITE_LABEL, Theme.GOLD, v ->
+                ir.meelano.manager.core.Brand.openSite(a)), a.kit.lp(-1, -2));
+        for (String ph : ir.meelano.manager.core.Brand.PHONES) {
+            final String fph = ph;
+            ab.addView(a.kit.btnGhost("📞  " + Money.fa(ph), Theme.TEAL, v ->
+                    ir.meelano.manager.core.Brand.dial(a, fph)), a.kit.lp(-1, -2));
+        }
         ab.addView(a.kit.hint("همه بخش‌ها داده زنده نمایش می‌دهند؛ بدون اتصال، اطلاع‌رسانی می‌شود."), a.kit.lp(-1, -2));
         a.kit.addCard(content, ab);
     }

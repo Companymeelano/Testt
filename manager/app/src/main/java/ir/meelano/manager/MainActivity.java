@@ -16,6 +16,7 @@ import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.Notify;
 import ir.meelano.manager.core.Queries;
 import ir.meelano.manager.core.ReportCatalog;
+import ir.meelano.manager.core.Usage;
 import ir.meelano.manager.data.Company;
 import ir.meelano.manager.data.Meta;
 import ir.meelano.manager.data.Repo;
@@ -43,6 +44,7 @@ import ir.meelano.manager.ui.FisPrint;
 import ir.meelano.manager.ui.MeelanoIcons;
 import ir.meelano.manager.ui.Pdf;
 import ir.meelano.manager.ui.Theme;
+import ir.meelano.licensing.License;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -63,6 +65,7 @@ public class MainActivity extends Activity {
     private ScrollView scroll;
     private LinearLayout bottomBar;
     private TextView connDot;
+    private TextView licChip;
     private TextView backFab;
     private TextView companyName;
     private android.widget.FrameLayout logoBox;
@@ -82,6 +85,7 @@ public class MainActivity extends Activity {
             return;
         }
         Theme.init(this);
+        Usage.opened(this);
         kit = new Kit(this);
         settings = new Settings(this);
         repo = new Repo(this, settings);
@@ -94,6 +98,14 @@ public class MainActivity extends Activity {
         // Re-validate the license every time the app comes to the foreground
         // (expired / clock-tampered devices fall back to the activation screen).
         if (!isFinishing() && !LicenseStore.unlocked(this)) toLicense();
+        Usage.touch(this);
+        refreshLicChip();
+    }
+
+    @Override
+    protected void onPause() {
+        Usage.paused(this);
+        super.onPause();
     }
 
     private void toLicense() {
@@ -321,6 +333,15 @@ public class MainActivity extends Activity {
         connDot = kit.text("●", 13, Theme.WARNING, true);
         header.addView(connDot, kit.lp(-2, -2));
         header.addView(kit.space(8));
+        // License chip: subtle remaining-time pill, taps through to activation/support.
+        licChip = kit.text("", 10.5f, Theme.GOLD_SOFT, true);
+        licChip.setBackground(Theme.ghostButton(Theme.GOLD));
+        licChip.setPadding(Theme.dp(9), Theme.dp(4), Theme.dp(9), Theme.dp(4));
+        licChip.setSingleLine(true);
+        Theme.pressable(licChip);
+        licChip.setOnClickListener(v -> openLicense());
+        header.addView(licChip, kit.lp(-2, -2));
+        header.addView(kit.space(8));
         logoBox = new android.widget.FrameLayout(this);
         logoBox.setBackground(Theme.avatar(Theme.GOLD));
         logoGlyph = kit.text("♛", 20, 0xFFFFFFFF, true);
@@ -379,6 +400,7 @@ public class MainActivity extends Activity {
         tools.addView(refresh, kit.lp(-2, -2));
         header.addView(tools, kit.lp(-2, -2));
         root.addView(header, kit.lp(-1, -2));
+        refreshLicChip();
 
         // content (centered max-width column on tablets / wide screens)
         scroll = new ScrollView(this);
@@ -741,6 +763,39 @@ public class MainActivity extends Activity {
     }
 
     // ================= helpers for screens =================
+    /** Paint the header license chip (remaining time; red when ≤ 7 days). */
+    public void refreshLicChip() {
+        if (licChip == null) return;
+        try {
+            LicenseStore.Status s = LicenseStore.check(this);
+            if (!s.ok) {
+                licChip.setVisibility(View.GONE);
+                return;
+            }
+            licChip.setVisibility(View.VISIBLE);
+            if (s.plan == License.P_PERM) {
+                licChip.setText("◈ دائمی");
+                licChip.setTextColor(Theme.GOLD_SOFT);
+            } else if (s.daysLeft <= 7) {
+                licChip.setText("◈ " + Money.fa(String.valueOf(s.daysLeft)) + " روز!");
+                licChip.setTextColor(Theme.DANGER);
+            } else {
+                licChip.setText("◈ " + Money.fa(String.valueOf(s.daysLeft)) + " روز");
+                licChip.setTextColor(Theme.GOLD_SOFT);
+            }
+        } catch (Exception e) {
+            try {
+                licChip.setVisibility(View.GONE);
+            } catch (Exception ignored) { }
+        }
+    }
+
+    private void openLicense() {
+        try {
+            startActivity(new Intent(this, LicenseActivity.class));
+        } catch (Exception ignored) { }
+    }
+
     public void checkConn() {
         repo.run(c -> Repo.one(c, new Queries.Q("SELECT 1 AS ok")), new Repo.Cb<Row>() {
             @Override

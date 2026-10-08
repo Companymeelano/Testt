@@ -14,6 +14,31 @@ public final class Settings {
     }
 
     public String host() { return p.getString("db_host", "").trim(); }
+
+    /** Server address with all but the last segment masked (safe to display). */
+    public String maskedHost() {
+        String h = effHost().trim();
+        if (h.isEmpty()) return "";
+        String v = h.replaceFirst("^[a-zA-Z]+://", "");
+        int slash = v.indexOf('/');
+        if (slash >= 0) v = v.substring(0, slash);
+        String[] parts = v.split("\\.");
+        if (parts.length > 1) {
+            StringBuilder b = new StringBuilder();
+            for (int i = 0; i < parts.length - 1; i++) {
+                if (i > 0) b.append('.');
+                b.append("•••");
+            }
+            return b.append('.').append(parts[parts.length - 1]).toString();
+        }
+        if (v.length() <= 3) return "•••";
+        return "•••" + v.substring(v.length() - 2);
+    }
+
+    /** True once the seller's connection card has been applied on this phone. */
+    public boolean connConfigured() {
+        return !host().isEmpty();
+    }
     public String port() { return p.getString("db_port", "").trim(); }
     public String db() { return p.getString("db_name", "").trim(); }
     public String user() { return p.getString("db_user", "").trim(); }

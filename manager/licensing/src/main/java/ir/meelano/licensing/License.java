@@ -275,14 +275,224 @@ public final class License {
         return null;
     }
 
-    /** Self-test (wired to nothing; run from a unit check when paranoid). */
+    // ---------------- encrypted DB connection card ----------------
+    /**
+     * Connection card: the seller's admin app encrypts the customer's SQL Server
+     * profile (host/port/db/user/pass) into one shareable line; the client app
+     * decrypts it on the customer's own phone. Device-bound: a card minted for
+     * device A never opens on device B. Format:
+     * {@code MILANO-DB1|<base64url IV+ciphertext, AES-128-CBC, key = SHA256(secret|db|dev)>}.
+     * The customer never types (or sees) server addresses.
+     */
+    public static final String DB_PREFIX = "MILANO-DB1";
+
+    public static final class DbProfile {
+        public String host = "";
+        public String port = "";
+        public String db = "";
+        public String user = "";
+        public String pass = "";
+
+        public boolean complete() {
+            return !host.isEmpty() && !port.isEmpty() && !db.isEmpty() && !user.isEmpty();
+        }
+    }
+
+    /** Mint a connection card for one device. Throws IllegalArgumentException on bad input. */
+    public static String dbCard(String device8, DbProfile p) {
+        String dev = normalize(device8);
+        if (dev.length() != 8) throw new IllegalArgumentException("device");
+        if (p == null || !p.complete()) throw new IllegalArgumentException("profile");
+        if (!validPort(p.port)) throw new IllegalArgumentException("port");
+        String payload = esc(dev) + "|" + esc(p.host) + "|" + esc(p.port) + "|"
+                + esc(p.db) + "|" + esc(p.user) + "|" + esc(p.pass);
+        try {
+            byte[] key = sha256(secret() + "|db|" + dev);
+            byte[] iv = randomBytes(16);
+            javax.crypto.Cipher c = javax.crypto.Cipher.getInstance("AES/CBC/PKCS5Padding");
+            c.init(javax.crypto.Cipher.ENCRYPT_MODE,
+                    new javax.crypto.spec.SecretKeySpec(key, 0, 16, "AES"),
+                    new javax.crypto.spec.IvParameterSpec(iv));
+            byte[] ct = c.doFinal(payload.getBytes(Charset.forName("UTF-8")));
+            byte[] both = new byte[16 + ct.length];
+            System.arraycopy(iv, 0, both, 0, 16);
+            System.arraycopy(ct, 0, both, 16, ct.length);
+            return DB_PREFIX + "|" + java.util.Base64.getUrlEncoder().withoutPadding()
+                    .encodeToString(both);
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IllegalArgumentException("crypto");
+        }
+    }
+
+    /**
+     * Open a connection card on this device. Scans pasted text for the card line,
+     * decrypts it, and returns the profile — or null when the card is missing,
+     * corrupt, or minted for another device.
+     */
+    public static DbProfile parseDbCard(String text, String expectDevice8) {
+        String want = normalize(expectDevice8);
+        if (text == null || want.length() != 8) return null;
+        String blob = null;
+        for (String raw : text.split("\n")) {
+            String line = raw.trim();
+            if (line.startsWith(DB_PREFIX + "|")) {
+                blob = line.substring(DB_PREFIX.length() + 1).trim();
+                break;
+            }
+        }
+        if (blob == null || blob.isEmpty()) return null;
+        try {
+            byte[] both = java.util.Base64.getUrlDecoder().decode(blob);
+            if (both.length < 33 || (both.length - 16) % 16 != 0) return null;
+            byte[] key = sha256(secret() + "|db|" + want);
+            javax.crypto.Cipher c = javax.crypto.Cipher.getInstance("AES/CBC/PKCS5Padding");
+            c.init(javax.crypto.Cipher.DECRYPT_MODE,
+                    new javax.crypto.spec.SecretKeySpec(key, 0, 16, "AES"),
+                    new javax.crypto.spec.IvParameterSpec(both, 0, 16));
+            byte[] pt = c.doFinal(both, 16, both.length - 16);
+            String[] f = unescSplit(new String(pt, Charset.forName("UTF-8")));
+            if (f.length != 6 || !normalize(f[0]).equals(want)) return null;
+            DbProfile p = new DbProfile();
+            p.host = f[1];
+            p.port = f[2];
+            p.db = f[3];
+            p.user = f[4];
+            p.pass = f[5];
+            if (!p.complete() || !validPort(p.port)) return null;
+            return p;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static boolean validPort(String port) {
+        try {
+            int p = Integer.parseInt(port.trim());
+            return p >= 1 && p <= 65535;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private static String esc(String s) {
+        if (s == null) return "";
+        return s.replace("\\", "\\\\").replace("|", "\\p").replace("\n", " ");
+    }
+
+    private static String[] unescSplit(String s) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        StringBuilder cur = new StringBuilder();
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '\\' && i + 1 < s.length()) {
+                char n = s.charAt(++i);
+                cur.append(n == 'p' ? '|' : n);
+            } else if (c == '|') {
+                out.add(cur.toString());
+                cur.setLength(0);
+            } else {
+                cur.append(c);
+            }
+        }
+        out.add(cur.toString());
+        return out.toArray(new String[0]);
+    }
+
+    // ---------------- usage report ----------------
+    /**
+     * Compact usage report the client attaches to every license request
+     * (and can share on demand):
+     * {@code MILANO-USE1|DEV8|totalMin|opens|lastDay}.
+     * The admin app stores it per customer («last seen», total hours, opens).
+     * Honest note: with no server there is no live «online» flag — the seller
+     * always sees the freshest report the customer has sent (every request
+     * and renewal refreshes it).
+     */
+    public static final String USE_PREFIX = "MILANO-USE1";
+
+    public static final class Use {
+        public String dev = "";
+        public long totalMin;
+        public int opens;
+        public long lastDay;
+    }
+
+    public static String useLine(String dev8, long totalMin, int opens, long lastDay) {
+        String dev = normalize(dev8);
+        if (dev.length() != 8) dev = "00000000";
+        return USE_PREFIX + "|" + dev + "|" + Math.max(0, totalMin) + "|"
+                + Math.max(0, opens) + "|" + Math.max(0, lastDay);
+    }
+
+    /** Find and parse the usage line inside pasted text; null when absent/invalid. */
+    public static Use parseUse(String text) {
+        if (text == null) return null;
+        for (String raw : text.split("\n")) {
+            String line = raw.trim();
+            if (!line.startsWith(USE_PREFIX + "|")) continue;
+            String[] p = line.split("\\|", -1);
+            if (p.length < 5) return null;
+            Use u = new Use();
+            u.dev = normalize(p[1]);
+            if (u.dev.length() != 8) return null;
+            try {
+                u.totalMin = Long.parseLong(p[2].trim());
+                u.opens = Integer.parseInt(p[3].trim());
+                u.lastDay = Long.parseLong(p[4].trim());
+            } catch (Exception e) {
+                return null;
+            }
+            if (u.totalMin < 0 || u.opens < 0 || u.lastDay < 0) return null;
+            return u;
+        }
+        return null;
+    }
+
+    /**
+     * Full self-test: pack round-trip + tamper rejection, request round-trip,
+     * usage round-trip, and connection-card round-trip incl. special chars,
+     * device binding and port validation. The admin app runs it on launch.
+     */
     public static boolean selfTest() {
         try {
             String dev = deviceCode("test-fingerprint");
             String p = generate(dev, P_MONTHLY, 0);
             Result r = parse(p);
-            return r.ok && r.dev.equals(dev) && r.plan == P_MONTHLY && r.expDay == r.iatDay + 30
-                    && !parse(p.substring(0, 38) + (p.charAt(38) == '0' ? '1' : '0')).ok;
+            if (!r.ok || !r.dev.equals(dev) || r.plan != P_MONTHLY
+                    || r.expDay != r.iatDay + 30) return false;
+            if (parse(p.substring(0, 38) + (p.charAt(38) == '0' ? '1' : '0')).ok) return false;
+            Req rq = parseRequest("hi\n"
+                    + requestLine(dev, "نام", "فامیل", "ش|ا\\پ", "0912", "تهران") + "\nbye");
+            if (rq == null || !rq.dev.equals(dev) || !"نام".equals(rq.name)
+                    || !"ش/ا\\پ".equals(rq.shop)) return false;
+            Use u = parseUse("x\n" + useLine(dev, 42, 7, today()) + "\ny");
+            if (u == null || !u.dev.equals(dev) || u.totalMin != 42 || u.opens != 7
+                    || u.lastDay != today()) return false;
+            DbProfile prof = new DbProfile();
+            prof.host = "h|o\\st";
+            prof.port = "1433";
+            prof.db = "d";
+            prof.user = "u";
+            prof.pass = "p|a\\ss";
+            String card = dbCard(dev, prof);
+            DbProfile back = parseDbCard("x\n" + card + "\ny", dev);
+            if (back == null || !back.host.equals("h|o\\st")
+                    || !back.pass.equals("p|a\\ss") || !"1433".equals(back.port)) return false;
+            if (parseDbCard(card, "ZZZZZZZZ") != null) return false;
+            if (parseDbCard(card + "X", dev) != null) return false;
+            try {
+                DbProfile bad = new DbProfile();
+                bad.host = "h";
+                bad.port = "99999";
+                bad.db = "d";
+                bad.user = "u";
+                dbCard(dev, bad);
+                return false;
+            } catch (IllegalArgumentException expected) {
+            }
+            return true;
         } catch (Exception e) {
             return false;
         }

@@ -9,19 +9,35 @@ import android.database.sqlite.SQLiteOpenHelper;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Local seller database: customers + every pack ever minted (incl. revoked). */
+/**
+ * Local seller database: customers + every pack ever minted (incl. revoked).
+ * v2 adds the per-customer usage ledger (synced from request messages) and the
+ * saved SQL Server profile used to mint connection cards.
+ */
 public class AdminDb extends SQLiteOpenHelper {
 
     private static final String NAME = "meelano_admin.db";
-    private static final int VERSION = 1;
+    private static final int VERSION = 2;
 
     public static final class Customer {
         public long id;
         public String name = "", family = "", shop = "", phone = "", city = "", dev = "";
         public long created;
+        // v2: usage ledger (from MILANO-USE1 reports)
+        public long lastUseDay;
+        public long totalMin;
+        public int opens;
+        // v2: saved connection profile (for connection cards)
+        public String dbHost = "", dbPort = "", dbName = "", dbUser = "", dbPass = "";
+
         public String full() {
             String n = (name + " " + family).trim();
             return n.isEmpty() ? "(بی‌نام)" : n;
+        }
+
+        public boolean hasSite() {
+            return !dbHost.isEmpty() && !dbPort.isEmpty() && !dbName.isEmpty()
+                    && !dbUser.isEmpty();
         }
     }
 
@@ -33,6 +49,14 @@ public class AdminDb extends SQLiteOpenHelper {
         public String customer = "";
     }
 
+    /** License roll-up per customer for the categorized list. */
+    public static final class CustLic {
+        /** 0 = active & healthy, 1 = expiring soon (≤ 30 d), 2 = expired/none. */
+        public int cat = 2;
+        public char plan = 'M';
+        public long days;
+    }
+
     public AdminDb(Context c) {
         super(c, NAME, null, VERSION);
     }
@@ -42,7 +66,12 @@ public class AdminDb extends SQLiteOpenHelper {
         db.execSQL("CREATE TABLE customers(_id INTEGER PRIMARY KEY AUTOINCREMENT,"
                 + "name TEXT DEFAULT '',family TEXT DEFAULT '',shop TEXT DEFAULT '',"
                 + "phone TEXT DEFAULT '',city TEXT DEFAULT '',"
-                + "dev TEXT UNIQUE NOT NULL,created INTEGER DEFAULT 0)");
+                + "dev TEXT UNIQUE NOT NULL,created INTEGER DEFAULT 0,"
+                + "last_use_day INTEGER DEFAULT 0,total_min INTEGER DEFAULT 0,"
+                + "opens INTEGER DEFAULT 0,"
+                + "db_host TEXT DEFAULT '',db_port TEXT DEFAULT '',"
+                + "db_name TEXT DEFAULT '',db_user TEXT DEFAULT '',"
+                + "db_pass TEXT DEFAULT '')");
         db.execSQL("CREATE TABLE licenses(_id INTEGER PRIMARY KEY AUTOINCREMENT,"
                 + "customer_id INTEGER NOT NULL DEFAULT 0,dev TEXT DEFAULT '',"
                 + "plan TEXT DEFAULT 'T',exp INTEGER DEFAULT 0,iat INTEGER DEFAULT 0,"
@@ -54,7 +83,20 @@ public class AdminDb extends SQLiteOpenHelper {
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldV, int newV) {
-        // v1: nothing to migrate yet.
+        if (oldV < 2) {
+            String[] cols = {"last_use_day INTEGER DEFAULT 0",
+                    "total_min INTEGER DEFAULT 0", "opens INTEGER DEFAULT 0",
+                    "db_host TEXT DEFAULT ''", "db_port TEXT DEFAULT ''",
+                    "db_name TEXT DEFAULT ''", "db_user TEXT DEFAULT ''",
+                    "db_pass TEXT DEFAULT ''"};
+            for (String col : cols) {
+                try {
+                    db.execSQL("ALTER TABLE customers ADD COLUMN " + col);
+                } catch (Exception ignored) {
+                    // Column already there (interrupted upgrade) — safe to skip.
+                }
+            }
+        }
     }
 
     // ---------- customers ----------
@@ -124,6 +166,50 @@ public class AdminDb extends SQLiteOpenHelper {
     public boolean deleteCustomer(long id) {
         try {
             return getWritableDatabase().delete("customers", "_id=?",
+                    new String[]{String.valueOf(id)}) > 0;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /** Store a usage report (only moves forward — stale pastes can't rewind). */
+    public boolean updateUsage(String dev, long totalMin, int opens, long lastDay) {
+        try {
+            Customer c = byDev(dev);
+            if (c == null) return false;
+            ContentValues v = new ContentValues();
+            v.put("total_min", Math.max(c.totalMin, totalMin));
+            v.put("opens", Math.max(c.opens, opens));
+            v.put("last_use_day", Math.max(c.lastUseDay, lastDay));
+            return getWritableDatabase().update("customers", v, "dev=?",
+                    new String[]{s(dev)}) > 0;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public boolean saveSite(long id, String host, String port, String db,
+                             String user, String pass) {
+        try {
+            ContentValues v = new ContentValues();
+            v.put("db_host", s(host));
+            v.put("db_port", s(port));
+            v.put("db_name", s(db));
+            v.put("db_user", s(user));
+            v.put("db_pass", pass == null ? "" : pass);
+            return getWritableDatabase().update("customers", v, "_id=?",
+                    new String[]{String.valueOf(id)}) > 0;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /** Move a customer record to a new device code (phone change). False on clash. */
+    public boolean updateDev(long id, String newDev) {
+        try {
+            ContentValues v = new ContentValues();
+            v.put("dev", s(newDev));
+            return getWritableDatabase().update("customers", v, "_id=?",
                     new String[]{String.valueOf(id)}) > 0;
         } catch (Exception e) {
             return false;
@@ -204,6 +290,39 @@ public class AdminDb extends SQLiteOpenHelper {
         return out;
     }
 
+    /** Best active license per customer → category chip for the customer list. */
+    public CustLic custState(long customerId, long today) {
+        CustLic st = new CustLic();
+        boolean any = false;
+        long best = -1;
+        try {
+            for (Lic l : licensesForCustomer(customerId)) {
+                any = true;
+                if (l.revoked) continue;
+                char p = (l.plan == null || l.plan.isEmpty()) ? 'T' : l.plan.charAt(0);
+                if (p == 'P') {
+                    st.cat = 0;
+                    st.plan = 'P';
+                    st.days = -1;
+                    return st;
+                }
+                long left = l.exp - today;
+                if (left >= 0 && left > best) {
+                    best = left;
+                    st.plan = p;
+                }
+            }
+        } catch (Exception ignored) { }
+        if (best >= 0) {
+            st.cat = best <= 30 ? 1 : 0;
+            st.days = best;
+        } else {
+            st.cat = 2;
+            st.days = 0;
+        }
+        return st;
+    }
+
     public int activeCount(long today) {
         try (Cursor c = getReadableDatabase().rawQuery(
                 "SELECT COUNT(*) FROM licenses WHERE revoked=0 AND exp>=?",
@@ -240,6 +359,22 @@ public class AdminDb extends SQLiteOpenHelper {
         }
     }
 
+    /**
+     * Revoke every live pack of an old device (phone-change transfer) and stamp
+     * the note. Returns how many rows were revoked.
+     */
+    public int revokeActiveForDev(String dev, String stamp) {
+        try {
+            android.database.sqlite.SQLiteStatement st = getWritableDatabase().compileStatement(
+                    "UPDATE licenses SET revoked=1, note=note||? WHERE dev=? AND revoked=0");
+            st.bindString(1, stamp == null ? "" : stamp);
+            st.bindString(2, s(dev));
+            return st.executeUpdateDelete();
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
     public boolean deleteLicense(long id) {
         try {
             return getWritableDatabase().delete("licenses", "_id=?",
@@ -268,6 +403,14 @@ public class AdminDb extends SQLiteOpenHelper {
         o.city = getStr(c, "city");
         o.dev = getStr(c, "dev");
         o.created = getLong(c, "created");
+        o.lastUseDay = getLong(c, "last_use_day");
+        o.totalMin = getLong(c, "total_min");
+        o.opens = (int) getLong(c, "opens");
+        o.dbHost = getStr(c, "db_host");
+        o.dbPort = getStr(c, "db_port");
+        o.dbName = getStr(c, "db_name");
+        o.dbUser = getStr(c, "db_user");
+        o.dbPass = getStr(c, "db_pass");
         return o;
     }
 

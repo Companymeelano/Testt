@@ -44,6 +44,11 @@ public class AdminActivity extends Activity {
             getWindow().setNavigationBarColor(AdminKit.BG);
         } catch (Exception ignored) { }
         db = new AdminDb(this);
+        try {
+            if (!License.selfTest()) {
+                AdminKit.toast(this, "⚠ خطای موتور لایسنس؛ برنامه را دوباره نصب کنید");
+            }
+        } catch (Exception ignored) { }
         show(this::showHome);
     }
 
@@ -201,8 +206,12 @@ public class AdminActivity extends Activity {
 
         bParse.setOnClickListener(v -> {
             out.removeAllViews();
-            License.Req req = License.parseRequest(AdminKit.txt(paste));
+            String pasted = AdminKit.txt(paste);
+            License.Req req = License.parseRequest(pasted);
+            License.Use use = License.parseUse(pasted);
+            if (use != null) showUseReport(out, use);
             if (req == null) {
+                if (use != null) return; // usage-only report, already shown above
                 out.addView(AdminKit.text(this,
                         "✕ متن معتبر نیست. خط MILANO-REQ1 داخل آن پیدا نشد؛ از مشتری بخواهید متن کامل را بفرستد.",
                         14, AdminKit.RED, false));
@@ -242,6 +251,38 @@ public class AdminActivity extends Activity {
             out.addView(go);
         });
         root(box);
+    }
+
+    /** Show + store a usage report found inside pasted text. */
+    private void showUseReport(LinearLayout out, License.Use use) {
+        AdminDb.Customer c = db.byDev(use.dev);
+        if (c == null) {
+            out.addView(AdminKit.text(this,
+                    "گزارش مصرف از دستگاه ناشناس رسید (هنوز مشتری ثبت نشده).",
+                    13, AdminKit.MUTED, false));
+            return;
+        }
+        db.updateUsage(use.dev, use.totalMin, use.opens, use.lastDay);
+        AdminDb.Customer fresh = db.byDev(use.dev);
+        if (fresh == null) fresh = c;
+        LinearLayout card = (LinearLayout) AdminKit.card(this);
+        AdminKit.cardMargin(card, this);
+        AdminKit.infoRow(card, this, "📊 گزارش مصرف «" + fresh.full() + "» ثبت شد",
+                fmtUse(fresh.totalMin, fresh.opens, fresh.lastUseDay), false);
+        out.addView(card);
+    }
+
+    /** Friendly usage line: «آخرین استفاده: دیروز • ۳ ساعت • ۱۲ بار باز شدن». */
+    private String fmtUse(long totalMin, int opens, long lastDay) {
+        if (lastDay <= 0 && opens <= 0) return "هنوز گزارشی نرسیده است";
+        long ago = License.today() - lastDay;
+        String seen = ago <= 0 ? "امروز" : (ago == 1 ? "دیروز"
+                : (AdminKit.fa(ago) + " روز پیش"));
+        String hrs = totalMin < 60
+                ? AdminKit.fa(totalMin) + " دقیقه"
+                : AdminKit.fa(totalMin / 60) + " ساعت";
+        return "آخرین استفاده: " + seen + " • " + hrs + " • "
+                + AdminKit.fa(opens) + " بار باز شدن";
     }
 
     // ---------- mint ----------
@@ -440,6 +481,12 @@ public class AdminActivity extends Activity {
                 shareText(l)));
         box.addView(bShare);
 
+        if (l.customerId > 0) {
+            Button bCard = AdminKit.btn(this, "کارت اتصال برای همین مشتری", false);
+            bCard.setOnClickListener(v -> show(() -> showDbCard(l.customerId)));
+            box.addView(bCard);
+        }
+
         Button bHome = AdminKit.btn(this, "بازگشت به خانه", false);
         bHome.setOnClickListener(v -> home());
         box.addView(bHome);
@@ -473,36 +520,28 @@ public class AdminActivity extends Activity {
         box.addView(bGo, 2);
 
         List<AdminDb.Customer> rows = db.searchCustomers(custQuery);
+        long today = License.today();
         if (rows.isEmpty()) {
             list.addView(AdminKit.text(this, "مشتری‌ای پیدا نشد.", 13,
                     AdminKit.MUTED, false));
-        } else {
+        } else if (!custQuery.isEmpty()) {
             list.addView(AdminKit.text(this,
-                    AdminKit.fa(rows.size()) + " مشتری", 12.5f, AdminKit.MUTED, false));
+                    AdminKit.fa(rows.size()) + " نتیجه", 12.5f, AdminKit.MUTED, false));
+            for (AdminDb.Customer c : rows) list.addView(custRow(c, today));
+        } else {
+            // Categorized list: expiring first (money!), then healthy, then dead.
+            java.util.List<AdminDb.Customer> exp = new java.util.ArrayList<>();
+            java.util.List<AdminDb.Customer> ok = new java.util.ArrayList<>();
+            java.util.List<AdminDb.Customer> dead = new java.util.ArrayList<>();
             for (AdminDb.Customer c : rows) {
-                LinearLayout card = (LinearLayout) AdminKit.card(this);
-                AdminKit.cardMargin(card, this);
-                LinearLayout row = new LinearLayout(this);
-                row.setOrientation(LinearLayout.HORIZONTAL);
-                row.setGravity(Gravity.CENTER_VERTICAL);
-                row.addView(AdminKit.icon(this, R.drawable.mi_person, AdminKit.GOLD));
-                LinearLayout tt = AdminKit.vbox(this);
-                tt.addView(AdminKit.text(this, c.full(), 15.5f, AdminKit.TEXT, true));
-                String sub = c.shop.isEmpty() ? c.city
-                        : (c.shop + (c.city.isEmpty() ? "" : " • " + c.city));
-                if (!sub.isEmpty()) {
-                    tt.addView(AdminKit.text(this, sub, 12.5f, AdminKit.MUTED, false));
-                }
-                TextView dev = AdminKit.text(this, prettyDev(c.dev), 12,
-                        AdminKit.GOLD_SOFT, false);
-                dev.setTypeface(AdminKit.mon(this));
-                tt.addView(dev);
-                row.addView(tt);
-                card.addView(row);
-                final long cid = c.id;
-                AdminKit.rowTap(card, () -> show(() -> showCustomer(cid)));
-                list.addView(card);
+                int cat = db.custState(c.id, today).cat;
+                if (cat == 1) exp.add(c);
+                else if (cat == 0) ok.add(c);
+                else dead.add(c);
             }
+            addCustSection(list, "⚠ نیاز به تمدید", exp, today, AdminKit.RED);
+            addCustSection(list, "✓ فعال", ok, today, AdminKit.GREEN);
+            addCustSection(list, "✕ منقضی / بدون لایسنس", dead, today, AdminKit.MUTED);
         }
 
         Button bManual = AdminKit.btn(this, "＋ صدور دستی (بدون متن درخواست)", false);
@@ -542,6 +581,20 @@ public class AdminActivity extends Activity {
         });
         box.addView(bNew);
 
+        LinearLayout ucard = (LinearLayout) AdminKit.card(this);
+        AdminKit.cardMargin(ucard, this);
+        AdminKit.infoRow(ucard, this, "📊 مصرف برنامه",
+                fmtUse(c.totalMin, c.opens, c.lastUseDay), false);
+        box.addView(ucard);
+
+        Button bCard = AdminKit.btn(this, "کارت اتصال دیتابیس", false);
+        bCard.setOnClickListener(v -> show(() -> showDbCard(c.id)));
+        box.addView(bCard);
+
+        Button bMove = AdminKit.btn(this, "🔄 انتقال به گوشی جدید (ریست)", false);
+        bMove.setOnClickListener(v -> show(() -> showTransfer(c.id)));
+        box.addView(bMove);
+
         box.addView(AdminKit.text(this, "لایسنس‌های این مشتری", 15,
                 AdminKit.GOLD_SOFT, true));
         long today = License.today();
@@ -567,6 +620,62 @@ public class AdminActivity extends Activity {
         }
         box.addView(bDel);
         root(box);
+    }
+
+    private View custRow(AdminDb.Customer c, long today) {
+        LinearLayout card = (LinearLayout) AdminKit.card(this);
+        AdminKit.cardMargin(card, this);
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        AdminDb.CustLic st = db.custState(c.id, today);
+        row.addView(AdminKit.icon(this, R.drawable.mi_person,
+                st.cat == 0 ? AdminKit.GREEN
+                        : (st.cat == 1 ? AdminKit.RED : AdminKit.MUTED)));
+        LinearLayout tt = AdminKit.vbox(this);
+        tt.addView(AdminKit.text(this, c.full(), 15.5f, AdminKit.TEXT, true));
+        String sub = c.shop.isEmpty() ? c.city
+                : (c.shop + (c.city.isEmpty() ? "" : " • " + c.city));
+        if (!sub.isEmpty()) {
+            tt.addView(AdminKit.text(this, sub, 12.5f, AdminKit.MUTED, false));
+        }
+        tt.addView(AdminKit.text(this, custChip(st), 12.5f,
+                st.cat == 0 ? AdminKit.GREEN
+                        : (st.cat == 1 ? AdminKit.RED : AdminKit.MUTED),
+                true));
+        TextView dev = AdminKit.text(this, prettyDev(c.dev), 12,
+                AdminKit.GOLD_SOFT, false);
+        dev.setTypeface(AdminKit.mon(this));
+        tt.addView(dev);
+        row.addView(tt);
+        card.addView(row);
+        final long cid = c.id;
+        AdminKit.rowTap(card, () -> show(() -> showCustomer(cid)));
+        return card;
+    }
+
+    private static String custChip(AdminDb.CustLic st) {
+        if (st.cat == 0) {
+            return st.plan == License.P_PERM ? "♾ دائمی"
+                    : ("✓ «" + License.planFa(st.plan) + "» • "
+                    + AdminKit.fa(st.days) + " روز مانده");
+        }
+        if (st.cat == 1) {
+            return "⚠ «" + License.planFa(st.plan) + "» • "
+                    + AdminKit.fa(st.days) + " روز مانده — زنگ بزن!";
+        }
+        return "✕ بدون لایسنس معتبر";
+    }
+
+    private void addCustSection(LinearLayout list, String title,
+                                java.util.List<AdminDb.Customer> rows, long today,
+                                int color) {
+        if (rows.isEmpty()) return;
+        TextView h = AdminKit.text(this,
+                title + " (" + AdminKit.fa(rows.size()) + ")", 14, color, true);
+        h.setPadding(0, AdminKit.dp(this, 8), 0, AdminKit.dp(this, 6));
+        list.addView(h);
+        for (AdminDb.Customer c : rows) list.addView(custRow(c, today));
     }
 
     // ---------- licenses ----------
@@ -742,17 +851,205 @@ public class AdminActivity extends Activity {
         return dev.substring(0, 4) + "-" + dev.substring(4);
     }
 
+    // ---------- connection card ----------
+
+    private void showDbCard(long cid) {
+        AdminDb.Customer c = db.byId(cid);
+        if (c == null) {
+            goBack();
+            return;
+        }
+        LinearLayout box = AdminKit.vbox(this);
+        box.addView(AdminKit.titleBar(this, "کارت اتصال «" + c.full() + "»", this::goBack));
+        box.addView(AdminKit.text(this,
+                "مشخصات SQL Server فروشگاه مشتری را یک‌بار اینجا ذخیره کنید؛ "
+                        + "بعد هر وقت لازم بود «صدور کارت» را بزنید و متن را برای مشتری بفرستید. "
+                        + "کارت فقط روی همین گوشی (" + prettyDev(c.dev) + ") باز می‌شود.",
+                13, AdminKit.MUTED, false));
+        LinearLayout card = (LinearLayout) AdminKit.card(this);
+        AdminKit.cardMargin(card, this);
+        EditText fHost = AdminKit.field(this, "آدرس سرور (IP یا نام)");
+        fHost.setText(c.dbHost);
+        card.addView(fHost);
+        EditText fPort = AdminKit.field(this, "پورت (معمولاً 1433)");
+        fPort.setText(c.dbPort.isEmpty() ? "1433" : c.dbPort);
+        try {
+            fPort.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        } catch (Exception ignored) { }
+        card.addView(fPort);
+        EditText fDb = AdminKit.field(this, "نام دیتابیس");
+        fDb.setText(c.dbName);
+        card.addView(fDb);
+        EditText fUser = AdminKit.field(this, "نام کاربری");
+        fUser.setText(c.dbUser);
+        card.addView(fUser);
+        EditText fPass = AdminKit.field(this, "رمز عبور (اگر ندارد خالی بگذارید)");
+        fPass.setText(c.dbPass);
+        try {
+            fPass.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                    | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        } catch (Exception ignored) { }
+        card.addView(fPass);
+        box.addView(card);
+
+        LinearLayout out = AdminKit.vbox(this);
+        box.addView(out);
+
+        Button bSave = AdminKit.btn(this, "فقط ذخیره مشخصات", false);
+        bSave.setOnClickListener(v -> {
+            db.saveSite(cid, AdminKit.txt(fHost), AdminKit.txt(fPort),
+                    AdminKit.txt(fDb), AdminKit.txt(fUser), AdminKit.txt(fPass));
+            AdminKit.toast(this, "مشخصات ذخیره شد");
+        });
+        box.addView(bSave);
+
+        Button bMint = AdminKit.btn(this, "صدور کارت اتصال", true);
+        bMint.setOnClickListener(v -> {
+            String host = AdminKit.txt(fHost);
+            String port = AdminKit.txt(fPort);
+            String dbn = AdminKit.txt(fDb);
+            String user = AdminKit.txt(fUser);
+            String pass = AdminKit.txt(fPass);
+            AdminDb.Customer cc = db.byId(cid);
+            if (cc == null) {
+                goBack();
+                return;
+            }
+            License.DbProfile p = new License.DbProfile();
+            p.host = host;
+            p.port = port;
+            p.db = dbn;
+            p.user = user;
+            p.pass = pass;
+            String cardText;
+            try {
+                cardText = License.dbCard(cc.dev, p);
+            } catch (IllegalArgumentException e) {
+                AdminKit.toast(this, "port".equals(e.getMessage())
+                        ? "پورت معتبر نیست (۱ تا ۶۵۵۳۵)"
+                        : "آدرس سرور، پورت، نام دیتابیس و نام کاربری لازم است");
+                return;
+            }
+            db.saveSite(cid, host, port, dbn, user, pass);
+            out.removeAllViews();
+            LinearLayout rc = (LinearLayout) AdminKit.card(this);
+            AdminKit.cardMargin(rc, this);
+            rc.addView(AdminKit.text(this,
+                    "کارت اتصال «" + cc.full() + "» — فقط همین گوشی", 13,
+                    AdminKit.MUTED, false));
+            TextView tv = AdminKit.text(this, cardText, 11, AdminKit.GOLD_SOFT, false);
+            tv.setTypeface(AdminKit.mon(this));
+            try {
+                tv.setTextIsSelectable(true);
+            } catch (Exception ignored) { }
+            tv.setPadding(0, AdminKit.dp(this, 8), 0, AdminKit.dp(this, 8));
+            rc.addView(tv);
+            out.addView(rc);
+            final String fcard = cardText;
+            final String fname = cc.full();
+            Button bCopy = AdminKit.btn(this, "کپی کارت", true);
+            bCopy.setOnClickListener(x -> {
+                AdminKit.copy(this, "کارت اتصال", fcard);
+                AdminKit.toast(this, "کارت کپی شد");
+            });
+            out.addView(bCopy);
+            Button bShare = AdminKit.btn(this, "اشتراک‌گذاری برای مشتری", false);
+            bShare.setOnClickListener(x -> AdminKit.share(this, "ارسال کارت اتصال",
+                    "کارت اتصال میلانو منیجر (" + fname + ")\n" + fcard
+                            + "\nراهنما: در صفحه فعال‌سازی، بخش ۴، این متن را بچسبانید و «ثبت و تست اتصال» را بزنید."));
+            out.addView(bShare);
+        });
+        box.addView(bMint);
+        root(box);
+    }
+
+    // ---------- phone-change transfer (reset) ----------
+
+    private void showTransfer(long cid) {
+        AdminDb.Customer c = db.byId(cid);
+        if (c == null) {
+            goBack();
+            return;
+        }
+        LinearLayout box = AdminKit.vbox(this);
+        box.addView(AdminKit.titleBar(this, "انتقال «" + c.full() + "»", this::goBack));
+        box.addView(AdminKit.text(this,
+                "مشتری گوشی عوض کرده یا برنامه خراب شده؟ کد دستگاه جدید را از صفحه فعال‌سازی گوشی تازه بگیرید و اینجا وارد کنید:\n"
+                        + "• همه کدهای گوشی قبلی (" + prettyDev(c.dev) + ") باطل و در تاریخچه مهر «منتقل شد» می‌خورند\n"
+                        + "• رکورد مشتری به گوشی جدید منتقل می‌شود\n"
+                        + "• بلافاصله وارد صدور کد تازه برای گوشی جدید می‌شوید",
+                13.5f, AdminKit.MUTED, false));
+        LinearLayout card = (LinearLayout) AdminKit.card(this);
+        AdminKit.cardMargin(card, this);
+        EditText fDev = AdminKit.field(this, "کد دستگاه جدید (۸ حرف)");
+        fDev.setTypeface(AdminKit.mon(this));
+        card.addView(fDev);
+        EditText fWhy = AdminKit.field(this, "علت (اختیاری): تعویض گوشی، خرابی، …");
+        card.addView(fWhy);
+        box.addView(card);
+
+        Button bGo = AdminKit.btn(this, "انتقال و صدور کد تازه", true);
+        confirmStep(bGo, "تأیید انتقال؟ کدهای قبلی باطل می‌شوند", () -> {
+            String nd = AdminKit.txt(fDev).toUpperCase().replaceAll("[^A-Z0-9]", "");
+            if (nd.length() != 8) {
+                AdminKit.toast(this, "کد دستگاه باید ۸ حرف باشد");
+                return;
+            }
+            AdminDb.Customer cc = db.byId(cid);
+            if (cc == null) {
+                goBack();
+                return;
+            }
+            if (nd.equals(cc.dev)) {
+                AdminKit.toast(this, "این همان کد فعلی است");
+                return;
+            }
+            if (db.byDev(nd) != null) {
+                AdminKit.toast(this, "این کد دستگاه متعلق به مشتری دیگری است");
+                return;
+            }
+            String why = AdminKit.txt(fWhy);
+            int n = db.revokeActiveForDev(cc.dev,
+                    " ⟵ منتقل شد به " + nd + (why.isEmpty() ? "" : " (" + why + ")"));
+            if (!db.updateDev(cid, nd)) {
+                AdminKit.toast(this, "انتقال ممکن نشد");
+                return;
+            }
+            AdminKit.toast(this, n > 0
+                    ? ("منتقل شد؛ " + AdminKit.fa(n) + " کد قبلی باطل شد")
+                    : "منتقل شد (کد فعالی برای ابطال نبود)");
+            AdminDb.Customer moved = db.byId(cid);
+            MintCtx ctx = new MintCtx();
+            if (moved != null) {
+                ctx.customerId = moved.id;
+                ctx.dev = moved.dev;
+                ctx.name = moved.name;
+                ctx.family = moved.family;
+                ctx.shop = moved.shop;
+                ctx.phone = moved.phone;
+                ctx.city = moved.city;
+            } else {
+                ctx.dev = nd;
+            }
+            show(() -> showMint(ctx));
+        });
+        box.addView(bGo);
+        root(box);
+    }
+
     // ---------- export ----------
 
     private void exportCsv() {
         StringBuilder b = new StringBuilder("\uFEFF");
-        b.append("نوع,id,نام,نام خانوادگی,فروشگاه,موبایل,شهر,کد دستگاه,طرح,انقضا(شمسی),وضعیت,کد فعال‌سازی,یادداشت\n");
+        b.append("نوع,id,نام,نام خانوادگی,فروشگاه,موبایل,شهر,کد دستگاه,طرح,انقضا(شمسی),وضعیت,کد فعال‌سازی,یادداشت,آخرین استفاده,مجموع مصرف(دقیقه),باز شدن\n");
         for (AdminDb.Customer c : db.searchCustomers("")) {
             b.append("customer,").append(c.id).append(',')
                     .append(csv(c.name)).append(',').append(csv(c.family)).append(',')
                     .append(csv(c.shop)).append(',').append(csv(c.phone)).append(',')
                     .append(csv(c.city)).append(',').append(csv(c.dev))
-                    .append(",,,,\n");
+                    .append(",,,,")
+                    .append(c.lastUseDay > 0 ? csv(jalali(c.lastUseDay)) : "").append(',')
+                    .append(c.totalMin).append(',').append(c.opens).append('\n');
         }
         long today = License.today();
         for (AdminDb.Lic l : db.licenses(0, today)) {

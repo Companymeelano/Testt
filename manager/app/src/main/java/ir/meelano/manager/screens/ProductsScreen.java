@@ -94,6 +94,7 @@ public class ProductsScreen extends Screen {
         content.addView(a.kit.hint("آستانه کم‌موجودی: ۵ واحد • گردش کالا بر اساس بازه فیلتر"), a.kit.lp(-1, -2));
         content.addView(a.kit.btnGhost("▦ اسکن بارکد کالا", Theme.VIOLET, v -> a.startScan(code -> {
             filter.search = code;
+            filter.page = 0;
             a.refreshChrome();
             render(content);
         })), a.kit.lp(-1, -2));
@@ -150,6 +151,12 @@ public class ProductsScreen extends Screen {
         content.removeAllViews();
         content.addView(heroCard(), a.kit.lp(-1, -2));
         content.addView(a.kit.hint("آستانه کم‌موجودی: ۵ واحد • گردش کالا بر اساس بازه فیلتر"), a.kit.lp(-1, -2));
+        content.addView(a.kit.btnGhost("▦ اسکن بارکد کالا", Theme.VIOLET, v -> a.startScan(code -> {
+            filter.search = code;
+            filter.page = 0;
+            a.refreshChrome();
+            render(content);
+        })), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
         addSearchRow(content);
 

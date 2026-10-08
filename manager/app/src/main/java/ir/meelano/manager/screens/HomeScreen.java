@@ -10,6 +10,7 @@ import ir.meelano.manager.core.FollowUps;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.Money;
+import ir.meelano.manager.core.RoleStore;
 import ir.meelano.manager.core.MoneyQueries;
 import ir.meelano.manager.core.Queries;
 import ir.meelano.manager.data.Meta;
@@ -380,7 +381,7 @@ public class HomeScreen extends Screen {
         for (int i = 0; i < links.length; i++) {
             final String id = links[i][0];
             Screen s = a.screen(id);
-            if (s == null) continue;
+            if (s == null || !RoleStore.allowed(a, id)) continue;
             View r = a.kit.navRow(s.glyph(), s.title(), links[i][1], s.accent(), v -> a.nav(id));
             LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
             p.setMargins(0, 0, 0, Theme.dp(10));

@@ -4,6 +4,7 @@ import android.view.View;
 import android.widget.LinearLayout;
 
 import ir.meelano.manager.MainActivity;
+import ir.meelano.manager.core.RoleStore;
 import ir.meelano.manager.ui.Theme;
 
 /** Full section index (the 5th tab). */
@@ -60,7 +61,7 @@ public class MoreScreen extends Screen {
                 continue;
             }
             Screen s = a.screen(id);
-            if (s == null) continue;
+            if (s == null || !RoleStore.allowed(a, id)) continue;
             View r = a.kit.navRow(s.glyph(), s.title(), ITEMS[i][1], s.accent(), v -> a.nav(id));
             LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
             p.setMargins(0, 0, 0, Theme.dp(10));

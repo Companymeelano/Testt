@@ -120,6 +120,7 @@ public class ReportsScreen extends Screen {
         a.repo.run(c -> {
             Meta m = new Meta(c);
             List<Row> rows = Repo.exec(c, ReportCatalog.query(m, spec.id, f));
+            if ("yoy_sales".equals(spec.id)) rows = mapYoY(rows);
             if ("aging".equals(spec.id)) mapAging(rows, m);
             if ("unsettled".equals(spec.id)) mapUnsettled(rows);
             return rows;
@@ -171,6 +172,47 @@ public class ReportsScreen extends Screen {
         }
     }
 
+    /** Merge ~24 monthly rows into 12 month rows: this year vs last year + growth %. */
+    private List<Row> mapYoY(List<Row> rows) {
+        List<Row> out = new ArrayList<>();
+        if (rows == null) return out;
+        String y1 = "";
+        for (Row r : rows) {
+            String k = mon7(r.s("month"));
+            if (k.length() == 7 && k.compareTo(y1) > 0) y1 = k.substring(0, 4);
+        }
+        if (y1.isEmpty()) return out;
+        int y0;
+        try {
+            y0 = Integer.parseInt(y1) - 1;
+        } catch (Exception e) {
+            return out;
+        }
+        for (int m = 1; m <= 12; m++) {
+            String mm = (m < 10 ? "0" : "") + m;
+            double t = 0, l = 0;
+            for (Row r : rows) {
+                String k = mon7(r.s("month"));
+                if ((y1 + "/" + mm).equals(k)) t += r.d("total");
+                else if ((y0 + "/" + mm).equals(k)) l += r.d("total");
+            }
+            double g = l > 0.5 ? (t - l) * 100.0 / l : (t > 0.5 ? 100 : 0);
+            Row r = new Row();
+            String lab = Jalali.monthName(y1 + "/" + mm + "/01");
+            r.put("mlab", lab.isEmpty() ? mm : lab);
+            r.put("thisY", t);
+            r.put("lastY", l);
+            r.put("growth", Math.round(g * 10) / 10.0);
+            out.add(r);
+        }
+        return out;
+    }
+
+    private static String mon7(String s) {
+        s = s == null ? "" : s.trim();
+        return s.length() >= 7 ? s.substring(0, 7) : "";
+    }
+
     private String monthBucket(String month) {
         try {
             String t = Jalali.todayStr();
@@ -200,8 +242,7 @@ public class ReportsScreen extends Screen {
 
         if (spec.chart != ReportCatalog.C_NONE && !spec.chartX.isEmpty() && !spec.chartY.isEmpty()) {
             LinearLayout c = a.kit.card(sectionAccent(spec.section));
-            c.addView(a.kit.text("نمودار", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
-            List<Charts.Point> pts = new ArrayList<>();
+            final List<Charts.Point> pts = new ArrayList<>();
             int cap = spec.chart == ReportCatalog.C_DONUT ? 8 : 31;
             for (int i = 0; i < Math.min(cap, rows.size()); i++) {
                 Row r = rows.get(i);
@@ -210,6 +251,22 @@ public class ReportsScreen extends Screen {
                     pts.add(new Charts.Point(x, r.d(spec.chartY), PALETTE[i % PALETTE.length]));
                 else pts.add(new Charts.Point(x, r.d(spec.chartY)));
             }
+            c.addView(a.kit.chartHead("نمودار", () -> {
+                if (spec.chart == ReportCatalog.C_LINE) {
+                    Charts.Area fh = new Charts.Area(a);
+                    fh.setData(pts, sectionAccent(spec.section), Charts.COMPACT);
+                    return fh;
+                } else if (spec.chart == ReportCatalog.C_BARS) {
+                    Charts.Bars fb = new Charts.Bars(a);
+                    fb.setData(pts, Charts.COMPACT);
+                    return fb;
+                }
+                Charts.Donut fd = new Charts.Donut(a);
+                double fsum = 0;
+                for (Row rr : rows) fsum += rr.d(spec.chartY);
+                fd.setData(pts, "جمع", Money.compactRial(fsum));
+                return fd;
+            }), a.kit.lp(-1, -2));
             if (spec.chart == ReportCatalog.C_LINE) {
                 Charts.Area ch = new Charts.Area(a);
                 ch.setData(pts, sectionAccent(spec.section), Charts.COMPACT);

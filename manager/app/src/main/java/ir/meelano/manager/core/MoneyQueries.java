@@ -529,26 +529,42 @@ public final class MoneyQueries {
         return new Queries.Q(sql, binds);
     }
 
-    /** Cheques due within daysAhead (still outstanding): same columns as the list. */
-    public static Queries.Q chequeDue(Meta m, boolean incoming, int daysAhead) throws Queries.Missing {
-        Chq c = chq(m, incoming);
-        if (c.sardate == null) throw new Queries.Missing("ستون سررسید در «" + AtiranSchema.faTitle(c.table) + "» پیدا نشد");
+    /** Shared WHERE for outstanding cheques due within [today, today+daysAhead]. */
+    private static final class DueCtx {
+        Chq c;
+        List<String> conds;
+        List<Object> binds;
+        String sar;
+    }
+
+    private static DueCtx dueCtx(Meta m, boolean incoming, int daysAhead) throws Queries.Missing {
+        DueCtx x = new DueCtx();
+        x.c = chq(m, incoming);
+        if (x.c.sardate == null)
+            throw new Queries.Missing("ستون سررسید در «" + AtiranSchema.faTitle(x.c.table) + "» پیدا نشد");
         String today = Jalali.todayStr();
         String until = Jalali.addDays(today, Math.max(0, daysAhead));
-        List<Object> binds = new ArrayList<>();
-        String st = "LTRIM(RTRIM(TRY_CONVERT(nvarchar(40),h.[" + c.st + "])))";
-        List<String> conds = new ArrayList<>();
+        x.binds = new ArrayList<>();
+        String st = "LTRIM(RTRIM(TRY_CONVERT(nvarchar(40),h.[" + x.c.st + "])))";
+        x.conds = new ArrayList<>();
         // Due dates may be Jalali text or Gregorian datetime — match the window in both.
-        String sar = Sql.date10("h", c.sardate);
-        String d1 = Sql.dateCond(sar, today, until, binds);
-        String d2 = Sql.dateCond(sar, Jalali.todayGregorian(), Jalali.toGregorian(until), binds);
-        conds.add("(" + d1 + " OR " + d2 + ")");
+        x.sar = Sql.date10("h", x.c.sardate);
+        String d1 = Sql.dateCond(x.sar, today, until, x.binds);
+        String d2 = Sql.dateCond(x.sar, Jalali.todayGregorian(), Jalali.toGregorian(until), x.binds);
+        x.conds.add("(" + d1 + " OR " + d2 + ")");
         // Outstanding = still with us: incoming 1/2 (not bounced), outgoing 1 (issued).
-        conds.add(incoming ? st + " IN (N'1',N'2')" : st + "=N'1'");
-        if (incoming && c.back != null)
-            conds.add("(UPPER(LTRIM(RTRIM(TRY_CONVERT(nvarchar(10),h.[" + c.back + "])))) NOT IN (N'T',N'1',N'TRUE'))");
+        x.conds.add(incoming ? st + " IN (N'1',N'2')" : st + "=N'1'");
+        if (incoming && x.c.back != null)
+            x.conds.add("(UPPER(LTRIM(RTRIM(TRY_CONVERT(nvarchar(10),h.[" + x.c.back + "])))) NOT IN (N'T',N'1',N'TRUE'))");
         // Skip placeholder due dates («--», «1499/12/29» on blank cheques).
-        conds.add("(" + sar + " NOT LIKE N'--%' AND " + sar + " NOT LIKE N'149%' AND " + sar + " NOT LIKE N'15%' AND " + sar + " NOT LIKE N'16%')");
+        x.conds.add("(" + x.sar + " NOT LIKE N'--%' AND " + x.sar + " NOT LIKE N'149%' AND " + x.sar + " NOT LIKE N'15%' AND " + x.sar + " NOT LIKE N'16%')");
+        return x;
+    }
+
+    /** Cheques due within daysAhead (still outstanding): same columns as the list. */
+    public static Queries.Q chequeDue(Meta m, boolean incoming, int daysAhead) throws Queries.Missing {
+        DueCtx x = dueCtx(m, incoming, daysAhead);
+        Chq c = x.c;
         boolean needCust = !c.isView && c.shmo != null;
         String join = needCust ? Queries.custJoin(m, "h", c.shmo, "cu") : "";
         String custExpr = c.custName != null ? "COALESCE(" + Sql.txt("h", c.custName, 250) + ",N'—')"
@@ -559,7 +575,16 @@ public final class MoneyQueries {
                 + ", " + Sql.date10("h", c.sardate) + " AS sardate"
                 + ", " + custExpr + " AS customer"
                 + ", COALESCE(" + Sql.txt("h", c.st, 40) + ",N'') AS st"
-                + " FROM dbo.[" + c.table + "] h" + join + " WHERE " + Sql.join(conds, " AND ")
-                + " ORDER BY h.[" + c.sardate + "]", binds);
+                + " FROM dbo.[" + c.table + "] h" + join + " WHERE " + Sql.join(x.conds, " AND ")
+                + " ORDER BY h.[" + c.sardate + "]", x.binds);
+    }
+
+    /** Daily cash-flow forecast: per-day count + total of outstanding cheques due in the window. */
+    public static Queries.Q chequeDueDaily(Meta m, boolean incoming, int daysAhead) throws Queries.Missing {
+        DueCtx x = dueCtx(m, incoming, daysAhead);
+        Chq c = x.c;
+        return new Queries.Q("SELECT " + x.sar + " AS day, COUNT(*) AS n, SUM(" + Sql.num("h", c.amount) + ") AS total"
+                + " FROM dbo.[" + c.table + "] h WHERE " + Sql.join(x.conds, " AND ")
+                + " GROUP BY " + x.sar + " ORDER BY " + x.sar, x.binds);
     }
 }

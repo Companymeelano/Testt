@@ -5,7 +5,7 @@ import android.content.SharedPreferences;
 
 import ir.meelano.manager.core.Money;
 
-/** App settings: connection overrides + optional PIN lock. */
+/** App settings: connection + PIN lock + luxury theme + notifications + offline cache. */
 public final class Settings {
     private final SharedPreferences p;
 
@@ -71,5 +71,47 @@ public final class Settings {
         } catch (Exception e) {
             return "x" + s;
         }
+    }
+
+    // ---------------- luxury theme ----------------
+    /** "dark" (Midnight Gold) or "light" (Ivory Royal). */
+    public String themeMode() {
+        String m = p.getString("theme_mode", "dark");
+        return "light".equals(m) ? "light" : "dark";
+    }
+
+    public void setThemeMode(String mode) {
+        p.edit().putString("theme_mode", "light".equals(mode) ? "light" : "dark").apply();
+    }
+
+    /** Accent key: gold / emerald / sapphire / ruby / violet / teal. */
+    public String themeAccent() {
+        String k = p.getString("theme_accent", "gold");
+        for (String ok : new String[]{"gold", "emerald", "sapphire", "ruby", "violet", "teal"})
+            if (ok.equals(k)) return k;
+        return "gold";
+    }
+
+    public void setThemeAccent(String key) {
+        p.edit().putString("theme_accent", key == null ? "gold" : key).apply();
+    }
+
+    // ---------------- smart notifications ----------------
+    public boolean notifOn() { return p.getBoolean("notif_on", true); }
+
+    public void setNotifOn(boolean on) { p.edit().putBoolean("notif_on", on).apply(); }
+
+    // ---------------- shop card ----------------
+    public String shopName() { return p.getString("shop_name", "").trim(); }
+
+    public void setShopName(String name) {
+        p.edit().putString("shop_name", name == null ? "" : name.trim()).apply();
+    }
+
+    // ---------------- offline home cache (compact JSON) ----------------
+    public String homeCache() { return p.getString("home_cache", ""); }
+
+    public void saveHomeCache(String json) {
+        p.edit().putString("home_cache", json == null ? "" : json).apply();
     }
 }

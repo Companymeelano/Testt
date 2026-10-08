@@ -92,17 +92,119 @@ public class HomeScreen extends Screen {
         }, new Repo.Cb<Data>() {
             @Override
             public void ok(Data d) {
+                saveCache(d);
                 build(content, d);
             }
 
             @Override
             public void fail(String faError) {
+                String[] ts = {""};
+                Data cached = loadCached(ts);
+                if (cached != null) {
+                    build(content, cached);
+                    LinearLayout bc = a.kit.card(Theme.WARNING);
+                    bc.addView(a.kit.text("📴 حالت آفلاین — آخرین داده ذخیره‌شده", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
+                    if (!ts[0].isEmpty())
+                        bc.addView(a.kit.kv("آخرین به‌روزرسانی", Money.fa(ts[0]), Theme.WARNING), a.kit.lp(-1, -2));
+                    bc.addView(a.kit.kv("خطا", faError == null ? "" : faError, Theme.MUTED), a.kit.lp(-1, -2));
+                    bc.addView(a.kit.btn("تلاش مجدد", v -> render(content)), a.kit.lp(-1, -2));
+                    content.addView(bc, 0);
+                    content.addView(a.kit.gap(10), 1);
+                    return;
+                }
                 content.removeAllViews();
                 content.addView(greetingHero(), a.kit.lp(-1, -2));
                 content.addView(a.kit.gap(12));
                 content.addView(a.kit.error(faError, () -> render(content)), a.kit.lp(-1, -2));
             }
         });
+    }
+
+    // ---------------- offline cache (summary rows + timestamp) ----------------
+    private void saveCache(Data d) {
+        try {
+            Calendar c = Calendar.getInstance();
+            String hm = String.format(java.util.Locale.US, "%02d:%02d",
+                    c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE));
+            String s = "ts=" + esc(a.kit.todayLine() + " ساعت " + hm)
+                    + "|sales=" + rowStr(d.salesDay)
+                    + "|buy=" + rowStr(d.buyDay)
+                    + "|in=" + rowStr(d.inDay)
+                    + "|out=" + rowStr(d.outDay)
+                    + "|cust=" + rowStr(d.custSum);
+            a.settings.saveHomeCache(s);
+            pokeWidget();
+        } catch (Exception ignored) { }
+    }
+
+    /** Ask the home-screen widget to re-read the fresh cache. */
+    private void pokeWidget() {
+        try {
+            android.appwidget.AppWidgetManager mgr = android.appwidget.AppWidgetManager.getInstance(a);
+            android.content.ComponentName cn = new android.content.ComponentName(a,
+                    ir.meelano.manager.widget.CashWidget.class);
+            int[] ids = mgr.getAppWidgetIds(cn);
+            if (ids != null && ids.length > 0) {
+                android.content.Intent in = new android.content.Intent(a,
+                        ir.meelano.manager.widget.CashWidget.class);
+                in.setAction(android.appwidget.AppWidgetManager.ACTION_APPWIDGET_UPDATE);
+                in.putExtra(android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_IDS, ids);
+                a.sendBroadcast(in);
+            }
+        } catch (Exception ignored) { }
+    }
+
+    private Data loadCached(String[] tsOut) {
+        try {
+            String s = a.settings.homeCache();
+            if (s == null || s.isEmpty()) return null;
+            Data d = new Data();
+            boolean any = false;
+            for (String part : s.split("\\|")) {
+                int eq = part.indexOf('=');
+                if (eq < 0) continue;
+                String k = part.substring(0, eq);
+                String v = part.substring(eq + 1);
+                if ("ts".equals(k)) tsOut[0] = unesc(v);
+                else if ("sales".equals(k)) { d.salesDay = rowFrom(v); any = true; }
+                else if ("buy".equals(k)) { d.buyDay = rowFrom(v); any = true; }
+                else if ("in".equals(k)) { d.inDay = rowFrom(v); any = true; }
+                else if ("out".equals(k)) { d.outDay = rowFrom(v); any = true; }
+                else if ("cust".equals(k)) { d.custSum = rowFrom(v); any = true; }
+            }
+            return any ? d : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static String rowStr(Row r) {
+        if (r == null) return "";
+        StringBuilder b = new StringBuilder();
+        for (Map.Entry<String, Object> e : r.entrySet()) {
+            if (b.length() > 0) b.append(';');
+            b.append(e.getKey()).append('=').append(esc(String.valueOf(e.getValue())));
+        }
+        return b.toString();
+    }
+
+    private static Row rowFrom(String s) {
+        Row r = new Row();
+        if (s == null || s.isEmpty()) return r;
+        for (String p : s.split(";")) {
+            int eq = p.indexOf('=');
+            if (eq < 0) continue;
+            r.put(p.substring(0, eq), unesc(p.substring(eq + 1)));
+        }
+        return r;
+    }
+
+    private static String esc(String s) {
+        return s.replace("%", "%25").replace(";", "%3B").replace("=", "%3D").replace("|", "%7C");
+    }
+
+    private static String unesc(String s) {
+        return s.replace("%7C", "|").replace("%3D", "=").replace("%3B", ";").replace("%25", "%");
     }
 
     private String firstNote(Map<String, String> notes) {

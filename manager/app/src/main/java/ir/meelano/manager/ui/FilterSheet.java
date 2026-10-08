@@ -112,7 +112,21 @@ public final class FilterSheet {
                 }
                 return false;
             });
-            root.addView(search, kit.lp(-1, -2));
+            LinearLayout sRow = kit.h();
+            sRow.setGravity(Gravity.CENTER_VERTICAL);
+            sRow.addView(search, kit.wlp(1f));
+            sRow.addView(kit.space(8));
+            View mic = kit.btnGhost("🎙", Theme.GOLD, v -> {
+                try {
+                    ((ir.meelano.manager.MainActivity) kit.a).startVoiceSearch(t -> {
+                        search.setText(t == null ? "" : t);
+                        search.setSelection(search.getText().length());
+                        pendingSearch[0] = t == null ? "" : t;
+                    });
+                } catch (Exception ignored) { }
+            });
+            sRow.addView(mic, new LinearLayout.LayoutParams(Theme.dp(52), Theme.dp(50)));
+            root.addView(sRow, kit.lp(-1, -2));
             root.addView(kit.gap(10));
             // NOTE: pendingSearch keeps f.search — clearing it here would wipe the
             // search text whenever the user applies any other filter change.

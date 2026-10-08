@@ -10,12 +10,14 @@ import android.widget.TextView;
 
 import ir.meelano.manager.core.Filter;
 import ir.meelano.manager.core.Money;
+import ir.meelano.manager.core.Notify;
 import ir.meelano.manager.core.Queries;
 import ir.meelano.manager.core.ReportCatalog;
 import ir.meelano.manager.data.Meta;
 import ir.meelano.manager.data.Repo;
 import ir.meelano.manager.data.Row;
 import ir.meelano.manager.data.Settings;
+import ir.meelano.manager.screens.CashScreen;
 import ir.meelano.manager.screens.ChequesScreen;
 import ir.meelano.manager.screens.CustomersScreen;
 import ir.meelano.manager.screens.HomeScreen;
@@ -69,11 +71,85 @@ public class MainActivity extends Activity {
         kit = new Kit(this);
         settings = new Settings(this);
         repo = new Repo(this, settings);
-        if (settings.pinEnabled()) pinGate();
-        else {
-            unlocked = true;
-            shell();
+        splash();
+    }
+
+    /** Luxury launch splash with the developer signature, then PIN gate / shell. */
+    private void splash() {
+        styleBars();
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setGravity(Gravity.CENTER);
+        root.setBackgroundColor(Theme.BG);
+        root.setPadding(Theme.dp(28), Theme.dp(28), Theme.dp(28), Theme.dp(28));
+        root.addView(kit.logo(110), new LinearLayout.LayoutParams(Theme.dp(110), Theme.dp(110)));
+        TextView t = kit.text("مدیریت میلانو", 26, Theme.TEXT, true);
+        t.setGravity(Gravity.CENTER);
+        root.addView(t, kit.lp(-1, -2));
+        TextView s = kit.text("داشبورد مدیریتی آتیران", 12.5f, Theme.MUTED, false);
+        s.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams sp = kit.lp(-1, -2);
+        sp.setMargins(0, Theme.dp(4), 0, Theme.dp(14));
+        root.addView(s, sp);
+        View line = new View(this);
+        line.setBackgroundColor(Theme.alpha(Theme.GOLD, 160));
+        LinearLayout.LayoutParams llp = new LinearLayout.LayoutParams(Theme.dp(120), Theme.dp(2));
+        llp.gravity = Gravity.CENTER;
+        root.addView(line, llp);
+        TextView dev = kit.text("Milad Yaghoobi", 21, Theme.GOLD, true);
+        dev.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams dp = kit.lp(-1, -2);
+        dp.setMargins(0, Theme.dp(12), 0, 0);
+        root.addView(dev, dp);
+        TextView role = kit.text("طراح و توسعه‌دهنده", 12f, Theme.MUTED, false);
+        role.setGravity(Gravity.CENTER);
+        root.addView(role, kit.lp(-1, -2));
+        TextView ver = kit.text(splashVersion(), 10.5f, Theme.MUTED, false);
+        ver.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams vp = kit.lp(-1, -2);
+        vp.setMargins(0, Theme.dp(10), 0, 0);
+        root.addView(ver, vp);
+        setContentView(root);
+        root.setAlpha(0f);
+        root.animate().alpha(1f).setDuration(450).start();
+        dev.setScaleX(0.92f);
+        dev.setScaleY(0.92f);
+        dev.animate().scaleX(1f).scaleY(1f).setDuration(900).start();
+        root.postDelayed(() -> {
+            if (settings.pinEnabled()) pinGate();
+            else {
+                unlocked = true;
+                shell();
+            }
+        }, 1750);
+    }
+
+    private String splashVersion() {
+        try {
+            String v = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+            return "نسخه " + Money.fa(v == null || v.isEmpty() ? "—" : v);
+        } catch (Exception e) {
+            return "";
         }
+    }
+
+    /** Paint status/navigation bars for the current skin. */
+    private void styleBars() {
+        try {
+            getWindow().setStatusBarColor(Theme.statusBar());
+            getWindow().setNavigationBarColor(Theme.statusBar());
+            int vis = getWindow().getDecorView().getSystemUiVisibility();
+            if (Theme.isLight()) vis |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+            else vis &= ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+            getWindow().getDecorView().setSystemUiVisibility(vis);
+        } catch (Exception ignored) { }
+    }
+
+    /** Re-apply the luxury theme and rebuild the shell on the current screen. */
+    public void refreshTheme() {
+        Theme.apply(this);
+        history.clear();
+        shell();
     }
 
     @Override
@@ -211,6 +287,7 @@ public class MainActivity extends Activity {
         reg(new MoneyScreen(this, 0));
         reg(new MoneyScreen(this, 1));
         reg(new ChequesScreen(this));
+        reg(new CashScreen(this));
         reg(new ProductsScreen(this));
         reg(new CustomersScreen(this));
         reg(new VisitorsScreen(this));
@@ -221,8 +298,10 @@ public class MainActivity extends Activity {
         reg(new MoreScreen(this));
 
         buildBottom();
-        nav("home");
+        nav(screens.containsKey(currentId) ? currentId : "home");
+        styleBars();
         checkConn();
+        Notify.boot(this);
     }
 
     private void reg(Screen s) {
@@ -320,6 +399,50 @@ public class MainActivity extends Activity {
         });
     }
 
+    // ================= Persian voice search =================
+    private static final int VOICE_REQ = 901;
+    private java.util.function.Consumer<String> voiceCb;
+
+    /** Start Persian speech recognition; the transcript is delivered to cb. */
+    public void startVoiceSearch(java.util.function.Consumer<String> cb) {
+        voiceCb = cb;
+        try {
+            android.content.Intent i = new android.content.Intent(
+                    android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+            i.putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                    android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+            i.putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, "fa-IR");
+            i.putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "…بگویید چه چیزی جستجو شود");
+            startActivityForResult(i, VOICE_REQ);
+        } catch (Exception e) {
+            kit.toast("جستجوی صوتی در این گوشی پشتیبانی نمی‌شود");
+            voiceCb = null;
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, android.content.Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == VOICE_REQ && resultCode == Activity.RESULT_OK && data != null && voiceCb != null) {
+            try {
+                java.util.ArrayList<String> out = data.getStringArrayListExtra(
+                        android.speech.RecognizerIntent.EXTRA_RESULTS);
+                if (out != null && !out.isEmpty() && out.get(0) != null && !out.get(0).trim().isEmpty())
+                    voiceCb.accept(out.get(0).trim());
+                else kit.toast("چیزی شنیده نشد");
+            } catch (Exception e) {
+                kit.toast("جستجوی صوتی ممکن نشد");
+            }
+        }
+        voiceCb = null;
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        // Notification permission is best-effort; the app works fully without it.
+    }
+
     @Override
     public void onBackPressed() {
         if (!unlocked) {
@@ -378,6 +501,35 @@ public class MainActivity extends Activity {
                 });
             } catch (Exception e) {
                 runOnUiThread(() -> kit.toast("ساخت PDF ممکن نشد"));
+            }
+        }).start();
+    }
+
+    /** Share a bitmap (shop card) via the FileProvider. */
+    public void shareImage(final android.graphics.Bitmap bmp, final String title) {
+        if (bmp == null) {
+            kit.toast("تصویری برای اشتراک نیست");
+            return;
+        }
+        kit.toast("در حال آماده‌سازی کارت…");
+        new Thread(() -> {
+            try {
+                File dir = new File(getCacheDir(), "share");
+                if (!dir.exists()) dir.mkdirs();
+                File f = new File(dir, "shop-card.png");
+                java.io.FileOutputStream out = new java.io.FileOutputStream(f);
+                bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out);
+                out.flush();
+                out.close();
+                runOnUiThread(() -> {
+                    try {
+                        ShareProvider.share(this, f, "image/png", title);
+                    } catch (Exception e) {
+                        kit.toast("اشتراک ممکن نشد");
+                    }
+                });
+            } catch (Exception e) {
+                runOnUiThread(() -> kit.toast("ساخت تصویر ممکن نشد"));
             }
         }).start();
     }

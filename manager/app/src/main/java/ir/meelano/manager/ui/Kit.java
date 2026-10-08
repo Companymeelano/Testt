@@ -1,5 +1,6 @@
 package ir.meelano.manager.ui;
 
+import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.text.InputType;
@@ -152,13 +153,25 @@ public final class Kit {
         public final String sub;
         public final int accent;
         public final Runnable action;
+        /** When not NaN, the tile counts up from 0 to this number. */
+        public final double countTo;
 
         public Kpi(String label, String value, String sub, int accent) {
             this(label, value, sub, accent, null);
         }
 
         public Kpi(String label, String value, String sub, int accent, Runnable action) {
+            this(label, Double.NaN, value, sub, accent, action);
+        }
+
+        /** Count-up tile: animates 0 → target, then shows the exact formatted value. */
+        public Kpi(String label, double countTo, String value, String sub, int accent) {
+            this(label, countTo, value, sub, accent, null);
+        }
+
+        public Kpi(String label, double countTo, String value, String sub, int accent, Runnable action) {
             this.label = label;
+            this.countTo = countTo;
             this.value = value;
             this.sub = sub;
             this.accent = accent;
@@ -178,6 +191,19 @@ public final class Kit {
         v.setSingleLine(true);
         v.setEllipsize(TextUtils.TruncateAt.END);
         t.addView(v, lp(-1, -2));
+        if (!Double.isNaN(k.countTo)) {
+            ValueAnimator va = ValueAnimator.ofFloat(0f, 1f);
+            va.setDuration(900);
+            va.setInterpolator(new android.view.animation.DecelerateInterpolator());
+            va.addUpdateListener(an -> v.setText(Money.fa(Money.compact(k.countTo * (float) an.getAnimatedValue()))));
+            va.addListener(new android.animation.AnimatorListenerAdapter() {
+                @Override public void onAnimationEnd(android.animation.Animator animation) { v.setText(k.value); }
+            });
+            va.start();
+        } else {
+            v.setAlpha(0f);
+            v.animate().alpha(1f).setDuration(350).start();
+        }
         if (k.sub != null && !k.sub.isEmpty()) {
             TextView s = text(k.sub, 10f, k.accent, true);
             s.setSingleLine(true);
@@ -359,7 +385,7 @@ public final class Kit {
         Button b = new Button(a);
         b.setText(t);
         b.setTextSize(13.5f);
-        b.setTextColor(0xFF1A1206);
+        b.setTextColor(Theme.onAccent());
         b.setTypeface(Theme.face(true));
         b.setBackground(Theme.goldButton());
         b.setPadding(Theme.dp(16), Theme.dp(10), Theme.dp(16), Theme.dp(10));
@@ -386,7 +412,7 @@ public final class Kit {
     }
 
     public TextView chip(String t, boolean selected, int accent, View.OnClickListener onClick) {
-        TextView c = text(t, 11.5f, selected ? 0xFF14100A : accent, true);
+        TextView c = text(t, 11.5f, selected ? Theme.onAccent() : accent, true);
         c.setBackground(Theme.chip(selected, selected ? accent : Theme.alpha(accent, 255)));
         c.setPadding(Theme.dp(14), Theme.dp(8), Theme.dp(14), Theme.dp(8));
         c.setSingleLine(true);
@@ -434,6 +460,17 @@ public final class Kit {
         e.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
         e.setInputType(InputType.TYPE_CLASS_TEXT);
         r.addView(e, wlp(1f));
+        r.addView(space(8));
+        Button mic = btnGhost("🎙", Theme.GOLD, v -> {
+            try {
+                ((ir.meelano.manager.MainActivity) a).startVoiceSearch(t -> {
+                    e.setText(t == null ? "" : t);
+                    hideKeyboard(e);
+                    l.onGo(t == null ? "" : t);
+                });
+            } catch (Exception ignored) { }
+        });
+        r.addView(mic, new LinearLayout.LayoutParams(Theme.dp(52), Theme.dp(50)));
         r.addView(space(8));
         Button go = btnGold("⌕", v -> {
             hideKeyboard(e);
@@ -562,16 +599,21 @@ public final class Kit {
         return "—".equals(t) ? t : Money.fa(Jalali.faDate(t));
     }
 
-    /** Scrollable table with a sticky-feel header. */
+    /** Deluxe scrollable table: row numbers, gold zebra, red negatives, rounded card. */
     public View dataTable(ReportCatalog.Col[] cols, List<Row> rows, final RowClick click) {
         HorizontalScrollView sv = new HorizontalScrollView(a);
+        sv.setBackground(Theme.card());
+        sv.setPadding(Theme.dp(4), Theme.dp(4), Theme.dp(4), Theme.dp(4));
         LinearLayout t = v();
         t.setPadding(Theme.dp(2), Theme.dp(2), Theme.dp(2), Theme.dp(2));
         LinearLayout head = h();
         head.setBackground(Theme.tableHeader());
-        head.setPadding(Theme.dp(6), Theme.dp(8), Theme.dp(6), Theme.dp(8));
+        head.setPadding(Theme.dp(6), Theme.dp(9), Theme.dp(6), Theme.dp(9));
+        TextView rn0 = text("#", 11.5f, Theme.GOLD_SOFT, true);
+        rn0.setGravity(Gravity.CENTER);
+        head.addView(rn0, new LinearLayout.LayoutParams(Theme.dp(44), -2));
         for (ReportCatalog.Col c : cols) {
-            TextView h = text(c.title, 11f, Theme.GOLD_SOFT, true);
+            TextView h = text(c.title, 11.5f, Theme.GOLD_SOFT, true);
             h.setGravity(Gravity.CENTER);
             head.addView(h, new LinearLayout.LayoutParams(Theme.dp(colWidth(c)), -2));
         }
@@ -579,12 +621,16 @@ public final class Kit {
         for (int i = 0; i < rows.size(); i++) {
             final Row r = rows.get(i);
             LinearLayout row = h();
-            row.setPadding(Theme.dp(6), Theme.dp(9), Theme.dp(6), Theme.dp(9));
-            if (i % 2 == 1) row.setBackgroundColor(Theme.alpha(Theme.SURFACE2, 255));
+            row.setPadding(Theme.dp(6), Theme.dp(10), Theme.dp(6), Theme.dp(10));
+            if (i % 2 == 1) row.setBackgroundColor(Theme.alpha(Theme.GOLD, Theme.DARK ? 16 : 30));
+            TextView rn = text(Money.fa(String.valueOf(i + 1)), 11f, Theme.MUTED, true);
+            rn.setGravity(Gravity.CENTER);
+            row.addView(rn, new LinearLayout.LayoutParams(Theme.dp(44), -2));
             for (ReportCatalog.Col c : cols) {
-                TextView cell = text(fmtCol(c, r), 11.5f,
-                        c.type == ReportCatalog.T_MONEY ? Theme.TEXT : (c.type == ReportCatalog.T_TEXT ? Theme.TEXT : Theme.MUTED),
-                        c.type == ReportCatalog.T_MONEY);
+                double dv = (c.type == ReportCatalog.T_MONEY || c.type == ReportCatalog.T_NUM) ? r.d(c.key) : 0;
+                int col = dv < -0.0001 ? Theme.DANGER
+                        : (c.type == ReportCatalog.T_MONEY ? Theme.TEXT : (c.type == ReportCatalog.T_TEXT ? Theme.TEXT : Theme.MUTED));
+                TextView cell = text(fmtCol(c, r), 12f, col, c.type == ReportCatalog.T_MONEY);
                 cell.setGravity(Gravity.CENTER);
                 cell.setSingleLine(true);
                 cell.setEllipsize(TextUtils.TruncateAt.END);
@@ -595,7 +641,7 @@ public final class Kit {
                 row.setOnClickListener(v -> click.onRow(r));
             }
             t.addView(row, lp(-2, -2));
-            t.addView(divider(), lp(-2, Theme.dp(1)));
+            if (i < rows.size() - 1) t.addView(divider(), lp(-1, Theme.dp(1)));
         }
         sv.addView(t, new HorizontalScrollView.LayoutParams(-2, -2));
         return sv;
@@ -630,6 +676,33 @@ public final class Kit {
         sv.addView(inner, new ScrollView.LayoutParams(-1, -2));
         sv.setLayoutParams(new LinearLayout.LayoutParams(-1, Theme.dp(maxDp)));
         return sv;
+    }
+
+    // ---------------- fullscreen charts ----------------
+    /** Builds a fresh chart view for the fullscreen viewer. */
+    public interface ChartMaker { View make(); }
+
+    /** Card title row with an expand (⤢) button that opens the fullscreen viewer. */
+    public View chartHead(String title, final ChartMaker maker) {
+        LinearLayout r = h();
+        r.setGravity(Gravity.CENTER_VERTICAL);
+        r.addView(title(title), wlp(1f));
+        if (maker != null) {
+            Button b = btnGhost("⤢", Theme.GOLD, v -> fullChart(title, maker));
+            r.addView(b, new LinearLayout.LayoutParams(Theme.dp(48), Theme.dp(44)));
+        }
+        return r;
+    }
+
+    /** Tall dialog hosting a freshly built chart. */
+    public void fullChart(String title, ChartMaker maker) {
+        if (maker == null) return;
+        LinearLayout root = v();
+        root.setPadding(Theme.dp(10), Theme.dp(6), Theme.dp(10), Theme.dp(10));
+        View chart = maker.make();
+        int hPx = (int) (a.getResources().getDisplayMetrics().heightPixels * 0.60);
+        root.addView(chart, new LinearLayout.LayoutParams(-1, hPx));
+        try { dialog(title, root, true).show(); } catch (Exception ignored) { }
     }
 
     public ImageView logo(int sizeDp) {

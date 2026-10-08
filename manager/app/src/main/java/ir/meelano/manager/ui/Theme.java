@@ -6,28 +6,72 @@ import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.view.View;
 
-/** «Midnight Gold» luxury theme: tokens, fonts and drawable factories. */
+import ir.meelano.manager.data.Settings;
+
+/**
+ * Luxury theme engine: two skins («Midnight Gold» dark, «Ivory Royal» light)
+ * × six accent colors, applied to the WHOLE app at runtime.
+ *
+ * Colors are plain static fields (not constants) on purpose: every screen,
+ * chart and drawable reads them fresh on each render, so switching theme +
+ * re-render is all it takes. GOLD / GOLD_SOFT always mean «the current
+ * accent», whatever the user picked.
+ */
 public final class Theme {
     private Theme() { }
 
-    public static final int BG = 0xFF0C1220;
-    public static final int SURFACE = 0xFF151D31;
-    public static final int SURFACE2 = 0xFF1D2742;
-    public static final int GOLD = 0xFFD9AE5A;
-    public static final int GOLD_SOFT = 0xFFF1D493;
-    public static final int TEXT = 0xFFF4EFE4;
-    public static final int MUTED = 0xFF9AA3B5;
-    public static final int SUCCESS = 0xFF35C26E;
-    public static final int DANGER = 0xFFE5484D;
-    public static final int WARNING = 0xFFF5A524;
-    public static final int INFO = 0xFF4FA3FF;
-    public static final int VIOLET = 0xFF9A7BFF;
-    public static final int TEAL = 0xFF3ED6C5;
-    public static final int STEEL = 0xFF7C8DA6;
+    // ---------------- dynamic palette (set by apply) ----------------
+    public static int BG = 0xFF0C1220;
+    public static int SURFACE = 0xFF151D31;
+    public static int SURFACE2 = 0xFF1D2742;
+    /** Current accent (gold by default). */
+    public static int GOLD = 0xFFD9AE5A;
+    /** Current accent, soft variant (readable on the background). */
+    public static int GOLD_SOFT = 0xFFF1D493;
+    public static int TEXT = 0xFFF4EFE4;
+    public static int MUTED = 0xFF9AA3B5;
+    public static int SUCCESS = 0xFF35C26E;
+    public static int DANGER = 0xFFE5484D;
+    public static int WARNING = 0xFFF5A524;
+    public static int INFO = 0xFF4FA3FF;
+    public static int VIOLET = 0xFF9A7BFF;
+    public static int TEAL = 0xFF3ED6C5;
+    public static int STEEL = 0xFF7C8DA6;
 
+    private static boolean light = false;
+    /** Mirror of !light for call sites (charts, tables). */
+    public static boolean DARK = true;
+    private static String accentKey = "gold";
     private static float density = 3f;
     private static Typeface regular;
     private static Typeface bold;
+
+    /** Accent: key, Persian label, dark, darkSoft, light, lightSoft. */
+    private static final String[][] ACCENTS = {
+            {"gold", "طلایی", "FFD9AE5A", "FFF1D493", "FFA86F14", "FF7A5410"},
+            {"emerald", "زمردی", "FF3ED598", "FF9BF0C8", "FF0E9F6E", "FF046C4E"},
+            {"sapphire", "یاقوت آبی", "FF4FA3FF", "FFB3D4FF", "FF1C64F2", "FF1E429F"},
+            {"ruby", "یاقوتی", "FFF2617A", "FFFFB3C0", "FFD61F4A", "FF8F0F2E"},
+            {"violet", "بنفش سلطنتی", "FF9A7BFF", "FFCDBFFF", "FF7C3AED", "FF5B21B6"},
+            {"teal", "فیروزه‌ای", "FF3ED6C5", "FFA7F3EA", "FF0E9E8F", "FF065F56"},
+    };
+
+    public static String[][] accents() { return ACCENTS; }
+
+    public static String accentLabel(String key) {
+        for (String[] a : ACCENTS) if (a[0].equals(key)) return a[1];
+        return ACCENTS[0][1];
+    }
+
+    /** Raw accent color (dark variant) for swatch previews. */
+    public static int accentPreview(String key) {
+        for (String[] a : ACCENTS) if (a[0].equals(key)) return (int) Long.parseLong(a[2], 16);
+        return (int) Long.parseLong(ACCENTS[0][2], 16);
+    }
+
+    public static boolean isLight() { return light; }
+
+    public static String accentKey() { return accentKey; }
 
     public static void init(Context c) {
         density = c.getResources().getDisplayMetrics().density;
@@ -38,6 +82,60 @@ public final class Theme {
             regular = Typeface.DEFAULT;
             bold = Typeface.DEFAULT_BOLD;
         }
+        apply(c);
+    }
+
+    /** Re-read theme settings and repaint the whole palette. Call before any render. */
+    public static void apply(Context c) {
+        Settings s = new Settings(c);
+        light = "light".equals(s.themeMode());
+        DARK = !light;
+        accentKey = s.themeAccent();
+        int dark = 0xFFD9AE5A, darkSoft = 0xFFF1D493, lite = 0xFFA86F14, liteSoft = 0xFF7A5410;
+        for (String[] a : ACCENTS) {
+            if (a[0].equals(accentKey)) {
+                dark = (int) Long.parseLong(a[2], 16);
+                darkSoft = (int) Long.parseLong(a[3], 16);
+                lite = (int) Long.parseLong(a[4], 16);
+                liteSoft = (int) Long.parseLong(a[5], 16);
+            }
+        }
+        if (light) {
+            BG = 0xFFF5EFE3;
+            SURFACE = 0xFFFFFFFF;
+            SURFACE2 = 0xFFECE2CC;
+            GOLD = lite;
+            GOLD_SOFT = liteSoft;
+            TEXT = 0xFF1C2434;
+            MUTED = 0xFF6E7789;
+            SUCCESS = 0xFF189A55;
+            DANGER = 0xFFD63A40;
+            WARNING = 0xFFDD8A00;
+            INFO = 0xFF2B7DE0;
+            VIOLET = 0xFF7C5CFC;
+            TEAL = 0xFF0E9E8F;
+            STEEL = 0xFF64748B;
+        } else {
+            BG = 0xFF0C1220;
+            SURFACE = 0xFF151D31;
+            SURFACE2 = 0xFF1D2742;
+            GOLD = dark;
+            GOLD_SOFT = darkSoft;
+            TEXT = 0xFFF4EFE4;
+            MUTED = 0xFF9AA3B5;
+            SUCCESS = 0xFF35C26E;
+            DANGER = 0xFFE5484D;
+            WARNING = 0xFFF5A524;
+            INFO = 0xFF4FA3FF;
+            VIOLET = 0xFF9A7BFF;
+            TEAL = 0xFF3ED6C5;
+            STEEL = 0xFF7C8DA6;
+        }
+    }
+
+    /** Text color readable ON the accent gradient (gold → dark ink, jewel tones → white). */
+    public static int onAccent() {
+        return "gold".equals(accentKey) ? 0xFF1A1206 : 0xFFFFFFFF;
     }
 
     public static int dp(float v) {
@@ -53,6 +151,26 @@ public final class Theme {
         return Color.argb(Math.max(0, Math.min(255, a)), Color.red(color), Color.green(color), Color.blue(color));
     }
 
+    /** Mix color toward white (amt 0..1) or black (amt -1..0). */
+    public static int shade(int color, float amt) {
+        float r = Color.red(color), g = Color.green(color), b = Color.blue(color);
+        if (amt >= 0) {
+            r += (255 - r) * amt;
+            g += (255 - g) * amt;
+            b += (255 - b) * amt;
+        } else {
+            r *= (1 + amt);
+            g *= (1 + amt);
+            b *= (1 + amt);
+        }
+        return Color.rgb(Math.round(r), Math.round(g), Math.round(b));
+    }
+
+    // ---------------- system bars ----------------
+    public static int statusBar() {
+        return light ? 0xFFF5EFE3 : 0xFF0C1220;
+    }
+
     // ---------------- drawable factories ----------------
     private static GradientDrawable base(int fill, float radiusDp, int strokePx, int strokeColor) {
         GradientDrawable d = new GradientDrawable();
@@ -64,45 +182,46 @@ public final class Theme {
 
     /** Standard glass card. */
     public static GradientDrawable card() {
-        return base(SURFACE, 20, dp(1), alpha(GOLD, 40));
+        return base(SURFACE, 20, dp(1), alpha(light ? TEXT : GOLD, light ? 26 : 40));
     }
 
     /** Card with an accent glow edge. */
     public static GradientDrawable cardAccent(int accent) {
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{alpha(accent, 46), alpha(accent, 14), SURFACE});
+                new int[]{alpha(accent, light ? 30 : 46), alpha(accent, light ? 10 : 14), SURFACE});
         d.setCornerRadius(dp(20));
-        d.setStroke(dp(1), alpha(accent, 90));
+        d.setStroke(dp(1), alpha(accent, light ? 70 : 90));
         return d;
     }
 
     /** Hero header background. */
     public static GradientDrawable hero(int accent) {
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TR_BL,
-                new int[]{alpha(accent, 70), alpha(accent, 22), alpha(SURFACE, 255)});
+                new int[]{alpha(accent, light ? 44 : 70), alpha(accent, light ? 16 : 22), alpha(SURFACE, 255)});
         d.setCornerRadius(dp(24));
-        d.setStroke(dp(1), alpha(accent, 110));
+        d.setStroke(dp(1), alpha(accent, light ? 90 : 110));
         return d;
     }
 
     /** KPI tile background. */
     public static GradientDrawable kpi(int accent) {
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{alpha(accent, 34), alpha(SURFACE, 255)});
+                new int[]{alpha(accent, light ? 26 : 34), alpha(SURFACE, 255)});
         d.setCornerRadius(dp(18));
-        d.setStroke(dp(1), alpha(accent, 70));
+        d.setStroke(dp(1), alpha(accent, light ? 60 : 70));
         return d;
     }
 
+    /** Primary button gradient, built from the current accent. */
     public static GradientDrawable goldButton() {
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
-                new int[]{0xFFB9822F, GOLD, GOLD_SOFT});
+                new int[]{shade(GOLD, -0.18f), GOLD, shade(GOLD, 0.28f)});
         d.setCornerRadius(dp(16));
         return d;
     }
 
     public static GradientDrawable ghostButton(int accent) {
-        return base(alpha(accent, 26), 16, dp(1), alpha(accent, 110));
+        return base(alpha(accent, light ? 18 : 26), 16, dp(1), alpha(accent, light ? 130 : 110));
     }
 
     public static GradientDrawable chip(boolean selected, int accent) {
@@ -116,11 +235,11 @@ public final class Theme {
     }
 
     public static GradientDrawable pill(int color) {
-        return base(alpha(color, 30), 999, dp(1), alpha(color, 120));
+        return base(alpha(color, light ? 22 : 30), 999, dp(1), alpha(color, 120));
     }
 
     public static GradientDrawable searchBar() {
-        return base(SURFACE2, 16, dp(1), alpha(GOLD, 46));
+        return base(SURFACE2, 16, dp(1), alpha(GOLD, light ? 70 : 46));
     }
 
     public static GradientDrawable avatar(int color) {
@@ -132,7 +251,7 @@ public final class Theme {
 
     public static GradientDrawable bottomBar() {
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{0xFF101828, 0xFF0C1220});
+                light ? new int[]{0xFFFFFFFF, 0xFFF1E8D6} : new int[]{0xFF101828, 0xFF0C1220});
         d.setStroke(dp(1), alpha(GOLD, 44));
         return d;
     }
@@ -143,7 +262,19 @@ public final class Theme {
     }
 
     public static GradientDrawable tableHeader() {
-        return base(alpha(GOLD, 30), 12, 0, 0);
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{alpha(GOLD, light ? 90 : 60), alpha(GOLD, light ? 40 : 26)});
+        d.setCornerRadius(dp(12));
+        return d;
+    }
+
+    /** Color-dot swatch for the theme picker. */
+    public static GradientDrawable swatch(int color, boolean selected) {
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{color, shade(color, -0.22f)});
+        d.setCornerRadius(dp(999));
+        if (selected) d.setStroke(dp(3), TEXT);
+        return d;
     }
 
     public static void pressable(View v) {

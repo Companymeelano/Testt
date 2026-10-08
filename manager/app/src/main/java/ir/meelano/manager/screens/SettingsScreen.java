@@ -5,6 +5,7 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 
 import ir.meelano.manager.MainActivity;
+import ir.meelano.manager.ShopCard;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.data.NetRoute;
 import ir.meelano.manager.data.Repo;
@@ -95,6 +96,75 @@ public class SettingsScreen extends Screen {
         c.addView(a.kit.hint("اگر فیلترشکن مسیر سرور را می‌بندد، «اتصال مستقیم» را روشن کنید تا برنامه از شبکه عادی عبور کند."), a.kit.lp(-1, -2));
         a.kit.addCard(content, c);
 
+        // ---- luxury theme ----
+        LinearLayout th = a.kit.card(Theme.GOLD);
+        th.addView(a.kit.text("✦ ظاهر لاکچری", 14.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        th.addView(a.kit.text("قالب", 12f, Theme.MUTED, true), a.kit.lp(-1, -2));
+        final boolean isLight = "light".equals(a.settings.themeMode());
+        th.addView(a.kit.chips(new String[]{"◐ تیره • طلای نیمه‌شب", "◑ روشن • عاج سلطنتی"}, isLight ? 1 : 0, idx -> {
+            a.settings.setThemeMode(idx == 1 ? "light" : "dark");
+            a.refreshTheme();
+        }), a.kit.lp(-1, -2));
+        th.addView(a.kit.gap(8));
+        th.addView(a.kit.text("رنگ اصلی برنامه", 12f, Theme.MUTED, true), a.kit.lp(-1, -2));
+        LinearLayout sw = a.kit.h();
+        sw.setGravity(android.view.Gravity.CENTER);
+        final String cur = a.settings.themeAccent();
+        for (String[] acc : Theme.accents()) {
+            final String key = acc[0];
+            android.widget.TextView dot = new android.widget.TextView(a);
+            boolean on = key.equals(cur);
+            dot.setBackground(Theme.swatch(Theme.accentPreview(key), on));
+            int sz = Theme.dp(on ? 46 : 38);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(sz, sz);
+            lp.setMargins(Theme.dp(5), Theme.dp(4), Theme.dp(5), Theme.dp(4));
+            dot.setLayoutParams(lp);
+            android.widget.LinearLayout cell = a.kit.v();
+            cell.setGravity(android.view.Gravity.CENTER);
+            cell.addView(dot, lp);
+            android.widget.TextView lb = a.kit.text(acc[1], 9.5f, on ? Theme.TEXT : Theme.MUTED, on);
+            lb.setGravity(android.view.Gravity.CENTER);
+            cell.addView(lb, a.kit.lp(-2, -2));
+            cell.setPadding(Theme.dp(2), 0, Theme.dp(2), 0);
+            Theme.pressable(cell);
+            cell.setOnClickListener(v -> {
+                a.settings.setThemeAccent(key);
+                a.refreshTheme();
+            });
+            sw.addView(cell, a.kit.wlp(1f));
+        }
+        th.addView(sw, a.kit.lp(-1, -2));
+        th.addView(a.kit.hint("قالب و رنگ انتخابی فوراً روی همه بخش‌ها، جدول‌ها، نمودارها و آیکن‌ها اعمال می‌شود."), a.kit.lp(-1, -2));
+        a.kit.addCard(content, th);
+
+        // ---- notifications + shop ----
+        LinearLayout nt = a.kit.card(Theme.INFO);
+        nt.addView(a.kit.text("هشدارها و فروشگاه", 14.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        final boolean non = a.settings.notifOn();
+        nt.addView(a.kit.btnGhost("🔊 هشدار هوشمند سررسید: " + (non ? "روشن" : "خاموش"), Theme.INFO, v -> {
+            a.settings.setNotifOn(!non);
+            if (!non) {
+                ir.meelano.manager.core.Notify.boot(a);
+                a.kit.toast("هشدار هوشمند روشن شد؛ هر روز ساعت ۸ بررسی می‌شود");
+            } else {
+                ir.meelano.manager.core.Notify.cancelDaily(a);
+                a.kit.toast("هشدار هوشمند خاموش شد");
+            }
+            render(content);
+        }), a.kit.lp(-1, -2));
+        final android.widget.EditText shop = a.kit.edit("نام فروشگاه (برای کارت ویزیت دیجیتال)", a.settings.shopName());
+        LinearLayout.LayoutParams shp = a.kit.lp(-1, -2);
+        shp.setMargins(0, Theme.dp(6), 0, 0);
+        nt.addView(shop, shp);
+        nt.addView(a.kit.btnGhost("🪪 ساخت کارت ویزیت دیجیتال", Theme.VIOLET, v -> {
+            String nm = shop.getText().toString().trim();
+            if (!nm.isEmpty()) a.settings.setShopName(nm);
+            a.kit.toast(nm.isEmpty() ? "نام فروشگاه را وارد کنید" : "نام فروشگاه ذخیره شد");
+            if (!nm.isEmpty()) ShopCard.show(a);
+        }), a.kit.lp(-1, -2));
+        nt.addView(a.kit.hint("هشدار هوشمند هر روز صبح سررسید ۳ روز آینده چک‌ها و فاکتورهای معوق را اعلان می‌کند."), a.kit.lp(-1, -2));
+        a.kit.addCard(content, nt);
+
         // ---- PIN ----
         LinearLayout p = a.kit.card(Theme.INFO);
         p.addView(a.kit.text("قفل مدیریتی", 14.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
@@ -113,9 +183,20 @@ public class SettingsScreen extends Screen {
         p.addView(prow, a.kit.lp(-1, -2));
         a.kit.addCard(content, p);
 
-        // ---- about ----
+        // ---- about + developer signature ----
         LinearLayout ab = a.kit.card(Theme.VIOLET);
-        ab.addView(a.kit.text("درباره", 14.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        ab.setGravity(android.view.Gravity.CENTER);
+        ab.addView(a.kit.logo(84), new LinearLayout.LayoutParams(Theme.dp(84), Theme.dp(84)));
+        android.widget.TextView dn = a.kit.text("Milad Yaghoobi", 23, Theme.GOLD, true);
+        dn.setGravity(android.view.Gravity.CENTER);
+        ab.addView(dn, a.kit.lp(-1, -2));
+        android.widget.TextView dr = a.kit.text("✦ طراح و توسعه‌دهنده ✦", 13f, Theme.TEXT, true);
+        dr.setGravity(android.view.Gravity.CENTER);
+        ab.addView(dr, a.kit.lp(-1, -2));
+        android.widget.TextView tag = a.kit.text("مدیریت میلانو • داشبورد مدیریتی آتیران", 11f, Theme.MUTED, false);
+        tag.setGravity(android.view.Gravity.CENTER);
+        ab.addView(tag, a.kit.lp(-1, -2));
+        ab.addView(a.kit.gap(4));
         ab.addView(a.kit.kv("نسخه", appVersion() + " • ویرایش مدیریت", Theme.TEXT), a.kit.lp(-1, -2));
         ab.addView(a.kit.kv("منبع داده", "SQL Server آتیران (اتصال مستقیم)", Theme.TEXT), a.kit.lp(-1, -2));
         ab.addView(a.kit.hint("همه بخش‌ها داده زنده نمایش می‌دهند؛ بدون اتصال، اطلاع‌رسانی می‌شود."), a.kit.lp(-1, -2));

@@ -70,6 +70,9 @@ public final class ReportCatalog {
             s("sales_monthly", "فروش ماهانه", "فروش", "جمع و تعداد فاکتور فروش هر ماه", false,
                     new Col[]{c("month", "ماه", T_TEXT), c("total", "جمع فروش", T_MONEY), c("docs", "اسناد", T_NUM)},
                     C_BARS, "month", "total"),
+            s("yoy_sales", "مقایسه فروش با پارسال", "فروش", "فروش ماهانه امسال در برابر پارسال + درصد رشد", false,
+                    new Col[]{c("mlab", "ماه", T_TEXT), c("thisY", "فروش امسال", T_MONEY), c("lastY", "فروش پارسال", T_MONEY), c("growth", "رشد ٪", T_NUM)},
+                    C_BARS, "mlab", "thisY"),
             s("sales_by_visitor", "فروش ویزیتورها", "فروش", "سهم هر ویزیتور از فروش بازه", true,
                     new Col[]{c("label", "ویزیتور", T_TEXT), c("total", "جمع فروش", T_MONEY), c("docs", "اسناد", T_NUM)},
                     C_BARS, "label", "total"),
@@ -198,6 +201,7 @@ public final class ReportCatalog {
         ff.page = 0;
         if ("sales_daily".equals(id)) return Queries.factorDaily(m, true, ff.from, ff.to);
         if ("sales_monthly".equals(id)) return MasterQueries.monthly(m, true, 12);
+        if ("yoy_sales".equals(id)) return MasterQueries.monthly(m, true, 24);
         if ("sales_by_visitor".equals(id)) return Queries.salesByVisitor(m, ff, 50);
         if ("sales_by_customer".equals(id)) return Queries.factorByCustomer(m, true, ff, 50);
         if ("sales_by_route".equals(id)) return Queries.factorByRoute(m, true, ff, 50);

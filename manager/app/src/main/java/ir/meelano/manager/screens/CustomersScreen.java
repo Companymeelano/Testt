@@ -257,6 +257,53 @@ public class CustomersScreen extends Screen {
         body.addView(a.kit.kv("وضعیت", blocked ? "⛔ مسدود" : "✓ فعال", blocked ? Theme.DANGER : Theme.SUCCESS), a.kit.lp(-1, -2));
         if (!h.s("addre").isEmpty()) body.addView(a.kit.kv("آدرس", h.s("addre"), Theme.MUTED), a.kit.lp(-1, -2));
 
+        // ---- credit score (0..100 gauge + breakdown) ----
+        int score = 100;
+        List<String> why = new ArrayList<>();
+        if (blocked) {
+            score = 5;
+            why.add("مشتری مسدود است");
+        } else {
+            int bounced = 0;
+            for (Row r : dz.chqIn) {
+                String b = r.s("back").trim().toUpperCase(java.util.Locale.US);
+                if ("T".equals(b) || "1".equals(b) || "TRUE".equals(b)) bounced++;
+            }
+            if (bounced > 0) {
+                int pen = Math.min(45, bounced * 15);
+                score -= pen;
+                why.add(Money.fa(String.valueOf(bounced)) + " چک برگشتی (−" + Money.fa(String.valueOf(pen)) + ")");
+            }
+            if (h.d("cred") > 0) {
+                double use2 = bal > 0 ? bal / h.d("cred") : 0;
+                if (use2 > 1) { score -= 25; why.add("تخطی از سقف اعتبار (−۲۵)"); }
+                else if (use2 > 0.8) { score -= 12; why.add("مصرف بالای اعتبار (−۱۲)"); }
+                else if (use2 > 0.5) { score -= 6; why.add("مصرف نیمی از اعتبار (−۶)"); }
+            }
+            double invT = 0, invP = 0;
+            for (Row r : dz.invoices) { invT += r.d("total"); invP += r.d("paid"); }
+            if (invT > 0) {
+                double un = (invT - invP) / invT;
+                if (un > 0.5) { score -= 20; why.add("بیش از نیمی از فاکتورها وصول نشده (−۲۰)"); }
+                else if (un > 0.3) { score -= 12; why.add("وصول‌نشدن بخشی از فاکتورها (−۱۲)"); }
+                else if (un > 0.1) { score -= 6; why.add("مانده جزئی فاکتورها (−۶)"); }
+            }
+            if (bal < -0.5) score = Math.min(100, score + 5);
+        }
+        score = Math.max(5, Math.min(100, score));
+        String grade = score >= 85 ? "عالی" : score >= 70 ? "خوب" : score >= 50 ? "متوسط" : score >= 30 ? "ضعیف" : "پرخطر";
+        int gCol = score >= 70 ? Theme.SUCCESS : score >= 50 ? Theme.GOLD : score >= 30 ? Theme.WARNING : Theme.DANGER;
+        body.addView(a.kit.gap(6));
+        LinearLayout cc = a.kit.card(gCol);
+        cc.addView(a.kit.text("⭐ امتیاز اعتباری", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        ir.meelano.manager.ui.Charts.Gauge gauge = new ir.meelano.manager.ui.Charts.Gauge(a);
+        cc.addView(gauge, a.kit.lp(-1, Theme.dp(168)));
+        gauge.set(score / 100.0, Money.fa(String.valueOf(score)) + " • " + grade, gCol, "امتیاز از ۱۰۰");
+        for (String w : why) cc.addView(a.kit.hint("• " + w), a.kit.lp(-1, -2));
+        if (why.isEmpty()) cc.addView(a.kit.hint("• بدون نکته منفی — خوش‌حساب"), a.kit.lp(-1, -2));
+        body.addView(cc, a.kit.lp(-1, -2));
+        body.addView(a.kit.gap(6));
+
         if (!dz.ledger.isEmpty()) {
             body.addView(a.kit.text("گردش حساب (" + Money.fa(String.valueOf(dz.ledger.size())) + " سند)", 13.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
             ReportCatalog.Col[] cols = new ReportCatalog.Col[]{

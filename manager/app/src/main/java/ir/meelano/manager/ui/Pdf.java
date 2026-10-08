@@ -51,8 +51,8 @@ public final class Pdf {
             PdfDocument.Page page = doc.startPage(info);
             android.graphics.Canvas g = page.getCanvas();
             g.drawColor(0xFFFFFFFF);
-            // gold top bar
-            paint.setColor(0xFFD9AE5A);
+            // accent top bar (follows the user's theme color)
+            paint.setColor(Theme.GOLD);
             g.drawRect(0, 0, W, 10, paint);
             // title (right aligned)
             head.setColor(0xFF101828);
@@ -100,6 +100,8 @@ public final class Pdf {
             muted.setTextSize(11);
             muted.setTextAlign(Paint.Align.CENTER);
             g.drawText("صفحه " + Money.fa(String.valueOf(pg + 1)) + " از " + Money.fa(String.valueOf(pages)), W / 2f, H - 30, muted);
+            muted.setTextSize(10);
+            g.drawText("Milad Yaghoobi • طراح و توسعه‌دهنده", W / 2f, H - 48, muted);
             doc.finishPage(page);
         }
         File dir = ShareProvider.shareDir(c);

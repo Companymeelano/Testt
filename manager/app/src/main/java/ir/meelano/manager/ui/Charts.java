@@ -53,9 +53,15 @@ public final class Charts {
             0xFFD9AE5A, 0xFF4FA3FF, 0xFF35C26E, 0xFF9A7BFF, 0xFFF5A524,
             0xFFE5484D, 0xFF3ED6C5, 0xFFF27BB5, 0xFF8BC34A, 0xFF7C8DA6
     };
+    /** Deeper jewel tones for the light theme (contrast on white paper). */
+    private static final int[] PALETTE_LIGHT = {
+            0xFFB07A1E, 0xFF2B7FFF, 0xFF1E9E57, 0xFF7C5CFC, 0xFFE08A00,
+            0xFFD92D20, 0xFF0E9384, 0xFFD6508B, 0xFF669F2A, 0xFF667085
+    };
 
     public static int palette(int i) {
-        return PALETTE[Math.abs(i) % PALETTE.length];
+        int[] p = Theme.DARK ? PALETTE : PALETTE_LIGHT;
+        return p[Math.abs(i) % p.length];
     }
 
     // ================= base =================
@@ -110,6 +116,27 @@ public final class Charts {
     static String ellipsize(String s, int n) {
         if (s == null) return "";
         return s.length() <= n ? s : s.substring(0, n) + "…";
+    }
+
+    /** Gold tooltip bubble with theme-aware text, clamped inside [0, maxW]. */
+    static void bubble(Canvas g, Paint paint, Paint text, String s, float cx, float yText, float maxW) {
+        text.setTextSize(Theme.dp(10.5f));
+        text.setTypeface(Theme.face(true));
+        text.setTextAlign(Paint.Align.CENTER);
+        float tw = Math.min(text.measureText(s), maxW - Theme.dp(24));
+        float bx = Math.max(tw / 2f + Theme.dp(14), Math.min(maxW - tw / 2f - Theme.dp(4), cx));
+        float by = Math.max(yText, Theme.dp(16));
+        RectF bb = new RectF(bx - tw / 2f - Theme.dp(10), by - Theme.dp(13),
+                bx + tw / 2f + Theme.dp(10), by + Theme.dp(9));
+        paint.setStyle(Paint.Style.FILL);
+        paint.setShader(null);
+        paint.setColor(Theme.GOLD);
+        g.drawRoundRect(bb, Theme.dp(10), Theme.dp(10), paint);
+        int oldC = text.getColor();
+        text.setColor(Theme.onAccent());
+        g.drawText(s, bx, by + Theme.dp(4), text);
+        text.setColor(oldC);
+        text.setTypeface(Theme.face(false));
     }
 
     // ================= area =================
@@ -202,13 +229,17 @@ public final class Charts {
             for (int i = 0; i < n; i += step) {
                 g.drawText(Money.fa(ellipsize(data.get(i).label, 8)), xs[i], plot.bottom + Theme.dp(16), text);
             }
-            // selected
+            // selected dot + tooltip bubble
             if (selected >= 0 && selected < n) {
                 paint.setStyle(Paint.Style.FILL);
+                paint.setShader(null);
                 paint.setColor(Theme.TEXT);
                 g.drawCircle(xs[selected], ys[selected], Theme.dp(4.5f), paint);
                 paint.setColor(accent);
                 g.drawCircle(xs[selected], ys[selected], Theme.dp(2.6f), paint);
+                Point sp = data.get(selected);
+                bubble(g, paint, text, Money.fa(sp.label + "  •  " + fmt.format(sp.value)),
+                        xs[selected], ys[selected] - Theme.dp(26), w);
             }
         }
 
@@ -306,6 +337,14 @@ public final class Charts {
                     text.setColor(Theme.MUTED);
                     g.drawText(Money.fa(ellipsize(p.label, 7)), cx, plot.bottom + Theme.dp(16), text);
                 }
+            }
+            // tooltip bubble over the selected bar
+            if (selected >= 0 && selected < n) {
+                Point sp = data.get(selected);
+                float cx = plot.right - slot * selected - slot / 2f;
+                float yv = (float) (plot.bottom - plot.height() * ((sp.value - mn) / (mx - mn)) * progress);
+                bubble(g, paint, text, Money.fa(sp.label + "  •  " + fmt.format(sp.value)),
+                        cx, Math.min(yv, zeroY) - Theme.dp(12), w);
             }
         }
 
@@ -457,12 +496,33 @@ public final class Charts {
             for (int i = 0; i < data.size(); i++) {
                 Point p = data.get(i);
                 float top = Theme.dp(8) + i * Theme.dp(ROW_H);
-                // line 1: label (right) + value (left) — never overlapping the bar
-                text.setTextSize(Theme.dp(11));
+                // rank medal (gold / silver / bronze / outline)
+                float mr = Theme.dp(9);
+                float mCx = w - Theme.dp(8) - mr;
+                float mCy = top + Theme.dp(7);
+                int mCol = i == 0 ? 0xFFFFD166 : i == 1 ? 0xFFC9D2DE : i == 2 ? 0xFFE0A066 : 0;
+                paint.setStyle(Paint.Style.FILL);
+                paint.setShader(null);
+                if (mCol != 0) {
+                    paint.setColor(mCol);
+                    g.drawCircle(mCx, mCy, mr, paint);
+                } else {
+                    paint.setStyle(Paint.Style.STROKE);
+                    paint.setStrokeWidth(Theme.dp(1.2f));
+                    paint.setColor(Theme.alpha(Theme.MUTED, 170));
+                    g.drawCircle(mCx, mCy, mr, paint);
+                    paint.setStyle(Paint.Style.FILL);
+                }
+                text.setTextSize(Theme.dp(10));
                 text.setTypeface(Theme.face(true));
+                text.setTextAlign(Paint.Align.CENTER);
+                text.setColor(mCol != 0 ? 0xFF232323 : Theme.MUTED);
+                g.drawText(Money.fa(String.valueOf(i + 1)), mCx, mCy + Theme.dp(3.5f), text);
+                // line 1: label (right of medal) + value (left) — never overlapping the bar
+                text.setTextSize(Theme.dp(11));
                 text.setTextAlign(Paint.Align.RIGHT);
                 text.setColor(Theme.TEXT);
-                g.drawText(Money.fa(ellipsize(p.label, 24)), w - Theme.dp(8), top + Theme.dp(12), text);
+                g.drawText(Money.fa(ellipsize(p.label, 22)), mCx - mr - Theme.dp(6), top + Theme.dp(12), text);
                 text.setTextAlign(Paint.Align.LEFT);
                 text.setColor(Theme.GOLD_SOFT);
                 g.drawText(Money.fa(fmt.format(p.value)), Theme.dp(8), top + Theme.dp(12), text);
@@ -497,6 +557,8 @@ public final class Charts {
     public static final class Gauge extends Base {
         double frac = 0;
         String center = "";
+        Integer arcColor = null;
+        String caption = "تحقق هدف";
 
         public Gauge(Context c) {
             super(c);
@@ -504,8 +566,14 @@ public final class Charts {
         }
 
         public void set(double fraction, String centerText) {
+            set(fraction, centerText, 0, null);
+        }
+
+        public void set(double fraction, String centerText, int color, String captionText) {
             frac = Math.max(0, Math.min(1.2, fraction));
             center = centerText == null ? "" : centerText;
+            if (color != 0) arcColor = color;
+            if (captionText != null) caption = captionText;
             animateIn();
         }
 
@@ -523,7 +591,19 @@ public final class Charts {
             paint.setStrokeCap(Paint.Cap.ROUND);
             paint.setColor(Theme.alpha(Theme.TEXT, 24));
             g.drawArc(o, 180, 180, false, paint);
-            int col = frac >= 1 ? Theme.SUCCESS : (frac >= 0.7 ? Theme.GOLD : Theme.WARNING);
+            // tick ring
+            paint.setStrokeWidth(Theme.dp(2));
+            paint.setStrokeCap(Paint.Cap.BUTT);
+            paint.setColor(Theme.alpha(Theme.MUTED, 160));
+            for (int i = 0; i <= 10; i++) {
+                double a = Math.toRadians(180 + i * 18);
+                float r1 = radius - Theme.dp(11), r2 = radius - Theme.dp(16);
+                g.drawLine(cx + (float) Math.cos(a) * r1, cy + (float) Math.sin(a) * r1,
+                        cx + (float) Math.cos(a) * r2, cy + (float) Math.sin(a) * r2, paint);
+            }
+            paint.setStrokeWidth(Theme.dp(13));
+            paint.setStrokeCap(Paint.Cap.ROUND);
+            int col = arcColor != null ? arcColor : (frac >= 1 ? Theme.SUCCESS : (frac >= 0.7 ? Theme.GOLD : Theme.WARNING));
             paint.setColor(col);
             g.drawArc(o, 180, (float) (180 * Math.min(1, frac) * progress), false, paint);
             paint.setStyle(Paint.Style.FILL);
@@ -535,7 +615,7 @@ public final class Charts {
             paint.setTypeface(Theme.face(false));
             paint.setColor(Theme.MUTED);
             paint.setTextSize(Theme.dp(10.5f));
-            g.drawText("تحقق هدف", cx, cy - Theme.dp(4), paint);
+            g.drawText(Money.fa(caption), cx, cy - Theme.dp(4), paint);
         }
     }
 }

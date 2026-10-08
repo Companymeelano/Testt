@@ -221,6 +221,60 @@ public final class License {
         return b;
     }
 
+    // ---------------- customer request ----------------
+    /**
+     * Request line the client app builds for the customer to send the seller:
+     * {@code MILANO-REQ1|DEV8|name|family|shop|phone|city}.
+     * One line, pipe-separated, embedded in a human-readable message; the admin
+     * app scans pasted text for it. Both apps share this exact format.
+     */
+    public static final String REQ_PREFIX = "MILANO-REQ1";
+
+    public static final class Req {
+        public String dev = "";
+        public String name = "";
+        public String family = "";
+        public String shop = "";
+        public String phone = "";
+        public String city = "";
+    }
+
+    public static String requestLine(String dev, String name, String family,
+                                     String shop, String phone, String city) {
+        return REQ_PREFIX + "|" + clean(dev) + "|" + clean(name) + "|"
+                + clean(family) + "|" + clean(shop) + "|" + clean(phone)
+                + "|" + clean(city);
+    }
+
+    private static String clean(String s) {
+        if (s == null) return "";
+        return s.trim().replace('|', '/').replace('\n', ' ');
+    }
+
+    /**
+     * Find and parse the request line inside pasted text (extra chat text
+     * around it is fine). Returns null when no valid line is found.
+     */
+    public static Req parseRequest(String text) {
+        if (text == null) return null;
+        for (String raw : text.split("\n")) {
+            String line = raw.trim();
+            if (!line.startsWith(REQ_PREFIX + "|")) continue;
+            String[] p = line.split("\\|", -1);
+            if (p.length < 7) return null;
+            Req r = new Req();
+            r.dev = normalize(p[1]);
+            if (r.dev.length() != 8) return null;
+            r.name = p[2].trim();
+            r.family = p[3].trim();
+            r.shop = p[4].trim();
+            r.phone = p[5].trim();
+            r.city = p[6].trim();
+            return r;
+        }
+        return null;
+    }
+
     /** Self-test (wired to nothing; run from a unit check when paranoid). */
     public static boolean selfTest() {
         try {

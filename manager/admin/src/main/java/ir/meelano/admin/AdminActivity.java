@@ -349,7 +349,7 @@ public class AdminActivity extends Activity {
             }
             String pack;
             try {
-                pack = License.mint(ctx.dev, ctx.plan);
+                pack = License.generate(ctx.dev, ctx.plan, TRIAL_DAYS);
             } catch (Exception e) {
                 AdminKit.toast(this, "صدور ناموفق بود");
                 return;
@@ -385,11 +385,20 @@ public class AdminActivity extends Activity {
         return "بدون تاریخ انقضا (ویژه)";
     }
 
+    /** Trial packs are fixed at 7 days (License.planDays covers W/M/Y only). */
+    private static final int TRIAL_DAYS = 7;
+
+    private static int daysFor(char plan) {
+        if (plan == License.P_TRIAL) return TRIAL_DAYS;
+        if (plan == License.P_PERM) return 0;
+        return License.planDays(plan);
+    }
+
     private String expiryPreview(char plan) {
         if (plan == License.P_PERM) return "انقضا: بدون انقضا (دائمی)";
-        long exp = License.today() + License.planDays(plan);
+        long exp = License.today() + daysFor(plan);
         return "انقضا: " + AdminKit.fa(jalali(exp)) + "  ("
-                + AdminKit.fa(License.planDays(plan)) + " روز دیگر)";
+                + AdminKit.fa(daysFor(plan)) + " روز دیگر)";
     }
 
     private void showMintResult(long licId) {

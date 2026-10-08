@@ -116,7 +116,7 @@ public class LicenseActivity extends Activity {
             fSeller.setText(LicenseStore.sellerPhone(this));
         } catch (Exception ignored) { }
 
-        if (Tamper.rooted()) {
+        if (Tamper.isRooted()) {
             TextView w = new TextView(this);
             w.setText("⚠ گوشی روت شده است؛ در صورت مشکل با فروشنده در میان بگذارید.");
             w.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);

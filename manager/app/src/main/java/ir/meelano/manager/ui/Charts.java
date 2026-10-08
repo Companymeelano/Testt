@@ -394,20 +394,39 @@ public final class Charts {
 
         @Override
         public boolean onTouchEvent(MotionEvent e) {
-            if ((e.getAction() == MotionEvent.ACTION_DOWN || e.getAction() == MotionEvent.ACTION_MOVE) && !data.isEmpty()) {
-                int n = data.size();
-                float slot = plot.width() / n;
-                int idx = (int) ((plot.right - e.getX()) / slot);
-                if (idx < 0) idx = 0;
-                if (idx >= n) idx = n - 1;
-                if (idx != selected) {
-                    selected = idx;
-                    invalidate();
-                    fire(idx);
+            int act = e.getAction();
+            if (act == MotionEvent.ACTION_DOWN && !data.isEmpty()) {
+                downX = e.getX();
+                downY = e.getY();
+                tracking = true;
+                return true;
+            }
+            if (act == MotionEvent.ACTION_MOVE && tracking && !data.isEmpty()) {
+                if (scrubbing(e.getX(), e.getY())) {
+                    holdParent();
+                    selectSlot(e.getX());
                 }
                 return true;
             }
+            if (act == MotionEvent.ACTION_UP && tracking && !data.isEmpty() && tapped(e.getX(), e.getY())) {
+                selectSlot(e.getX());
+            }
+            if (act == MotionEvent.ACTION_UP || act == MotionEvent.ACTION_CANCEL) tracking = false;
             return super.onTouchEvent(e);
+        }
+
+        private void selectSlot(float x) {
+            int n = data.size();
+            if (n == 0 || plot.width() <= 0) return;
+            float slot = plot.width() / n;
+            int idx = (int) ((plot.right - x) / slot);
+            if (idx < 0) idx = 0;
+            if (idx >= n) idx = n - 1;
+            if (idx != selected) {
+                selected = idx;
+                invalidate();
+                fire(idx);
+            }
         }
     }
 

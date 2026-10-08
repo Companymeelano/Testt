@@ -289,7 +289,12 @@ public final class Jalali {
             int m = Integer.parseInt(head.substring(5, 7));
             int d = Integer.parseInt(head.substring(8, 10));
             if (m < 1 || m > 12 || d < 1 || d > 31) return t;
-            return format(g2d(y, m, d)) + t.substring(10);
+            // Real Gregorian datetimes live in 1700–2300; earlier dash dates
+            // («1405-07-06») are Jalali with dash separators — normalize as Jalali.
+            if (y >= 1700 && y <= 2300) return format(g2d(y, m, d)) + t.substring(10);
+            if (y >= 1300 && y <= 1600 && d <= daysInMonth(y, m))
+                return String.format(Locale.US, "%04d/%02d/%02d", y, m, d) + t.substring(10);
+            return t;
         } catch (Exception e) {
             return t;
         }

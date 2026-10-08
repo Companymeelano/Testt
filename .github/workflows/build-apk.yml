@@ -58,8 +58,8 @@ jobs:
           name: MEELANO v17 — client + seller admin (debug APKs)
           body: |
             دو فایل نصبی (دیباگ) — مستقیم روی گوشی نصب می‌شوند:
-            • meelano-manager-v17-debug.apk — برنامه مشتری (فعال‌سازی هوشمند + اتصال خودکار + پشتیبانی)
-            • meelano-admin-v1.2-debug.apk — برنامه فروشنده (صدور کد + کارت اتصال + انتقال گوشی + گزارش مصرف)
+            • meelano-manager-v17-debug.apk — برنامه مشتری (پیامک مستقیم + فعال‌سازی خودکار + اتصال خودکار + پشتیبانی)
+            • meelano-admin-v1.2-debug.apk — برنامه فروشنده (دریافت خودکار درخواست + ارسال مستقیم کد و کارت اتصال + انتقال گوشی + گزارش مصرف)
             Debug builds — install directly on the phone.
             Client connects to the shop's Atiran SQL Server automatically via the seller's connection card.
           files: |

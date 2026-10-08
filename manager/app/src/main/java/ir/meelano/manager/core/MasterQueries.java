@@ -842,7 +842,7 @@ public final class MasterQueries {
             if (!dc.isEmpty()) conds.add(dc);
         }
         String where = conds.isEmpty() ? "" : " WHERE " + Sql.join(conds, " AND ");
-        return new Queries.Q("SELECT " + label + " AS bank, " + inExpr + " AS in, " + outExpr + " AS out"
+        return new Queries.Q("SELECT " + label + " AS bank, " + inExpr + " AS [in], " + outExpr + " AS [out]"
                 + ", COUNT_BIG(1) AS count FROM dbo.ban_act h" + join + where
                 + " GROUP BY " + label + " ORDER BY 2 DESC", binds);
     }

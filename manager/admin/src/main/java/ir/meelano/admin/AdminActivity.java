@@ -273,11 +273,23 @@ public class AdminActivity extends Activity {
     // ---------- new request ----------
 
     private void showRequest() {
-        LinearLayout box = AdminKit.vbox(this);
-        box.addView(AdminKit.titleBar(this, "درخواست جدید", this::goBack));
+        showRequestSms("");
+    }
 
-        box.addView(AdminKit.text(this,
-                "متن ارسالی مشتری را اینجا بچسبانید و «تحلیل» را بزنید.", 13,
+    /**
+     * @param prefill raw SMS text staged by {@link SmsReceiver} (auto-parsed),
+     *                or "" for the manual paste flow.
+     */
+    private void showRequestSms(String prefill) {
+        if (prefill == null) prefill = "";
+        final boolean fromSms = !prefill.isEmpty();
+        LinearLayout box = AdminKit.vbox(this);
+        box.addView(AdminKit.titleBar(this, fromSms ? "✦ درخواست از پیامک" : "درخواست جدید",
+                this::goBack));
+
+        box.addView(AdminKit.text(this, fromSms
+                ? "درخواست مشتری با پیامک رسید و خودکار تحلیل شد — بررسی و صدور کنید."
+                : "متن ارسالی مشتری را اینجا بچسبانید و «تحلیل» را بزنید.", 13,
                 AdminKit.MUTED, false));
         EditText paste = AdminKit.field(this, "متن درخواست مشتری…");
         paste.setMinLines(4);
@@ -353,7 +365,12 @@ public class AdminActivity extends Activity {
             Button go = AdminKit.btn(this, "ادامه → انتخاب طرح و صدور کد", true);
             go.setOnClickListener(x -> show(() -> showMint(ctx)));
             out.addView(go);
-        });
+        };
+        bParse.setOnClickListener(parse);
+        if (fromSms) {
+            paste.setText(prefill);
+            parse.onClick(bParse);
+        }
         root(box);
     }
 
@@ -486,7 +503,6 @@ public class AdminActivity extends Activity {
             ctx.family = AdminKit.txt(fFamily);
             ctx.shop = AdminKit.txt(fShop);
             ctx.phone = AdminKit.txt(fPhone);
-            ctx.city = AdminKit.txt(ft.txt(fPhone);
             ctx.city = AdminKit.txt(fCity);
             ctx.note = AdminKit.txt(fNote);
             if (ctx.dev.length() != 8) {
@@ -875,7 +891,9 @@ public class AdminActivity extends Activity {
         AdminKit.infoRow(card, this, "انقضا", expText(l), false);
         AdminKit.infoRow(card, this, "کد دستگاه", prettyDev(l.dev), true);
         if (!l.note.isEmpty()) AdminKit.infoRow(card, this, "یادداشت", l.note, false);
-   nKit.btn(this, "کپی کد", false);
+        box.addView(card);
+
+        Button bCopy = AdminKit.btn(this, "کپی کد", false);
         bCopy.setOnClickListener(v -> {
             AdminKit.copy(this, "کد فعال‌سازی", l.pack);
             AdminKit.toast(this, "کد کپی شد");

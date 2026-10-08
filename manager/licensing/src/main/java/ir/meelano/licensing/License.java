@@ -433,18 +433,18 @@ public final class License {
             String line = raw.trim();
             if (!line.startsWith(USE_PREFIX + "|")) continue;
             String[] p = line.split("\\|", -1);
-            if (p.length < 5) return null;
+            if (p.length < 5) continue;
             Use u = new Use();
             u.dev = normalize(p[1]);
-            if (u.dev.length() != 8) return null;
+            if (u.dev.length() != 8) continue;
             try {
                 u.totalMin = Long.parseLong(p[2].trim());
                 u.opens = Integer.parseInt(p[3].trim());
                 u.lastDay = Long.parseLong(p[4].trim());
             } catch (Exception e) {
-                return null;
+                continue;
             }
-            if (u.totalMin < 0 || u.opens < 0 || u.lastDay < 0) return null;
+            if (u.totalMin < 0 || u.opens < 0 || u.lastDay < 0) continue;
             return u;
         }
         return null;

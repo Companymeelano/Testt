@@ -19,7 +19,7 @@ import ir.meelano.manager.ui.Theme;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Reports center: 34 management reports with charts, tables and PDF sharing. */
+/** Reports center: 43 management reports with charts, tables and PDF sharing. */
 public class ReportsScreen extends Screen {
     private final Filter filter = new Filter();
     private ReportCatalog.Spec sel;
@@ -46,10 +46,15 @@ public class ReportsScreen extends Screen {
 
     @Override
     public FilterSheet.Config filterConfig() {
-        if (sel == null || !sel.needsRange) return null;
+        if (sel == null) return null;
+        boolean search = "fleeing_customers".equals(sel.id) || "lost_basket".equals(sel.id)
+                || "cheque_reliability".equals(sel.id) || "stock_forecast".equals(sel.id)
+                || "invoice_profit".equals(sel.id);
+        if (!sel.needsRange && !search) return null;
         FilterSheet.Config c = new FilterSheet.Config();
-        c.search = false;
-        c.range = true;
+        c.search = search;
+        c.searchHint = "جستجوی مشتری / کالا / فاکتور…";
+        c.range = sel.needsRange;
         return c;
     }
 
@@ -73,6 +78,7 @@ public class ReportsScreen extends Screen {
         if ("سود و زیان".equals(section)) return Theme.GOLD;
         if ("بانک و صندوق".equals(section)) return Theme.INFO;
         if ("کاربران و نظارت".equals(section)) return Theme.STEEL;
+        if ("هوشمند".equals(section)) return Theme.TEAL;
         return Theme.MUTED;
     }
 
@@ -129,6 +135,7 @@ public class ReportsScreen extends Screen {
             if ("yoy_sales".equals(spec.id)) rows = mapYoY(rows);
             if ("aging".equals(spec.id)) mapAging(rows, m);
             if ("unsettled".equals(spec.id)) mapUnsettled(rows);
+            if ("fleeing_customers".equals(spec.id)) mapFleeing(rows);
             return rows;
         }, new Repo.Cb<List<Row>>() {
             @Override
@@ -159,6 +166,18 @@ public class ReportsScreen extends Screen {
             if (r.l("days") < 0) {
                 int dd = Jalali.diffDays(r.s("dueDate"), today);
                 r.put("days", dd < 0 ? 0 : dd);
+            }
+        }
+    }
+
+    /** Fleeing customers: the server sends daysAway=−1; derive it from the last-buy date. */
+    private void mapFleeing(List<Row> rows) {
+        if (rows == null) return;
+        String today = Jalali.todayStr();
+        for (Row r : rows) {
+            if (r.l("daysAway") < 0) {
+                int dd = Jalali.diffDays(r.s("lastBuy"), today);
+                r.put("daysAway", dd < 0 ? 0 : dd);
             }
         }
     }

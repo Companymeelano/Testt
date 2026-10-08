@@ -108,6 +108,18 @@ public final class Settings {
         p.edit().putString("shop_name", name == null ? "" : name.trim()).apply();
     }
 
+    public String shopPhone() { return p.getString("shop_phone", "").trim(); }
+
+    public void setShopPhone(String phone) {
+        p.edit().putString("shop_phone", phone == null ? "" : phone.trim()).apply();
+    }
+
+    public String shopAddr() { return p.getString("shop_addr", "").trim(); }
+
+    public void setShopAddr(String addr) {
+        p.edit().putString("shop_addr", addr == null ? "" : addr.trim()).apply();
+    }
+
     // ---------------- offline home cache (compact JSON) ----------------
     public String homeCache() { return p.getString("home_cache", ""); }
 

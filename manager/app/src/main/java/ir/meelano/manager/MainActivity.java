@@ -84,7 +84,8 @@ public class MainActivity extends Activity {
         root.setGravity(Gravity.CENTER);
         root.setBackgroundColor(Theme.BG);
         root.setPadding(Theme.dp(28), Theme.dp(28), Theme.dp(28), Theme.dp(28));
-        root.addView(kit.logo(110), new LinearLayout.LayoutParams(Theme.dp(110), Theme.dp(110)));
+        android.widget.ImageView logoV = kit.logo(110);
+        root.addView(logoV, new LinearLayout.LayoutParams(Theme.dp(110), Theme.dp(110)));
         TextView t = kit.text("مدیریت میلانو", 26, Theme.TEXT, true);
         t.setGravity(Gravity.CENTER);
         root.addView(t, kit.lp(-1, -2));
@@ -112,11 +113,28 @@ public class MainActivity extends Activity {
         vp.setMargins(0, Theme.dp(10), 0, 0);
         root.addView(ver, vp);
         setContentView(root);
-        root.setAlpha(0f);
-        root.animate().alpha(1f).setDuration(450).start();
+        // Staged luxury intro: the logo pops, lines rise one by one, the gold rule sweeps.
+        logoV.setScaleX(0.55f);
+        logoV.setScaleY(0.55f);
+        logoV.setAlpha(0f);
+        logoV.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(650)
+                .setInterpolator(new android.view.animation.OvershootInterpolator(1.4f)).start();
+        t.setAlpha(0f);
+        t.setTranslationY(Theme.dp(14));
+        t.animate().alpha(1f).translationY(0f).setDuration(500).setStartDelay(250).start();
+        s.setAlpha(0f);
+        s.animate().alpha(1f).setDuration(500).setStartDelay(450).start();
+        line.setPivotX(0f);
+        line.setScaleX(0f);
+        line.animate().scaleX(1f).setDuration(600).setStartDelay(600).start();
+        dev.setAlpha(0f);
         dev.setScaleX(0.92f);
         dev.setScaleY(0.92f);
-        dev.animate().scaleX(1f).scaleY(1f).setDuration(900).start();
+        dev.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(700).setStartDelay(750).start();
+        role.setAlpha(0f);
+        ver.setAlpha(0f);
+        role.animate().alpha(1f).setDuration(500).setStartDelay(950).start();
+        ver.animate().alpha(1f).setDuration(500).setStartDelay(1100).start();
         root.postDelayed(() -> {
             if (settings.pinEnabled()) pinGate();
             else {
@@ -382,9 +400,12 @@ public class MainActivity extends Activity {
             LinearLayout b = kit.v();
             b.setGravity(Gravity.CENTER);
             b.setPadding(0, Theme.dp(4), 0, Theme.dp(2));
-            TextView g = kit.text(s.glyph(), 19, Theme.MUTED, true);
+            LinearLayout badge = new LinearLayout(this);
+            badge.setGravity(Gravity.CENTER);
+            TextView g = kit.text(s.glyph(), 20, Theme.MUTED, true);
             g.setGravity(Gravity.CENTER);
-            b.addView(g, kit.lp(-1, -2));
+            badge.addView(g, kit.lp(-2, -2));
+            b.addView(badge, new LinearLayout.LayoutParams(Theme.dp(52), Theme.dp(40)));
             TextView l = kit.text(s.id().equals("sales") ? "فروش" : s.title(), 9.5f, Theme.MUTED, true);
             l.setGravity(Gravity.CENTER);
             l.setSingleLine(true);
@@ -402,10 +423,11 @@ public class MainActivity extends Activity {
             LinearLayout b = (LinearLayout) bottomBar.getChildAt(i);
             boolean on = TABS[i].equals(currentId)
                     || ("more".equals(TABS[i]) && !isTab(currentId));
-            int col = on ? Theme.GOLD : Theme.MUTED;
-            ((TextView) b.getChildAt(0)).setTextColor(on ? Theme.GOLD_SOFT : Theme.MUTED);
-            ((TextView) b.getChildAt(1)).setTextColor(col);
-            b.setBackground(on ? Theme.pill(Theme.GOLD) : null);
+            LinearLayout badge = (LinearLayout) b.getChildAt(0);
+            badge.setBackground(on ? Theme.avatar(Theme.GOLD) : null);
+            ((TextView) badge.getChildAt(0)).setTextColor(on ? 0xFFFFFFFF : Theme.MUTED);
+            ((TextView) b.getChildAt(1)).setTextColor(on ? Theme.GOLD : Theme.MUTED);
+            b.setBackground(null);
             Theme.pressable(b); // setBackground replaced the ripple — wrap it again
         }
     }

@@ -170,10 +170,20 @@ public class SettingsScreen extends Screen {
         LinearLayout.LayoutParams shp = a.kit.lp(-1, -2);
         shp.setMargins(0, Theme.dp(6), 0, 0);
         nt.addView(shop, shp);
+        final android.widget.EditText shopPhone = a.kit.edit("تلفن فروشگاه", a.settings.shopPhone());
+        LinearLayout.LayoutParams spp = a.kit.lp(-1, -2);
+        spp.setMargins(0, Theme.dp(6), 0, 0);
+        nt.addView(shopPhone, spp);
+        final android.widget.EditText shopAddr = a.kit.edit("آدرس فروشگاه", a.settings.shopAddr());
+        LinearLayout.LayoutParams sap = a.kit.lp(-1, -2);
+        sap.setMargins(0, Theme.dp(6), 0, 0);
+        nt.addView(shopAddr, sap);
         nt.addView(a.kit.btnGhost("🪪 ساخت کارت ویزیت دیجیتال", Theme.VIOLET, v -> {
             String nm = shop.getText().toString().trim();
             if (!nm.isEmpty()) a.settings.setShopName(nm);
-            a.kit.toast(nm.isEmpty() ? "نام فروشگاه را وارد کنید" : "نام فروشگاه ذخیره شد");
+            a.settings.setShopPhone(shopPhone.getText().toString());
+            a.settings.setShopAddr(shopAddr.getText().toString());
+            a.kit.toast(nm.isEmpty() ? "نام فروشگاه را وارد کنید" : "مشخصات فروشگاه ذخیره شد");
             if (!nm.isEmpty()) ShopCard.show(a);
         }), a.kit.lp(-1, -2));
         nt.addView(a.kit.btnGhost("📺 حالت تلویزیون فروشگاه", Theme.SUCCESS, v -> a.startTv()), a.kit.lp(-1, -2));

@@ -14,6 +14,7 @@ import android.widget.TextView;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.ui.Kit;
+import ir.meelano.manager.ui.Qr;
 import ir.meelano.manager.ui.Theme;
 
 import java.io.File;
@@ -73,6 +74,33 @@ public final class ShopCard {
         if (hiRes) t2.setTextSize(TypedValue.COMPLEX_UNIT_PX, 30);
         t2.setGravity(Gravity.CENTER);
         c.addView(t2, k.lp(-1, -2));
+        String phone = a.settings.shopPhone();
+        String addr = a.settings.shopAddr();
+        if (!phone.isEmpty()) {
+            TextView tp = k.text(phone, hiRes ? 32 : 12f, ink, true);
+            if (hiRes) tp.setTextSize(TypedValue.COMPLEX_UNIT_PX, 32);
+            tp.setGravity(Gravity.CENTER);
+            c.addView(tp, k.lp(-1, -2));
+        }
+        if (!addr.isEmpty()) {
+            TextView ta = k.text(addr, hiRes ? 28 : 11f, inkSoft, false);
+            if (hiRes) ta.setTextSize(TypedValue.COMPLEX_UNIT_PX, 28);
+            ta.setGravity(Gravity.CENTER);
+            c.addView(ta, k.lp(-1, -2));
+        }
+        Bitmap qr = Qr.make(qrText(shop, phone, addr), hiRes ? 300 : 132);
+        if (qr != null) {
+            ImageView qv = new ImageView(a);
+            qv.setImageBitmap(qr);
+            qv.setBackgroundColor(0xFFFFFFFF);
+            int qp = hiRes ? 18 : Theme.dp(8);
+            qv.setPadding(qp, qp, qp, qp);
+            LinearLayout.LayoutParams qlp = hiRes ? new LinearLayout.LayoutParams(336, 336)
+                    : new LinearLayout.LayoutParams(Theme.dp(148), Theme.dp(148));
+            qlp.gravity = Gravity.CENTER;
+            qlp.setMargins(0, hiRes ? 30 : Theme.dp(12), 0, 0);
+            c.addView(qv, qlp);
+        }
         TextView dv = k.text("Milad Yaghoobi • طراح و توسعه‌دهنده", hiRes ? 28 : 11f, inkSoft, false);
         if (hiRes) dv.setTextSize(TypedValue.COMPLEX_UNIT_PX, 28);
         dv.setGravity(Gravity.CENTER);
@@ -80,6 +108,13 @@ public final class ShopCard {
         dvp.setMargins(0, hiRes ? 30 : Theme.dp(10), 0, 0);
         c.addView(dv, dvp);
         return c;
+    }
+
+    private static String qrText(String shop, String phone, String addr) {
+        StringBuilder b = new StringBuilder(shop);
+        if (phone != null && !phone.isEmpty()) b.append('\n').append(phone);
+        if (addr != null && !addr.isEmpty()) b.append('\n').append(addr);
+        return b.toString();
     }
 
     private static void sharePng(final MainActivity a) {

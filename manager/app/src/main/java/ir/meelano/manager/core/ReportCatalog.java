@@ -63,6 +63,42 @@ public final class ReportCatalog {
     }
 
     public static final Spec[] ALL = {
+            // ---- هوشمند (v13) ----
+            s("fleeing_customers", "مشتریان در حال فرار", "هوشمند", "خریداران منظمی که بیش از ۴۵ روز است نیامده‌اند + زیان تقریبی", false,
+                    new Col[]{c("name", "مشتری", T_TEXT), c("cell", "همراه", T_TEXT), c("balance", "مانده", T_MONEY),
+                            c("lastBuy", "آخرین خرید", T_DATE), c("daysAway", "روز غیبت", T_NUM), c("invoices", "فاکتور سال", T_NUM),
+                            c("avgBuy", "میانگین سبد", T_MONEY), c("lostEst", "زیان تقریبی", T_MONEY)},
+                    C_BARS, "name", "lostEst"),
+            s("lost_basket", "سبد گمشده", "هوشمند", "کالای مکملی که مشتری نخریده ولی مشابه‌خریداران خریده‌اند + ارزش فرصت", false,
+                    new Col[]{c("customer", "مشتری", T_TEXT), c("bought", "خریده", T_TEXT), c("missed", "نخریده", T_TEXT),
+                            c("together", "همراه‌خرید", T_NUM), c("missedValue", "ارزش فرصت", T_MONEY)},
+                    C_NONE, "", ""),
+            s("cheque_reliability", "خوش‌قولی چکی", "هوشمند", "رتبه‌بندی مشتریان بر اساس سابقه برگشتی چک", false,
+                    new Col[]{c("customer", "مشتری", T_TEXT), c("total", "چک‌ها", T_NUM), c("bounced", "برگشتی", T_NUM),
+                            c("bouncedAmt", "مبلغ برگشتی", T_MONEY), c("totalAmt", "جمع چک‌ها", T_MONEY),
+                            c("rate", "نرخ برگشتی ٪", T_NUM), c("grade", "رتبه", T_TEXT)},
+                    C_BARS, "customer", "bouncedAmt"),
+            s("visitor_yield", "بازده ویزیتور", "هوشمند", "مشتریان منتسب، فعال بازه و ریزش ۹۰روزه هر ویزیتور + فاکتور به‌ازای مشتری", true,
+                    new Col[]{c("name", "ویزیتور", T_TEXT), c("assigned", "منتسب", T_NUM), c("active", "فعال بازه", T_NUM),
+                            c("churned", "ریزش", T_NUM), c("invoices", "فاکتور", T_NUM), c("sales", "فروش", T_MONEY),
+                            c("perCust", "فاکتور/مشتری", T_NUM)},
+                    C_BARS, "name", "sales"),
+            s("golden_hours", "ساعت طلایی فروش", "هوشمند", "پرفروش‌ترین ساعت‌ها (یا روزهای هفته، اگر ساعت ثبت نشده باشد)", true,
+                    new Col[]{c("slot", "بازه", T_TEXT), c("total", "جمع فروش", T_MONEY), c("docs", "اسناد", T_NUM)},
+                    C_BARS, "slot", "total"),
+            s("sleeping_capital", "سرمایه خوابیده", "هوشمند", "کالاهای بدون فروش ۹۰ روزه + سرمایه قفل‌شده (پیشنهاد: تسویه پلکانی)", false,
+                    new Col[]{c("label", "کالا", T_TEXT), c("shka", "کد", T_TEXT), c("vah", "موجودی", T_NUM),
+                            c("buyValue", "سرمایه خوابیده", T_MONEY), c("lastSale", "آخرین فروش", T_DATE)},
+                    C_BARS, "label", "buyValue"),
+            s("stock_forecast", "پیش‌بینی اتمام موجودی", "هوشمند", "چند روز تا اتمام، بر اساس فروش روزانه ۶۰ روزه + هشدار سفارش", false,
+                    new Col[]{c("label", "کالا", T_TEXT), c("vah", "موجودی", T_NUM), c("daily", "فروش روزانه", T_NUM),
+                            c("daysLeft", "روز تا اتمام", T_NUM), c("status", "وضعیت", T_TEXT)},
+                    C_NONE, "", ""),
+            s("invoice_profit", "سود واقعی فاکتور", "هوشمند", "سود هر فاکتور با کسر تخفیف و بهای تمام‌شده (مبنای قیمت خرید)", true,
+                    new Col[]{c("no", "فاکتور", T_TEXT), c("customer", "مشتری", T_TEXT), c("date", "تاریخ", T_DATE),
+                            c("amount", "مبلغ", T_MONEY), c("discount", "تخفیف", T_MONEY), c("cogs", "بهای تمام‌شده", T_MONEY),
+                            c("profit", "سود", T_MONEY), c("margin", "حاشیه ٪", T_NUM)},
+                    C_LINE, "date", "profit"),
             // ---- فروش ----
             s("sales_daily", "فروش روزانه", "فروش", "جمع و تعداد فاکتور فروش هر روز", true,
                     new Col[]{c("day", "روز", T_DATE), c("total", "جمع فروش", T_MONEY), c("docs", "اسناد", T_NUM)},
@@ -237,6 +273,14 @@ public final class ReportCatalog {
         if ("profit_costs".equals(id)) return MasterQueries.profitCosts(m, ff);
         if ("bank_turnover".equals(id)) return MasterQueries.bankTurnover(m, ff);
         if ("cows".equals(id)) return MasterQueries.cowList(m);
+        if ("fleeing_customers".equals(id)) return MasterQueries.fleeingCustomers(m, ff);
+        if ("lost_basket".equals(id)) return MasterQueries.lostBasket(m, ff);
+        if ("cheque_reliability".equals(id)) return MasterQueries.chequeReliability(m, ff);
+        if ("visitor_yield".equals(id)) return MasterQueries.visitorYield(m, ff);
+        if ("golden_hours".equals(id)) return MasterQueries.goldenHours(m, ff);
+        if ("sleeping_capital".equals(id)) return MasterQueries.deadStock(m, 90, 200);
+        if ("stock_forecast".equals(id)) return MasterQueries.stockForecast(m, ff);
+        if ("invoice_profit".equals(id)) return MasterQueries.invoiceProfit(m, ff);
         throw new Queries.Missing("گزارش ناشناخته است");
     }
 }

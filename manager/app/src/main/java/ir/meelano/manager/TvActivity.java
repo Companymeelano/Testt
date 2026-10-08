@@ -14,6 +14,7 @@ import android.widget.TextView;
 import ir.meelano.manager.core.Filter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.Money;
+import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.MoneyQueries;
 import ir.meelano.manager.core.Queries;
 import ir.meelano.manager.data.Meta;
@@ -31,7 +32,7 @@ import java.util.List;
 public class TvActivity extends Activity {
     private static final long SLIDE_MS = 12000;
     private static final long REFRESH_MS = 5 * 60 * 1000;
-    private static final int SLIDES = 5;
+    private static final int SLIDES = 6;
 
     private Kit kit;
     private Repo repo;
@@ -39,6 +40,7 @@ public class TvActivity extends Activity {
     private LinearLayout slideBox;
     private LinearLayout dots;
     private TextView clock;
+    private View progress;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private int slide;
     private TvData data;
@@ -47,6 +49,8 @@ public class TvActivity extends Activity {
     private static final class TvData {
         Row salesDay = new Row();
         Row inDay = new Row();
+        Row bounced = new Row();
+        Row prodSum = new Row();
         List<Row> daily = new ArrayList<>();
         List<Row> top = new ArrayList<>();
         List<Row> debtors = new ArrayList<>();
@@ -83,6 +87,11 @@ public class TvActivity extends Activity {
         clock = kit.text("", 20, Theme.GOLD_SOFT, true);
         head.addView(clock, kit.lp(-2, -2));
         root.addView(head, kit.lp(-1, -2));
+        progress = new View(this);
+        progress.setBackgroundColor(Theme.GOLD);
+        progress.setPivotX(0f);
+        progress.setScaleX(0f);
+        root.addView(progress, new LinearLayout.LayoutParams(-1, Theme.dp(3)));
         root.addView(kit.gap(8));
 
         ScrollView sv = new ScrollView(this);
@@ -177,6 +186,12 @@ public class TvActivity extends Activity {
             try {
                 d.dueOut = Repo.exec(c, MoneyQueries.chequeDue(m, false, 1));
             } catch (Exception ignored) { }
+            try {
+                d.bounced = Repo.one(c, MoneyQueries.bouncedTotal(m));
+            } catch (Exception ignored) { }
+            try {
+                d.prodSum = Repo.one(c, MasterQueries.productsSummary(m));
+            } catch (Exception ignored) { }
             return d;
         }, new Repo.Cb<TvData>() {
             @Override
@@ -201,10 +216,19 @@ public class TvActivity extends Activity {
             slideBox.addView(kit.loading("در حال دریافت داده…"), kit.lp(-1, -2));
             return;
         }
+        slideBox.setAlpha(0f);
+        slideBox.animate().alpha(1f).setDuration(400).start();
+        if (progress != null) {
+            progress.animate().cancel();
+            progress.setScaleX(0f);
+            progress.animate().scaleX(1f).setDuration(SLIDE_MS)
+                    .setInterpolator(new android.view.animation.LinearInterpolator()).start();
+        }
         if (slide == 0) slideSales();
         else if (slide == 1) slideTop();
         else if (slide == 2) slideDebtors();
         else if (slide == 3) slideDue();
+        else if (slide == 4) slideAlerts();
         else slideShop();
     }
 
@@ -282,6 +306,25 @@ public class TvActivity extends Activity {
         row.addView(kit.space(10));
         row.addView(big("خروجی", Money.compactRial(outSum),
                 Money.fa(String.valueOf(data.dueOut == null ? 0 : data.dueOut.size())) + " فقره", Theme.WARNING), kit.wlp(1f));
+        slideBox.addView(row, kit.lp(-1, -2));
+    }
+
+    private void slideAlerts() {
+        long bouncedN = data.bounced == null ? 0 : data.bounced.l("count");
+        double bouncedSum = data.bounced == null ? 0 : data.bounced.d("total");
+        long low = data.prodSum == null ? 0 : data.prodSum.l("low");
+        long out = data.prodSum == null ? 0 : data.prodSum.l("out");
+        int dueN = (data.dueIn == null ? 0 : data.dueIn.size()) + (data.dueOut == null ? 0 : data.dueOut.size());
+        slideBox.addView(big("هشدارهای امروز", "", "", Theme.DANGER), kit.lp(-1, -2));
+        slideBox.addView(kit.gap(10));
+        LinearLayout row = kit.h();
+        row.addView(big("چک برگشتی", Money.fa(String.valueOf(bouncedN)) + " فقره",
+                Money.compactRial(bouncedSum), Theme.DANGER), kit.wlp(1f));
+        row.addView(kit.space(10));
+        row.addView(big("سررسید امروز و فردا", Money.fa(String.valueOf(dueN)) + " فقره", "", Theme.WARNING), kit.wlp(1f));
+        row.addView(kit.space(10));
+        row.addView(big("کم‌موجودی / ناموجود", Money.fa(String.valueOf(low)) + " / " + Money.fa(String.valueOf(out)),
+                "قلم کالا", Theme.VIOLET), kit.wlp(1f));
         slideBox.addView(row, kit.lp(-1, -2));
     }
 

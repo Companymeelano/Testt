@@ -10,6 +10,7 @@ import android.widget.TextView;
 
 import ir.meelano.manager.core.Filter;
 import ir.meelano.manager.core.Finger;
+import ir.meelano.manager.core.LicenseStore;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.Notify;
 import ir.meelano.manager.core.Queries;
@@ -75,11 +76,32 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        if (!LicenseStore.unlocked(this)) {
+            toLicense();
+            return;
+        }
         Theme.init(this);
         kit = new Kit(this);
         settings = new Settings(this);
         repo = new Repo(this, settings);
         splash();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Re-validate the license every time the app comes to the foreground
+        // (expired / clock-tampered devices fall back to the activation screen).
+        if (!isFinishing() && !LicenseStore.unlocked(this)) toLicense();
+    }
+
+    private void toLicense() {
+        try {
+            Intent i = new Intent(this, LicenseActivity.class);
+            i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(i);
+        } catch (Exception ignored) { }
+        finish();
     }
 
     /** Luxury launch splash with the developer signature, then PIN gate / shell. */

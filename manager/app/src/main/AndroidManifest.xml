@@ -58,9 +58,10 @@
             android:label="اسکن بارکد"
             android:screenOrientation="portrait" />
         <activity
-            android:name=".MainActivity"
+            android:name=".LicenseActivity"
             android:configChanges="keyboard|keyboardHidden|screenSize|uiMode"
             android:exported="true"
+            android:label="فعال‌سازی میلانو"
             android:screenOrientation="portrait"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
@@ -68,5 +69,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".MainActivity"
+            android:configChanges="keyboard|keyboardHidden|screenSize|uiMode"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:windowSoftInputMode="adjustResize" />
     </application>
 </manifest>

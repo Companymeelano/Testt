@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Luxury delete-key glyph (PIN pad ⌫). Stroke-based so IconSpan tint applies cleanly. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="960" android:viewportHeight="960">
+    <path
+        android:strokeColor="#FF000000" android:strokeWidth="64"
+        android:strokeLineCap="round" android:strokeLineJoin="round"
+        android:pathData="M250,300 H710 Q800,300 800,390 V570 Q800,660 710,660 H250 Q160,660 160,570 V390 Q160,300 250,300 Z" />
+    <path
+        android:strokeColor="#FF000000" android:strokeWidth="64"
+        android:strokeLineCap="round"
+        android:pathData="M400,430 L560,590 M560,430 L400,590" />
+</vector>

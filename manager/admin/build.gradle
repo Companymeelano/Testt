@@ -1,0 +1,51 @@
+plugins { id 'com.android.application' }
+
+// ---- Release signing (shared with :app) ----
+// Same manager/keystore.properties as the client app (git-ignored).
+// Without it, `assembleRelease` builds unsigned; CI keeps shipping debug.
+def keystoreProps = new Properties()
+def keystoreFile = rootProject.file('keystore.properties')
+if (keystoreFile.exists()) keystoreFile.withInputStream { keystoreProps.load(it) }
+def hasSigning = keystoreFile.exists() || System.getenv('MEELANO_KEYSTORE') != null
+
+android {
+    namespace 'ir.meelano.admin'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'ir.meelano.admin'
+        minSdk 26
+        targetSdk 34
+        versionCode 1
+        versionName '1.0.0'
+    }
+
+    signingConfigs {
+        release {
+            if (hasSigning) {
+                storeFile file(keystoreProps.getProperty('storeFile', System.getenv('MEELANO_KEYSTORE') ?: 'meelano-release.jks'))
+                storePassword keystoreProps.getProperty('storePassword', System.getenv('MEELANO_STORE_PASS') ?: '')
+                keyAlias keystoreProps.getProperty('keyAlias', System.getenv('MEELANO_KEY_ALIAS') ?: 'meelano')
+                keyPassword keystoreProps.getProperty('keyPassword', System.getenv('MEELANO_KEY_PASS') ?: '')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (hasSigning) signingConfig signingConfigs.release
+        }
+        debug {
+            applicationIdSuffix '.debug'
+        }
+    }
+
+    compileOptions { sourceCompatibility JavaVersion.VERSION_1_8; targetCompatibility JavaVersion.VERSION_1_8 }
+}
+
+dependencies {
+    // Shared offline-license codec (same secret + pack format as the client app).
+    implementation project(':licensing')
+}

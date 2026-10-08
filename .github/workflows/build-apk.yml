@@ -1,4 +1,4 @@
-name: Build debug APK
+name: Build debug APKs (client + seller admin)
 
 on:
   push:
@@ -32,40 +32,48 @@ jobs:
         with:
           gradle-version: 8.11.1
 
-      - name: Build debug APK
+      - name: Build debug APKs (client + admin)
         working-directory: manager
         run: |
           set -o pipefail
-          gradle :app:assembleDebug --stacktrace 2>&1 | tee ../build-full.log | tail -40
+          gradle :app:assembleDebug :admin:assembleDebug --stacktrace 2>&1 | tee ../build-full.log | tail -40
 
-      - name: Rename APK
-        run: cp manager/app/build/outputs/apk/debug/app-debug.apk meelano-manager-v7-debug.apk
+      - name: Rename APKs
+        run: |
+          cp manager/app/build/outputs/apk/debug/app-debug.apk meelano-manager-v15-debug.apk
+          cp manager/admin/build/outputs/apk/debug/admin-debug.apk meelano-admin-v1-debug.apk
 
-      - name: Upload artifact
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: meelano-manager-v7-debug
-          path: meelano-manager-v7-debug.apk
+          name: meelano-apks-debug
+          path: |
+            meelano-manager-v15-debug.apk
+            meelano-admin-v1-debug.apk
 
       - name: Publish rolling release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: apk-debug
-          name: MEELANO Manager v7 (debug APK)
+          name: MEELANO v15 — client + seller admin (debug APKs)
           body: |
-            نسخه قابل نصب (دیباگ) — مستقیم روی گوشی نصب می‌شود.
-            Debug build — installs directly on the phone.
-            Needs a real Atiran SQL Server connection (set it in Settings).
-          files: meelano-manager-v7-debug.apk
+            دو فایل نصبی (دیباگ) — مستقیم روی گوشی نصب می‌شوند:
+            • meelano-manager-v15-debug.apk — برنامه مشتری (با قفل لایسنس آفلاین)
+            • meelano-admin-v1-debug.apk — برنامه فروشنده (صدور کد فعال‌سازی)
+            Debug builds — install directly on the phone.
+            Client needs a real Atiran SQL Server connection (set it in Settings).
+          files: |
+            meelano-manager-v15-debug.apk
+            meelano-admin-v1-debug.apk
 
-      - name: Commit APK to dist/ (in-chat delivery)
+      - name: Commit APKs to dist/ (in-chat delivery)
         run: |
           mkdir -p dist
-          cp meelano-manager-v7-debug.apk dist/
+          cp meelano-manager-v15-debug.apk meelano-admin-v1-debug.apk dist/
           git config user.name "arena-ci"
           git config user.email "arena-ci@local"
-          git add -f dist/meelano-manager-v7-debug.apk
-          git commit -m "dist: debug APK (auto-updated by CI)" || true
+          git add -f dist/meelano-manager-v15-debug.apk dist/meelano-admin-v1-debug.apk
+          git commit -m "dist: debug APKs (auto-updated by CI)" || true
           git push origin HEAD:arena/ba83e93c-testt || true
 
       - name: Save error tail to branch (diagnostics, on failure)

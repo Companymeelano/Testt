@@ -17,41 +17,49 @@ Starting a Gradle Daemon (subsequent builds will be faster)
 > Task :licensing:classes
 > Task :licensing:jar
 > Task :app:javaPreCompileDebug
-> Task :app:checkDebugAarMetadata
 > Task :app:generateDebugResValues
+> Task :app:checkDebugAarMetadata
 > Task :app:mapDebugSourceSetPaths
 > Task :app:generateDebugResources
 > Task :app:packageDebugResources
 > Task :app:mergeDebugResources
 > Task :app:createDebugCompatibleScreenManifests
 > Task :app:extractDeepLinksDebug
-> Task :app:parseDebugLocalResources
 > Task :app:processDebugMainManifest
+> Task :app:parseDebugLocalResources
 > Task :app:processDebugManifest
 > Task :app:mergeDebugShaders
 > Task :app:compileDebugShaders NO-SOURCE
 > Task :app:generateDebugAssets UP-TO-DATE
 > Task :app:mergeDebugAssets
-> Task :app:processDebugManifestForPackage
 > Task :app:processDebugJavaRes NO-SOURCE
 > Task :app:compressDebugAssets
 > Task :app:desugarDebugFileDependencies
-> Task :app:mergeDebugJniLibFolders
-> Task :app:processDebugResources
-> Task :app:mergeDebugNativeLibs NO-SOURCE
+> Task :app:processDebugManifestForPackage
 > Task :app:checkDebugDuplicateClasses
 > Task :app:mergeDebugJavaResource
+> Task :app:processDebugResources
+> Task :app:mergeExtDexDebug
 
 > Task :app:compileDebugJavaWithJavac
-/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/screens/SettingsScreen.java:272: error: variable row is already defined in method render(LinearLayout)
-                LinearLayout row = a.kit.h();
-                             ^
+/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/screens/TahvilScreen.java:102: error: heroCard() in TahvilScreen cannot override heroCard() in Screen
+    private View heroCard() {
+                 ^
+  attempting to assign weaker access privileges; was protected
+/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/screens/AnbarScreen.java:86: error: heroCard() in AnbarScreen cannot override heroCard() in Screen
+    private android.view.View heroCard() {
+                              ^
+  attempting to assign weaker access privileges; was protected
+/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/screens/ResidScreen.java:91: error: heroCard() in ResidScreen cannot override heroCard() in Screen
+    private View heroCard() {
+                 ^
+  attempting to assign weaker access privileges; was protected
 Note: Some input files use or override a deprecated API.
 Note: Recompile with -Xlint:deprecation for details.
-1 error
+3 errors
 
 > Task :app:compileDebugJavaWithJavac FAILED
-gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1791438989201.json
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1791539083682.json
 [Incubating] Problems report is available at: file:///home/runner/work/Testt/Testt/manager/build/reports/problems/problems-report.html
 
 FAILURE: Build failed with an exception.
@@ -61,10 +69,19 @@ Execution failed for task ':app:compileDebugJavaWithJavac'.
 > Compilation failed; see the compiler output below.
   Note: Recompile with -Xlint:deprecation for details.
   Note: Some input files use or override a deprecated API.
-  /home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/screens/SettingsScreen.java:272: error: variable row is already defined in method render(LinearLayout)
-                  LinearLayout row = a.kit.h();
-                               ^
-  1 error
+  /home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/screens/TahvilScreen.java:102: error: heroCard() in TahvilScreen cannot override heroCard() in Screen
+      private View heroCard() {
+                   ^
+    attempting to assign weaker access privileges; was protected
+  /home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/screens/AnbarScreen.java:86: error: heroCard() in AnbarScreen cannot override heroCard() in Screen
+      private android.view.View heroCard() {
+                                ^
+    attempting to assign weaker access privileges; was protected
+  /home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/screens/ResidScreen.java:91: error: heroCard() in ResidScreen cannot override heroCard() in Screen
+      private View heroCard() {
+                   ^
+    attempting to assign weaker access privileges; was protected
+  3 errors
 
 * Try:
 > Check your code and dependencies to fix the compilation error(s)
@@ -106,10 +123,19 @@ org.gradle.api.tasks.TaskExecutionException: Execution failed for task ':app:com
 Caused by: org.gradle.api.internal.tasks.compile.CompilationFailedException: Compilation failed; see the compiler output below.
 Note: Recompile with -Xlint:deprecation for details.
 Note: Some input files use or override a deprecated API.
-/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/screens/SettingsScreen.java:272: error: variable row is already defined in method render(LinearLayout)
-                LinearLayout row = a.kit.h();
-                             ^
-1 error
+/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/screens/TahvilScreen.java:102: error: heroCard() in TahvilScreen cannot override heroCard() in Screen
+    private View heroCard() {
+                 ^
+  attempting to assign weaker access privileges; was protected
+/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/screens/AnbarScreen.java:86: error: heroCard() in AnbarScreen cannot override heroCard() in Screen
+    private android.view.View heroCard() {
+                              ^
+  attempting to assign weaker access privileges; was protected
+/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/screens/ResidScreen.java:91: error: heroCard() in ResidScreen cannot override heroCard() in Screen
+    private View heroCard() {
+                 ^
+  attempting to assign weaker access privileges; was protected
+3 errors
 	at org.gradle.api.internal.tasks.compile.JdkJavaCompiler.execute(JdkJavaCompiler.java:84)
 	at org.gradle.api.internal.tasks.compile.JdkJavaCompiler.execute(JdkJavaCompiler.java:46)
 	at org.gradle.api.internal.tasks.compile.NormalizingJavaCompiler.delegateAndHandleErrors(NormalizingJavaCompiler.java:98)
@@ -263,5 +289,5 @@ Note: Some input files use or override a deprecated API.
 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:48)
 
 
-BUILD FAILED in 37s
+BUILD FAILED in 44s
 24 actionable tasks: 24 executed

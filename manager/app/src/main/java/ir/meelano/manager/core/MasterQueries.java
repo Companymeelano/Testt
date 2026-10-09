@@ -1445,4 +1445,214 @@ public final class MasterQueries {
                 + " WHERE " + Sql.join(conds, " AND ")
                 + " ORDER BY CASE WHEN ISNULL(s.daily,0)>0 THEN (" + stock + "/s.daily) ELSE 999999 END", binds);
     }
+
+    // ================= warehouse (v28: deliveries + receiving lookups) =================
+
+    /** Escape for LIKE patterns (user-typed search). */
+    private static String escLike(String q) {
+        String t = q == null ? "" : q;
+        return t.replace("[", "[[]").replace("%", "[%]").replace("_", "[_]");
+    }
+
+    /** Recent sales invoices ready for warehouse handover (newest first). */
+    public static Queries.Q whDeliveries(Meta m) throws Queries.Missing {
+        String no = m.must("sailfact", "شماره فاکتور", "shfacfo", "shFacFo");
+        String dt = m.must("sailfact", "تاریخ فاکتور", "date");
+        String shmo = m.col("sailfact", "shmo", "SHMO");
+        String vis = m.col("sailfact", "vis_rdf", "visrdf");
+        String all = m.col("sailfact", "all", "All", "sumall");
+        String tas = m.col("sailfact", "tasvieh", "Tasvieh");
+        String custJoin = "";
+        String custExpr = "N''";
+        String phoneExpr = "N''";
+        if (shmo != null && m.table("CUSTOMERS")) {
+            String cid = m.colFlex("CUSTOMERS", "shmo", "SHMO");
+            String cnm = m.colFlex("CUSTOMERS", "moname", "MONAME", "name");
+            String ccl = m.colFlex("CUSTOMERS", "cell", "tell1");
+            if (cid != null && cnm != null) {
+                custJoin = " LEFT JOIN dbo.CUSTOMERS cu ON TRY_CONVERT(nvarchar(60),cu.[" + cid + "])"
+                        + "=TRY_CONVERT(nvarchar(60),f.[" + shmo + "])";
+                custExpr = Sql.txt("cu", cnm, 200);
+                phoneExpr = "COALESCE(" + Sql.txt("cu", ccl == null ? cnm : ccl, 60) + ",N'')";
+            }
+        }
+        String visJoin = "";
+        String visExpr = "N''";
+        if (vis != null && m.table("visitors")) {
+            String vid = m.colFlex("visitors", "vis_rdf", "visrdf");
+            String vnm = m.colFlex("visitors", "vis_name", "visname", "name");
+            if (vid != null && vnm != null) {
+                visJoin = " LEFT JOIN dbo.visitors v ON TRY_CONVERT(nvarchar(60),v.[" + vid + "])"
+                        + "=TRY_CONVERT(nvarchar(60),f.[" + vis + "])";
+                visExpr = "COALESCE(" + Sql.txt("v", vnm, 120) + ",N'')";
+            }
+        }
+        return new Queries.Q("SELECT TOP 60 TRY_CONVERT(bigint,f.[" + no + "]) AS id, "
+                + Sql.date10("f", dt) + " AS dt, " + custExpr + " AS cust, " + phoneExpr + " AS phone, "
+                + visExpr + " AS visitor, "
+                + (all == null ? "0" : "TRY_CONVERT(money,f.[" + all + "])") + " AS amount, "
+                + (tas == null ? "N''" : "COALESCE(" + Sql.txt("f", tas, 10) + ",N'')") + " AS settled"
+                + " FROM dbo.sailfact f" + custJoin + visJoin
+                + " ORDER BY f.[" + no + "] DESC");
+    }
+
+    /** Lines of one sales invoice (for the handover receipt). */
+    public static Queries.Q whDeliveryItems(Meta m, String shfacfo) throws Queries.Missing {
+        String no = m.must("subsailfact", "شماره فاکتور", "shfacfo", "shFacFo");
+        String ka = m.col("subsailfact", "SHKA", "shka");
+        String nk = m.col("subsailfact", "naka", "NAKA", "name");
+        String qty = m.col("subsailfact", "TEDVAH", "tedvah", "tedad");
+        String unt = m.col("subsailfact", "BASTEBANDI", "bastebandi", "vah");
+        String prc = m.col("subsailfact", "VAHPRICE", "vahprice", "fi");
+        String sum = m.col("subsailfact", "LINESUM", "linesum");
+        String anb = m.col("subsailfact", "rdf_anbar", "rdfanbar");
+        java.util.List<Object> binds = new java.util.ArrayList<>();
+        binds.add(shfacfo);
+        return new Queries.Q("SELECT "
+                + (ka == null ? "N''" : "COALESCE(" + Sql.txt("s", ka, 60) + ",N'')") + " AS code, "
+                + (nk == null ? "N''" : "COALESCE(" + Sql.txt("s", nk, 300) + ",N'')") + " AS name, "
+                + (qty == null ? "0" : "TRY_CONVERT(decimal(18,3),s.[" + qty + "])") + " AS qty, "
+                + (unt == null ? "N''" : "COALESCE(" + Sql.txt("s", unt, 60) + ",N'')") + " AS unit, "
+                + (prc == null ? "0" : "TRY_CONVERT(money,s.[" + prc + "])") + " AS price, "
+                + (sum == null ? "0" : "TRY_CONVERT(money,s.[" + sum + "])") + " AS sum, "
+                + (anb == null ? "N''" : "COALESCE(" + Sql.txt("s", anb, 60) + ",N'')") + " AS anbar"
+                + " FROM dbo.subsailfact s WHERE TRY_CONVERT(nvarchar(60),s.[" + no + "])=?",
+                binds);
+    }
+
+    /** Product search for receiving (code or name). Empty q = latest 100. */
+    public static Queries.Q whProducts(Meta m, String q) throws Queries.Missing {
+        String ka = m.must("inventory", "کد کالا", "shka", "SHKA");
+        String nk = m.must("inventory", "نام کالا", "naka", "NAKA");
+        String un = m.col("inventory", "vahsanj", "VAHSANJ", "unit");
+        String st = m.col("inventory", "mojkavah", "MOJKAVAH", "mojodi");
+        String bp = m.col("inventory", "buy_price", "BUY_PRICE", "buyprice");
+        String gJoin = "";
+        String gExpr = "N''";
+        if (m.table("kagroup")) {
+            String gid = m.colFlex("kagroup", "group_rdf");
+            String gnm = m.colFlex("kagroup", "group_name", "name");
+            String gi = m.colFlex("inventory", "group_rdf");
+            if (gid != null && gnm != null && gi != null) {
+                gJoin = " LEFT JOIN dbo.kagroup g ON TRY_CONVERT(nvarchar(60),g.[" + gid + "])"
+                        + "=TRY_CONVERT(nvarchar(60),i.[" + gi + "])";
+                gExpr = "COALESCE(" + Sql.txt("g", gnm, 150) + ",N'')";
+            }
+        }
+        String t = q == null ? "" : q.trim();
+        String where = "";
+        java.util.List<Object> binds = new java.util.ArrayList<>();
+        if (!t.isEmpty()) {
+            // escLike() neutralizes wildcards with brackets; no ESCAPE clause needed.
+            where = " WHERE (TRY_CONVERT(nvarchar(60),i.[" + ka + "]) LIKE ?"
+                    + " OR i.[" + nk + "] LIKE ?)";
+            binds.add("%" + escLike(t) + "%");
+            binds.add("%" + escLike(t) + "%");
+        }
+        return new Queries.Q("SELECT TOP 100 TRY_CONVERT(bigint,i.[" + ka + "]) AS code, "
+                + Sql.txt("i", nk, 300) + " AS name, "
+                + (un == null ? "N''" : "COALESCE(" + Sql.txt("i", un, 80) + ",N'')") + " AS unit, "
+                + (st == null ? "0" : "TRY_CONVERT(decimal(18,3),i.[" + st + "])") + " AS stock, "
+                + (bp == null ? "0" : "TRY_CONVERT(money,i.[" + bp + "])") + " AS buy, "
+                + gExpr + " AS grp FROM dbo.inventory i" + gJoin + where
+                + " ORDER BY i.[" + ka + "] DESC", binds);
+    }
+
+    /** Customer/supplier search (same table in Atiran). Empty q = latest 100. */
+    public static Queries.Q whCustomers(Meta m, String q) throws Queries.Missing {
+        String id = m.must("CUSTOMERS", "کد مشتری", "shmo", "SHMO");
+        String nm = m.must("CUSTOMERS", "نام مشتری", "moname", "MONAME", "name");
+        String cell = m.col("CUSTOMERS", "cell", "CELL");
+        String tel = m.col("CUSTOMERS", "tell1", "TELL1");
+        String ad = m.col("CUSTOMERS", "addre", "ADDRE", "address");
+        String man = m.col("CUSTOMERS", "man", "MAN");
+        String t = q == null ? "" : q.trim();
+        String where = "";
+        java.util.List<Object> binds = new java.util.ArrayList<>();
+        if (!t.isEmpty()) {
+            where = " WHERE (TRY_CONVERT(nvarchar(60),c.[" + id + "]) LIKE ?"
+                    + " OR c.[" + nm + "] LIKE ?"
+                    + (cell == null ? "" : " OR c.[" + cell + "] LIKE ?") + ")";
+            binds.add("%" + escLike(t) + "%");
+            binds.add("%" + escLike(t) + "%");
+            if (cell != null) binds.add("%" + escLike(t) + "%");
+        }
+        return new Queries.Q("SELECT TOP 100 TRY_CONVERT(int,c.[" + id + "]) AS id, "
+                + Sql.txt("c", nm, 300) + " AS name, "
+                + (cell == null ? "N''" : "COALESCE(" + Sql.txt("c", cell, 60) + ",N'')") + " AS cell, "
+                + (tel == null ? "N''" : "COALESCE(" + Sql.txt("c", tel, 60) + ",N'')") + " AS tell, "
+                + (ad == null ? "N''" : "COALESCE(" + Sql.txt("c", ad, 300) + ",N'')") + " AS addr, "
+                + (man == null ? "0" : "TRY_CONVERT(money,c.[" + man + "])") + " AS bal"
+                + " FROM dbo.CUSTOMERS c" + where + " ORDER BY c.[" + id + "] DESC", binds);
+    }
+
+    public static Queries.Q whCustGroups(Meta m) throws Queries.Missing {
+        String id = m.must("custgroup", "کد گروه", "group_rdf");
+        String nm = m.must("custgroup", "نام گروه", "group_name", "name");
+        return new Queries.Q("SELECT TRY_CONVERT(int,[" + id + "]) AS id, "
+                + Sql.txt(null, nm, 150) + " AS name FROM dbo.custgroup ORDER BY 2");
+    }
+
+    public static Queries.Q whProductGroups(Meta m) throws Queries.Missing {
+        String id = m.must("kagroup", "کد گروه", "group_rdf");
+        String nm = m.must("kagroup", "نام گروه", "group_name", "name");
+        return new Queries.Q("SELECT TRY_CONVERT(int,[" + id + "]) AS id, "
+                + Sql.txt(null, nm, 150) + " AS name FROM dbo.kagroup ORDER BY 2");
+    }
+
+    public static Queries.Q whUnits(Meta m) throws Queries.Missing {
+        String nm = m.must("UNITS", "نام واحد", "UNIT_NAME", "unit_name", "name");
+        return new Queries.Q("SELECT " + Sql.txt(null, nm, 80) + " AS name FROM dbo.UNITS ORDER BY 1");
+    }
+
+    public static Queries.Q whVisitors(Meta m) throws Queries.Missing {
+        String id = m.must("visitors", "کد ویزیتور", "vis_rdf");
+        String nm = m.must("visitors", "نام ویزیتور", "vis_name", "name");
+        String cell = m.col("visitors", "vis_cell", "cell");
+        return new Queries.Q("SELECT TRY_CONVERT(int,[" + id + "]) AS id, "
+                + Sql.txt(null, nm, 150) + " AS name, "
+                + (cell == null ? "N''" : "COALESCE(" + Sql.txt(null, cell, 60) + ",N'')")
+                + " AS cell FROM dbo.visitors ORDER BY 2");
+    }
+
+    public static Queries.Q whAnbars(Meta m) throws Queries.Missing {
+        String id = m.must("anbars", "کد انبار", "rdf_anbar");
+        String nm = m.must("anbars", "نام انبار", "name");
+        String kp = m.col("anbars", "anbardar");
+        String bs = m.col("anbars", "Base", "base");
+        return new Queries.Q("SELECT TRY_CONVERT(int,[" + id + "]) AS id, "
+                + Sql.txt(null, nm, 150) + " AS name, "
+                + (kp == null ? "N''" : "COALESCE(" + Sql.txt(null, kp, 150) + ",N'')") + " AS keeper, "
+                + (bs == null ? "0" : "CASE WHEN " + boolTrue("[" + bs + "]") + " THEN 1 ELSE 0 END")
+                + " AS isbase FROM dbo.anbars ORDER BY 4 DESC, 2");
+    }
+
+    /** Warehouse hub numbers: today's sales count/sum + open purchase pre-invoices. */
+    public static Queries.Q whTodayStats(Meta m) {
+        StringBuilder sb = new StringBuilder("SELECT ");
+        String fdt = null, fall = null;
+        try {
+            fdt = m.col("sailfact", "date");
+            fall = m.col("sailfact", "all", "All");
+        } catch (Exception ignored) { }
+        String todayJ = Jalali.todayStr();
+        String todayG = Jalali.todayGregorian();
+        if (fdt != null && m.table("sailfact")) {
+            sb.append("(SELECT COUNT_BIG(1) FROM dbo.sailfact f WHERE "
+                    + Sql.date10("f", fdt) + " IN (").append(Sql.lit(todayJ)).append(",")
+                    .append(Sql.lit(todayG)).append(")) AS salesN, ");
+            sb.append("(SELECT ISNULL(SUM(TRY_CONVERT(money,f.[")
+                    .append(fall == null ? fdt : fall).append("])),0) FROM dbo.sailfact f WHERE "
+                    + Sql.date10("f", fdt) + " IN (").append(Sql.lit(todayJ)).append(",")
+                    .append(Sql.lit(todayG)).append(")) AS salesSum, ");
+        } else {
+            sb.append("0 AS salesN, 0 AS salesSum, ");
+        }
+        if (m.table("buyfact_pish")) {
+            sb.append("(SELECT COUNT_BIG(1) FROM dbo.buyfact_pish) AS pishN");
+        } else {
+            sb.append("0 AS pishN");
+        }
+        return new Queries.Q(sb.toString());
+    }
 }

@@ -661,14 +661,13 @@ public final class AtiranAuth {
     // ================= release phases (v27) =================
 
     /**
-     * Phase 1 = management build only: just the admin may enter.
-     * Phase 2 opens the warehouse build (add RoleStore.WAREHOUSE here),
-     * then one phase per role (visitor, distributor, moadian) — each phase
-     * is a deliberate one-line change, never an accident.
+     * Phase 1 = management build only. Phase 2 (v28) opens the warehouse
+     * build. Later phases open visitor, distributor and moadian — each a
+     * deliberate one-line change, never an accident.
      */
     public static boolean phaseOpen(Context c, String role) {
         if (RoleStore.ADMIN.equals(role)) return true;
-        // PHASE 2: || RoleStore.WAREHOUSE.equals(role)
+        if (RoleStore.WAREHOUSE.equals(role)) return true; // PHASE 2 (v28)
         return false;
     }
 

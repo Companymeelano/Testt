@@ -251,6 +251,11 @@ public final class Settings {
 
     public void setFpOn(boolean on) { p.edit().putBoolean("fp_on", on).apply(); }
 
+    /** Warehouse direct posting to Atiran (default OFF = local drafts only). */
+    public boolean whDirect() { return p.getBoolean("wh_direct", false); }
+
+    public void setWhDirect(boolean on) { p.edit().putBoolean("wh_direct", on).apply(); }
+
     // ---------------- home dashboard order ----------------
     public static final String HOME_ORDER_DEFAULT = "kpis,alerts,trend,donut,debtors,visitors,due,shortcuts";
 

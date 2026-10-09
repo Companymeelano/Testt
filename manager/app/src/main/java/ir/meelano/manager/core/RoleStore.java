@@ -43,9 +43,10 @@ public final class RoleStore {
     private static final String[] DISTRIBUTOR_OK = {
             "home", "sales", "customers", "products", "cheques", "dues", "cash",
             "search", "voice", "more"};
-    /** Warehouse side: stock + inbound receipts. */
+    /** Warehouse side: his own build (phase 2) + stock views. */
     private static final String[] WAREHOUSE_OK = {
-            "home", "products", "buy", "search", "voice", "more"};
+            "anbar", "tahvil", "resid", "home", "products", "customers",
+            "search", "voice", "more"};
     /** Moadian (tax) side: invoices + tax reports. */
     private static final String[] MOADIAN_OK = {
             "home", "sales", "customers", "reports", "search", "voice", "more"};
@@ -114,7 +115,7 @@ public final class RoleStore {
     public static String homeFor(String role) {
         if (VISITOR.equals(role)) return "customers";
         if (DISTRIBUTOR.equals(role)) return "sales";
-        if (WAREHOUSE.equals(role)) return "products";
+        if (WAREHOUSE.equals(role)) return "anbar";
         if (MOADIAN.equals(role)) return "sales";
         return "home";
     }

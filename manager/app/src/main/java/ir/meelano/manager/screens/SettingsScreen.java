@@ -344,6 +344,20 @@ public class SettingsScreen extends Screen {
                 a.kit.lp(-1, -2));
         a.kit.addCard(content, lg);
 
+        // ---- warehouse direct posting (v28) ----
+        LinearLayout wh = a.kit.card(Theme.SUCCESS);
+        wh.addView(a.kit.text("انبار", 14.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        final boolean wdir = a.settings.whDirect();
+        wh.addView(a.kit.btnGhost("◉ ثبت مستقیم در آتیران: " + (wdir ? "روشن" : "خاموش"),
+                Theme.SUCCESS, v -> {
+                    a.settings.setWhDirect(!wdir);
+                    a.kit.toast(!wdir ? "ثبت مستقیم روشن شد" : "ثبت مستقیم خاموش شد؛ فقط پیش‌نویس");
+                    render(content);
+                }), a.kit.lp(-1, -2));
+        wh.addView(a.kit.hint("خاموش = اسناد انبار فقط پیش‌نویس محلی می‌مانند (امن). روشن = ثبت مستقیم در پیش‌فاکتورهای آتیران؛ اول با «پیش‌نمایش SQL» در صفحه رسید کالا بررسی کنید."),
+                a.kit.lp(-1, -2));
+        a.kit.addCard(content, wh);
+
         // ---- home dashboard order ----
         LinearLayout ho = a.kit.card(Theme.GOLD);
         ho.addView(a.kit.text("ترتیب داشبورد خانه", 14.5f, Theme.TEXT, true), a.kit.lp(-1, -2));

@@ -16,6 +16,11 @@ user_password byte-length distribution. It NEVER prints password bytes.
 --pw-dump USER prints the hex of ONE user's stored user_password bytes so the
 developer can discover Atiran's hash recipe offline. ONLY run it for a
 THROWAWAY test user you create for this purpose (then delete it).
+
+--wh-shape dumps the exact live shape (columns, nullability, defaults,
+identity, PK, FK targets, triggers) of the warehouse tables plus the
+INSERT/UPDATE permission of this login on each. Run it on the shop server
+and send the output to the developer BEFORE enabling direct posting.
 """
 import argparse
 import sys
@@ -66,6 +71,8 @@ def main():
                     help="dump login/role metadata for the app login (read-only)")
     ap.add_argument("--pw-dump", metavar="USERNAME",
                     help="print stored user_password hex for ONE test user (see warning above)")
+    ap.add_argument("--wh-shape", action="store_true",
+                    help="dump warehouse tables shape + write permissions (read-only)")
     a = ap.parse_args()
 
     try:
@@ -81,6 +88,8 @@ def main():
         return auth_dump(conn, cur, a.db)
     if a.pw_dump:
         return pw_dump(conn, cur, a.pw_dump)
+    if a.wh_shape:
+        return wh_shape(conn, cur, a.db)
     ok_tables = 0
     print("== MEELANO Manager — Atiran probe ==\n-- tables --")
     for t, musts in TABLES.items():
@@ -136,6 +145,70 @@ def pw_dump(conn, cur, username):
     conn.close()
     print("Send (test password + stored length + stored hex) to the developer,")
     print("then DELETE the test user. Feed them to tools/crack_probe.py.")
+    return 0
+
+
+WH_TABLES = ["buyfact_pish", "subbuyfact_pish", "buyfact", "subbuyfact",
+             "sailfact_pish", "subsailfact_pish", "inventory", "CUSTOMERS",
+             "anbars", "UNITS", "kagroup", "custgroup", "visitors", "Tafsil"]
+
+
+def wh_shape(conn, cur, db):
+    """Exact live shape + write perms of the warehouse tables (read-only)."""
+    print("== MEELANO Manager — warehouse shape (read-only) ==")
+    for t in WH_TABLES:
+        print(f"\n-- {t} --")
+        try:
+            cur.execute("SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES "
+                        "WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME=%s", (t,))
+            if not cur.fetchone()[0]:
+                print("  [MISS]")
+                continue
+            cur.execute(f"SELECT COUNT_BIG(1) FROM dbo.[{t}]")
+            print(f"  rows: {cur.fetchone()[0]}")
+            cur.execute("SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, "
+                        "CASE WHEN COLUMN_DEFAULT IS NULL THEN '' ELSE 'DEF' END "
+                        "FROM INFORMATION_SCHEMA.COLUMNS "
+                        "WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME=%s "
+                        "ORDER BY ORDINAL_POSITION", (t,))
+            for name, typ, null, dflt in cur.fetchall():
+                print(f"  col: {name} : {typ} : {'NULL' if null == 'YES' else 'NOTNULL'}"
+                      f"{' : DEFAULT' if dflt else ''}")
+            cur.execute("SELECT c.name FROM sys.identity_columns ic "
+                        "JOIN sys.columns c ON c.object_id=ic.object_id "
+                        "AND c.column_id=ic.column_id "
+                        f"WHERE ic.object_id=OBJECT_ID('dbo.[{t}]')")
+            print(f"  identity: {[r[0] for r in cur.fetchall()] or '-'}")
+            cur.execute("SELECT c.name FROM sys.key_constraints kc "
+                        "JOIN sys.index_columns ic ON ic.object_id=kc.parent_object_id "
+                        "AND ic.index_id=kc.unique_index_id "
+                        "JOIN sys.columns c ON c.object_id=ic.object_id "
+                        "AND c.column_id=ic.column_id "
+                        f"WHERE kc.type='PK' AND kc.parent_object_id=OBJECT_ID('dbo.[{t}]')")
+            print(f"  pk: {[r[0] for r in cur.fetchall()] or '-'}")
+            cur.execute("SELECT c.name, OBJECT_NAME(f.referenced_object_id), rc.name "
+                        "FROM sys.foreign_keys f "
+                        "JOIN sys.foreign_key_columns fc "
+                        "ON fc.constraint_object_id=f.object_id "
+                        "JOIN sys.columns c ON c.object_id=fc.parent_object_id "
+                        "AND c.column_id=fc.parent_column_id "
+                        "JOIN sys.columns rc ON rc.object_id=fc.referenced_object_id "
+                        "AND rc.column_id=fc.referenced_column_id "
+                        f"WHERE f.parent_object_id=OBJECT_ID('dbo.[{t}]')")
+            fks = cur.fetchall()
+            print(f"  fk: {[f'{r[0]}->{r[1]}.{r[2]}' for r in fks] or '-'}")
+            cur.execute("SELECT name FROM sys.triggers "
+                        f"WHERE parent_id=OBJECT_ID('dbo.[{t}]') AND is_disabled=0")
+            print(f"  triggers: {[r[0] for r in cur.fetchall()] or '-'}")
+            for perm in ("INSERT", "UPDATE"):
+                cur.execute("SELECT HAS_PERMS_BY_NAME(%s, 'OBJECT', %s)",
+                            (f"dbo.[{t}]", perm))
+                print(f"  can_{perm.lower()}: "
+                      f"{'YES' if cur.fetchone()[0] == 1 else 'NO'}")
+        except Exception as e:
+            print(f"  [ERR] {e}")
+    conn.close()
+    print(f"\n{db}: warehouse shape done. Send this to the developer.")
     return 0
 
 

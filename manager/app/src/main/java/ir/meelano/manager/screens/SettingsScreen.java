@@ -302,7 +302,7 @@ public class SettingsScreen extends Screen {
             render(content);
         }), a.kit.lp(-1, -2));
         if (ren) {
-            String[][] rr = {{"admin", "مدیر"}, {"seller", "فروشنده"}, {"accountant", "حسابدار"}};
+            String[][] rr = {{"admin", "مدیر"}, {"seller", "فروشنده"}, {"accountant", "حسابدار"}, {"visitor", "ویزیتور"}, {"distributor", "موزع"}, {"warehouse", "انباردار"}, {"moadian", "مودیان"}};
             for (String[] role : rr) {
                 final String rk = role[0];
                 final String rn = role[1];
@@ -316,9 +316,33 @@ public class SettingsScreen extends Screen {
                 r.addView(rrow, a.kit.lp(-1, -2));
             }
             r.addView(a.kit.btnGhost("تعویض نقش", Theme.TEXT, v -> a.openRoleGate()), a.kit.lp(-1, -2));
-            r.addView(a.kit.hint("رمز پیش‌فرض مدیر ۱۲۳۴ است؛ حتماً عوضش کنید. بخش‌های حساس (تنظیمات، کاربران و سود) فقط برای مدیر است؛ فروشنده بخش مالی و حسابدار بخش فروش را نمی‌بیند."), a.kit.lp(-1, -2));
+            r.addView(a.kit.hint("رمز پیش‌فرض مدیر ۱۲۳۴ است؛ حتماً عوضش کنید. بخش‌های حساس (تنظیمات، کاربران و سود) فقط برای مدیر است. وقتی «ورود کاربر آتیران» روشن است، نقش هر نفر از آتیران می‌آید و این انتخاب‌گر کنار می‌رود."), a.kit.lp(-1, -2));
         }
         a.kit.addCard(content, r);
+
+        // ---- Atiran user login (v26) ----
+        LinearLayout lg = a.kit.card(Theme.GOLD);
+        lg.addView(a.kit.text("ورود کاربر آتیران", 14.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        final boolean lon = ir.meelano.manager.core.AtiranAuth.enabled(a);
+        if (ir.meelano.manager.core.AtiranAuth.hasSession(a)) {
+            lg.addView(a.kit.kv("کاربر فعلی",
+                    ir.meelano.manager.core.AtiranAuth.sessionName(a) + " («"
+                            + ir.meelano.manager.core.RoleStore.faName(
+                                    ir.meelano.manager.core.AtiranAuth.sessionRole(a))
+                            + "»)", Theme.TEXT), a.kit.lp(-1, -2));
+        }
+        lg.addView(a.kit.btnGhost("◉ صفحه ورود: " + (lon ? "روشن" : "خاموش"), Theme.GOLD, v -> {
+            ir.meelano.manager.core.AtiranAuth.setEnabled(a, !lon);
+            if (lon) ir.meelano.manager.core.AtiranAuth.clearSession(a);
+            a.kit.toast(!lon ? "صفحه ورود روشن شد" : "صفحه ورود خاموش شد");
+            render(content);
+        }), a.kit.lp(-1, -2));
+        if (ir.meelano.manager.core.AtiranAuth.hasSession(a))
+            lg.addView(a.kit.btnGhost("خروج از حساب فعلی", Theme.DANGER, v -> a.logout()),
+                    a.kit.lp(-1, -2));
+        lg.addView(a.kit.hint("وقتی روشن است، بعد از فعال‌سازی هر نفر با نام کاربری آتیران خودش وارد می‌شود و فقط بخش‌های نقش خودش را می‌بیند. رمز هر کاربر از بخش «کاربران» تعیین می‌شود."),
+                a.kit.lp(-1, -2));
+        a.kit.addCard(content, lg);
 
         // ---- home dashboard order ----
         LinearLayout ho = a.kit.card(Theme.GOLD);

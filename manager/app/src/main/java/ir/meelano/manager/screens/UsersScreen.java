@@ -7,10 +7,12 @@ import ir.meelano.manager.core.CacheStore;
 import android.widget.ScrollView;
 
 import ir.meelano.manager.MainActivity;
+import ir.meelano.manager.core.AtiranAuth;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.ReportCatalog;
+import ir.meelano.manager.core.RoleStore;
 import ir.meelano.manager.data.Meta;
 import ir.meelano.manager.data.Repo;
 import ir.meelano.manager.data.Row;
@@ -155,6 +157,7 @@ public class UsersScreen extends Screen {
                 body.addView(a.kit.kv("کاربر", user.s("name"), Theme.TEXT), a.kit.lp(-1, -2));
                 if (!user.s("role").isEmpty()) body.addView(a.kit.kv("نقش", user.s("role"), Theme.TEXT), a.kit.lp(-1, -2));
                 if (!user.s("phone").isEmpty()) body.addView(a.kit.kv("تلفن", Money.fa(user.s("phone")), Theme.TEXT), a.kit.lp(-1, -2));
+                addLoginMgmt(body, user);
                 if (rows.isEmpty()) {
                     body.addView(a.kit.hint("سابقه ورودی ثبت نشده است"), a.kit.lp(-1, -2));
                 } else {
@@ -183,5 +186,146 @@ public class UsersScreen extends Screen {
                 a.kit.toast(faError);
             }
         });
+    }
+
+    // ================= Atiran login management (v26, manager only) =================
+
+    private int uidOf(Row user) {
+        try {
+            return Integer.parseInt(Money.en(user.s("id")).trim());
+        } catch (Exception e) {
+            return -999;
+        }
+    }
+
+    /** PIN + app-role + staff-link rows for one Atiran user. */
+    private void addLoginMgmt(LinearLayout body, final Row user) {
+        final int uid = uidOf(user);
+        if (uid == -999) return;
+        body.addView(a.kit.gap(6));
+        body.addView(a.kit.text("ورود به اپ", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        final String autoRole = AtiranAuth.mapRole(0, user.s("role"));
+        String ov = AtiranAuth.overrideRole(a, uid);
+        final android.widget.TextView[] pinV = new android.widget.TextView[1];
+        final android.widget.TextView[] roleV = new android.widget.TextView[1];
+        final android.widget.TextView[] linkV = new android.widget.TextView[1];
+        final Runnable paint = () -> {
+            pinV[0].setText(AtiranAuth.pinSet(a, uid) ? "رمزدار \uD83D\uDD12" : "بدون رمز");
+            String o = AtiranAuth.overrideRole(a, uid);
+            roleV[0].setText(RoleStore.faName(o.isEmpty() ? autoRole : o)
+                    + (o.isEmpty() ? " (خودکار)" : ""));
+            linkV[0].setText(AtiranAuth.faStaffLink(a, uid));
+        };
+        pinV[0] = mgmtRow(body, "رمز ورود اپ", v -> pinDialog(user, uid, paint));
+        roleV[0] = mgmtRow(body, "نقش در اپ", v -> roleDialog(user, uid, autoRole, paint));
+        linkV[0] = mgmtRow(body, "اتصال پرسنلی", v -> linkDialog(user, uid, paint));
+        paint.run();
+        body.addView(a.kit.hint("رمز اپ برای ورود آفلاین هم کار می‌کند. نقش «خودکار» از روی نام نقش آتیران تشخیص داده می‌شود."),
+                a.kit.lp(-1, -2));
+    }
+
+    private android.widget.TextView mgmtRow(LinearLayout body, String label,
+            View.OnClickListener onClick) {
+        LinearLayout row = a.kit.h();
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        row.addView(a.kit.text(label, 13f, Theme.MUTED, false), a.kit.wlp(1f));
+        android.widget.TextView v = a.kit.text("—", 13f, Theme.TEXT, true);
+        row.addView(v, a.kit.lp(-2, -2));
+        row.addView(a.kit.space(8));
+        row.addView(a.kit.btnGhost("تغییر", Theme.GOLD, onClick), a.kit.lp(-2, -2));
+        body.addView(row, a.kit.lp(-1, -2));
+        return v;
+    }
+
+    private void pinDialog(Row user, final int uid, final Runnable paint) {
+        LinearLayout b = a.kit.v();
+        b.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(16));
+        b.addView(a.kit.kv("کاربر", user.s("name"), Theme.TEXT), a.kit.lp(-1, -2));
+        b.addView(a.kit.kv("وضعیت", AtiranAuth.pinSet(a, uid) ? "رمزدار \uD83D\uDD12" : "بدون رمز",
+                Theme.TEXT), a.kit.lp(-1, -2));
+        final android.widget.EditText e = a.kit.editPin("رمز ۴ رقمی جدید", "");
+        b.addView(e, a.kit.lp(-1, -2));
+        final AlertDialog[] box = new AlertDialog[1];
+        b.addView(a.kit.btn("ذخیره رمز", v -> {
+            String pin = e.getText().toString();
+            if (Money.en(pin).trim().length() < 4) {
+                a.kit.toast("رمز حداقل ۴ رقم باشد");
+                return;
+            }
+            AtiranAuth.setPin(a, uid, pin);
+            try {
+                box[0].dismiss();
+            } catch (Exception ignored) { }
+            paint.run();
+            a.kit.toast("رمز ورود ذخیره شد");
+        }), a.kit.lp(-1, -2));
+        b.addView(a.kit.btnGhost("حذف رمز", Theme.DANGER, v -> {
+            AtiranAuth.setPin(a, uid, null);
+            try {
+                box[0].dismiss();
+            } catch (Exception ignored) { }
+            paint.run();
+            a.kit.toast("رمز حذف شد");
+        }), a.kit.lp(-1, -2));
+        box[0] = a.kit.dialog("رمز ورود اپ", b, true);
+        box[0].show();
+    }
+
+    private void roleDialog(Row user, final int uid, String autoRole, final Runnable paint) {
+        LinearLayout b = a.kit.v();
+        b.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(16));
+        b.addView(a.kit.kv("کاربر", user.s("name"), Theme.TEXT), a.kit.lp(-1, -2));
+        String ator = user.s("role");
+        b.addView(a.kit.kv("نقش آتیران", ator.isEmpty() ? "—" : ator, Theme.TEXT),
+                a.kit.lp(-1, -2));
+        b.addView(a.kit.kv("تشخیص خودکار", RoleStore.faName(autoRole), Theme.TEXT),
+                a.kit.lp(-1, -2));
+        final AlertDialog[] box = new AlertDialog[1];
+        for (String r0 : RoleStore.ALL) {
+            final String r = r0;
+            String cur = AtiranAuth.overrideRole(a, uid);
+            String label = RoleStore.faName(r) + " — " + RoleStore.faDesc(r)
+                    + (r.equals(cur) ? " (فعلی)" : "");
+            b.addView(r.equals(cur) || (cur.isEmpty() && r.equals(autoRole))
+                    ? a.kit.btn(label, v -> pickRole(box, uid, r, paint))
+                    : a.kit.btnGhost(label, Theme.GOLD, v -> pickRole(box, uid, r, paint)),
+                    a.kit.lp(-1, -2));
+        }
+        b.addView(a.kit.btnGhost("بازگشت به خودکار", Theme.TEXT, v -> pickRole(box, uid, null, paint)),
+                a.kit.lp(-1, -2));
+        box[0] = a.kit.dialog("نقش در اپ", a.kit.scrollWrap(b, 420), true);
+        box[0].show();
+    }
+
+    private void pickRole(AlertDialog[] box, int uid, String role, Runnable paint) {
+        AtiranAuth.setOverrideRole(a, uid, role);
+        try {
+            box[0].dismiss();
+        } catch (Exception ignored) { }
+        paint.run();
+        a.kit.toast("نقش ذخیره شد؛ در ورود بعدی اعمال می‌شود");
+    }
+
+    private void linkDialog(Row user, final int uid, final Runnable paint) {
+        LinearLayout b = a.kit.v();
+        b.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(16));
+        b.addView(a.kit.kv("کاربر", user.s("name"), Theme.TEXT), a.kit.lp(-1, -2));
+        b.addView(a.kit.hint("این کاربر آتیران معادل کدام ویزیتور/انبار است؟ (برای شخصی‌سازی بعدی داده‌ها)"),
+                a.kit.lp(-1, -2));
+        final android.widget.EditText eV = a.kit.editNum("کد ویزیتور (vis_rdf)", "");
+        final android.widget.EditText eA = a.kit.editNum("کد انبار (rdf_anbar)", "");
+        b.addView(eV, a.kit.lp(-1, -2));
+        b.addView(eA, a.kit.lp(-1, -2));
+        final AlertDialog[] box = new AlertDialog[1];
+        b.addView(a.kit.btn("ذخیره اتصال", v -> {
+            AtiranAuth.setStaffLink(a, uid, eV.getText().toString(), eA.getText().toString());
+            try {
+                box[0].dismiss();
+            } catch (Exception ignored) { }
+            paint.run();
+            a.kit.toast("اتصال پرسنلی ذخیره شد");
+        }), a.kit.lp(-1, -2));
+        box[0] = a.kit.dialog("اتصال پرسنلی", b, true);
+        box[0].show();
     }
 }

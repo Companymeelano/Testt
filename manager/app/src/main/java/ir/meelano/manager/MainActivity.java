@@ -10,6 +10,7 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
+import ir.meelano.manager.core.AtiranAuth;
 import ir.meelano.manager.core.Filter;
 import ir.meelano.manager.core.Finger;
 import ir.meelano.manager.core.LicenseStore;
@@ -90,6 +91,8 @@ public class MainActivity extends Activity {
     private final List<String> history = new ArrayList<>();
     private String currentId = "home";
     private boolean rolePicked;
+    private boolean shellStarted;
+    private TextView userChip;
     private boolean unlocked = false;
 
     @Override
@@ -97,6 +100,10 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         if (!LicenseStore.unlocked(this)) {
             toLicense();
+            return;
+        }
+        if (AtiranAuth.gate(this)) {
+            toLogin();
             return;
         }
         Theme.init(this);
@@ -113,8 +120,10 @@ public class MainActivity extends Activity {
         // Re-validate the license every time the app comes to the foreground
         // (expired / clock-tampered devices fall back to the activation screen).
         if (!isFinishing() && !LicenseStore.unlocked(this)) toLicense();
+        if (!isFinishing() && AtiranAuth.gate(this)) toLogin();
         Usage.touch(this);
         refreshLicChip();
+        refreshUserChip();
     }
 
     @Override
@@ -130,6 +139,23 @@ public class MainActivity extends Activity {
             startActivity(i);
         } catch (Exception ignored) { }
         finish();
+    }
+
+    private void toLogin() {
+        try {
+            Intent i = new Intent(this, LoginActivity.class);
+            i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(i);
+        } catch (Exception ignored) { }
+        finish();
+    }
+
+    /** Log out the Atiran user and return to the login screen. */
+    public void logout() {
+        try {
+            AtiranAuth.clearSession(this);
+        } catch (Exception ignored) { }
+        toLogin();
     }
 
     /** Luxury launch splash with the developer signature, then PIN gate / shell. */
@@ -380,6 +406,14 @@ public class MainActivity extends Activity {
 
     // ================= shell =================
     private void shell() {
+        if (!shellStarted) {
+            shellStarted = true;
+            AtiranAuth.applySessionRole(this);
+            if (AtiranAuth.hasSession(this)) {
+                rolePicked = true;
+                currentId = AtiranAuth.startScreen(this);
+            }
+        }
         if (RoleStore.enabled(this) && !rolePicked) {
             roleGate(null);
             return;
@@ -416,6 +450,17 @@ public class MainActivity extends Activity {
         licChip.setOnClickListener(v -> openLicense());
         header.addView(licChip, kit.lp(-2, -2));
         header.addView(kit.space(8));
+        // Atiran user chip: who is logged in, taps through to logout.
+        userChip = kit.text("", 10.5f, Theme.GOLD_SOFT, true);
+        userChip.setBackground(Theme.ghostButton(Theme.GOLD));
+        userChip.setPadding(Theme.dp(9), Theme.dp(4), Theme.dp(9), Theme.dp(4));
+        userChip.setSingleLine(true);
+        userChip.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        Theme.pressable(userChip);
+        userChip.setOnClickListener(v -> userMenu());
+        header.addView(userChip, kit.lp(-2, -2));
+        header.addView(kit.space(8));
+        refreshUserChip();
         logoBox = new android.widget.FrameLayout(this);
         logoBox.setBackground(Theme.avatar(Theme.GOLD));
         logoGlyph = kit.text("♛", 20, 0xFFFFFFFF, true);
@@ -631,6 +676,10 @@ public class MainActivity extends Activity {
     // ================= user roles =================
     /** Open the role picker (role switch from Settings). No-op when roles are off. */
     public void openRoleGate() {
+        if (AtiranAuth.hasSession(this)) {
+            kit.toast("با ورود کاربر، نقش از آتیران می‌آید؛ برای تعویض نقش خارج شوید");
+            return;
+        }
         if (RoleStore.enabled(this)) roleGate(null);
     }
 
@@ -653,14 +702,11 @@ public class MainActivity extends Activity {
         sp.setMargins(0, Theme.dp(6), 0, Theme.dp(18));
         root.addView(sub, sp);
         String cur = RoleStore.current(this);
-        String[][] roles = {
-                {RoleStore.ADMIN, "مدیر", "دسترسی کامل به همه بخش‌ها"},
-                {RoleStore.SELLER, "فروشنده", "فروش، مشتریان، کالاها و چک‌ها"},
-                {RoleStore.ACCOUNTANT, "حسابدار", "چک‌ها، مطالبات و گزارش‌های مالی"}};
-        for (String[] r : roles) {
-            final String role = r[0];
-            String label = (RoleStore.pinSet(this, role) ? "\uD83D\uDD12 " : "") + r[1]
-                    + " — " + r[2] + (role.equals(cur) ? " (فعلی)" : "");
+        for (String role0 : RoleStore.ALL) {
+            final String role = role0;
+            String label = (RoleStore.pinSet(this, role) ? "\uD83D\uDD12 " : "")
+                    + RoleStore.faName(role) + " — " + RoleStore.faDesc(role)
+                    + (role.equals(cur) ? " (فعلی)" : "");
             android.widget.Button b = role.equals(cur)
                     ? kit.btn(label, v -> pickRole(role, thenNav))
                     : kit.btnGhost(label, Theme.GOLD, v -> pickRole(role, thenNav));
@@ -668,7 +714,9 @@ public class MainActivity extends Activity {
             bp.setMargins(0, Theme.dp(5), 0, Theme.dp(5));
             root.addView(b, bp);
         }
-        setContentView(root);
+        ScrollView sv = new ScrollView(this);
+        sv.addView(root);
+        setContentView(sv);
     }
 
     private void pickRole(String role, String thenNav) {
@@ -1002,6 +1050,55 @@ public class MainActivity extends Activity {
     private void openLicense() {
         try {
             startActivity(new Intent(this, LicenseActivity.class));
+        } catch (Exception ignored) { }
+    }
+
+    public void refreshUserChip() {
+        try {
+            if (userChip == null) return;
+            if (!AtiranAuth.hasSession(this)) {
+                userChip.setVisibility(View.GONE);
+                return;
+            }
+            userChip.setVisibility(View.VISIBLE);
+            String nm = AtiranAuth.sessionName(this);
+            if (nm.isEmpty()) nm = AtiranAuth.sessionUser(this);
+            if (nm.isEmpty()) nm = RoleStore.faName(AtiranAuth.sessionRole(this));
+            userChip.setText("\uD83D\uDC64 " + nm);
+        } catch (Exception ignored) { }
+    }
+
+    /** Who am I + logout (+ PIN-management shortcut for the manager). */
+    private void userMenu() {
+        try {
+            if (!AtiranAuth.hasSession(this)) return;
+            LinearLayout body = kit.v();
+            body.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(16));
+            String nm = AtiranAuth.sessionName(this);
+            if (nm.isEmpty()) nm = AtiranAuth.sessionUser(this);
+            body.addView(kit.kv("کاربر", nm.isEmpty() ? "—" : nm, Theme.TEXT), kit.lp(-1, -2));
+            body.addView(kit.kv("نقش", RoleStore.faName(AtiranAuth.sessionRole(this)), Theme.TEXT),
+                    kit.lp(-1, -2));
+            if (!AtiranAuth.sessionUser(this).isEmpty())
+                body.addView(kit.kv("نام کاربری آتیران", AtiranAuth.sessionUser(this), Theme.TEXT),
+                        kit.lp(-1, -2));
+            final AlertDialog[] box = new AlertDialog[1];
+            body.addView(kit.gap(8));
+            if (RoleStore.allowed(this, "users"))
+                body.addView(kit.btnGhost("تعیین رمز کاربران", Theme.GOLD, v -> {
+                    try {
+                        box[0].dismiss();
+                    } catch (Exception ignored) { }
+                    nav("users");
+                }), kit.lp(-1, -2));
+            body.addView(kit.btn("خروج / تغییر کاربر", v -> {
+                try {
+                    box[0].dismiss();
+                } catch (Exception ignored) { }
+                logout();
+            }), kit.lp(-1, -2));
+            box[0] = kit.dialog("حساب کاربری", body, true);
+            box[0].show();
         } catch (Exception ignored) { }
     }
 

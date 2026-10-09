@@ -4,10 +4,15 @@ import android.content.Context;
 import android.content.SharedPreferences;
 
 /**
- * In-app user roles (v18): مدیر (full access), فروشنده (trade side),
- * حسابدار (money side). Each role has its own optional 4-digit PIN.
- * Empty PIN = free entry; the admin PIN defaults to 1234 until changed.
+ * In-app user roles.
+ * v18: مدیر (full access), فروشنده (trade side), حسابدار (money side).
+ * v26: + ویزیتور، موزع، انباردار، مودیان — the four Atiran field roles.
+ * Each role has its own optional 4-digit PIN. Empty PIN = free entry;
+ * the admin PIN defaults to 1234 until changed.
  * Gating is enforced centrally in MainActivity.nav().
+ *
+ * When an Atiran login session is active (AtiranAuth), the session role
+ * ALWAYS applies — even if the legacy role picker is switched off.
  */
 public final class RoleStore {
     private RoleStore() { }
@@ -15,6 +20,13 @@ public final class RoleStore {
     public static final String ADMIN = "admin";
     public static final String SELLER = "seller";
     public static final String ACCOUNTANT = "accountant";
+    public static final String VISITOR = "visitor";
+    public static final String DISTRIBUTOR = "distributor";
+    public static final String WAREHOUSE = "warehouse";
+    public static final String MOADIAN = "moadian";
+
+    public static final String[] ALL = {
+            ADMIN, SELLER, ACCOUNTANT, VISITOR, DISTRIBUTOR, WAREHOUSE, MOADIAN};
 
     /** Seller side: everything except profit / reports / users / settings. */
     private static final String[] SELLER_OK = {
@@ -24,6 +36,19 @@ public final class RoleStore {
     private static final String[] ACCOUNTANT_OK = {
             "home", "customers", "cheques", "dues", "cash", "dar_in", "dar_out",
             "reports", "search", "voice", "more"};
+    /** Visitor side: showcase + his trade world. */
+    private static final String[] VISITOR_OK = {
+            "home", "customers", "products", "sales", "dues", "search", "voice", "more"};
+    /** Distributor side: delivery + collection on the road. */
+    private static final String[] DISTRIBUTOR_OK = {
+            "home", "sales", "customers", "products", "cheques", "dues", "cash",
+            "search", "voice", "more"};
+    /** Warehouse side: stock + inbound receipts. */
+    private static final String[] WAREHOUSE_OK = {
+            "home", "products", "buy", "search", "voice", "more"};
+    /** Moadian (tax) side: invoices + tax reports. */
+    private static final String[] MOADIAN_OK = {
+            "home", "sales", "customers", "reports", "search", "voice", "more"};
 
     private static SharedPreferences prefs(Context c) {
         return c.getSharedPreferences("meelano_roles", Context.MODE_PRIVATE);
@@ -47,22 +72,51 @@ public final class RoleStore {
     public static String current(Context c) {
         try {
             String r = prefs(c).getString("role_current", ADMIN);
-            if (SELLER.equals(r) || ACCOUNTANT.equals(r)) return r;
+            if (isValid(r)) return r;
         } catch (Exception ignored) { }
         return ADMIN;
     }
 
     public static void setCurrent(Context c, String role) {
         try {
-            if (!SELLER.equals(role) && !ACCOUNTANT.equals(role)) role = ADMIN;
+            if (!isValid(role)) role = ADMIN;
             prefs(c).edit().putString("role_current", role).apply();
         } catch (Exception ignored) { }
+    }
+
+    public static boolean isValid(String role) {
+        for (String r : ALL) if (r.equals(role)) return true;
+        return false;
     }
 
     public static String faName(String role) {
         if (SELLER.equals(role)) return "فروشنده";
         if (ACCOUNTANT.equals(role)) return "حسابدار";
+        if (VISITOR.equals(role)) return "ویزیتور";
+        if (DISTRIBUTOR.equals(role)) return "موزع";
+        if (WAREHOUSE.equals(role)) return "انباردار";
+        if (MOADIAN.equals(role)) return "مودیان";
         return "مدیر";
+    }
+
+    /** Short Persian description of what the role sees. */
+    public static String faDesc(String role) {
+        if (SELLER.equals(role)) return "فروش، مشتریان، کالاها و چک‌ها";
+        if (ACCOUNTANT.equals(role)) return "چک‌ها، مطالبات و گزارش‌های مالی";
+        if (VISITOR.equals(role)) return "مشتریان، کالاها و فروش";
+        if (DISTRIBUTOR.equals(role)) return "تحویل، مشتریان و مطالبات";
+        if (WAREHOUSE.equals(role)) return "کالاها و خرید / رسید انبار";
+        if (MOADIAN.equals(role)) return "فاکتورها و گزارش مالیاتی";
+        return "دسترسی کامل به همه بخش‌ها";
+    }
+
+    /** Landing screen per role (fresh launch with an Atiran session). */
+    public static String homeFor(String role) {
+        if (VISITOR.equals(role)) return "customers";
+        if (DISTRIBUTOR.equals(role)) return "sales";
+        if (WAREHOUSE.equals(role)) return "products";
+        if (MOADIAN.equals(role)) return "sales";
+        return "home";
     }
 
     /** True when the role has a PIN set (admin defaults to 1234). */
@@ -104,23 +158,46 @@ public final class RoleStore {
         } catch (Exception ignored) { }
     }
 
-    /** Central gate: may the current role open this screen? */
+    /**
+     * Central gate: may the current role open this screen?
+     * An active Atiran login session always wins over the legacy toggle.
+     */
     public static boolean allowed(Context c, String screenId) {
         try {
+            String sess = AtiranAuth.sessionRole(c);
+            if (sess != null) return inList(sess, screenId);
             if (!enabled(c)) return true;
-            String r = current(c);
-            if (ADMIN.equals(r)) return true;
-            String[] ok = SELLER.equals(r) ? SELLER_OK : ACCOUNTANT_OK;
-            for (String s : ok) if (s.equals(screenId)) return true;
-            return false;
+            return inList(current(c), screenId);
         } catch (Exception e) {
             return true;
         }
     }
 
+    private static boolean inList(String role, String screenId) {
+        if (ADMIN.equals(role)) return true;
+        String[] ok = listFor(role);
+        if (ok == null) return true;
+        for (String s : ok) if (s.equals(screenId)) return true;
+        return false;
+    }
+
+    private static String[] listFor(String role) {
+        if (SELLER.equals(role)) return SELLER_OK;
+        if (ACCOUNTANT.equals(role)) return ACCOUNTANT_OK;
+        if (VISITOR.equals(role)) return VISITOR_OK;
+        if (DISTRIBUTOR.equals(role)) return DISTRIBUTOR_OK;
+        if (WAREHOUSE.equals(role)) return WAREHOUSE_OK;
+        if (MOADIAN.equals(role)) return MOADIAN_OK;
+        return null; // admin + unknown = full
+    }
+
     private static String pinKey(String role) {
         if (SELLER.equals(role)) return "pin_seller";
         if (ACCOUNTANT.equals(role)) return "pin_accountant";
+        if (VISITOR.equals(role)) return "pin_visitor";
+        if (DISTRIBUTOR.equals(role)) return "pin_distributor";
+        if (WAREHOUSE.equals(role)) return "pin_warehouse";
+        if (MOADIAN.equals(role)) return "pin_moadian";
         return "pin_admin";
     }
 

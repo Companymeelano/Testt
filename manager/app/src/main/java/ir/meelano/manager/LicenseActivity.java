@@ -802,8 +802,6 @@ public class LicenseActivity extends Activity {
 
 
 
-    @Override
-
     // ---- SMS auto-apply ----
 
     /**

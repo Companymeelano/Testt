@@ -24,12 +24,14 @@ import ir.meelano.manager.ui.Theme;
  * the shell. Username + password are checked against the shop's own
  * `sys_users` table; the in-app role comes from the Atiran role name.
  *
- * v27 is strict and phase-1: ONLY the admin may enter, and ONLY with the
- * real Atiran password (server pwdcompare() + the full standard-hash try).
- * Nothing else opens the gate — no bootstrap, no app-PIN fallback here.
- * After the first online login the verifier is cached, so the same
- * real-password check also works offline. Later phases open the field
- * roles one by one (see AtiranAuth.phaseOpen).
+ * Strict since v27: login accepts ONLY the real Atiran password (server
+ * pwdcompare() + the full standard-hash try) — no bootstrap, no app-PIN
+ * fallback here. After the first online login the verifier is cached, so
+ * the same real-password check also works offline.
+ * One app, many editions (v30): the Atiran role routes each user to his
+ * own edition (admin -> management, warehouse -> anbar …). Roles whose
+ * edition is not published yet get a «coming soon» gate instead of an
+ * error (see AtiranAuth.phaseOpen).
  */
 public class LoginActivity extends Activity {
 
@@ -103,8 +105,12 @@ public class LoginActivity extends Activity {
         loginBtn = kit.btn("ورود", v -> doLogin());
         root.addView(loginBtn, kit.lp(-1, -2));
         root.addView(kit.gap(10));
-        root.addView(kit.hint("در فاز ۱ فقط مدیر با رمز واقعی آتیران وارد می‌شود. بعد از اولین ورود آنلاین، همان رمز به‌صورت آفلاین هم کار می‌کند. اگر رمز درست قبول نشد، با پشتیبانی تماس بگیرید."),
+        root.addView(kit.hint("با نام کاربری و رمز آتیران خودتان وارد شوید؛ به نسخه مخصوص نقش‌تان می‌روید."),
                 kit.lp(-1, -2));
+        root.addView(kit.gap(6));
+        TextView verLine = kit.text("میلانو • " + appVer(), 10.5f, Theme.MUTED, false);
+        verLine.setGravity(Gravity.CENTER);
+        root.addView(verLine, kit.lp(-1, -2));
 
         setContentView(sv);
     }
@@ -179,7 +185,7 @@ public class LoginActivity extends Activity {
                 String role = AtiranAuth.effectiveRole(LoginActivity.this, u.uid, u.appRole);
                 if (!AtiranAuth.phaseOpen(LoginActivity.this, role)) {
                     uiFail("نسخه «" + RoleStore.faName(role)
-                            + "» هنوز منتشر نشده است؛ در فاز ۱ فقط مدیر می‌تواند وارد شود");
+                            + "» به‌زودی به همین برنامه اضافه می‌شود 🌱");
                     return;
                 }
                 // STRICT: the real Atiran password, and nothing else.
@@ -215,7 +221,7 @@ public class LoginActivity extends Activity {
                 if (role.isEmpty()) role = RoleStore.ADMIN;
                 if (!AtiranAuth.phaseOpen(LoginActivity.this, role)) {
                     uiFail("نسخه «" + RoleStore.faName(role)
-                            + "» هنوز منتشر نشده است؛ در فاز ۱ فقط مدیر می‌تواند وارد شود");
+                            + "» به‌زودی به همین برنامه اضافه می‌شود 🌱");
                     return;
                 }
                 byte[] cached = AtiranAuth.cachedPw(LoginActivity.this, uid);
@@ -257,6 +263,15 @@ public class LoginActivity extends Activity {
             kit.toast(hello);
             goMain();
         });
+    }
+
+    private String appVer() {
+        try {
+            String v = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+            return "نسخه " + ir.meelano.manager.core.Money.fa(v == null || v.isEmpty() ? "—" : v);
+        } catch (Exception e) {
+            return "";
+        }
     }
 
     private void goMain() {

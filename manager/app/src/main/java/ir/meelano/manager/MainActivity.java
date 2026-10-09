@@ -177,7 +177,12 @@ public class MainActivity extends Activity {
         TextView t = kit.text("میلانو", 26, Theme.TEXT, true);
         t.setGravity(Gravity.CENTER);
         root.addView(t, kit.lp(-1, -2));
-        TextView s = kit.text("داشبورد مدیریتی آتیران", 12.5f, Theme.MUTED, false);
+        String splashSub = "داشبورد مدیریتی آتیران";
+        try {
+            String sr = AtiranAuth.sessionRole(this);
+            if (RoleStore.WAREHOUSE.equals(sr)) splashSub = "نسخه انباردار • آتیران";
+        } catch (Exception ignored) { }
+        TextView s = kit.text(splashSub, 12.5f, Theme.MUTED, false);
         s.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams sp = kit.lp(-1, -2);
         sp.setMargins(0, Theme.dp(4), 0, Theme.dp(14));
@@ -623,12 +628,28 @@ public class MainActivity extends Activity {
     }
 
     // ================= navigation =================
-    private static final String[] TABS = {"home", "sales", "products", "customers", "reports", "more"};
+    /** Bottom tabs of the current edition (v30: per role, single app). */
+    private String[] tabs = RoleStore.tabsFor(RoleStore.ADMIN);
+
+    private String effRole() {
+        try {
+            String r = AtiranAuth.sessionRole(this);
+            if (r != null && !r.isEmpty()) return r;
+        } catch (Exception ignored) { }
+        return RoleStore.current(this);
+    }
 
     private void buildBottom() {
         bottomBar.removeAllViews();
-        for (final String id : TABS) {
+        java.util.List<String> ids = new java.util.ArrayList<>();
+        for (String t : RoleStore.tabsFor(effRole())) {
+            if (screens.containsKey(t)) ids.add(t);
+        }
+        if (ids.isEmpty()) ids.add("home");
+        tabs = ids.toArray(new String[0]);
+        for (final String id : tabs) {
             final Screen s = screens.get(id);
+            if (s == null) continue;
             LinearLayout b = kit.v();
             b.setGravity(Gravity.CENTER);
             b.setPadding(0, Theme.dp(4), 0, Theme.dp(2));
@@ -638,7 +659,8 @@ public class MainActivity extends Activity {
             g.setGravity(Gravity.CENTER);
             badge.addView(g, kit.lp(-2, -2));
             b.addView(badge, new LinearLayout.LayoutParams(Theme.dp(52), Theme.dp(40)));
-            TextView l = kit.text(s.id().equals("sales") ? "فروش" : s.title(), 9.5f, Theme.MUTED, true);
+            String tl = RoleStore.tabLabel(id);
+            TextView l = kit.text(tl != null ? tl : s.title(), 9.5f, Theme.MUTED, true);
             l.setGravity(Gravity.CENTER);
             l.setSingleLine(true);
             b.addView(l, kit.lp(-1, -2));
@@ -654,8 +676,8 @@ public class MainActivity extends Activity {
     private void paintBottom() {
         for (int i = 0; i < bottomBar.getChildCount(); i++) {
             LinearLayout b = (LinearLayout) bottomBar.getChildAt(i);
-            boolean on = TABS[i].equals(currentId)
-                    || ("more".equals(TABS[i]) && !isTab(currentId));
+            boolean on = i < tabs.length && (tabs[i].equals(currentId)
+                    || ("more".equals(tabs[i]) && !isTab(currentId)));
             LinearLayout badge = (LinearLayout) b.getChildAt(0);
             badge.setBackground(on ? Theme.avatar(Theme.GOLD) : null);
             ((TextView) badge.getChildAt(0)).setTextColor(on ? 0xFFFFFFFF : Theme.MUTED);
@@ -666,7 +688,7 @@ public class MainActivity extends Activity {
     }
 
     private boolean isTab(String id) {
-        for (String t : TABS) if (t.equals(id)) return true;
+        for (String t : tabs) if (t.equals(id)) return true;
         return false;
     }
 

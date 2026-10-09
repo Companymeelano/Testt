@@ -406,7 +406,7 @@ public class SettingsScreen extends Screen {
         tag.setGravity(android.view.Gravity.CENTER);
         ab.addView(tag, a.kit.lp(-1, -2));
         ab.addView(a.kit.gap(4));
-        ab.addView(a.kit.kv("نسخه", appVersion() + " • ویرایش مدیریت", Theme.TEXT), a.kit.lp(-1, -2));
+        ab.addView(a.kit.kv("نسخه", appVersion() + " • " + editionNow(), Theme.TEXT), a.kit.lp(-1, -2));
         ab.addView(a.kit.btnGhost("✦  تازه‌های نسخه", Theme.GOLD, v ->
                 ir.meelano.manager.ui.WhatsNew.showCurrent(a)), a.kit.lp(-1, -2));
         ab.addView(a.kit.btnGhost("⬆  بررسی بروزرسانی", Theme.TEAL, v ->
@@ -547,6 +547,16 @@ public class SettingsScreen extends Screen {
         }), a.kit.lp(-1, -2));
         box[0] = a.kit.dialog("قفل مدیریتی", body, true);
         box[0].show();
+    }
+
+    private String editionNow() {
+        try {
+            String r = ir.meelano.manager.core.AtiranAuth.sessionRole(a);
+            if (r == null || r.isEmpty()) r = ir.meelano.manager.core.RoleStore.current(a);
+            return ir.meelano.manager.core.RoleStore.editionFa(r);
+        } catch (Exception e) {
+            return "نسخه مدیر";
+        }
     }
 
     private String appVersion() {

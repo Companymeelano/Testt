@@ -111,6 +111,41 @@ public final class RoleStore {
         return "دسترسی کامل به همه بخش‌ها";
     }
 
+    /**
+     * Bottom tabs per role (v30): ONE app, each role lands in its own
+     * edition. Closed phases still define tabs so opening a phase is only
+     * a one-line change in AtiranAuth.phaseOpen.
+     */
+    public static String[] tabsFor(String role) {
+        if (WAREHOUSE.equals(role))
+            return new String[]{"anbar", "tahvil", "resid", "shomarsh", "score", "more"};
+        if (SELLER.equals(role))
+            return new String[]{"home", "sales", "customers", "products", "dues", "more"};
+        if (ACCOUNTANT.equals(role))
+            return new String[]{"home", "customers", "cheques", "dues", "reports", "more"};
+        if (VISITOR.equals(role))
+            return new String[]{"customers", "products", "sales", "dues", "more"};
+        if (DISTRIBUTOR.equals(role))
+            return new String[]{"sales", "customers", "cheques", "dues", "more"};
+        if (MOADIAN.equals(role))
+            return new String[]{"sales", "customers", "reports", "more"};
+        return new String[]{"home", "sales", "products", "customers", "reports", "more"};
+    }
+
+    /** Short tab label (some screen titles are too long for a tab). */
+    public static String tabLabel(String screenId) {
+        if ("tahvil".equals(screenId)) return "تحویل";
+        if ("resid".equals(screenId)) return "رسید";
+        if ("shomarsh".equals(screenId)) return "شمارش";
+        if ("score".equals(screenId)) return "امتیاز";
+        return null; // fall back to the screen title
+    }
+
+    /** Edition name shown in Settings/about: «نسخه مدیر», «نسخه انباردار»… */
+    public static String editionFa(String role) {
+        return "نسخه " + faName(role);
+    }
+
     /** Landing screen per role (fresh launch with an Atiran session). */
     public static String homeFor(String role) {
         if (VISITOR.equals(role)) return "customers";

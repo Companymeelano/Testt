@@ -187,7 +187,7 @@ public class LicenseActivity extends Activity {
         String pill = done >= 2 ? "✓ آماده ورود"
                 : ("قدم " + Money.fa(String.valueOf(done + 1)) + " از ۲");
         Card3D.mount(box, Card3D.hero(this, kit, R.drawable.lic_shield, Theme.GOLD,
-                "فعال‌سازی میلانو منیجر",
+                "میلانو",
                 "۲ قدم ساده • همه‌چیز در یک قاب",
                 pill, done >= 2 ? Theme.SUCCESS : Theme.WARNING));
 
@@ -237,17 +237,10 @@ public class LicenseActivity extends Activity {
                         Money.fa(Jalali.format((int) (s.expDay + 2440588L))), Theme.TEXT),
                         kit.lp(-1, -2));
             }
-            String use = Usage.faSummary(this);
-            if (!use.isEmpty()) {
-                c.addView(kit.kv("کارکرد شما", use, Theme.MUTED), kit.lp(-1, -2));
-            }
             c.addView(kit.btnGold("ورود به برنامه ⇤", v -> enterApp()), kit.lp(-1, -2));
-            c.addView(kit.gap(6));
-            c.addView(kit.btnGhost("ارسال گزارش مصرف به فروشنده", Theme.TEAL, v -> shareUsage()),
-                    kit.lp(-1, -2));
         } else {
             String msg = "none".equals(s.reason)
-                    ? "برنامه هنوز فعال نشده — قاب «فعال‌سازی هوشمند» را تکمیل کنید."
+                    ? "برنامه هنوز فعال نشده — قاب زیر را تکمیل کنید."
                     : s.fa;
             c.addView(kit.hint(msg), kit.lp(-1, -2));
         }
@@ -296,7 +289,7 @@ public class LicenseActivity extends Activity {
             // Device code: tap to copy (no extra button).
             c.addView(kit.text("کد دستگاه شما (برای کپی لمس کنید)", 12f, Theme.MUTED, true),
                     kit.lp(-1, -2));
-            TextView dev = kit.text(device.isEmpty() ? "—" : prettyDev(device), 24,
+            TextView dev = kit.text(device.isEmpty() ? "—" : prettyDev(device), 20,
                     Theme.GOLD_SOFT, true);
             dev.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
             dev.setGravity(Gravity.CENTER);
@@ -311,7 +304,7 @@ public class LicenseActivity extends Activity {
             try {
                 fPhone.setInputType(android.text.InputType.TYPE_CLASS_PHONE);
             } catch (Exception ignored) { }
-            final EditText fSeller = kit.edit("شماره فروشنده (اختیاری)", "");
+            final EditText fSeller = kit.edit("شماره فروشنده (اختیاری — پاسخ خودکار)", "");
             try {
                 fSeller.setInputType(android.text.InputType.TYPE_CLASS_PHONE);
                 fSeller.setText(LicenseStore.sellerPhone(this));
@@ -323,44 +316,38 @@ public class LicenseActivity extends Activity {
             }
             c.addView(kit.btnGold("✦ دریافت کد فعال‌سازی", v ->
                     smartSend(txt(fName), txt(fPhone), txt(fSeller))), kit.lp(-1, -2));
-            c.addView(kit.hint("با شماره فروشنده مستقیم پیامک می‌شود و پاسخ خودکار می‌رسد؛ بدون آن از واتساپ یا برنامه دیگر بفرستید."),
-                    kit.lp(-1, -2));
             c.addView(kit.hint(SmsIo.statusLine(this)), kit.lp(-1, -2));
-            TextView div = kit.text("— پاسخ فروشنده —", 12f, Theme.MUTED, true);
-            div.setGravity(Gravity.CENTER);
-            c.addView(div, kit.lp(-1, -2));
+            c.addView(kit.gap(4));
         }
 
         // ---- step 2: the customer's own server (typed once, hidden forever) ----
         if (licOk && !connOk) {
-            c.addView(kit.text("اتصال به سرور اختصاصی شما", 14f, Theme.TEXT, true),
+            c.addView(kit.text("اتصال به سرور فروشگاه", 14f, Theme.TEXT, true),
                     kit.lp(-1, -2));
-            c.addView(kit.hint("آدرس سرور فروشگاه را وارد کنید؛ برنامه خودش می‌فهمد داخل فروشگاه هستید یا بیرون و از مسیر درست وصل می‌شود. یک‌بار ذخیره می‌شود و دیگر هیچ‌جا نمایش داده نمی‌شود."),
-                    kit.lp(-1, -2));
-            final EditText fLan = kit.edit("داخل فروشگاه — آی‌پی وای‌فای (مثلاً 192.168.1.10)", "");
-            final EditText fWan = kit.edit("خارج فروشگاه — آدرس اینترنتی (اختیاری)", "");
-            final EditText fDb = kit.edit("نام دیتابیس (مثلاً AtiranDb)", "");
+            final LinearLayout manualBox = kit.v();
+            manualBox.setVisibility(View.GONE);
+            final EditText fLan = kit.edit("آی‌پی داخل فروشگاه (مثلاً 192.168.1.10)", "");
+            final EditText fWan = kit.edit("آدرس اینترنتی (اختیاری)", "");
+            final EditText fDb = kit.edit("نام دیتابیس", "");
             final EditText fPort = kit.edit("پورت", "1433");
             for (EditText e : new EditText[]{fLan, fWan, fDb, fPort}) {
                 LinearLayout.LayoutParams lp2 = kit.lp(-1, -2);
                 lp2.setMargins(0, Theme.dp(4), 0, Theme.dp(4));
-                c.addView(e, lp2);
+                manualBox.addView(e, lp2);
             }
-            c.addView(kit.btnGold("💾 ذخیره و اتصال هوشمند", v ->
+            manualBox.addView(kit.btnGold("💾 ذخیره و اتصال", v ->
                     saveSiteManual(txt(fLan), txt(fWan), txt(fPort), txt(fDb))), kit.lp(-1, -2));
-            TextView div2 = kit.text("— یا کد اتصال فروشنده —", 12f, Theme.MUTED, true);
-            div2.setGravity(Gravity.CENTER);
-            c.addView(div2, kit.lp(-1, -2));
+            c.addView(manualBox, kit.lp(-1, -2));
+            c.addView(kit.btnGhost("⚙ ورود دستی آدرس سرور", Theme.MUTED, v ->
+                    manualBox.setVisibility(manualBox.getVisibility() == View.VISIBLE
+                            ? View.GONE : View.VISIBLE)), kit.lp(-1, -2));
+            c.addView(kit.hint("کد اتصال فروشنده را بچسبانید یا اسکن کنید."), kit.lp(-1, -2));
         }
 
         // ---- receive (pack or connection line, auto-detected) ----
         recvHint = kit.hint("");
         c.addView(recvHint, kit.lp(-1, -2));
         updateRecvHint();
-        c.addView(kit.kv("لایسنس", licOk ? "✓ فعال" : "— هنوز نشده",
-                licOk ? Theme.SUCCESS : Theme.MUTED), kit.lp(-1, -2));
-        c.addView(kit.kv("اتصال به سرور", connOk ? "✓ تنظیم شده" : "— هنوز نشده",
-                connOk ? Theme.SUCCESS : Theme.MUTED), kit.lp(-1, -2));
         final EditText fIn = kit.edit("کد فروشنده را اینجا بچسبانید…", "");
         fIn.setMinLines(2);
         try {
@@ -374,9 +361,6 @@ public class LicenseActivity extends Activity {
         row.addView(kit.space(8));
         row.addView(kit.btnGhost("◧ اسکن QR", Theme.TEAL, v -> scanCode()), kit.wlp(1f));
         c.addView(row, kit.lp(-1, -2));
-        c.addView(kit.hint("فرقی نمی‌کند فروشنده چه فرستاده — کد یا اتصال؛ خودش تشخیص می‌دهد و ثبت می‌کند."),
-                kit.lp(-1, -2));
-
         // ---- network footer (only while the server link is missing) ----
         if (!connOk) {
             c.addView(kit.gap(6));
@@ -387,11 +371,12 @@ public class LicenseActivity extends Activity {
             nrow.addView(kit.space(8));
             netTxt = kit.text("در حال بررسی…", 12.5f, Theme.TEXT, false);
             nrow.addView(netTxt, kit.wlp(1f));
-            c.addView(nrow, kit.lp(-1, -2));
-            c.addView(kit.btnGhost("↻ تلاش مجدد اتصال", Theme.TEAL, v -> {
+            nrow.addView(kit.space(8));
+            nrow.addView(kit.btnGhost("↻", Theme.TEAL, v -> {
                 updateNetRow();
                 retryStagedCard();
-            }), kit.lp(-1, -2));
+            }), kit.lp(-2, -2));
+            c.addView(nrow, kit.lp(-1, -2));
         }
         Card3D.mount(box, c);
     }
@@ -399,7 +384,7 @@ public class LicenseActivity extends Activity {
     private String buildRequestMsg(String dist, String phone) {
         String line = License.requestLine(device, dist, "", dist, phone, "");
         String use = Usage.reportLine(this, device);
-        StringBuilder b = new StringBuilder("درخواست فعال‌سازی میلانو منیجر\n").append(line);
+        StringBuilder b = new StringBuilder("درخواست فعال‌سازی میلانو\n").append(line);
         if (!use.isEmpty()) b.append('\n').append(use);
         b.append("\nنام پخش: ").append(dist.trim());
         b.append("\nتماس: ").append(phone.trim());
@@ -470,7 +455,7 @@ public class LicenseActivity extends Activity {
     private void permSettingsDialog() {
         LinearLayout b = kit.v();
         b.setPadding(Theme.dp(16), Theme.dp(8), Theme.dp(16), Theme.dp(8));
-        b.addView(kit.text("برای ارسال مستقیم پیامک، از تنظیمات گوشی اجازه «پیامک» را به میلانو منیجر بدهید.",
+        b.addView(kit.text("برای ارسال مستقیم پیامک، از تنظیمات گوشی اجازه «پیامک» را به میلانو بدهید.",
                 13f, Theme.TEXT, false), kit.lp(-1, -2));
         final AlertDialog[] box = new AlertDialog[1];
         LinearLayout row = kit.h();
@@ -516,7 +501,7 @@ public class LicenseActivity extends Activity {
             kit.toast("گزارشی برای ارسال نیست");
             return;
         }
-        String msg = "گزارش مصرف میلانو منیجر\n" + use
+        String msg = "گزارش مصرف میلانو\n" + use
                 + "\nکارکرد: " + Usage.faSummary(this);
         copyText("گزارش مصرف", msg);
         try {
@@ -812,11 +797,8 @@ public class LicenseActivity extends Activity {
 
     private void buildDevFooter(LinearLayout box) {
         LinearLayout c = Card3D.card(this, Theme.GOLD);
-        c.addView(Card3D.stepRow(this, kit, "✦", Theme.GOLD, "میلانو منیجر"),
+        c.addView(Card3D.stepRow(this, kit, "✦", Theme.GOLD, "میلانو"),
                 kit.lp(-1, -2));
-        TextView dv = kit.text("طراحی و توسعه: میلاد یعقوبی", 15f, Theme.GOLD_SOFT, true);
-        dv.setGravity(Gravity.CENTER);
-        c.addView(dv, kit.lp(-1, -2));
         TextView tag = kit.text(Brand.TAGLINE, 11.5f, Theme.MUTED, false);
         tag.setGravity(Gravity.CENTER);
         c.addView(tag, kit.lp(-1, -2));
@@ -827,9 +809,12 @@ public class LicenseActivity extends Activity {
         row.addView(kit.space(8));
         row.addView(kit.btnGhost("📞 پشتیبانی", Theme.TEAL, v -> supportDialog()), kit.wlp(1f));
         c.addView(row, kit.lp(-1, -2));
-        TextView ver = kit.text("نسخه ۲۳ • فعال‌سازی هوشمند", 10.5f, Theme.MUTED, false);
+        TextView ver = kit.text(appVer(), 11f, Theme.MUTED, false);
         ver.setGravity(Gravity.CENTER);
         c.addView(ver, kit.lp(-1, -2));
+        TextView sig = kit.text("Designed by Milad Yaghoubi", 9.5f, Theme.MUTED, false);
+        sig.setGravity(Gravity.CENTER);
+        c.addView(sig, kit.lp(-1, -2));
         Card3D.mount(box, c);
     }
 
@@ -1075,6 +1060,15 @@ public class LicenseActivity extends Activity {
             return e.getText().toString().trim();
         } catch (Exception ex) {
             return "";
+        }
+    }
+
+    private String appVer() {
+        try {
+            String v = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+            return "نسخه " + Money.fa(v == null || v.isEmpty() ? "—" : v);
+        } catch (Exception e) {
+            return "نسخه —";
         }
     }
 

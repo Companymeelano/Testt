@@ -232,6 +232,11 @@ public final class Theme {
         return d;
     }
 
+    /** One controlled lift for every card. Deliberately small: depth comes from spacing too. */
+    public static float cardElevation() {
+        return dp(light ? 2 : 3);
+    }
+
     /** Standard glass card. */
     public static GradientDrawable card() {
         return base(SURFACE, 20, dp(1), alpha(light ? TEXT : GOLD, light ? 26 : 40));

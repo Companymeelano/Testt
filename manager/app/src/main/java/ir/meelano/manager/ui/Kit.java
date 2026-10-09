@@ -40,7 +40,10 @@ public final class Kit {
     public TextView text(String s, float sp, int color, boolean bold) {
         TextView t = new TextView(a);
         t.setText(s == null ? "" : s);
-        t.setTextSize(sp * Theme.fontScale());
+        // v35: legibility floor. Tiny labels were being shrunk to fit; 11sp is the smallest
+        // size that stays readable, and the layout wraps instead of shrinking.
+        float base = sp < 11f ? 11f : sp;
+        t.setTextSize(base * Theme.fontScale());
         t.setTextColor(color);
         t.setTypeface(Theme.face(bold));
         t.setLineSpacing(Theme.dp(1.5f), 1.0f);
@@ -86,14 +89,25 @@ public final class Kit {
 
     public View gap(int dpH) {
         View v = new View(a);
-        v.setLayoutParams(new LinearLayout.LayoutParams(-1, Theme.dp(dpH)));
+        v.setLayoutParams(new LinearLayout.LayoutParams(-1, Theme.dp(step(dpH))));
         return v;
+    }
+
+    /** v35: snap every gap to one rhythm so vertical spacing is consistent in all sections. */
+    private static int step(int dp) {
+        if (dp <= 0) return 0;
+        if (dp > 24) return Math.round(dp / 8f) * 8;
+        int[] scale = {2, 4, 6, 8, 12, 16, 20, 24};
+        int best = scale[0];
+        for (int s : scale) if (Math.abs(s - dp) < Math.abs(best - dp)) best = s;
+        return best;
     }
 
     public LinearLayout card() {
         LinearLayout c = v();
         c.setBackground(Theme.card());
         c.setPadding(Theme.dp(14), Theme.dp(13), Theme.dp(14), Theme.dp(13));
+        c.setElevation(Theme.cardElevation());
         return c;
     }
 
@@ -101,6 +115,7 @@ public final class Kit {
         LinearLayout c = v();
         c.setBackground(Theme.cardAccent(accent));
         c.setPadding(Theme.dp(14), Theme.dp(13), Theme.dp(14), Theme.dp(13));
+        c.setElevation(Theme.cardElevation());
         return c;
     }
 
@@ -254,12 +269,16 @@ public final class Kit {
 
     public View kv(String k, String v, int vColor) {
         LinearLayout r = h();
-        r.setPadding(0, Theme.dp(4), 0, Theme.dp(4));
+        r.setPadding(0, Theme.dp(6), 0, Theme.dp(6));
         TextView key = text(k, 11.5f, Theme.MUTED, false);
-        r.addView(key, wlp(1f));
+        key.setSingleLine(true);
+        key.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        // v35: label and value each own a share of the row, so a long product name,
+        // address or note wraps instead of squeezing the label out of the row.
+        r.addView(key, wlp(0.42f));
         TextView val = text(v == null || v.isEmpty() ? "—" : v, 12.5f, vColor, true);
-        val.setGravity(Gravity.START);
-        r.addView(val, lp(-2, -2));
+        val.setGravity(Gravity.END);
+        r.addView(val, wlp(0.58f));
         return r;
     }
 
@@ -351,6 +370,7 @@ public final class Kit {
         LinearLayout c = h();
         c.setBackground(Theme.card());
         c.setPadding(Theme.dp(13), Theme.dp(12), Theme.dp(13), Theme.dp(12));
+        c.setElevation(Theme.cardElevation());
         TextView g = text(glyph, 22, accent, true);
         g.setGravity(Gravity.CENTER);
         g.setBackground(Theme.avatar(Theme.alpha(accent, 52)));

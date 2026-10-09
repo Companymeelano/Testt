@@ -814,6 +814,11 @@ public class MainActivity extends Activity {
     private void animateContent(boolean forward) {
         try {
             if (content == null) return;
+            if (!ir.meelano.manager.ui.Ui.motionOk(this)) {
+                content.setTranslationX(0f);
+                content.setAlpha(1f);
+                return;
+            }
             content.animate().cancel();
             content.setTranslationX((forward ? -1 : 1) * Theme.dp(48));
             content.setAlpha(0.35f);

@@ -101,10 +101,32 @@ public final class AdminKit {
     public static TextView text(Context c, String t, float sp, int color, boolean bold) {
         TextView v = new TextView(c);
         v.setText(t == null ? "" : t);
-        v.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp);
+        // Design system: nothing in the app is rendered below 11sp, and every known glyph
+        // becomes a vector icon instead of an emoji that depends on the phone's fonts.
+        float base = sp < 11f ? 11f : sp;
+        v.setTextSize(TypedValue.COMPLEX_UNIT_SP, base);
         v.setTextColor(color);
         v.setTypeface(bold ? bld(c) : reg(c));
+        v.setLineSpacing(dp(c, 1.5f), 1.0f);
+        AdminIcons.iconize(v);
         return v;
+    }
+
+    /** Vertical spacer snapped to one rhythm, so spacing is consistent everywhere. */
+    public static View gap(Context c, int dp) {
+        View v = new View(c);
+        v.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, gapDp(c, dp)));
+        return v;
+    }
+
+    private static int gapDp(Context c, int want) {
+        if (want <= 0) return 0;
+        if (want > 24) return dp(c, Math.round(want / 8f) * 8);
+        int[] scale = {2, 4, 6, 8, 12, 16, 20, 24};
+        int best = scale[0];
+        for (int v : scale) if (Math.abs(v - want) < Math.abs(best - want)) best = v;
+        return dp(c, best);
     }
 
     public static TextView header(Activity a, String title) {
@@ -150,9 +172,11 @@ public final class AdminKit {
         LinearLayout l = vbox(c);
         GradientDrawable d = new GradientDrawable();
         d.setColor(SURFACE);
-        d.setCornerRadius(dp(c, 14));
+        d.setCornerRadius(dp(c, 20));
         d.setStroke(dp(c, 1), LINE);
         l.setBackground(d);
+        // One controlled lift: depth comes from spacing as much as from shadow.
+        l.setElevation(dp(c, 3));
         int p = dp(c, 14);
         l.setPadding(p, p, p, p);
         return l;
@@ -173,7 +197,7 @@ public final class AdminKit {
         b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
         b.setTypeface(bld(c));
         GradientDrawable d = new GradientDrawable();
-        d.setCornerRadius(dp(c, 12));
+        d.setCornerRadius(dp(c, 16));
         if (primary) {
             d.setColor(GOLD);
             b.setTextColor(0xFF1A1408);
@@ -183,6 +207,12 @@ public final class AdminKit {
             b.setTextColor(TEXT);
         }
         b.setBackground(d);
+        // Design system: a button you can actually hit, and one icon family everywhere.
+        int h = dp(c, primary ? 52 : 48);
+        b.setMinHeight(h);
+        b.setMinimumHeight(h);
+        if (t != null && t.trim().length() <= 2) b.setMinWidth(h);
+        AdminIcons.iconize(b);
         int v = dp(c, 12);
         b.setPadding(dp(c, 16), v, dp(c, 16), v);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
@@ -200,19 +230,33 @@ public final class AdminKit {
         e.setTextColor(TEXT);
         e.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
         e.setTypeface(reg(c));
-        GradientDrawable d = new GradientDrawable();
-        d.setColor(SURFACE2);
-        d.setCornerRadius(dp(c, 10));
-        d.setStroke(dp(c, 1), LINE);
-        e.setBackground(d);
-        int p = dp(c, 10);
-        e.setPadding(p, p, p, p);
+        e.setBackground(fieldBg(c));
+        e.setMinHeight(dp(c, 48));
+        int p = dp(c, 14);
+        e.setPadding(p, dp(c, 12), p, dp(c, 12));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT);
         lp.topMargin = dp(c, 6);
         e.setLayoutParams(lp);
         return e;
+    }
+
+    /** Field shell: themed fill with a visible focus ring. */
+    public static android.graphics.drawable.StateListDrawable fieldBg(Context c) {
+        GradientDrawable normal = new GradientDrawable();
+        normal.setColor(SURFACE2);
+        normal.setCornerRadius(dp(c, 16));
+        normal.setStroke(dp(c, 1), LINE);
+        GradientDrawable focused = new GradientDrawable();
+        focused.setColor(SURFACE2);
+        focused.setCornerRadius(dp(c, 16));
+        focused.setStroke(dp(c, 2), GOLD);
+        android.graphics.drawable.StateListDrawable s =
+                new android.graphics.drawable.StateListDrawable();
+        s.addState(new int[]{android.R.attr.state_focused}, focused);
+        s.addState(new int[]{}, normal);
+        return s;
     }
 
     public static void rowTap(View v, Runnable r) {
@@ -227,7 +271,12 @@ public final class AdminKit {
         TextView kk = text(c, k, 12.5f, MUTED, false);
         box.addView(kk);
         TextView vv = text(c, (v == null || v.isEmpty()) ? "—" : v, 15, TEXT, false);
-        if (mono) vv.setTypeface(mon(c));
+        if (mono) {
+            vv.setTypeface(mon(c));
+            // Licence packs are Latin/digit strings; keep them LTR so the order and the
+            // dashes never get re-arranged by the bidirectional algorithm.
+            vv.setTextDirection(View.TEXT_DIRECTION_LTR);
+        }
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT);

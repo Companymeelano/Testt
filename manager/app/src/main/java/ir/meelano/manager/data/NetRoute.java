@@ -1,6 +1,8 @@
 package ir.meelano.manager.data;
 
+import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
@@ -22,6 +24,25 @@ public final class NetRoute {
     private NetRoute() { }
 
     private static int binds = 0;
+
+    /**
+     * Open the phone's VPN screen so the user can switch the VPN off in
+     * place, then come back and retry. Falls back gracefully on devices
+     * without a dedicated VPN screen.
+     */
+    public static void openVpnSettings(Activity a) {
+        try {
+            try {
+                a.startActivity(new Intent("android.settings.VPN_SETTINGS"));
+                return;
+            } catch (Exception ignored) { }
+            try {
+                a.startActivity(new Intent(android.provider.Settings.ACTION_WIRELESS_SETTINGS));
+                return;
+            } catch (Exception ignored) { }
+            a.startActivity(new Intent(android.provider.Settings.ACTION_SETTINGS));
+        } catch (Exception ignored) { }
+    }
 
     /** True when any active network is a VPN transport. */
     public static boolean isVpnActive(Context ctx) {

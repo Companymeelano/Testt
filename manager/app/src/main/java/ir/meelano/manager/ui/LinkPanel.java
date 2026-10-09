@@ -144,6 +144,93 @@ public final class LinkPanel {
         } catch (Exception ignored) { }
     }
 
+    /**
+     * Compact fix sheet (v31): short verdict + at most three fixes + the
+     * VPN off-ramp. Fits any phone; the full technical report stays one
+     * tap away (for the seller / support).
+     */
+    public static void showFixSheet(Activity a, SmartLink.Report r, Runnable retry, Runnable full) {
+        try {
+            Kit kit = new Kit(a);
+            LinearLayout body = kit.v();
+            body.setPadding(Theme.dp(18), Theme.dp(4), Theme.dp(18), Theme.dp(12));
+            LinearLayout vc = kit.card(Theme.DANGER);
+            vc.addView(kit.text(r.verdict == null || r.verdict.isEmpty()
+                    ? "وصل نشد" : r.verdict, 14f, Theme.TEXT, true), kit.lp(-1, -2));
+            String tp = r.transportFa == null ? "" : r.transportFa;
+            if (!tp.isEmpty())
+                vc.addView(kit.text("شبکه گوشی: " + tp, 12f, Theme.MUTED, false),
+                        kit.lp(-1, -2));
+            body.addView(vc, kit.lp(-1, -2));
+            java.util.List<String> fixes = new java.util.ArrayList<>();
+            try {
+                if (r.profs != null) {
+                    for (SmartLink.Prof pf : r.profs) {
+                        if (pf == null || pf.stages == null) continue;
+                        for (SmartLink.Stage st : pf.stages) {
+                            if (st == null || st.ok || st.skipped) continue;
+                            if (st.fix == null || st.fix.isEmpty()) continue;
+                            if (!fixes.contains(st.fix)) fixes.add(st.fix);
+                            if (fixes.size() >= 3) break;
+                        }
+                        if (fixes.size() >= 3) break;
+                    }
+                }
+            } catch (Exception ignored) { }
+            for (String f : fixes) {
+                LinearLayout row = kit.h();
+                row.addView(kit.text("◈", 13, Theme.GOLD, true), kit.lp(-2, -2));
+                row.addView(kit.space(6));
+                row.addView(kit.text(f, 12.5f, Theme.TEXT, false), kit.wlp(1f));
+                body.addView(row, kit.lp(-1, -2));
+                body.addView(kit.gap(4));
+            }
+            if (r.vpnOn && !r.anyOk) {
+                body.addView(kit.gap(4));
+                LinearLayout vpn = kit.card(Theme.WARNING);
+                vpn.addView(kit.text("⚠ فیلترشکن روشن است", 13.5f, Theme.TEXT, true),
+                        kit.lp(-1, -2));
+                vpn.addView(kit.text("فیلترشکن مسیر سرور فروشگاه را می‌بندد؛ خاموشش کنید و برگردید.",
+                        12f, Theme.MUTED, false), kit.lp(-1, -2));
+                vpn.addView(kit.gap(4));
+                vpn.addView(kit.btnGold("خاموش کردن فیلترشکن", v -> {
+                    try {
+                        NetRoute.openVpnSettings(a);
+                        kit.toast("بعد از خاموش کردن برگردید و «تلاش مجدد» بزنید");
+                    } catch (Exception ignored) { }
+                }), kit.lp(-1, -2));
+                body.addView(vpn, kit.lp(-1, -2));
+            }
+            body.addView(kit.gap(8));
+            final AlertDialog[] box = new AlertDialog[1];
+            LinearLayout row = kit.h();
+            row.addView(kit.btnGold("تلاش مجدد", v -> {
+                try {
+                    if (box[0] != null) box[0].dismiss();
+                } catch (Exception ignored) { }
+                if (retry != null) retry.run();
+            }), kit.wlp(1f));
+            row.addView(kit.space(8));
+            row.addView(kit.btnGhost("عیب‌یابی کامل", Theme.TEAL, v -> {
+                try {
+                    if (box[0] != null) box[0].dismiss();
+                } catch (Exception ignored) { }
+                if (full != null) full.run();
+            }), kit.wlp(1f));
+            body.addView(row, kit.lp(-1, -2));
+            body.addView(kit.gap(8));
+            body.addView(kit.btnGhost("بستن", Theme.MUTED, v -> {
+                try {
+                    if (box[0] != null) box[0].dismiss();
+                } catch (Exception ignored) { }
+            }), kit.lp(-1, -2));
+            signature(kit, body);
+            AlertDialog d = kit.dialog("✦ اتصال نشد", kit.scrollWrap(body, 420), true);
+            box[0] = d;
+            d.show();
+        } catch (Exception ignored) { }
+    }
+
     private static void renderReport(Activity a, SmartLink.Report r, Runnable retry) {
         try {
             Kit kit = new Kit(a);

@@ -74,7 +74,7 @@ public class SmsReceiver extends BroadcastReceiver {
             }
             LicenseStore.addPendingSms(app, pack, card);
             ping(app, ctx);
-            notifySms(app, pack != null, card != null);
+            // v31: activation applies silently — no notification, no noise.
         } catch (Exception ignored) { }
     }
 
@@ -179,39 +179,5 @@ public class SmsReceiver extends BroadcastReceiver {
         } catch (Exception ignored) { }
     }
 
-    private static void notifySms(Context app, boolean hasPack, boolean hasCard) {
-        try {
-            if (Build.VERSION.SDK_INT >= 33
-                    && app.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
-                    != android.content.pm.PackageManager.PERMISSION_GRANTED) return;
-            NotificationManager nm = (NotificationManager) app.getSystemService(Context.NOTIFICATION_SERVICE);
-            if (nm == null) return;
-            if (Build.VERSION.SDK_INT >= 26) {
-                NotificationChannel ch = new NotificationChannel("milano_sms", "پیامک میلانو",
-                        NotificationManager.IMPORTANCE_HIGH);
-                try {
-                    nm.createNotificationChannel(ch);
-                } catch (Exception ignored) { }
-            }
-            String txt = hasPack && hasCard ? "کد فعال‌سازی و کارت اتصال رسید — برای اعمال خودکار لمس کنید"
-                    : hasPack ? "کد فعال‌سازی رسید — برای اعمال خودکار لمس کنید"
-                    : "کارت اتصال رسید — برای اعمال خودکار لمس کنید";
-            Intent i = new Intent(app, LicenseActivity.class);
-            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-            PendingIntent pi = PendingIntent.getActivity(app, 7701, i,
-                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-            android.app.Notification.Builder nb = Build.VERSION.SDK_INT >= 26
-                    ? new android.app.Notification.Builder(app, "milano_sms")
-                    : new android.app.Notification.Builder(app);
-            nb.setSmallIcon(R.mipmap.ic_launcher)
-                    .setContentTitle("✦ پیامک میلانو")
-                    .setContentText(txt)
-                    .setAutoCancel(true)
-                    .setContentIntent(pi);
-            try {
-                nb.setChannelId("milano_sms");
-            } catch (Exception ignored) { }
-            nm.notify(7701, nb.build());
-        } catch (Exception ignored) { }
-    }
+
 }

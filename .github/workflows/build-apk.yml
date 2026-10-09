@@ -40,7 +40,7 @@ jobs:
 
       - name: Rename APKs
         run: |
-          cp manager/app/build/outputs/apk/debug/app-debug.apk meelano-manager-v30-debug.apk
+          cp manager/app/build/outputs/apk/debug/app-debug.apk meelano-manager-v31-debug.apk
           cp manager/admin/build/outputs/apk/debug/admin-debug.apk meelano-admin-v1.6-debug.apk
 
       - name: Upload artifacts
@@ -48,7 +48,7 @@ jobs:
         with:
           name: meelano-apks-debug
           path: |
-            meelano-manager-v30-debug.apk
+            meelano-manager-v31-debug.apk
             meelano-admin-v1.6-debug.apk
 
       - name: Publish rolling release
@@ -56,22 +56,22 @@ jobs:
         with:
           tag_name: apk-debug
           prerelease: true
-          name: MEELANO v30 — client + seller admin (debug APKs)
+          name: MEELANO v31 — client + seller admin (debug APKs)
           body: |
             دو فایل نصبی (دیباگ) — مستقیم روی گوشی نصب می‌شوند:
-            • meelano-manager-v30-debug.apk — برنامه مشتری (تک‌برنامه چندنسخه‌ای: ورود نقشی + تب‌های هر نقش + لایسنس خلوت + نمایش نسخه)
+            • meelano-manager-v31-debug.apk — برنامه مشتری (فعال‌سازی قدم‌به‌قدم: نام‌ونمبره → انتظار زیبا → آدرس‌ودیتابیس با کشف خودکار شبکه + شیت عیب‌یابی + دکمه فیلترشکن)
             • meelano-admin-v1.6-debug.apk — برنامه فروشنده (آدرس داخل/خارج شبکه + کارت دوحالته + انقضای دلخواه + کنترل از راه دور)
             Debug builds — install directly on the phone.
             Client connects to the shop's Atiran SQL Server automatically via the seller's connection card.
           files: |
-            meelano-manager-v30-debug.apk
+            meelano-manager-v31-debug.apk
             meelano-admin-v1.6-debug.apk
 
       - name: Commit APKs to dist/ (in-chat delivery)
         run: |
           mkdir -p dist
           rm -f dist/meelano-manager-v*-debug.apk dist/meelano-admin-v*-debug.apk
-          cp meelano-manager-v30-debug.apk meelano-admin-v1.6-debug.apk dist/
+          cp meelano-manager-v31-debug.apk meelano-admin-v1.6-debug.apk dist/
           git config user.name "arena-ci"
           git config user.email "arena-ci@local"
           git add -A -f dist/

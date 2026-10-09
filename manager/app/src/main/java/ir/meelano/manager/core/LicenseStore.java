@@ -170,7 +170,22 @@ public final class LicenseStore {
         try {
             prefs(c).edit().remove("pack").remove("dev").remove("exp")
                     .remove("last_seen").remove("sms_pack").remove("sms_card")
-                    .remove("sms_at").apply();
+                    .remove("sms_at").remove("lic_requested").apply();
+        } catch (Exception ignored) { }
+    }
+
+    /** Step memory (v31): request sent, still waiting for the license. */
+    public static boolean requested(Context c) {
+        try {
+            return prefs(c).getBoolean("lic_requested", false);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public static void setRequested(Context c, boolean v) {
+        try {
+            prefs(c).edit().putBoolean("lic_requested", v).apply();
         } catch (Exception ignored) { }
     }
 
@@ -226,6 +241,22 @@ public final class LicenseStore {
             if (n != null && !n.trim().isEmpty()) return n.trim();
         } catch (Exception ignored) { }
         return "میلانو";
+    }
+
+    /** Customer contact number, remembered for request resends. */
+    public static String contactPhone(Context c) {
+        try {
+            String v = prefs(c).getString("contact_phone", "");
+            return v == null ? "" : v.trim();
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    public static void setContactPhone(Context c, String phone) {
+        try {
+            prefs(c).edit().putString("contact_phone", phone == null ? "" : phone.trim()).apply();
+        } catch (Exception ignored) { }
     }
 
     /** Remaining seller-contact, remembered across requests. */

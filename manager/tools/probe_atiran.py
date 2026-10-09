@@ -12,6 +12,10 @@ Usage:
 --auth-dump prints ONLY the login/role metadata the app's user-login needs:
 table presence, column names, row counts, role rows (id+name) and the
 user_password byte-length distribution. It NEVER prints password bytes.
+
+--pw-dump USER prints the hex of ONE user's stored user_password bytes so the
+developer can discover Atiran's hash recipe offline. ONLY run it for a
+THROWAWAY test user you create for this purpose (then delete it).
 """
 import argparse
 import sys
@@ -60,6 +64,8 @@ def main():
     ap.add_argument("--password", required=True)
     ap.add_argument("--auth-dump", action="store_true",
                     help="dump login/role metadata for the app login (read-only)")
+    ap.add_argument("--pw-dump", metavar="USERNAME",
+                    help="print stored user_password hex for ONE test user (see warning above)")
     a = ap.parse_args()
 
     try:
@@ -73,6 +79,8 @@ def main():
     cur = conn.cursor()
     if a.auth_dump:
         return auth_dump(conn, cur, a.db)
+    if a.pw_dump:
+        return pw_dump(conn, cur, a.pw_dump)
     ok_tables = 0
     print("== MEELANO Manager — Atiran probe ==\n-- tables --")
     for t, musts in TABLES.items():
@@ -100,6 +108,34 @@ def main():
     conn.close()
     print(f"\n{a.db}: {ok_tables}/{len(TABLES)} tables present.")
     print("MISS = that app card will show a Persian 'unavailable' note; app keeps working.")
+    return 0
+
+
+def pw_dump(conn, cur, username):
+    """Print ONE user's stored user_password bytes as hex (test users only!)."""
+    print("== MEELANO Manager — password-verifier dump ==")
+    print("WARNING: only for a THROWAWAY test user. Delete that user afterwards.")
+    print(f"user: {username}")
+    try:
+        cur.execute("SELECT DATALENGTH(user_password) FROM dbo.sys_users "
+                    "WHERE user_name=%s", (username,))
+        row = cur.fetchone()
+        if not row:
+            print("no such user in sys_users.")
+            conn.close()
+            return 1
+        print(f"stored length: {row[0]} bytes")
+        cur.execute("SELECT CONVERT(VARCHAR(MAX), user_password, 2) FROM dbo.sys_users "
+                    "WHERE user_name=%s", (username,))
+        hx = cur.fetchone()[0]
+        print(f"stored hex: {hx}")
+    except Exception as e:
+        print(f"[ERR] {e}")
+        conn.close()
+        return 1
+    conn.close()
+    print("Send (test password + stored length + stored hex) to the developer,")
+    print("then DELETE the test user. Feed them to tools/crack_probe.py.")
     return 0
 
 

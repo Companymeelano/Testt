@@ -20,14 +20,19 @@ import ir.meelano.manager.data.Meta;
  *
  * Password reality: Atiran stores `user_password` as varbinary(50) — a
  * proprietary binary hash whose algorithm is NOT documented. So verification
- * works in two honest layers:
- *  1. Smart try — the typed password is compared against the stored bytes
- *     through every standard hash (MD5 / SHA-1 / SHA-224 / SHA-256 / SHA-384
- *     × UTF-8 / UTF-16LE / UTF-16BE, plus raw and hex forms). If Atiran used
- *     a standard hash, the REAL Atiran password just works — zero setup.
- *  2. App PIN — the manager sets a 4-digit app PIN per Atiran user (Users
- *     section). The PIN also enables OFFLINE login when the server is
- *     unreachable (the Atiran password can only be tried online).
+ * throws everything plausible at the stored bytes (v27):
+ *  - server side: SQL pwdcompare() (covers SQL-native pwdencrypt values);
+ *  - client side: every standard hash (MD5 / SHA-1 / SHA-224 / SHA-256 /
+ *    SHA-384 × UTF-8 / UTF-16LE / UTF-16BE / windows-1256, raw and hex
+ *    forms) plus username-salted variants. If Atiran used any of these,
+ *    the REAL Atiran password just works — zero setup.
+ * v27 is strict: login accepts ONLY the real Atiran password (no app-PIN
+ * fallback at the gate). The stored verifier bytes are cached per user so
+ * the same real-password check also works OFFLINE after the first online
+ * login. The per-user app PIN (Users section) stays as managed tooling for
+ * later phases.
+ * v27 phase 1: ONLY the admin build is live — every non-admin role is
+ * refused at the gate until its phase opens (see phaseOpen).
  *
  * Everything here is READ-ONLY against the server: we never write
  * IsLoggedIn / LoginDetails / PINs back to Atiran. PINs, sessions and the
@@ -168,14 +173,18 @@ public final class AtiranAuth {
 
     /**
      * Compare the typed password with Atiran's stored bytes through every
-     * plausible standard transform. Pure in-memory equality — no writes,
-     * no lockout risk. Returns false for unknown/custom hashes (the app
-     * PIN flow then takes over).
+     * plausible standard transform (plain, salted, raw, hex). Pure in-memory
+     * equality — no writes, no lockout risk. Returns false for truly custom
+     * hashes (the tools/crack_probe.py flow then takes over).
      */
     public static boolean verifyPassword(byte[] stored, String typed) {
+        return verifyPassword(stored, typed, "");
+    }
+
+    public static boolean verifyPassword(byte[] stored, String typed, String userName) {
         if (stored == null || stored.length == 0 || typed == null) return false;
         String[] texts = {typed, typed.trim()};
-        String[] charsets = {"UTF-8", "UTF-16LE", "UTF-16BE"};
+        String[] charsets = {"UTF-8", "UTF-16LE", "UTF-16BE", "windows-1256"};
         String[] algs = {"MD5", "SHA-1", "SHA-224", "SHA-256", "SHA-384"};
         try {
             for (String t : texts) {
@@ -188,30 +197,57 @@ public final class AtiranAuth {
                     }
                     if (eq(stored, raw)) return true; // plain bytes
                     for (String alg : algs) {
-                        byte[] d;
-                        try {
-                            java.security.MessageDigest md =
-                                    java.security.MessageDigest.getInstance(alg);
-                            d = md.digest(raw);
-                        } catch (Exception e) {
-                            continue;
-                        }
-                        if (eq(stored, d)) return true;
+                        if (eq(stored, digest(alg, raw))) return true;
                     }
                 }
             }
-            // Stored as ASCII/UTF-16 hex of a standard digest?
+            // Username-salted variants: salt+pw and pw+salt.
+            String[] salts = saltVariants(userName);
+            String[] sAlgs = {"MD5", "SHA-1", "SHA-256"};
+            String[] sCs = {"UTF-8", "UTF-16LE"};
+            for (String t : texts) {
+                for (String salt : salts) {
+                    if (salt.isEmpty()) continue;
+                    String[] combos = {salt + t, t + salt};
+                    for (String combo : combos) {
+                        for (String cs : sCs) {
+                            byte[] raw;
+                            try {
+                                raw = combo.getBytes(cs);
+                            } catch (Exception e) {
+                                continue;
+                            }
+                            for (String alg : sAlgs) {
+                                if (eq(stored, digest(alg, raw))) return true;
+                            }
+                        }
+                    }
+                }
+            }
+            // Stored as ASCII hex of a standard digest (plain + salted)?
             String hex = asciiHex(stored);
             if (hex != null) {
                 for (String t : texts) {
                     for (String cs : charsets) {
                         byte[] raw = t.getBytes(cs);
                         for (String alg : algs) {
-                            try {
-                                java.security.MessageDigest md =
-                                        java.security.MessageDigest.getInstance(alg);
-                                if (hex.equalsIgnoreCase(toHex(md.digest(raw)))) return true;
-                            } catch (Exception ignored) { }
+                            byte[] d = digest(alg, raw);
+                            if (d != null && hex.equalsIgnoreCase(toHex(d))) return true;
+                        }
+                    }
+                }
+                for (String t : texts) {
+                    for (String salt : salts) {
+                        if (salt.isEmpty()) continue;
+                        String[] combos = {salt + t, t + salt};
+                        for (String combo : combos) {
+                            for (String cs : sCs) {
+                                byte[] raw = combo.getBytes(cs);
+                                for (String alg : sAlgs) {
+                                    byte[] d = digest(alg, raw);
+                                    if (d != null && hex.equalsIgnoreCase(toHex(d))) return true;
+                                }
+                            }
                         }
                     }
                 }
@@ -220,11 +256,58 @@ public final class AtiranAuth {
         return false;
     }
 
+    /**
+     * Server-side check: if Atiran stored the value with SQL-native
+     * pwdencrypt(), pwdcompare() verifies it with zero algorithm knowledge.
+     * Returns false for anything else (or any error) — always safe to try.
+     */
+    public static boolean verifyPasswordServer(Connection c, String username, String typed) {
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            Meta m = new Meta(c);
+            if (!m.table("sys_users")) return false;
+            String un = m.col("sys_users", "user_name");
+            String pw = m.col("sys_users", "user_password");
+            if (un == null || pw == null || typed == null || typed.isEmpty()) return false;
+            ps = c.prepareStatement("SELECT TOP 1 pwdcompare(?, " + pw
+                    + ") FROM sys_users WHERE " + un + " = ?");
+            ps.setString(1, typed);
+            ps.setString(2, username == null ? "" : username.trim());
+            rs = ps.executeQuery();
+            return rs.next() && rs.getInt(1) == 1;
+        } catch (Exception e) {
+            return false;
+        } finally {
+            closeQuiet(rs);
+            closeQuiet(ps);
+        }
+    }
+
     private static boolean eq(byte[] a, byte[] b) {
         if (a == null || b == null || a.length != b.length) return false;
         int diff = 0;
         for (int i = 0; i < a.length; i++) diff |= (a[i] ^ b[i]);
         return diff == 0;
+    }
+
+    private static byte[] digest(String alg, byte[] raw) {
+        try {
+            return java.security.MessageDigest.getInstance(alg).digest(raw);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static String[] saltVariants(String userName) {
+        String u = userName == null ? "" : userName.trim();
+        if (u.isEmpty()) return new String[]{""};
+        String up = u.toUpperCase(Locale.US), lo = u.toLowerCase(Locale.US);
+        java.util.List<String> out = new java.util.ArrayList<>();
+        out.add(u);
+        if (!out.contains(up)) out.add(up);
+        if (!out.contains(lo)) out.add(lo);
+        return out.toArray(new String[0]);
     }
 
     private static String asciiHex(byte[] b) {
@@ -573,6 +656,44 @@ public final class AtiranAuth {
 
     private static String canon(String u) {
         return u == null ? "" : u.trim().toLowerCase(Locale.US);
+    }
+
+    // ================= release phases (v27) =================
+
+    /**
+     * Phase 1 = management build only: just the admin may enter.
+     * Phase 2 opens the warehouse build (add RoleStore.WAREHOUSE here),
+     * then one phase per role (visitor, distributor, moadian) — each phase
+     * is a deliberate one-line change, never an accident.
+     */
+    public static boolean phaseOpen(Context c, String role) {
+        if (RoleStore.ADMIN.equals(role)) return true;
+        // PHASE 2: || RoleStore.WAREHOUSE.equals(role)
+        return false;
+    }
+
+    // ---- cached verifier bytes: the real-password check, offline ----
+
+    /** Cache the stored bytes after any successful fetch (same exposure as the baked-in SQL login). */
+    public static void putPwCache(Context c, int uid, byte[] pw) {
+        try {
+            if (pw == null || pw.length == 0) return;
+            prefs(c).edit().putString("pwb" + uid, toHex(pw)).apply();
+        } catch (Exception ignored) { }
+    }
+
+    public static byte[] cachedPw(Context c, int uid) {
+        try {
+            String h = prefs(c).getString("pwb" + uid, "");
+            if (h.isEmpty() || (h.length() % 2) != 0) return null;
+            byte[] b = new byte[h.length() / 2];
+            for (int i = 0; i < b.length; i++) {
+                b[i] = (byte) Integer.parseInt(h.substring(i * 2, i * 2 + 2), 16);
+            }
+            return b;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     // ================= small helpers =================

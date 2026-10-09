@@ -220,7 +220,7 @@ public class UsersScreen extends Screen {
         roleV[0] = mgmtRow(body, "نقش در اپ", v -> roleDialog(user, uid, autoRole, paint));
         linkV[0] = mgmtRow(body, "اتصال پرسنلی", v -> linkDialog(user, uid, paint));
         paint.run();
-        body.addView(a.kit.hint("رمز اپ برای ورود آفلاین هم کار می‌کند. نقش «خودکار» از روی نام نقش آتیران تشخیص داده می‌شود."),
+        body.addView(a.kit.hint("در فاز ۱ ورود فقط با رمز واقعی آتیران است؛ این رمز و نقش از فاز ۲ به بعد برای نسخه‌های هر نقش به کار می‌روند. نقش «خودکار» از روی نام نقش آتیران تشخیص داده می‌شود."),
                 a.kit.lp(-1, -2));
     }
 

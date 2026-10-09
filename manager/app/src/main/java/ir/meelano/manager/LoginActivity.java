@@ -13,7 +13,6 @@ import android.widget.TextView;
 import java.sql.Connection;
 
 import ir.meelano.manager.core.AtiranAuth;
-import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.RoleStore;
 import ir.meelano.manager.data.Settings;
 import ir.meelano.manager.core.SmartLink;
@@ -25,9 +24,12 @@ import ir.meelano.manager.ui.Theme;
  * the shell. Username + password are checked against the shop's own
  * `sys_users` table; the in-app role comes from the Atiran role name.
  *
- * Layers: (1) the real Atiran password when it is a standard hash,
- * (2) the manager-set 4-digit app PIN (works offline too),
- * (3) manager bootstrap with the admin PIN (default 1234) to set PINs.
+ * v27 is strict and phase-1: ONLY the admin may enter, and ONLY with the
+ * real Atiran password (server pwdcompare() + the full standard-hash try).
+ * Nothing else opens the gate — no bootstrap, no app-PIN fallback here.
+ * After the first online login the verifier is cached, so the same
+ * real-password check also works offline. Later phases open the field
+ * roles one by one (see AtiranAuth.phaseOpen).
  */
 public class LoginActivity extends Activity {
 
@@ -62,10 +64,10 @@ public class LoginActivity extends Activity {
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(Theme.dp(92), Theme.dp(92));
         lp.gravity = Gravity.CENTER;
         root.addView(kit.logo(92), lp);
-        TextView t = kit.text("ورود کاربر", 23, Theme.TEXT, true);
+        TextView t = kit.text("ورود مدیر", 23, Theme.TEXT, true);
         t.setGravity(Gravity.CENTER);
         root.addView(t, kit.lp(-1, -2));
-        TextView s = kit.text("نام کاربری و رمز آتیران را وارد کنید", 12.5f, Theme.MUTED, false);
+        TextView s = kit.text("نام کاربری و رمز واقعی آتیران", 12.5f, Theme.MUTED, false);
         s.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams sp = kit.lp(-1, -2);
         sp.setMargins(0, Theme.dp(6), 0, Theme.dp(16));
@@ -100,11 +102,8 @@ public class LoginActivity extends Activity {
 
         loginBtn = kit.btn("ورود", v -> doLogin());
         root.addView(loginBtn, kit.lp(-1, -2));
-        root.addView(kit.gap(8));
-        root.addView(kit.btnGhost("🛠 ورود راه‌اندازی مدیر", Theme.VIOLET, v -> bootDialog()),
-                kit.lp(-1, -2));
         root.addView(kit.gap(10));
-        root.addView(kit.hint("رمز همان رمز آتیران است؛ اگر قبول نکرد، مدیر از بخش «کاربران» برای شما رمز ۴ رقمی تعیین می‌کند. ورود با رمز اپ حتی بدون اینترنت هم کار می‌کند."),
+        root.addView(kit.hint("در فاز ۱ فقط مدیر با رمز واقعی آتیران وارد می‌شود. بعد از اولین ورود آنلاین، همان رمز به‌صورت آفلاین هم کار می‌کند. اگر رمز درست قبول نشد، با پشتیبانی تماس بگیرید."),
                 kit.lp(-1, -2));
 
         setContentView(sv);
@@ -153,8 +152,11 @@ public class LoginActivity extends Activity {
             try {
                 Connection c = SmartLink.open(getApplicationContext(), settings);
                 AtiranAuth.AuthUser u = null;
+                boolean serverOk = false;
                 try {
                     u = AtiranAuth.fetchUser(c, user);
+                    // Server check while the connection is still open.
+                    if (u != null) serverOk = AtiranAuth.verifyPasswordServer(c, u.userName, pass);
                 } finally {
                     try {
                         c.close();
@@ -172,23 +174,21 @@ public class LoginActivity extends Activity {
                     uiFail("این حساب در آتیران غیرفعال است");
                     return;
                 }
+                // Cache the verifier now: enables the same real-password check offline.
+                AtiranAuth.putPwCache(LoginActivity.this, u.uid, u.pw);
                 String role = AtiranAuth.effectiveRole(LoginActivity.this, u.uid, u.appRole);
-                if (AtiranAuth.verifyPassword(u.pw, pass)) {
-                    // Real Atiran password — zero setup needed.
+                if (!AtiranAuth.phaseOpen(LoginActivity.this, role)) {
+                    uiFail("نسخه «" + RoleStore.faName(role)
+                            + "» هنوز منتشر نشده است؛ در فاز ۱ فقط مدیر می‌تواند وارد شود");
+                    return;
+                }
+                // STRICT: the real Atiran password, and nothing else.
+                if (serverOk || AtiranAuth.verifyPassword(u.pw, pass, u.userName)) {
                     uiSuccess(u.uid, u.userName, u.displayName, role, rem, false,
                             "خوش آمدید " + u.displayName);
                     return;
                 }
-                if (AtiranAuth.pinSet(LoginActivity.this, u.uid)) {
-                    if (AtiranAuth.checkPin(LoginActivity.this, u.uid, pass)) {
-                        uiSuccess(u.uid, u.userName, u.displayName, role, rem, false,
-                                "خوش آمدید " + u.displayName);
-                    } else {
-                        uiFail("رمز اشتباه است");
-                    }
-                    return;
-                }
-                uiFail("برای این کاربر رمزی تعیین نشده؛ از مدیر بخواهید از بخش «کاربران» رمز تعیین کند");
+                uiFail("رمز آتیران اشتباه است");
             } catch (AtiranAuth.NoTable nt) {
                 // This database has no login tables: don't trap the user here.
                 try {
@@ -210,22 +210,29 @@ public class LoginActivity extends Activity {
     private void offlineTry(String user, String pass, boolean rem) {
         try {
             int uid = AtiranAuth.cachedUid(LoginActivity.this, user);
-            if (uid != -999 && AtiranAuth.pinSet(LoginActivity.this, uid)
-                    && AtiranAuth.checkPin(LoginActivity.this, uid, pass)) {
-                String nm = AtiranAuth.cachedName(LoginActivity.this, uid);
+            if (uid != -999) {
                 String role = AtiranAuth.cachedRole(LoginActivity.this, uid);
-                if (nm.isEmpty()) nm = user;
-                if (role.isEmpty()) role = RoleStore.SELLER;
-                uiSuccess(uid, user, nm, role, rem, false,
-                        "ورود آفلاین — خوش آمدید " + nm);
-                return;
-            }
-            if (uid != -999 && AtiranAuth.pinSet(LoginActivity.this, uid)) {
-                uiFail("رمز اشتباه است");
-                return;
+                if (role.isEmpty()) role = RoleStore.ADMIN;
+                if (!AtiranAuth.phaseOpen(LoginActivity.this, role)) {
+                    uiFail("نسخه «" + RoleStore.faName(role)
+                            + "» هنوز منتشر نشده است؛ در فاز ۱ فقط مدیر می‌تواند وارد شود");
+                    return;
+                }
+                byte[] cached = AtiranAuth.cachedPw(LoginActivity.this, uid);
+                if (cached != null && AtiranAuth.verifyPassword(cached, pass, user)) {
+                    String nm = AtiranAuth.cachedName(LoginActivity.this, uid);
+                    if (nm.isEmpty()) nm = user;
+                    uiSuccess(uid, user, nm, role, rem, false,
+                            "ورود آفلاین — خوش آمدید " + nm);
+                    return;
+                }
+                if (cached != null) {
+                    uiFail("رمز آتیران اشتباه است");
+                    return;
+                }
             }
         } catch (Exception ignored) { }
-        uiFail("ارتباط با سرور ممکن نشد؛ اینترنت/شبکه را بررسی کنید");
+        uiFail("ارتباط با سرور ممکن نشد؛ برای اولین ورود، اینترنت لازم است");
     }
 
     private void uiFail(final String msg) {
@@ -259,39 +266,6 @@ public class LoginActivity extends Activity {
             startActivity(i);
         } catch (Exception ignored) { }
         finish();
-    }
-
-    // ================= manager bootstrap =================
-
-    /** First-time setup: the admin PIN opens a manager session to set user PINs. */
-    private void bootDialog() {
-        if (busy) return;
-        LinearLayout body = kit.v();
-        body.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(16));
-        body.addView(kit.text("ورود راه‌اندازی مدیر", 13.5f, Theme.TEXT, true), kit.lp(-1, -2));
-        body.addView(kit.hint("رمز نقش مدیر (پیش‌فرض " + Money.fa("1234") + ") را وارد کنید؛ بعد از ورود، از بخش «کاربران» برای هر کاربر رمز تعیین کنید."),
-                kit.lp(-1, -2));
-        final EditText e = kit.editPin("رمز مدیر", "");
-        body.addView(e, kit.lp(-1, -2));
-        body.addView(kit.gap(8));
-        final android.app.AlertDialog[] box = new android.app.AlertDialog[1];
-        body.addView(kit.btn("ورود مدیر", v -> {
-            if (RoleStore.checkRole(LoginActivity.this, RoleStore.ADMIN,
-                    e.getText().toString())) {
-                try {
-                    box[0].dismiss();
-                } catch (Exception ignored) { }
-                AtiranAuth.saveSession(LoginActivity.this, -1, "", "مدیر راه‌اندازی",
-                        RoleStore.ADMIN, false, true);
-                RoleStore.setCurrent(LoginActivity.this, RoleStore.ADMIN);
-                kit.toast("به‌عنوان مدیر وارد شدید");
-                goMain();
-            } else {
-                kit.toast("رمز اشتباه است");
-            }
-        }), kit.lp(-1, -2));
-        box[0] = kit.dialog("راه‌اندازی", body, true);
-        box[0].show();
     }
 
     @Override

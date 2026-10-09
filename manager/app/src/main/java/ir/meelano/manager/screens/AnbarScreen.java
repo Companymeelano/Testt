@@ -37,7 +37,7 @@ public class AnbarScreen extends Screen {
     @Override
     public void render(LinearLayout content) {
         content.removeAllViews();
-        content.addView(heroCard(), a.kit.lp(-1, -2));
+        content.addView(topCard(), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
         final LinearLayout kpiBox = a.kit.v();
         content.addView(kpiBox, a.kit.lp(-1, -2));
@@ -83,7 +83,7 @@ public class AnbarScreen extends Screen {
         });
     }
 
-    private android.view.View heroCard() {
+    private android.view.View topCard() {
         LinearLayout card = a.kit.card(Theme.GOLD);
         String keeper = AtiranAuth.sessionName(a);
         if (keeper.isEmpty()) keeper = AtiranAuth.sessionUser(a);

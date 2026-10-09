@@ -50,7 +50,7 @@ public class TahvilScreen extends Screen {
     public void render(LinearLayout content) {
         this.content = content;
         content.removeAllViews();
-        content.addView(heroCard(), a.kit.lp(-1, -2));
+        content.addView(topCard(), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
         final LinearLayout box = a.kit.v();
         content.addView(box, a.kit.lp(-1, -2));
@@ -99,7 +99,7 @@ public class TahvilScreen extends Screen {
         });
     }
 
-    private View heroCard() {
+    private View topCard() {
         LinearLayout card = a.kit.card(Theme.SUCCESS);
         card.addView(a.kit.text("🛻 تحویل فاکتور", 17f, Theme.TEXT, true), a.kit.lp(-1, -2));
         card.addView(a.kit.text("فاکتور را به مشتری حضوری یا موزع تحویل بدهید و رسید بگیرید",

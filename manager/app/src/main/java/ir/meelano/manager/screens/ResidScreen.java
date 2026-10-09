@@ -69,7 +69,7 @@ public class ResidScreen extends Screen {
     public void render(LinearLayout content) {
         this.content = content;
         content.removeAllViews();
-        content.addView(heroCard(), a.kit.lp(-1, -2));
+        content.addView(topCard(), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
         content.addView(typeCard(), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
@@ -88,7 +88,7 @@ public class ResidScreen extends Screen {
         return WarehouseWriter.CUSTRET.equals(type) ? "مشتری" : "تأمین‌کننده";
     }
 
-    private View heroCard() {
+    private View topCard() {
         LinearLayout card = a.kit.card(Theme.INFO);
         card.addView(a.kit.text("📥 رسید کالا (فقط تعداد)", 17f, Theme.TEXT, true),
                 a.kit.lp(-1, -2));

@@ -849,7 +849,7 @@ public class MainActivity extends Activity {
 
     private void paintCompany() {
         try {
-            if (companyName != null) companyName.setText(companyTitle());
+            if (companyName != null) ir.meelano.manager.ui.MeelanoIcons.set(companyName, companyTitle());
             android.graphics.Bitmap b = Company.logo(this);
             if (logoImg != null && logoGlyph != null) {
                 if (b != null) {
@@ -1146,13 +1146,13 @@ public class MainActivity extends Activity {
             }
             licChip.setVisibility(View.VISIBLE);
             if (s.plan == License.P_PERM) {
-                licChip.setText("◈ دائمی");
+                ir.meelano.manager.ui.MeelanoIcons.set(licChip, "◈ دائمی");
                 licChip.setTextColor(Theme.GOLD_SOFT);
             } else if (s.daysLeft <= 7) {
-                licChip.setText("◈ " + Money.fa(String.valueOf(s.daysLeft)) + " روز!");
+                ir.meelano.manager.ui.MeelanoIcons.set(licChip, "◈ " + Money.fa(String.valueOf(s.daysLeft)) + " روز!");
                 licChip.setTextColor(Theme.DANGER);
             } else {
-                licChip.setText("◈ " + Money.fa(String.valueOf(s.daysLeft)) + " روز");
+                ir.meelano.manager.ui.MeelanoIcons.set(licChip, "◈ " + Money.fa(String.valueOf(s.daysLeft)) + " روز");
                 licChip.setTextColor(Theme.GOLD_SOFT);
             }
         } catch (Exception e) {
@@ -1179,7 +1179,7 @@ public class MainActivity extends Activity {
             String nm = AtiranAuth.sessionName(this);
             if (nm.isEmpty()) nm = AtiranAuth.sessionUser(this);
             if (nm.isEmpty()) nm = RoleStore.faName(AtiranAuth.sessionRole(this));
-            userChip.setText("\uD83D\uDC64 " + nm);
+            ir.meelano.manager.ui.MeelanoIcons.set(userChip, "\uD83D\uDC64 " + nm);
         } catch (Exception ignored) { }
     }
 

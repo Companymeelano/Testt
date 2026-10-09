@@ -54,7 +54,7 @@ public final class MeelanoIcons {
         name("settings", R.drawable.mi_settings); name("logout", R.drawable.mi_logout); name("arrow_forward", R.drawable.mi_arrow_forward);
         name("save", R.drawable.mi_save); name("add", R.drawable.mi_add); name("picture_as_pdf", R.drawable.mi_picture_as_pdf);
         name("print", R.drawable.mi_print); name("share", R.drawable.mi_share); name("notifications_off", R.drawable.mi_notifications_off);
-        name("wifi", R.drawable.mi_wifi);
+        name("wifi", R.drawable.mi_wifi); name("wifi_off", R.drawable.mi_wifi_off);
 
         any("✓", R.drawable.mi_check); any("✔", R.drawable.mi_check); any("✅", R.drawable.mi_check_circle);
         any("❌", R.drawable.mi_cancel); any("✕", R.drawable.mi_close); any("✖", R.drawable.mi_close);
@@ -84,6 +84,36 @@ public final class MeelanoIcons {
         any("☾", R.drawable.mi_dark_mode); any("🌅", R.drawable.mi_wb_twilight); any("🌙", R.drawable.mi_bedtime);
         any("🏅", R.drawable.mi_military_tech); any("💡", R.drawable.mi_lightbulb); any("⌘", R.drawable.mi_keyboard_command_key);
         any("⋯", R.drawable.mi_more_horiz);
+
+        // ---- v34: the rest of the glyphs used across the app, all from the same
+        // Material Symbols family, so no raw emoji is left anywhere in the UI. ----
+        any("🖨", R.drawable.mi_print); any("🔍", R.drawable.mi_search);
+        any("🛻", R.drawable.mi_local_shipping); any("📥", R.drawable.mi_download);
+        any("💾", R.drawable.mi_save); any("🛠", R.drawable.mi_tune);
+        any("🛡", R.drawable.mi_shield); any("⛨", R.drawable.mi_shield);
+        any("⭐", R.drawable.mi_star_fill); any("📅", R.drawable.mi_calendar_month);
+        any("👁", R.drawable.mi_visibility); any("✏", R.drawable.mi_edit);
+        any("🖊", R.drawable.mi_edit); any("🗑", R.drawable.mi_delete);
+        any("➕", R.drawable.mi_add); any("🧍", R.drawable.mi_person);
+        any("🥇", R.drawable.mi_military_tech); any("🥈", R.drawable.mi_military_tech);
+        any("🥉", R.drawable.mi_military_tech); any("🚧", R.drawable.mi_pending);
+        any("🌱", R.drawable.mi_pending); any("🔑", R.drawable.mi_key);
+        any("📄", R.drawable.mi_description); any("👆", R.drawable.mi_fingerprint);
+        any("🗂", R.drawable.mi_inbox); any("⚡", R.drawable.mi_bolt);
+        any("🎭", R.drawable.mi_palette); any("🌸", R.drawable.mi_palette);
+        any("🍉", R.drawable.mi_beach_access); any("🍂", R.drawable.mi_wb_twilight);
+        any("❄", R.drawable.mi_bedtime); any("◑", R.drawable.mi_contrast);
+        any("↻", R.drawable.mi_refresh); any("⇤", R.drawable.mi_login);
+        any("☑", R.drawable.mi_task_alt); any("⛁", R.drawable.mi_cloud_upload);
+        any("📤", R.drawable.mi_upload); any("↪", R.drawable.mi_assignment_return);
+        any("🔢", R.drawable.mi_fact_check); any("💳", R.drawable.mi_credit_card);
+        any("◈", R.drawable.mi_inventory_2); any("📶", R.drawable.mi_wifi);
+        any("📴", R.drawable.mi_wifi_off); any("⌨", R.drawable.mi_keyboard_command_key);
+        any("⇔", R.drawable.mi_swap_horiz); any("🔗", R.drawable.mi_swap_horiz);
+        any("⤢", R.drawable.mi_open_in_new); any("🌐", R.drawable.mi_open_in_new);
+        any("♾", R.drawable.mi_verified_user); any("📺", R.drawable.mi_apps);
+        any("📲", R.drawable.mi_send); any("💧", R.drawable.mi_payments);
+        any("⬆", R.drawable.mi_trending_up);
         any("🚗", R.drawable.mi_directions_car); any("🏁", R.drawable.mi_flag); any("☝", R.drawable.mi_fingerprint);
         any("⧗", R.drawable.mi_assignment_late); any("⌛", R.drawable.mi_work_history);
         any("🚚", R.drawable.mi_local_shipping); any("✍", R.drawable.mi_edit); any("📞", R.drawable.mi_call); any("🗺", R.drawable.mi_location_on);
@@ -184,6 +214,23 @@ public final class MeelanoIcons {
         if (t.length() > 24) t = t.substring(0, 24);
         for (String[] kv : KEYWORDS) if (t.contains(kv[0])) { Integer r = BY_NAME.get(kv[1]); if (r != null) return r; }
         return 0;
+    }
+
+    /**
+     * setText() that keeps the vector icons. Views created through Kit get their icons at build
+     * time; any label changed later (chips, toggles, status lines) must go through this so the
+     * glyph never shows up as a raw emoji.
+     */
+    public static void set(TextView tv, CharSequence text) {
+        if (tv == null) return;
+        try {
+            tv.setText(text);
+        } catch (Exception ignored) {
+            return;
+        }
+        try {
+            iconize(tv);
+        } catch (Exception ignored) { }
     }
 
     /** Applies {@link #iconize} to one TextView (EditTexts are left alone so typing is never disturbed). */

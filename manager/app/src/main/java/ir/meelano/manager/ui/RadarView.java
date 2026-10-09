@@ -58,7 +58,7 @@ public class RadarView extends View {
         float r = Math.min(w, h) / 2f - 4;
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(2.5f);
-        paint.setColor(0xFF2ED3A3);
+        paint.setColor(Theme.TEAL);
         paint.setAlpha(220);
         c.drawCircle(cx, cy, r, paint);
         paint.setAlpha(120);
@@ -74,7 +74,7 @@ public class RadarView extends View {
             c.drawArc(o, angle - 12 - i * 9, 9, true, paint);
         }
         // blips
-        paint.setColor(0xFFE9C37C);
+        paint.setColor(Theme.GOLD_SOFT);
         paint.setAlpha(255);
         float b1 = (angle * 3.1f) % 360;
         c.drawCircle(cx + (float) Math.cos(Math.toRadians(b1)) * r * 0.55f,

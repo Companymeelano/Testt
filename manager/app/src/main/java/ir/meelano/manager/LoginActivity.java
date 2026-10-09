@@ -117,7 +117,7 @@ public class LoginActivity extends Activity {
 
     private void paintRemember() {
         try {
-            rememberV.setText((remember ? "☑ " : "○ ") + "مرا به خاطر بسپار");
+            ir.meelano.manager.ui.MeelanoIcons.set(rememberV, (remember ? "☑ " : "○ ") + "مرا به خاطر بسپار");
         } catch (Exception ignored) { }
     }
 

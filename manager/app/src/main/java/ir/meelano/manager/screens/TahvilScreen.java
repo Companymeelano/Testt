@@ -162,8 +162,8 @@ public class TahvilScreen extends Screen {
         final android.widget.Button[] bOut = new android.widget.Button[1];
         final Runnable paint = () -> {
             boolean isIn = "in".equals(mode[0]);
-            bIn[0].setText("🧍 مشتری حضوری" + (isIn ? " ✓" : ""));
-            bOut[0].setText("🛻 موزع" + (!isIn ? " ✓" : ""));
+            ir.meelano.manager.ui.MeelanoIcons.set(bIn[0], "🧍 مشتری حضوری" + (isIn ? " ✓" : ""));
+            ir.meelano.manager.ui.MeelanoIcons.set(bOut[0], "🛻 موزع" + (!isIn ? " ✓" : ""));
             bIn[0].setAlpha(isIn ? 1f : 0.55f);
             bOut[0].setAlpha(!isIn ? 1f : 0.55f);
         };

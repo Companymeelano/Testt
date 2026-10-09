@@ -745,7 +745,7 @@ public class LicenseActivity extends Activity {
             } catch (Exception ignored) { }
             try {
                 btn.setEnabled(true);
-                btn.setText("✦ دریافت کلید");
+                ir.meelano.manager.ui.MeelanoIcons.set(btn, "✦ دریافت کلید");
             } catch (Exception ignored2) { }
         }, 1200);
     }
@@ -959,7 +959,7 @@ public class LicenseActivity extends Activity {
             runOnUiThread(() -> {
                 try {
                     btn.setEnabled(true);
-                    btn.setText("✦ اتصال");
+                    ir.meelano.manager.ui.MeelanoIcons.set(btn, "✦ اتصال");
                 } catch (Exception ignored) { }
                 if (isFinishing()) return;
                 hideRadar();
@@ -1141,7 +1141,7 @@ public class LicenseActivity extends Activity {
             r.setOnClickListener(v -> {
                 sel[0] = idx;
                 for (int k = 0; k < marks.size(); k++)
-                    marks.get(k).setText(k == idx ? "◉" : "○");
+                    ir.meelano.manager.ui.MeelanoIcons.set(marks.get(k), k == idx ? "◉" : "○");
             });
             rows.addView(r, kit.lp(-1, -2));
         }
@@ -1405,7 +1405,7 @@ public class LicenseActivity extends Activity {
         if (recvHint == null) return;
         try {
             if (recvGranted()) {
-                recvHint.setText("✦ دریافت خودکار فعال است — فقط منتظر بمانید.");
+                ir.meelano.manager.ui.MeelanoIcons.set(recvHint, "✦ دریافت خودکار فعال است — فقط منتظر بمانید.");
                 recvHint.setTextColor(Theme.TEAL);
             } else {
                 recvHint.setText("برای دریافت خودکار کلید، اجازه را تأیید کنید.");

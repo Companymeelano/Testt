@@ -20,7 +20,7 @@ public class ConfettiView extends View {
     private boolean fired;
     private int frames;
     private static final int[] COLORS = {
-            0xFFFFF6DE, 0xFFE9C37C, 0xFFD9AE5A, 0xFF2ED3A3, 0xFFFFFFFF};
+            0xFFFFF6DE, 0xFFE9C37C, 0xFFD9AE5A, 0xFF2ED3A3, Theme.GOLD_SOFT};
 
     public ConfettiView(Context c) {
         super(c);

@@ -399,6 +399,9 @@ public final class Kit {
         b.setTypeface(Theme.face(true));
         b.setBackground(Theme.goldButton());
         b.setPadding(Theme.dp(16), Theme.dp(10), Theme.dp(16), Theme.dp(10));
+        b.setMinHeight(Theme.dp(52));
+        b.setMinimumHeight(Theme.dp(52));
+        if (t != null && t.trim().length() <= 2) b.setMinWidth(Theme.dp(52));
         b.setOnClickListener(onClick);
         b.setAllCaps(false);
         MeelanoIcons.iconize(b);
@@ -414,6 +417,9 @@ public final class Kit {
         b.setTypeface(Theme.face(true));
         b.setBackground(Theme.ghostButton(accent));
         b.setPadding(Theme.dp(14), Theme.dp(9), Theme.dp(14), Theme.dp(9));
+        b.setMinHeight(Theme.dp(48));
+        b.setMinimumHeight(Theme.dp(48));
+        if (t != null && t.trim().length() <= 2) b.setMinWidth(Theme.dp(48));
         b.setOnClickListener(onClick);
         b.setAllCaps(false);
         MeelanoIcons.iconize(b);
@@ -893,12 +899,13 @@ public final class Kit {
         EditText e = new EditText(a);
         e.setHint(hint);
         e.setText(value == null ? "" : value);
-        e.setTextSize(13f);
+        e.setTextSize(14f);
         e.setTextColor(Theme.TEXT);
         e.setHintTextColor(Theme.MUTED);
         e.setTypeface(Theme.face(false));
-        e.setBackground(Theme.searchBar());
-        e.setPadding(Theme.dp(12), Theme.dp(10), Theme.dp(12), Theme.dp(10));
+        e.setBackground(Theme.fieldBg());
+        e.setPadding(Theme.dp(14), Theme.dp(12), Theme.dp(14), Theme.dp(12));
+        e.setMinHeight(Theme.dp(48));
         e.setSingleLine(true);
         if (password) e.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         return e;

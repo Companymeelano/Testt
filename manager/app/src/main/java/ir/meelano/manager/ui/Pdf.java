@@ -6,6 +6,7 @@ import android.graphics.pdf.PdfDocument;
 
 import ir.meelano.manager.ShareProvider;
 import ir.meelano.manager.core.Jalali;
+import ir.meelano.manager.core.LicenseStore;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.ReportCatalog;
 import ir.meelano.manager.data.Row;
@@ -62,7 +63,7 @@ public final class Pdf {
             muted.setTextSize(12);
             muted.setTextAlign(Paint.Align.RIGHT);
             if (subtitle != null && !subtitle.isEmpty()) g.drawText(safe(subtitle), W - margin, 86, muted);
-            g.drawText("مدیریت میلانو • " + Money.fa(Jalali.todayStr()), W - margin, 106, muted);
+            g.drawText(LicenseStore.brandName(c) + " • " + Money.fa(Jalali.todayStr()), W - margin, 106, muted);
             // header row
             int y = 130;
             paint.setColor(0xFF101828);

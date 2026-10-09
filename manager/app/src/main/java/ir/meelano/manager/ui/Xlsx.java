@@ -4,6 +4,7 @@ import android.content.Context;
 
 import ir.meelano.manager.ShareProvider;
 import ir.meelano.manager.core.Jalali;
+import ir.meelano.manager.core.LicenseStore;
 import ir.meelano.manager.core.ReportCatalog;
 import ir.meelano.manager.data.Row;
 
@@ -50,7 +51,7 @@ public final class Xlsx {
         rowOpen(sheet, r, 20);
         String sub = safe(subtitle);
         if (!sub.isEmpty()) sub += "  •  ";
-        sub += "مدیریت میلانو • " + Jalali.todayStr();
+        sub += LicenseStore.brandName(c) + " • " + Jalali.todayStr();
         sheet.append(cellStr("A" + r, sh.add(sub), 2));
         rowClose(sheet);
         // Header.

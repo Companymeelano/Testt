@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 
 import ir.meelano.licensing.License;
+import ir.meelano.manager.data.Company;
 
 /**
  * Client-side license vault: stores the activated pack and re-validates it on
@@ -15,7 +16,7 @@ public final class LicenseStore {
 
     public static final class Status {
         public boolean ok;
-        /** none | bad | device | expired | clock | pin */
+        /** none | bad | device | expired | clock | pin | blocked */
         public String reason = "none";
         public char plan = License.P_TRIAL;
         public long expDay;
@@ -45,6 +46,15 @@ public final class LicenseStore {
         } catch (Exception e) {
             s.reason = "bad";
             s.fa = "خطا در خواندن لایسنس";
+            return s;
+        }
+        String blocked = "";
+        try {
+            blocked = prefs(c).getString("blocked_reason", "");
+        } catch (Exception ignored) { }
+        if (blocked != null && !blocked.isEmpty()) {
+            s.reason = "blocked";
+            s.fa = blocked;
             return s;
         }
         if (pack == null || pack.isEmpty()) {
@@ -151,6 +161,71 @@ public final class LicenseStore {
         try {
             prefs(c).edit().clear().apply();
         } catch (Exception ignored) { }
+    }
+
+    // ---------------- remote control (seller kill-switch) ----------------
+
+    /** Remote revoke: drop the license but keep contacts + distributor name. */
+    public static void revoke(Context c) {
+        try {
+            prefs(c).edit().remove("pack").remove("dev").remove("exp")
+                    .remove("last_seen").remove("sms_pack").remove("sms_card")
+                    .remove("sms_at").apply();
+        } catch (Exception ignored) { }
+    }
+
+    public static String blockedReason(Context c) {
+        try {
+            String b = prefs(c).getString("blocked_reason", "");
+            return b == null ? "" : b;
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    public static void setBlocked(Context c, String reason) {
+        try {
+            revoke(c);
+            prefs(c).edit().putString("blocked_reason",
+                    reason == null || reason.isEmpty() ? "تخلف از قوانین استفاده" : reason).apply();
+        } catch (Exception ignored) { }
+    }
+
+    public static void clearBlocked(Context c) {
+        try {
+            prefs(c).edit().remove("blocked_reason").apply();
+        } catch (Exception ignored) { }
+    }
+
+    // ---------------- distributor identity (report branding) ----------------
+
+    /** «نام پخش» typed at activation — brands every PDF/Excel/Word/image. */
+    public static String distName(Context c) {
+        try {
+            String d = prefs(c).getString("dist_name", "");
+            return d == null ? "" : d.trim();
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    public static void setDistName(Context c, String name) {
+        try {
+            prefs(c).edit().putString("dist_name", name == null ? "" : name.trim()).apply();
+        } catch (Exception ignored) { }
+    }
+
+    /** Report brand: distributor name → company name → Milano fallback. */
+    public static String brandName(Context c) {
+        try {
+            String d = distName(c);
+            if (!d.isEmpty()) return d;
+        } catch (Exception ignored) { }
+        try {
+            String n = Company.get(c).name;
+            if (n != null && !n.trim().isEmpty()) return n.trim();
+        } catch (Exception ignored) { }
+        return "میلانو";
     }
 
     /** Remaining seller-contact, remembered across requests. */

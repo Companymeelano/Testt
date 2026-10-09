@@ -45,9 +45,12 @@ public final class License {
     public static final char P_MONTHLY = 'M';
     public static final char P_YEARLY = 'Y';
     public static final char P_PERM = 'P';
+    /** Custom plan (seller-typed expiry date, 1–3650 days). */
+    public static final char P_CUSTOM = 'C';
 
     public static boolean isPlan(char p) {
-        return p == P_TRIAL || p == P_WEEKLY || p == P_MONTHLY || p == P_YEARLY || p == P_PERM;
+        return p == P_TRIAL || p == P_WEEKLY || p == P_MONTHLY || p == P_YEARLY || p == P_PERM
+                || p == P_CUSTOM;
     }
 
     /** Fixed duration in days (trial/permanent are decided by the caller). */
@@ -64,6 +67,7 @@ public final class License {
         if (p == P_MONTHLY) return "ماهانه";
         if (p == P_YEARLY) return "سالانه";
         if (p == P_PERM) return "دائمی";
+        if (p == P_CUSTOM) return "سفارشی";
         return "نامشخص";
     }
 
@@ -96,8 +100,8 @@ public final class License {
     }
 
     /**
-     * Mint a license pack. days is used for trial (1–90); weekly/monthly/yearly
-     * use their fixed durations; permanent ignores days.
+     * Mint a license pack. days is used for trial (1–90) and custom (1–3650);
+     * weekly/monthly/yearly use their fixed durations; permanent ignores days.
      */
     public static String generate(String device8, char plan, int days) {
         String dev = normalize(device8);
@@ -107,6 +111,7 @@ public final class License {
         long exp;
         if (plan == P_PERM) exp = 99999;
         else if (plan == P_TRIAL) exp = iat + Math.max(1, Math.min(90, days));
+        else if (plan == P_CUSTOM) exp = iat + Math.max(1, Math.min(3650, days));
         else exp = iat + planDays(plan);
         String rnd = crock(randomBytes(2), 2);
         String payload = "M1" + dev + plan + pad5(exp) + pad5(iat) + rnd;
@@ -497,6 +502,136 @@ public final class License {
      * always sees the freshest report the customer has sent (every request
      * and renewal refreshes it).
      */
+    // ---------------- remote control (revoke / block / unblock / site sync) ----------------
+    /**
+     * Signed one-line commands, all device-bound and MAC'd with the shared
+     * secret (same HMAC as packs, truncated to 8 chars). The seller sends them
+     * by SMS (or QR); the client verifies before obeying anything.
+     */
+    public static final String REVOKE_PREFIX = "MILANO-REVOKE1";
+    public static final String BLOCK_PREFIX = "MILANO-BLOCK1";
+    public static final String UNBLOCK_PREFIX = "MILANO-UNBLOCK1";
+    public static final String SITE_PREFIX = "MILANO-SITE1";
+
+    private static String mac8(String s) {
+        String m = sig(s);
+        return m.length() >= 8 ? m.substring(0, 8) : m;
+    }
+
+    private static String findLine(String text, String prefix) {
+        if (text == null) return null;
+        for (String raw : text.split("\n")) {
+            String line = raw.trim();
+            if (line.startsWith(prefix + "|")) return line;
+        }
+        return null;
+    }
+
+    /** Signed remote-revoke line for a device (seller → customer SMS). */
+    public static String revokeLine(String device8) {
+        String dev = normalize(device8);
+        if (dev.length() != 8) throw new IllegalArgumentException("device");
+        return REVOKE_PREFIX + "|" + dev + "|" + mac8("REVOKE1|" + dev);
+    }
+
+    public static boolean parseRevoke(String text, String expectDevice8) {
+        String line = findLine(text, REVOKE_PREFIX);
+        if (line == null) return false;
+        String[] p = line.split("\\|", -1);
+        if (p.length != 3) return false;
+        String dev = normalize(p[1]);
+        if (!dev.equals(normalize(expectDevice8))) return false;
+        return constantEq(mac8("REVOKE1|" + dev), normalize(p[2]));
+    }
+
+    /** Signed unblock line (lifts a block; the license itself stays revoked). */
+    public static String unblockLine(String device8) {
+        String dev = normalize(device8);
+        if (dev.length() != 8) throw new IllegalArgumentException("device");
+        return UNBLOCK_PREFIX + "|" + dev + "|" + mac8("UNBLOCK1|" + dev);
+    }
+
+    public static boolean parseUnblock(String text, String expectDevice8) {
+        String line = findLine(text, UNBLOCK_PREFIX);
+        if (line == null) return false;
+        String[] p = line.split("\\|", -1);
+        if (p.length != 3) return false;
+        String dev = normalize(p[1]);
+        if (!dev.equals(normalize(expectDevice8))) return false;
+        return constantEq(mac8("UNBLOCK1|" + dev), normalize(p[2]));
+    }
+
+    /** Signed block line with a human reason (shown on the customer's phone). */
+    public static String blockLine(String device8, String reason) {
+        String dev = normalize(device8);
+        if (dev.length() != 8) throw new IllegalArgumentException("device");
+        String r = reason == null ? "" : reason.trim().replace("\n", " ");
+        if (r.isEmpty()) r = "تخلف از قوانین استفاده";
+        if (r.length() > 80) r = r.substring(0, 80);
+        return BLOCK_PREFIX + "|" + dev + "|" + esc(r) + "|" + mac8("BLOCK1|" + dev + "|" + r);
+    }
+
+    /** The block reason when the line is valid for this device, else null. */
+    public static String parseBlock(String text, String expectDevice8) {
+        String line = findLine(text, BLOCK_PREFIX);
+        if (line == null) return null;
+        String[] p = unescSplit(line);
+        if (p.length != 4) return null;
+        String dev = normalize(p[1]);
+        if (!dev.equals(normalize(expectDevice8))) return null;
+        if (!constantEq(mac8("BLOCK1|" + dev + "|" + p[2]), normalize(p[3]))) return null;
+        return p[2];
+    }
+
+    /**
+     * Customer → seller site report: the IP + DB the customer typed in step 2,
+     * so the seller keeps a full customer record. Verified by MAC on arrival.
+     */
+    public static String siteLine(String device8, String host, String port, String db) {
+        String dev = normalize(device8);
+        if (dev.length() != 8) throw new IllegalArgumentException("device");
+        String h = host == null ? "" : host.trim();
+        String pt = port == null ? "" : port.trim();
+        String d = db == null ? "" : db.trim();
+        if (h.isEmpty() || pt.isEmpty() || d.isEmpty()) throw new IllegalArgumentException("site");
+        try {
+            int pn = Integer.parseInt(pt);
+            if (pn < 1 || pn > 65535) throw new IllegalArgumentException("port");
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("port");
+        }
+        return SITE_PREFIX + "|" + dev + "|" + esc(h) + "|" + esc(pt) + "|" + esc(d)
+                + "|" + mac8("SITE1|" + dev + "|" + h + "|" + pt + "|" + d);
+    }
+
+    /** The reported site when the line verifies, else null. */
+    public static NetProfile parseSite(String text) {
+        String line = findLine(text, SITE_PREFIX);
+        if (line == null) return null;
+        String[] p = unescSplit(line);
+        if (p.length != 6) return null;
+        String dev = normalize(p[1]);
+        if (dev.length() != 8) return null;
+        if (!constantEq(mac8("SITE1|" + dev + "|" + p[2] + "|" + p[3] + "|" + p[4]),
+                normalize(p[5]))) return null;
+        NetProfile np = new NetProfile();
+        np.host = p[2];
+        np.port = p[3];
+        np.db = p[4];
+        return np;
+    }
+
+    /** The device a SITE1 line belongs to ("" when the line is invalid). */
+    public static String parseSiteDev(String text) {
+        String line = findLine(text, SITE_PREFIX);
+        if (line == null) return "";
+        String[] p = unescSplit(line);
+        if (p.length != 6) return "";
+        NetProfile np = parseSite(text);
+        if (np == null) return "";
+        return normalize(p[1]);
+    }
+
     public static final String USE_PREFIX = "MILANO-USE1";
 
     public static final class Use {
@@ -600,6 +735,18 @@ public final class License {
                 return false;
             } catch (IllegalArgumentException expected) {
             }
+            String pc = generate(dev, P_CUSTOM, 45);
+            Result rc = parse(pc);
+            if (!rc.ok || rc.plan != P_CUSTOM || rc.expDay != rc.iatDay + 45) return false;
+            if (!parseRevoke("x\n" + revokeLine(dev) + "\ny", dev)) return false;
+            if (parseRevoke(revokeLine(dev), "ZZZZZZZZ")) return false;
+            String blk = blockLine(dev, "عدم تسویه | تست");
+            if (!"عدم تسویه | تست".equals(parseBlock("x\n" + blk, dev))) return false;
+            if (parseBlock(blk, "ZZZZZZZZ") != null) return false;
+            if (!parseUnblock(unblockLine(dev), dev)) return false;
+            NetProfile sp = parseSite("x\n" + siteLine(dev, "1.2.3.4", "1433", "AtiranDb") + "\ny");
+            if (sp == null || !"1.2.3.4".equals(sp.host) || !"AtiranDb".equals(sp.db)) return false;
+            if (!dev.equals(parseSiteDev(siteLine(dev, "1.2.3.4", "1433", "AtiranDb")))) return false;
             return true;
         } catch (Exception e) {
             return false;

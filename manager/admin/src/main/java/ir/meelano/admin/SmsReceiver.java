@@ -13,9 +13,9 @@ import android.telephony.SmsMessage;
 import ir.meelano.licensing.License;
 
 /**
- * Catches the customer's request SMS (MILANO-REQ1 + MILANO-USE1): usage is
- * recorded instantly into the local database and each request lands in the
- * inbox list — the seller never pastes text.
+ * Catches the customer's SMS: requests (MILANO-REQ1 + MILANO-USE1) land in
+ * the inbox + usage ledger, and connection reports (MILANO-SITE1) update the
+ * customer's saved site — the seller never pastes text.
  */
 public class SmsReceiver extends BroadcastReceiver {
 
@@ -30,7 +30,10 @@ public class SmsReceiver extends BroadcastReceiver {
             if (body == null || body.isEmpty()) return;
             License.Req req = License.parseRequest(body);
             License.Use use = License.parseUse(body);
-            if (req == null && use == null) return;
+            License.NetProfile site = License.parseSite(body);
+            String siteDev = site == null ? "" : License.parseSiteDev(body);
+            if (site != null && siteDev.isEmpty()) site = null;
+            if (req == null && use == null && site == null) return;
             Context app = ctx.getApplicationContext();
             // Usage lands in the DB immediately, even if the app is never opened.
             if (use != null) {
@@ -46,7 +49,23 @@ public class SmsReceiver extends BroadcastReceiver {
                 try {
                     AdminDb db = new AdminDb(app);
                     db.clearInboxForDev(req.dev);
-                    db.addInbox(req.dev, (req.name + " " + req.family).trim(), req.phone, body);
+                    db.addInbox(req.dev, (req.name + " " + req.family).trim(), req.phone,
+                            req.shop, body);
+                    try {
+                        db.close();
+                    } catch (Exception ignored) { }
+                } catch (Exception ignored) { }
+            }
+            String siteSaved = "";
+            if (site != null) {
+                try {
+                    AdminDb db = new AdminDb(app);
+                    AdminDb.Customer c = db.byDev(siteDev);
+                    if (c != null) {
+                        db.saveSite(c.id, site.host, site.port, site.db,
+                                License.SQL_USER, License.SQL_PASS);
+                        siteSaved = c.full();
+                    }
                     try {
                         db.close();
                     } catch (Exception ignored) { }
@@ -57,7 +76,7 @@ public class SmsReceiver extends BroadcastReceiver {
                 ping.setPackage(ctx.getPackageName());
                 ctx.sendBroadcast(ping);
             } catch (Exception ignored) { }
-            notifySms(app, req, use);
+            notifySms(app, req, use, siteSaved);
         } catch (Exception ignored) { }
     }
 
@@ -96,7 +115,7 @@ public class SmsReceiver extends BroadcastReceiver {
         }
     }
 
-    private static void notifySms(Context app, License.Req req, License.Use use) {
+    private static void notifySms(Context app, License.Req req, License.Use use, String siteSaved) {
         try {
             if (Build.VERSION.SDK_INT >= 33
                     && app.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
@@ -114,7 +133,9 @@ public class SmsReceiver extends BroadcastReceiver {
             if (who.isEmpty() && use != null) who = "دستگاه " + use.dev;
             String txt = req != null
                     ? ("درخواست لایسنس" + (who.isEmpty() ? "" : " «" + who + "»") + " رسید — برای صدور لمس کنید")
-                    : ("گزارش مصرف «" + who + "» ثبت شد");
+                    : (!siteSaved.isEmpty()
+                    ? ("مشخصات اتصال «" + siteSaved + "» رسید و ذخیره شد")
+                    : ("گزارش مصرف «" + who + "» ثبت شد"));
             Intent i = new Intent(app, AdminActivity.class);
             i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
             PendingIntent pi = PendingIntent.getActivity(app, 7702, i,

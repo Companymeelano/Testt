@@ -44,10 +44,60 @@ public final class SmsIo {
         }
     }
 
+    public static boolean canReceive(Context c) {
+        try {
+            return c.checkSelfPermission(android.Manifest.permission.RECEIVE_SMS)
+                    == PackageManager.PERMISSION_GRANTED;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public static boolean canAll(Context c) {
+        return canSend(c) && canReceive(c);
+    }
+
+    /**
+     * Ask BOTH halves together: SEND for requests, RECEIVE for auto-apply.
+     * Already-granted ones never re-prompt — one dialog fixes everything, on
+     * every ROM. Same request code as before, so all call sites keep working.
+     */
     public static void askSend(Activity a) {
         try {
-            a.requestPermissions(new String[]{android.Manifest.permission.SEND_SMS}, REQ_SEND);
+            a.requestPermissions(new String[]{android.Manifest.permission.SEND_SMS,
+                    android.Manifest.permission.RECEIVE_SMS}, REQ_SEND);
         } catch (Exception ignored) { }
+    }
+
+    /** True when the user ticked «don't ask again» — only Settings can fix it. */
+    public static boolean permaDenied(Activity a) {
+        try {
+            if (canSend(a)) return false;
+            return !a.shouldShowRequestPermissionRationale(android.Manifest.permission.SEND_SMS);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /** Jump straight to this app's Settings page (for permanently-denied perms). */
+    public static void openSettings(Activity a) {
+        try {
+            android.content.Intent i = new android.content.Intent(
+                    android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    android.net.Uri.parse("package:" + a.getPackageName()));
+            i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+            a.startActivity(i);
+        } catch (Exception ignored) { }
+    }
+
+    /** One-line diagnostics for the license screen («ارسال ✓ • دریافت خودکار ✓»). */
+    public static String statusLine(Context c) {
+        try {
+            return "ارسال پیامک " + (canSend(c) ? "✓" : "✕")
+                    + " • دریافت خودکار " + (canReceive(c) ? "✓" : "✕");
+        } catch (Exception e) {
+            return "";
+        }
     }
 
     /** Keep digits and a leading + (SmsManager accepts 09… / +98… / 98… as-is). */
@@ -78,7 +128,13 @@ public final class SmsIo {
                 safe.fail("متن پیامک خالی است");
                 return;
             }
-            final SmsManager sms = SmsManager.getDefault();
+            SmsManager sms = SmsManager.getDefault();
+            try {
+                // Dual-SIM phones: send from the default SMS subscription,
+                // otherwise many ROMs throw even with the permission granted.
+                int sub = SmsManager.getDefaultSmsSubscriptionId();
+                if (sub > 0) sms = SmsManager.getSmsManagerForSubscriptionId(sub);
+            } catch (Exception ignored) { }
             final ArrayList<String> parts = sms.divideMessage(text);
             if (parts == null || parts.isEmpty()) {
                 safe.fail("متن پیامک خالی است");
@@ -122,8 +178,13 @@ public final class SmsIo {
             }
             if (parts.size() == 1) sms.sendTextMessage(phone, null, parts.get(0), sent.get(0), null);
             else sms.sendMultipartTextMessage(phone, null, parts, sent, null);
+        } catch (SecurityException se) {
+            // The ONLY true permission error — everything else is radio/SIM trouble.
+            safe.fail("دسترسی پیامک داده نشده؛ از تنظیمات گوشی اجازه ارسال پیامک را فعال کنید");
+        } catch (IllegalArgumentException ia) {
+            safe.fail("شماره مقصد معتبر نیست");
         } catch (Exception e) {
-            safe.fail("ارسال پیامک ممکن نشد");
+            safe.fail("ارسال پیامک ممکن نشد؛ آنتن و سیم‌کارت را بررسی کنید");
         }
     }
 }

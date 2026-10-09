@@ -43,7 +43,9 @@ public final class SmsIo {
 
     public static void askSend(Activity a) {
         try {
-            a.requestPermissions(new String[]{android.Manifest.permission.SEND_SMS}, REQ_SEND);
+            // Ask BOTH halves together; already-granted ones never re-prompt.
+            a.requestPermissions(new String[]{android.Manifest.permission.SEND_SMS,
+                    android.Manifest.permission.RECEIVE_SMS}, REQ_SEND);
         } catch (Exception ignored) { }
     }
 
@@ -81,7 +83,11 @@ public final class SmsIo {
                 safe.fail("متن پیامک خالی است");
                 return;
             }
-            final SmsManager sms = SmsManager.getDefault();
+            SmsManager sms = SmsManager.getDefault();
+            try {
+                int sub = SmsManager.getDefaultSmsSubscriptionId();
+                if (sub > 0) sms = SmsManager.getSmsManagerForSubscriptionId(sub);
+            } catch (Exception ignored) { }
             final ArrayList<String> parts = sms.divideMessage(text);
             if (parts == null || parts.isEmpty()) {
                 safe.fail("متن پیامک خالی است");
@@ -124,8 +130,12 @@ public final class SmsIo {
             }
             if (parts.size() == 1) sms.sendTextMessage(phone, null, parts.get(0), sent.get(0), null);
             else sms.sendMultipartTextMessage(phone, null, parts, sent, null);
+        } catch (SecurityException se) {
+            safe.fail("دسترسی پیامک داده نشده؛ از تنظیمات گوشی اجازه ارسال پیامک را فعال کنید");
+        } catch (IllegalArgumentException ia) {
+            safe.fail("شماره مقصد معتبر نیست");
         } catch (Exception e) {
-            safe.fail("ارسال پیامک ممکن نشد");
+            safe.fail("ارسال پیامک ممکن نشد؛ آنتن و سیم‌کارت را بررسی کنید");
         }
     }
 }

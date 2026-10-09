@@ -1013,16 +1013,60 @@ public class MainActivity extends Activity {
         }).start();
     }
 
-    /** One-row export bar: PDF + Excel + print (share sheet covers social apps + Bluetooth). */
+    public void shareDocx(final String title, final String subtitle, final ReportCatalog.Col[] cols, final List<Row> rows) {
+        kit.toast("در حال ساخت ورد…");
+        new Thread(() -> {
+            try {
+                final File f = ir.meelano.manager.ui.Docx.build(this, title, subtitle, cols, rows, 2000);
+                runOnUiThread(() -> {
+                    try {
+                        ShareProvider.share(this, f, ir.meelano.manager.ui.Docx.MIME, title);
+                    } catch (Exception e) {
+                        kit.toast("اشتراک ممکن نشد");
+                    }
+                });
+            } catch (Exception e) {
+                runOnUiThread(() -> kit.toast("ساخت ورد ممکن نشد"));
+            }
+        }).start();
+    }
+
+    public void sharePng(final String title, final String subtitle, final ReportCatalog.Col[] cols, final List<Row> rows) {
+        kit.toast("در حال ساخت عکس…");
+        new Thread(() -> {
+            try {
+                final File f = ir.meelano.manager.ui.TableShot.build(this, title, subtitle, cols, rows, 120);
+                runOnUiThread(() -> {
+                    try {
+                        ShareProvider.share(this, f, "image/png", title);
+                    } catch (Exception e) {
+                        kit.toast("اشتراک ممکن نشد");
+                    }
+                });
+            } catch (Exception e) {
+                runOnUiThread(() -> kit.toast("ساخت عکس ممکن نشد"));
+            }
+        }).start();
+    }
+
+    /** Two-row export bar: PDF + Excel + Word / image + print (share sheet covers social apps + Bluetooth). */
     public android.view.View exportBar(final String title, final String subtitle,
                                        final ReportCatalog.Col[] cols, final List<Row> rows) {
-        LinearLayout bar = kit.h();
-        bar.addView(kit.btnGhost("▤ PDF", Theme.DANGER, v -> sharePdf(title, subtitle, cols, rows)), kit.wlp(1f));
-        bar.addView(kit.space(8));
-        bar.addView(kit.btnGhost("▦ اکسل", Theme.SUCCESS, v -> shareXlsx(title, subtitle, cols, rows)), kit.wlp(1f));
-        bar.addView(kit.space(8));
-        bar.addView(kit.btnGhost("🖨 چاپ", Theme.GOLD, v -> printPdf(title, subtitle, cols, rows)), kit.wlp(1f));
-        return bar;
+        LinearLayout box = kit.v();
+        LinearLayout r1 = kit.h();
+        r1.addView(kit.btnGhost("▤ PDF", Theme.DANGER, v -> sharePdf(title, subtitle, cols, rows)), kit.wlp(1f));
+        r1.addView(kit.space(8));
+        r1.addView(kit.btnGhost("▦ اکسل", Theme.SUCCESS, v -> shareXlsx(title, subtitle, cols, rows)), kit.wlp(1f));
+        r1.addView(kit.space(8));
+        r1.addView(kit.btnGhost("✎ ورد", Theme.INFO, v -> shareDocx(title, subtitle, cols, rows)), kit.wlp(1f));
+        box.addView(r1, kit.lp(-1, -2));
+        box.addView(kit.gap(8));
+        LinearLayout r2 = kit.h();
+        r2.addView(kit.btnGhost("▧ عکس", Theme.VIOLET, v -> sharePng(title, subtitle, cols, rows)), kit.wlp(1f));
+        r2.addView(kit.space(8));
+        r2.addView(kit.btnGhost("🖨 چاپ", Theme.GOLD, v -> printPdf(title, subtitle, cols, rows)), kit.wlp(1f));
+        box.addView(r2, kit.lp(-1, -2));
+        return box;
     }
 
     /** Zoom button: cycle ۱۰۰٪ → ۱۱۵٪ → ۱۳۰٪ → ۹۰٪ → ۱۰۰٪. */

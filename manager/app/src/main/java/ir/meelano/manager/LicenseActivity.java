@@ -12,6 +12,8 @@ import android.content.pm.PackageManager;
 import android.graphics.Typeface;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.EditText;
@@ -38,8 +40,10 @@ import ir.meelano.manager.ui.Theme;
 import ir.meelano.licensing.License;
 
 /**
- * Offline license gate, v21: ONE luxury frame («فعال‌سازی هوشمند») — ۱) smart request
- * (direct SMS when the seller number is filled, share sheet otherwise),
+ * Offline license gate, v23: step ۱ (device code + distributor name + mobile →
+ * direct SMS + 3D wait for the seller's reply), step ۲ (the customer's own
+ * server IP + DB name, saved once and hidden forever, reported to the seller),
+ * remote revoke/block enforcement, and the developer signature on page one.
  * ۲) smart receive (paste/scan anything — pack or connection line — it
  * detects and applies it). No Wi-Fi needed: the pack activates on any network
  * (even fully offline); a connection line is tested live and, while the server
@@ -66,6 +70,18 @@ public class LicenseActivity extends Activity {
 
     private String pendingSmsPhone = "";
     private String pendingSmsText = "";
+    private String pendingKind = "";
+    private AlertDialog waitDlg;
+    private TextView waitStage;
+    private TextView waitTime;
+    private long waitStart;
+    private final Handler waitHandler = new Handler(Looper.getMainLooper());
+    private final Runnable waitTick = new Runnable() {
+        @Override
+        public void run() {
+            tickWait();
+        }
+    };
     private boolean wantScan;
     private long lastCardTry;
     private BroadcastReceiver smsPing;
@@ -133,7 +149,8 @@ public class LicenseActivity extends Activity {
                 if (g && pendingSmsText != null && !pendingSmsText.isEmpty()) {
                     doSmsSend(pendingSmsPhone, pendingSmsText);
                 } else if (!g) {
-                    kit.toast("بدون دسترسی پیامک، شماره فروشنده را خالی بگذارید و دوباره بزنید");
+                    if (SmsIo.permaDenied(LicenseActivity.this)) permSettingsDialog();
+                    else kit.toast("بدون دسترسی پیامک، شماره فروشنده را خالی بگذارید و دوباره بزنید");
                 }
                 pendingSmsPhone = "";
                 pendingSmsText = "";
@@ -159,6 +176,10 @@ public class LicenseActivity extends Activity {
         box.setPadding(pad, pad, pad, pad);
 
         LicenseStore.Status s = LicenseStore.check(this);
+        if ("blocked".equals(s.reason)) {
+            buildBlockedUi(s.fa);
+            return;
+        }
         boolean conn = connConfigured();
         int done = (s.ok ? 1 : 0) + (conn ? 1 : 0);
         String pill = done >= 2 ? "✓ آماده ورود"
@@ -172,7 +193,7 @@ public class LicenseActivity extends Activity {
         netTxt = null;
         buildStatusCard(box, s);
         if (!s.ok || !conn) buildMasterCard(box, s.ok, conn);
-        buildSupportCard(box);
+        buildDevFooter(box);
 
         if (Tamper.isRooted()) {
             box.addView(kit.hint("⚠ گوشی روت شده است؛ در صورت مشکل با پشتیبانی در میان بگذارید."),
@@ -283,8 +304,8 @@ public class LicenseActivity extends Activity {
                 kit.toast("کد دستگاه کپی شد");
             });
             c.addView(dev, kit.lp(-1, -2));
-            final EditText fName = kit.edit("نام", "");
-            final EditText fPhone = kit.edit("شماره تماس (0912…)", "");
+            final EditText fName = kit.edit("نام پخش (اجباری)", LicenseStore.distName(this));
+            final EditText fPhone = kit.edit("شماره موبایل (0912…)", "");
             try {
                 fPhone.setInputType(android.text.InputType.TYPE_CLASS_PHONE);
             } catch (Exception ignored) { }
@@ -298,13 +319,35 @@ public class LicenseActivity extends Activity {
                 lp.setMargins(0, Theme.dp(4), 0, Theme.dp(4));
                 c.addView(e, lp);
             }
-            c.addView(kit.btnGold("✦ ارسال درخواست", v ->
+            c.addView(kit.btnGold("✦ دریافت کد فعال‌سازی", v ->
                     smartSend(txt(fName), txt(fPhone), txt(fSeller))), kit.lp(-1, -2));
-            c.addView(kit.hint("با شماره فروشنده مستقیم پیامک می‌شود؛ بدون آن از واتساپ یا برنامه دیگر بفرستید."),
+            c.addView(kit.hint("با شماره فروشنده مستقیم پیامک می‌شود و پاسخ خودکار می‌رسد؛ بدون آن از واتساپ یا برنامه دیگر بفرستید."),
                     kit.lp(-1, -2));
+            c.addView(kit.hint(SmsIo.statusLine(this)), kit.lp(-1, -2));
             TextView div = kit.text("— پاسخ فروشنده —", 12f, Theme.MUTED, true);
             div.setGravity(Gravity.CENTER);
             c.addView(div, kit.lp(-1, -2));
+        }
+
+        // ---- step 2: the customer's own server (typed once, hidden forever) ----
+        if (licOk && !connOk) {
+            c.addView(kit.text("اتصال به سرور اختصاصی شما", 14f, Theme.TEXT, true),
+                    kit.lp(-1, -2));
+            c.addView(kit.hint("آی‌پی سرور و نام دیتابیس فروشگاه خود را وارد کنید؛ یک‌بار ذخیره می‌شود و دیگر هیچ‌جا نمایش داده نمی‌شود."),
+                    kit.lp(-1, -2));
+            final EditText fIp = kit.edit("آی‌پی سرور (مثلاً 192.168.1.10)", "");
+            final EditText fDb = kit.edit("نام دیتابیس (مثلاً AtiranDb)", "");
+            final EditText fPort = kit.edit("پورت", "1433");
+            for (EditText e : new EditText[]{fIp, fDb, fPort}) {
+                LinearLayout.LayoutParams lp2 = kit.lp(-1, -2);
+                lp2.setMargins(0, Theme.dp(4), 0, Theme.dp(4));
+                c.addView(e, lp2);
+            }
+            c.addView(kit.btnGold("💾 ذخیره و اتصال", v ->
+                    saveSiteManual(txt(fIp), txt(fPort), txt(fDb))), kit.lp(-1, -2));
+            TextView div2 = kit.text("— یا کد اتصال فروشنده —", 12f, Theme.MUTED, true);
+            div2.setGravity(Gravity.CENTER);
+            c.addView(div2, kit.lp(-1, -2));
         }
 
         // ---- receive (pack or connection line, auto-detected) ----
@@ -350,30 +393,31 @@ public class LicenseActivity extends Activity {
         Card3D.mount(box, c);
     }
 
-    private String buildRequestMsg(String name, String phone) {
-        String line = License.requestLine(device, name, "", "", phone, "");
+    private String buildRequestMsg(String dist, String phone) {
+        String line = License.requestLine(device, dist, "", dist, phone, "");
         String use = Usage.reportLine(this, device);
         StringBuilder b = new StringBuilder("درخواست فعال‌سازی میلانو منیجر\n").append(line);
         if (!use.isEmpty()) b.append('\n').append(use);
-        b.append("\nنام: ").append(name.trim());
+        b.append("\nنام پخش: ").append(dist.trim());
         b.append("\nتماس: ").append(phone.trim());
         return b.toString();
     }
 
     /** One button: validate, then direct SMS when the seller number is filled, share sheet otherwise. */
-    private void smartSend(String name, String phone, String seller) {
-        if (name == null || name.trim().isEmpty()) {
-            kit.toast("نام را وارد کنید");
+    private void smartSend(String dist, String phone, String seller) {
+        if (dist == null || dist.trim().isEmpty()) {
+            kit.toast("نام پخش را وارد کنید");
             return;
         }
         if (SmsIo.cleanPhone(phone).length() < 10) {
-            kit.toast("شماره تماس معتبر وارد کنید (مثلاً 09123456789)");
+            kit.toast("شماره موبایل معتبر وارد کنید (مثلاً 09123456789)");
             return;
         }
+        LicenseStore.setDistName(this, dist);
         if (SmsIo.cleanPhone(seller).length() >= 10) {
-            directSendRequest(name, phone, seller);
+            directSendRequest(dist, phone, seller);
         } else {
-            shareRequest(name, phone, seller);
+            shareRequest(dist, phone, seller);
         }
     }
 
@@ -386,6 +430,7 @@ public class LicenseActivity extends Activity {
         }
         LicenseStore.setSellerPhone(this, seller);
         String msg = buildRequestMsg(name, phone);
+        pendingKind = "req";
         if (!SmsIo.canSend(this)) {
             pendingSmsPhone = dest;
             pendingSmsText = msg;
@@ -398,17 +443,43 @@ public class LicenseActivity extends Activity {
 
     private void doSmsSend(String dest, String msg) {
         kit.toast("در حال ارسال پیامک…");
+        final String kind = pendingKind == null ? "" : pendingKind;
+        pendingKind = "";
         SmsIo.send(this, dest, msg, new SmsIo.Cb() {
             @Override
             public void ok() {
-                kit.toast("✓ درخواست با پیامک ارسال شد؛ منتظر پاسخ فروشنده باشید");
+                if ("site".equals(kind)) {
+                    kit.toast("✓ مشخصات اتصال برای فروشنده ارسال شد");
+                } else {
+                    kit.toast("✓ درخواست ارسال شد؛ منتظر پاسخ فروشنده باشید");
+                    showWaitDialog();
+                }
             }
 
             @Override
             public void fail(String fa) {
                 kit.toast(fa);
+                if (!"site".equals(kind) && SmsIo.permaDenied(LicenseActivity.this)) permSettingsDialog();
             }
         });
+    }
+
+    private void permSettingsDialog() {
+        LinearLayout b = kit.v();
+        b.setPadding(Theme.dp(16), Theme.dp(8), Theme.dp(16), Theme.dp(8));
+        b.addView(kit.text("برای ارسال مستقیم پیامک، از تنظیمات گوشی اجازه «پیامک» را به میلانو منیجر بدهید.",
+                13f, Theme.TEXT, false), kit.lp(-1, -2));
+        final AlertDialog[] box = new AlertDialog[1];
+        LinearLayout row = kit.h();
+        row.addView(kit.btn("باز کردن تنظیمات", v -> {
+            box[0].dismiss();
+            SmsIo.openSettings(LicenseActivity.this);
+        }), kit.wlp(1f));
+        row.addView(kit.space(8));
+        row.addView(kit.btnGhost("بعداً", Theme.MUTED, v -> box[0].dismiss()), kit.wlp(1f));
+        b.addView(row, kit.lp(-1, -2));
+        box[0] = kit.dialog("دسترسی پیامک", b, true);
+        box[0].show();
     }
 
     private void shareRequest(String name, String phone, String seller) {
@@ -460,6 +531,26 @@ public class LicenseActivity extends Activity {
      * any pasted text and applies whatever it finds (pack first, then card).
      */
     private void smartReceive(String in) {
+        if (in != null && !in.isEmpty()) {
+            if (License.parseRevoke(in, device)) {
+                LicenseStore.revoke(this);
+                kit.toast("لایسنس لغو شد؛ برای فعال‌سازی مجدد اقدام کنید");
+                buildUi();
+                return;
+            }
+            String br = License.parseBlock(in, device);
+            if (br != null) {
+                LicenseStore.setBlocked(this, br);
+                buildUi();
+                return;
+            }
+            if (License.parseUnblock(in, device)) {
+                LicenseStore.clearBlocked(this);
+                kit.toast("مسدودی برداشته شد؛ برنامه را فعال کنید");
+                buildUi();
+                return;
+            }
+        }
         if (in == null || in.isEmpty()) {
             // Imperceptible: pull the clipboard automatically, then process.
             String clip = clipText();
@@ -629,6 +720,7 @@ public class LicenseActivity extends Activity {
                 LicenseStore.Status st = LicenseStore.activate(this, s.pack);
                 if (st.ok) {
                     kit.toast("✦ کد فعال‌سازی از پیامک اعمال شد!");
+                    waitSuccess();
                     buildUi();
                 } else {
                     kit.toast(st.fa);
@@ -713,18 +805,28 @@ public class LicenseActivity extends Activity {
         });
     }
 
-    // ---- support (slim: one button, the numbers live in a dialog) ----
+    // ---- developer signature + support (always on page one) ----
 
-    private void buildSupportCard(LinearLayout box) {
+    private void buildDevFooter(LinearLayout box) {
         LinearLayout c = Card3D.card(this, Theme.GOLD);
-        c.addView(Card3D.stepRow(this, kit, "✦", Theme.GOLD, "پشتیبانی میلانو"),
+        c.addView(Card3D.stepRow(this, kit, "✦", Theme.GOLD, "میلانو منیجر"),
                 kit.lp(-1, -2));
-        c.addView(kit.gap(4));
-        c.addView(kit.btnGhost("📞 تماس با پشتیبانی", Theme.TEAL, v -> supportDialog()),
-                kit.lp(-1, -2));
+        TextView dv = kit.text("طراحی و توسعه: میلاد یعقوبی", 15f, Theme.GOLD_SOFT, true);
+        dv.setGravity(Gravity.CENTER);
+        c.addView(dv, kit.lp(-1, -2));
         TextView tag = kit.text(Brand.TAGLINE, 11.5f, Theme.MUTED, false);
         tag.setGravity(Gravity.CENTER);
         c.addView(tag, kit.lp(-1, -2));
+        c.addView(kit.gap(4));
+        LinearLayout row = kit.h();
+        row.addView(kit.btnGhost("🌐  " + Brand.SITE_LABEL, Theme.GOLD,
+                v -> Brand.openSite(this)), kit.wlp(1f));
+        row.addView(kit.space(8));
+        row.addView(kit.btnGhost("📞 پشتیبانی", Theme.TEAL, v -> supportDialog()), kit.wlp(1f));
+        c.addView(row, kit.lp(-1, -2));
+        TextView ver = kit.text("نسخه ۲۳ • فعال‌سازی هوشمند", 10.5f, Theme.MUTED, false);
+        ver.setGravity(Gravity.CENTER);
+        c.addView(ver, kit.lp(-1, -2));
         Card3D.mount(box, c);
     }
 
@@ -757,6 +859,168 @@ public class LicenseActivity extends Activity {
             }
         } catch (Exception ignored) { }
         return null;
+    }
+
+    /** Full-stop violation screen: no code, no activation, just the notice. */
+    private void buildBlockedUi(String reason) {
+        LinearLayout box = kit.v();
+        box.setBackgroundColor(Theme.BG);
+        int pad = Theme.dp(16);
+        box.setPadding(pad, pad, pad, pad);
+        Card3D.mount(box, Card3D.hero(this, kit, R.drawable.lic_shield, Theme.DANGER,
+                "⛔ دسترسی مسدود شد",
+                "اجرای برنامه متوقف شده است",
+                "مسدود", Theme.DANGER));
+        LinearLayout c = Card3D.card(this, Theme.DANGER);
+        c.addView(kit.text("این گوشی توسط فروشنده مسدود شده است.", 14f, Theme.TEXT, true),
+                kit.lp(-1, -2));
+        c.addView(kit.gap(4));
+        c.addView(kit.kv("علت", reason == null || reason.isEmpty() ? "تخلف از قوانین استفاده" : reason,
+                Theme.DANGER), kit.lp(-1, -2));
+        c.addView(kit.hint("برای رفع مسدودی با فروشنده تماس بگیرید. بدون رفع مسدودی، فعال‌سازی جدید ممکن نیست."),
+                kit.lp(-1, -2));
+        Card3D.mount(box, c);
+        buildDevFooter(box);
+        ScrollView sv = new ScrollView(this);
+        sv.setFillViewport(true);
+        sv.addView(box);
+        setContentView(sv);
+    }
+
+    // ---------- 3D wait: the seller is issuing your code ----------
+
+    private void showWaitDialog() {
+        dismissWait();
+        LinearLayout body = kit.v();
+        body.setPadding(Theme.dp(20), Theme.dp(16), Theme.dp(20), Theme.dp(8));
+        body.addView(kit.loading("در انتظار پاسخ فروشنده…"), kit.lp(-1, -2));
+        waitStage = kit.text("✓ درخواست ارسال شد", 13f, Theme.SUCCESS, true);
+        waitStage.setGravity(Gravity.CENTER);
+        body.addView(waitStage, kit.lp(-1, -2));
+        waitTime = kit.text("", 12f, Theme.MUTED, false);
+        waitTime.setGravity(Gravity.CENTER);
+        body.addView(waitTime, kit.lp(-1, -2));
+        body.addView(kit.hint("می‌توانید خارج شوید؛ پاسخ فروشنده خودکار اعمال می‌شود."),
+                kit.lp(-1, -2));
+        final AlertDialog[] box = new AlertDialog[1];
+        body.addView(kit.btn("انصراف", v -> {
+            if (box[0] != null) box[0].dismiss();
+        }), kit.lp(-1, -2));
+        waitDlg = kit.dialog("✦ دریافت کد فعال‌سازی", body, true);
+        box[0] = waitDlg;
+        waitDlg.setOnDismissListener(d -> waitDlg = null);
+        waitStart = System.currentTimeMillis();
+        waitDlg.show();
+        waitHandler.post(waitTick);
+    }
+
+    private void tickWait() {
+        if (waitDlg == null || waitTime == null) return;
+        long sec = (System.currentTimeMillis() - waitStart) / 1000;
+        waitTime.setText("زمان انتظار: " + Money.fa(String.format(java.util.Locale.US,
+                "%d:%02d", sec / 60, sec % 60)));
+        waitHandler.postDelayed(waitTick, 1000);
+    }
+
+    private void waitSuccess() {
+        if (waitDlg == null) return;
+        try {
+            if (waitStage != null) waitStage.setText("✓✓ فعال شد! وارد مرحله بعد می‌شوید…");
+        } catch (Exception ignored) { }
+        final AlertDialog d = waitDlg;
+        waitHandler.postDelayed(() -> {
+            try {
+                d.dismiss();
+            } catch (Exception ignored) { }
+        }, 1500);
+    }
+
+    private void dismissWait() {
+        try {
+            if (waitDlg != null) waitDlg.dismiss();
+        } catch (Exception ignored) { }
+        waitDlg = null;
+    }
+
+    // ---------- step 2: the customer's own server ----------
+
+    private void saveSiteManual(String ip, String portStr, String db) {
+        if (ip == null || ip.isEmpty()) {
+            kit.toast("آی‌پی سرور را وارد کنید");
+            return;
+        }
+        if (db == null || db.isEmpty()) {
+            kit.toast("نام دیتابیس را وارد کنید");
+            return;
+        }
+        int port = 1433;
+        try {
+            port = Integer.parseInt(portStr.trim());
+            if (port < 1 || port > 65535) throw new NumberFormatException();
+        } catch (Exception e) {
+            kit.toast("پورت معتبر نیست (۱ تا ۶۵۵۳۵)");
+            return;
+        }
+        if (!Net.online(this)) {
+            kit.toast("اینترنت قطع است — وصل شوید و دوباره بزنید");
+            return;
+        }
+        kit.toast("در حال ذخیره و تست اتصال…");
+        final String fIp = ip.trim();
+        final String fDb = db.trim();
+        final int fPort = port;
+        repo.runWith(fIp, fPort, fDb, License.SQL_USER, License.SQL_PASS, conn -> {
+            Meta m = new Meta(conn);
+            int n = 0;
+            for (String t : new String[]{"sailfact", "buyfact", "dar", "getchk",
+                    "putchk", "CUSTOMERS", "inventory", "visitors"})
+                if (m.table(t)) n++;
+            return "اتصال برقرار شد • " + Money.fa(String.valueOf(n)) + " جدول اصلی در دسترس";
+        }, new Repo.Cb<String>() {
+            @Override
+            public void ok(String v) {
+                try {
+                    settings.saveConnection(fIp, String.valueOf(fPort), fDb,
+                            License.SQL_USER, License.SQL_PASS);
+                } catch (Exception ignored) { }
+                kit.toast("✓ " + v);
+                sendSiteSms(fIp, fPort, fDb);
+                buildUi();
+            }
+
+            @Override
+            public void fail(String faError) {
+                kit.toast(faError == null || faError.isEmpty()
+                        ? "سرور در دسترس نیست؛ آی‌پی و نام دیتابیس را بررسی کنید"
+                        : faError);
+            }
+        });
+    }
+
+    /** Report the typed site back to the seller (full customer record). */
+    private void sendSiteSms(String ip, int port, String db) {
+        String dest = SmsIo.cleanPhone(LicenseStore.sellerPhone(this));
+        if (dest.length() < 10) {
+            kit.toast("شماره فروشنده ثبت نیست؛ مشخصات اتصال را به او اطلاع دهید");
+            return;
+        }
+        String line;
+        try {
+            line = License.siteLine(device, ip, String.valueOf(port), db);
+        } catch (Exception e) {
+            return;
+        }
+        String dist = LicenseStore.distName(this);
+        String msg = "مشخصات اتصال مشتری\n" + line
+                + (dist.isEmpty() ? "" : "\nپخش: " + dist);
+        pendingKind = "site";
+        if (!SmsIo.canSend(this)) {
+            pendingSmsPhone = dest;
+            pendingSmsText = msg;
+            SmsIo.askSend(this);
+            return;
+        }
+        doSmsSend(dest, msg);
     }
 
     // ---------- misc ----------

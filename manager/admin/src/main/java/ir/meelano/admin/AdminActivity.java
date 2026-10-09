@@ -47,6 +47,7 @@ public class AdminActivity extends Activity {
         long inboxId;
         String dev = "", name = "", family = "", shop = "", phone = "", city = "", note = "";
         char plan = License.P_MONTHLY;
+        String customDate = "";
         long extendOf;
     }
 
@@ -310,6 +311,7 @@ public class AdminActivity extends Activity {
                 AdminKit.cardMargin(card, this);
                 String who = fr.name.isEmpty() ? "(بی‌نام)" : fr.name;
                 AdminKit.infoRow(card, this, who, prettyDev(fr.dev), true);
+                if (!fr.shop.isEmpty()) AdminKit.infoRow(card, this, "پخش", fr.shop, false);
                 if (!fr.phone.isEmpty()) AdminKit.infoRow(card, this, "موبایل", fr.phone, false);
                 AdminKit.infoRow(card, this, "رسیده", agoFa(fr.created), false);
                 LinearLayout btns = new LinearLayout(this);
@@ -521,8 +523,13 @@ public class AdminActivity extends Activity {
         box.addView(card);
 
         box.addView(AdminKit.text(this, "طرح لایسنس", 15, AdminKit.GOLD_SOFT, true));
+        final EditText fCustom;
+        if (ctx.plan == License.P_CUSTOM) {
+            fCustom = AdminKit.field(this, "انقضا تا (سال/ماه/روز، مثلاً 1405/03/15)");
+            fCustom.setText(ctx.customDate);
+        } else fCustom = null;
         char[] plans = {License.P_TRIAL, License.P_WEEKLY, License.P_MONTHLY,
-                License.P_YEARLY, License.P_PERM};
+                License.P_YEARLY, License.P_PERM, License.P_CUSTOM};
         for (char p : plans) {
             boolean sel = ctx.plan == p;
             LinearLayout row = new LinearLayout(this);
@@ -556,6 +563,7 @@ public class AdminActivity extends Activity {
                 ctx.phone = AdminKit.txt(fPhone);
                 ctx.city = AdminKit.txt(fCity);
                 ctx.note = AdminKit.txt(fNote);
+                if (fCustom != null) ctx.customDate = AdminKit.txt(fCustom);
                 reload();
             });
             row.addView(inner, new LinearLayout.LayoutParams(
@@ -564,7 +572,8 @@ public class AdminActivity extends Activity {
             box.addView(row);
         }
 
-        TextView expPrev = AdminKit.text(this, expiryPreview(ctx.plan), 13.5f,
+        if (fCustom != null) box.addView(fCustom);
+        TextView expPrev = AdminKit.text(this, expiryPreview(ctx), 13.5f,
                 AdminKit.GOLD_SOFT, false);
         expPrev.setGravity(Gravity.CENTER);
         expPrev.setPadding(0, AdminKit.dp(this, 4), 0, AdminKit.dp(this, 4));
@@ -586,13 +595,23 @@ public class AdminActivity extends Activity {
             ctx.phone = AdminKit.txt(fPhone);
             ctx.city = AdminKit.txt(fCity);
             ctx.note = AdminKit.txt(fNote);
+            if (fCustom != null) ctx.customDate = AdminKit.txt(fCustom);
             if (ctx.dev.length() != 8) {
                 AdminKit.toast(this, "کد دستگاه باید ۸ حرف باشد");
                 return;
             }
+            int days = TRIAL_DAYS;
+            if (ctx.plan == License.P_CUSTOM) {
+                long cExp = jalaliToDay(ctx.customDate);
+                if (cExp <= License.today()) {
+                    AdminKit.toast(this, "تاریخ انقضای معتبر (آینده) وارد کنید");
+                    return;
+                }
+                days = (int) (cExp - License.today());
+            }
             String pack;
             try {
-                pack = License.generate(ctx.dev, ctx.plan, TRIAL_DAYS);
+                pack = License.generate(ctx.dev, ctx.plan, days);
             } catch (Exception e) {
                 AdminKit.toast(this, "صدور ناموفق بود");
                 return;
@@ -626,6 +645,7 @@ public class AdminActivity extends Activity {
         if (p == License.P_WEEKLY) return "۷ روزه، مناسب مغازه‌های سیار";
         if (p == License.P_MONTHLY) return "۳۰ روزه — پرفروش‌ترین";
         if (p == License.P_YEARLY) return "۳۶۵ روزه، یک‌سال کامل";
+        if (p == License.P_CUSTOM) return "تاریخ انقضای دلخواه شما";
         return "بدون تاریخ انقضا (ویژه)";
     }
 
@@ -638,8 +658,15 @@ public class AdminActivity extends Activity {
         return License.planDays(plan);
     }
 
-    private String expiryPreview(char plan) {
+    private String expiryPreview(MintCtx ctx) {
+        char plan = ctx.plan;
         if (plan == License.P_PERM) return "انقضا: بدون انقضا (دائمی)";
+        if (plan == License.P_CUSTOM) {
+            long exp = jalaliToDay(ctx.customDate);
+            if (exp <= License.today()) return "انقضا: تاریخ آینده وارد کنید (سال/ماه/روز)";
+            return "انقضا: " + AdminKit.fa(jalali(exp)) + "  ("
+                    + AdminKit.fa(exp - License.today()) + " روز دیگر)";
+        }
         long exp = License.today() + daysFor(plan);
         return "انقضا: " + AdminKit.fa(jalali(exp)) + "  ("
                 + AdminKit.fa(daysFor(plan)) + " روز دیگر)";
@@ -1065,6 +1092,66 @@ public class AdminActivity extends Activity {
         });
         box.addView(bRevoke);
 
+        AdminDb.Customer rc0 = db.byId(l.customerId);
+        if (rc0 == null) rc0 = db.byDev(l.dev);
+        final AdminDb.Customer rc = rc0;
+        final String rDev = l.dev;
+        final String rPhone = rc == null ? "" : rc.phone;
+        EditText fReason = AdminKit.field(this, "علت مسدودی (نمایش در گوشی مشتری)");
+        fReason.setText("عدم تسویه حساب");
+        box.addView(fReason);
+        Button bRemote = AdminKit.btn(this, "📵 لغو از راه دور (پیامک به مشتری)", false);
+        confirmStep(bRemote, "مشتری غیرفعال شود؟", () -> {
+            try {
+                String line = License.revokeLine(rDev);
+                if (SmsIo.cleanPhone(rPhone).length() >= 10) {
+                    directSms(rPhone, "میلانو منیجر\n" + line
+                            + "\nلایسنس شما لغو شد؛ برای فعال‌سازی مجدد با فروشنده در تماس باشید.");
+                    db.setRevoked(l.id, true);
+                    reload();
+                } else {
+                    AdminKit.copy(this, "متن لغو", line);
+                    AdminKit.toast(this, "شماره مشتری ثبت نیست؛ متن لغو کپی شد");
+                }
+            } catch (Exception e) {
+                AdminKit.toast(this, "ساخت متن لغو ممکن نشد");
+            }
+        });
+        box.addView(bRemote);
+        Button bBlock = AdminKit.btn(this, "⛔ مسدودسازی گوشی مشتری", false);
+        confirmStep(bBlock, "گوشی مشتری مسدود شود؟", () -> {
+            try {
+                String line = License.blockLine(rDev, AdminKit.txt(fReason));
+                if (SmsIo.cleanPhone(rPhone).length() >= 10) {
+                    directSms(rPhone, "میلانو منیجر\n" + line);
+                    db.setRevoked(l.id, true);
+                    reload();
+                } else {
+                    AdminKit.copy(this, "متن مسدودی", line);
+                    AdminKit.toast(this, "شماره مشتری ثبت نیست؛ متن مسدودی کپی شد");
+                }
+            } catch (Exception e) {
+                AdminKit.toast(this, "ساخت متن مسدودی ممکن نشد");
+            }
+        });
+        box.addView(bBlock);
+        Button bUnblock = AdminKit.btn(this, "🔓 رفع مسدودی گوشی", false);
+        bUnblock.setOnClickListener(v -> {
+            try {
+                String line = License.unblockLine(rDev);
+                if (SmsIo.cleanPhone(rPhone).length() >= 10) {
+                    directSms(rPhone, "میلانو منیجر\n" + line
+                            + "\nمسدودی برداشته شد؛ برنامه را فعال کنید.");
+                } else {
+                    AdminKit.copy(this, "متن رفع مسدودی", line);
+                    AdminKit.toast(this, "شماره مشتری ثبت نیست؛ متن کپی شد");
+                }
+            } catch (Exception e) {
+                AdminKit.toast(this, "ساخت متن ممکن نشد");
+            }
+        });
+        box.addView(bUnblock);
+
         Button bDel = AdminKit.btn(this, "حذف رکورد", false);
         confirmStep(bDel, "تأیید حذف رکورد؟", () -> {
             if (db.deleteLicense(l.id)) {
@@ -1364,6 +1451,39 @@ public class AdminActivity extends Activity {
                 AdminKit.toast(this, "برای تأیید، دوباره بزنید");
             }
         });
+    }
+
+    /** "1405/3/9" (fa/en digits) → epoch day, or -1 when invalid. Uses the verified jalali(). */
+    private static long jalaliToDay(String in) {
+        try {
+            if (in == null) return -1;
+            String t = fa2en(in).replaceAll("[^0-9/]", "");
+            String[] p = t.split("/");
+            if (p.length != 3) return -1;
+            int jy = Integer.parseInt(p[0]);
+            int jm = Integer.parseInt(p[1]);
+            int jd = Integer.parseInt(p[2]);
+            if (jy < 1404 || jy > 1460 || jm < 1 || jm > 12 || jd < 1 || jd > 31) return -1;
+            String want = jy + "/" + jm + "/" + jd;
+            long now = License.today();
+            for (long d = now + 1; d < now + 3650; d++) {
+                if (want.equals(jalali(d))) return d;
+            }
+        } catch (Exception ignored) { }
+        return -1;
+    }
+
+    private static String fa2en(String s) {
+        if (s == null) return "";
+        char[] fa = {'۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'};
+        StringBuilder b = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            int ix = -1;
+            for (int k = 0; k < 10; k++) if (c == fa[k]) { ix = k; break; }
+            b.append(ix >= 0 ? (char) ('0' + ix) : c);
+        }
+        return b.toString();
     }
 
     // ---------- Jalali date (verified port; brute-force tested 2020–2032) ----------

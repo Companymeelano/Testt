@@ -17,7 +17,7 @@ import java.util.List;
 public class AdminDb extends SQLiteOpenHelper {
 
     private static final String NAME = "meelano_admin.db";
-    private static final int VERSION = 3;
+    private static final int VERSION = 4;
 
     public static final class Customer {
         public long id;
@@ -81,7 +81,7 @@ public class AdminDb extends SQLiteOpenHelper {
         db.execSQL("CREATE INDEX idx_lic_cust ON licenses(customer_id)");
         db.execSQL("CREATE TABLE IF NOT EXISTS inbox(_id INTEGER PRIMARY KEY AUTOINCREMENT,"
                 + "dev TEXT DEFAULT '',name TEXT DEFAULT '',phone TEXT DEFAULT '',"
-                + "body TEXT DEFAULT '',created INTEGER DEFAULT 0)");
+                + "body TEXT DEFAULT '',created INTEGER DEFAULT 0,shop TEXT DEFAULT '')");
     }
 
     @Override
@@ -104,7 +104,12 @@ public class AdminDb extends SQLiteOpenHelper {
             try {
                 db.execSQL("CREATE TABLE IF NOT EXISTS inbox(_id INTEGER PRIMARY KEY AUTOINCREMENT,"
                         + "dev TEXT DEFAULT '',name TEXT DEFAULT '',phone TEXT DEFAULT '',"
-                        + "body TEXT DEFAULT '',created INTEGER DEFAULT 0)");
+                        + "body TEXT DEFAULT '',created INTEGER DEFAULT 0,shop TEXT DEFAULT '')");
+            } catch (Exception ignored) { }
+        }
+        if (oldV < 4) {
+            try {
+                db.execSQL("ALTER TABLE inbox ADD COLUMN shop TEXT DEFAULT ''");
             } catch (Exception ignored) { }
         }
     }
@@ -113,15 +118,16 @@ public class AdminDb extends SQLiteOpenHelper {
 
     public static final class Inbox {
         public long id;
-        public String dev = "", name = "", phone = "", body = "";
+        public String dev = "", name = "", phone = "", body = "", shop = "";
         public long created;
     }
 
-    public long addInbox(String dev, String name, String phone, String body) {
+    public long addInbox(String dev, String name, String phone, String shop, String body) {
         ContentValues v = new ContentValues();
         v.put("dev", s(dev));
         v.put("name", s(name));
         v.put("phone", s(phone));
+        v.put("shop", s(shop));
         v.put("body", body == null ? "" : body);
         v.put("created", System.currentTimeMillis());
         try {
@@ -148,6 +154,7 @@ public class AdminDb extends SQLiteOpenHelper {
                 o.dev = getStr(c, "dev");
                 o.phone = getStr(c, "phone");
                 o.name = getStr(c, "name");
+                o.shop = getStr(c, "shop");
                 o.body = getStr(c, "body");
                 o.created = getLong(c, "created");
                 out.add(o);

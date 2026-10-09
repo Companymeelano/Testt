@@ -69,7 +69,7 @@ jobs:
       - name: Commit APKs to dist/ (in-chat delivery)
         run: |
           mkdir -p dist
-          rm -f dist/meelano-manager-v1*-debug.apk dist/meelano-admin-v1.*-debug.apk
+          rm -f dist/meelano-manager-v*-debug.apk dist/meelano-admin-v*-debug.apk
           cp meelano-manager-v21-debug.apk meelano-admin-v1.4-debug.apk dist/
           git config user.name "arena-ci"
           git config user.email "arena-ci@local"

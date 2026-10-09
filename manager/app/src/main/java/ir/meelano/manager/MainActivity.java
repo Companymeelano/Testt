@@ -603,6 +603,12 @@ public class MainActivity extends Activity {
         styleBars();
         checkConn();
         refreshCompany();
+        try {
+            if (ir.meelano.manager.core.LicenseStore.tourPending(this)) {
+                ir.meelano.manager.core.LicenseStore.setTourPending(this, false);
+                ir.meelano.manager.ui.WhatsNew.showCurrent(this);
+            }
+        } catch (Exception ignored) { }
         Notify.boot(this);
         syncBackFab();
         // v24: What's New on upgrade (once), then the silent licensed update check.

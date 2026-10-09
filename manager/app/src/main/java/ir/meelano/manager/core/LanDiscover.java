@@ -1,6 +1,9 @@
 package ir.meelano.manager.core;
 
 import java.net.Inet4Address;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.util.ArrayList;
@@ -126,6 +129,42 @@ public final class LanDiscover {
             }
         } catch (Exception ignored) { }
         return ordered;
+    }
+
+    /**
+     * User database names on a reachable server (via master). Empty when
+     * the login fails or nothing is visible. Call off the UI thread.
+     */
+    public static java.util.List<String> listDatabases(String host, int port,
+            String user, String pass) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        Connection c = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            c = ir.meelano.manager.data.Atiran.open(host, port, "master",
+                    user, pass, 3000, 6, false);
+            ps = c.prepareStatement("SELECT name FROM sys.databases "
+                    + "WHERE database_id > 4 AND state = 0 ORDER BY name");
+            rs = ps.executeQuery();
+            while (rs.next()) {
+                String nm = null;
+                try {
+                    nm = rs.getString(1);
+                } catch (Exception ignored) { }
+                if (nm != null && !nm.trim().isEmpty()) out.add(nm.trim());
+            }
+        } catch (Exception ignored) { }
+        try {
+            if (rs != null) rs.close();
+        } catch (Exception ignored) { }
+        try {
+            if (ps != null) ps.close();
+        } catch (Exception ignored) { }
+        try {
+            if (c != null) c.close();
+        } catch (Exception ignored) { }
+        return out;
     }
 
     private static String lastOctet(String ipv4) {

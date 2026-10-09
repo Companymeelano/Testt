@@ -174,6 +174,35 @@ public final class LicenseStore {
         } catch (Exception ignored) { }
     }
 
+    /** First-entry tour (v33): MainActivity shows the welcome tour once. */
+    public static boolean tourPending(Context c) {
+        try {
+            return prefs(c).getBoolean("tour_pending", false);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public static void setTourPending(Context c, boolean v) {
+        try {
+            prefs(c).edit().putBoolean("tour_pending", v).apply();
+        } catch (Exception ignored) { }
+    }
+
+    public static boolean enteredOnce(Context c) {
+        try {
+            return prefs(c).getBoolean("entered_once", false);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public static void setEnteredOnce(Context c) {
+        try {
+            prefs(c).edit().putBoolean("entered_once", true).apply();
+        } catch (Exception ignored) { }
+    }
+
     /** Step memory (v31): request sent, still waiting for the license. */
     public static boolean requested(Context c) {
         try {

@@ -13,6 +13,8 @@ import ir.meelano.manager.core.FollowUps;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.Money;
+import ir.meelano.manager.core.MoneyQueries;
+import ir.meelano.manager.core.Queries;
 import ir.meelano.manager.core.ReportCatalog;
 import ir.meelano.manager.core.SmsIo;
 import ir.meelano.manager.data.Company;
@@ -20,6 +22,7 @@ import ir.meelano.manager.data.Meta;
 import ir.meelano.manager.data.Repo;
 import ir.meelano.manager.data.Row;
 import ir.meelano.manager.ui.FilterSheet;
+import ir.meelano.manager.ui.FisPrint;
 import ir.meelano.manager.ui.Kit;
 import ir.meelano.manager.ui.Theme;
 
@@ -81,6 +84,13 @@ public class CustomersScreen extends Screen {
         };
         return c;
     }
+
+    private static final ReportCatalog.Col[] LEDGER_COLS = new ReportCatalog.Col[]{
+            new ReportCatalog.Col("date", "تاریخ", ReportCatalog.T_DATE),
+            new ReportCatalog.Col("opLabel", "عملیات", ReportCatalog.T_TEXT),
+            new ReportCatalog.Col("bed", "بدهکار", ReportCatalog.T_MONEY),
+            new ReportCatalog.Col("bes", "بستانکار", ReportCatalog.T_MONEY),
+    };
 
     private static final String[][] BUCKETS = {
             {"", "همه"}, {"debt", "بدهکار"}, {"credit", "بستانکار"},
@@ -299,6 +309,12 @@ public class CustomersScreen extends Screen {
         body.addView(a.kit.kv("وضعیت", blocked ? "⛔ مسدود" : "✓ فعال", blocked ? Theme.DANGER : Theme.SUCCESS), a.kit.lp(-1, -2));
         if (!h.s("addre").isEmpty()) body.addView(a.kit.kv("آدرس", h.s("addre"), Theme.MUTED), a.kit.lp(-1, -2));
 
+        if (!dz.ledger.isEmpty()) {
+            body.addView(a.kit.text("خروجی کامل گردش حساب", 13.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
+            body.addView(a.exportBar("گردش حساب " + h.s("name"), "کد " + dz.code, LEDGER_COLS, dz.ledger), a.kit.lp(-1, -2));
+            body.addView(a.kit.gap(8));
+        }
+
         // ---- follow-up notes ----
         final String folCode = dz.code;
         final String folName = h.s("name");
@@ -376,13 +392,8 @@ public class CustomersScreen extends Screen {
             for (Row r : dz.ledger)
                 if (r.s("opLabel").isEmpty()) r.put("opLabel", AtiranSchema.actNameFallback(r.s("op")));
             body.addView(a.kit.text("گردش حساب (" + Money.fa(String.valueOf(dz.ledger.size())) + " سند)", 13.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
-            ReportCatalog.Col[] cols = new ReportCatalog.Col[]{
-                    new ReportCatalog.Col("date", "تاریخ", ReportCatalog.T_DATE),
-                    new ReportCatalog.Col("opLabel", "عملیات", ReportCatalog.T_TEXT),
-                    new ReportCatalog.Col("bed", "بدهکار", ReportCatalog.T_MONEY),
-                    new ReportCatalog.Col("bes", "بستانکار", ReportCatalog.T_MONEY),
-            };
-            body.addView(a.kit.dataTable(cols, cap(dz.ledger, 50), null), a.kit.lp(-1, -2));
+            body.addView(a.kit.hint("برای مشاهده شرح کامل هر سند، روی ردیف آن بزنید"), a.kit.lp(-1, -2));
+            body.addView(a.kit.dataTable(LEDGER_COLS, cap(dz.ledger, 50), this::ledgerDialog), a.kit.lp(-1, -2));
             if (dz.ledger.size() > 50)
                 body.addView(a.kit.hint("+" + Money.fa(String.valueOf(dz.ledger.size() - 50)) + " سند قدیمی‌تر…"), a.kit.lp(-1, -2));
         }
@@ -395,25 +406,30 @@ public class CustomersScreen extends Screen {
                     new ReportCatalog.Col("total", "جمع", ReportCatalog.T_MONEY),
                     new ReportCatalog.Col("paid", "دریافتی", ReportCatalog.T_MONEY),
             };
-            body.addView(a.kit.dataTable(cols, cap(dz.invoices, 30), null), a.kit.lp(-1, -2));
+            body.addView(a.kit.hint("برای مشاهده اقلام و تسویه‌ها، روی هر فاکتور بزنید"), a.kit.lp(-1, -2));
+            body.addView(a.kit.dataTable(cols, cap(dz.invoices, 30), r -> openInvoiceDetail(r.s("no"))), a.kit.lp(-1, -2));
         }
 
         if (!dz.darsIn.isEmpty()) {
             body.addView(a.kit.text("دریافت‌ها (" + Money.fa(String.valueOf(dz.darsIn.size())) + ")", 13.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
-            body.addView(darTable(dz.darsIn), a.kit.lp(-1, -2));
+            body.addView(a.kit.hint("برای تفکیک نقد / کارت / حواله / چک، روی هر قبض بزنید"), a.kit.lp(-1, -2));
+            body.addView(darTable(dz.darsIn, 0), a.kit.lp(-1, -2));
         }
         if (!dz.darsOut.isEmpty()) {
             body.addView(a.kit.text("پرداخت‌ها (" + Money.fa(String.valueOf(dz.darsOut.size())) + ")", 13.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
-            body.addView(darTable(dz.darsOut), a.kit.lp(-1, -2));
+            body.addView(a.kit.hint("برای تفکیک نقد / کارت / حواله / چک، روی هر قبض بزنید"), a.kit.lp(-1, -2));
+            body.addView(darTable(dz.darsOut, 1), a.kit.lp(-1, -2));
         }
         if (!dz.chqIn.isEmpty()) {
             for (Row r : dz.chqIn) r.put("stLabel", inLabel(r));
             body.addView(a.kit.text("چک‌های دریافتی (" + Money.fa(String.valueOf(dz.chqIn.size())) + ")", 13.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
+            body.addView(a.kit.hint("برای جزئیات کامل، روی هر چک بزنید"), a.kit.lp(-1, -2));
             body.addView(chqTable(dz.chqIn), a.kit.lp(-1, -2));
         }
         if (!dz.chqOut.isEmpty()) {
             for (Row r : dz.chqOut) r.put("stLabel", outLabel(r));
             body.addView(a.kit.text("چک‌های پرداختی (" + Money.fa(String.valueOf(dz.chqOut.size())) + ")", 13.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
+            body.addView(a.kit.hint("برای جزئیات کامل، روی هر چک بزنید"), a.kit.lp(-1, -2));
             body.addView(chqTable(dz.chqOut), a.kit.lp(-1, -2));
         }
 
@@ -432,21 +448,21 @@ public class CustomersScreen extends Screen {
         AlertDialog dlg = new AlertDialog.Builder(a, android.R.style.Theme_Material_Dialog_NoActionBar)
                 .setView(sv).create();
         dlgH[0] = dlg;
-        if (dlg.getWindow() != null)
+        if (dlg.getWindow() != null) {
             dlg.getWindow().setBackgroundDrawable(Theme.dialogBg());
+            try {
+                android.view.WindowManager.LayoutParams lp = dlg.getWindow().getAttributes();
+                lp.width = (int) (a.getResources().getDisplayMetrics().widthPixels * 0.94);
+                dlg.getWindow().setAttributes(lp);
+            } catch (Exception ignored) { }
+        }
         LinearLayout footer = a.kit.h();
         if (!dz.ledger.isEmpty()) {
             final List<Row> fLedger = dz.ledger;
             final String fName = h.s("name");
             final String fCode = dz.code;
             footer.addView(a.kit.btn("اشتراک گردش", v -> {
-                ReportCatalog.Col[] cols = new ReportCatalog.Col[]{
-                        new ReportCatalog.Col("date", "تاریخ", ReportCatalog.T_DATE),
-                        new ReportCatalog.Col("opLabel", "عملیات", ReportCatalog.T_TEXT),
-                        new ReportCatalog.Col("bed", "بدهکار", ReportCatalog.T_MONEY),
-                        new ReportCatalog.Col("bes", "بستانکار", ReportCatalog.T_MONEY),
-                };
-                a.sharePdf("گردش حساب " + fName, "کد " + fCode, cols, fLedger);
+                a.sharePdf("گردش حساب " + fName, "کد " + fCode, LEDGER_COLS, fLedger);
             }), a.kit.wlp(1f));
             footer.addView(a.kit.space(8));
         }
@@ -563,18 +579,293 @@ public class CustomersScreen extends Screen {
         box[0].show();
     }
 
+    // ---------------- drill-down: ledger / invoice / voucher / cheque ----------------
+
+    private void ledgerDialog(Row r) {
+        LinearLayout nb = a.kit.v();
+        nb.setPadding(Theme.dp(16), Theme.dp(8), Theme.dp(16), Theme.dp(8));
+        nb.addView(a.kit.kv("تاریخ", Jalali.dispFa(r.s("date")), Theme.TEXT), a.kit.lp(-1, -2));
+        nb.addView(a.kit.kv("عملیات", r.s("opLabel").isEmpty() ? r.s("op") : r.s("opLabel"), Theme.TEXT), a.kit.lp(-1, -2));
+        if (r.d("bed") > 0) nb.addView(a.kit.kv("بدهکار", Money.rial(r.d("bed")), Theme.DANGER), a.kit.lp(-1, -2));
+        if (r.d("bes") > 0) nb.addView(a.kit.kv("بستانکار", Money.rial(r.d("bes")), Theme.SUCCESS), a.kit.lp(-1, -2));
+        if (!r.s("ghno").isEmpty()) nb.addView(a.kit.kv("شماره سند", Money.fa(r.s("ghno")), Theme.TEXT), a.kit.lp(-1, -2));
+        if (!r.s("descrip").isEmpty()) nb.addView(a.kit.kv("شرح", r.s("descrip"), Theme.MUTED), a.kit.lp(-1, -2));
+        if (!r.s("doneDate").isEmpty()) nb.addView(a.kit.kv("تاریخ ثبت", Jalali.dispFa(r.s("doneDate")), Theme.MUTED), a.kit.lp(-1, -2));
+        nb.addView(a.kit.gap(8));
+        nb.addView(a.exportBar("سند گردش حساب", Jalali.dispFa(r.s("date")), LEDGER_COLS,
+                java.util.Collections.singletonList(r)), a.kit.lp(-1, -2));
+        nb.addView(a.kit.gap(8));
+        final AlertDialog[] box = new AlertDialog[1];
+        nb.addView(a.kit.btn("بستن", v -> box[0].dismiss()), a.kit.lp(-1, -2));
+        box[0] = a.kit.dialog("جزئیات سند", nb, true);
+        box[0].show();
+    }
+
+    private void openInvoiceDetail(final String no) {
+        if (no == null || no.isEmpty()) return;
+        a.kit.toast("در حال دریافت فاکتور…");
+        a.repo.run(c -> {
+            Meta m = new Meta(c);
+            Row head = Repo.one(c, Queries.factorHeader(m, true, no));
+            List<Row> lines = Repo.exec(c, Queries.factorLines(m, true, no));
+            List<Row> dars = new ArrayList<>();
+            try {
+                dars = Repo.exec(c, MoneyQueries.invoiceDars(m, 0, no));
+            } catch (Exception ignored) { }
+            return new InvDetail(head, lines, dars);
+        }, new Repo.Cb<InvDetail>() {
+            @Override
+            public void ok(InvDetail dt) {
+                if (dt == null || dt.head == null || dt.head.s("no").isEmpty()) {
+                    a.kit.toast("فاکتور یافت نشد");
+                    return;
+                }
+                showInvoiceDetail(dt);
+            }
+
+            @Override
+            public void fail(String faError) {
+                a.kit.toast(faError);
+            }
+        });
+    }
+
+    private static final class InvDetail {
+        final Row head;
+        final List<Row> lines;
+        final List<Row> dars;
+
+        InvDetail(Row head, List<Row> lines, List<Row> dars) {
+            this.head = head;
+            this.lines = lines;
+            this.dars = dars;
+        }
+    }
+
+    private void showInvoiceDetail(InvDetail dt) {
+        Row head = dt.head;
+        LinearLayout body = a.kit.v();
+        body.setPadding(Theme.dp(16), Theme.dp(8), Theme.dp(16), Theme.dp(8));
+        body.addView(a.kit.kv("شماره", Money.fa(head.s("no")), Theme.TEXT), a.kit.lp(-1, -2));
+        body.addView(a.kit.kv("تاریخ", Jalali.dispFa(head.s("date")), Theme.TEXT), a.kit.lp(-1, -2));
+        body.addView(a.kit.kv("مشتری", head.s("customer"), Theme.TEXT), a.kit.lp(-1, -2));
+        if (!head.s("visitor").isEmpty() && !"بدون ویزیتور".equals(head.s("visitor")))
+            body.addView(a.kit.kv("ویزیتور", head.s("visitor"), Theme.TEXT), a.kit.lp(-1, -2));
+        String desc = head.has("description") ? head.s("description") : head.s("descrip");
+        if (!desc.isEmpty()) body.addView(a.kit.kv("شرح", desc, Theme.MUTED), a.kit.lp(-1, -2));
+        if (head.has("tafif") && head.d("tafif") > 0)
+            body.addView(a.kit.kv("تخفیف", Money.rial(head.d("tafif")), Theme.TEXT), a.kit.lp(-1, -2));
+        if (head.has("tax") && head.d("tax") > 0)
+            body.addView(a.kit.kv("مالیات", Money.rial(head.d("tax")), Theme.TEXT), a.kit.lp(-1, -2));
+        body.addView(a.kit.kv("جمع", Money.rial(head.d("total")), Theme.GOLD_SOFT), a.kit.lp(-1, -2));
+        body.addView(a.kit.kv("دریافتی", Money.rial(head.d("paid")), Theme.SUCCESS), a.kit.lp(-1, -2));
+        String tasvieh = head.has("tasvieh") ? AtiranSchema.tasviehFa(head.s("tasvieh")) : "نامشخص";
+        if (!"نامشخص".equals(tasvieh))
+            body.addView(a.kit.kv("وضعیت تسویه", tasvieh,
+                    "تسویه‌شده".equals(tasvieh) ? Theme.SUCCESS : Theme.WARNING), a.kit.lp(-1, -2));
+        double remain = head.d("total") - head.d("paid");
+        if (Math.abs(remain) > AtiranSchema.SETTLE_TOLERANCE)
+            body.addView(a.kit.kv("مانده", Money.rial(remain), remain > 0 ? Theme.DANGER : Theme.INFO), a.kit.lp(-1, -2));
+        body.addView(a.kit.text("مبلغ به حروف: " + Money.words(head.d("total")), 11f, Theme.MUTED, false), a.kit.lp(-1, -2));
+        ReportCatalog.Col[] lineCols = new ReportCatalog.Col[]{
+                new ReportCatalog.Col("naka", "کالا", ReportCatalog.T_TEXT),
+                new ReportCatalog.Col("qtyVah", "مقدار", ReportCatalog.T_NUM),
+                new ReportCatalog.Col("vahPrice", "فی", ReportCatalog.T_MONEY),
+                new ReportCatalog.Col("lineSum", "مبلغ", ReportCatalog.T_MONEY),
+        };
+        if (!dt.lines.isEmpty()) {
+            for (Row r : dt.lines) {
+                if (Math.abs(r.d("qtyVah")) < 0.0005 && Math.abs(r.d("qtyJoz")) > 0.0005)
+                    r.put("qtyVah", r.d("qtyJoz"));
+                if (Math.abs(r.d("vahPrice")) < 0.005 && Math.abs(r.d("jozPrice")) > 0.005)
+                    r.put("vahPrice", r.d("jozPrice"));
+            }
+            body.addView(a.kit.text("اقلام فاکتور", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
+            body.addView(a.kit.dataTable(lineCols, dt.lines, null), a.kit.lp(-1, -2));
+        }
+        if (!dt.dars.isEmpty()) {
+            body.addView(a.kit.text("دریافت‌های این فاکتور", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
+            ReportCatalog.Col[] dcols = new ReportCatalog.Col[]{
+                    new ReportCatalog.Col("ghno", "قبض", ReportCatalog.T_TEXT),
+                    new ReportCatalog.Col("date", "تاریخ", ReportCatalog.T_DATE),
+                    new ReportCatalog.Col("total", "مبلغ قبض", ReportCatalog.T_MONEY),
+                    new ReportCatalog.Col("settled", "تسویه‌شده", ReportCatalog.T_MONEY),
+            };
+            body.addView(a.kit.dataTable(dcols, dt.dars, r -> openDarDetail(0, r.s("ghno"))), a.kit.lp(-1, -2));
+        }
+        final String fNo = head.s("no");
+        final String fParty = head.s("customer");
+        final String fDate = Jalali.dispFa(head.s("date"));
+        final List<Row> fLines = dt.lines;
+        final Row fHead = head;
+        body.addView(a.kit.gap(8));
+        if (!fLines.isEmpty())
+            body.addView(a.exportBar("فاکتور " + fNo, fParty + " • " + fDate, lineCols, fLines), a.kit.lp(-1, -2));
+        body.addView(a.kit.gap(6));
+        LinearLayout row = a.kit.h();
+        final AlertDialog[] box = new AlertDialog[1];
+        row.addView(a.kit.btnGhost("🖨 چاپ حرارتی", Theme.GOLD, v -> FisPrint.print(a, fHead, fLines, true)), a.kit.wlp(1f));
+        row.addView(a.kit.space(8));
+        row.addView(a.kit.btn("بستن", v -> box[0].dismiss()), a.kit.wlp(1f));
+        body.addView(row, a.kit.lp(-1, -2));
+        box[0] = a.kit.dialog("فاکتور " + Money.fa(fNo), body, true);
+        box[0].show();
+    }
+
+    private void openDarDetail(final int p, final String ghno) {
+        if (ghno == null || ghno.isEmpty()) return;
+        a.kit.toast("در حال دریافت قبض…");
+        a.repo.run(c -> {
+            Meta m = new Meta(c);
+            Row head = Repo.one(c, MoneyQueries.darHeader(m, p, ghno));
+            List<Row> pos = new ArrayList<>();
+            try {
+                pos = Repo.exec(c, MoneyQueries.darPos(m, p, ghno));
+            } catch (Exception ignored) { }
+            List<Row> chqs = new ArrayList<>();
+            try {
+                chqs = Repo.exec(c, MoneyQueries.darCheques(m, p, ghno));
+            } catch (Exception ignored) { }
+            List<Row> invs = new ArrayList<>();
+            try {
+                invs = Repo.exec(c, MoneyQueries.darSettled(m, p, ghno));
+            } catch (Exception ignored) { }
+            return new DarDetail(head, pos, chqs, invs);
+        }, new Repo.Cb<DarDetail>() {
+            @Override
+            public void ok(DarDetail dt) {
+                showDarDetail(p, dt);
+            }
+
+            @Override
+            public void fail(String faError) {
+                a.kit.toast(faError);
+            }
+        });
+    }
+
+    private static final class DarDetail {
+        final Row head;
+        final List<Row> pos;
+        final List<Row> chqs;
+        final List<Row> invs;
+
+        DarDetail(Row head, List<Row> pos, List<Row> chqs, List<Row> invs) {
+            this.head = head;
+            this.pos = pos;
+            this.chqs = chqs;
+            this.invs = invs;
+        }
+    }
+
+    private void showDarDetail(final int p, DarDetail dt) {
+        Row head = dt.head == null ? new Row() : dt.head;
+        LinearLayout body = a.kit.v();
+        body.setPadding(Theme.dp(16), Theme.dp(8), Theme.dp(16), Theme.dp(8));
+        body.addView(a.kit.kv("شماره قبض", Money.fa(head.s("ghno")), Theme.TEXT), a.kit.lp(-1, -2));
+        body.addView(a.kit.kv("تاریخ", Jalali.dispFa(head.s("date")), Theme.TEXT), a.kit.lp(-1, -2));
+        if (!head.s("customer").isEmpty()) body.addView(a.kit.kv("طرف‌حساب", head.s("customer"), Theme.TEXT), a.kit.lp(-1, -2));
+        if (!head.s("kind").isEmpty()) body.addView(a.kit.kv("نوع", head.s("kind"), Theme.TEXT), a.kit.lp(-1, -2));
+        // ---- separated type breakdown (cash / card / havaleh / cheque) ----
+        List<Kit.Kpi> kpis = new ArrayList<>();
+        kpis.add(new Kit.Kpi("نقد", Money.compactRial(head.d("cash")), "", Theme.SUCCESS));
+        kpis.add(new Kit.Kpi("کارت", Money.compactRial(head.d("pos")), "", Theme.INFO));
+        kpis.add(new Kit.Kpi("حواله", Money.compactRial(head.d("havaleh")), "", Theme.VIOLET));
+        kpis.add(new Kit.Kpi("چک" + (head.l("chkCount") > 0 ? " (" + Money.fa(String.valueOf(head.l("chkCount"))) + ")" : ""),
+                Money.compactRial(head.d("cheque")), "", Theme.WARNING));
+        body.addView(a.kit.kpiGrid(kpis, 2), a.kit.lp(-1, -2));
+        body.addView(a.kit.gap(4));
+        body.addView(a.kit.kv("جمع قبض", Money.rial(head.d("total")), Theme.GOLD_SOFT), a.kit.lp(-1, -2));
+        if (!head.s("descrip").isEmpty()) body.addView(a.kit.kv("شرح", head.s("descrip"), Theme.MUTED), a.kit.lp(-1, -2));
+        if (!head.s("username").isEmpty()) body.addView(a.kit.kv("کاربر", head.s("username"), Theme.MUTED), a.kit.lp(-1, -2));
+        body.addView(a.kit.text("مبلغ به حروف: " + Money.words(head.d("total")), 11f, Theme.MUTED, false), a.kit.lp(-1, -2));
+        if (!dt.pos.isEmpty()) {
+            body.addView(a.kit.text("کارت / حواله", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
+            ReportCatalog.Col[] cols = new ReportCatalog.Col[]{
+                    new ReportCatalog.Col("bank", "بانک", ReportCatalog.T_TEXT),
+                    new ReportCatalog.Col("amount", "مبلغ", ReportCatalog.T_MONEY),
+                    new ReportCatalog.Col("tracking", "پیگیری", ReportCatalog.T_TEXT),
+            };
+            body.addView(a.kit.dataTable(cols, dt.pos, null), a.kit.lp(-1, -2));
+        }
+        if (!dt.chqs.isEmpty()) {
+            body.addView(a.kit.text("چک‌های این قبض", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
+            final boolean inChq = p == 0;
+            for (Row r : dt.chqs)
+                r.put("stLabel", inChq ? AtiranSchema.chequeInStatusFa(r.s("st"), r.s("back"))
+                        : AtiranSchema.chequeOutStatusFa(r.s("st")));
+            ReportCatalog.Col[] cols = new ReportCatalog.Col[]{
+                    new ReportCatalog.Col("num", "شماره", ReportCatalog.T_TEXT),
+                    new ReportCatalog.Col("amount", "مبلغ", ReportCatalog.T_MONEY),
+                    new ReportCatalog.Col("sardate", "سررسید", ReportCatalog.T_DATE),
+                    new ReportCatalog.Col("stLabel", "وضعیت", ReportCatalog.T_TEXT),
+            };
+            body.addView(a.kit.dataTable(cols, dt.chqs, this::chequeDialog), a.kit.lp(-1, -2));
+        }
+        if (!dt.invs.isEmpty()) {
+            body.addView(a.kit.text(p == 0 ? "فاکتورهای تسویه‌شده" : "فاکتورهای خرید تسویه‌شده", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
+            ReportCatalog.Col[] cols = new ReportCatalog.Col[]{
+                    new ReportCatalog.Col("no", "فاکتور", ReportCatalog.T_TEXT),
+                    new ReportCatalog.Col("customer", "طرف‌حساب", ReportCatalog.T_TEXT),
+                    new ReportCatalog.Col("paidSettled", "تسویه‌شده", ReportCatalog.T_MONEY),
+            };
+            body.addView(a.kit.dataTable(cols, dt.invs, r -> openInvoiceDetail(r.s("no"))), a.kit.lp(-1, -2));
+            body.addView(a.kit.gap(4));
+            body.addView(a.exportBar("تسویه‌های قبض " + head.s("ghno"), Jalali.dispFa(head.s("date")), cols, dt.invs), a.kit.lp(-1, -2));
+        } else if (!dt.pos.isEmpty()) {
+            ReportCatalog.Col[] cols = new ReportCatalog.Col[]{
+                    new ReportCatalog.Col("bank", "بانک", ReportCatalog.T_TEXT),
+                    new ReportCatalog.Col("amount", "مبلغ", ReportCatalog.T_MONEY),
+                    new ReportCatalog.Col("tracking", "پیگیری", ReportCatalog.T_TEXT),
+            };
+            body.addView(a.kit.gap(4));
+            body.addView(a.exportBar("قبض " + head.s("ghno"), Jalali.dispFa(head.s("date")), cols, dt.pos), a.kit.lp(-1, -2));
+        }
+        body.addView(a.kit.gap(8));
+        final AlertDialog[] box = new AlertDialog[1];
+        body.addView(a.kit.btn("بستن", v -> box[0].dismiss()), a.kit.lp(-1, -2));
+        box[0] = a.kit.dialog((p == 0 ? "قبض دریافت " : "قبض پرداخت ") + Money.fa(head.s("ghno")), body, true);
+        box[0].show();
+    }
+
+    private void chequeDialog(Row r) {
+        LinearLayout nb = a.kit.v();
+        nb.setPadding(Theme.dp(16), Theme.dp(8), Theme.dp(16), Theme.dp(8));
+        nb.addView(a.kit.kv("شماره چک", Money.fa(r.s("num")), Theme.TEXT), a.kit.lp(-1, -2));
+        if (!r.s("bank").isEmpty()) nb.addView(a.kit.kv("بانک", r.s("bank"), Theme.TEXT), a.kit.lp(-1, -2));
+        nb.addView(a.kit.kv("مبلغ", Money.rial(r.d("amount")), Theme.GOLD_SOFT), a.kit.lp(-1, -2));
+        if (!r.s("sardate").isEmpty()) nb.addView(a.kit.kv("سررسید", Jalali.dispFa(r.s("sardate")), Theme.TEXT), a.kit.lp(-1, -2));
+        if (!r.s("stLabel").isEmpty()) nb.addView(a.kit.kv("وضعیت", r.s("stLabel"), Theme.INFO), a.kit.lp(-1, -2));
+        nb.addView(a.kit.text("مبلغ به حروف: " + Money.words(r.d("amount")), 11f, Theme.MUTED, false), a.kit.lp(-1, -2));
+        nb.addView(a.kit.gap(8));
+        ReportCatalog.Col[] cols = new ReportCatalog.Col[]{
+                new ReportCatalog.Col("num", "شماره", ReportCatalog.T_TEXT),
+                new ReportCatalog.Col("bank", "بانک", ReportCatalog.T_TEXT),
+                new ReportCatalog.Col("amount", "مبلغ", ReportCatalog.T_MONEY),
+                new ReportCatalog.Col("sardate", "سررسید", ReportCatalog.T_DATE),
+                new ReportCatalog.Col("stLabel", "وضعیت", ReportCatalog.T_TEXT),
+        };
+        nb.addView(a.exportBar("چک " + r.s("num"), "", cols,
+                java.util.Collections.singletonList(r)), a.kit.lp(-1, -2));
+        nb.addView(a.kit.gap(8));
+        final AlertDialog[] box = new AlertDialog[1];
+        nb.addView(a.kit.btn("بستن", v -> box[0].dismiss()), a.kit.lp(-1, -2));
+        box[0] = a.kit.dialog("جزئیات چک", nb, true);
+        box[0].show();
+    }
+
     private List<Row> cap(List<Row> rows, int n) {
         if (rows.size() <= n) return rows;
         return new ArrayList<>(rows.subList(0, n));
     }
 
-    private View darTable(List<Row> rows0) {
+    private View darTable(List<Row> rows0, final int p) {
         ReportCatalog.Col[] cols = new ReportCatalog.Col[]{
                 new ReportCatalog.Col("ghno", "قبض", ReportCatalog.T_TEXT),
                 new ReportCatalog.Col("date", "تاریخ", ReportCatalog.T_DATE),
                 new ReportCatalog.Col("total", "مبلغ", ReportCatalog.T_MONEY),
         };
-        return a.kit.dataTable(cols, cap(rows0, 30), null);
+        return a.kit.dataTable(cols, cap(rows0, 30), r -> openDarDetail(p, r.s("ghno")));
     }
 
     private View chqTable(List<Row> rows0) {
@@ -584,7 +875,7 @@ public class CustomersScreen extends Screen {
                 new ReportCatalog.Col("amount", "مبلغ", ReportCatalog.T_MONEY),
                 new ReportCatalog.Col("stLabel", "وضعیت", ReportCatalog.T_TEXT),
         };
-        return a.kit.dataTable(cols, cap(rows0, 30), null);
+        return a.kit.dataTable(cols, cap(rows0, 30), this::chequeDialog);
     }
 
     private String inLabel(Row r) {

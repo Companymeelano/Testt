@@ -124,10 +124,9 @@ public class SettingsScreen extends Screen {
             sw.addView(cell, a.kit.wlp(1f));
         }
         th.addView(sw, a.kit.lp(-1, -2));
-        final boolean bf = a.settings.bigFont();
-        th.addView(a.kit.btnGhost("🔍 درشت‌نمایی متن: " + (bf ? "روشن" : "خاموش"), Theme.GOLD, v -> {
-            a.settings.setBigFont(!bf);
-            a.refreshTheme();
+        th.addView(a.kit.btnGhost("🔍 بزرگ‌نمایی متن: " + MainActivity.zoomLabel(a.settings.zoomIdx()) + " (برای تغییر بزنید)", Theme.GOLD, v -> {
+            a.cycleZoom();
+            render(content);
         }), a.kit.lp(-1, -2));
         final boolean sn = a.settings.seasonalOn();
         th.addView(a.kit.btnGhost("🌸 تم مناسبتی خودکار: " + (sn ? "روشن" : "خاموش"), Theme.TEAL, v -> {

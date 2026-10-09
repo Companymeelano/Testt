@@ -340,6 +340,16 @@ public class TradeScreen extends Screen {
         content.addView(a.kit.pager(filter.page, hasMore,
                 () -> { filter.page = Math.max(0, filter.page - 1); render(content); },
                 () -> { filter.page = filter.page + 1; render(content); }), a.kit.lp(-1, -2));
+        content.addView(a.kit.gap(8));
+        ReportCatalog.Col[] expCols = new ReportCatalog.Col[]{
+                new ReportCatalog.Col("no", "فاکتور", ReportCatalog.T_TEXT),
+                new ReportCatalog.Col("date", "تاریخ", ReportCatalog.T_DATE),
+                new ReportCatalog.Col("customer", "طرف‌حساب", ReportCatalog.T_TEXT),
+                new ReportCatalog.Col("total", "جمع", ReportCatalog.T_MONEY),
+                new ReportCatalog.Col("remain", "مانده", ReportCatalog.T_MONEY),
+        };
+        content.addView(a.exportBar(sales ? "فهرست فاکتورهای فروش" : "فهرست فاکتورهای خرید",
+                filter.rangeFa(), expCols, d.list), a.kit.lp(-1, -2));
     }
 
     private void buildOverdue(LinearLayout content, Data d) {
@@ -518,17 +528,17 @@ public class TradeScreen extends Screen {
         final String fNo = head.s("no");
         final String fParty = head.s("customer");
         final String fDate = Jalali.dispFa(head.s("date"));
+        ReportCatalog.Col[] expCols = new ReportCatalog.Col[]{
+                new ReportCatalog.Col("naka", "کالا", ReportCatalog.T_TEXT),
+                new ReportCatalog.Col("qtyVah", "مقدار", ReportCatalog.T_NUM),
+                new ReportCatalog.Col("vahPrice", "فی", ReportCatalog.T_MONEY),
+                new ReportCatalog.Col("lineSum", "مبلغ", ReportCatalog.T_MONEY),
+        };
+        if (!fLines.isEmpty()) {
+            body.addView(a.kit.gap(8));
+            body.addView(a.exportBar("فاکتور " + fNo, fParty + " • " + fDate, expCols, fLines), a.kit.lp(-1, -2));
+        }
         LinearLayout footer = a.kit.h();
-        footer.addView(a.kit.btn("اشتراک PDF", v -> {
-            ReportCatalog.Col[] cols = new ReportCatalog.Col[]{
-                    new ReportCatalog.Col("naka", "کالا", ReportCatalog.T_TEXT),
-                    new ReportCatalog.Col("qtyVah", "مقدار", ReportCatalog.T_NUM),
-                    new ReportCatalog.Col("vahPrice", "فی", ReportCatalog.T_MONEY),
-                    new ReportCatalog.Col("lineSum", "مبلغ", ReportCatalog.T_MONEY),
-            };
-            a.sharePdf("فاکتور " + fNo, fParty + " • " + fDate, cols, fLines);
-        }), a.kit.wlp(1f));
-        footer.addView(a.kit.space(8));
         footer.addView(a.kit.btnGhost("🖨 چاپ", Theme.GOLD, v -> FisPrint.print(a, head, fLines, sales)), a.kit.wlp(1f));
         footer.addView(a.kit.space(8));
         footer.addView(a.kit.btn("بستن", v -> dlg.dismiss()), a.kit.wlp(1f));

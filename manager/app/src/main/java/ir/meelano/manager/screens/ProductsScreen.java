@@ -241,6 +241,15 @@ public class ProductsScreen extends Screen {
         content.addView(a.kit.pager(filter.page, hasMore,
                 () -> { filter.page = Math.max(0, filter.page - 1); render(content); },
                 () -> { filter.page = filter.page + 1; render(content); }), a.kit.lp(-1, -2));
+        content.addView(a.kit.gap(8));
+        ReportCatalog.Col[] expCols = new ReportCatalog.Col[]{
+                new ReportCatalog.Col("naka", "کالا", ReportCatalog.T_TEXT),
+                new ReportCatalog.Col("shka", "کد", ReportCatalog.T_TEXT),
+                new ReportCatalog.Col("groupName", "گروه", ReportCatalog.T_TEXT),
+                new ReportCatalog.Col("vah", "موجودی", ReportCatalog.T_NUM),
+                new ReportCatalog.Col("sale", "قیمت فروش", ReportCatalog.T_MONEY),
+        };
+        content.addView(a.exportBar("فهرست کالاها", "", expCols, d.list), a.kit.lp(-1, -2));
     }
 
     private void buildLow(LinearLayout content, Data d) {

@@ -256,4 +256,16 @@ public final class Settings {
     public String guardSeen() { return p.getString("guard_seen", ""); }
 
     public void setGuardSeen(String v) { p.edit().putString("guard_seen", v == null ? "" : v).apply(); }
+
+    /** Text zoom level: 0 = 90٪, 1 = 100٪, 2 = 115٪, 3 = 130٪. */
+    public int zoomIdx() {
+        try {
+            int z = p.getInt("zoom_idx", 1);
+            return z < 0 || z > 3 ? 1 : z;
+        } catch (Exception e) {
+            return 1;
+        }
+    }
+
+    public void setZoomIdx(int z) { p.edit().putInt("zoom_idx", z < 0 ? 0 : (z > 3 ? 3 : z)).apply(); }
 }

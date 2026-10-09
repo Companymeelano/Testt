@@ -208,6 +208,15 @@ public class MoneyScreen extends Screen {
         content.addView(a.kit.pager(filter.page, hasMore,
                 () -> { filter.page = Math.max(0, filter.page - 1); render(content); },
                 () -> { filter.page = filter.page + 1; render(content); }), a.kit.lp(-1, -2));
+        content.addView(a.kit.gap(8));
+        ReportCatalog.Col[] expCols = new ReportCatalog.Col[]{
+                new ReportCatalog.Col("ghno", "قبض", ReportCatalog.T_TEXT),
+                new ReportCatalog.Col("date", "تاریخ", ReportCatalog.T_DATE),
+                new ReportCatalog.Col("customer", "طرف‌حساب", ReportCatalog.T_TEXT),
+                new ReportCatalog.Col("total", "مبلغ", ReportCatalog.T_MONEY),
+        };
+        content.addView(a.exportBar(p == 0 ? "فهرست قبوض دریافت" : "فهرست قبوض پرداخت",
+                filter.rangeFa(), expCols, d.list), a.kit.lp(-1, -2));
     }
 
     private void buildBanks(LinearLayout content, Data d) {
@@ -356,6 +365,15 @@ public class MoneyScreen extends Screen {
         dlgHolder[0] = dlg;
         if (dlg.getWindow() != null)
             dlg.getWindow().setBackgroundDrawable(Theme.dialogBg());
+        if (!dt.invs.isEmpty()) {
+            ReportCatalog.Col[] expCols = new ReportCatalog.Col[]{
+                    new ReportCatalog.Col("no", "فاکتور", ReportCatalog.T_TEXT),
+                    new ReportCatalog.Col("customer", "طرف‌حساب", ReportCatalog.T_TEXT),
+                    new ReportCatalog.Col("paidSettled", "تسویه‌شده", ReportCatalog.T_MONEY),
+            };
+            body.addView(a.kit.gap(8));
+            body.addView(a.exportBar("تسویه‌های قبض " + head.s("ghno"), Jalali.dispFa(head.s("date")), expCols, dt.invs), a.kit.lp(-1, -2));
+        }
         body.addView(a.kit.gap(8));
         body.addView(a.kit.btn("بستن", v -> dlg.dismiss()), a.kit.lp(-1, -2));
         body.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(16));

@@ -63,6 +63,22 @@ public final class ReportCatalog {
     }
 
     public static final Spec[] ALL = {
+            // ---- ویژه مدیر (v22: the vital few, checked every morning) ----
+            s("today_top", "پرفروش‌ترین‌های امروز", "ویژه مدیر", "کالاهای دارای بیشترین فروش ریالی امروز", false,
+                    new Col[]{c("label", "کالا", T_TEXT), c("qty", "مقدار", T_NUM), c("total", "جمع فروش", T_MONEY), c("docs", "ردیف", T_NUM)},
+                    C_BARS, "label", "total"),
+            s("cheques_today", "سررسیدهای امروز و فردا", "ویژه مدیر", "چک‌های دریافتی با سررسید امروز یا فردا — اقدام فوری", false,
+                    new Col[]{c("num", "شماره", T_TEXT), c("customer", "مشتری", T_TEXT), c("bank", "بانک", T_TEXT),
+                            c("amount", "مبلغ", T_MONEY), c("sardate", "سررسید", T_DATE)},
+                    C_NONE, "", ""),
+            s("dying_stock", "اتمام موجودی فوری", "ویژه مدیر", "کالاهایی که تا ۷ روز آینده تمام می‌شوند — سفارش بدهید", false,
+                    new Col[]{c("label", "کالا", T_TEXT), c("vah", "موجودی", T_NUM), c("daily", "فروش روزانه", T_NUM),
+                            c("daysLeft", "روز تا اتمام", T_NUM), c("status", "وضعیت", T_TEXT)},
+                    C_NONE, "", ""),
+            s("fresh_debtors", "بدهکاران تازه", "ویژه مدیر", "بدهکارانی که ۳۰ روز اخیر خریده‌اند — بهترین هدف وصول", false,
+                    new Col[]{c("name", "مشتری", T_TEXT), c("cell", "همراه", T_TEXT), c("balance", "مانده", T_MONEY),
+                            c("lastSale", "آخرین خرید", T_DATE)},
+                    C_NONE, "", ""),
             // ---- هوشمند (v13) ----
             s("fleeing_customers", "مشتریان در حال فرار", "هوشمند", "خریداران منظمی که بیش از ۴۵ روز است نیامده‌اند + زیان تقریبی", false,
                     new Col[]{c("name", "مشتری", T_TEXT), c("cell", "همراه", T_TEXT), c("balance", "مانده", T_MONEY),
@@ -107,6 +123,12 @@ public final class ReportCatalog {
             s("sales_daily", "فروش روزانه", "فروش", "جمع و تعداد فاکتور فروش هر روز", true,
                     new Col[]{c("day", "روز", T_DATE), c("total", "جمع فروش", T_MONEY), c("docs", "اسناد", T_NUM)},
                     C_LINE, "day", "total"),
+            s("sales_top_products", "پرفروش‌ترین کالاها", "فروش", "کالاهای دارای بیشترین فروش ریالی", true,
+                    new Col[]{c("label", "کالا", T_TEXT), c("qty", "مقدار", T_NUM), c("total", "جمع فروش", T_MONEY), c("docs", "ردیف", T_NUM)},
+                    C_BARS, "label", "total"),
+            s("sales_by_customer", "فروش مشتریان", "فروش", "برترین مشتریان از نظر خرید در بازه", true,
+                    new Col[]{c("label", "مشتری", T_TEXT), c("total", "جمع خرید", T_MONEY), c("docs", "اسناد", T_NUM)},
+                    C_BARS, "label", "total"),
             s("sales_monthly", "فروش ماهانه", "فروش", "جمع و تعداد فاکتور فروش هر ماه", false,
                     new Col[]{c("month", "ماه", T_TEXT), c("total", "جمع فروش", T_MONEY), c("docs", "اسناد", T_NUM)},
                     C_BARS, "month", "total"),
@@ -116,18 +138,12 @@ public final class ReportCatalog {
             s("sales_by_visitor", "فروش ویزیتورها", "فروش", "سهم هر ویزیتور از فروش بازه", true,
                     new Col[]{c("label", "ویزیتور", T_TEXT), c("total", "جمع فروش", T_MONEY), c("docs", "اسناد", T_NUM)},
                     C_BARS, "label", "total"),
-            s("sales_by_customer", "فروش مشتریان", "فروش", "برترین مشتریان از نظر خرید در بازه", true,
-                    new Col[]{c("label", "مشتری", T_TEXT), c("total", "جمع خرید", T_MONEY), c("docs", "اسناد", T_NUM)},
-                    C_BARS, "label", "total"),
             s("sales_by_route", "فروش مسیرها", "فروش", "سهم هر مسیر از فروش بازه", true,
                     new Col[]{c("label", "مسیر", T_TEXT), c("total", "جمع فروش", T_MONEY), c("docs", "اسناد", T_NUM)},
                     C_BARS, "label", "total"),
             s("sales_by_group", "فروش گروه‌های مشتری", "فروش", "سهم هر گروه مشتری از فروش", true,
                     new Col[]{c("label", "گروه", T_TEXT), c("total", "جمع فروش", T_MONEY), c("docs", "اسناد", T_NUM)},
                     C_DONUT, "label", "total"),
-            s("sales_top_products", "پرفروش‌ترین کالاها", "فروش", "کالاهای دارای بیشترین فروش ریالی", true,
-                    new Col[]{c("label", "کالا", T_TEXT), c("qty", "مقدار", T_NUM), c("total", "جمع فروش", T_MONEY), c("docs", "ردیف", T_NUM)},
-                    C_BARS, "label", "total"),
             s("unsettled", "فاکتورهای معوق", "فروش", "فاکتورهای تسویه‌نشده با سررسید گذشته", false,
                     new Col[]{c("invoice", "فاکتور", T_TEXT), c("party", "مشتری", T_TEXT), c("amount", "مبلغ", T_MONEY),
                             c("dueDate", "سررسید", T_DATE), c("days", "روز تأخیر", T_NUM), c("visitor", "ویزیتور", T_TEXT)},
@@ -139,14 +155,14 @@ public final class ReportCatalog {
             s("buy_daily", "خرید روزانه", "خرید", "جمع و تعداد فاکتور خرید هر روز", true,
                     new Col[]{c("day", "روز", T_DATE), c("total", "جمع خرید", T_MONEY), c("docs", "اسناد", T_NUM)},
                     C_LINE, "day", "total"),
+            s("buy_top_products", "پرخریدترین کالاها", "خرید", "کالاهای دارای بیشترین خرید ریالی", true,
+                    new Col[]{c("label", "کالا", T_TEXT), c("qty", "مقدار", T_NUM), c("total", "جمع خرید", T_MONEY), c("docs", "ردیف", T_NUM)},
+                    C_BARS, "label", "total"),
             s("buy_monthly", "خرید ماهانه", "خرید", "جمع و تعداد فاکتور خرید هر ماه", false,
                     new Col[]{c("month", "ماه", T_TEXT), c("total", "جمع خرید", T_MONEY), c("docs", "اسناد", T_NUM)},
                     C_BARS, "month", "total"),
             s("buy_by_party", "خرید از طرف‌حساب‌ها", "خرید", "برترین فروشندگان/تأمین‌کنندگان", true,
                     new Col[]{c("label", "طرف‌حساب", T_TEXT), c("total", "جمع خرید", T_MONEY), c("docs", "اسناد", T_NUM)},
-                    C_BARS, "label", "total"),
-            s("buy_top_products", "پرخریدترین کالاها", "خرید", "کالاهای دارای بیشترین خرید ریالی", true,
-                    new Col[]{c("label", "کالا", T_TEXT), c("qty", "مقدار", T_NUM), c("total", "جمع خرید", T_MONEY), c("docs", "ردیف", T_NUM)},
                     C_BARS, "label", "total"),
             // ---- دریافت و پرداخت ----
             s("in_daily", "دریافت روزانه", "دریافت و پرداخت", "جمع قبوض دریافت هر روز", true,
@@ -239,6 +255,10 @@ public final class ReportCatalog {
     public static Queries.Q query(Meta m, String id, Filter f) throws Queries.Missing {
         Filter ff = f.copy();
         ff.page = 0;
+        if ("today_top".equals(id)) { ff.from = Jalali.todayStr(); ff.to = ff.from; ff.top = 20; return Queries.factorTopProducts(m, true, ff, 20); }
+        if ("cheques_today".equals(id)) return MoneyQueries.chequeDue(m, true, 1);
+        if ("dying_stock".equals(id)) return MasterQueries.stockForecast(m, ff);
+        if ("fresh_debtors".equals(id)) { ff.status = "debt"; ff.sort = "debt"; ff.top = 200; return MasterQueries.customersList(m, ff); }
         if ("sales_daily".equals(id)) return Queries.factorDaily(m, true, ff.from, ff.to);
         if ("sales_monthly".equals(id)) return MasterQueries.monthly(m, true, 12);
         if ("yoy_sales".equals(id)) return MasterQueries.monthly(m, true, 24);

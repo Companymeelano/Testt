@@ -1,10 +1,13 @@
 package ir.meelano.manager.screens;
 
+import android.view.Gravity;
 import android.view.View;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import ir.meelano.manager.core.CacheStore;
 
 import ir.meelano.manager.MainActivity;
+import ir.meelano.manager.R;
 import ir.meelano.manager.core.Filter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.Money;
@@ -20,10 +23,11 @@ import ir.meelano.manager.ui.Theme;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Reports center: 44 management reports with charts, tables and PDF sharing. */
+/** Reports center: 48 management reports, category landing, charts, tables, PDF/Excel/print. */
 public class ReportsScreen extends Screen {
     private final Filter filter = new Filter();
     private ReportCatalog.Spec sel;
+    private String selCat;
     private LinearLayout contentRef;
 
     public ReportsScreen(MainActivity a) {
@@ -50,6 +54,7 @@ public class ReportsScreen extends Screen {
         if (sel == null) return null;
         boolean search = "fleeing_customers".equals(sel.id) || "lost_basket".equals(sel.id)
                 || "cheque_reliability".equals(sel.id) || "stock_forecast".equals(sel.id)
+                || "dying_stock".equals(sel.id) || "fresh_debtors".equals(sel.id)
                 || "order_suggest".equals(sel.id) || "invoice_profit".equals(sel.id);
         if (!sel.needsRange && !search) return null;
         FilterSheet.Config c = new FilterSheet.Config();
@@ -61,14 +66,16 @@ public class ReportsScreen extends Screen {
 
     @Override
     public boolean onBack() {
-        if (sel == null) return false;
-        sel = null;
+        if (sel == null && selCat == null) return false;
+        if (sel != null) sel = null;
+        else selCat = null;
         a.refreshChrome();
         if (contentRef != null) render(contentRef);
         return true;
     }
 
     private int sectionAccent(String section) {
+        if ("ویژه مدیر".equals(section)) return Theme.GOLD;
         if ("فروش".equals(section)) return Theme.GOLD;
         if ("خرید".equals(section)) return Theme.INFO;
         if ("دریافت و پرداخت".equals(section)) return Theme.SUCCESS;
@@ -83,6 +90,22 @@ public class ReportsScreen extends Screen {
         return Theme.MUTED;
     }
 
+    private int sectionIcon(String section) {
+        if ("ویژه مدیر".equals(section)) return R.drawable.mi_military_tech;
+        if ("فروش".equals(section)) return R.drawable.mi_point_of_sale;
+        if ("خرید".equals(section)) return R.drawable.mi_shopping_cart;
+        if ("دریافت و پرداخت".equals(section)) return R.drawable.mi_payments;
+        if ("چک‌ها".equals(section)) return R.drawable.mi_receipt_long;
+        if ("کالا و انبار".equals(section)) return R.drawable.mi_inventory_2;
+        if ("مشتریان".equals(section)) return R.drawable.mi_group;
+        if ("ویزیتورها".equals(section)) return R.drawable.mi_directions_car;
+        if ("سود و زیان".equals(section)) return R.drawable.mi_diamond;
+        if ("بانک و صندوق".equals(section)) return R.drawable.mi_account_balance;
+        if ("کاربران و نظارت".equals(section)) return R.drawable.mi_admin_panel_settings;
+        if ("هوشمند".equals(section)) return R.drawable.mi_lightbulb;
+        return R.drawable.mi_widgets;
+    }
+
     @Override
     public void render(final LinearLayout content) {
         contentRef = content;
@@ -92,14 +115,38 @@ public class ReportsScreen extends Screen {
 
     private void renderList(LinearLayout content) {
         content.removeAllViews();
-        content.addView(a.kit.hero(glyph(), title(), "فهرست کامل گزارش‌های مدیریتی آتیران", accent()), a.kit.lp(-1, -2));
-        content.addView(a.kit.gap(12));
-        String lastSection = "";
-        for (final ReportCatalog.Spec s : ReportCatalog.ALL) {
-            if (!s.section.equals(lastSection)) {
-                lastSection = s.section;
-                content.addView(a.kit.sectionHead(s.section, null, null), a.kit.lp(-1, -2));
+        if (selCat == null) {
+            content.addView(a.kit.hero(glyph(), title(), "دسته گزارش را انتخاب کنید", accent()), a.kit.lp(-1, -2));
+            content.addView(a.kit.gap(12));
+            java.util.List<String> secs = new java.util.ArrayList<>();
+            java.util.List<Integer> counts = new java.util.ArrayList<>();
+            for (ReportCatalog.Spec s : ReportCatalog.ALL) {
+                int ix = secs.indexOf(s.section);
+                if (ix < 0) {
+                    secs.add(s.section);
+                    counts.add(1);
+                } else counts.set(ix, counts.get(ix) + 1);
             }
+            for (int i = 0; i < secs.size(); i += 2) {
+                if (i > 0) content.addView(a.kit.gap(10));
+                LinearLayout gr = a.kit.h();
+                gr.addView(catCard(secs.get(i), counts.get(i)), a.kit.wlp(1f));
+                gr.addView(a.kit.space(10));
+                if (i + 1 < secs.size()) gr.addView(catCard(secs.get(i + 1), counts.get(i + 1)), a.kit.wlp(1f));
+                else gr.addView(a.kit.space(10), a.kit.wlp(1f));
+                content.addView(gr, a.kit.lp(-1, -2));
+            }
+            return;
+        }
+        content.addView(a.kit.btnGhost("‹ همه دسته‌ها", Theme.GOLD, v -> {
+            selCat = null;
+            render(contentRef);
+        }), a.kit.lp(-1, -2));
+        content.addView(a.kit.gap(10));
+        content.addView(a.kit.hero("▤", selCat, "گزارش‌های این دسته، به ترتیب اولویت", sectionAccent(selCat)), a.kit.lp(-1, -2));
+        content.addView(a.kit.gap(12));
+        for (final ReportCatalog.Spec s : ReportCatalog.ALL) {
+            if (!s.section.equals(selCat)) continue;
             View r = a.kit.navRow("▤", s.title, s.desc + (s.needsRange ? " • بازه‌دار" : ""), sectionAccent(s.section), v -> {
                 sel = s;
                 a.refreshChrome();
@@ -109,6 +156,32 @@ public class ReportsScreen extends Screen {
             p.setMargins(0, 0, 0, Theme.dp(10));
             content.addView(r, p);
         }
+    }
+
+    private View catCard(final String section, int count) {
+        LinearLayout c = a.kit.card(sectionAccent(section));
+        c.setGravity(Gravity.CENTER_HORIZONTAL);
+        ImageView iv = new ImageView(a);
+        try {
+            iv.setImageResource(sectionIcon(section));
+            iv.setColorFilter(sectionAccent(section));
+        } catch (Exception ignored) { }
+        int sz = Theme.dp(44);
+        c.addView(iv, new LinearLayout.LayoutParams(sz, sz));
+        c.addView(a.kit.gap(6));
+        android.widget.TextView t = a.kit.text(section, 14f, Theme.TEXT, true);
+        t.setGravity(Gravity.CENTER);
+        c.addView(t, a.kit.lp(-1, -2));
+        android.widget.TextView u = a.kit.text(Money.fa(String.valueOf(count)) + " گزارش", 11.5f, Theme.MUTED, false);
+        u.setGravity(Gravity.CENTER);
+        c.addView(u, a.kit.lp(-1, -2));
+        c.addView(a.kit.gap(2));
+        Theme.pressable(c);
+        c.setOnClickListener(v -> {
+            selCat = section;
+            render(contentRef);
+        });
+        return c;
     }
 
     /** In-content filter bar under the report hero (v12: filters live inside each report). */
@@ -137,6 +210,8 @@ public class ReportsScreen extends Screen {
             if ("aging".equals(spec.id)) mapAging(rows, m);
             if ("unsettled".equals(spec.id)) mapUnsettled(rows);
             if ("fleeing_customers".equals(spec.id)) mapFleeing(rows);
+            if ("dying_stock".equals(spec.id)) rows = mapDying(rows);
+            if ("fresh_debtors".equals(spec.id)) rows = mapFresh(rows);
             return rows;
         }, new Repo.Cb<List<Row>>() {
             @Override
@@ -210,6 +285,33 @@ java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
         }
     }
 
+    /** Urgent only: items running out within 7 days (or already out), soonest first. */
+    private List<Row> mapDying(List<Row> rows) {
+        List<Row> out = new ArrayList<>();
+        if (rows == null) return out;
+        for (Row r : rows) {
+            double dl = r.d("daysLeft");
+            if ((dl >= 0 && dl <= 7) || r.d("vah") <= 0) out.add(r);
+        }
+        java.util.Collections.sort(out, (x, y) -> Double.compare(x.d("daysLeft"), y.d("daysLeft")));
+        return out;
+    }
+
+    /** Fresh debtors: bought within the last 30 days. */
+    private List<Row> mapFresh(List<Row> rows) {
+        List<Row> out = new ArrayList<>();
+        if (rows == null) return out;
+        String cut = "";
+        try {
+            cut = Jalali.addDays(Jalali.todayStr(), -30);
+        } catch (Exception ignored) { }
+        for (Row r : rows) {
+            String ls = Jalali.disp(r.s("lastSale"));
+            if (!ls.isEmpty() && ls.compareTo(cut) >= 0) out.add(r);
+        }
+        return out;
+    }
+
     /** Merge ~24 monthly rows into 12 month rows: this year vs last year + growth %. */
     private List<Row> mapYoY(List<Row> rows) {
         List<Row> out = new ArrayList<>();
@@ -280,6 +382,9 @@ java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
             return;
         }
 
+        content.addView(a.exportBar(spec.title, spec.needsRange ? filter.rangeFa() : spec.desc, spec.cols, rows), a.kit.lp(-1, -2));
+        content.addView(a.kit.gap(12));
+
         if (spec.chart != ReportCatalog.C_NONE && !spec.chartX.isEmpty() && !spec.chartY.isEmpty()) {
             LinearLayout c = a.kit.card(sectionAccent(spec.section));
             final List<Charts.Point> pts = new ArrayList<>();
@@ -341,8 +446,7 @@ java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
             c.addView(a.kit.hint("+" + Money.fa(String.valueOf(rows.size() - show)) + " ردیف دیگر در PDF…"), a.kit.lp(-1, -2));
         LinearLayout.LayoutParams fp = a.kit.lp(-1, -2);
         fp.setMargins(0, Theme.dp(10), 0, 0);
-        c.addView(a.kit.btn("اشتراک PDF گزارش", v ->
-                a.sharePdf(spec.title, spec.needsRange ? filter.rangeFa() : spec.desc, spec.cols, rows)), fp);
+        c.addView(a.exportBar(spec.title, spec.needsRange ? filter.rangeFa() : spec.desc, spec.cols, rows), fp);
         a.kit.addCard(content, c);
     }
 

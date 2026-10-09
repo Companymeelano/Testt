@@ -130,7 +130,12 @@ public final class Theme {
         Settings s = new Settings(c);
         light = "light".equals(s.themeMode());
         DARK = !light;
-        fontScale = s.bigFont() ? 1.3f : 1f;
+        int zi = 1;
+        try {
+            zi = s.zoomIdx();
+            if (s.bigFont()) zi = 3;
+        } catch (Exception ignored) { }
+        fontScale = zi == 0 ? 0.9f : zi == 2 ? 1.15f : zi == 3 ? 1.3f : 1f;
         accentKey = s.themeAccent();
         if (s.seasonalOn() && "gold".equals(accentKey)) accentKey = seasonAccentKey();
         int dark = 0xFFD9AE5A, darkSoft = 0xFFF1D493, lite = 0xFFA86F14, liteSoft = 0xFF7A5410;

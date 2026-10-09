@@ -407,6 +407,25 @@ public class MainActivity extends Activity {
         refresh.setOnClickListener(v -> renderCurrent());
         MeelanoIcons.iconize(refresh);
         tools.addView(refresh, kit.lp(-2, -2));
+        tools.addView(vdiv(), kit.lp(Theme.dp(1), Theme.dp(22)));
+        TextView sett = kit.text("⚙", 18, Theme.GOLD_SOFT, true);
+        sett.setPadding(Theme.dp(11), Theme.dp(6), Theme.dp(11), Theme.dp(6));
+        sett.setContentDescription("تنظیمات");
+        Theme.pressable(sett);
+        sett.setOnClickListener(v -> nav("settings"));
+        MeelanoIcons.iconize(sett);
+        tools.addView(sett, kit.lp(-2, -2));
+        tools.addView(vdiv(), kit.lp(Theme.dp(1), Theme.dp(22)));
+        android.widget.ImageView zoom = new android.widget.ImageView(this);
+        try {
+            zoom.setImageResource(R.drawable.mi_zoom);
+            zoom.setColorFilter(Theme.GOLD_SOFT);
+        } catch (Exception ignored) { }
+        zoom.setPadding(Theme.dp(11), Theme.dp(8), Theme.dp(11), Theme.dp(8));
+        zoom.setContentDescription("بزرگ‌نمایی متن");
+        Theme.pressable(zoom);
+        zoom.setOnClickListener(v -> cycleZoom());
+        tools.addView(zoom, new LinearLayout.LayoutParams(Theme.dp(42), Theme.dp(36)));
         header.addView(tools, kit.lp(-2, -2));
         root.addView(header, kit.lp(-1, -2));
         refreshLicChip();
@@ -955,6 +974,70 @@ public class MainActivity extends Activity {
                 runOnUiThread(() -> kit.toast("ساخت PDF ممکن نشد"));
             }
         }).start();
+    }
+
+    public void shareXlsx(final String title, final String subtitle, final ReportCatalog.Col[] cols, final List<Row> rows) {
+        kit.toast("در حال ساخت اکسل…");
+        new Thread(() -> {
+            try {
+                final File f = ir.meelano.manager.ui.Xlsx.build(this, title, subtitle, cols, rows, 2000);
+                runOnUiThread(() -> {
+                    try {
+                        ShareProvider.share(this, f, ir.meelano.manager.ui.Xlsx.MIME, title);
+                    } catch (Exception e) {
+                        kit.toast("اشتراک ممکن نشد");
+                    }
+                });
+            } catch (Exception e) {
+                runOnUiThread(() -> kit.toast("ساخت اکسل ممکن نشد"));
+            }
+        }).start();
+    }
+
+    /** System print (printer picker) of the same report PDF. */
+    public void printPdf(final String title, final String subtitle, final ReportCatalog.Col[] cols, final List<Row> rows) {
+        kit.toast("در حال آماده‌سازی چاپ…");
+        new Thread(() -> {
+            try {
+                final File f = Pdf.build(this, title, subtitle, cols, rows, 400);
+                runOnUiThread(() -> {
+                    try {
+                        ir.meelano.manager.ui.PrintKit.printPdf(this, f, title);
+                    } catch (Exception e) {
+                        kit.toast("چاپ ممکن نشد");
+                    }
+                });
+            } catch (Exception e) {
+                runOnUiThread(() -> kit.toast("ساخت PDF ممکن نشد"));
+            }
+        }).start();
+    }
+
+    /** One-row export bar: PDF + Excel + print (share sheet covers social apps + Bluetooth). */
+    public android.view.View exportBar(final String title, final String subtitle,
+                                       final ReportCatalog.Col[] cols, final List<Row> rows) {
+        LinearLayout bar = kit.h();
+        bar.addView(kit.btnGhost("▤ PDF", Theme.DANGER, v -> sharePdf(title, subtitle, cols, rows)), kit.wlp(1f));
+        bar.addView(kit.space(8));
+        bar.addView(kit.btnGhost("▦ اکسل", Theme.SUCCESS, v -> shareXlsx(title, subtitle, cols, rows)), kit.wlp(1f));
+        bar.addView(kit.space(8));
+        bar.addView(kit.btnGhost("🖨 چاپ", Theme.GOLD, v -> printPdf(title, subtitle, cols, rows)), kit.wlp(1f));
+        return bar;
+    }
+
+    /** Zoom button: cycle ۱۰۰٪ → ۱۱۵٪ → ۱۳۰٪ → ۹۰٪ → ۱۰۰٪. */
+    public void cycleZoom() {
+        int next = (settings.zoomIdx() + 1) % 4;
+        settings.setZoomIdx(next);
+        kit.toast("بزرگ‌نمایی " + zoomLabel(next));
+        refreshTheme();
+    }
+
+    public static String zoomLabel(int idx) {
+        if (idx == 0) return "٪۹۰";
+        if (idx == 2) return "٪۱۱۵";
+        if (idx == 3) return "٪۱۳۰";
+        return "٪۱۰۰";
     }
 
     /** Share a bitmap (shop card) via the FileProvider. */

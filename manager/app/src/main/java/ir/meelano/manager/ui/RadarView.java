@@ -42,7 +42,7 @@ public class RadarView extends View {
         @Override
         public void run() {
             if (!live) return;
-            if (getVisibility() == VISIBLE && getWidth() > 0) {
+            if (getVisibility() == VISIBLE && getWidth() > 0 && Ui.motionOk(getContext())) {
                 angle = (angle + 9) % 360;
                 invalidate();
             }

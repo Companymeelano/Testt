@@ -272,6 +272,32 @@ public final class Theme {
         return d;
     }
 
+    /** Controlled rose-gold for the primary start CTA (v34). */
+    public static final int ROSE = 0xFFC2527E;
+
+    /** Primary start button: restrained gold-to-rose diagonal, same radius as gold buttons. */
+    public static GradientDrawable startButton() {
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{shade(GOLD, -0.10f), ROSE});
+        d.setCornerRadius(dp(16));
+        return d;
+    }
+
+    /** Luxury field background with a real focus ring (v34). */
+    public static android.graphics.drawable.StateListDrawable fieldBg() {
+        GradientDrawable normal = base(SURFACE2, 16, dp(1), alpha(GOLD, light ? 70 : 46));
+        GradientDrawable focused = base(SURFACE2, 16, dp(2), TEAL);
+        android.graphics.drawable.StateListDrawable s = new android.graphics.drawable.StateListDrawable();
+        s.addState(new int[]{android.R.attr.state_focused}, focused);
+        s.addState(new int[]{}, normal);
+        return s;
+    }
+
+    /** Field background in the error state (v34). */
+    public static GradientDrawable fieldBgError() {
+        return base(SURFACE2, 16, dp(2), DANGER);
+    }
+
     public static GradientDrawable ghostButton(int accent) {
         return base(alpha(accent, light ? 18 : 26), 16, dp(1), alpha(accent, light ? 130 : 110));
     }

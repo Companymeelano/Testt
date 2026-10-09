@@ -34,7 +34,8 @@ public class ParticlesView extends View {
     }
 
     private void init() {
-        n = 26;
+        setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
+        n = 10;
         x = new float[n];
         y = new float[n];
         r = new float[n];
@@ -43,8 +44,8 @@ public class ParticlesView extends View {
         for (int i = 0; i < n; i++) {
             x[i] = rnd.nextFloat();
             y[i] = rnd.nextFloat();
-            r[i] = 1.5f + rnd.nextFloat() * 3.5f;
-            v[i] = 0.0006f + rnd.nextFloat() * 0.0016f;
+            r[i] = 1.0f + rnd.nextFloat() * 2.0f;
+            v[i] = 0.0004f + rnd.nextFloat() * 0.0008f;
             tw[i] = rnd.nextFloat() * 6.28f;
         }
     }
@@ -52,8 +53,8 @@ public class ParticlesView extends View {
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
-        live = true;
-        post(step);
+        live = Ui.motionOk(getContext());
+        if (live) post(step);
     }
 
     @Override
@@ -87,7 +88,7 @@ public class ParticlesView extends View {
         if (shader == null || h != lastH) {
             lastH = h;
             shader = new LinearGradient(0, 0, 0, h,
-                    new int[]{0xFF0B0E12, 0xFF101319, 0xFF151009},
+                    new int[]{Theme.BG, Theme.SURFACE, Theme.SURFACE2},
                     new float[]{0f, 0.6f, 1f}, Shader.TileMode.CLAMP);
         }
         paint.setShader(shader);
@@ -95,9 +96,9 @@ public class ParticlesView extends View {
         c.drawRect(0, 0, w, h, paint);
         paint.setShader(null);
         for (int i = 0; i < n; i++) {
-            float a = 0.25f + 0.55f * (0.5f + 0.5f * (float) Math.sin(tw[i]));
+            float a = 0.08f + 0.18f * (0.5f + 0.5f * (float) Math.sin(tw[i]));
             paint.setAlpha((int) (a * 255));
-            paint.setColor(0xFFD9AE5A);
+            paint.setColor(Theme.GOLD);
             c.drawCircle(x[i] * w, y[i] * h, r[i] * (w / 700f + 0.5f), paint);
         }
     }

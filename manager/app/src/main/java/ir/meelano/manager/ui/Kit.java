@@ -904,6 +904,39 @@ public final class Kit {
         return e;
     }
 
+    /** Luxury field (v34): focus ring, 56dp touch height. */
+    public EditText editLux(String hint, String value) {
+        EditText e = edit(hint, value, false);
+        e.setTextSize(14f);
+        e.setBackground(Theme.fieldBg());
+        e.setMinHeight(Theme.dp(56));
+        e.setPadding(Theme.dp(14), Theme.dp(12), Theme.dp(14), Theme.dp(12));
+        return e;
+    }
+
+    /** Static vector icon (v34): one family (Material Symbols Rounded), decorative by default. */
+    public ImageView icon(int res, int color, int dp) {
+        ImageView v = new ImageView(a);
+        try {
+            android.graphics.drawable.Drawable d = a.getDrawable(res);
+            if (d != null) {
+                d = d.mutate();
+                d.setTint(color);
+                v.setImageDrawable(d);
+            } else {
+                v.setImageResource(res);
+            }
+        } catch (Exception ex) {
+            try {
+                v.setImageResource(res);
+            } catch (Exception ignored) { }
+        }
+        int s = Theme.dp(dp);
+        v.setLayoutParams(new LinearLayout.LayoutParams(s, s));
+        v.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        return v;
+    }
+
     /** Numeric PIN field (the 4-digit lock code). */
     public EditText editPin(String hint, String value) {
         EditText e = edit(hint, value, false);

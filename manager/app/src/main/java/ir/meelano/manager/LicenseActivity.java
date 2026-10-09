@@ -50,6 +50,7 @@ import ir.meelano.manager.ui.ConfettiView;
 import ir.meelano.manager.ui.Kit;
 import ir.meelano.manager.ui.ParticlesView;
 import ir.meelano.manager.ui.RadarView;
+import ir.meelano.manager.ui.Ui;
 import ir.meelano.manager.ui.Theme;
 import ir.meelano.licensing.License;
 
@@ -91,29 +92,18 @@ public class LicenseActivity extends Activity {
     private int dotsN;
     private boolean logoBig;
     private android.widget.Button glowBtn;
-    private boolean glowOn;
+    private boolean sending;
     private TextView waitTimer;
     private RadarView connRadar;
     private TextView connStage;
     private long waitStartMs;
     private int tickCount;
     private TextView waitCreative;
-    private final Runnable glowTick = new Runnable() {
-        @Override
-        public void run() {
-            try {
-                if (glowBtn != null) {
-                    glowOn = !glowOn;
-                    glowBtn.animate().alpha(glowOn ? 1f : 0.86f).setDuration(900).start();
-                }
-            } catch (Exception ignored) { }
-            uiHandler.postDelayed(glowTick, 950);
-        }
-    };
     private final Runnable dotsTick = new Runnable() {
         @Override
         public void run() {
-            try {
+            boolean motion = Ui.motionOk(LicenseActivity.this);
+            if (motion) try {
                 dotsN = (dotsN + 1) % 4;
                 if (dotsView != null) {
                     StringBuilder b = new StringBuilder();
@@ -134,7 +124,7 @@ public class LicenseActivity extends Activity {
                     waitTimer.setText("زمان انتظار: " + Money.fa(String.format(
                             java.util.Locale.US, "%d:%02d", sec / 60, sec % 60)));
                 }
-                if (waitCreative != null && tickCount % 7 == 0 && tickCount > 0) {
+                if (motion && waitCreative != null && tickCount % 7 == 0 && tickCount > 0) {
                     waitCreative.setText(WAIT_LINES[(tickCount / 7) % WAIT_LINES.length]);
                 }
             } catch (Exception ignored) { }
@@ -196,7 +186,6 @@ public class LicenseActivity extends Activity {
     protected void onPause() {
         try {
             uiHandler.removeCallbacks(dotsTick);
-            uiHandler.removeCallbacks(glowTick);
         } catch (Exception ignored) { }
         try {
             unregisterReceiver(smsPing);
@@ -260,29 +249,38 @@ public class LicenseActivity extends Activity {
 
         ScrollView sv = new ScrollView(this);
         sv.setFillViewport(true);
-        sv.addView(box);
+        if (Ui.widthDp(this) > 600) {
+            LinearLayout center = kit.h();
+            center.setGravity(Gravity.CENTER_HORIZONTAL);
+            center.addView(box, new LinearLayout.LayoutParams(Theme.dp(560), -2));
+            sv.addView(center);
+        } else {
+            sv.addView(box);
+        }
         android.widget.FrameLayout wrap = new android.widget.FrameLayout(this);
         wrap.addView(new ParticlesView(this),
                 new android.widget.FrameLayout.LayoutParams(-1, -1));
         wrap.addView(sv, new android.widget.FrameLayout.LayoutParams(-1, -1));
         setContentView(wrap);
         try {
-            sv.setAlpha(0f);
-            sv.setTranslationY(Theme.dp(26));
-            sv.animate().alpha(1f).translationY(0).setDuration(380).start();
+            if (Ui.motionOk(this)) {
+                sv.setAlpha(0f);
+                sv.setTranslationY(Theme.dp(26));
+                sv.animate().alpha(1f).translationY(0).setDuration(380).start();
+            }
         } catch (Exception ignored) { }
     }
 
     private void stopDots() {
         try {
             uiHandler.removeCallbacks(dotsTick);
-            uiHandler.removeCallbacks(glowTick);
         } catch (Exception ignored) { }
         dotsView = null;
         waitLogo = null;
         waitTimer = null;
         waitCreative = null;
         glowBtn = null;
+        sending = false;
         connRadar = null;
         connStage = null;
     }
@@ -299,10 +297,10 @@ public class LicenseActivity extends Activity {
             boolean done = idx < active;
             boolean on = idx == active;
             TextView dot = kit.text(done ? "✓" : String.valueOf(idx), 14,
-                    done || on ? 0xFFFFFFFF : Theme.MUTED, true);
+                    done || on ? 0xFF0B1220 : Theme.MUTED, true);
             dot.setGravity(Gravity.CENTER);
             dot.setBackground(Theme.avatar(done ? Theme.SUCCESS
-                    : (on ? Theme.TEAL : 0xFF2A2E35)));
+                    : (on ? Theme.TEAL : Theme.SURFACE2)));
             int d = Theme.dp(34);
             LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(d, d);
             dlp.gravity = Gravity.CENTER;
@@ -310,16 +308,23 @@ public class LicenseActivity extends Activity {
             TextView lb = kit.text(labels[idx - 1], 10f,
                     done || on ? Theme.GOLD_SOFT : Theme.MUTED, true);
             lb.setGravity(Gravity.CENTER);
+            try {
+                lb.setSingleLine(true);
+                cell.setContentDescription("مرحله " + idx + " از ۳: " + labels[idx - 1]
+                        + (done ? "، انجام شد" : (on ? "، مرحله کنونی" : "، مانده")));
+            } catch (Exception ignored) { }
             cell.addView(lb, kit.lp(-2, -2));
             row.addView(cell, kit.lp(-2, -2));
-            dot.setScaleX(0.4f);
-            dot.setScaleY(0.4f);
-            dot.setAlpha(0f);
-            dot.animate().scaleX(1f).scaleY(1f).alpha(1f)
-                    .setStartDelay(idx * 120L).setDuration(320).start();
+            if (Ui.motionOk(this)) {
+                dot.setScaleX(0.4f);
+                dot.setScaleY(0.4f);
+                dot.setAlpha(0f);
+                dot.animate().scaleX(1f).scaleY(1f).alpha(1f)
+                        .setStartDelay(idx * 120L).setDuration(320).start();
+            }
             if (idx < 3) {
                 View line = new View(this);
-                line.setBackgroundColor(idx < active ? Theme.SUCCESS : 0xFF2A2E35);
+                line.setBackgroundColor(idx < active ? Theme.SUCCESS : Theme.SURFACE2);
                 LinearLayout.LayoutParams llp = new LinearLayout.LayoutParams(0, Theme.dp(3));
                 llp.weight = 1;
                 llp.gravity = Gravity.CENTER_VERTICAL;
@@ -343,11 +348,35 @@ public class LicenseActivity extends Activity {
         c.addView(kit.gap(6));
         c.addView(deviceCodeView(), kit.lp(-1, -2));
         c.addView(kit.gap(6));
-        final EditText fName = kit.edit("نام", LicenseStore.distName(this));
-        c.addView(iconField(fName, "👤"), kit.lp(-1, -2));
-        final EditText fPhone = kit.edit("شماره تماس", LicenseStore.contactPhone(this));
+        final TextView errName = errSlot();
+        final TextView errPhone = errSlot();
+        final EditText fName = kit.editLux("نام", LicenseStore.distName(this));
+        try {
+            fName.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                    | android.text.InputType.TYPE_TEXT_VARIATION_PERSON_NAME);
+        } catch (Exception ignored) { }
+        fName.addTextChangedListener(new android.text.TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence x, int a, int b, int cc) { }
+            @Override
+            public void onTextChanged(CharSequence x, int a, int b, int cc) { }
+            @Override
+            public void afterTextChanged(android.text.Editable x) {
+                try {
+                    if (x != null && x.toString().trim().length() > 0
+                            && errName.getText().length() > 0) {
+                        errName.setText("");
+                        fName.setBackground(Theme.fieldBg());
+                    }
+                } catch (Exception ignored) { }
+            }
+        });
+        c.addView(iconField(fName, R.drawable.mi_person), kit.lp(-1, -2));
+        c.addView(errName, kit.lp(-1, -2));
+        final EditText fPhone = kit.editLux("شماره تماس", LicenseStore.contactPhone(this));
         try {
             fPhone.setInputType(android.text.InputType.TYPE_CLASS_PHONE);
+            fPhone.setTextDirection(View.TEXT_DIRECTION_LOCALE);
         } catch (Exception ignored) { }
         final TextView tick = kit.text("✓", 18, Theme.SUCCESS, true);
         try {
@@ -366,66 +395,130 @@ public class LicenseActivity extends Activity {
                 try {
                     tick.setVisibility(SmsIo.cleanPhone(x.toString()).length() == 11
                             ? View.VISIBLE : View.INVISIBLE);
+                    if (SmsIo.cleanPhone(x.toString()).length() >= 10
+                            && errPhone.getText().length() > 0) {
+                        errPhone.setText("");
+                        fPhone.setBackground(Theme.fieldBg());
+                    }
                 } catch (Exception ignored) { }
             }
         });
-        LinearLayout prow = kit.h();
-        prow.setGravity(Gravity.CENTER_VERTICAL);
-        prow.addView(kit.text("📱", 20, Theme.MUTED, false), kit.lp(-2, -2));
-        prow.addView(kit.space(8));
-        prow.addView(fPhone, kit.wlp(1f));
+        LinearLayout prow = iconField(fPhone, R.drawable.mi_call);
         prow.addView(kit.space(6));
         prow.addView(tick, kit.lp(-2, -2));
         c.addView(prow, kit.lp(-1, -2));
+        c.addView(errPhone, kit.lp(-1, -2));
         c.addView(kit.gap(4));
-        glowBtn = kit.btnGold("✦ شروع", v -> requestStart(txt(fName), txt(fPhone)));
-        c.addView(glowBtn, kit.lp(-1, -2));
-        uiHandler.post(glowTick);
+        final android.widget.Button startBtn = kit.btnGold("✦ شروع", null);
+        try {
+            startBtn.setBackground(Theme.startButton());
+            startBtn.setTextSize(15f);
+            startBtn.setMinHeight(Theme.dp(52));
+        } catch (Exception ignored) { }
+        glowBtn = startBtn;
+        startBtn.setOnClickListener(v -> requestStart(txt(fName), txt(fPhone),
+                fName, fPhone, errName, errPhone, startBtn));
+        c.addView(startBtn, kit.lp(-1, -2));
         Card3D.mount(box, c);
         buildDevFooter(box);
     }
 
-    /** Field row with a leading icon (v33). */
-    private LinearLayout iconField(EditText e, String icon) {
+    /** Field row with a leading vector icon from the single icon family (v34). */
+    private LinearLayout iconField(EditText e, int iconRes) {
         LinearLayout r = kit.h();
         r.setGravity(Gravity.CENTER_VERTICAL);
-        r.addView(kit.text(icon, 20, Theme.MUTED, false), kit.lp(-2, -2));
+        r.addView(kit.icon(iconRes, Theme.MUTED, 24), kit.lp(-2, -2));
         r.addView(kit.space(8));
         r.addView(e, kit.wlp(1f));
         return r;
     }
 
-    /** Device code as a mini bank card with a copy button (v33). */
+    /** Reserved one-line error slot under a field: no layout jump when it fills (v34). */
+    private TextView errSlot() {
+        TextView e = kit.text("", 11.5f, Theme.DANGER, false);
+        try {
+            e.setMinHeight(Theme.dp(20));
+        } catch (Exception ignored) { }
+        return e;
+    }
+
+    /** Device code card: LTR-isolated code, one line, honest copy feedback (v34). */
     private LinearLayout deviceCodeView() {
         LinearLayout card = Card3D.card(this, Theme.TEAL);
         LinearLayout top = kit.h();
         top.setGravity(Gravity.CENTER_VERTICAL);
-        top.addView(kit.text("💳 کد دستگاه", 12.5f, Theme.GOLD_SOFT, true), kit.wlp(1f));
-        top.addView(kit.btnGhost("کپی", Theme.TEAL, v -> {
-            copyText("کد دستگاه میلانو", device);
-            kit.toast("کد دستگاه کپی شد");
-        }), kit.lp(-2, -2));
+        top.addView(kit.icon(R.drawable.mi_credit_card, Theme.GOLD_SOFT, 20), kit.lp(-2, -2));
+        top.addView(kit.space(6));
+        top.addView(kit.text("کد دستگاه", 12.5f, Theme.GOLD_SOFT, true), kit.wlp(1f));
+        final android.widget.Button copyBtn = kit.btnGhost("کپی", Theme.TEAL, null);
+        try {
+            android.graphics.drawable.Drawable ic = getDrawable(R.drawable.mi_content_copy);
+            if (ic != null) {
+                ic = ic.mutate();
+                ic.setTint(Theme.TEAL);
+                copyBtn.setCompoundDrawablesRelativeWithIntrinsicBounds(ic, null, null, null);
+                copyBtn.setCompoundDrawablePadding(Theme.dp(6));
+            }
+            copyBtn.setMinHeight(Theme.dp(48));
+            copyBtn.setContentDescription("کپی کد دستگاه");
+        } catch (Exception ignored) { }
+        copyBtn.setOnClickListener(v -> {
+            if (copyText("کد دستگاه میلانو", device)) {
+                kit.toast("کد دستگاه کپی شد");
+            } else {
+                kit.toast("کپی نشد؛ دوباره تلاش کنید");
+            }
+        });
+        top.addView(copyBtn, kit.lp(-2, -2));
         card.addView(top, kit.lp(-1, -2));
-        TextView dev = kit.text(device.isEmpty() ? "—" : prettyDev(device), 24,
+        int wide = Ui.widthDp(this);
+        int codeSp = wide < 360 ? 19 : 24;
+        TextView dev = kit.text(device.isEmpty() ? "—" : prettyDev(device), codeSp,
                 Theme.GOLD_SOFT, true);
         try {
             dev.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
             dev.setLetterSpacing(0.12f);
+            dev.setSingleLine(true);
+            dev.setTextDirection(View.TEXT_DIRECTION_LTR);
+            dev.setAutoSizeTextTypeUniformWithConfiguration(14, codeSp, 1,
+                    android.util.TypedValue.COMPLEX_UNIT_SP);
         } catch (Exception ignored) { }
         dev.setGravity(Gravity.CENTER);
+        try {
+            dev.setContentDescription("کد دستگاه " + device);
+        } catch (Exception ignored) { }
         card.addView(dev, kit.lp(-1, -2));
         return card;
     }
 
-    private void requestStart(String dist, String phone) {
-        if (dist == null || dist.trim().isEmpty()) {
-            kit.toast("نام را وارد کنید");
+    private void requestStart(String dist, String phone, EditText fName, EditText fPhone,
+                                TextView errName, TextView errPhone, android.widget.Button btn) {
+        if (sending) return;
+        boolean badName = dist == null || dist.trim().isEmpty();
+        boolean badPhone = SmsIo.cleanPhone(phone).length() < 10;
+        try {
+            errName.setText(badName ? "نام را وارد کنید" : "");
+            errPhone.setText(badPhone ? "شماره تماس معتبر وارد کنید (مثلاً 09123456789)" : "");
+            fName.setBackground(badName ? Theme.fieldBgError() : Theme.fieldBg());
+            fPhone.setBackground(badPhone ? Theme.fieldBgError() : Theme.fieldBg());
+        } catch (Exception ignored) { }
+        if (badName || badPhone) {
+            try {
+                if (badName) {
+                    fName.requestFocus();
+                    Ui.announce(errName, "نام را وارد کنید");
+                } else {
+                    fPhone.requestFocus();
+                    Ui.announce(errPhone, "شماره تماس معتبر وارد کنید");
+                }
+            } catch (Exception ignored) { }
             return;
         }
-        if (SmsIo.cleanPhone(phone).length() < 10) {
-            kit.toast("شماره تماس معتبر وارد کنید (مثلاً 09123456789)");
-            return;
-        }
+        sending = true;
+        try {
+            btn.setEnabled(false);
+            btn.setText("در حال ارسال…");
+        } catch (Exception ignored) { }
         LicenseStore.setDistName(this, dist);
         LicenseStore.setContactPhone(this, phone);
         LicenseStore.setRequested(this, true);
@@ -576,6 +669,12 @@ public class LicenseActivity extends Activity {
      */
     /** Golden-burst celebration overlay, then the next step (v33). */
     private void celebrateThen(Runnable after) {
+        if (!Ui.motionOk(this)) {
+            try {
+                after.run();
+            } catch (Exception ignored) { }
+            return;
+        }
         try {
             android.widget.FrameLayout root = new android.widget.FrameLayout(this);
             root.setBackgroundColor(0xCC0B0E12);
@@ -736,16 +835,26 @@ public class LicenseActivity extends Activity {
             fIp.setInputType(android.text.InputType.TYPE_CLASS_TEXT
                     | android.text.InputType.TYPE_TEXT_VARIATION_URI);
         } catch (Exception ignored) { }
-        c.addView(iconField(fIp, "🖥"), kit.lp(-1, -2));
+        c.addView(iconField(fIp, R.drawable.mi_my_location), kit.lp(-1, -2));
         final EditText fDb = kit.edit("نام دیتابیس", "");
-        c.addView(iconField(fDb, "🗄"), kit.lp(-1, -2));
+        c.addView(iconField(fDb, R.drawable.mi_database), kit.lp(-1, -2));
         c.addView(kit.gap(4));
         final android.widget.Button[] btn = new android.widget.Button[1];
         btn[0] = kit.btnGold("✦ اتصال", v -> connectSmart(txt(fIp), txt(fDb), btn[0]));
         c.addView(btn[0], kit.lp(-1, -2));
         c.addView(kit.gap(6));
         final android.widget.Button[] wbtn = new android.widget.Button[1];
-        wbtn[0] = kit.btnGhost("📶 اتصال با وای‌فای", Theme.TEAL, v -> wifiConnect(wbtn[0]));
+        wbtn[0] = kit.btnGhost("اتصال با وای‌فای", Theme.TEAL, v -> wifiConnect(wbtn[0]));
+        try {
+            android.graphics.drawable.Drawable icd = getDrawable(R.drawable.mi_wifi);
+            if (icd != null) {
+                icd = icd.mutate();
+                icd.setTint(Theme.TEAL);
+                wbtn[0].setCompoundDrawablesRelativeWithIntrinsicBounds(icd, null, null, null);
+                wbtn[0].setCompoundDrawablePadding(Theme.dp(6));
+            }
+            wbtn[0].setMinHeight(Theme.dp(48));
+        } catch (Exception ignored) { }
         c.addView(wbtn[0], kit.lp(-1, -2));
         Card3D.mount(box, c);
         buildDevFooter(box);
@@ -1000,7 +1109,7 @@ public class LicenseActivity extends Activity {
     private void restoreWifiBtn(android.widget.Button btn) {
         try {
             btn.setEnabled(true);
-            btn.setText("📶 اتصال با وای‌فای");
+            btn.setText("اتصال با وای‌فای");
         } catch (Exception ignored) { }
     }
 
@@ -1448,12 +1557,19 @@ public class LicenseActivity extends Activity {
         tag.setGravity(Gravity.CENTER);
         box.addView(tag, kit.lp(-1, -2));
         box.addView(kit.gap(4));
-        LinearLayout row = kit.h();
-        row.addView(kit.btnGhost("🌐  " + Brand.SITE_LABEL, Theme.GOLD,
-                v -> Brand.openSite(this)), kit.wlp(1f));
-        row.addView(kit.space(8));
-        row.addView(kit.btnGhost("📞 پشتیبانی", Theme.TEAL, v -> supportDialog()), kit.wlp(1f));
-        box.addView(row, kit.lp(-1, -2));
+        if (Ui.widthDp(this) < 360) {
+            box.addView(kit.btnGhost(Brand.SITE_LABEL, Theme.GOLD,
+                    v -> Brand.openSite(this)), kit.lp(-1, -2));
+            box.addView(kit.gap(6));
+            box.addView(kit.btnGhost("پشتیبانی", Theme.TEAL, v -> supportDialog()), kit.lp(-1, -2));
+        } else {
+            LinearLayout row = kit.h();
+            row.addView(kit.btnGhost(Brand.SITE_LABEL, Theme.GOLD,
+                    v -> Brand.openSite(this)), kit.wlp(1f));
+            row.addView(kit.space(8));
+            row.addView(kit.btnGhost("پشتیبانی", Theme.TEAL, v -> supportDialog()), kit.wlp(1f));
+            box.addView(row, kit.lp(-1, -2));
+        }
         TextView ver = kit.text(appVer(), 11f, Theme.MUTED, false);
         ver.setGravity(Gravity.CENTER);
         box.addView(ver, kit.lp(-1, -2));
@@ -1467,20 +1583,23 @@ public class LicenseActivity extends Activity {
             TextView over = kit.text("D E S I G N E D   B Y", 10f, Theme.MUTED, true);
             over.setGravity(Gravity.CENTER);
             c.addView(over, kit.lp(-1, -2));
-            final TextView name = kit.text("Milad Yaghoubi", 22, Theme.GOLD_SOFT, true);
+            final TextView name = kit.text("Milad Yaghoubi", 20, Theme.GOLD_SOFT, true);
             name.setGravity(Gravity.CENTER);
             try {
                 name.setTypeface(Theme.face(true));
                 name.setLetterSpacing(0.06f);
-                name.setShadowLayer(5, 0, 3, 0x80000000);
+                name.setShadowLayer(3, 0, 2, 0x40000000);
             } catch (Exception ignored) { }
             c.addView(name, kit.lp(-1, -2));
             name.post(() -> {
                 try {
                     int h = name.getHeight();
                     if (h <= 0) h = Theme.dp(28);
+                    int[] sigCols = Theme.isLight()
+                            ? new int[]{0xFF7A5410, 0xFFA86F14, 0xFF5C3F0C, 0xFFA86F14, 0xFF7A5410}
+                            : new int[]{0xFFF3E3B8, 0xFFE9C37C, 0xFFB08A3E, 0xFFE9C37C, 0xFFF3E3B8};
                     name.getPaint().setShader(new android.graphics.LinearGradient(0, 0, 0, h,
-                            new int[]{0xFFFFF6DE, 0xFFE9C37C, 0xFF8A6420, 0xFFF1D493, 0xFFFFF6DE},
+                            sigCols,
                             new float[]{0f, 0.35f, 0.55f, 0.75f, 1f},
                             android.graphics.Shader.TileMode.CLAMP));
                     name.invalidate();
@@ -1492,12 +1611,23 @@ public class LicenseActivity extends Activity {
     private void supportDialog() {
         LinearLayout body = kit.v();
         body.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(8));
-        body.addView(kit.btnGhost("🌐  " + Brand.SITE_LABEL, Theme.GOLD,
+        body.addView(kit.btnGhost(Brand.SITE_LABEL, Theme.GOLD,
                 v -> Brand.openSite(this)), kit.lp(-1, -2));
         for (String ph : Brand.PHONES) {
             final String fph = ph;
-            body.addView(kit.btnGhost("📞  " + Money.fa(ph), Theme.TEAL,
-                    v -> Brand.dial(this, fph)), kit.lp(-1, -2));
+            final android.widget.Button pb = kit.btnGhost(Money.fa(ph), Theme.TEAL,
+                    v -> Brand.dial(this, fph));
+            try {
+                android.graphics.drawable.Drawable icd = getDrawable(R.drawable.mi_call);
+                if (icd != null) {
+                    icd = icd.mutate();
+                    icd.setTint(Theme.TEAL);
+                    pb.setCompoundDrawablesRelativeWithIntrinsicBounds(icd, null, null, null);
+                    pb.setCompoundDrawablePadding(Theme.dp(6));
+                }
+                pb.setMinHeight(Theme.dp(48));
+            } catch (Exception ignored) { }
+            body.addView(pb, kit.lp(-1, -2));
         }
         final AlertDialog[] dlgH = new AlertDialog[1];
         body.addView(kit.gap(4));
@@ -1630,10 +1760,14 @@ public class LicenseActivity extends Activity {
         return code.substring(0, 4) + "-" + code.substring(4);
     }
 
-    private void copyText(String label, String text) {
+    private boolean copyText(String label, String text) {
         try {
             ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-            if (cm != null) cm.setPrimaryClip(ClipData.newPlainText(label, text));
-        } catch (Exception ignored) { }
+            if (cm == null) return false;
+            cm.setPrimaryClip(ClipData.newPlainText(label, text == null ? "" : text));
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 }

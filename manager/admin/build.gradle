@@ -16,8 +16,8 @@ android {
         applicationId 'ir.meelano.admin'
         minSdk 26
         targetSdk 34
-        versionCode 7
-        versionName '1.6.0'
+        versionCode 8
+        versionName '1.7.0'
     }
 
     signingConfigs {
@@ -48,6 +48,4 @@ android {
 dependencies {
     // Shared offline-license codec (same secret + pack format as the client app).
     implementation project(':licensing')
-    // QR display for offline pairing (seller shows, customer scans).
-    implementation 'com.google.zxing:core:3.5.3'
 }

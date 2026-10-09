@@ -63,8 +63,6 @@ import ir.meelano.licensing.License;
 public class LicenseActivity extends Activity {
 
     private static final int REQ_RECV = 906;
-    private static final int REQ_SCAN = 807;
-    private static final int REQ_CAM = 809;
 
     private Kit kit;
     private Settings settings;
@@ -99,7 +97,6 @@ public class LicenseActivity extends Activity {
         }
     };
 
-    private boolean wantScan;
     private long lastCardTry;
     private BroadcastReceiver smsPing;
 
@@ -174,13 +171,6 @@ public class LicenseActivity extends Activity {
             if (req == REQ_RECV) {
                 updateRecvHint();
                 buildUi();
-            } else if (req == REQ_CAM) {
-                boolean g = grants != null && grants.length > 0
-                        && grants[0] == PackageManager.PERMISSION_GRANTED;
-                boolean w = wantScan;
-                wantScan = false;
-                if (g && w) launchScan();
-                else if (!g) kit.toast("بدون دسترسی دوربین، کد را دستی وارد کنید");
             }
         } catch (Exception ignored) { }
     }
@@ -314,9 +304,13 @@ public class LicenseActivity extends Activity {
         lp.gravity = Gravity.CENTER;
         c.addView(waitLogo, lp);
         c.addView(kit.gap(6));
+        LinearLayout whead = kit.h();
+        whead.setGravity(Gravity.CENTER_VERTICAL);
         TextView t = kit.text("در انتظار دریافت لایسنس", 17f, Theme.TEXT, true);
         t.setGravity(Gravity.CENTER);
-        c.addView(t, kit.lp(-1, -2));
+        whead.addView(t, kit.wlp(1f));
+        whead.addView(refreshIconView(), kit.lp(-2, -2));
+        c.addView(whead, kit.lp(-1, -2));
         dotsView = kit.text("○○○", 22, Theme.GOLD, true);
         dotsView.setGravity(Gravity.CENTER);
         dotsView.setHeight(Theme.dp(30));
@@ -337,10 +331,12 @@ public class LicenseActivity extends Activity {
         c.addView(deviceCodeView(), kit.lp(-1, -2));
         c.addView(kit.gap(6));
         LinearLayout row = kit.h();
-        row.addView(kit.btnGhost("↻ ارسال مجدد", Theme.GOLD, v -> shareRequest(
+        row.addView(kit.btnGhost("↻ ارسال مجدد", Theme.MUTED, v -> shareRequest(
                 LicenseStore.distName(this), LicenseStore.contactPhone(this))), kit.wlp(1f));
         row.addView(kit.space(8));
-        row.addView(kit.btnGhost("ثبت دستی کلید", Theme.TEAL, v -> manualKeyDialog()), kit.wlp(1f));
+        final android.widget.Button[] recall = new android.widget.Button[1];
+        recall[0] = kit.btnGold("✦ دریافت کلید", v -> recallFlow(recall[0]));
+        row.addView(recall[0], kit.wlp(1f));
         c.addView(row, kit.lp(-1, -2));
         Card3D.mount(box, c);
         buildDevFooter(box);
@@ -353,45 +349,90 @@ public class LicenseActivity extends Activity {
         uiHandler.post(dotsTick);
     }
 
-    private void manualKeyDialog() {
-        LinearLayout b = kit.v();
-        b.setPadding(Theme.dp(16), Theme.dp(8), Theme.dp(16), Theme.dp(8));
-        final EditText f = kit.edit("کلید را اینجا بچسبانید…", "");
-        f.setMinLines(2);
-        try {
-            f.setTypeface(Typeface.MONOSPACE);
-        } catch (Exception ignored) { }
-        b.addView(f, kit.lp(-1, -2));
-        final AlertDialog[] box = new AlertDialog[1];
-        LinearLayout row = kit.h();
-        row.addView(kit.btnGold("✦ ثبت", v -> {
-            String in = txt(f);
-            if (in.isEmpty()) {
-                String cl = clipText();
-                if (cl != null && !cl.isEmpty()) in = cl;
-            }
-            if (in.isEmpty()) {
-                kit.toast("کلید را بچسبانید یا اسکن کنید");
-                return;
-            }
-            try {
-                box[0].dismiss();
-            } catch (Exception ignored) { }
-            smartReceive(in);
-        }), kit.wlp(1f));
-        row.addView(kit.space(8));
-        row.addView(kit.btnGhost("◧ اسکن", Theme.TEAL, v -> {
-            try {
-                box[0].dismiss();
-            } catch (Exception ignored) { }
-            scanCode();
-        }), kit.wlp(1f));
-        b.addView(row, kit.lp(-1, -2));
-        box[0] = kit.dialog("ثبت کلید", b, true);
-        box[0].show();
-    }
 
     // ================= page 2: server + DB, the app finds the rest =================
+
+    /**
+     * Luxury manual recall (v32): no mechanism talk — the button says the
+     * key is on its way, and either the license lands or one smart line
+     * explains the wait. Also sweeps the clipboard invisibly.
+     */
+    private void recallFlow(final android.widget.Button btn) {
+        if (!recvGranted()) {
+            ensureRecvPerm();
+            return;
+        }
+        try {
+            btn.setEnabled(false);
+            btn.setText("در حال فعال‌سازی…");
+        } catch (Exception ignored) { }
+        uiHandler.postDelayed(() -> {
+            try {
+                consumeSms();
+                if (LicenseStore.check(LicenseActivity.this).ok) {
+                    buildUi();
+                    return;
+                }
+                String cl = clipText();
+                if (cl != null && !cl.isEmpty()
+                        && (extractPackToken(cl) != null || extractCardLine(cl) != null)) {
+                    smartReceive(cl);
+                    return;
+                }
+                kit.toast("هنوز کلیدی نرسیده؛ کمی صبر کنید ✦");
+            } catch (Exception ignored) { }
+            try {
+                btn.setEnabled(true);
+                btn.setText("✦ دریافت کلید");
+            } catch (Exception ignored2) { }
+        }, 1200);
+    }
+
+    /**
+     * One-tap refresh (v32): re-apply anything staged, verdict the network,
+     * rebuild only when the state actually moved (typed text is preserved).
+     */
+    private void refreshFlow() {
+        boolean licBefore = false;
+        boolean connBefore = false;
+        try {
+            licBefore = LicenseStore.check(this).ok;
+            connBefore = connConfigured();
+        } catch (Exception ignored) { }
+        try {
+            consumeSms();
+        } catch (Exception ignored) { }
+        updateRecvHint();
+        boolean moved = false;
+        try {
+            moved = LicenseStore.check(this).ok != licBefore
+                    || connConfigured() != connBefore;
+        } catch (Exception ignored) { }
+        if (moved) {
+            buildUi();
+            return;
+        }
+        try {
+            kit.toast(Net.online(this) ? "✓ بررسی شد"
+                    : "اینترنت قطع است — وصل شوید و دوباره بزنید");
+        } catch (Exception ignored) { }
+    }
+
+    /** Circular gold refresh icon for the card headers. */
+    private TextView refreshIconView() {
+        TextView v = kit.text("↻", 22, Theme.GOLD_SOFT, true);
+        v.setGravity(Gravity.CENTER);
+        v.setBackground(Theme.ghostButton(Theme.GOLD));
+        int p = Theme.dp(8);
+        v.setPadding(p, Theme.dp(2), p, Theme.dp(2));
+        try {
+            v.setMinWidth(Theme.dp(44));
+            v.setMinHeight(Theme.dp(44));
+        } catch (Exception ignored) { }
+        Theme.pressable(v);
+        v.setOnClickListener(vv -> refreshFlow());
+        return v;
+    }
 
     private void buildConnPage(LinearLayout box, LicenseStore.Status s) {
         Card3D.mount(box, Card3D.hero(this, kit, R.drawable.lic_bolt, Theme.GOLD,
@@ -409,7 +450,11 @@ public class LicenseActivity extends Activity {
         }
         Card3D.mount(box, lc);
         LinearLayout c = Card3D.card(this, Theme.GOLD);
-        c.addView(Card3D.stepRow(this, kit, "✦", Theme.GOLD, "اتصال به فروشگاه"), kit.lp(-1, -2));
+        LinearLayout chead = kit.h();
+        chead.setGravity(Gravity.CENTER_VERTICAL);
+        chead.addView(Card3D.stepRow(this, kit, "✦", Theme.GOLD, "اتصال به فروشگاه"), kit.wlp(1f));
+        chead.addView(refreshIconView(), kit.lp(-2, -2));
+        c.addView(chead, kit.lp(-1, -2));
         c.addView(kit.text("کلید رسید ✦ حالا آدرس فروشگاه را بنویسید.",
                 13f, Theme.TEXT, false), kit.lp(-1, -2));
         c.addView(kit.gap(6));
@@ -427,8 +472,6 @@ public class LicenseActivity extends Activity {
         final android.widget.Button[] btn = new android.widget.Button[1];
         btn[0] = kit.btnGold("✦ اتصال", v -> connectSmart(txt(fIp), txt(fDb), btn[0]));
         c.addView(btn[0], kit.lp(-1, -2));
-        c.addView(kit.gap(4));
-        c.addView(kit.btnGhost("◧ اسکن کد فروشنده", Theme.TEAL, v -> scanCode()), kit.lp(-1, -2));
         Card3D.mount(box, c);
         buildDevFooter(box);
     }
@@ -666,7 +709,7 @@ public class LicenseActivity extends Activity {
                 smartReceive(clip);
                 return;
             }
-            kit.toast("کلید را بچسبانید یا اسکن کنید");
+            kit.toast("کلیدی پیدا نشد");
             return;
         }
         String pack = extractPackToken(in);
@@ -755,48 +798,11 @@ public class LicenseActivity extends Activity {
 
     /** Manual retry: take a staged card/pack and try it right now. */
 
-    // ---- QR scan (offline pairing: seller shows, customer scans) ----
 
-    private void scanCode() {
-        if (!camGranted()) {
-            wantScan = true;
-            requestPermissions(new String[]{android.Manifest.permission.CAMERA}, REQ_CAM);
-            return;
-        }
-        launchScan();
-    }
 
-    private boolean camGranted() {
-        try {
-            if (Build.VERSION.SDK_INT < 23) return true;
-            return checkSelfPermission(android.Manifest.permission.CAMERA)
-                    == PackageManager.PERMISSION_GRANTED;
-        } catch (Exception e) {
-            return false;
-        }
-    }
 
-    private void launchScan() {
-        try {
-            Intent i = new Intent(this, ScanActivity.class);
-            i.putExtra(ScanActivity.EXTRA_TITLE, "اسکن کد فروشنده");
-            i.putExtra(ScanActivity.EXTRA_HINT, "QR فروشنده (کد یا کارت اتصال) را جلوی دوربین بگیرید…");
-            startActivityForResult(i, REQ_SCAN);
-        } catch (Exception e) {
-            kit.toast("باز کردن دوربین ممکن نشد");
-        }
-    }
 
     @Override
-    protected void onActivityResult(int req, int res, Intent data) {
-        super.onActivityResult(req, res, data);
-        try {
-            if (req != REQ_SCAN || res != RESULT_OK || data == null) return;
-            String code = data.getStringExtra(ScanActivity.EXTRA_CODE);
-            if (code == null || code.isEmpty()) return;
-            smartReceive(code);
-        } catch (Exception ignored) { }
-    }
 
     // ---- SMS auto-apply ----
 
@@ -843,7 +849,7 @@ public class LicenseActivity extends Activity {
 
     private void applyCard(String pasted) {
         if (pasted == null || pasted.isEmpty()) {
-            kit.toast("کارت اتصال را بچسبانید");
+            kit.toast("کارتی پیدا نشد");
             return;
         }
         License.DbProfile prof = License.parseAnyCard(pasted, device);

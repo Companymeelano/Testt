@@ -22,7 +22,8 @@ import java.util.List;
 import ir.meelano.licensing.License;
 
 /**
- * Seller app: paste a customer request → mint a signed pack → share it back.
+ * Seller app: a customer request in (SMS inbox, shared text or clipboard —
+ * all automatic, zero paste) → mint a signed pack → share it back.
  * Fully offline; everything lives in a local SQLite database.
  */
 public class AdminActivity extends Activity {
@@ -40,6 +41,8 @@ public class AdminActivity extends Activity {
     private BroadcastReceiver smsPing;
     /** Inbox size at last check (-1 = baseline not set yet). */
     private int lastInboxN = -1;
+    /** Text shared from another app (WhatsApp → seller app), consumed on parse. */
+    private String sharedText = "";
 
     /** Draft carried from «new request» / customer / extend into the mint screen. */
     private static final class MintCtx {
@@ -65,8 +68,43 @@ public class AdminActivity extends Activity {
                 AdminKit.toast(this, "⚠ خطای موتور لایسنس؛ برنامه را دوباره نصب کنید");
             }
         } catch (Exception ignored) { }
-        show(this::showHome);
+        captureShared(getIntent());
+        if (sharedText != null && !sharedText.trim().isEmpty()) show(this::showRequest);
+        else show(this::showHome);
         ensureRecvPerm();
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        try {
+            setIntent(intent);
+            captureShared(intent);
+            if (sharedText != null && !sharedText.trim().isEmpty()) show(this::showRequest);
+        } catch (Exception ignored) { }
+    }
+
+    private void captureShared(Intent i) {
+        try {
+            if (i != null && Intent.ACTION_SEND.equals(i.getAction())
+                    && "text/plain".equals(i.getType())) {
+                String t = i.getStringExtra(Intent.EXTRA_TEXT);
+                if (t != null && !t.trim().isEmpty()) sharedText = t;
+            }
+        } catch (Exception ignored) { }
+    }
+
+    private String clipRequest() {
+        try {
+            android.content.ClipboardManager cm = (android.content.ClipboardManager)
+                    getSystemService(CLIPBOARD_SERVICE);
+            if (cm != null && cm.getPrimaryClip() != null
+                    && cm.getPrimaryClip().getItemCount() > 0) {
+                CharSequence t = cm.getPrimaryClip().getItemAt(0).getText();
+                if (t != null) return t.toString().trim();
+            }
+        } catch (Exception ignored) { }
+        return "";
     }
 
     @Override
@@ -226,7 +264,7 @@ public class AdminActivity extends Activity {
                 w(1f));
         box.addView(stats);
 
-        Button bReq = AdminKit.btn(this, "＋  درخواست جدید (چسباندن متن مشتری)", true);
+        Button bReq = AdminKit.btn(this, "＋  درخواست جدید", true);
         bReq.setOnClickListener(v -> show(this::showRequest));
         box.addView(bReq);
 
@@ -359,102 +397,82 @@ public class AdminActivity extends Activity {
 
     /**
      * @param prefill raw SMS text staged by {@link SmsReceiver} (auto-parsed),
-     *                or "" for the manual paste flow.
+     *                or "" for the automatic flow (shared text, then clipboard).
      */
     private void showRequestSms(String prefill, final long inboxId) {
         if (prefill == null) prefill = "";
-        final boolean fromSms = !prefill.isEmpty();
+        final String sms = prefill;
+        final boolean fromSms = !sms.isEmpty();
         LinearLayout box = AdminKit.vbox(this);
-        box.addView(AdminKit.titleBar(this, fromSms ? "✦ درخواست از پیامک" : "درخواست جدید",
+        box.addView(AdminKit.titleBar(this, fromSms ? "✦ درخواست از پیامک" : "✦ درخواست جدید",
                 this::goBack));
-
         box.addView(AdminKit.text(this, fromSms
                 ? "درخواست مشتری با پیامک رسید و خودکار تحلیل شد — بررسی و صدور کنید."
-                : "متن ارسالی مشتری را اینجا بچسبانید و «تحلیل» را بزنید.", 13,
-                AdminKit.MUTED, false));
-        EditText paste = AdminKit.field(this, "متن درخواست مشتری…");
-        paste.setMinLines(4);
-        paste.setGravity(Gravity.TOP);
-        box.addView(paste);
-
-        LinearLayout btnRow = new LinearLayout(this);
-        btnRow.setOrientation(LinearLayout.HORIZONTAL);
-        Button bPaste = AdminKit.btn(this, "چسباندن", false);
-        bPaste.setLayoutParams(w(1f));
-        bPaste.setOnClickListener(v -> {
-            try {
-                android.content.ClipboardManager cm = (android.content.ClipboardManager)
-                        getSystemService(CLIPBOARD_SERVICE);
-                if (cm != null && cm.getPrimaryClip() != null
-                        && cm.getPrimaryClip().getItemCount() > 0) {
-                    CharSequence t = cm.getPrimaryClip().getItemAt(0).getText();
-                    if (t != null) paste.setText(t.toString().trim());
-                }
-            } catch (Exception ignored) { }
-        });
-        Button bParse = AdminKit.btn(this, "تحلیل درخواست", true);
-        bParse.setLayoutParams(w(1f));
-        btnRow.addView(bPaste);
-        btnRow.addView(bParse);
-        box.addView(btnRow);
-
+                : "متن درخواست مشتری را خودکار پیدا و تحلیل می‌کنم.",
+                13, AdminKit.MUTED, false));
         LinearLayout out = AdminKit.vbox(this);
         box.addView(out);
-
-        View.OnClickListener parse = v -> {
-            out.removeAllViews();
-            String pasted = AdminKit.txt(paste);
-            License.Req req = License.parseRequest(pasted);
-            License.Use use = License.parseUse(pasted);
-            if (use != null) showUseReport(out, use);
-            if (req == null) {
-                if (use != null) return; // usage-only report, already shown above
-                out.addView(AdminKit.text(this,
-                        "✕ متن معتبر نیست. خط MILANO-REQ1 داخل آن پیدا نشد؛ از مشتری بخواهید متن کامل را بفرستد.",
-                        14, AdminKit.RED, false));
-                return;
-            }
-            MintCtx ctx = new MintCtx();
-            ctx.dev = req.dev;
-            ctx.name = req.name;
-            ctx.family = req.family;
-            ctx.shop = req.shop;
-            ctx.phone = req.phone;
-            ctx.city = req.city;
-            ctx.inboxId = inboxId;
-
-            LinearLayout card = (LinearLayout) AdminKit.card(this);
-            AdminKit.cardMargin(card, this);
-            AdminKit.infoRow(card, this, "کد دستگاه", prettyDev(req.dev), true);
-            String whoName = (req.name + " " + req.family).trim();
-            if (!whoName.isEmpty()) AdminKit.infoRow(card, this, "نام", whoName, false);
-            if (!req.shop.isEmpty()) AdminKit.infoRow(card, this, "فروشگاه", req.shop, false);
-            if (!req.phone.isEmpty()) AdminKit.infoRow(card, this, "موبایل", req.phone, false);
-            if (!req.city.isEmpty()) AdminKit.infoRow(card, this, "شهر", req.city, false);
-            out.addView(card);
-
-            AdminDb.Customer dup = db.byDev(req.dev);
-            if (dup != null) {
-                ctx.customerId = dup.id;
-                TextView warn = AdminKit.text(this,
-                        "⚠ این دستگاه قبلاً به نام «" + dup.full() + "» ثبت شده؛ صدور کد جدید برای همان مشتری انجام می‌شود.",
-                        13.5f, AdminKit.GOLD_SOFT, false);
-                warn.setPadding(0, 0, 0, AdminKit.dp(this, 8));
-                out.addView(warn);
-            } else {
-                out.addView(AdminKit.text(this, "✓ درخواست معتبر است؛ مشتری جدید.",
-                        14, AdminKit.GREEN, false));
-            }
-            Button go = AdminKit.btn(this, "ادامه → انتخاب طرح و صدور کد", true);
-            go.setOnClickListener(x -> show(() -> showMint(ctx)));
-            out.addView(go);
+        final Runnable[] retry = new Runnable[1];
+        retry[0] = () -> {
+            String text = !sms.isEmpty() ? sms : sharedText;
+            if (text == null || text.isEmpty()) text = clipRequest();
+            renderRequest(out, text == null ? "" : text, inboxId, retry[0]);
         };
-        bParse.setOnClickListener(parse);
-        if (fromSms) {
-            paste.setText(prefill);
-            parse.onClick(bParse);
-        }
+        retry[0].run();
         root(box);
+    }
+
+    /** Parse + render a request, or a smart empty state with one retry button. */
+    private void renderRequest(LinearLayout out, String text, long inboxId, Runnable retry) {
+        out.removeAllViews();
+        License.Req req = License.parseRequest(text);
+        License.Use use = License.parseUse(text);
+        if (use != null) showUseReport(out, use);
+        if (req == null) {
+            if (use != null) return; // usage-only report, already shown above
+            out.addView(AdminKit.text(this,
+                    "✕ متن درخواستی پیدا نکردم؛ در واتساپ متن مشتری را کپی کنید (یا با «اشتراک‌گذاری» بفرستید) و «تلاش مجدد» را بزنید.",
+                    14, AdminKit.RED, false));
+            Button again = AdminKit.btn(this, "↻ تلاش مجدد", true);
+            again.setOnClickListener(v -> retry.run());
+            out.addView(again);
+            return;
+        }
+        sharedText = "";
+        MintCtx ctx = new MintCtx();
+        ctx.dev = req.dev;
+        ctx.name = req.name;
+        ctx.family = req.family;
+        ctx.shop = req.shop;
+        ctx.phone = req.phone;
+        ctx.city = req.city;
+        ctx.inboxId = inboxId;
+
+        LinearLayout card = (LinearLayout) AdminKit.card(this);
+        AdminKit.cardMargin(card, this);
+        AdminKit.infoRow(card, this, "کد دستگاه", prettyDev(req.dev), true);
+        String whoName = (req.name + " " + req.family).trim();
+        if (!whoName.isEmpty()) AdminKit.infoRow(card, this, "نام", whoName, false);
+        if (!req.shop.isEmpty()) AdminKit.infoRow(card, this, "فروشگاه", req.shop, false);
+        if (!req.phone.isEmpty()) AdminKit.infoRow(card, this, "موبایل", req.phone, false);
+        if (!req.city.isEmpty()) AdminKit.infoRow(card, this, "شهر", req.city, false);
+        out.addView(card);
+
+        AdminDb.Customer dup = db.byDev(req.dev);
+        if (dup != null) {
+            ctx.customerId = dup.id;
+            TextView warn = AdminKit.text(this,
+                    "⚠ این دستگاه قبلاً به نام «" + dup.full() + "» ثبت شده؛ صدور کد جدید برای همان مشتری انجام می‌شود.",
+                    13.5f, AdminKit.GOLD_SOFT, false);
+            warn.setPadding(0, 0, 0, AdminKit.dp(this, 8));
+            out.addView(warn);
+        } else {
+            out.addView(AdminKit.text(this, "✓ درخواست معتبر است؛ مشتری جدید.",
+                    14, AdminKit.GREEN, false));
+        }
+        Button go = AdminKit.btn(this, "ادامه → انتخاب طرح و صدور کد", true);
+        go.setOnClickListener(x -> show(() -> showMint(ctx)));
+        out.addView(go);
     }
 
     /** Show + store a usage report found inside pasted text. */
@@ -694,22 +712,6 @@ public class AdminActivity extends Activity {
         pack.setGravity(Gravity.CENTER);
         pack.setPadding(0, AdminKit.dp(this, 10), 0, AdminKit.dp(this, 10));
         card.addView(pack);
-        android.graphics.Bitmap qr = QrShow.make(l.pack, 600);
-        if (qr != null) {
-            ImageView qv = new ImageView(this);
-            qv.setImageBitmap(qr);
-            qv.setBackgroundColor(0xFFFFFFFF);
-            int qpad = AdminKit.dp(this, 10);
-            qv.setPadding(qpad, qpad, qpad, qpad);
-            int qz = AdminKit.dp(this, 220);
-            LinearLayout.LayoutParams qp = new LinearLayout.LayoutParams(qz, qz);
-            qp.gravity = Gravity.CENTER_HORIZONTAL;
-            card.addView(qv, qp);
-            TextView qcap = AdminKit.text(this, "مشتری این QR را در بخش ۲ اسکن می‌کند", 12,
-                    AdminKit.MUTED, false);
-            qcap.setGravity(Gravity.CENTER);
-            card.addView(qcap);
-        }
         AdminKit.infoRow(card, this, "طرح",
                 "«" + License.planFa(planOf(l)) + "»", false);
         AdminKit.infoRow(card, this, "انقضا", expText(l), false);
@@ -777,11 +779,11 @@ public class AdminActivity extends Activity {
     }
 
     private String shareText(AdminDb.Lic l) {
-        return "کد فعال‌سازی میلانو منیجر\n"
+        return "کد فعال‌سازی میلانو\n"
                 + AdminKit.prettifyPack(l.pack) + "\n"
                 + "طرح: «" + License.planFa(planOf(l)) + "»\n"
                 + "انقضا: " + expText(l) + "\n"
-                + "راهنما: در برنامه، بخش ۲ (فعال‌سازی هوشمند)، این کد را وارد کنید.";
+                + "راهنما: برنامه را باز نگه دارید؛ کد خودکار فعال می‌شود.";
     }
 
     // ---------- customers ----------
@@ -1297,22 +1299,6 @@ public class AdminActivity extends Activity {
             } catch (Exception ignored) { }
             tv.setPadding(0, AdminKit.dp(this, 8), 0, AdminKit.dp(this, 8));
             rc.addView(tv);
-            android.graphics.Bitmap qrc = QrShow.make(cardText, 700);
-            if (qrc != null) {
-                ImageView qv = new ImageView(this);
-                qv.setImageBitmap(qrc);
-                qv.setBackgroundColor(0xFFFFFFFF);
-                int qpad = AdminKit.dp(this, 10);
-                qv.setPadding(qpad, qpad, qpad, qpad);
-                int qz = AdminKit.dp(this, 240);
-                LinearLayout.LayoutParams qp = new LinearLayout.LayoutParams(qz, qz);
-                qp.gravity = Gravity.CENTER_HORIZONTAL;
-                rc.addView(qv, qp);
-                TextView qcap = AdminKit.text(this, "مشتری این QR را در بخش ۲ اسکن می‌کند", 12,
-                        AdminKit.MUTED, false);
-                qcap.setGravity(Gravity.CENTER);
-                rc.addView(qcap);
-            }
             out.addView(rc);
             final String fcard = cardText;
             final String fname = cc.full();
@@ -1322,8 +1308,8 @@ public class AdminActivity extends Activity {
                 AdminKit.toast(this, "کارت کپی شد");
             });
             out.addView(bCopy);
-            final String fmsg = "کارت اتصال میلانو منیجر (" + fname + ")\n" + fcard
-                    + "\nراهنما: در صفحه فعال‌سازی، بخش ۲ (فعال‌سازی هوشمند)، «ثبت خودکار» را بزنید.";
+            final String fmsg = "کارت اتصال میلانو (" + fname + ")\n" + fcard
+                    + "\nراهنما: برنامه را باز نگه دارید؛ کارت خودکار ثبت می‌شود.";
             Button bShare = AdminKit.btn(this, "اشتراک‌گذاری برای مشتری", false);
             bShare.setOnClickListener(x -> AdminKit.share(this, "ارسال کارت اتصال", fmsg));
             out.addView(bShare);

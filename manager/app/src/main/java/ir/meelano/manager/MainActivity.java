@@ -13,6 +13,8 @@ import android.widget.TextView;
 import ir.meelano.manager.core.Filter;
 import ir.meelano.manager.core.Finger;
 import ir.meelano.manager.core.LicenseStore;
+import ir.meelano.manager.core.UpdateCenter;
+import ir.meelano.manager.ui.WhatsNew;
 import ir.meelano.manager.core.RoleStore;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.Notify;
@@ -478,6 +480,10 @@ public class MainActivity extends Activity {
         refreshCompany();
         Notify.boot(this);
         syncBackFab();
+        // v24: What's New on upgrade (once), then the silent licensed update check.
+        try {
+            WhatsNew.maybeShow(this, () -> UpdateCenter.autoCheck(this));
+        } catch (Exception ignored) { }
     }
 
     /** Hairline divider between header tool buttons. */
@@ -802,6 +808,12 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, android.content.Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == UpdateCenter.REQ_UNKNOWN) {
+            try {
+                UpdateCenter.onUnknownSourcesReturn(this);
+            } catch (Exception ignored) { }
+            return;
+        }
         if (requestCode == VOICE_REQ && resultCode == Activity.RESULT_OK && data != null && voiceCb != null) {
             try {
                 java.util.ArrayList<String> out = data.getStringArrayListExtra(

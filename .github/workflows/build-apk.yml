@@ -40,37 +40,38 @@ jobs:
 
       - name: Rename APKs
         run: |
-          cp manager/app/build/outputs/apk/debug/app-debug.apk meelano-manager-v22-debug.apk
-          cp manager/admin/build/outputs/apk/debug/admin-debug.apk meelano-admin-v1.4-debug.apk
+          cp manager/app/build/outputs/apk/debug/app-debug.apk meelano-manager-v24-debug.apk
+          cp manager/admin/build/outputs/apk/debug/admin-debug.apk meelano-admin-v1.5-debug.apk
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: meelano-apks-debug
           path: |
-            meelano-manager-v22-debug.apk
-            meelano-admin-v1.4-debug.apk
+            meelano-manager-v24-debug.apk
+            meelano-admin-v1.5-debug.apk
 
       - name: Publish rolling release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: apk-debug
-          name: MEELANO v20 — client + seller admin (debug APKs)
+          prerelease: true
+          name: MEELANO v24 — client + seller admin (debug APKs)
           body: |
             دو فایل نصبی (دیباگ) — مستقیم روی گوشی نصب می‌شوند:
-            • meelano-manager-v22-debug.apk — برنامه مشتری (گردش حساب کلیک‌پذیر + اکسل واقعی + چاپ + دسته‌بندی گزارشات + ویژه مدیر + زوم)
-            • meelano-admin-v1.4-debug.apk — برنامه فروشنده (صندوق درخواست‌ها + خط اتصال کوتاه + ارسال یک‌پیامکی + QR)
+            • meelano-manager-v24-debug.apk — برنامه مشتری (بروزرسانی خودکار + صفحه تازه‌های نسخه + فعال‌سازی دومرحله‌ای + خروجی Word و عکس)
+            • meelano-admin-v1.5-debug.apk — برنامه فروشنده (انقضای دلخواه + لغو/مسدودسازی از راه دور + صندوق درخواست‌ها + QR)
             Debug builds — install directly on the phone.
             Client connects to the shop's Atiran SQL Server automatically via the seller's connection card.
           files: |
-            meelano-manager-v22-debug.apk
-            meelano-admin-v1.4-debug.apk
+            meelano-manager-v24-debug.apk
+            meelano-admin-v1.5-debug.apk
 
       - name: Commit APKs to dist/ (in-chat delivery)
         run: |
           mkdir -p dist
           rm -f dist/meelano-manager-v*-debug.apk dist/meelano-admin-v*-debug.apk
-          cp meelano-manager-v22-debug.apk meelano-admin-v1.4-debug.apk dist/
+          cp meelano-manager-v24-debug.apk meelano-admin-v1.5-debug.apk dist/
           git config user.name "arena-ci"
           git config user.email "arena-ci@local"
           git add -A -f dist/

@@ -346,6 +346,11 @@ public class SettingsScreen extends Screen {
         ab.addView(tag, a.kit.lp(-1, -2));
         ab.addView(a.kit.gap(4));
         ab.addView(a.kit.kv("نسخه", appVersion() + " • ویرایش مدیریت", Theme.TEXT), a.kit.lp(-1, -2));
+        ab.addView(a.kit.btnGhost("✦  تازه‌های نسخه", Theme.GOLD, v ->
+                ir.meelano.manager.ui.WhatsNew.showCurrent(a)), a.kit.lp(-1, -2));
+        ab.addView(a.kit.btnGhost("⬆  بررسی بروزرسانی", Theme.TEAL, v ->
+                ir.meelano.manager.core.UpdateCenter.manualCheck(a)), a.kit.lp(-1, -2));
+        ab.addView(a.kit.hint(ir.meelano.manager.core.UpdateCenter.lastCheckLine(a)), a.kit.lp(-1, -2));
         ab.addView(a.kit.kv("منبع داده", "SQL Server آتیران (اتصال مستقیم)", Theme.TEXT), a.kit.lp(-1, -2));
         ab.addView(a.kit.text("✦ پشتیبانی میلانو", 13f, Theme.GOLD_SOFT, true), a.kit.lp(-1, -2));
         ab.addView(a.kit.btnGhost("🌐  " + ir.meelano.manager.core.Brand.SITE_LABEL, Theme.GOLD, v ->

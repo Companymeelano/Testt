@@ -2,6 +2,7 @@ package ir.meelano.licensing;
 
 import java.nio.charset.Charset;
 import java.security.SecureRandom;
+import java.util.Locale;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -621,6 +622,33 @@ public final class License {
         return np;
     }
 
+    // ---------------- in-app update channel ----------------
+    /**
+     * Domain tag for the signed update descriptor (see {@code version.json}
+     * on the release page): the app trusts a descriptor only when its MAC
+     * verifies with the same license secret, binding versionCode to the
+     * APK's SHA-256 so a descriptor from one release can never be mixed
+     * with another release's APK.
+     */
+    public static final String UPDATE_PREFIX = "MILANO-UPDATE1";
+
+    /** MAC binding a release (versionCode + APK SHA-256) to the license secret. */
+    public static String updateMac(int versionCode, String sha256hex) {
+        String h = sha256hex == null ? "" : sha256hex.trim().toLowerCase(Locale.US);
+        return mac8("UPDATE1|" + versionCode + "|" + h);
+    }
+
+    /** True when the update descriptor's MAC is genuine. Never throws. */
+    public static boolean updateVerify(int versionCode, String sha256hex, String mac) {
+        try {
+            if (versionCode <= 0 || sha256hex == null || mac == null) return false;
+            if (!sha256hex.trim().matches("(?i)[0-9a-f]{64}")) return false;
+            return constantEq(updateMac(versionCode, sha256hex), normalize(mac));
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     /** The device a SITE1 line belongs to ("" when the line is invalid). */
     public static String parseSiteDev(String text) {
         String line = findLine(text, SITE_PREFIX);
@@ -747,6 +775,13 @@ public final class License {
             NetProfile sp = parseSite("x\n" + siteLine(dev, "1.2.3.4", "1433", "AtiranDb") + "\ny");
             if (sp == null || !"1.2.3.4".equals(sp.host) || !"AtiranDb".equals(sp.db)) return false;
             if (!dev.equals(parseSiteDev(siteLine(dev, "1.2.3.4", "1433", "AtiranDb")))) return false;
+            String uh = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+            String um = updateMac(17, uh);
+            if (!updateVerify(17, uh, um)) return false;
+            if (!updateVerify(17, uh.toUpperCase(Locale.US), um)) return false;
+            if (updateVerify(18, uh, um)) return false;
+            if (updateVerify(17, uh, um + "X")) return false;
+            if (updateVerify(17, "xyz", um)) return false;
             return true;
         } catch (Exception e) {
             return false;

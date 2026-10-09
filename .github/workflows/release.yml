@@ -1,0 +1,103 @@
+name: Publish signed release (customer update channel)
+
+# The customer-facing channel: push a tag like v24.0.0 and this builds
+# SIGNED release APKs (client + seller admin), verifies the signatures,
+# writes the MAC-signed version.json, and publishes a GitHub Release.
+# Licensed phones pick the update automatically on next entry.
+#
+# One-time setup (see manager/docs/UPDATE_FA.md): create the release
+# keystore ONCE and store these repository secrets:
+#   MEELANO_KEYSTORE_B64, MEELANO_STORE_PASS, MEELANO_KEY_ALIAS,
+#   MEELANO_KEY_PASS, MEELANO_UPDATE_SECRET
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: "17"
+          distribution: temurin
+
+      - name: Install Android platform + build-tools
+        run: |
+          SDKMAN="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMAN" --licenses > /dev/null || true
+          "$SDKMAN" "platforms;android-34" "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.11.1
+
+      - name: Restore release keystore
+        run: |
+          echo "$MEELANO_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/meelano-release.jks"
+          test -s "$RUNNER_TEMP/meelano-release.jks"
+        env:
+          MEELANO_KEYSTORE_B64: ${{ secrets.MEELANO_KEYSTORE_B64 }}
+
+      - name: Build signed release APKs (client + admin)
+        working-directory: manager
+        env:
+          MEELANO_KEYSTORE: ${{ runner.temp }}/meelano-release.jks
+          MEELANO_STORE_PASS: ${{ secrets.MEELANO_STORE_PASS }}
+          MEELANO_KEY_ALIAS: ${{ secrets.MEELANO_KEY_ALIAS }}
+          MEELANO_KEY_PASS: ${{ secrets.MEELANO_KEY_PASS }}
+        run: |
+          set -o pipefail
+          gradle :app:assembleRelease :admin:assembleRelease --stacktrace 2>&1 | tee ../build-release.log | tail -40
+
+      - name: Verify APK signatures
+        run: |
+          APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          "$APKSIGNER" verify --print-certs manager/app/build/outputs/apk/release/app-release.apk
+          "$APKSIGNER" verify manager/admin/build/outputs/apk/release/admin-release.apk
+
+      - name: Write signed version.json
+        env:
+          MEELANO_UPDATE_SECRET: ${{ secrets.MEELANO_UPDATE_SECRET }}
+        run: |
+          python3 manager/tools/make_version.py \
+            --tag "${GITHUB_REF_NAME}" \
+            --manager manager/app/build/outputs/apk/release/app-release.apk \
+            --admin manager/admin/build/outputs/apk/release/admin-release.apk \
+            --aapt "$ANDROID_HOME/build-tools/35.0.0/aapt" \
+            --out release-out/ \
+            --msg "پیشنهاد می‌کنیم همین حالا به‌روزرسانی کنید؛ نصب امن و خودکار است."
+          ls -la release-out/
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: میلانو ${{ github.ref_name }} — نسخه رسمی
+          body: |
+            نسخه رسمی امضاشده — گوشی‌های دارای لایسنس فعال، این نسخه را خودکار در ورود بعدی می‌بینند و با یک لمس نصب می‌کنند.
+            • meelano-manager-v*.apk — برنامه مشتری
+            • meelano-admin-v*.apk — برنامه فروشنده
+            • version.json — شناسنامه امضاشده نسخه (کانال آپدیت خودکار)
+          files: |
+            release-out/meelano-manager-*.apk
+            release-out/meelano-admin-*.apk
+            release-out/version.json
+
+      - name: Save error tail to branch (diagnostics, on failure)
+        if: failure()
+        run: |
+          tail -c 60000 build-release.log > build-error-tail.txt || echo "no log" > build-error-tail.txt
+          git config user.name "arena-ci"
+          git config user.email "arena-ci@local"
+          git add -f build-error-tail.txt
+          git commit -m "CI diagnostics (temporary, will be removed)" || true
+          git push origin HEAD:arena/ba83e93c-testt || true

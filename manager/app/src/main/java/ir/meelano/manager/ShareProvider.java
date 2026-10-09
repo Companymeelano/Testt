@@ -36,6 +36,19 @@ public class ShareProvider extends ContentProvider {
         return new Uri.Builder().scheme("content").authority(authority(c)).appendPath(f.getName()).build();
     }
 
+    /**
+     * Hands a verified APK (already inside {@link #shareDir(Context)}) to the
+     * system installer. Read-only serving + the granted URI permission is all
+     * the installer needs.
+     */
+    public static void install(Context c, File apk) {
+        Uri uri = uriFor(c, apk);
+        Intent i = new Intent(Intent.ACTION_VIEW);
+        i.setDataAndType(uri, "application/vnd.android.package-archive");
+        i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+        c.startActivity(i);
+    }
+
     /** Opens the system share sheet for a file that lives in {@link #shareDir(Context)}. */
     public static void share(Context c, File f, String mime, String title) {
         Uri uri = uriFor(c, f);
@@ -74,6 +87,7 @@ public class ShareProvider extends ContentProvider {
         if (n.endsWith(".png")) return "image/png";
         if (n.endsWith(".jpg") || n.endsWith(".jpeg")) return "image/jpeg";
         if (n.endsWith(".txt")) return "text/plain";
+        if (n.endsWith(".apk")) return "application/vnd.android.package-archive";
         return "application/octet-stream";
     }
 

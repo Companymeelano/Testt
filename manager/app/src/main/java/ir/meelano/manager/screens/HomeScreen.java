@@ -232,6 +232,7 @@ public class HomeScreen extends Screen {
             else if ("debtors".equals(key)) secDebtors(content, d);
             else if ("visitors".equals(key)) secVisitors(content, d);
             else if ("due".equals(key)) secDue(content, d);
+            else if ("eod".equals(key)) secEod(content);
             else if ("shortcuts".equals(key)) secShortcuts(content, d);
         }
         renderNotes(content, d.notes);
@@ -240,7 +241,7 @@ public class HomeScreen extends Screen {
     /** Dashboard order from settings; unknown keys dropped, missing sections appended. */
     private List<String> orderedKeys() {
         List<String> out = new ArrayList<>();
-        String[] known = {"kpis", "alerts", "trend", "donut", "debtors", "visitors", "due", "shortcuts"};
+        String[] known = {"kpis", "alerts", "trend", "donut", "debtors", "visitors", "due", "eod", "shortcuts"};
         for (String k : a.settings.homeOrder().split(",")) {
             String t = k == null ? "" : k.trim();
             if (!t.isEmpty() && !out.contains(t)) {
@@ -366,6 +367,41 @@ public class HomeScreen extends Screen {
                 c.addView(a.kit.kv("پرداختی (" + Money.fa(String.valueOf(d.dueOut.size())) + " فقره)", Money.rial(dueOutSum), Theme.DANGER), a.kit.lp(-1, -2));
             a.kit.addCard(content, c);
         }
+    }
+
+    private void secEod(LinearLayout content) {
+        // ---- end-of-day summary (saved nightly, one-tap share) ----
+        String txt;
+        String dt;
+        try {
+            txt = a.settings.eodText();
+            dt = a.settings.eodDate();
+        } catch (Exception e) {
+            return;
+        }
+        if (txt == null || txt.isEmpty()) return;
+        LinearLayout c = a.kit.card(Theme.VIOLET);
+        String when = "";
+        try {
+            when = dt == null || dt.isEmpty() ? "" : Jalali.dispFa(dt);
+        } catch (Exception ignored) { }
+        c.addView(a.kit.sectionHead("🌙 جمع‌بندی پایان روز" + (when.isEmpty() ? "" : " • " + when),
+                null, null), a.kit.lp(-1, -2));
+        c.addView(a.kit.text(txt, 13f, Theme.TEXT, false), a.kit.lp(-1, -2));
+        c.addView(a.kit.gap(6));
+        final String share = "🌙 جمع‌بندی پایان روز میلانو" + (when.isEmpty() ? "" : " (" + when + ")")
+                + "\n" + txt;
+        c.addView(a.kit.btnGhost("↗ اشتراک‌گذاری", Theme.VIOLET, v -> {
+            try {
+                android.content.Intent i = new android.content.Intent(android.content.Intent.ACTION_SEND);
+                i.setType("text/plain");
+                i.putExtra(android.content.Intent.EXTRA_TEXT, share);
+                a.startActivity(android.content.Intent.createChooser(i, "اشتراک جمع‌بندی روز"));
+            } catch (Exception e) {
+                a.kit.toast("اشتراک ممکن نشد");
+            }
+        }), a.kit.lp(-1, -2));
+        a.kit.addCard(content, c);
     }
 
     private void secShortcuts(LinearLayout content, Data d) {

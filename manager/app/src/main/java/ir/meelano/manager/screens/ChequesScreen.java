@@ -3,6 +3,7 @@ package ir.meelano.manager.screens;
 import android.app.AlertDialog;
 import android.view.View;
 import android.widget.LinearLayout;
+import ir.meelano.manager.core.CacheStore;
 import android.widget.ScrollView;
 
 import ir.meelano.manager.MainActivity;
@@ -130,11 +131,19 @@ public class ChequesScreen extends Screen {
         }, new Repo.Cb<Data>() {
             @Override
             public void ok(Data d) {
+                saveCache(d);
                 build(content, d);
             }
 
             @Override
             public void fail(String faError) {
+                String[] lab = {""};
+                Data cached = loadCache(lab);
+                if (cached != null) {
+                    build(content, cached);
+                    offlineBanner(content, lab[0], faError);
+                    return;
+                }
                 content.removeAllViews();
                 content.addView(heroCard(), a.kit.lp(-1, -2));
                 content.addView(a.kit.gap(12));
@@ -151,6 +160,33 @@ public class ChequesScreen extends Screen {
     private static final class Agg {
         long count;
         double total;
+    }
+
+    private void saveCache(Data d) {
+        java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+        m.put("groups", d.groups);
+        m.put("list", d.list);
+        m.put("cal", d.cal);
+        Row meta = new Row();
+        meta.put("in", d.snapIn ? "1" : "0");
+        meta.put("bucket", d.snapBucket);
+        meta.put("cal", d.snapCal ? "1" : "0");
+        m.put("meta", meta);
+        CacheStore.saveData(a, "cx_cheques", cacheNow(), m);
+    }
+
+    private Data loadCache(String[] lab) {
+        java.util.Map<String, Object> m = CacheStore.loadData(a, "cx_cheques", lab);
+        if (m == null) return null;
+        Data d = new Data();
+        d.groups = CacheStore.rows(m, "groups");
+        d.list = CacheStore.rows(m, "list");
+        d.cal = CacheStore.rows(m, "cal");
+        Row meta = CacheStore.row(m, "meta");
+        d.snapIn = "1".equals(meta.s("in"));
+        d.snapBucket = meta.s("bucket");
+        d.snapCal = "1".equals(meta.s("cal"));
+        return d;
     }
 
     private void build(LinearLayout content, Data d) {

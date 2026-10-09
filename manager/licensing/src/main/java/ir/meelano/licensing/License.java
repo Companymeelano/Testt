@@ -367,6 +367,93 @@ public final class License {
         }
     }
 
+    // ---------------- fixed SQL login + mini connection line ----------------
+    /**
+     * Fixed SQL Server login shared by every customer (SQL Server 2014).
+     * Per-customer connection data is therefore only host + port + db name,
+     * carried by the short {@code MILANO-NET1} line below. The legacy AES
+     * {@code MILANO-DB1} card keeps parsing for cards minted earlier.
+     */
+    public static final String SQL_USER = "AdminAn";
+    public static final String SQL_PASS = "St@R2022$";
+
+    public static final String NET_PREFIX = "MILANO-NET1";
+
+    public static final class NetProfile {
+        public String host = "";
+        public String port = "";
+        public String db = "";
+
+        public boolean complete() {
+            return !host.isEmpty() && !port.isEmpty() && !db.isEmpty();
+        }
+
+        /** Full profile with the fixed SQL login filled in. */
+        public DbProfile withFixedLogin() {
+            DbProfile p = new DbProfile();
+            p.host = host;
+            p.port = port;
+            p.db = db;
+            p.user = SQL_USER;
+            p.pass = SQL_PASS;
+            return p;
+        }
+    }
+
+    /** Mint a short connection line for one device. Throws IllegalArgumentException on bad input. */
+    public static String netLine(String device8, NetProfile p) {
+        String dev = normalize(device8);
+        if (dev.length() != 8) throw new IllegalArgumentException("device");
+        if (p == null || !p.complete()) throw new IllegalArgumentException("profile");
+        String host = p.host.trim();
+        String port = p.port.trim();
+        String db = p.db.trim();
+        if (host.isEmpty() || db.isEmpty()) throw new IllegalArgumentException("profile");
+        if (!validPort(port)) throw new IllegalArgumentException("port");
+        String mac = sig("NET1|" + dev + "|" + host + "|" + port + "|" + db).substring(0, 8);
+        return NET_PREFIX + "|" + dev + "|" + esc(host) + "|" + port + "|" + esc(db) + "|" + mac;
+    }
+
+    /**
+     * Open a mini connection line on this device. Scans pasted text for the
+     * line and returns the profile — or null when missing, corrupt, or minted
+     * for another device.
+     */
+    public static NetProfile parseNetLine(String text, String expectDevice8) {
+        String want = normalize(expectDevice8);
+        if (text == null || want.length() != 8) return null;
+        String found = null;
+        for (String raw : text.split("\n")) {
+            String line = raw.trim();
+            if (line.startsWith(NET_PREFIX + "|")) {
+                found = line;
+                break;
+            }
+        }
+        if (found == null) return null;
+        String[] f = unescSplit(found);
+        if (f.length != 6 || !NET_PREFIX.equals(f[0])) return null;
+        if (!normalize(f[1]).equals(want)) return null;
+        NetProfile np = new NetProfile();
+        np.host = f[2].trim();
+        np.port = f[3].trim();
+        np.db = f[4].trim();
+        if (!np.complete() || !validPort(np.port)) return null;
+        String mac = sig("NET1|" + want + "|" + np.host + "|" + np.port + "|" + np.db).substring(0, 8);
+        if (!constantEq(mac, normalize(f[5]))) return null;
+        return np;
+    }
+
+    /**
+     * Either connection line (NET1 mini or legacy DB1 card) inside pasted text,
+     * as a full DbProfile (NET1 carries the fixed SQL login). Null when none.
+     */
+    public static DbProfile parseAnyCard(String text, String expectDevice8) {
+        NetProfile n = parseNetLine(text, expectDevice8);
+        if (n != null) return n.withFixedLogin();
+        return parseDbCard(text, expectDevice8);
+    }
+
     private static boolean validPort(String port) {
         try {
             int p = Integer.parseInt(port.trim());
@@ -489,6 +576,27 @@ public final class License {
                 bad.db = "d";
                 bad.user = "u";
                 dbCard(dev, bad);
+                return false;
+            } catch (IllegalArgumentException expected) {
+            }
+            NetProfile np = new NetProfile();
+            np.host = "192.168.1.10";
+            np.port = "1433";
+            np.db = "AtiranDb";
+            String net = netLine(dev, np);
+            DbProfile nb = parseAnyCard("x\n" + net + "\ny", dev);
+            if (nb == null || !"192.168.1.10".equals(nb.host) || !"AtiranDb".equals(nb.db)
+                    || !SQL_USER.equals(nb.user) || !SQL_PASS.equals(nb.pass)) return false;
+            if (parseAnyCard(net, "ZZZZZZZZ") != null) return false;
+            char last = net.charAt(net.length() - 1);
+            String cut = net.substring(0, net.length() - 1) + (last == '0' ? '1' : '0');
+            if (parseNetLine(cut, dev) != null) return false;
+            try {
+                NetProfile badN = new NetProfile();
+                badN.host = "h";
+                badN.port = "abc";
+                badN.db = "d";
+                netLine(dev, badN);
                 return false;
             } catch (IllegalArgumentException expected) {
             }

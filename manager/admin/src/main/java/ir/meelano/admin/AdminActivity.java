@@ -38,10 +38,13 @@ public class AdminActivity extends Activity {
     private String pendingSmsPhone = "";
     private String pendingSmsText = "";
     private BroadcastReceiver smsPing;
+    /** Inbox size at last check (-1 = baseline not set yet). */
+    private int lastInboxN = -1;
 
     /** Draft carried from «new request» / customer / extend into the mint screen. */
     private static final class MintCtx {
         long customerId;
+        long inboxId;
         String dev = "", name = "", family = "", shop = "", phone = "", city = "", note = "";
         char plan = License.P_MONTHLY;
         long extendOf;
@@ -152,14 +155,14 @@ public class AdminActivity extends Activity {
         } catch (Exception ignored) { }
     }
 
-    /** Consume a staged customer-request SMS (once) and jump to issuing. */
+    /** New request SMS arrivals toast once; the home inbox badge always refreshes. */
     private void consumeSmsReq() {
         try {
-            String sms = SmsReceiver.takePendingReq(this);
-            if (sms == null || sms.isEmpty()) return;
-            final String f = sms;
-            AdminKit.toast(this, "✦ درخواست مشتری از پیامک رسید");
-            show(() -> showRequestSms(f));
+            int n = db.inboxCount();
+            if (lastInboxN >= 0 && n > lastInboxN)
+                AdminKit.toast(this, "✦ درخواست مشتری رسید — صندوق را ببینید");
+            lastInboxN = n;
+            if (stack.size() <= 1) reload();
         } catch (Exception ignored) { }
     }
 
@@ -226,6 +229,16 @@ public class AdminActivity extends Activity {
         bReq.setOnClickListener(v -> show(this::showRequest));
         box.addView(bReq);
 
+        int inboxN = 0;
+        try {
+            inboxN = db.inboxCount();
+        } catch (Exception ignored) { }
+        Button bInbox = AdminKit.btn(this,
+                inboxN > 0 ? ("📥  صندوق درخواست‌ها (" + AdminKit.fa(inboxN) + " تازه)") : "📥  صندوق درخواست‌ها",
+                inboxN > 0);
+        bInbox.setOnClickListener(v -> show(this::showInbox));
+        box.addView(bInbox);
+
         Button bCust = AdminKit.btn(this, "مشتریان", false);
         bCust.setOnClickListener(v -> show(() -> showCustomers()));
         box.addView(bCust);
@@ -277,17 +290,76 @@ public class AdminActivity extends Activity {
         return c;
     }
 
+    // ---------- request inbox ----------
+
+    private void showInbox() {
+        LinearLayout box = AdminKit.vbox(this);
+        box.addView(AdminKit.titleBar(this, "📥 صندوق درخواست‌ها", this::goBack));
+        List<AdminDb.Inbox> rows = db.inboxList();
+        if (rows.isEmpty()) {
+            box.addView(AdminKit.text(this,
+                    "درخواستی نرسیده است. وقتی مشتری با پیامک درخواست بفرستد، خودکار اینجا جمع می‌شود.",
+                    13, AdminKit.MUTED, false));
+        } else {
+            box.addView(AdminKit.text(this,
+                    AdminKit.fa(rows.size()) + " درخواست در انتظار صدور — برای صدور روی دکمه هر ردیف بزنید.",
+                    13, AdminKit.GOLD_SOFT, false));
+            for (AdminDb.Inbox r : rows) {
+                final AdminDb.Inbox fr = r;
+                LinearLayout card = (LinearLayout) AdminKit.card(this);
+                AdminKit.cardMargin(card, this);
+                String who = fr.name.isEmpty() ? "(بی‌نام)" : fr.name;
+                AdminKit.infoRow(card, this, who, prettyDev(fr.dev), true);
+                if (!fr.phone.isEmpty()) AdminKit.infoRow(card, this, "موبایل", fr.phone, false);
+                AdminKit.infoRow(card, this, "رسیده", agoFa(fr.created), false);
+                LinearLayout btns = new LinearLayout(this);
+                btns.setOrientation(LinearLayout.HORIZONTAL);
+                Button bGo = AdminKit.btn(this, "صدور کد →", true);
+                bGo.setLayoutParams(w(1f));
+                bGo.setOnClickListener(v -> show(() -> showRequestSms(fr.body, fr.id)));
+                Button bDel = AdminKit.btn(this, "حذف", false);
+                bDel.setLayoutParams(w(1f));
+                bDel.setOnClickListener(v -> {
+                    db.deleteInbox(fr.id);
+                    reload();
+                });
+                btns.addView(bGo);
+                btns.addView(bDel);
+                card.addView(btns);
+                box.addView(card);
+            }
+            Button bClear = AdminKit.btn(this, "حذف همه", false);
+            bClear.setOnClickListener(v -> {
+                db.clearInbox();
+                reload();
+            });
+            box.addView(bClear);
+        }
+        root(box);
+    }
+
+    private String agoFa(long created) {
+        try {
+            long days = License.today() - created / License.DAY_MS;
+            if (days <= 0) return "امروز";
+            if (days == 1) return "دیروز";
+            return AdminKit.fa(days) + " روز پیش";
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
     // ---------- new request ----------
 
     private void showRequest() {
-        showRequestSms("");
+        showRequestSms("", 0);
     }
 
     /**
      * @param prefill raw SMS text staged by {@link SmsReceiver} (auto-parsed),
      *                or "" for the manual paste flow.
      */
-    private void showRequestSms(String prefill) {
+    private void showRequestSms(String prefill, final long inboxId) {
         if (prefill == null) prefill = "";
         final boolean fromSms = !prefill.isEmpty();
         LinearLayout box = AdminKit.vbox(this);
@@ -347,14 +419,16 @@ public class AdminActivity extends Activity {
             ctx.shop = req.shop;
             ctx.phone = req.phone;
             ctx.city = req.city;
+            ctx.inboxId = inboxId;
 
             LinearLayout card = (LinearLayout) AdminKit.card(this);
             AdminKit.cardMargin(card, this);
             AdminKit.infoRow(card, this, "کد دستگاه", prettyDev(req.dev), true);
-            AdminKit.infoRow(card, this, "نام", (req.name + " " + req.family).trim(), false);
-            AdminKit.infoRow(card, this, "فروشگاه", req.shop, false);
-            AdminKit.infoRow(card, this, "موبایل", req.phone, false);
-            AdminKit.infoRow(card, this, "شهر", req.city, false);
+            String whoName = (req.name + " " + req.family).trim();
+            if (!whoName.isEmpty()) AdminKit.infoRow(card, this, "نام", whoName, false);
+            if (!req.shop.isEmpty()) AdminKit.infoRow(card, this, "فروشگاه", req.shop, false);
+            if (!req.phone.isEmpty()) AdminKit.infoRow(card, this, "موبایل", req.phone, false);
+            if (!req.city.isEmpty()) AdminKit.infoRow(card, this, "شهر", req.city, false);
             out.addView(card);
 
             AdminDb.Customer dup = db.byDev(req.dev);
@@ -539,6 +613,7 @@ public class AdminActivity extends Activity {
                 AdminKit.toast(this, "ذخیره در دیتابیس ناموفق بود");
                 return;
             }
+            if (ctx.inboxId > 0) db.deleteInbox(ctx.inboxId);
             final long flid = lid;
             show(() -> showMintResult(flid));
         });
@@ -603,7 +678,7 @@ public class AdminActivity extends Activity {
             LinearLayout.LayoutParams qp = new LinearLayout.LayoutParams(qz, qz);
             qp.gravity = Gravity.CENTER_HORIZONTAL;
             card.addView(qv, qp);
-            TextView qcap = AdminKit.text(this, "مشتری این QR را در بخش ۳ اسکن می‌کند", 12,
+            TextView qcap = AdminKit.text(this, "مشتری این QR را در بخش ۲ اسکن می‌کند", 12,
                     AdminKit.MUTED, false);
             qcap.setGravity(Gravity.CENTER);
             card.addView(qcap);
@@ -638,6 +713,31 @@ public class AdminActivity extends Activity {
         }
 
         if (l.customerId > 0) {
+            AdminDb.Customer site = null;
+            try {
+                site = db.byId(l.customerId);
+            } catch (Exception ignored) { }
+            if (site != null && !site.dbHost.isEmpty() && !site.dbName.isEmpty()
+                    && smsPhone != null && SmsIo.cleanPhone(smsPhone).length() >= 10) {
+                final String fphone2 = smsPhone;
+                final AdminDb.Customer fsite = site;
+                final AdminDb.Lic fl = l;
+                Button bBoth = AdminKit.btn(this, "✦ ارسال یک‌پیامکی کد + اتصال", true);
+                bBoth.setOnClickListener(v -> {
+                    try {
+                        License.NetProfile np = new License.NetProfile();
+                        np.host = fsite.dbHost;
+                        np.port = fsite.dbPort.isEmpty() ? "1433" : fsite.dbPort;
+                        np.db = fsite.dbName;
+                        String line = License.netLine(fl.dev, np);
+                        directSms(fphone2, shareText(fl) + "\n\n" + line);
+                    } catch (Exception e) {
+                        AdminKit.toast(AdminActivity.this,
+                                "مشخصات اتصال مشتری ناقص است؛ اول «کارت اتصال» را کامل کنید");
+                    }
+                });
+                box.addView(bBoth);
+            }
             Button bCard = AdminKit.btn(this, "کارت اتصال برای همین مشتری", false);
             bCard.setOnClickListener(v -> show(() -> showDbCard(l.customerId)));
             box.addView(bCard);
@@ -654,7 +754,7 @@ public class AdminActivity extends Activity {
                 + AdminKit.prettifyPack(l.pack) + "\n"
                 + "طرح: «" + License.planFa(planOf(l)) + "»\n"
                 + "انقضا: " + expText(l) + "\n"
-                + "راهنما: در برنامه، بخش ۳ (وارد کردن کد فعال‌سازی)، این کد را وارد کنید.";
+                + "راهنما: در برنامه، بخش ۲ (فعال‌سازی هوشمند)، این کد را وارد کنید.";
     }
 
     // ---------- customers ----------
@@ -1037,16 +1137,9 @@ public class AdminActivity extends Activity {
         EditText fDb = AdminKit.field(this, "نام دیتابیس");
         fDb.setText(c.dbName);
         card.addView(fDb);
-        EditText fUser = AdminKit.field(this, "نام کاربری");
-        fUser.setText(c.dbUser);
-        card.addView(fUser);
-        EditText fPass = AdminKit.field(this, "رمز عبور (اگر ندارد خالی بگذارید)");
-        fPass.setText(c.dbPass);
-        try {
-            fPass.setInputType(android.text.InputType.TYPE_CLASS_TEXT
-                    | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        } catch (Exception ignored) { }
-        card.addView(fPass);
+        card.addView(AdminKit.text(this,
+                "نام کاربری و رمز SQL برای همه مشتریان ثابت است و خودکار گذاشته می‌شود — فقط همین ۳ قلم لازم است.",
+                12.5f, AdminKit.GOLD_SOFT, false));
         box.addView(card);
 
         LinearLayout out = AdminKit.vbox(this);
@@ -1055,7 +1148,7 @@ public class AdminActivity extends Activity {
         Button bSave = AdminKit.btn(this, "فقط ذخیره مشخصات", false);
         bSave.setOnClickListener(v -> {
             db.saveSite(cid, AdminKit.txt(fHost), AdminKit.txt(fPort),
-                    AdminKit.txt(fDb), AdminKit.txt(fUser), AdminKit.txt(fPass));
+                    AdminKit.txt(fDb), License.SQL_USER, License.SQL_PASS);
             AdminKit.toast(this, "مشخصات ذخیره شد");
         });
         box.addView(bSave);
@@ -1065,29 +1158,25 @@ public class AdminActivity extends Activity {
             String host = AdminKit.txt(fHost);
             String port = AdminKit.txt(fPort);
             String dbn = AdminKit.txt(fDb);
-            String user = AdminKit.txt(fUser);
-            String pass = AdminKit.txt(fPass);
             AdminDb.Customer cc = db.byId(cid);
             if (cc == null) {
                 goBack();
                 return;
             }
-            License.DbProfile p = new License.DbProfile();
+            License.NetProfile p = new License.NetProfile();
             p.host = host;
-            p.port = port;
+            p.port = port.isEmpty() ? "1433" : port;
             p.db = dbn;
-            p.user = user;
-            p.pass = pass;
             String cardText;
             try {
-                cardText = License.dbCard(cc.dev, p);
+                cardText = License.netLine(cc.dev, p);
             } catch (IllegalArgumentException e) {
                 AdminKit.toast(this, "port".equals(e.getMessage())
                         ? "پورت معتبر نیست (۱ تا ۶۵۵۳۵)"
-                        : "آدرس سرور، پورت، نام دیتابیس و نام کاربری لازم است");
+                        : "آدرس سرور، پورت و نام دیتابیس لازم است");
                 return;
             }
-            db.saveSite(cid, host, port, dbn, user, pass);
+            db.saveSite(cid, host, p.port, dbn, License.SQL_USER, License.SQL_PASS);
             out.removeAllViews();
             LinearLayout rc = (LinearLayout) AdminKit.card(this);
             AdminKit.cardMargin(rc, this);
@@ -1112,7 +1201,7 @@ public class AdminActivity extends Activity {
                 LinearLayout.LayoutParams qp = new LinearLayout.LayoutParams(qz, qz);
                 qp.gravity = Gravity.CENTER_HORIZONTAL;
                 rc.addView(qv, qp);
-                TextView qcap = AdminKit.text(this, "مشتری این QR را در بخش ۴ اسکن می‌کند", 12,
+                TextView qcap = AdminKit.text(this, "مشتری این QR را در بخش ۲ اسکن می‌کند", 12,
                         AdminKit.MUTED, false);
                 qcap.setGravity(Gravity.CENTER);
                 rc.addView(qcap);
@@ -1127,7 +1216,7 @@ public class AdminActivity extends Activity {
             });
             out.addView(bCopy);
             final String fmsg = "کارت اتصال میلانو منیجر (" + fname + ")\n" + fcard
-                    + "\nراهنما: در صفحه فعال‌سازی، بخش ۴، این متن را بچسبانید و «ثبت و تست اتصال» را بزنید.";
+                    + "\nراهنما: در صفحه فعال‌سازی، بخش ۲ (فعال‌سازی هوشمند)، «ثبت خودکار» را بزنید.";
             Button bShare = AdminKit.btn(this, "اشتراک‌گذاری برای مشتری", false);
             bShare.setOnClickListener(x -> AdminKit.share(this, "ارسال کارت اتصال", fmsg));
             out.addView(bShare);

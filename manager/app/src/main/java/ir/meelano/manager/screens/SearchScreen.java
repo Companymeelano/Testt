@@ -2,6 +2,7 @@ package ir.meelano.manager.screens;
 
 import android.view.View;
 import android.widget.LinearLayout;
+import ir.meelano.manager.core.CacheStore;
 
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.core.AtiranSchema;
@@ -95,11 +96,19 @@ public class SearchScreen extends Screen {
         }, new Repo.Cb<Data>() {
             @Override
             public void ok(Data d) {
+                saveCache(d);
                 build(content, d, query);
             }
 
             @Override
             public void fail(String faError) {
+                String[] lab = {""};
+                Data cached = loadCache(lab);
+                if (cached != null) {
+                    build(content, cached, query);
+                    offlineBanner(content, lab[0], faError);
+                    return;
+                }
                 content.removeAllViews();
                 content.addView(heroCard(), a.kit.lp(-1, -2));
                 content.addView(a.kit.gap(10));
@@ -108,6 +117,25 @@ public class SearchScreen extends Screen {
         });
     }
 
+    private void saveCache(Data d) {
+        java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+        m.put("cust", d.cust);
+        m.put("prod", d.prod);
+        m.put("inv", d.inv);
+        m.put("chq", d.chq);
+        CacheStore.saveData(a, "cx_search", cacheNow(), m);
+    }
+
+    private Data loadCache(String[] lab) {
+        java.util.Map<String, Object> m = CacheStore.loadData(a, "cx_search", lab);
+        if (m == null) return null;
+        Data d = new Data();
+        d.cust = CacheStore.rows(m, "cust");
+        d.prod = CacheStore.rows(m, "prod");
+        d.inv = CacheStore.rows(m, "inv");
+        d.chq = CacheStore.rows(m, "chq");
+        return d;
+    }
     private void build(LinearLayout content, Data d, final String query) {
         content.removeAllViews();
         content.addView(heroCard(), a.kit.lp(-1, -2));

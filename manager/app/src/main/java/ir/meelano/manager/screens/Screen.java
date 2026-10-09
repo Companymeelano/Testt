@@ -59,6 +59,10 @@ public abstract class Screen {
         return false;
     }
 
+    /** SEND_SMS permission result (screens with a pending send override this). */
+    public void onSmsPermission(boolean granted) {
+    }
+
     // ---------------- soft parts ----------------
     public interface Soft<T> {
         T run() throws Exception;
@@ -94,6 +98,31 @@ public abstract class Screen {
         String hint = cfg.searchHint == null || cfg.searchHint.isEmpty() ? "جستجو…" : cfg.searchHint;
         content.addView(a.kit.searchBar(hint, v -> a.openFilter()), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
+    }
+
+    /** Offline banner card above cached data (timestamp + original error). */
+    protected void offlineBanner(LinearLayout content, String label, String err) {
+        LinearLayout bc = a.kit.card(Theme.WARNING);
+        bc.addView(a.kit.text("📴 حالت آفلاین — آخرین داده ذخیره‌شده", 13f, Theme.TEXT, true),
+                a.kit.lp(-1, -2));
+        if (label != null && !label.isEmpty())
+            bc.addView(a.kit.kv("آخرین به‌روزرسانی", label, Theme.WARNING), a.kit.lp(-1, -2));
+        if (err != null && !err.isEmpty())
+            bc.addView(a.kit.kv("خطا", err, Theme.MUTED), a.kit.lp(-1, -2));
+        content.addView(bc, 0);
+        content.addView(a.kit.gap(10), 1);
+    }
+
+    /** Persian timestamp label for cache saves («… ساعت ۱۲:۳۰»). */
+    protected String cacheNow() {
+        try {
+            java.util.Calendar c = java.util.Calendar.getInstance();
+            String hm = String.format(java.util.Locale.US, "%02d:%02d",
+                    c.get(java.util.Calendar.HOUR_OF_DAY), c.get(java.util.Calendar.MINUTE));
+            return a.kit.todayLine() + " ساعت " + hm;
+        } catch (Exception e) {
+            return "";
+        }
     }
 
     protected View heroCard() {

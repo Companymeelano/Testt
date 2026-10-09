@@ -1,6 +1,7 @@
 package ir.meelano.manager.screens;
 
 import android.widget.LinearLayout;
+import ir.meelano.manager.core.CacheStore;
 import android.widget.TextView;
 
 import ir.meelano.manager.MainActivity;
@@ -86,11 +87,19 @@ public class ProfitScreen extends Screen {
         }, new Repo.Cb<Data>() {
             @Override
             public void ok(Data d) {
+                saveCache(d);
                 build(content, d);
             }
 
             @Override
             public void fail(String faError) {
+                String[] lab = {""};
+                Data cached = loadCache(lab);
+                if (cached != null) {
+                    build(content, cached);
+                    offlineBanner(content, lab[0], faError);
+                    return;
+                }
                 content.removeAllViews();
                 content.addView(heroCard(), a.kit.lp(-1, -2));
                 content.addView(a.kit.gap(12));
@@ -104,6 +113,29 @@ public class ProfitScreen extends Screen {
         return "داده‌ای دریافت نشد";
     }
 
+    private void saveCache(Data d) {
+        java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+        m.put("sales", d.sales);
+        m.put("cogs", d.cogs);
+        m.put("daily", d.daily);
+        m.put("byProduct", d.byProduct);
+        m.put("byCust", d.byCust);
+        m.put("costs", d.costs);
+        CacheStore.saveData(a, "cx_profit", cacheNow(), m);
+    }
+
+    private Data loadCache(String[] lab) {
+        java.util.Map<String, Object> m = CacheStore.loadData(a, "cx_profit", lab);
+        if (m == null) return null;
+        Data d = new Data();
+        d.sales = CacheStore.row(m, "sales");
+        d.cogs = CacheStore.row(m, "cogs");
+        d.daily = CacheStore.rows(m, "daily");
+        d.byProduct = CacheStore.rows(m, "byProduct");
+        d.byCust = CacheStore.rows(m, "byCust");
+        d.costs = CacheStore.rows(m, "costs");
+        return d;
+    }
     private void build(LinearLayout content, Data d) {
         content.removeAllViews();
         content.addView(heroCard(), a.kit.lp(-1, -2));

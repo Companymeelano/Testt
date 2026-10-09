@@ -3,6 +3,7 @@ package ir.meelano.manager.screens;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.LinearLayout;
+import ir.meelano.manager.core.CacheStore;
 import android.widget.TextView;
 
 import ir.meelano.manager.MainActivity;
@@ -81,6 +82,9 @@ public class DuesScreen extends Screen {
         }, new Repo.Cb<List<Row>>() {
             @Override
             public void ok(List<Row> rows) {
+java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
+                sm.put("rows", rows);
+                CacheStore.saveData(a, "cx_dues_" + jy + "_" + jm, cacheNow(), sm);
                 monthRows = rows == null ? new ArrayList<>() : rows;
                 buildGrid(content);
                 renderNotes(content, notes);
@@ -88,6 +92,14 @@ public class DuesScreen extends Screen {
 
             @Override
             public void fail(String faError) {
+                String[] lab = {""};
+                java.util.Map<String, Object> cm = CacheStore.loadData(a, "cx_dues_" + jy + "_" + jm, lab);
+                if (cm != null) {
+                    monthRows = CacheStore.rows(cm, "rows");
+                    buildGrid(content);
+                    offlineBanner(content, lab[0], faError);
+                    return;
+                }
                 content.removeAllViews();
                 content.addView(heroCard(), a.kit.lp(-1, -2));
                 content.addView(a.kit.gap(10));

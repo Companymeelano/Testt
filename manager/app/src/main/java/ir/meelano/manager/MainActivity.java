@@ -18,6 +18,7 @@ import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.Notify;
 import ir.meelano.manager.core.Queries;
 import ir.meelano.manager.core.ReportCatalog;
+import ir.meelano.manager.core.SmsIo;
 import ir.meelano.manager.core.Usage;
 import ir.meelano.manager.data.Company;
 import ir.meelano.manager.data.Meta;
@@ -40,6 +41,7 @@ import ir.meelano.manager.screens.SettingsScreen;
 import ir.meelano.manager.screens.TradeScreen;
 import ir.meelano.manager.screens.UsersScreen;
 import ir.meelano.manager.screens.VisitorsScreen;
+import ir.meelano.manager.screens.VoiceScreen;
 import ir.meelano.manager.ui.FilterSheet;
 import ir.meelano.manager.ui.Kit;
 import ir.meelano.manager.ui.FisPrint;
@@ -448,6 +450,7 @@ public class MainActivity extends Activity {
         reg(new SettingsScreen(this));
         reg(new MoreScreen(this));
         reg(new SearchScreen(this));
+        reg(new VoiceScreen(this));
 
         buildBottom();
         nav(screens.containsKey(currentId) ? currentId : "home");
@@ -818,6 +821,11 @@ public class MainActivity extends Activity {
                 kit.toast("برای اسکن بارکد دسترسی دوربین لازم است");
                 scanCb = null;
             }
+        } else if (requestCode == SmsIo.REQ_SEND) {
+            try {
+                Screen s = screens.get(currentId);
+                if (s != null) s.onSmsPermission(granted);
+            } catch (Exception ignored) { }
         } else if (requestCode == FisPrint.BT_REQ) {
             FisPrint.onPermissionResult(this, granted);
         }

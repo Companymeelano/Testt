@@ -2,6 +2,7 @@ package ir.meelano.manager.screens;
 
 import android.view.View;
 import android.widget.LinearLayout;
+import ir.meelano.manager.core.CacheStore;
 
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.core.Jalali;
@@ -88,11 +89,19 @@ public class CashScreen extends Screen {
         }, new Repo.Cb<Data>() {
             @Override
             public void ok(Data d) {
+                saveCache(d);
                 build(content, d);
             }
 
             @Override
             public void fail(String faError) {
+                String[] lab = {""};
+                Data cached = loadCache(lab);
+                if (cached != null) {
+                    build(content, cached);
+                    offlineBanner(content, lab[0], faError);
+                    return;
+                }
                 content.removeAllViews();
                 content.addView(heroCard(), a.kit.lp(-1, -2));
                 content.addView(a.kit.gap(12));
@@ -101,6 +110,23 @@ public class CashScreen extends Screen {
         });
     }
 
+    private void saveCache(Data d) {
+        java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+        m.put("in", d.inDaily);
+        m.put("out", d.outDaily);
+        m.put("tab", d.snapIdx);
+        CacheStore.saveData(a, "cx_cash", cacheNow(), m);
+    }
+
+    private Data loadCache(String[] lab) {
+        java.util.Map<String, Object> m = CacheStore.loadData(a, "cx_cash", lab);
+        if (m == null) return null;
+        Data d = new Data();
+        d.inDaily = CacheStore.rows(m, "in");
+        d.outDaily = CacheStore.rows(m, "out");
+        d.snapIdx = (int) CacheStore.num(m, "tab");
+        return d;
+    }
     private void build(LinearLayout content, Data d) {
         content.removeAllViews();
         shownIdx = d.snapIdx;

@@ -3,6 +3,7 @@ package ir.meelano.manager.screens;
 import android.app.AlertDialog;
 import android.view.View;
 import android.widget.LinearLayout;
+import ir.meelano.manager.core.CacheStore;
 import android.widget.ScrollView;
 
 import ir.meelano.manager.MainActivity;
@@ -129,11 +130,19 @@ public class ProductsScreen extends Screen {
         }, new Repo.Cb<Data>() {
             @Override
             public void ok(Data d) {
+                saveCache(d);
                 build(content, d);
             }
 
             @Override
             public void fail(String faError) {
+                String[] lab = {""};
+                Data cached = loadCache(lab);
+                if (cached != null) {
+                    build(content, cached);
+                    offlineBanner(content, lab[0], faError);
+                    return;
+                }
                 content.removeAllViews();
                 content.addView(heroCard(), a.kit.lp(-1, -2));
                 content.addView(a.kit.gap(12));
@@ -147,6 +156,31 @@ public class ProductsScreen extends Screen {
         return "داده‌ای دریافت نشد";
     }
 
+    private void saveCache(Data d) {
+        java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+        m.put("sum", d.summary);
+        m.put("list", d.list);
+        m.put("low", d.low);
+        m.put("groups", d.groups);
+        m.put("top", d.top);
+        m.put("dead", d.dead);
+        m.put("tab", d.snapTab);
+        CacheStore.saveData(a, "cx_prod", cacheNow(), m);
+    }
+
+    private Data loadCache(String[] lab) {
+        java.util.Map<String, Object> m = CacheStore.loadData(a, "cx_prod", lab);
+        if (m == null) return null;
+        Data d = new Data();
+        d.summary = CacheStore.row(m, "sum");
+        d.list = CacheStore.rows(m, "list");
+        d.low = CacheStore.rows(m, "low");
+        d.groups = CacheStore.rows(m, "groups");
+        d.top = CacheStore.rows(m, "top");
+        d.dead = CacheStore.rows(m, "dead");
+        d.snapTab = (int) CacheStore.num(m, "tab");
+        return d;
+    }
     private void build(LinearLayout content, Data d) {
         content.removeAllViews();
         content.addView(heroCard(), a.kit.lp(-1, -2));

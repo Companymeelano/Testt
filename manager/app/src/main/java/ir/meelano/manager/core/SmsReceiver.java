@@ -15,8 +15,8 @@ import ir.meelano.manager.R;
 import ir.meelano.licensing.License;
 
 /**
- * Catches the seller's reply SMS (activation pack / MILANO-DB1 connection
- * card), validates it, and stages it for instant auto-apply — the customer
+ * Catches the seller's reply SMS (activation pack / connection line
+ * MILANO-DB1 or MILANO-NET1), validates it, and stages it for instant auto-apply — the customer
  * never copies or pastes anything. Fires an internal ping so an open
  * LicenseActivity applies it on the spot; otherwise a notification + onResume
  * pickup covers it.
@@ -46,7 +46,7 @@ public class SmsReceiver extends BroadcastReceiver {
                 License.Result r = License.parse(pack);
                 if (!r.ok || !r.dev.equals(dev)) pack = null;
             }
-            if (card != null && License.parseDbCard(card, dev) == null) card = null;
+            if (card != null && License.parseAnyCard(card, dev) == null) card = null;
             if (pack == null && card == null) return;
             LicenseStore.addPendingSms(ctx.getApplicationContext(), pack, card);
             try {
@@ -99,12 +99,13 @@ public class SmsReceiver extends BroadcastReceiver {
         return null;
     }
 
-    /** The MILANO-DB1 card line, or null. */
+    /** The connection line (MILANO-DB1 card or MILANO-NET1 mini line), or null. */
     private static String extractCard(String body) {
         try {
             for (String raw : body.split("\n")) {
                 String line = raw.trim();
                 if (line.startsWith(License.DB_PREFIX + "|")) return line;
+                if (line.startsWith(License.NET_PREFIX + "|")) return line;
             }
         } catch (Exception ignored) { }
         return null;

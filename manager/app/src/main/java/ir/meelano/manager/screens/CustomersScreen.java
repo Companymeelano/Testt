@@ -3,6 +3,7 @@ package ir.meelano.manager.screens;
 import android.app.AlertDialog;
 import android.view.View;
 import android.widget.LinearLayout;
+import ir.meelano.manager.core.CacheStore;
 import android.widget.ScrollView;
 
 import ir.meelano.manager.MainActivity;
@@ -13,6 +14,8 @@ import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.ReportCatalog;
+import ir.meelano.manager.core.SmsIo;
+import ir.meelano.manager.data.Company;
 import ir.meelano.manager.data.Meta;
 import ir.meelano.manager.data.Repo;
 import ir.meelano.manager.data.Row;
@@ -28,6 +31,9 @@ import java.util.Map;
 /** Customers: buckets, balances, and the full dossier (ledger + invoices + vouchers + cheques). */
 public class CustomersScreen extends Screen {
     private final Filter filter = new Filter();
+    /** Queued debtor-SMS, flushed once SEND_SMS is granted. */
+    private String pendSmsPhone = "";
+    private String pendSmsText = "";
 
     public CustomersScreen(MainActivity a) {
         super(a);
@@ -105,11 +111,19 @@ public class CustomersScreen extends Screen {
         }, new Repo.Cb<Data>() {
             @Override
             public void ok(Data d) {
+                saveCache(d);
                 build(content, d);
             }
 
             @Override
             public void fail(String faError) {
+                String[] lab = {""};
+                Data cached = loadCache(lab);
+                if (cached != null) {
+                    build(content, cached);
+                    offlineBanner(content, lab[0], faError);
+                    return;
+                }
                 content.removeAllViews();
                 content.addView(heroCard(), a.kit.lp(-1, -2));
                 content.addView(a.kit.gap(12));
@@ -123,6 +137,21 @@ public class CustomersScreen extends Screen {
         return "داده‌ای دریافت نشد";
     }
 
+    private void saveCache(Data d) {
+        java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+        m.put("sum", d.summary);
+        m.put("list", d.list);
+        CacheStore.saveData(a, "cx_cust", cacheNow(), m);
+    }
+
+    private Data loadCache(String[] lab) {
+        java.util.Map<String, Object> m = CacheStore.loadData(a, "cx_cust", lab);
+        if (m == null) return null;
+        Data d = new Data();
+        d.summary = CacheStore.row(m, "sum");
+        d.list = CacheStore.rows(m, "list");
+        return d;
+    }
     private void build(LinearLayout content, Data d) {
         content.removeAllViews();
         content.addView(heroCard(), a.kit.lp(-1, -2));
@@ -174,6 +203,16 @@ public class CustomersScreen extends Screen {
         }
 
         renderNotes(content, d.notes);
+    }
+
+    @Override
+    public void onSmsPermission(boolean granted) {
+        String d = pendSmsPhone;
+        String t = pendSmsText;
+        pendSmsPhone = "";
+        pendSmsText = "";
+        if (granted && t != null && !t.isEmpty()) doDebtSend(d, t);
+        else if (!granted) a.kit.toast("بدون دسترسی پیامک، ارسال ممکن نیست");
     }
 
     // ---------------- dossier ----------------
@@ -378,6 +417,16 @@ public class CustomersScreen extends Screen {
             body.addView(chqTable(dz.chqOut), a.kit.lp(-1, -2));
         }
 
+        String cell0 = SmsIo.cleanPhone(h.s("cell"));
+        if (cell0.length() >= 10 && bal > 0.5) {
+            final String dCell = cell0;
+            final String dName = h.s("name");
+            final double dBal = bal;
+            body.addView(a.kit.btnGhost("✉ یادآوری بدهی با پیامک", Theme.TEAL, v ->
+                    debtDialog(dCell, dName, dBal)), a.kit.lp(-1, -2));
+            body.addView(a.kit.gap(6));
+        }
+
         ScrollView sv = new ScrollView(a);
         sv.addView(body);
         AlertDialog dlg = new AlertDialog.Builder(a, android.R.style.Theme_Material_Dialog_NoActionBar)
@@ -419,6 +468,67 @@ public class CustomersScreen extends Screen {
         body.addView(footer, a.kit.lp(-1, -2));
         body.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(16));
         dlg.show();
+    }
+
+    private void debtDialog(String cell, String name, double bal) {
+        String msg = "«" + (name.isEmpty() ? "مشتری گرامی" : name) + "» سلام؛ مانده بدهی شما "
+                + Money.rial(bal) + " است. لطفاً جهت تسویه اقدام فرمایید. — " + shopLine();
+        LinearLayout nb = a.kit.v();
+        nb.setPadding(Theme.dp(16), Theme.dp(8), Theme.dp(16), Theme.dp(8));
+        final android.widget.EditText te = a.kit.edit("متن پیامک…", msg);
+        try {
+            te.setMinLines(3);
+        } catch (Exception ignored) { }
+        nb.addView(te, a.kit.lp(-1, -2));
+        nb.addView(a.kit.gap(8));
+        nb.addView(a.kit.kv("گیرنده", Money.fa(cell), Theme.TEXT), a.kit.lp(-1, -2));
+        final android.app.AlertDialog[] box = new android.app.AlertDialog[1];
+        nb.addView(a.kit.btn("✉ ارسال پیامک", v -> {
+            String t = te.getText().toString().trim();
+            if (t.isEmpty()) {
+                a.kit.toast("متن پیامک را وارد کنید");
+                return;
+            }
+            box[0].dismiss();
+            sendDebtSms(cell, t);
+        }), a.kit.lp(-1, -2));
+        box[0] = a.kit.dialog("یادآوری بدهی", nb, true);
+        box[0].show();
+    }
+
+    private String shopLine() {
+        try {
+            String nm = Company.get(a).displayName(a);
+            return nm.isEmpty() ? "مدیریت فروشگاه" : nm;
+        } catch (Exception e) {
+            return "مدیریت فروشگاه";
+        }
+    }
+
+    private void sendDebtSms(String dest, String msg) {
+        if (!SmsIo.canSend(a)) {
+            pendSmsPhone = dest;
+            pendSmsText = msg;
+            a.kit.toast("برای ارسال پیامک، دسترسی را تأیید کنید");
+            SmsIo.askSend(a);
+            return;
+        }
+        doDebtSend(dest, msg);
+    }
+
+    private void doDebtSend(String dest, String msg) {
+        a.kit.toast("در حال ارسال پیامک…");
+        SmsIo.send(a, dest, msg, new SmsIo.Cb() {
+            @Override
+            public void ok() {
+                a.kit.toast("✓ یادآوری ارسال شد");
+            }
+
+            @Override
+            public void fail(String fa) {
+                a.kit.toast(fa);
+            }
+        });
     }
 
     private void noteDialog(final String code, final String name, final AlertDialog[] dlgH) {

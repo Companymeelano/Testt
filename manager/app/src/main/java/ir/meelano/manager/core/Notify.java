@@ -29,7 +29,7 @@ import java.util.List;
 public final class Notify {
     private Notify() { }
 
-    private static final String CH = "meelano_due";
+    static final String CH = "meelano_due";
     private static final int ALARM_REQ = 7001;
     private static final int NOTIF_ID = 7002;
     static final String ACT_BACKUP = "ir.meelano.manager.BACKUP";
@@ -38,6 +38,12 @@ public final class Notify {
     static final String ACT_WEEKLY = "ir.meelano.manager.WEEKLY";
     private static final int WEEKLY_REQ = 7005;
     private static final int WEEKLY_NOTIF_ID = 7006;
+    static final String ACT_EOD = "ir.meelano.manager.EOD";
+    private static final int EOD_REQ = 7007;
+    private static final int EOD_NOTIF_ID = 7008;
+    static final String ACT_GUARD = "ir.meelano.manager.GUARD";
+    private static final int GUARD_REQ = 7009;
+    static final int GUARD_NOTIF_ID = 7010;
     private static boolean launched = false;
 
     /** Create channel, schedule the daily alarm, ask permission, run one launch check. */
@@ -49,6 +55,8 @@ public final class Notify {
             scheduleDaily(a);
             if (s.backupOn()) scheduleWeekly(a);
             if (s.weeklyOn()) scheduleWeeklyReport(a);
+            if (s.eodOn()) scheduleEod(a);
+            if (s.guardOn()) scheduleGuard(a);
             if (Build.VERSION.SDK_INT >= 33
                     && a.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
                     != android.content.pm.PackageManager.PERMISSION_GRANTED) {
@@ -158,6 +166,142 @@ public final class Notify {
             PendingIntent pi = PendingIntent.getBroadcast(c, WEEKLY_REQ, i,
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             if (am != null) am.cancel(pi);
+        } catch (Exception ignored) { }
+    }
+
+    /** Every night at 21:00 (inexact, battery-friendly): the day in numbers. */
+    public static void scheduleEod(Context c) {
+        try {
+            AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
+            if (am == null) return;
+            Intent i = new Intent(c, NotifyReceiver.class);
+            i.setAction(ACT_EOD);
+            PendingIntent pi = PendingIntent.getBroadcast(c, EOD_REQ, i,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            Calendar cal = Calendar.getInstance();
+            cal.set(Calendar.HOUR_OF_DAY, 21);
+            cal.set(Calendar.MINUTE, 0);
+            cal.set(Calendar.SECOND, 0);
+            if (cal.getTimeInMillis() <= System.currentTimeMillis()) cal.add(Calendar.DAY_OF_YEAR, 1);
+            am.setInexactRepeating(AlarmManager.RTC_WAKEUP, cal.getTimeInMillis(),
+                    AlarmManager.INTERVAL_DAY, pi);
+        } catch (Exception ignored) { }
+    }
+
+    public static void cancelEod(Context c) {
+        try {
+            AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
+            Intent i = new Intent(c, NotifyReceiver.class);
+            i.setAction(ACT_EOD);
+            PendingIntent pi = PendingIntent.getBroadcast(c, EOD_REQ, i,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            if (am != null) am.cancel(pi);
+        } catch (Exception ignored) { }
+    }
+
+    /** Every 30 minutes (inexact, battery-friendly): the live sales guard. */
+    public static void scheduleGuard(Context c) {
+        try {
+            AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
+            if (am == null) return;
+            Intent i = new Intent(c, NotifyReceiver.class);
+            i.setAction(ACT_GUARD);
+            PendingIntent pi = PendingIntent.getBroadcast(c, GUARD_REQ, i,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            am.setInexactRepeating(AlarmManager.RTC_WAKEUP,
+                    System.currentTimeMillis() + AlarmManager.INTERVAL_HALF_HOUR,
+                    AlarmManager.INTERVAL_HALF_HOUR, pi);
+        } catch (Exception ignored) { }
+    }
+
+    public static void cancelGuard(Context c) {
+        try {
+            AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
+            Intent i = new Intent(c, NotifyReceiver.class);
+            i.setAction(ACT_GUARD);
+            PendingIntent pi = PendingIntent.getBroadcast(c, GUARD_REQ, i,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            if (am != null) am.cancel(pi);
+        } catch (Exception ignored) { }
+    }
+
+    /** Tonight's numbers, saved for the home card + a nightly summary notification. */
+    public static void eodNow(final Context appCtx, final Runnable onDone) {
+        final Context c = appCtx.getApplicationContext();
+        try {
+            Settings s = new Settings(c);
+            if (!s.eodOn()) {
+                finishCb(onDone);
+                return;
+            }
+            final Repo repo = new Repo(c, s);
+            final String today = Jalali.todayStr();
+            repo.run(conn -> {
+                Meta m = new Meta(conn);
+                double sales = 0, inAmt = 0, outAmt = 0;
+                long docs = 0;
+                try {
+                    Row r = Repo.one(conn, Queries.salesOn(m, true, today));
+                    sales = r.d("total");
+                    docs = r.l("docs");
+                } catch (Exception ignored) { }
+                try {
+                    inAmt = Repo.one(conn, MoneyQueries.darOn(m, 0, today)).d("total");
+                } catch (Exception ignored) { }
+                try {
+                    outAmt = Repo.one(conn, MoneyQueries.darOn(m, 1, today)).d("total");
+                } catch (Exception ignored) { }
+                return new long[]{(long) sales, docs, (long) inAmt, (long) outAmt};
+            }, new Repo.Cb<long[]>() {
+                @Override
+                public void ok(long[] v) {
+                    try {
+                        repo.close();
+                    } catch (Exception ignored) { }
+                    finishCb(onDone);
+                    if (v == null || v.length < 4) return;
+                    String msg = "فروش " + Money.compactRial(v[0])
+                            + (v[1] > 0 ? " (" + Money.fa(String.valueOf(v[1])) + " فاکتور)" : "")
+                            + " • دریافت " + Money.compactRial(v[2])
+                            + " • پرداخت " + Money.compactRial(v[3]);
+                    try {
+                        new Settings(c).saveEod(msg, today);
+                    } catch (Exception ignored) { }
+                    showEod(c, msg);
+                }
+
+                @Override
+                public void fail(String faError) {
+                    try {
+                        repo.close();
+                    } catch (Exception ignored) { }
+                    finishCb(onDone);
+                }
+            });
+        } catch (Exception ignored) {
+            finishCb(onDone);
+        }
+    }
+
+    private static void showEod(Context c, String msg) {
+        try {
+            channel(c);
+            String full = msg + "؛ برای جزئیات لمس کنید.";
+            Intent open = new Intent(c, MainActivity.class);
+            open.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            PendingIntent pi = PendingIntent.getActivity(c, EOD_NOTIF_ID, open,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            Notification n = new Notification.Builder(c, CH)
+                    .setContentTitle("🌙 جمع‌بندی روز میلانو")
+                    .setContentText(full)
+                    .setStyle(new Notification.BigTextStyle().bigText(full))
+                    .setSmallIcon(R.mipmap.ic_launcher)
+                    .setContentIntent(pi)
+                    .setAutoCancel(true)
+                    .setColor(0xFF9B7BFF)
+                    .build();
+            NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm != null) nm.notify(EOD_NOTIF_ID, n);
         } catch (Exception ignored) { }
     }
 
@@ -429,6 +573,20 @@ final class NotifyReceiver extends BroadcastReceiver {
                 } else finishPr(pr);
                 return;
             }
+            if (Notify.ACT_EOD.equals(act)) {
+                if (s.eodOn()) {
+                    Notify.scheduleEod(c);
+                    Notify.eodNow(c, () -> finishPr(pr));
+                } else finishPr(pr);
+                return;
+            }
+            if (Notify.ACT_GUARD.equals(act)) {
+                if (s.guardOn()) {
+                    Notify.scheduleGuard(c);
+                    Guard.checkNow(c, () -> finishPr(pr));
+                } else finishPr(pr);
+                return;
+            }
             if (!s.notifOn()) {
                 finishPr(pr);
                 return;
@@ -436,6 +594,8 @@ final class NotifyReceiver extends BroadcastReceiver {
             Notify.scheduleDaily(c);
             if (s.backupOn()) Notify.scheduleWeekly(c);
             if (s.weeklyOn()) Notify.scheduleWeeklyReport(c);
+            if (s.eodOn()) Notify.scheduleEod(c);
+            if (s.guardOn()) Notify.scheduleGuard(c);
             AutoBackup.reschedule(c);
             Notify.checkNow(c, () -> finishPr(pr));
         } catch (Exception ignored) {

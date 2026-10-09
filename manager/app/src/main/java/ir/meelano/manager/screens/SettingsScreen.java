@@ -181,6 +181,22 @@ public class SettingsScreen extends Screen {
             a.kit.toast(!stk ? "هشدار کم‌موجودی روشن شد" : "هشدار کم‌موجودی خاموش شد");
             render(content);
         }), a.kit.lp(-1, -2));
+        final boolean eod = a.settings.eodOn();
+        nt.addView(a.kit.btnGhost("🌙 جمع‌بندی پایان روز (هر شب ساعت ۲۱): " + (eod ? "روشن" : "خاموش"), Theme.VIOLET, v -> {
+            a.settings.setEodOn(!eod);
+            if (!eod) ir.meelano.manager.core.Notify.scheduleEod(a);
+            else ir.meelano.manager.core.Notify.cancelEod(a);
+            a.kit.toast(!eod ? "جمع‌بندی پایان روز روشن شد" : "جمع‌بندی پایان روز خاموش شد");
+            render(content);
+        }), a.kit.lp(-1, -2));
+        final boolean grd = a.settings.guardOn();
+        nt.addView(a.kit.btnGhost("🛡 نگهبان فروش لحظه‌ای: " + (grd ? "روشن" : "خاموش"), Theme.DANGER, v -> {
+            a.settings.setGuardOn(!grd);
+            if (!grd) ir.meelano.manager.core.Notify.scheduleGuard(a);
+            else ir.meelano.manager.core.Notify.cancelGuard(a);
+            a.kit.toast(!grd ? "نگهبان فروش روشن شد؛ هر ۳۰ دقیقه بررسی می‌شود" : "نگهبان فروش خاموش شد");
+            render(content);
+        }), a.kit.lp(-1, -2));
         companyInfo(nt, content);
         nt.addView(a.kit.btnGhost("🪪 ساخت کارت ویزیت دیجیتال", Theme.VIOLET, v -> ShopCard.show(a)), a.kit.lp(-1, -2));
         nt.addView(a.kit.btnGhost("📺 حالت تلویزیون فروشگاه", Theme.SUCCESS, v -> a.startTv()), a.kit.lp(-1, -2));
@@ -293,6 +309,7 @@ public class SettingsScreen extends Screen {
                 {"debtors", "بدهکاران اولویت‌دار"},
                 {"visitors", "عملکرد ویزیتورها"},
                 {"due", "سررسید چک‌ها"},
+                {"eod", "جمع‌بندی پایان روز"},
                 {"shortcuts", "دسترسی سریع"},
         };
         final java.util.List<String> order = new java.util.ArrayList<>();

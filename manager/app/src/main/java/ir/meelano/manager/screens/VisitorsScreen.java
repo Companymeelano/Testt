@@ -3,6 +3,7 @@ package ir.meelano.manager.screens;
 import android.app.AlertDialog;
 import android.view.View;
 import android.widget.LinearLayout;
+import ir.meelano.manager.core.CacheStore;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
@@ -79,11 +80,19 @@ public class VisitorsScreen extends Screen {
         }, new Repo.Cb<Data>() {
             @Override
             public void ok(Data d) {
+                saveCache(d);
                 build(content, d);
             }
 
             @Override
             public void fail(String faError) {
+                String[] lab = {""};
+                Data cached = loadCache(lab);
+                if (cached != null) {
+                    build(content, cached);
+                    offlineBanner(content, lab[0], faError);
+                    return;
+                }
                 content.removeAllViews();
                 content.addView(heroCard(), a.kit.lp(-1, -2));
                 content.addView(a.kit.gap(12));
@@ -97,6 +106,19 @@ public class VisitorsScreen extends Screen {
         return "داده‌ای دریافت نشد";
     }
 
+    private void saveCache(Data d) {
+        java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+        m.put("perf", d.perf);
+        CacheStore.saveData(a, "cx_vis", cacheNow(), m);
+    }
+
+    private Data loadCache(String[] lab) {
+        java.util.Map<String, Object> m = CacheStore.loadData(a, "cx_vis", lab);
+        if (m == null) return null;
+        Data d = new Data();
+        d.perf = CacheStore.rows(m, "perf");
+        return d;
+    }
     private void build(LinearLayout content, Data d) {
         content.removeAllViews();
         content.addView(heroCard(), a.kit.lp(-1, -2));

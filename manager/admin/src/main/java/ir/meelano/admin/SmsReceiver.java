@@ -14,15 +14,13 @@ import ir.meelano.licensing.License;
 
 /**
  * Catches the customer's request SMS (MILANO-REQ1 + MILANO-USE1): usage is
- * recorded instantly into the local database and the request is staged, so
- * opening the app jumps straight to issuing — the seller never pastes text.
+ * recorded instantly into the local database and each request lands in the
+ * inbox list — the seller never pastes text.
  */
 public class SmsReceiver extends BroadcastReceiver {
 
     /** Internal ping (dynamic receivers only): a fresh request SMS just landed. */
     public static final String ACTION_INTERNAL = "ir.meelano.admin.SMS_MILANO";
-
-    private static final String PREFS = "meelano_admin_sms";
 
     @Override
     public void onReceive(Context ctx, Intent intent) {
@@ -44,12 +42,15 @@ public class SmsReceiver extends BroadcastReceiver {
                     } catch (Exception ignored) { }
                 } catch (Exception ignored) { }
             }
-            if (req != null) {
-                String line = reqLine(body);
-                if (line != null) {
-                    app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-                            .putString("req", body).putLong("req_at", System.currentTimeMillis()).apply();
-                }
+            if (req != null && reqLine(body) != null) {
+                try {
+                    AdminDb db = new AdminDb(app);
+                    db.clearInboxForDev(req.dev);
+                    db.addInbox(req.dev, (req.name + " " + req.family).trim(), req.phone, body);
+                    try {
+                        db.close();
+                    } catch (Exception ignored) { }
+                } catch (Exception ignored) { }
             }
             try {
                 Intent ping = new Intent(ACTION_INTERNAL);
@@ -58,19 +59,6 @@ public class SmsReceiver extends BroadcastReceiver {
             } catch (Exception ignored) { }
             notifySms(app, req, use);
         } catch (Exception ignored) { }
-    }
-
-    /** Take + clear the staged request SMS ("" when nothing arrived). */
-    public static String takePendingReq(Context c) {
-        try {
-            android.content.SharedPreferences p = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-            String s = p.getString("req", "");
-            if (s == null) s = "";
-            if (!s.isEmpty()) p.edit().remove("req").remove("req_at").apply();
-            return s;
-        } catch (Exception e) {
-            return "";
-        }
     }
 
     private static String reqLine(String body) {

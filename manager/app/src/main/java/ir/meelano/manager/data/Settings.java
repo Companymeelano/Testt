@@ -228,4 +228,32 @@ public final class Settings {
     public void setAbHour(int h) {
         p.edit().putInt("ab_hour", h < 0 ? 0 : (h > 23 ? 23 : h)).apply();
     }
+
+    // ---------------- end-of-day summary + sales guard (v21) ----------------
+    public boolean eodOn() { return p.getBoolean("eod_on", true); }
+
+    public void setEodOn(boolean on) { p.edit().putBoolean("eod_on", on).apply(); }
+
+    public String eodText() { return p.getString("eod_text", ""); }
+
+    public String eodDate() { return p.getString("eod_date", ""); }
+
+    public void saveEod(String text, String date) {
+        p.edit().putString("eod_text", text == null ? "" : text)
+                .putString("eod_date", date == null ? "" : date).apply();
+    }
+
+    public boolean guardOn() { return p.getBoolean("guard_on", false); }
+
+    public void setGuardOn(boolean on) { p.edit().putBoolean("guard_on", on).apply(); }
+
+    /** Last seen bounced-cheque count for the guard (-1 = never checked). */
+    public long guardBounced() { return p.getLong("guard_bounced", -1); }
+
+    public void setGuardBounced(long n) { p.edit().putLong("guard_bounced", n).apply(); }
+
+    /** Already-notified big invoices («S|no;B|no…», pruned to 200). */
+    public String guardSeen() { return p.getString("guard_seen", ""); }
+
+    public void setGuardSeen(String v) { p.edit().putString("guard_seen", v == null ? "" : v).apply(); }
 }

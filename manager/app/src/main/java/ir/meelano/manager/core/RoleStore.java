@@ -19,11 +19,11 @@ public final class RoleStore {
     /** Seller side: everything except profit / reports / users / settings. */
     private static final String[] SELLER_OK = {
             "home", "sales", "buy", "customers", "products", "visitors",
-            "cheques", "dues", "cash", "dar_in", "dar_out", "search", "more"};
+            "cheques", "dues", "cash", "dar_in", "dar_out", "search", "voice", "more"};
     /** Money side: everything except trade / profit / users / settings. */
     private static final String[] ACCOUNTANT_OK = {
             "home", "customers", "cheques", "dues", "cash", "dar_in", "dar_out",
-            "reports", "search", "more"};
+            "reports", "search", "voice", "more"};
 
     private static SharedPreferences prefs(Context c) {
         return c.getSharedPreferences("meelano_roles", Context.MODE_PRIVATE);

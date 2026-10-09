@@ -2,6 +2,7 @@ package ir.meelano.manager.screens;
 
 import android.view.View;
 import android.widget.LinearLayout;
+import ir.meelano.manager.core.CacheStore;
 
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.core.Filter;
@@ -140,11 +141,21 @@ public class ReportsScreen extends Screen {
         }, new Repo.Cb<List<Row>>() {
             @Override
             public void ok(List<Row> rows) {
+java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
+                sm.put("rows", rows);
+                CacheStore.saveData(a, "cx_rep_" + spec.id, cacheNow(), sm);
                 buildReport(content, spec, rows);
             }
 
             @Override
             public void fail(String faError) {
+                String[] lab = {""};
+                java.util.Map<String, Object> cm = CacheStore.loadData(a, "cx_rep_" + spec.id, lab);
+                if (cm != null) {
+                    buildReport(content, spec, CacheStore.rows(cm, "rows"));
+                    offlineBanner(content, lab[0], faError);
+                    return;
+                }
                 content.removeAllViews();
                 content.addView(a.kit.btnGhost("‹ بازگشت به فهرست", Theme.GOLD, v -> onBack()), a.kit.lp(-1, -2));
                 content.addView(a.kit.gap(10));

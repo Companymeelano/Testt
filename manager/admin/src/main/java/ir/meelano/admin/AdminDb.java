@@ -17,7 +17,7 @@ import java.util.List;
 public class AdminDb extends SQLiteOpenHelper {
 
     private static final String NAME = "meelano_admin.db";
-    private static final int VERSION = 2;
+    private static final int VERSION = 3;
 
     public static final class Customer {
         public long id;
@@ -79,6 +79,9 @@ public class AdminDb extends SQLiteOpenHelper {
                 + "created INTEGER DEFAULT 0)");
         db.execSQL("CREATE INDEX idx_lic_dev ON licenses(dev)");
         db.execSQL("CREATE INDEX idx_lic_cust ON licenses(customer_id)");
+        db.execSQL("CREATE TABLE IF NOT EXISTS inbox(_id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                + "dev TEXT DEFAULT '',name TEXT DEFAULT '',phone TEXT DEFAULT '',"
+                + "body TEXT DEFAULT '',created INTEGER DEFAULT 0)");
     }
 
     @Override
@@ -97,6 +100,83 @@ public class AdminDb extends SQLiteOpenHelper {
                 }
             }
         }
+        if (oldV < 3) {
+            try {
+                db.execSQL("CREATE TABLE IF NOT EXISTS inbox(_id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                        + "dev TEXT DEFAULT '',name TEXT DEFAULT '',phone TEXT DEFAULT '',"
+                        + "body TEXT DEFAULT '',created INTEGER DEFAULT 0)");
+            } catch (Exception ignored) { }
+        }
+    }
+
+    // ---------- request inbox ----------
+
+    public static final class Inbox {
+        public long id;
+        public String dev = "", name = "", phone = "", body = "";
+        public long created;
+    }
+
+    public long addInbox(String dev, String name, String phone, String body) {
+        ContentValues v = new ContentValues();
+        v.put("dev", s(dev));
+        v.put("name", s(name));
+        v.put("phone", s(phone));
+        v.put("body", body == null ? "" : body);
+        v.put("created", System.currentTimeMillis());
+        try {
+            return getWritableDatabase().insert("inbox", null, v);
+        } catch (Exception e) {
+            return -1;
+        }
+    }
+
+    /** One row per device: a new request replaces the older one. */
+    public void clearInboxForDev(String dev) {
+        try {
+            getWritableDatabase().delete("inbox", "dev=?", new String[]{s(dev)});
+        } catch (Exception ignored) { }
+    }
+
+    public List<Inbox> inboxList() {
+        List<Inbox> out = new ArrayList<>();
+        try (Cursor c = getReadableDatabase().query("inbox", null, null, null,
+                null, null, "created DESC", "200")) {
+            if (c != null) while (c.moveToNext()) {
+                Inbox o = new Inbox();
+                o.id = getLong(c, "_id");
+                o.dev = getStr(c, "dev");
+                o.phone = getStr(c, "phone");
+                o.name = getStr(c, "name");
+                o.body = getStr(c, "body");
+                o.created = getLong(c, "created");
+                out.add(o);
+            }
+        } catch (Exception ignored) { }
+        return out;
+    }
+
+    public int inboxCount() {
+        try (Cursor c = getReadableDatabase()
+                .rawQuery("SELECT COUNT(*) FROM inbox", null)) {
+            if (c != null && c.moveToFirst()) return c.getInt(0);
+        } catch (Exception ignored) { }
+        return 0;
+    }
+
+    public boolean deleteInbox(long id) {
+        try {
+            return getWritableDatabase().delete("inbox", "_id=?",
+                    new String[]{String.valueOf(id)}) > 0;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public void clearInbox() {
+        try {
+            getWritableDatabase().delete("inbox", null, null);
+        } catch (Exception ignored) { }
     }
 
     // ---------- customers ----------

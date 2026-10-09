@@ -107,7 +107,7 @@ public final class AdminKit {
         v.setTextSize(TypedValue.COMPLEX_UNIT_SP, base);
         v.setTextColor(color);
         v.setTypeface(bold ? bld(c) : reg(c));
-        v.setLineSpacing(dp(c, 1.5f), 1.0f);
+        v.setLineSpacing(dp(c, 2), 1.0f);
         AdminIcons.iconize(v);
         return v;
     }

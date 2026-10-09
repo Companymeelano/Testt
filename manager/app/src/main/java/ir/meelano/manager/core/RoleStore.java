@@ -31,11 +31,11 @@ public final class RoleStore {
     /** Seller side: everything except profit / reports / users / settings. */
     private static final String[] SELLER_OK = {
             "home", "sales", "buy", "customers", "products", "visitors",
-            "cheques", "dues", "cash", "dar_in", "dar_out", "search", "voice", "more"};
+            "cheques", "dues", "cash", "dar_in", "dar_out", "takmil", "search", "voice", "more"};
     /** Money side: everything except trade / profit / users / settings. */
     private static final String[] ACCOUNTANT_OK = {
             "home", "customers", "cheques", "dues", "cash", "dar_in", "dar_out",
-            "reports", "search", "voice", "more"};
+            "reports", "takmil", "search", "voice", "more"};
     /** Visitor side: showcase + his trade world. */
     private static final String[] VISITOR_OK = {
             "home", "customers", "products", "sales", "dues", "search", "voice", "more"};
@@ -45,7 +45,7 @@ public final class RoleStore {
             "search", "voice", "more"};
     /** Warehouse side: his own build (phase 2) + stock views. */
     private static final String[] WAREHOUSE_OK = {
-            "anbar", "tahvil", "resid", "home", "products", "customers",
+            "anbar", "tahvil", "resid", "shomarsh", "score", "home", "products", "customers",
             "search", "voice", "more"};
     /** Moadian (tax) side: invoices + tax reports. */
     private static final String[] MOADIAN_OK = {

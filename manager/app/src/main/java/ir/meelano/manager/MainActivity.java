@@ -44,10 +44,13 @@ import ir.meelano.manager.screens.ProfitScreen;
 import ir.meelano.manager.screens.ReportsScreen;
 import ir.meelano.manager.screens.Screen;
 import ir.meelano.manager.screens.ResidScreen;
+import ir.meelano.manager.screens.ScoreScreen;
 import ir.meelano.manager.screens.SearchScreen;
 import ir.meelano.manager.screens.SettingsScreen;
 import ir.meelano.manager.screens.TradeScreen;
+import ir.meelano.manager.screens.ShomarshScreen;
 import ir.meelano.manager.screens.TahvilScreen;
+import ir.meelano.manager.screens.TakmilScreen;
 import ir.meelano.manager.screens.UsersScreen;
 import ir.meelano.manager.screens.VisitorsScreen;
 import ir.meelano.manager.screens.VoiceScreen;
@@ -171,7 +174,7 @@ public class MainActivity extends Activity {
         root.setPadding(Theme.dp(28), Theme.dp(28), Theme.dp(28), Theme.dp(28));
         android.widget.ImageView logoV = kit.logo(110);
         root.addView(logoV, new LinearLayout.LayoutParams(Theme.dp(110), Theme.dp(110)));
-        TextView t = kit.text("مدیریت میلانو", 26, Theme.TEXT, true);
+        TextView t = kit.text("میلانو", 26, Theme.TEXT, true);
         t.setGravity(Gravity.CENTER);
         root.addView(t, kit.lp(-1, -2));
         TextView s = kit.text("داشبورد مدیریتی آتیران", 12.5f, Theme.MUTED, false);
@@ -317,7 +320,7 @@ public class MainActivity extends Activity {
         root.setBackgroundColor(Theme.BG);
         root.setPadding(Theme.dp(28), Theme.dp(28), Theme.dp(28), Theme.dp(28));
         root.addView(kit.logo(120), new LinearLayout.LayoutParams(Theme.dp(120), Theme.dp(120)));
-        TextView t = kit.text("مدیریت میلانو", 22, Theme.TEXT, true);
+        TextView t = kit.text("میلانو", 22, Theme.TEXT, true);
         t.setGravity(Gravity.CENTER);
         root.addView(t, kit.lp(-1, -2));
         TextView s = kit.text("رمز عبور مدیریتی را وارد کنید", 12.5f, Theme.MUTED, false);
@@ -586,6 +589,9 @@ public class MainActivity extends Activity {
         reg(new AnbarScreen(this));
         reg(new TahvilScreen(this));
         reg(new ResidScreen(this));
+        reg(new TakmilScreen(this));
+        reg(new ShomarshScreen(this));
+        reg(new ScoreScreen(this));
 
         buildBottom();
         nav(screens.containsKey(currentId) ? currentId : "home");
@@ -807,7 +813,7 @@ public class MainActivity extends Activity {
         try {
             nm = Company.get(this).displayName(this);
         } catch (Exception e) {
-            nm = "مدیریت میلانو";
+            nm = "میلانو";
         }
         String g = Theme.seasonGlyph(this);
         return g.isEmpty() ? nm : nm + " " + g;
@@ -956,6 +962,34 @@ public class MainActivity extends Activity {
             }
             scanCb = null;
         }
+        if (requestCode == DOC_REQ && docCb != null) {
+            try {
+                if (resultCode == Activity.RESULT_OK && data != null && data.getData() != null) {
+                    java.io.InputStream in = getContentResolver().openInputStream(data.getData());
+                    StringBuilder b = new StringBuilder();
+                    byte[] buf = new byte[8192];
+                    int n;
+                    while ((n = in.read(buf)) > 0) b.append(new String(buf, 0, n, "UTF-8"));
+                    try {
+                        in.close();
+                    } catch (Exception ignored) { }
+                    docCb.accept(b.toString());
+                } else kit.toast("فایلی انتخاب نشد");
+            } catch (Exception e) {
+                kit.toast("خواندن فایل ممکن نشد");
+            }
+            docCb = null;
+        }
+        if (requestCode == PHOTO_REQ && photoCb != null) {
+            try {
+                if (resultCode == Activity.RESULT_OK && photoUri != null) photoCb.accept(photoUri);
+                else kit.toast("عکسی گرفته نشد");
+            } catch (Exception e) {
+                kit.toast("دوربین ممکن نشد");
+            }
+            photoCb = null;
+            photoUri = null;
+        }
     }
 
     @Override
@@ -1007,6 +1041,53 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             kit.toast("اسکنر باز نشد");
             scanCb = null;
+        }
+    }
+
+    // ================= document pick + photo =================
+    private static final int DOC_REQ = 904;
+    private static final int PHOTO_REQ = 905;
+    private java.util.function.Consumer<String> docCb;
+    private java.util.function.Consumer<android.net.Uri> photoCb;
+    private android.net.Uri photoUri;
+
+    /** Pick a JSON file; its text is delivered to cb. */
+    public void startDocPick(java.util.function.Consumer<String> cb) {
+        docCb = cb;
+        try {
+            android.content.Intent i = new android.content.Intent(
+                    android.content.Intent.ACTION_OPEN_DOCUMENT);
+            i.addCategory(android.content.Intent.CATEGORY_OPENABLE);
+            i.setType("*/*");
+            i.putExtra(android.content.Intent.EXTRA_MIME_TYPES,
+                    new String[]{"application/json", "text/plain"});
+            startActivityForResult(i, DOC_REQ);
+        } catch (Exception e) {
+            kit.toast("انتخاب فایل ممکن نشد");
+            docCb = null;
+        }
+    }
+
+    /** Take a photo (saved to the gallery); its Uri is delivered to cb. */
+    public void startPhoto(java.util.function.Consumer<android.net.Uri> cb) {
+        photoCb = cb;
+        try {
+            android.content.ContentValues cv = new android.content.ContentValues();
+            cv.put(android.provider.MediaStore.Images.Media.DISPLAY_NAME,
+                    "tahvil-" + System.currentTimeMillis() + ".jpg");
+            cv.put(android.provider.MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
+            photoUri = getContentResolver().insert(
+                    android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cv);
+            if (photoUri == null) throw new Exception("media");
+            android.content.Intent i = new android.content.Intent(
+                    android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
+            i.putExtra(android.provider.MediaStore.EXTRA_OUTPUT, photoUri);
+            i.addFlags(android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+            startActivityForResult(i, PHOTO_REQ);
+        } catch (Exception e) {
+            kit.toast("دوربین باز نشد");
+            photoCb = null;
+            photoUri = null;
         }
     }
 
@@ -1185,6 +1266,27 @@ public class MainActivity extends Activity {
         new Thread(() -> {
             try {
                 final File f = Pdf.build(this, title, subtitle, cols, rows, 400);
+                runOnUiThread(() -> {
+                    try {
+                        ShareProvider.share(this, f, "application/pdf", title);
+                    } catch (Exception e) {
+                        kit.toast("اشتراک ممکن نشد");
+                    }
+                });
+            } catch (Exception e) {
+                runOnUiThread(() -> kit.toast("ساخت PDF ممکن نشد"));
+            }
+        }).start();
+    }
+
+    /** Same report plus an image appendix (signature / photo pages). */
+    public void sharePdfImages(final String title, final String subtitle,
+            final ReportCatalog.Col[] cols, final List<Row> rows,
+            final java.util.List<Pdf.Img> images) {
+        kit.toast("در حال ساخت PDF…");
+        new Thread(() -> {
+            try {
+                final File f = Pdf.buildFull(this, title, subtitle, cols, rows, 400, images);
                 runOnUiThread(() -> {
                     try {
                         ShareProvider.share(this, f, "application/pdf", title);

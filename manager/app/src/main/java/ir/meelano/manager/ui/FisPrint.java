@@ -213,7 +213,7 @@ public final class FisPrint {
         if (Math.abs(remain) > 0.5)
             blocks.add(new Block(lay("مانده: " + Money.rial(remain), 28, true, Layout.Alignment.ALIGN_NORMAL), 2));
         blocks.add(new Block(lay("سپاس از خرید شما", 28, true, Layout.Alignment.ALIGN_CENTER), 2));
-        blocks.add(new Block(lay(Jalali.todayStr() + " • مدیریت میلانو", 22, false, Layout.Alignment.ALIGN_CENTER), 0));
+        blocks.add(new Block(lay(Jalali.todayStr() + " • میلانو", 22, false, Layout.Alignment.ALIGN_CENTER), 0));
 
         int h = 16;
         for (Block b : blocks) h += b.lay.getHeight() + b.gapAfter;

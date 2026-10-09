@@ -402,7 +402,7 @@ public class SettingsScreen extends Screen {
         android.widget.TextView dr = a.kit.text("✦ طراح و توسعه‌دهنده ✦", 13f, Theme.TEXT, true);
         dr.setGravity(android.view.Gravity.CENTER);
         ab.addView(dr, a.kit.lp(-1, -2));
-        android.widget.TextView tag = a.kit.text("مدیریت میلانو • داشبورد مدیریتی آتیران", 11f, Theme.MUTED, false);
+        android.widget.TextView tag = a.kit.text("میلانو • داشبورد مدیریتی آتیران", 11f, Theme.MUTED, false);
         tag.setGravity(android.view.Gravity.CENTER);
         ab.addView(tag, a.kit.lp(-1, -2));
         ab.addView(a.kit.gap(4));

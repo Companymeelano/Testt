@@ -337,7 +337,7 @@ public class TvActivity extends Activity {
         TextView nm = kit.text(shop, 34, Theme.TEXT, true);
         nm.setGravity(Gravity.CENTER);
         c.addView(nm, kit.lp(-1, -2));
-        TextView t1 = kit.text("مدیریت میلانو • داشبورد مدیریتی آتیران", 16f, Theme.MUTED, true);
+        TextView t1 = kit.text("میلانو • داشبورد مدیریتی آتیران", 16f, Theme.MUTED, true);
         t1.setGravity(Gravity.CENTER);
         c.addView(t1, kit.lp(-1, -2));
         TextView t2 = kit.text(kit.todayLine(), 15f, Theme.GOLD_SOFT, false);

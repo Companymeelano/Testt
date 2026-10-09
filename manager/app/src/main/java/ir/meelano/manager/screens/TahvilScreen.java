@@ -6,6 +6,7 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 
 import ir.meelano.manager.MainActivity;
+import ir.meelano.manager.ShareProvider;
 import ir.meelano.manager.core.AtiranAuth;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.MasterQueries;
@@ -16,6 +17,8 @@ import ir.meelano.manager.data.Meta;
 import ir.meelano.manager.data.Repo;
 import ir.meelano.manager.data.Row;
 import ir.meelano.manager.ui.Kit;
+import ir.meelano.manager.ui.Pdf;
+import ir.meelano.manager.ui.SignView;
 import ir.meelano.manager.ui.Theme;
 
 import java.util.ArrayList;
@@ -158,9 +161,11 @@ public class TahvilScreen extends Screen {
         final android.widget.Button[] bIn = new android.widget.Button[1];
         final android.widget.Button[] bOut = new android.widget.Button[1];
         final Runnable paint = () -> {
-            // Rebuild is simplest: recreate the two buttons via visibility trick.
-            bIn[0].setText("🧍 مشتری حضوری" + ("in".equals(mode[0]) ? " ✓" : ""));
-            bOut[0].setText("🛻 موزع" + ("out".equals(mode[0]) ? " ✓" : ""));
+            boolean isIn = "in".equals(mode[0]);
+            bIn[0].setText("🧍 مشتری حضوری" + (isIn ? " ✓" : ""));
+            bOut[0].setText("🛻 موزع" + (!isIn ? " ✓" : ""));
+            bIn[0].setAlpha(isIn ? 1f : 0.55f);
+            bOut[0].setAlpha(!isIn ? 1f : 0.55f);
         };
         bIn[0] = a.kit.btn("🧍 مشتری حضوری ✓", v -> {
             mode[0] = "in";
@@ -176,6 +181,36 @@ public class TahvilScreen extends Screen {
         row.addView(a.kit.space(8));
         row.addView(bOut[0], a.kit.wlp(1f));
         body.addView(row, a.kit.lp(-1, -2));
+        body.addView(a.kit.gap(6));
+        body.addView(a.kit.text("مدرک تحویل (اختیاری)", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        final android.graphics.Bitmap[] signBmp = {null};
+        final android.graphics.Bitmap[] photoBmp = {null};
+        final android.widget.TextView proofStatus = a.kit.text("امضا: — • عکس: —",
+                12f, Theme.MUTED, false);
+        final Runnable paintProof = () -> proofStatus.setText(
+                "امضا: " + (signBmp[0] == null ? "—" : "✓")
+                        + " • عکس: " + (photoBmp[0] == null ? "—" : "✓"));
+        LinearLayout proofRow = a.kit.h();
+        proofRow.addView(a.kit.btnGhost("🖊 امضای گیرنده", Theme.GOLD, v -> signDialog(signBmp,
+                paintProof)), a.kit.wlp(1f));
+        proofRow.addView(a.kit.space(8));
+        proofRow.addView(a.kit.btnGhost("📷 عکس تحویل", Theme.GOLD, v -> {
+            try {
+                a.startPhoto(uri -> {
+                    try {
+                        photoBmp[0] = loadScaled(uri, 1200);
+                        paintProof.run();
+                        a.kit.toast(photoBmp[0] == null ? "خواندن عکس ممکن نشد" : "عکس ثبت شد");
+                    } catch (Exception e) {
+                        a.kit.toast("خواندن عکس ممکن نشد");
+                    }
+                });
+            } catch (Exception e) {
+                a.kit.toast("دوربین باز نشد");
+            }
+        }), a.kit.wlp(1f));
+        body.addView(proofRow, a.kit.lp(-1, -2));
+        body.addView(proofStatus, a.kit.lp(-1, -2));
         final AlertDialog[] box = new AlertDialog[1];
         body.addView(a.kit.gap(8));
         body.addView(a.kit.btn("ثبت تحویل + رسید PDF", v -> {
@@ -204,7 +239,17 @@ public class TahvilScreen extends Screen {
                     new ReportCatalog.Col("qty", "تعداد", ReportCatalog.T_TEXT),
                     new ReportCatalog.Col("unit", "واحد", ReportCatalog.T_TEXT),
             };
-            a.sharePdf("رسید تحویل فاکتور " + f.s("id"), sub, cols, items);
+            List<Pdf.Img> images = new ArrayList<>();
+            if (signBmp[0] != null) {
+                savePng("tahvil-" + f.s("id") + "-sign.png", signBmp[0]);
+                images.add(new Pdf.Img(signBmp[0], "امضای گیرنده"));
+            }
+            if (photoBmp[0] != null) {
+                savePng("tahvil-" + f.s("id") + "-photo.png", photoBmp[0]);
+                images.add(new Pdf.Img(photoBmp[0], "عکس تحویل"));
+            }
+            if (images.isEmpty()) a.sharePdf("رسید تحویل فاکتور " + f.s("id"), sub, cols, items);
+            else a.sharePdfImages("رسید تحویل فاکتور " + f.s("id"), sub, cols, items, images);
             if (content != null) render(content);
         }), a.kit.lp(-1, -2));
         ScrollView sv = new ScrollView(a);
@@ -214,6 +259,67 @@ public class TahvilScreen extends Screen {
         if (dlg.getWindow() != null) dlg.getWindow().setBackgroundDrawable(Theme.dialogBg());
         box[0] = dlg;
         dlg.show();
+    }
+
+    private void signDialog(final android.graphics.Bitmap[] out, final Runnable done) {
+        LinearLayout b = a.kit.v();
+        b.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(16));
+        b.addView(a.kit.text("گیرنده اینجا امضا کند", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        final SignView sign = new SignView(a);
+        b.addView(sign, new LinearLayout.LayoutParams(-1, Theme.dp(220)));
+        final AlertDialog[] box = new AlertDialog[1];
+        LinearLayout row = a.kit.h();
+        row.addView(a.kit.btnGhost("پاک", Theme.DANGER, v -> sign.clear()), a.kit.wlp(1f));
+        row.addView(a.kit.space(8));
+        row.addView(a.kit.btn("ثبت امضا", v -> {
+            if (sign.isEmpty()) {
+                a.kit.toast("امضایی کشیده نشده است");
+                return;
+            }
+            out[0] = sign.bitmap();
+            try {
+                box[0].dismiss();
+            } catch (Exception ignored) { }
+            done.run();
+        }), a.kit.wlp(1f));
+        b.addView(row, a.kit.lp(-1, -2));
+        box[0] = a.kit.dialog("امضای گیرنده", b, true);
+        box[0].show();
+    }
+
+    private android.graphics.Bitmap loadScaled(android.net.Uri uri, int maxDim) {
+        java.io.InputStream in = null;
+        try {
+            in = a.getContentResolver().openInputStream(uri);
+            android.graphics.BitmapFactory.Options o = new android.graphics.BitmapFactory.Options();
+            o.inJustDecodeBounds = true;
+            android.graphics.BitmapFactory.decodeStream(in, null, o);
+            try {
+                in.close();
+            } catch (Exception ignored) { }
+            int s = 1;
+            while (Math.max(o.outWidth, o.outHeight) / s > maxDim) s *= 2;
+            android.graphics.BitmapFactory.Options o2 =
+                    new android.graphics.BitmapFactory.Options();
+            o2.inSampleSize = Math.max(1, s);
+            in = a.getContentResolver().openInputStream(uri);
+            return android.graphics.BitmapFactory.decodeStream(in, null, o2);
+        } catch (Exception e) {
+            return null;
+        } finally {
+            try {
+                if (in != null) in.close();
+            } catch (Exception ignored) { }
+        }
+    }
+
+    private void savePng(String name, android.graphics.Bitmap bmp) {
+        try {
+            java.io.File f = new java.io.File(ShareProvider.shareDir(a), name);
+            java.io.FileOutputStream fos = new java.io.FileOutputStream(f);
+            bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 90, fos);
+            fos.close();
+        } catch (Exception ignored) { }
     }
 
     private void pickDistributor(final String[] name, final String[] cell, final Runnable done) {

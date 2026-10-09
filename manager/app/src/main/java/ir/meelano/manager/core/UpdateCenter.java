@@ -579,7 +579,7 @@ public final class UpdateCenter {
                 LinearLayout body = kit.v();
                 body.setPadding(Theme.dp(18), Theme.dp(4), Theme.dp(18), Theme.dp(12));
                 body.addView(kit.text(
-                        "برای نصب نسخه جدید، در صفحه بعد گزینه «اجازه نصب از این منبع» را برای «مدیریت میلانو» روشن کنید و برگردید؛ نصب خودکار ادامه پیدا می‌کند.",
+                        "برای نصب نسخه جدید، در صفحه بعد گزینه «اجازه نصب از این منبع» را برای «میلانو» روشن کنید و برگردید؛ نصب خودکار ادامه پیدا می‌کند.",
                         13.5f, Theme.TEXT, false), kit.lp(-1, -2));
                 body.addView(kit.gap(10));
                 final AlertDialog[] box = new AlertDialog[1];

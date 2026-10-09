@@ -1655,4 +1655,106 @@ public final class MasterQueries {
         }
         return new Queries.Q(sb.toString());
     }
+
+    // ================= warehouse wave 2 (v29) =================
+
+    /** Items at/below reorder point (shortage alerts). */
+    public static Queries.Q whShortage(Meta m) throws Queries.Missing {
+        String ka = m.must("inventory", "کد کالا", "shka", "SHKA");
+        String nk = m.must("inventory", "نام کالا", "naka", "NAKA");
+        String st = m.must("inventory", "موجودی", "mojkavah", "MOJKAVAH");
+        String re = m.must("inventory", "نقطه سفارش", "reopoint", "REOPOINT");
+        String un = m.col("inventory", "vahsanj", "VAHSANJ", "unit");
+        return new Queries.Q("SELECT TOP 30 TRY_CONVERT(bigint,i.[" + ka + "]) AS code, "
+                + Sql.txt("i", nk, 300) + " AS name, "
+                + "TRY_CONVERT(decimal(18,3),i.[" + st + "]) AS stock, "
+                + "TRY_CONVERT(decimal(18,3),i.[" + re + "]) AS reopoint, "
+                + (un == null ? "N''" : "COALESCE(" + Sql.txt("i", un, 80) + ",N'')") + " AS unit"
+                + " FROM dbo.inventory i WHERE TRY_CONVERT(decimal(18,3),i.[" + st + "])<="
+                + "TRY_CONVERT(decimal(18,3),i.[" + re + "])"
+                + " ORDER BY TRY_CONVERT(decimal(18,3),i.[" + st + "])-"
+                + "TRY_CONVERT(decimal(18,3),i.[" + re + "])");
+    }
+
+    /** Per-warehouse stock for counting (graceful when the link table is absent). */
+    public static Queries.Q whAnbarStock(Meta m, String anbarId) throws Queries.Missing {
+        if (!m.table("inventory_anbars"))
+            throw new Queries.Missing("موجودی انباری در دیتابیس نیست");
+        String an = m.colFlex("inventory_anbars", "rdf_anbars", "rdf_anbar", "anbar", "anbar_rdf");
+        String ka = m.colFlex("inventory_anbars", "shka", "SHKA", "kala");
+        String qt = m.colFlex("inventory_anbars", "tedad", "mojodi", "mojkavah", "meghdar",
+                "mande", "stock", "qty");
+        if (an == null || ka == null || qt == null)
+            throw new Queries.Missing("ستون موجودی انباری شناخته نشد");
+        String ik = m.colFlex("inventory", "shka", "SHKA");
+        String inm = m.colFlex("inventory", "naka", "NAKA");
+        String iun = m.colFlex("inventory", "vahsanj", "VAHSANJ");
+        java.util.List<Object> binds = new java.util.ArrayList<>();
+        binds.add(anbarId);
+        return new Queries.Q("SELECT TRY_CONVERT(bigint,s.[" + ka + "]) AS code, "
+                + (inm == null ? "N''" : "COALESCE(" + Sql.txt("i", inm, 300) + ",N'')") + " AS name, "
+                + "TRY_CONVERT(decimal(18,3),s.[" + qt + "]) AS stock, "
+                + (iun == null ? "N''" : "COALESCE(" + Sql.txt("i", iun, 80) + ",N'')") + " AS unit"
+                + " FROM dbo.inventory_anbars s"
+                + (ik == null || inm == null ? ""
+                : " LEFT JOIN dbo.inventory i ON TRY_CONVERT(nvarchar(60),i.[" + ik + "])"
+                + "=TRY_CONVERT(nvarchar(60),s.[" + ka + "])")
+                + " WHERE TRY_CONVERT(nvarchar(60),s.[" + an + "])=? ORDER BY 2", binds);
+    }
+
+    /** Today's warehouse documents (posted pre-invoices), best-effort per table. */
+    public static Queries.Q whTodayDocs(Meta m) {
+        StringBuilder sb = new StringBuilder("SELECT ");
+        String todayJ = Jalali.todayStr();
+        String todayG = Jalali.todayGregorian();
+        String[][] tables = {{"buyfact_pish", "buyN"}, {"sailfact_pish", "retN"}};
+        boolean first = true;
+        for (String[] t : tables) {
+            if (!first) sb.append(", ");
+            first = false;
+            String dt = null;
+            try {
+                dt = m.col(t[0], "date", "DATE", "tarikh");
+            } catch (Exception ignored) { }
+            if (dt != null && m.table(t[0])) {
+                sb.append("(SELECT COUNT_BIG(1) FROM dbo.[").append(t[0]).append("] d WHERE ")
+                        .append(Sql.date10("d", dt)).append(" IN (").append(Sql.lit(todayJ))
+                        .append(",").append(Sql.lit(todayG)).append(")) AS ").append(t[1]);
+            } else if (m.table(t[0])) {
+                sb.append("(SELECT COUNT_BIG(1) FROM dbo.[").append(t[0]).append("]) AS ").append(t[1]);
+            } else {
+                sb.append("0 AS ").append(t[1]);
+            }
+        }
+        return new Queries.Q(sb.toString());
+    }
+
+    /** Supplier scorecard: purchase volume + open pre-invoices per supplier. */
+    public static Queries.Q whSupplierStats(Meta m) throws Queries.Missing {
+        String id = m.must("CUSTOMERS", "کد", "shmo", "SHMO");
+        String nm = m.must("CUSTOMERS", "نام", "moname", "MONAME", "name");
+        String man = m.col("CUSTOMERS", "man", "MAN");
+        String bShmo = m.col("buyfact", "shmo", "SHMO");
+        String bSum = m.col("buyfact", "all", "All", "sumall", "jam", "mablagh");
+        String pShmo = m.col("buyfact_pish", "shmo", "SHMO");
+        String buyAgg = "0 AS buyN, 0 AS buySum";
+        if (bShmo != null && m.table("buyfact")) {
+            buyAgg = "(SELECT COUNT_BIG(1) FROM dbo.buyfact b WHERE TRY_CONVERT(nvarchar(60),b.["
+                    + bShmo + "])=TRY_CONVERT(nvarchar(60),c.[" + id + "])) AS buyN, "
+                    + "(SELECT ISNULL(SUM(TRY_CONVERT(money,b.["
+                    + (bSum == null ? bShmo : bSum) + "])),0) FROM dbo.buyfact b WHERE "
+                    + "TRY_CONVERT(nvarchar(60),b.[" + bShmo + "])=TRY_CONVERT(nvarchar(60),c.["
+                    + id + "])) AS buySum";
+        }
+        String pishAgg = "0 AS pishN";
+        if (pShmo != null && m.table("buyfact_pish")) {
+            pishAgg = "(SELECT COUNT_BIG(1) FROM dbo.buyfact_pish p WHERE TRY_CONVERT(nvarchar(60),p.["
+                    + pShmo + "])=TRY_CONVERT(nvarchar(60),c.[" + id + "])) AS pishN";
+        }
+        return new Queries.Q("SELECT TOP 100 TRY_CONVERT(int,c.[" + id + "]) AS id, "
+                + Sql.txt("c", nm, 300) + " AS name, "
+                + (man == null ? "0" : "TRY_CONVERT(money,c.[" + man + "])") + " AS bal, "
+                + buyAgg + ", " + pishAgg
+                + " FROM dbo.CUSTOMERS c ORDER BY buySum DESC");
+    }
 }

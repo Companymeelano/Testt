@@ -10,6 +10,7 @@ import android.widget.TextView;
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.ShareProvider;
 import ir.meelano.manager.core.AtiranAuth;
+import ir.meelano.manager.core.FaNum;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.Money;
@@ -182,15 +183,8 @@ public class ResidScreen extends Screen {
             View v = a.kit.personRow(nm.isEmpty() ? "—" : nm,
                     (ln.optBoolean(WarehouseWriter.L_NEW, false) ? "کالای جدید • " : "")
                             + "کد " + Money.fa(ln.optString(WarehouseWriter.L_SHKA, "—")),
-                    qty + (un.isEmpty() ? "" : " " + un), "✕", Theme.DANGER,
-                    v2 -> {
-                        JSONArray keep = new JSONArray();
-                        for (int k = 0; k < lines.length(); k++) {
-                            if (k != idx) keep.put(lines.optJSONObject(k));
-                        }
-                        lines = keep;
-                        if (content != null) render(content);
-                    });
+                    qty + (un.isEmpty() ? "" : " " + un), "⋯", Theme.GOLD,
+                    v2 -> lineMenu(idx));
             LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
             p.setMargins(0, 0, 0, Theme.dp(8));
             card.addView(v, p);
@@ -509,6 +503,12 @@ public class ResidScreen extends Screen {
             } catch (Exception ignored) { }
             postDoc(d, false);
         }), a.kit.lp(-1, -2));
+        body.addView(a.kit.btnGhost("✏ ویرایش پیش‌نویس", Theme.GOLD, v -> {
+            try {
+                box[0].dismiss();
+            } catch (Exception ignored) { }
+            loadDraft(d);
+        }), a.kit.lp(-1, -2));
         body.addView(a.kit.btnGhost("📤 ارسال پیش‌نویس (فایل)", Theme.INFO, v -> shareDraft(d)),
                 a.kit.lp(-1, -2));
         body.addView(a.kit.btnGhost("🗑 حذف پیش‌نویس", Theme.DANGER, v -> {
@@ -542,6 +542,128 @@ public class ResidScreen extends Screen {
             ShareProvider.share(a, f, "application/json", "پیش‌نویس انبار");
         } catch (Exception e) {
             a.kit.toast("ارسال ممکن نشد");
+        }
+    }
+
+    private void lineMenu(final int idx) {
+        JSONObject ln = lines.optJSONObject(idx);
+        if (ln == null) return;
+        String nm = ln.optBoolean(WarehouseWriter.L_NEW, false)
+                ? ln.optString(WarehouseWriter.L_NNAME, "")
+                : ln.optString(WarehouseWriter.L_NAKA, "");
+        LinearLayout b = a.kit.v();
+        b.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(16));
+        b.addView(a.kit.kv("کالا", nm.isEmpty() ? "—" : nm, Theme.TEXT), a.kit.lp(-1, -2));
+        final AlertDialog[] box = new AlertDialog[1];
+        b.addView(a.kit.btn("✏ ویرایش تعداد", v -> {
+            try {
+                box[0].dismiss();
+            } catch (Exception ignored) { }
+            editQtyDialog(idx);
+        }), a.kit.lp(-1, -2));
+        b.addView(a.kit.btnGhost("🏷 لیبل قفسه", Theme.GOLD, v -> {
+            try {
+                box[0].dismiss();
+            } catch (Exception ignored) { }
+            printLabel(idx);
+        }), a.kit.lp(-1, -2));
+        b.addView(a.kit.btnGhost("🗑 حذف قلم", Theme.DANGER, v -> {
+            JSONArray keep = new JSONArray();
+            for (int k = 0; k < lines.length(); k++) {
+                if (k != idx) keep.put(lines.optJSONObject(k));
+            }
+            lines = keep;
+            try {
+                box[0].dismiss();
+            } catch (Exception ignored) { }
+            if (content != null) render(content);
+        }), a.kit.lp(-1, -2));
+        box[0] = a.kit.dialog("قلم سند", b, true);
+        box[0].show();
+    }
+
+    private void editQtyDialog(final int idx) {
+        JSONObject ln = lines.optJSONObject(idx);
+        if (ln == null) return;
+        LinearLayout b = a.kit.v();
+        b.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(16));
+        final EditText e = a.kit.editNum("تعداد *", ln.optString(WarehouseWriter.L_QTY, ""));
+        b.addView(e, a.kit.lp(-1, -2));
+        b.addView(a.kit.btnGhost("🎙 گفتن تعداد", Theme.VIOLET, v -> voiceQty(e)), a.kit.lp(-1, -2));
+        final AlertDialog[] box = new AlertDialog[1];
+        b.addView(a.kit.btn("ذخیره", v -> {
+            double q = 0;
+            try {
+                q = Double.parseDouble(Money.en(e.getText().toString()).trim());
+            } catch (Exception ignored) { }
+            if (q <= 0) {
+                a.kit.toast("تعداد معتبر وارد کنید");
+                return;
+            }
+            try {
+                lines.optJSONObject(idx).put(WarehouseWriter.L_QTY, String.valueOf(q));
+                try {
+                    box[0].dismiss();
+                } catch (Exception ignored) { }
+                if (content != null) render(content);
+            } catch (Exception ex) {
+                a.kit.toast("ذخیره ممکن نشد");
+            }
+        }), a.kit.lp(-1, -2));
+        box[0] = a.kit.dialog("ویرایش تعداد", b, true);
+        box[0].show();
+    }
+
+    private void voiceQty(final EditText e) {
+        try {
+            a.startVoiceSearch(text -> {
+                Double v = FaNum.parse(text);
+                if (v == null) {
+                    a.kit.toast("عدد فهمیده نشد: " + text);
+                    return;
+                }
+                String out = (Math.abs(v - Math.round(v)) < 0.001)
+                        ? String.valueOf(Math.round(v)) : String.valueOf(v);
+                e.setText(out);
+                a.kit.toast("شنیده شد: " + Money.fa(out));
+            });
+        } catch (Exception ex) {
+            a.kit.toast("ورودی صوتی ممکن نشد");
+        }
+    }
+
+    private void printLabel(int idx) {
+        JSONObject ln = lines.optJSONObject(idx);
+        if (ln == null) return;
+        String code = ln.optString(WarehouseWriter.L_SHKA, "");
+        String nm = ln.optBoolean(WarehouseWriter.L_NEW, false)
+                ? ln.optString(WarehouseWriter.L_NNAME, "")
+                : ln.optString(WarehouseWriter.L_NAKA, "");
+        String un = ln.optString(WarehouseWriter.L_UNIT, "");
+        if (code.isEmpty()) {
+            a.kit.toast("این قلم هنوز کد ندارد (بعد از ثبت)");
+            return;
+        }
+        ir.meelano.manager.ui.LabelPrint.share(a, code, nm, un);
+    }
+
+    /** Load a draft back into the form for editing. */
+    private void loadDraft(JSONObject d) {
+        try {
+            type = d.optString(WarehouseWriter.D_TYPE, WarehouseWriter.BUY);
+            partyId = d.optString(WarehouseWriter.D_PSHMO, "");
+            partyName = d.optString(WarehouseWriter.D_PNAME, "").replace(" (جدید)", "");
+            partyNew = d.optJSONObject(WarehouseWriter.D_PNEW);
+            anbarId = d.optString(WarehouseWriter.D_ANBAR, "");
+            anbarName = d.optString(WarehouseWriter.D_ANBARNAME, "");
+            JSONArray ls = d.optJSONArray(WarehouseWriter.D_LINES);
+            lines = ls == null ? new JSONArray() : new JSONArray(ls.toString());
+            desc = d.optString(WarehouseWriter.D_DESC, "");
+            editingDraft = d.optInt(WarehouseWriter.D_NO, 0);
+            if (content != null) render(content);
+            a.kit.toast("پیش‌نویس " + Money.fa(String.valueOf(editingDraft)) + " باز شد");
+        } catch (Exception e) {
+            a.kit.toast("باز کردن ممکن نشد");
         }
     }
 
@@ -817,6 +939,7 @@ public class ResidScreen extends Screen {
         if (!unit.isEmpty()) b.addView(a.kit.kv("واحد", unit, Theme.TEXT), a.kit.lp(-1, -2));
         final EditText e = a.kit.editNum("تعداد *", "");
         b.addView(e, a.kit.lp(-1, -2));
+        b.addView(a.kit.btnGhost("🎙 گفتن تعداد", Theme.VIOLET, v -> voiceQty(e)), a.kit.lp(-1, -2));
         final AlertDialog[] box = new AlertDialog[1];
         b.addView(a.kit.btn("افزودن به سند", v -> {
             double q = 0;

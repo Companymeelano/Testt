@@ -66,7 +66,7 @@ public final class ShopCard {
         llp.gravity = Gravity.CENTER;
         llp.setMargins(0, hiRes ? 36 : Theme.dp(12), 0, hiRes ? 36 : Theme.dp(12));
         c.addView(line, llp);
-        TextView t1 = k.text("مدیریت میلانو • داشبورد مدیریتی آتیران", hiRes ? 34 : 12.5f, inkSoft, true);
+        TextView t1 = k.text("میلانو • داشبورد مدیریتی آتیران", hiRes ? 34 : 12.5f, inkSoft, true);
         if (hiRes) t1.setTextSize(TypedValue.COMPLEX_UNIT_PX, 34);
         t1.setGravity(Gravity.CENTER);
         c.addView(t1, k.lp(-1, -2));

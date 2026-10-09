@@ -39,10 +39,12 @@ public final class WarehouseWriter {
     public static final String BUY = "BUY";         // supplier -> warehouse
     public static final String CUSTRET = "CUSTRET"; // customer  -> warehouse
     public static final String BUYRET = "BUYRET";   // warehouse -> supplier
+    public static final String COUNT = "COUNT";     // cycle count (draft + report only)
 
     public static String faType(String t) {
         if (CUSTRET.equals(t)) return "برگشت از مشتری";
         if (BUYRET.equals(t)) return "برگشت از خرید";
+        if (COUNT.equals(t)) return "شمارش انبار";
         return "خرید";
     }
 
@@ -81,6 +83,9 @@ public final class WarehouseWriter {
     public static final String L_NUNIT = "newUnit";
     public static final String L_NGROUP = "newGroupId";
     public static final String L_NGROUPNAME = "newGroupName";
+    public static final String L_PRICE = "price";       // office completion (Takmil)
+    public static final String L_COUNTED = "counted";   // cycle count qty
+    public static final String L_STOCK = "stock";       // system stock at count
 
     // ================= draft store (private prefs) =================
 
@@ -420,7 +425,7 @@ public final class WarehouseWriter {
             real = ctx.get("qty");
         if (real == null && (n.equals("vahsanj") || n.equals("bastebandi") || n.equals("unit")
                 || n.equals("vah"))) real = ctx.get("unit");
-        if (real == null && n.equals("lineno") || n.equals("radif")) real = ctx.get("lineNo");
+        if (real == null && (n.equals("lineno") || n.equals("radif"))) real = ctx.get("lineNo");
         // --- product master (quick-create) ---
         if (real == null && ctx.containsKey("p_name") && (n.equals("naka") || n.equals("coka")))
             real = ctx.get("p_name");
@@ -611,6 +616,9 @@ public final class WarehouseWriter {
             out.add(buildInsert(c, lTable, lShape, lctx, warnings));
         }
         warnings.add(0, "شماره سند: " + docNo);
+        try {
+            doc.put("_postedNo", docNo);
+        } catch (Exception ignored) { }
         return out;
     }
 
@@ -684,6 +692,109 @@ public final class WarehouseWriter {
                 c.setAutoCommit(auto);
             } catch (Exception ignored) { }
         }
+    }
+
+    public static JSONArray handlog(Context c) {
+        try {
+            return new JSONArray(prefs(c).getString("handlog", "[]"));
+        } catch (Exception e) {
+            return new JSONArray();
+        }
+    }
+
+    /**
+     * Office completion (Takmil): write unit prices + line sums onto an
+     * already-posted pre-invoice, then refresh its header totals. Column
+     * names are resolved live by pattern; anything unmapped is reported in
+     * warnings and skipped (never guessed). Lines carry shka/qty/price.
+     *
+     * @return document total posted.
+     */
+    public static double completePrices(Connection c, String hTable, String lTable,
+            String noCol, long docNo, JSONArray lines, List<String> warnings) throws Exception {
+        List<Col> lShape = shape(c, lTable);
+        List<Col> hShape = shape(c, hTable);
+        if (lShape.isEmpty() || hShape.isEmpty())
+            throw new Exception("جدول سند در دسترس نیست");
+        String shkaCol = matchCol(lShape, "shka", "SHKA", "kala", "kala_rdf");
+        String priceCol = matchCol(lShape, "vahprice", "VAHPRICE", "fi", "FI", "price",
+                "buyprice", "BUY_PRICE", "narkh", "gheymat", "unitprice", "vahadprice");
+        String sumCol = matchCol(lShape, "linesum", "LINESUM", "sum", "mablagh", "jam",
+                "total", "linetotal");
+        if (shkaCol == null)
+            throw new Exception("ستون کالای اقلام شناخته نشد");
+        if (priceCol == null && sumCol == null)
+            throw new Exception("ستون مبلغ در اقلام این دیتابیس شناخته نشد");
+        if (priceCol == null) warnings.add("ستون فی واحد یافت نشد؛ فقط جمع سطرها ثبت شد");
+        if (sumCol == null) warnings.add("ستون جمع سطر یافت نشد؛ فقط فی واحد ثبت شد");
+        double total = 0;
+        for (int i = 0; i < lines.length(); i++) {
+            JSONObject ln = lines.optJSONObject(i);
+            if (ln == null) continue;
+            double qty = ln.optDouble(L_QTY, 0);
+            try {
+                qty = Double.parseDouble(Money.en(ln.optString(L_QTY, "0")).trim());
+            } catch (Exception ignored) { }
+            double price = ln.optDouble(L_PRICE, 0);
+            try {
+                price = Double.parseDouble(Money.en(ln.optString(L_PRICE, "0")).trim());
+            } catch (Exception ignored) { }
+            double sum = qty * price;
+            total += sum;
+            StringBuilder set = new StringBuilder();
+            List<Object> binds = new ArrayList<>();
+            if (priceCol != null) {
+                set.append("[").append(priceCol.replace("]", "]]")).append("]=?");
+                binds.add(price);
+            }
+            if (sumCol != null) {
+                if (set.length() > 0) set.append(", ");
+                set.append("[").append(sumCol.replace("]", "]]")).append("]=?");
+                binds.add(sum);
+            }
+            String sql = "UPDATE dbo.[" + lTable.replace("]", "]]") + "] SET " + set
+                    + " WHERE [" + noCol.replace("]", "]]") + "]=? AND ["
+                    + shkaCol.replace("]", "]]") + "]=?";
+            PreparedStatement ps = null;
+            try {
+                ps = c.prepareStatement(sql);
+                int p = 1;
+                for (Object b : binds) ps.setDouble(p++, ((Number) b).doubleValue());
+                ps.setLong(p++, docNo);
+                try {
+                    ps.setLong(p, Long.parseLong(
+                            Money.en(ln.optString(L_SHKA, "0")).trim()));
+                } catch (Exception e) {
+                    ps.setString(p, ln.optString(L_SHKA, ""));
+                }
+                ps.executeUpdate();
+            } finally {
+                closeQuiet(ps);
+            }
+        }
+        // Header totals (best-effort over total-ish columns).
+        String[] totals = {"sumlineall", "all", "jam", "mablagh", "total", "jamkol", "sumall"};
+        int posted = 0;
+        for (String t : totals) {
+            String hc = matchCol(hShape, t);
+            if (hc == null) continue;
+            PreparedStatement ps = null;
+            try {
+                ps = c.prepareStatement("UPDATE dbo.[" + hTable.replace("]", "]]")
+                        + "] SET [" + hc.replace("]", "]]") + "]=? WHERE ["
+                        + noCol.replace("]", "]]") + "]=?");
+                ps.setDouble(1, total);
+                ps.setLong(2, docNo);
+                ps.executeUpdate();
+                posted++;
+            } catch (Exception ignored) {
+            } finally {
+                closeQuiet(ps);
+            }
+        }
+        if (posted == 0) warnings.add("ستون جمع سربرگ یافت نشد؛ جمع سند در سربرگ ثبت نشد");
+        warnings.add(0, "جمع سند: " + total);
+        return total;
     }
 
     /** Human-readable SQL with binds inlined (dry-run display). Never executed. */

@@ -19,8 +19,26 @@ import java.util.List;
 public final class Pdf {
     private Pdf() { }
 
+    /** One image for the appendix (signature / photo) with a Persian caption. */
+    public static final class Img {
+        public final android.graphics.Bitmap bmp;
+        public final String cap;
+
+        public Img(android.graphics.Bitmap bmp, String cap) {
+            this.bmp = bmp;
+            this.cap = cap;
+        }
+    }
+
     public static File build(Context c, String title, String subtitle, ReportCatalog.Col[] cols,
                              List<Row> rows, int maxRows) throws Exception {
+        return buildFull(c, title, subtitle, cols, rows, maxRows, null);
+    }
+
+    /** Same report plus an image appendix (each image on its own page). */
+    public static File buildFull(Context c, String title, String subtitle, ReportCatalog.Col[] cols,
+                                 List<Row> rows, int maxRows,
+                                 java.util.List<Img> images) throws Exception {
         int W = 820;
         int H = 1120;
         int margin = 44;
@@ -104,6 +122,36 @@ public final class Pdf {
             muted.setTextSize(10);
             g.drawText("Milad Yaghoobi • طراح و توسعه‌دهنده", W / 2f, H - 48, muted);
             doc.finishPage(page);
+        }
+        // ---- image appendix ----
+        if (images != null) {
+            for (Img im : images) {
+                if (im == null || im.bmp == null || im.bmp.isRecycled()) continue;
+                PdfDocument.PageInfo info = new PdfDocument.PageInfo.Builder(W, H, 999).create();
+                PdfDocument.Page page = doc.startPage(info);
+                android.graphics.Canvas g = page.getCanvas();
+                g.drawColor(0xFFFFFFFF);
+                paint.setColor(Theme.GOLD);
+                g.drawRect(0, 0, W, 10, paint);
+                head.setColor(0xFF101828);
+                head.setTextSize(19);
+                head.setTextAlign(Paint.Align.RIGHT);
+                g.drawText(safe(im.cap), W - margin, 62, head);
+                int iw = im.bmp.getWidth(), ih = im.bmp.getHeight();
+                float maxW = W - margin * 2f, maxH = H - 220f;
+                float sc = Math.min(maxW / Math.max(1, iw), maxH / Math.max(1, ih));
+                sc = Math.min(1f, sc);
+                float dw = iw * sc, dh = ih * sc;
+                float dx = (W - dw) / 2f, dy = 110 + (maxH - dh) / 2f;
+                android.graphics.RectF dst = new android.graphics.RectF(dx, dy, dx + dw, dy + dh);
+                Paint imgP = new Paint(Paint.FILTER_BITMAP_FLAG);
+                g.drawRect(dst.left - 6, dst.top - 6, dst.right + 6, dst.bottom + 6, muted);
+                g.drawBitmap(im.bmp, null, dst, imgP);
+                muted.setTextSize(11);
+                muted.setTextAlign(Paint.Align.CENTER);
+                g.drawText("پیوست • " + Money.fa(Jalali.todayStr()), W / 2f, H - 30, muted);
+                doc.finishPage(page);
+            }
         }
         File dir = ShareProvider.shareDir(c);
         File out = new File(dir, "report-" + System.currentTimeMillis() + ".pdf");

@@ -62,7 +62,10 @@ public class SmsReceiver extends BroadcastReceiver {
                     AdminDb db = new AdminDb(app);
                     AdminDb.Customer c = db.byDev(siteDev);
                     if (c != null) {
-                        db.saveSite(c.id, site.host, site.port, site.db,
+                        String lan = c.dbHost, wan = c.dbWan;
+                        if ("wan".equals(AdminDb.siteKind(site.host))) wan = site.host;
+                        else lan = site.host;
+                        db.saveSite(c.id, lan, wan, site.port, site.db,
                                 License.SQL_USER, License.SQL_PASS);
                         siteSaved = c.full();
                     }

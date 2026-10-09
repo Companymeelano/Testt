@@ -50,6 +50,22 @@ public class SettingsScreen extends Screen {
         if (cfg) {
             c.addView(a.kit.kv("سرور", a.settings.maskedHost(), Theme.MUTED), a.kit.lp(-1, -2));
         }
+        String lanM = a.settings.maskedLan();
+        String wanM = a.settings.maskedWan();
+        c.addView(a.kit.kv("داخل شبکه", lanM.isEmpty() ? "✕ ثبت نشده" : "✓ " + lanM,
+                lanM.isEmpty() ? Theme.DANGER : Theme.SUCCESS), a.kit.lp(-1, -2));
+        c.addView(a.kit.kv("خارج شبکه", wanM.isEmpty() ? "✕ ثبت نشده" : "✓ " + wanM,
+                wanM.isEmpty() ? Theme.DANGER : Theme.SUCCESS), a.kit.lp(-1, -2));
+        String lm = a.settings.linkMode();
+        c.addView(a.kit.chips(new String[]{"خودکار ✦", "فقط داخل شبکه", "فقط خارج شبکه"},
+                "lan".equals(lm) ? 1 : ("wan".equals(lm) ? 2 : 0), idx -> {
+            a.settings.setLinkMode(idx == 1 ? "lan" : (idx == 2 ? "wan" : "auto"));
+            a.kit.toast(idx == 0 ? "حالت خودکار فعال شد" : "حالت دستی فعال شد");
+            try {
+                a.checkConn();
+            } catch (Exception ignored) { }
+            render(content);
+        }), a.kit.lp(-1, -2));
         LinearLayout row = a.kit.h();
         row.addView(a.kit.btn("تست اتصال", v -> {
             a.kit.toast("در حال تست اتصال…");
@@ -75,6 +91,13 @@ public class SettingsScreen extends Screen {
             }
         }), a.kit.wlp(1f));
         c.addView(row, a.kit.lp(-1, -2));
+        c.addView(a.kit.btnGhost("🛠 عیب‌یابی هوشمند اتصال", Theme.TEAL, v -> {
+            try {
+                ir.meelano.manager.ui.LinkPanel.showDiagnose(a, a.settings);
+            } catch (Exception e) {
+                a.kit.toast("ممکن نشد");
+            }
+        }), a.kit.lp(-1, -2));
         boolean vpn = NetRoute.isVpnActive(a);
         c.addView(a.kit.kv("فیلترشکن", vpn ? "فعال" : "غیرفعال", vpn ? Theme.WARNING : Theme.SUCCESS), a.kit.lp(-1, -2));
         final boolean direct = a.settings.directConn();

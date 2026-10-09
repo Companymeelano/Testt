@@ -5,6 +5,7 @@ import android.os.Handler;
 import android.os.Looper;
 
 import ir.meelano.manager.core.Queries;
+import ir.meelano.manager.core.SmartLink;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -30,6 +31,11 @@ public final class Repo {
         void fail(String faError);
     }
 
+    /** Opens one validated connection (smart dual-path or explicit values). */
+    public interface Opener {
+        Connection open() throws Exception;
+    }
+
     private final ExecutorService pool = Executors.newFixedThreadPool(3);
     private final Handler main = new Handler(Looper.getMainLooper());
     private final Settings settings;
@@ -40,20 +46,25 @@ public final class Repo {
         this.settings = settings;
     }
 
+    /** Smart run: inside/outside profiles in auto-detected order with failover. */
     public <T> void run(final Task<T> t, final Cb<T> cb) {
-        runWith(settings.effHost(), settings.effPort(), settings.effDb(), settings.effUser(), settings.effPass(), t, cb);
+        runOpener(() -> SmartLink.open(appCtx, settings), t, cb);
     }
 
     /** Same as {@link #run}, but against explicit connection values (tests unsaved settings). */
     public <T> void runWith(final String host, final int port, final String db,
                             final String user, final String pass, final Task<T> t, final Cb<T> cb) {
+        runOpener(() -> Atiran.open(host, port, db, user, pass), t, cb);
+    }
+
+    private <T> void runOpener(final Opener opener, final Task<T> t, final Cb<T> cb) {
         final Runnable job = () -> {
             Object out = null;
             String err = null;
             boolean direct = settings.directConn();
             boolean bound = direct && NetRoute.bindDirect(appCtx);
             try {
-                try (Connection c = Atiran.open(host, port, db, user, pass)) {
+                try (Connection c = opener.open()) {
                     out = t.run(c);
                 }
             } catch (Queries.Missing m) {

@@ -26,6 +26,8 @@ import ir.meelano.manager.core.DeviceId;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.LicenseStore;
 import ir.meelano.manager.core.Money;
+import ir.meelano.manager.core.SmartLink;
+import ir.meelano.manager.ui.LinkPanel;
 import ir.meelano.manager.core.Net;
 import ir.meelano.manager.core.SmsIo;
 import ir.meelano.manager.core.SmsReceiver;
@@ -333,18 +335,19 @@ public class LicenseActivity extends Activity {
         if (licOk && !connOk) {
             c.addView(kit.text("اتصال به سرور اختصاصی شما", 14f, Theme.TEXT, true),
                     kit.lp(-1, -2));
-            c.addView(kit.hint("آی‌پی سرور و نام دیتابیس فروشگاه خود را وارد کنید؛ یک‌بار ذخیره می‌شود و دیگر هیچ‌جا نمایش داده نمی‌شود."),
+            c.addView(kit.hint("آدرس سرور فروشگاه را وارد کنید؛ برنامه خودش می‌فهمد داخل فروشگاه هستید یا بیرون و از مسیر درست وصل می‌شود. یک‌بار ذخیره می‌شود و دیگر هیچ‌جا نمایش داده نمی‌شود."),
                     kit.lp(-1, -2));
-            final EditText fIp = kit.edit("آی‌پی سرور (مثلاً 192.168.1.10)", "");
+            final EditText fLan = kit.edit("داخل فروشگاه — آی‌پی وای‌فای (مثلاً 192.168.1.10)", "");
+            final EditText fWan = kit.edit("خارج فروشگاه — آدرس اینترنتی (اختیاری)", "");
             final EditText fDb = kit.edit("نام دیتابیس (مثلاً AtiranDb)", "");
             final EditText fPort = kit.edit("پورت", "1433");
-            for (EditText e : new EditText[]{fIp, fDb, fPort}) {
+            for (EditText e : new EditText[]{fLan, fWan, fDb, fPort}) {
                 LinearLayout.LayoutParams lp2 = kit.lp(-1, -2);
                 lp2.setMargins(0, Theme.dp(4), 0, Theme.dp(4));
                 c.addView(e, lp2);
             }
-            c.addView(kit.btnGold("💾 ذخیره و اتصال", v ->
-                    saveSiteManual(txt(fIp), txt(fPort), txt(fDb))), kit.lp(-1, -2));
+            c.addView(kit.btnGold("💾 ذخیره و اتصال هوشمند", v ->
+                    saveSiteManual(txt(fLan), txt(fWan), txt(fPort), txt(fDb))), kit.lp(-1, -2));
             TextView div2 = kit.text("— یا کد اتصال فروشنده —", 12f, Theme.MUTED, true);
             div2.setGravity(Gravity.CENTER);
             c.addView(div2, kit.lp(-1, -2));
@@ -787,7 +790,7 @@ public class LicenseActivity extends Activity {
             @Override
             public void ok(String v) {
                 try {
-                    settings.saveConnection(fh, String.valueOf(port), fd, fu, fp);
+                    settings.placeHost(fh, String.valueOf(port), fd, fu, fp);
                 } catch (Exception ignored) { }
                 kit.toast("✓ " + v);
                 buildUi();
@@ -944,9 +947,11 @@ public class LicenseActivity extends Activity {
 
     // ---------- step 2: the customer's own server ----------
 
-    private void saveSiteManual(String ip, String portStr, String db) {
-        if (ip == null || ip.isEmpty()) {
-            kit.toast("آی‌پی سرور را وارد کنید");
+    private void saveSiteManual(String lan, String wan, String portStr, String db) {
+        final String fLan = lan == null ? "" : lan.trim();
+        final String fWan = wan == null ? "" : wan.trim();
+        if (fLan.isEmpty() && fWan.isEmpty()) {
+            kit.toast("دست‌کم یک آدرس (داخل یا خارج فروشگاه) را وارد کنید");
             return;
         }
         if (db == null || db.isEmpty()) {
@@ -965,36 +970,67 @@ public class LicenseActivity extends Activity {
             kit.toast("اینترنت قطع است — وصل شوید و دوباره بزنید");
             return;
         }
-        kit.toast("در حال ذخیره و تست اتصال…");
-        final String fIp = ip.trim();
+        kit.toast("در حال تست مسیرها…");
         final String fDb = db.trim();
         final int fPort = port;
-        repo.runWith(fIp, fPort, fDb, License.SQL_USER, License.SQL_PASS, conn -> {
-            Meta m = new Meta(conn);
-            int n = 0;
-            for (String t : new String[]{"sailfact", "buyfact", "dar", "getchk",
-                    "putchk", "CUSTOMERS", "inventory", "visitors"})
-                if (m.table(t)) n++;
-            return "اتصال برقرار شد • " + Money.fa(String.valueOf(n)) + " جدول اصلی در دسترس";
-        }, new Repo.Cb<String>() {
-            @Override
-            public void ok(String v) {
+        new Thread(() -> {
+            final int[] lanN = {-1};
+            final int[] wanN = {-1};
+            if (!fLan.isEmpty()) {
                 try {
-                    settings.saveConnection(fIp, String.valueOf(fPort), fDb,
+                    lanN[0] = SmartLink.probeTables(fLan, fPort, fDb,
                             License.SQL_USER, License.SQL_PASS);
+                } catch (Exception ignored) { lanN[0] = -1; }
+            }
+            if (!fWan.isEmpty()) {
+                try {
+                    wanN[0] = SmartLink.probeTables(fWan, fPort, fDb,
+                            License.SQL_USER, License.SQL_PASS);
+                } catch (Exception ignored) { wanN[0] = -1; }
+            }
+            runOnUiThread(() -> {
+                if (lanN[0] < 0 && wanN[0] < 0) {
+                    // Nothing worked: open the troubleshooter with these exact values.
+                    kit.toast("هیچ مسیری وصل نشد؛ عیب‌یابی باز می‌شود");
+                    try {
+                        LinkPanel.showDiagnoseExplicit(LicenseActivity.this, fLan, fWan,
+                                fPort, fDb, License.SQL_USER, License.SQL_PASS);
+                    } catch (Exception ignored) { }
+                    return;
+                }
+                try {
+                    settings.saveSmart(fLan, fWan, String.valueOf(fPort), fDb,
+                            License.SQL_USER, License.SQL_PASS);
+                    settings.setLinkLast(pickLast(lanN[0], wanN[0]));
                 } catch (Exception ignored) { }
-                kit.toast("✓ " + v);
-                sendSiteSms(fIp, fPort, fDb);
+                String v = "داخل: " + (fLan.isEmpty() ? "—" : (lanN[0] >= 0 ? "✓" : "✕"))
+                        + " • خارج: " + (fWan.isEmpty() ? "—" : (wanN[0] >= 0 ? "✓" : "✕"));
+                int n = Math.max(lanN[0], wanN[0]);
+                kit.toast("✓ ذخیره شد (" + v + ") • "
+                        + Money.fa(String.valueOf(n)) + " جدول اصلی در دسترس");
+                sendSiteSms(pickHost(fLan, lanN[0], fWan, wanN[0]), fPort, fDb);
                 buildUi();
-            }
+            });
+        }).start();
+    }
 
-            @Override
-            public void fail(String faError) {
-                kit.toast(faError == null || faError.isEmpty()
-                        ? "سرور در دسترس نیست؛ آی‌پی و نام دیتابیس را بررسی کنید"
-                        : faError);
-            }
-        });
+    /** Prefer the winner matching the current transport for SITE1 + last-path. */
+    private String pickLast(int lanN, int wanN) {
+        boolean wifi = false;
+        try {
+            wifi = Net.wifi(this);
+        } catch (Exception ignored) { }
+        if (wifi && lanN >= 0) return SmartLink.LAN;
+        if (!wifi && wanN >= 0) return SmartLink.WAN;
+        if (lanN >= 0) return SmartLink.LAN;
+        return SmartLink.WAN;
+    }
+
+    private String pickHost(String lan, int lanN, String wan, int wanN) {
+        String last = pickLast(lanN, wanN);
+        if (SmartLink.LAN.equals(last) && lanN >= 0) return lan;
+        if (SmartLink.WAN.equals(last) && wanN >= 0) return wan;
+        return lanN >= 0 ? lan : wan;
     }
 
     /** Report the typed site back to the seller (full customer record). */

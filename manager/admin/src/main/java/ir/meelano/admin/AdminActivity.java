@@ -744,7 +744,7 @@ public class AdminActivity extends Activity {
             try {
                 site = db.byId(l.customerId);
             } catch (Exception ignored) { }
-            if (site != null && !site.dbHost.isEmpty() && !site.dbName.isEmpty()
+            if (site != null && (!site.dbHost.isEmpty() || !site.dbWan.isEmpty()) && !site.dbName.isEmpty()
                     && smsPhone != null && SmsIo.cleanPhone(smsPhone).length() >= 10) {
                 final String fphone2 = smsPhone;
                 final AdminDb.Customer fsite = site;
@@ -753,7 +753,7 @@ public class AdminActivity extends Activity {
                 bBoth.setOnClickListener(v -> {
                     try {
                         License.NetProfile np = new License.NetProfile();
-                        np.host = fsite.dbHost;
+                        np.host = fsite.dbHost.isEmpty() ? fsite.dbWan : fsite.dbHost;
                         np.port = fsite.dbPort.isEmpty() ? "1433" : fsite.dbPort;
                         np.db = fsite.dbName;
                         String line = License.netLine(fl.dev, np);
@@ -1212,9 +1212,23 @@ public class AdminActivity extends Activity {
                 13, AdminKit.MUTED, false));
         LinearLayout card = (LinearLayout) AdminKit.card(this);
         AdminKit.cardMargin(card, this);
-        EditText fHost = AdminKit.field(this, "آدرس سرور (IP یا نام)");
+        EditText fHost = AdminKit.field(this, "داخل شبکه — آی‌پی وای‌فای فروشگاه");
         fHost.setText(c.dbHost);
         card.addView(fHost);
+        EditText fWan = AdminKit.field(this, "خارج شبکه — آدرس اینترنتی (اختیاری)");
+        fWan.setText(c.dbWan);
+        card.addView(fWan);
+        final boolean[] cardWan = {c.dbHost.isEmpty() && !c.dbWan.isEmpty()};
+        final Button bWhich = AdminKit.btn(this, "", false);
+        final Runnable paintWhich = () -> bWhich.setText(cardWan[0]
+                ? "کارت اتصال: خارج شبکه (اینترنت)"
+                : "کارت اتصال: داخل شبکه (فروشگاه)");
+        paintWhich.run();
+        bWhich.setOnClickListener(v -> {
+            cardWan[0] = !cardWan[0];
+            paintWhich.run();
+        });
+        card.addView(bWhich);
         EditText fPort = AdminKit.field(this, "پورت (معمولاً 1433)");
         fPort.setText(c.dbPort.isEmpty() ? "1433" : c.dbPort);
         try {
@@ -1225,7 +1239,7 @@ public class AdminActivity extends Activity {
         fDb.setText(c.dbName);
         card.addView(fDb);
         card.addView(AdminKit.text(this,
-                "نام کاربری و رمز SQL برای همه مشتریان ثابت است و خودکار گذاشته می‌شود — فقط همین ۳ قلم لازم است.",
+                "نام کاربری و رمز SQL برای همه مشتریان ثابت است و خودکار گذاشته می‌شود. هر دو آدرس را وارد کنید تا گوشی مشتری خودش مسیر درست را پیدا کند.",
                 12.5f, AdminKit.GOLD_SOFT, false));
         box.addView(card);
 
@@ -1234,7 +1248,7 @@ public class AdminActivity extends Activity {
 
         Button bSave = AdminKit.btn(this, "فقط ذخیره مشخصات", false);
         bSave.setOnClickListener(v -> {
-            db.saveSite(cid, AdminKit.txt(fHost), AdminKit.txt(fPort),
+            db.saveSite(cid, AdminKit.txt(fHost), AdminKit.txt(fWan), AdminKit.txt(fPort),
                     AdminKit.txt(fDb), License.SQL_USER, License.SQL_PASS);
             AdminKit.toast(this, "مشخصات ذخیره شد");
         });
@@ -1242,7 +1256,12 @@ public class AdminActivity extends Activity {
 
         Button bMint = AdminKit.btn(this, "صدور کارت اتصال", true);
         bMint.setOnClickListener(v -> {
-            String host = AdminKit.txt(fHost);
+            String host = cardWan[0] ? AdminKit.txt(fWan) : AdminKit.txt(fHost);
+            if (host.isEmpty()) {
+                AdminKit.toast(this, "آدرس «" + (cardWan[0] ? "خارج" : "داخل")
+                        + " شبکه» خالی است؛ واردش کنید یا نوع کارت را عوض کنید");
+                return;
+            }
             String port = AdminKit.txt(fPort);
             String dbn = AdminKit.txt(fDb);
             AdminDb.Customer cc = db.byId(cid);
@@ -1263,7 +1282,8 @@ public class AdminActivity extends Activity {
                         : "آدرس سرور، پورت و نام دیتابیس لازم است");
                 return;
             }
-            db.saveSite(cid, host, p.port, dbn, License.SQL_USER, License.SQL_PASS);
+            db.saveSite(cid, AdminKit.txt(fHost), AdminKit.txt(fWan), p.port, dbn,
+                    License.SQL_USER, License.SQL_PASS);
             out.removeAllViews();
             LinearLayout rc = (LinearLayout) AdminKit.card(this);
             AdminKit.cardMargin(rc, this);

@@ -15,29 +15,30 @@ public final class Settings {
 
     public String host() { return p.getString("db_host", "").trim(); }
 
+    /** Inside-network address (shop Wi-Fi / cable): raw, never displayed. */
+    public String lan() { return p.getString("db_lan", "").trim(); }
+
+    /** Outside-network address (mobile data / public IP): raw, never displayed. */
+    public String wan() { return p.getString("db_wan", "").trim(); }
+
     /** Server address with all but the last segment masked (safe to display). */
     public String maskedHost() {
-        String h = effHost().trim();
-        if (h.isEmpty()) return "";
-        String v = h.replaceFirst("^[a-zA-Z]+://", "");
-        int slash = v.indexOf('/');
-        if (slash >= 0) v = v.substring(0, slash);
-        String[] parts = v.split("\\.");
-        if (parts.length > 1) {
-            StringBuilder b = new StringBuilder();
-            for (int i = 0; i < parts.length - 1; i++) {
-                if (i > 0) b.append('.');
-                b.append("•••");
-            }
-            return b.append('.').append(parts[parts.length - 1]).toString();
-        }
-        if (v.length() <= 3) return "•••";
-        return "•••" + v.substring(v.length() - 2);
+        return mask(effHost().trim());
+    }
+
+    /** Masked inside address ("" when unset). */
+    public String maskedLan() { return lan().isEmpty() ? "" : mask(lan()); }
+
+    /** Masked outside address ("" when unset). */
+    public String maskedWan() { return wan().isEmpty() ? "" : mask(wan()); }
+
+    private static String mask(String h) {
+        return ir.meelano.manager.core.SmartLink.maskHost(h);
     }
 
     /** True once the seller's connection card has been applied on this phone. */
     public boolean connConfigured() {
-        return !host().isEmpty();
+        return !lan().isEmpty() || !wan().isEmpty() || !host().isEmpty();
     }
     public String port() { return p.getString("db_port", "").trim(); }
     public String db() { return p.getString("db_name", "").trim(); }
@@ -63,6 +64,62 @@ public final class Settings {
                 .putString("db_name", db == null ? "" : db.trim())
                 .putString("db_user", user == null ? "" : user.trim())
                 .putString("db_pass", pass == null ? "" : pass).apply();
+    }
+
+    /** Save both smart-link profiles at once (either address may be empty). */
+    public void saveSmart(String lan, String wan, String port, String db, String user, String pass) {
+        p.edit().putString("db_lan", lan == null ? "" : lan.trim())
+                .putString("db_wan", wan == null ? "" : wan.trim())
+                .putString("db_port", port == null ? "" : port.trim())
+                .putString("db_name", db == null ? "" : db.trim())
+                .putString("db_user", user == null ? "" : user.trim())
+                .putString("db_pass", pass == null ? "" : pass).apply();
+    }
+
+    /**
+     * Store one address into the matching profile (private → inside,
+     * public → outside) without touching the other profile.
+     */
+    public void placeHost(String host, String port, String db, String user, String pass) {
+        String h = host == null ? "" : host.trim();
+        SharedPreferences.Editor e = p.edit();
+        if (!h.isEmpty()) {
+            Boolean priv = ir.meelano.manager.core.SmartLink.isPrivate(h);
+            if (priv != null && !priv) e.putString("db_wan", h);
+            else e.putString("db_lan", h);
+        }
+        e.putString("db_port", port == null ? "" : port.trim())
+                .putString("db_name", db == null ? "" : db.trim())
+                .putString("db_user", user == null ? "" : user.trim())
+                .putString("db_pass", pass == null ? "" : pass).apply();
+    }
+
+    /** One-time migration of the legacy single address into lan/wan. */
+    public void migrateLegacyHost() {
+        try {
+            if (!lan().isEmpty() || !wan().isEmpty()) return;
+            String h = host();
+            if (h.isEmpty()) return;
+            placeHost(h, port(), db(), user(), pass());
+        } catch (Exception ignored) { }
+    }
+
+    /** Smart-link mode: "auto" (default), "lan" or "wan". */
+    public String linkMode() {
+        String m = p.getString("link_mode", "auto");
+        if ("lan".equals(m) || "wan".equals(m)) return m;
+        return "auto";
+    }
+
+    public void setLinkMode(String mode) {
+        p.edit().putString("link_mode", "lan".equals(mode) || "wan".equals(mode) ? mode : "auto").apply();
+    }
+
+    /** Profile that worked last ("lan" / "wan" / ""). */
+    public String linkLast() { return p.getString("link_last", ""); }
+
+    public void setLinkLast(String kind) {
+        p.edit().putString("link_last", "wan".equals(kind) ? "wan" : ("lan".equals(kind) ? "lan" : "")).apply();
     }
 
     public boolean directConn() { return p.getBoolean("net_direct", false); }

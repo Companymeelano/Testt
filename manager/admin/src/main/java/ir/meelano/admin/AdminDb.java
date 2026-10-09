@@ -17,7 +17,7 @@ import java.util.List;
 public class AdminDb extends SQLiteOpenHelper {
 
     private static final String NAME = "meelano_admin.db";
-    private static final int VERSION = 4;
+    private static final int VERSION = 5;
 
     public static final class Customer {
         public long id;
@@ -28,7 +28,7 @@ public class AdminDb extends SQLiteOpenHelper {
         public long totalMin;
         public int opens;
         // v2: saved connection profile (for connection cards)
-        public String dbHost = "", dbPort = "", dbName = "", dbUser = "", dbPass = "";
+        public String dbHost = "", dbWan = "", dbPort = "", dbName = "", dbUser = "", dbPass = "";
 
         public String full() {
             String n = (name + " " + family).trim();
@@ -36,8 +36,8 @@ public class AdminDb extends SQLiteOpenHelper {
         }
 
         public boolean hasSite() {
-            return !dbHost.isEmpty() && !dbPort.isEmpty() && !dbName.isEmpty()
-                    && !dbUser.isEmpty();
+            return (!dbHost.isEmpty() || !dbWan.isEmpty()) && !dbPort.isEmpty()
+                    && !dbName.isEmpty() && !dbUser.isEmpty();
         }
     }
 
@@ -69,7 +69,7 @@ public class AdminDb extends SQLiteOpenHelper {
                 + "dev TEXT UNIQUE NOT NULL,created INTEGER DEFAULT 0,"
                 + "last_use_day INTEGER DEFAULT 0,total_min INTEGER DEFAULT 0,"
                 + "opens INTEGER DEFAULT 0,"
-                + "db_host TEXT DEFAULT '',db_port TEXT DEFAULT '',"
+                + "db_host TEXT DEFAULT '',db_wan TEXT DEFAULT '',db_port TEXT DEFAULT '',"
                 + "db_name TEXT DEFAULT '',db_user TEXT DEFAULT '',"
                 + "db_pass TEXT DEFAULT '')");
         db.execSQL("CREATE TABLE licenses(_id INTEGER PRIMARY KEY AUTOINCREMENT,"
@@ -111,6 +111,35 @@ public class AdminDb extends SQLiteOpenHelper {
             try {
                 db.execSQL("ALTER TABLE inbox ADD COLUMN shop TEXT DEFAULT ''");
             } catch (Exception ignored) { }
+        }
+        if (oldV < 5) {
+            try {
+                db.execSQL("ALTER TABLE customers ADD COLUMN db_wan TEXT DEFAULT ''");
+            } catch (Exception ignored) { }
+        }
+    }
+
+    /** "lan" for private/LAN addresses, else "wan" (SITE1 placement). */
+    public static String siteKind(String host) {
+        try {
+            String h = host == null ? "" : host.trim().toLowerCase(java.util.Locale.US);
+            int scheme = h.indexOf("://");
+            if (scheme >= 0) h = h.substring(scheme + 3);
+            int slash = h.indexOf('/');
+            if (slash >= 0) h = h.substring(0, slash);
+            if (h.isEmpty() || h.equals("localhost") || h.equals("::1")
+                    || h.endsWith(".local") || h.indexOf('.') < 0) return "lan";
+            String[] p = h.split("\\.");
+            if (p.length == 4) {
+                int a = Integer.parseInt(p[0]), b = Integer.parseInt(p[1]);
+                if (a == 10 || a == 127) return "lan";
+                if (a == 172 && b >= 16 && b <= 31) return "lan";
+                if (a == 192 && b == 168) return "lan";
+                return "wan";
+            }
+            return "wan";
+        } catch (Exception e) {
+            return "wan";
         }
     }
 
@@ -277,11 +306,12 @@ public class AdminDb extends SQLiteOpenHelper {
         }
     }
 
-    public boolean saveSite(long id, String host, String port, String db,
+    public boolean saveSite(long id, String lan, String wan, String port, String db,
                              String user, String pass) {
         try {
             ContentValues v = new ContentValues();
-            v.put("db_host", s(host));
+            v.put("db_host", s(lan));
+            v.put("db_wan", s(wan));
             v.put("db_port", s(port));
             v.put("db_name", s(db));
             v.put("db_user", s(user));
@@ -496,6 +526,7 @@ public class AdminDb extends SQLiteOpenHelper {
         o.totalMin = getLong(c, "total_min");
         o.opens = (int) getLong(c, "opens");
         o.dbHost = getStr(c, "db_host");
+        o.dbWan = getStr(c, "db_wan");
         o.dbPort = getStr(c, "db_port");
         o.dbName = getStr(c, "db_name");
         o.dbUser = getStr(c, "db_user");

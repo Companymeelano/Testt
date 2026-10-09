@@ -26,6 +26,29 @@ public final class Net {
         }
     }
 
+    /** Active transport: "wifi", "cell", "eth" (cable/USB) or "none". */
+    public static String transport(Context c) {
+        try {
+            NetworkCapabilities nc = caps(c);
+            if (nc == null) return "none";
+            if (nc.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) return "wifi";
+            if (nc.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) return "eth";
+            if (nc.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) return "cell";
+            return "none";
+        } catch (Exception e) {
+            return "none";
+        }
+    }
+
+    /** Persian label of the active transport (for the smart-link panel). */
+    public static String transportFa(Context c) {
+        String t = transport(c);
+        if ("wifi".equals(t)) return "وای‌فای";
+        if ("eth".equals(t)) return "کابل (USB / شبکه)";
+        if ("cell".equals(t)) return "دیتای موبایل (سیم‌کارت)";
+        return "قطع";
+    }
+
     /** True when the phone is on Wi-Fi (network status row). */
     public static boolean wifi(Context c) {
         try {

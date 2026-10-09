@@ -16,6 +16,9 @@ import ir.meelano.manager.core.LicenseStore;
 import ir.meelano.manager.core.UpdateCenter;
 import ir.meelano.manager.ui.WhatsNew;
 import ir.meelano.manager.core.RoleStore;
+import ir.meelano.manager.core.SmartLink;
+import ir.meelano.manager.ui.LinkPanel;
+import ir.meelano.manager.data.NetRoute;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.Notify;
 import ir.meelano.manager.core.Queries;
@@ -70,7 +73,12 @@ public class MainActivity extends Activity {
     private LinearLayout content;
     private ScrollView scroll;
     private LinearLayout bottomBar;
-    private TextView connDot;
+    private android.widget.ImageView linkIcon;
+    private android.net.ConnectivityManager.NetworkCallback linkCb = null;
+    private boolean linkCbReg = false;
+    private final android.os.Handler linkHandler =
+            new android.os.Handler(android.os.Looper.getMainLooper());
+    private Runnable linkPending = null;
     private TextView licChip;
     private TextView backFab;
     private TextView companyName;
@@ -224,8 +232,52 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        try {
+            if (linkCbReg) {
+                android.net.ConnectivityManager cm =
+                        (android.net.ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+                if (cm != null && linkCb != null) cm.unregisterNetworkCallback(linkCb);
+            }
+        } catch (Exception ignored) { }
+        linkCbReg = false;
+        try {
+            if (linkPending != null) linkHandler.removeCallbacks(linkPending);
+        } catch (Exception ignored) { }
         try { repo.close(); } catch (Exception ignored) { }
         super.onDestroy();
+    }
+
+    /** Re-probe the smart link shortly after any network change (debounced). */
+    private void watchLink() {
+        if (linkCbReg) return;
+        try {
+            android.net.ConnectivityManager cm =
+                    (android.net.ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+            if (cm == null) return;
+            linkCb = new android.net.ConnectivityManager.NetworkCallback() {
+                @Override
+                public void onAvailable(android.net.Network n) { linkChanged(); }
+                @Override
+                public void onLost(android.net.Network n) { linkChanged(); }
+                @Override
+                public void onCapabilitiesChanged(android.net.Network n,
+                                                  android.net.NetworkCapabilities c) { linkChanged(); }
+            };
+            cm.registerDefaultNetworkCallback(linkCb);
+            linkCbReg = true;
+        } catch (Exception ignored) { }
+    }
+
+    private void linkChanged() {
+        try {
+            if (linkPending != null) linkHandler.removeCallbacks(linkPending);
+            linkPending = () -> {
+                try {
+                    if (!isFinishing()) checkConn();
+                } catch (Exception ignored) { }
+            };
+            linkHandler.postDelayed(linkPending, 1500);
+        } catch (Exception ignored) { }
     }
 
     // ================= PIN gate =================
@@ -341,8 +393,19 @@ public class MainActivity extends Activity {
         LinearLayout header = kit.h();
         header.setGravity(Gravity.CENTER_VERTICAL);
         header.setPadding(Theme.dp(14), Theme.dp(10), Theme.dp(14), Theme.dp(8));
-        connDot = kit.text("●", 13, Theme.WARNING, true);
-        header.addView(connDot, kit.lp(-2, -2));
+        linkIcon = new android.widget.ImageView(this);
+        try {
+            linkIcon.setImageResource(R.drawable.link_probe);
+        } catch (Exception ignored) { }
+        linkIcon.setContentDescription("وضعیت اتصال — لمس برای جزئیات");
+        linkIcon.setPadding(Theme.dp(2), Theme.dp(2), Theme.dp(2), Theme.dp(2));
+        Theme.pressable(linkIcon);
+        linkIcon.setOnClickListener(v -> {
+            try {
+                LinkPanel.showStatus(this, settings, () -> checkConn());
+            } catch (Exception ignored) { }
+        });
+        header.addView(linkIcon, new LinearLayout.LayoutParams(Theme.dp(30), Theme.dp(30)));
         header.addView(kit.space(8));
         // License chip: subtle remaining-time pill, taps through to activation/support.
         licChip = kit.text("", 10.5f, Theme.GOLD_SOFT, true);
@@ -484,6 +547,7 @@ public class MainActivity extends Activity {
         try {
             WhatsNew.maybeShow(this, () -> UpdateCenter.autoCheck(this));
         } catch (Exception ignored) { }
+        watchLink();
     }
 
     /** Hairline divider between header tool buttons. */
@@ -942,21 +1006,64 @@ public class MainActivity extends Activity {
     }
 
     public void checkConn() {
+        setLinkIcon("probe");
         repo.run(c -> Repo.one(c, new Queries.Q("SELECT 1 AS ok")), new Repo.Cb<Row>() {
             @Override
             public void ok(Row v) {
-                connDot.setTextColor(Theme.SUCCESS);
+                String last = "";
+                try {
+                    last = settings.linkLast();
+                } catch (Exception ignored) { }
+                setLinkIcon(last.isEmpty() ? SmartLink.LAN : last);
             }
 
             @Override
             public void fail(String faError) {
-                connDot.setTextColor(Theme.DANGER);
+                setLinkIcon("off");
             }
         });
     }
 
+    /** Header link icon: inside / outside / probing (spins) / offline. */
+    private void setLinkIcon(String kind) {
+        if (linkIcon == null) return;
+        try {
+            linkIcon.clearAnimation();
+            if ("probe".equals(kind)) {
+                linkIcon.setImageResource(R.drawable.link_probe);
+                android.view.animation.RotateAnimation spin =
+                        new android.view.animation.RotateAnimation(0, 360,
+                                android.view.animation.Animation.RELATIVE_TO_SELF, 0.5f,
+                                android.view.animation.Animation.RELATIVE_TO_SELF, 0.5f);
+                spin.setDuration(900);
+                spin.setRepeatCount(android.view.animation.Animation.INFINITE);
+                spin.setInterpolator(new android.view.animation.LinearInterpolator());
+                linkIcon.startAnimation(spin);
+                linkIcon.setContentDescription("در حال بررسی اتصال");
+            } else if (SmartLink.WAN.equals(kind)) {
+                linkIcon.setImageResource(R.drawable.link_wan);
+                linkIcon.setContentDescription("متصل از خارج شبکه — لمس برای جزئیات");
+            } else if (SmartLink.LAN.equals(kind)) {
+                linkIcon.setImageResource(R.drawable.link_lan);
+                linkIcon.setContentDescription("متصل از داخل شبکه — لمس برای جزئیات");
+            } else {
+                linkIcon.setImageResource(R.drawable.link_off);
+                linkIcon.setContentDescription("قطع — لمس برای عیب‌یابی");
+            }
+        } catch (Exception ignored) { }
+    }
+
     public void testConnection(final Repo.Cb<String> cb) {
-        testConnection(settings.effHost(), settings.effPort(), settings.effDb(), settings.effUser(), settings.effPass(), cb);
+        boolean vpn = false;
+        try {
+            vpn = NetRoute.isVpnActive(this);
+        } catch (Exception ignored) { }
+        SmartLink.diagnose(this, settings, vpn, r -> {
+            try {
+                if (r.anyOk) cb.ok("✓ متصل از مسیر " + SmartLink.kindShort(r.activeKind));
+                else cb.fail(r.verdict);
+            } catch (Exception ignored) { }
+        });
     }
 
     /** Probe explicit (possibly unsaved) connection values. */

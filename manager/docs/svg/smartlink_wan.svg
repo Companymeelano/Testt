@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#16405F"/>
+      <stop offset="1" stop-color="#0A1A30"/>
+    </linearGradient>
+  </defs>
+  <!-- tile -->
+  <path d="M28,4 H68 Q92,4 92,28 V68 Q92,92 68,92 H28 Q4,92 4,68 V28 Q4,4 28,4 Z" fill="url(#tile)"/>
+  <path d="M28,4 H68 Q92,4 92,28 V68 Q92,92 68,92 H28 Q4,92 4,68 V28 Q4,4 28,4 Z" fill="none" stroke="#FFFFFF" stroke-opacity="0.16" stroke-width="2"/>
+  <!-- top gloss -->
+  <path d="M23,10 H73 Q82,10 82,19 Q82,28 73,28 H23 Q14,28 14,19 Q14,10 23,10 Z" fill="#FFFFFF" fill-opacity="0.10"/>
+  <!-- signal arcs = outside / over the air -->
+  <g fill="none" stroke="#8FC2FF" stroke-width="4" stroke-linecap="round">
+    <path d="M36,34 A15,15 0 0 1 60,34" stroke-opacity="0.9"/>
+    <path d="M29,28 A24,24 0 0 1 67,28" stroke-opacity="0.45"/>
+  </g>
+  <!-- chain link, bevel underlay -->
+  <g transform="translate(0,2)" fill="none" stroke="#1E429F" stroke-width="14">
+    <path d="M26,52 a11,11 0 1,0 22,0 a11,11 0 1,0 -22,0"/>
+    <path d="M48,52 a11,11 0 1,0 22,0 a11,11 0 1,0 -22,0"/>
+  </g>
+  <!-- chain link, sapphire face -->
+  <g fill="none" stroke="#8FC2FF" stroke-width="10">
+    <path d="M26,52 a11,11 0 1,0 22,0 a11,11 0 1,0 -22,0"/>
+    <path d="M48,52 a11,11 0 1,0 22,0 a11,11 0 1,0 -22,0"/>
+  </g>
+  <!-- shine -->
+  <path d="M23,47 A16,16 0 0 1 35,37" fill="none" stroke="#FFFFFF" stroke-opacity="0.5" stroke-width="3" stroke-linecap="round"/>
+  <!-- status dot -->
+  <path d="M63,71 a10,10 0 1,0 20,0 a10,10 0 1,0 -20,0" fill="#4FA3FF" fill-opacity="0.28"/>
+  <path d="M67,71 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0" fill="#4FA3FF"/>
+  <path d="M69.4,69 a1.6,1.6 0 1,0 3.2,0 a1.6,1.6 0 1,0 -3.2,0" fill="#FFFFFF" fill-opacity="0.85"/>
+</svg>

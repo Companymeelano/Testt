@@ -33,22 +33,32 @@ public final class Atiran {
 
     /** Open a validated connection (TCP preflight + one automatic retry). */
     public static Connection open(String host, int port, String db, String user, String pass) throws Exception {
+        return open(host, port, db, user, pass, 3000, 8, true);
+    }
+
+    /**
+     * Same, with tunable speed: the smart link uses a fast profile
+     * (no retry — failover to the other profile IS the retry).
+     */
+    public static Connection open(String host, int port, String db, String user, String pass,
+                                  int tcpMs, int loginSec, boolean retry) throws Exception {
         Class.forName("net.sourceforge.jtds.jdbc.Driver");
         String url = "jdbc:jtds:sqlserver://" + host + ":" + port + "/" + db
-                + ";loginTimeout=8;socketTimeout=75;appName=MEELANO-Manager7;";
+                + ";loginTimeout=" + Math.max(2, loginSec) + ";socketTimeout=75;appName=MEELANO-Manager7;";
         Properties p = new Properties();
         p.setProperty("user", user);
         p.setProperty("password", pass);
         p.setProperty("charset", "UTF-8");
         p.setProperty("sendStringParametersAsUnicode", "true");
         try (Socket s = new Socket()) {
-            s.connect(new InetSocketAddress(host, port), 3000);
+            s.connect(new InetSocketAddress(host, port), Math.max(500, tcpMs));
         } catch (Exception e) {
             throw new Exception(diagnose(e));
         }
         try {
             return validated(DriverManager.getConnection(url, p));
         } catch (Exception first) {
+            if (!retry) throw new Exception(diagnose(first));
             Thread.sleep(700);
             try {
                 return validated(DriverManager.getConnection(url, p));

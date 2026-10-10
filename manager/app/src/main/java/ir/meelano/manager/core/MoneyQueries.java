@@ -99,7 +99,7 @@ public final class MoneyQueries {
         if (c.back == null) throw new Queries.Missing("ستون برگشتی در «چک‌های دریافتی» پیدا نشد");
         String back = "UPPER(LTRIM(RTRIM(TRY_CONVERT(nvarchar(10),h.[" + c.back + "]))))";
         return new Queries.Q("SELECT COUNT_BIG(1) AS count, ISNULL(SUM(" + Sql.num("h", c.amount) + "),0) AS total"
-                + " FROM dbo.[" + c.table + "] h WHERE " + back + " IN (N'T',N'1',N'TRUE')",
+                + " FROM " + c.from + " h WHERE " + back + " IN (N'T',N'1',N'TRUE')",
                 new ArrayList<>());
     }
 
@@ -368,7 +368,7 @@ public final class MoneyQueries {
     // Cheques. Source = VW when fully usable, else the base table.
     // =====================================================================================
     public static final class Chq {
-        String table, amount, num, bank, branch, acc, sardate, getdate, st, back, ourBank, ghno;
+        String table, from, amount, num, bank, branch, acc, sardate, getdate, st, back, ourBank, ghno;
         String shmo, sayad, desc, kharjTo, kharjDate, naghdDate, typeId, typeName;
         String custName, custCode, statusLabel;
         boolean isView;
@@ -433,7 +433,55 @@ public final class MoneyQueries {
                 c.statusLabel = m.col(use, "CheckStatus", "state");
             }
         }
+        c.from = chequeFrom(m, c, incoming);
         return c;
+    }
+
+    /**
+     * Atiran keeps cheques in two places: the live table and its prior-years archive
+     * (getchk 76 rows vs NGetchk 438; putchk 202 vs NPutchk 1026 on the 1405/07/14 backup).
+     * Reading only the live table reported roughly one cheque in six, which is why the
+     * cheque sections looked wrong. This returns a FROM source spanning both.
+     *
+     * It degrades to the live table alone whenever the archive is missing, or whenever the
+     * archive does not expose the amount and status columns every report depends on — so a
+     * differently-shaped archive can never inject phantom rows or crash a screen.
+     */
+    private static String chequeFrom(Meta m, Chq c, boolean incoming) {
+        String live = "dbo.[" + c.table + "]";
+        String arch = incoming ? "NGetchk" : "NPutchk";
+        if (!m.table(arch)) return live;
+        // Every cheque report needs an amount and a status. Without both on the archive we
+        // ignore it, so a differently-shaped archive can never inject phantom rows.
+        if (m.col(arch, c.amount) == null || m.col(arch, c.st) == null) return live;
+
+        String[][] cols = {
+                {c.amount, "decimal(19,2)"}, {c.st, "nvarchar(80)"},
+                {c.num, "nvarchar(120)"}, {c.bank, "nvarchar(200)"},
+                {c.branch, "nvarchar(200)"}, {c.acc, "nvarchar(200)"},
+                {c.sardate, "nvarchar(40)"}, {c.getdate, "nvarchar(40)"},
+                {c.back, "nvarchar(20)"}, {c.ourBank, "nvarchar(80)"},
+                {c.shmo, "nvarchar(120)"}, {c.sayad, "nvarchar(120)"},
+                {c.desc, "nvarchar(2000)"}, {c.ghno, "nvarchar(120)"},
+                {c.kharjTo, "nvarchar(120)"}, {c.kharjDate, "nvarchar(40)"},
+                {c.naghdDate, "nvarchar(40)"}, {c.typeId, "int"},
+                {c.custName, "nvarchar(400)"}, {c.custCode, "nvarchar(120)"},
+                {c.statusLabel, "nvarchar(200)"}, {"rdf", "nvarchar(120)"},
+        };
+        StringBuilder a = new StringBuilder("(SELECT ");
+        StringBuilder b = new StringBuilder(" UNION ALL SELECT ");
+        boolean first = true;
+        for (String[] col : cols) {
+            String name = col[0], type = col[1];
+            if (name == null || name.trim().isEmpty()) continue;
+            if (!first) { a.append(", "); b.append(", "); }
+            first = false;
+            a.append("TRY_CAST(").append(m.col(c.table, name) != null ? "[" + name + "]" : "NULL")
+                    .append(" AS ").append(type).append(") AS [").append(name).append("]");
+            b.append("TRY_CAST(").append(m.col(arch, name) != null ? "[" + name + "]" : "NULL")
+                    .append(" AS ").append(type).append(")");
+        }
+        return first ? live : a + " FROM " + live + b + " FROM dbo.[" + arch + "])";
     }
 
     private static String chqStatusLabel(Meta m, Chq c, String a) {
@@ -464,7 +512,7 @@ public final class MoneyQueries {
         return new Queries.Q("SELECT COALESCE(" + Sql.txt("h", c.st, 40) + ",N'') AS st, " + back + " AS back"
                 + ", " + bank + " AS hasBank, COUNT_BIG(1) AS count"
                 + ", ISNULL(SUM(" + Sql.num("h", c.amount) + "),0) AS total"
-                + " FROM dbo.[" + c.table + "] h" + where + " GROUP BY COALESCE(" + Sql.txt("h", c.st, 40) + ",N''), "
+                + " FROM " + c.from + " h" + where + " GROUP BY COALESCE(" + Sql.txt("h", c.st, 40) + ",N''), "
                 + back + ", " + bank, binds);
     }
 
@@ -546,7 +594,7 @@ public final class MoneyQueries {
                 + ", " + (c.sayad == null ? "N''" : "COALESCE(" + Sql.txt("h", c.sayad, 60) + ",N'')") + " AS sayad"
                 + ", " + (c.desc == null ? "N''" : "COALESCE(" + Sql.txt("h", c.desc, 500) + ",N'')") + " AS descrip"
                 + ", " + (c.ghno == null ? "N''" : "COALESCE(" + Sql.txt("h", c.ghno, 60) + ",N'')") + " AS ghno"
-                + " FROM dbo.[" + c.table + "] h" + join + where
+                + " FROM " + c.from + " h" + join + where
                 + " ORDER BY " + orderCol + Queries.pageClause(binds, f.page, f.top);
         // «rdf» may be named differently on the view; fall back gracefully.
         if (m.col(c.table, "rdf") == null) sql = sql.replace(Sql.txt("h", "rdf", 60) + " AS rdf", "CAST(NULL AS nvarchar(60)) AS rdf");
@@ -602,7 +650,7 @@ public final class MoneyQueries {
                 + ", " + Sql.date10("h", c.sardate) + " AS sardate"
                 + ", " + custExpr + " AS customer"
                 + ", COALESCE(" + Sql.txt("h", c.st, 40) + ",N'') AS st"
-                + " FROM dbo.[" + c.table + "] h" + join + " WHERE " + Sql.join(x.conds, " AND ")
+                + " FROM " + c.from + " h" + join + " WHERE " + Sql.join(x.conds, " AND ")
                 + " ORDER BY h.[" + c.sardate + "]", x.binds);
     }
 
@@ -610,8 +658,8 @@ public final class MoneyQueries {
     public static Queries.Q chequeDueDaily(Meta m, boolean incoming, int daysAhead) throws Queries.Missing {
         DueCtx x = dueCtx(m, incoming, daysAhead);
         Chq c = x.c;
-        return new Queries.Q("SELECT " + x.sar + " AS day, COUNT(*) AS n, SUM(" + Sql.num("h", c.amount) + ") AS total"
-                + " FROM dbo.[" + c.table + "] h WHERE " + Sql.join(x.conds, " AND ")
+        return new Queries.Q("SELECT " + x.sar + " AS day, COUNT(*) AS n, ISNULL(SUM(" + Sql.num("h", c.amount) + "),0) AS total"
+                + " FROM " + c.from + " h WHERE " + Sql.join(x.conds, " AND ")
                 + " GROUP BY " + x.sar + " ORDER BY " + x.sar, x.binds);
     }
 }

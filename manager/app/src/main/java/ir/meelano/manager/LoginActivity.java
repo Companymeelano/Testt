@@ -162,7 +162,10 @@ public class LoginActivity extends Activity {
                 try {
                     u = AtiranAuth.fetchUser(c, user);
                     // Server check while the connection is still open.
-                    if (u != null) serverOk = AtiranAuth.verifyPasswordServer(c, u.userName, pass);
+                    if (u != null) {
+                        serverOk = AtiranAuth.verifyPasswordServer(c, u.userName, pass);
+                        u.serverCompared = serverOk;
+                    }
                 } finally {
                     try {
                         c.close();
@@ -194,7 +197,7 @@ public class LoginActivity extends Activity {
                             "خوش آمدید " + u.displayName);
                     return;
                 }
-                uiFail("رمز آتیران اشتباه است");
+                uiPwFail(u, serverOk);
             } catch (AtiranAuth.NoTable nt) {
                 // This database has no login tables: don't trap the user here.
                 try {

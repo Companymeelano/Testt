@@ -60,6 +60,10 @@ public final class AtiranAuth {
         public boolean active = true;
         public boolean locked;
         public byte[] pw;
+        /** False when sys_users has no user_password column we could recognise. */
+        public boolean pwColFound;
+        /** Result of the server-side pwdcompare() probe, when it could be run. */
+        public boolean serverCompared;
     }
 
     // ================= server read (call off the UI thread) =================
@@ -121,6 +125,7 @@ public final class AtiranAuth {
                 } catch (Exception ignored) { }
             }
             u.phone = col(rs, "a_phone");
+            u.pwColFound = (pwCol != null);
             if (pwCol != null) {
                 try { u.pw = rs.getBytes("a_pw"); } catch (Exception ignored) { }
             }

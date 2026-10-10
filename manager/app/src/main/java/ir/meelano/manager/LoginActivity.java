@@ -244,6 +244,75 @@ public class LoginActivity extends Activity {
         uiFail("ارتباط با سرور ممکن نشد؛ برای اولین ورود، اینترنت لازم است");
     }
 
+    /**
+     * Password failure, but an honest one: "wrong password" used to be shown for four very
+     * different situations (missing column, unreadable value, unknown hash algorithm, or a
+     * genuinely mistyped password). Naming the real reason is what makes it fixable.
+     */
+    private void uiPwFail(AtiranAuth.AuthUser u, boolean serverOk) {
+        String msg;
+        if (u == null) msg = "رمز آتیران اشتباه است";
+        else if (!u.pwColFound) msg = "ستونِ رمز در جدول کاربرانِ آتیران یافت نشد";
+        else if (u.pw == null || u.pw.length == 0)
+            msg = "رمز این کاربر در آتیران ثبت نشده یا خوانده نمی‌شود";
+        else msg = "رمز آتیران اشتباه است • قالبِ ذخیره‌شده: "
+                + String.valueOf(u.pw.length) + " بایت";
+        final String report = pwReport(u, serverOk);
+        runOnUiThread(() -> {
+            if (isFinishing()) return;
+            setBusy(false);
+            showErr(msg);
+            try {
+                // Tap the message to copy a diagnostics report for support.
+                err.setOnClickListener(v -> {
+                    boolean ok = copyText("گزارش ورود میلانو", report);
+                    kit.toast(ok ? "گزارش کپی شد" : "کپی نشد");
+                });
+            } catch (Exception ignored) { }
+        });
+    }
+
+    /** Diagnostics a developer can act on — no password, only what is stored. */
+    private String pwReport(AtiranAuth.AuthUser u, boolean serverOk) {
+        StringBuilder b = new StringBuilder();
+        b.append("Meelano login diagnostics\n");
+        if (u == null) {
+            b.append("user: <null>\n");
+            return b.toString();
+        }
+        b.append("user: ").append(u.userName == null ? "" : u.userName).append('\n');
+        b.append("uid: ").append(u.uid).append('\n');
+        b.append("pw_column_found: ").append(u.pwColFound).append('\n');
+        b.append("stored_len: ").append(u.pw == null ? -1 : u.pw.length).append('\n');
+        b.append("stored_hex: ").append(u.pw == null ? "" : toHex(u.pw)).append('\n');
+        b.append("pwdcompare_ok: ").append(serverOk).append('\n');
+        b.append("role: ").append(u.roleName).append(" -> ").append(u.appRole).append('\n');
+        return b.toString();
+    }
+
+    private static String toHex(byte[] a) {
+        if (a == null) return "";
+        StringBuilder s = new StringBuilder(a.length * 2);
+        for (byte v : a) {
+            String h = Integer.toHexString(v & 0xFF);
+            if (h.length() == 1) s.append('0');
+            s.append(h);
+        }
+        return s.toString();
+    }
+
+    private boolean copyText(String label, String text) {
+        try {
+            android.content.ClipboardManager cm =
+                    (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+            if (cm == null) return false;
+            cm.setPrimaryClip(android.content.ClipData.newPlainText(label, text));
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     private void uiFail(final String msg) {
         runOnUiThread(() -> {
             if (isFinishing()) return;

@@ -74,7 +74,7 @@ public final class MoneyQueries {
                 + ", ISNULL(SUM(" + Sql.num("h", d.havaleh) + "),0) AS havaleh"
                 + ", ISNULL(SUM(" + Sql.num("h", d.cheque) + "),0) AS cheque"
                 + ", COUNT_BIG(1) AS count FROM dbo.dar h WHERE h.[p]=?"
-                + " AND " + Sql.date10("h", d.date) + "=?"
+                + " AND " + Sql.dateKey(Sql.date10("h", d.date)) + "=?"
                 + Sql.activeAnd(cols, "h") + Sql.softAnd(cols, "h");
         return new Queries.Q(sql, binds);
     }
@@ -88,7 +88,7 @@ public final class MoneyQueries {
         binds.add(day == null ? "" : day);
         String sql = "SELECT " + Sql.lit(day == null ? "" : day) + " AS d, ISNULL(SUM(" + darTotal("h", d) + "),0) AS total"
                 + ", COUNT_BIG(1) AS count FROM dbo.dar h WHERE h.[p]=?"
-                + " AND " + Sql.date10("h", d.date) + "=?"
+                + " AND " + Sql.dateKey(Sql.date10("h", d.date)) + "=?"
                 + Sql.activeAnd(cols, "h") + Sql.softAnd(cols, "h");
         return new Queries.Q(sql, binds);
     }
@@ -113,7 +113,7 @@ public final class MoneyQueries {
         conds.add("h.[p]=?");
         String dc = Sql.dateCond(Sql.date10("h", d.date), from, to, binds);
         if (!dc.isEmpty()) conds.add(dc);
-        String day = Sql.date10("h", d.date);
+        String day = Sql.dateKey(Sql.date10("h", d.date));
         return new Queries.Q("SELECT " + day + " AS day, ISNULL(SUM(" + darTotal("h", d) + "),0) AS total"
                 + ", COUNT_BIG(1) AS count FROM dbo.dar h WHERE " + Sql.join(conds, " AND ")
                 + Sql.activeAnd(cols, "h") + Sql.softAnd(cols, "h") + " GROUP BY " + day + " ORDER BY " + day, binds);

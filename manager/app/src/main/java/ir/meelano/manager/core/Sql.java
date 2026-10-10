@@ -58,18 +58,38 @@ public final class Sql {
      * Date-range condition on an Atiran date expression. Appends bind values.
      * Empty when the filter has no range (means: all dates).
      */
+    /**
+     * Normalise Atiran's date text to a sortable «YYYY/MM/DD».
+     *
+     * Most rows are stored zero-padded, but a real minority is not («1403/5/12»). Range
+     * filters compare these as text, and «1403/5/12» sorts after «1403/12/29», so those
+     * rows fell outside every range and quietly vanished from the reports.
+     */
+    public static String dateKey(String dateExpr) {
+        String d = dateExpr;
+        return "(CASE"
+                + " WHEN " + d + " LIKE N'[0-9][0-9][0-9][0-9]/[0-9]/[0-9]'"
+                + " THEN LEFT(" + d + ",5)+N'0'+SUBSTRING(" + d + ",6,1)+N'/0'+SUBSTRING(" + d + ",8,1)"
+                + " WHEN " + d + " LIKE N'[0-9][0-9][0-9][0-9]/[0-9]/[0-9][0-9]'"
+                + " THEN LEFT(" + d + ",5)+N'0'+SUBSTRING(" + d + ",6,4)"
+                + " WHEN " + d + " LIKE N'[0-9][0-9][0-9][0-9]/[0-9][0-9]/[0-9]'"
+                + " THEN LEFT(" + d + ",8)+N'0'+SUBSTRING(" + d + ",9,1)"
+                + " ELSE " + d + " END)";
+    }
+
     public static String dateCond(String dateExpr, String from, String to, List<Object> binds) {
         boolean f = from != null && !from.trim().isEmpty();
         boolean t = to != null && !to.trim().isEmpty();
         if (!f && !t) return "";
+        String dk = dateKey(dateExpr);
         if (f && t) {
             if (from.compareTo(to) > 0) { String x = from; from = to; to = x; }
             binds.add(from.trim()); binds.add(to.trim());
-            return "(" + dateExpr + ">=? AND " + dateExpr + "<=?)";
+            return "(" + dk + ">=? AND " + dk + "<=?)";
         }
-        if (f) { binds.add(from.trim()); return "(" + dateExpr + ">=?)"; }
+        if (f) { binds.add(from.trim()); return "(" + dk + ">=?)"; }
         binds.add(to.trim());
-        return "(" + dateExpr + "<=?)";
+        return "(" + dk + "<=?)";
     }
 
     /** AND active='t' (Atiran's active flag), or "" when there is no such column. */
@@ -78,7 +98,14 @@ public final class Sql {
         if (c == null) return "";
         String p = alias == null || alias.trim().isEmpty() ? "" : alias + ".";
         String field = p + q(c);
-        return " AND (UPPER(LTRIM(RTRIM(TRY_CONVERT(nvarchar(20)," + field + ")))) IN (N'T',N'TRUE',N'Y',N'YES',N'1') OR TRY_CONVERT(int," + field + ")=1)";
+        String n = "UPPER(LTRIM(RTRIM(TRY_CONVERT(nvarchar(20)," + field + "))))";
+        // Keep the row unless there is *positive* evidence that it is inactive.
+        // It used to be an allow-list (only 'T/TRUE/Y/YES/1' survived), so every row
+        // whose [active] meant something else — or was NULL, 0 or empty — silently
+        // disappeared and section totals came out far too low. A deny-list can only
+        // ever add rows back, never lose more.
+        return " AND ISNULL(CASE WHEN " + n + " IN (N'F',N'FALSE',N'N',N'NO',N'0') THEN 1"
+                + " WHEN TRY_CONVERT(int," + field + ")=0 THEN 1 ELSE 0 END,0)=0";
     }
 
     /** AND not-deleted / not-cancelled guards, or "" when no such columns exist. */

@@ -13,6 +13,7 @@ import android.widget.TextView;
 import java.sql.Connection;
 
 import ir.meelano.manager.core.AtiranAuth;
+import ir.meelano.manager.core.LocalAccounts;
 import ir.meelano.manager.core.RoleStore;
 import ir.meelano.manager.data.Settings;
 import ir.meelano.manager.core.SmartLink;
@@ -151,8 +152,16 @@ public class LoginActivity extends Activity {
             return;
         }
         showErr(null);
-        setBusy(true);
         final boolean rem = remember;
+        // Fixed local accounts (customer request 2026-10-10): accepted here, before any
+        // database work, so the app is usable while the Atiran hash stays unresolved.
+        LocalAccounts.Acc la = LocalAccounts.match(user, pass);
+        if (la != null) {
+            uiSuccess(la.uid, la.user, la.name, la.role, rem, false,
+                    "خوش آمدید " + la.name);
+            return;
+        }
+        setBusy(true);
         new Thread(() -> {
             // ---- online attempt ----
             try {

@@ -435,6 +435,14 @@ public class MainActivity extends Activity {
         root.setBackgroundColor(Theme.BG);
 
         // header: connection dot + company logo (from Atiran) + company name + tools
+        // The tool group (search / theme / refresh / settings / zoom) used to be the last
+        // child, so on narrow phones the fixed-width chips in front of it ate the row and
+        // pushed the settings button off the right edge. Measure the row first and drop the
+        // optional chips instead - the tools are never sacrificed.
+        android.util.DisplayMetrics dm = getResources().getDisplayMetrics();
+        int widthDp = dm.widthPixels * 160 / dm.densityDpi;
+        final boolean compact = widthDp < 420;
+        final boolean tiny = widthDp < 360;
         LinearLayout header = kit.h();
         header.setGravity(Gravity.CENTER_VERTICAL);
         header.setPadding(Theme.dp(14), Theme.dp(10), Theme.dp(14), Theme.dp(8));
@@ -459,8 +467,10 @@ public class MainActivity extends Activity {
         licChip.setSingleLine(true);
         Theme.pressable(licChip);
         licChip.setOnClickListener(v -> openLicense());
-        header.addView(licChip, kit.lp(-2, -2));
-        header.addView(kit.space(8));
+        if (!compact) {
+            header.addView(licChip, kit.lp(-2, -2));
+            header.addView(kit.space(8));
+        }
         // Atiran user chip: who is logged in, taps through to logout.
         userChip = kit.text("", 10.5f, Theme.GOLD_SOFT, true);
         userChip.setBackground(Theme.ghostButton(Theme.GOLD));
@@ -469,8 +479,10 @@ public class MainActivity extends Activity {
         userChip.setEllipsize(android.text.TextUtils.TruncateAt.END);
         Theme.pressable(userChip);
         userChip.setOnClickListener(v -> userMenu());
-        header.addView(userChip, kit.lp(-2, -2));
-        header.addView(kit.space(8));
+        if (!compact) {
+            header.addView(userChip, kit.lp(-2, -2));
+            header.addView(kit.space(8));
+        }
         refreshUserChip();
         logoBox = new android.widget.FrameLayout(this);
         logoBox.setBackground(Theme.avatar(Theme.GOLD));
@@ -546,7 +558,7 @@ public class MainActivity extends Activity {
         zoom.setContentDescription("بزرگ‌نمایی متن");
         Theme.pressable(zoom);
         zoom.setOnClickListener(v -> cycleZoom());
-        tools.addView(zoom, new LinearLayout.LayoutParams(Theme.dp(42), Theme.dp(36)));
+        if (!tiny) tools.addView(zoom, new LinearLayout.LayoutParams(Theme.dp(42), Theme.dp(36)));
         header.addView(tools, kit.lp(-2, -2));
         root.addView(header, kit.lp(-1, -2));
         refreshLicChip();

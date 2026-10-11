@@ -158,7 +158,9 @@ public final class Settings {
     // ---------------- luxury theme ----------------
     /** "dark" (Midnight Gold) or "light" (Ivory Royal). */
     public String themeMode() {
-        String m = p.getString("theme_mode", "dark");
+        // v37: light is the default theme. The dark palette stays available and is
+        // switched to from the header toggle or Settings.
+        String m = p.getString("theme_mode", "light");
         return "light".equals(m) ? "light" : "dark";
     }
 

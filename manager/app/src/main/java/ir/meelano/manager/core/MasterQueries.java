@@ -1800,4 +1800,96 @@ public final class MasterQueries {
                 + buyAgg + ", " + pishAgg
                 + " FROM dbo.CUSTOMERS c ORDER BY buySum DESC");
     }
+
+    // =====================================================================================
+    // RETURNS (برگشتی) — dbo.back_sanad, typed by dbo.back_sanad_kind.
+    //
+    // Every column is resolved at run time against the customer's own schema and the
+    // query throws Missing when the structure is not there. Never guess a column name:
+    // a wrong one silently returns zero and reads as "no returns", which is a lie.
+    // =====================================================================================
+    private static final class RetCols {
+        String kind, no, amount, date, customer, desc;
+    }
+
+    private static RetCols retCols(Meta m) throws Queries.Missing {
+        if (!m.table("back_sanad"))
+            throw new Queries.Missing("جدول اسناد برگشتی (back_sanad) در این پایگاه داده وجود ندارد");
+        RetCols r = new RetCols();
+        r.kind = m.must("back_sanad", "نوع سند برگشتی", "kind");
+        r.no = m.colFlex("back_sanad", "shomare", "shfac", "rdf", "shomareh", "code");
+        r.amount = m.colFlex("back_sanad", "mab", "mablagh", "all", "total", "price", "amount", "value");
+        r.date = m.colFlex("back_sanad", "date_", "date", "tarikh", "done_date", "donedate", "TaeedDate");
+        r.customer = m.colFlex("back_sanad", "moname", "customer_name", "moshtari", "shmo");
+        r.desc = m.colFlex("back_sanad", "tozih", "sharh", "description", "act_dis", "tozihat");
+        if (r.amount == null)
+            throw new Queries.Missing("ستون مبلغ در جدول اسناد برگشتی (back_sanad) پیدا نشد");
+        return r;
+    }
+
+    /**
+     * Join dbo.back_sanad_kind so the type shows its Persian name instead of a raw code.
+     * Returns {label, from} — the join fragment may be "" when the lookup table is absent.
+     */
+    private static String[] retKindJoin(Meta m, RetCols r) {
+        String fallback = Sql.txt("h", r.kind, 80);
+        if (!m.table("back_sanad_kind")) return new String[]{fallback, ""};
+        String kid = m.colFlex("back_sanad_kind", "id", "rdf", "code", "kind");
+        String knm = m.colFlex("back_sanad_kind", "name", "onvan", "sharh", "tozih", "title", "kind_name");
+        if (kid == null || knm == null) return new String[]{fallback, ""};
+        String join = " LEFT JOIN dbo.[back_sanad_kind] k ON LTRIM(RTRIM(TRY_CONVERT(nvarchar(60),k.["
+                + kid + "]))) = LTRIM(RTRIM(TRY_CONVERT(nvarchar(60),h.[" + r.kind + "])))";
+        String label = "COALESCE(NULLIF(LTRIM(RTRIM(" + Sql.txt("k", knm, 150) + ")),N''), " + fallback + ")";
+        return new String[]{label, join};
+    }
+
+    /** Returns grouped by document type: document count + total amount, best for a donut. */
+    public static Queries.Q returnsByKind(Meta m, Filter f) throws Queries.Missing {
+        RetCols r = retCols(m);
+        String[] kj = retKindJoin(m, r);
+        List<Object> binds = new ArrayList<>();
+        String dc = r.date == null ? "" : Sql.dateCond(Sql.date10("h", r.date), f.from, f.to, binds);
+        String where = dc.isEmpty() ? "" : " WHERE " + dc;
+        return new Queries.Q("SELECT " + kj[0] + " AS label, COUNT_BIG(1) AS docs"
+                + ", ISNULL(SUM(" + Sql.num("h", r.amount) + "),0) AS total"
+                + " FROM dbo.[back_sanad] h" + kj[1] + where
+                + " GROUP BY " + kj[0]
+                + " ORDER BY 3 DESC", binds);
+    }
+
+    /** The return documents themselves, newest first. */
+    public static Queries.Q returnsList(Meta m, Filter f) throws Queries.Missing {
+        RetCols r = retCols(m);
+        String[] kj = retKindJoin(m, r);
+        List<Object> binds = new ArrayList<>();
+        List<String> conds = new ArrayList<>();
+        if (r.date != null) {
+            String dc = Sql.dateCond(Sql.date10("h", r.date), f.from, f.to, binds);
+            if (!dc.isEmpty()) conds.add(dc);
+        }
+        if (f.search != null && !f.search.trim().isEmpty()) {
+            List<String> exprs = new ArrayList<>();
+            if (r.no != null) exprs.add(Sql.txt("h", r.no, 80));
+            if (r.customer != null) exprs.add(Sql.txt("h", r.customer, 250));
+            if (r.desc != null) exprs.add(Sql.txt("h", r.desc, 500));
+            if (!exprs.isEmpty()) {
+                binds.add("%" + f.search.trim() + "%");
+                List<String> likes = new ArrayList<>();
+                for (String e : exprs) likes.add(e + " LIKE ?");
+                conds.add("(" + Sql.join(likes, " OR ") + ")");
+            }
+        }
+        String where = conds.isEmpty() ? "" : " WHERE " + Sql.join(conds, " AND ");
+        String no = r.no == null ? "CAST(NULL AS nvarchar(80))" : Sql.txt("h", r.no, 80);
+        String dt = r.date == null ? "CAST(NULL AS nvarchar(20))" : Sql.date10("h", r.date);
+        String cu = r.customer == null ? "CAST(NULL AS nvarchar(150))" : Sql.txt("h", r.customer, 150);
+        String dz = r.desc == null ? "CAST(NULL AS nvarchar(300))" : Sql.txt("h", r.desc, 300);
+        String orderBy = r.date == null ? kj[0] : Sql.date10("h", r.date) + " DESC, " + kj[0];
+        return new Queries.Q("SELECT " + no + " AS no, " + dt + " AS date, " + kj[0] + " AS kind"
+                + ", " + cu + " AS customer, " + Sql.num("h", r.amount) + " AS total, " + dz + " AS descr"
+                + " FROM dbo.[back_sanad] h" + kj[1] + where
+                + " ORDER BY " + orderBy
+                + Queries.pageClause(binds, f.page, f.top), binds);
+    }
+
 }

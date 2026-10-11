@@ -62,6 +62,8 @@ public class HomeScreen extends Screen {
         List<Row> saleState = new ArrayList<>();
         /** Purchase invoices split the same way. */
         List<Row> buyState = new ArrayList<>();
+        /** Return documents (اسناد برگشتی) of the last 30 days, grouped by type. */
+        List<Row> returns = new ArrayList<>();
         Map<String, String> notes = new LinkedHashMap<>();
     }
 
@@ -95,6 +97,10 @@ public class HomeScreen extends Screen {
             String stFrom = Jalali.addDays(to, -29);
             d.saleState = soft(d.notes, "وضعیت فروش", () -> Repo.exec(c, Queries.factorStatusSummary(m, true, stFrom, to)));
             d.buyState = soft(d.notes, "وضعیت خرید", () -> Repo.exec(c, Queries.factorStatusSummary(m, false, stFrom, to)));
+            Filter rf = new Filter();
+            rf.from = stFrom;
+            rf.to = to;
+            d.returns = soft(d.notes, "برگشتی", () -> Repo.exec(c, MasterQueries.returnsByKind(m, rf)));
             if (d.salesDay == null && d.inDay == null && d.custSum == null && d.buyDay == null && d.outDay == null)
                 throw new Exception(firstNote(d.notes));
             return d;
@@ -240,6 +246,7 @@ public class HomeScreen extends Screen {
             else if ("visitors".equals(key)) secVisitors(content, d);
             else if ("due".equals(key)) secDue(content, d);
             else if ("invstatus".equals(key)) secInvStatus(content, d);
+            else if ("returns".equals(key)) secReturns(content, d);
             else if ("eod".equals(key)) secEod(content);
             else if ("shortcuts".equals(key)) secShortcuts(content, d);
         }
@@ -249,7 +256,7 @@ public class HomeScreen extends Screen {
     /** Dashboard order from settings; unknown keys dropped, missing sections appended. */
     private List<String> orderedKeys() {
         List<String> out = new ArrayList<>();
-        String[] known = {"kpis", "alerts", "trend", "donut", "debtors", "visitors", "due", "invstatus", "eod", "shortcuts"};
+        String[] known = {"kpis", "alerts", "trend", "donut", "debtors", "visitors", "due", "invstatus", "returns", "eod", "shortcuts"};
         for (String k : a.settings.homeOrder().split(",")) {
             String t = k == null ? "" : k.trim();
             if (!t.isEmpty() && !out.contains(t)) {
@@ -329,6 +336,42 @@ public class HomeScreen extends Screen {
                 ? Money.fa(String.valueOf(pendingN)) + " فاکتور تأییدنشده (" + Money.compactMoney(pendingSum) + ")"
                 : "همه تأیید شده‌اند");
         c.addView(a.kit.kv(txt, pendingN > 0 ? "نیاز به بررسی" : "✓", col), a.kit.lp(-1, -2));
+    }
+
+    /**
+     * Return documents of the last 30 days. dbo.back_sanad is the ledger of goods
+     * moving back — out of the warehouse, back from a customer, and so on — so a
+     * sudden rise here is a quality or logistics problem long before it shows up
+     * in the profit figures.
+     */
+    private void secReturns(LinearLayout content, Data d) {
+        LinearLayout c = a.kit.card(Theme.DANGER);
+        c.addView(a.kit.sectionHead("برگشتی‌های ۳۰ روز اخیر", "گزارش ›", v -> a.nav("reports")),
+                a.kit.lp(-1, -2));
+        long n = 0;
+        double sum = 0;
+        if (d.returns != null) {
+            for (Row r : d.returns) {
+                n += r.l("docs");
+                sum += r.d("total");
+            }
+        }
+        if (n == 0) {
+            c.addView(a.kit.kv("هیچ سند برگشتی در این بازه ثبت نشده", "✓", Theme.SUCCESS), a.kit.lp(-1, -2));
+        } else {
+            c.addView(a.kit.kv(Money.fa(String.valueOf(n)) + " سند برگشتی",
+                    Money.compactMoney(sum), Theme.DANGER), a.kit.lp(-1, -2));
+            int shown = 0;
+            for (Row r : d.returns) {
+                if (shown++ >= 3) break;
+                String label = r.s("label");
+                if (label == null || label.trim().isEmpty()) continue;
+                c.addView(a.kit.kv(label,
+                        Money.fa(String.valueOf(r.l("docs"))) + " سند • " + Money.compactMoney(r.d("total")),
+                        Theme.TEXT), a.kit.lp(-1, -2));
+            }
+        }
+        a.kit.addCard(content, c);
     }
 
     private void secTrend(LinearLayout content, Data d) {

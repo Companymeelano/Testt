@@ -388,6 +388,7 @@ public class SettingsScreen extends Screen {
                 {"due", "سررسید چک‌ها"},
                 {"eod", "جمع‌بندی پایان روز"},
                 {"invstatus", "وضعیت فاکتورها"},
+                {"returns", "برگشتی‌ها"},
                 {"shortcuts", "دسترسی سریع"},
         };
         final java.util.List<String> order = new java.util.ArrayList<>();

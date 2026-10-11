@@ -248,6 +248,17 @@ public final class ReportCatalog {
                     new Col[]{c("no", "شماره", T_TEXT), c("date", "تاریخ", T_DATE), c("customer", "طرف‌حساب", T_TEXT),
                             c("total", "مبلغ", T_MONEY), c("paid", "پرداختی", T_MONEY), c("remain", "مانده", T_MONEY)},
                     C_NONE, null, null),
+            s("returns_by_kind", "برگشتی‌ها بر اساس نوع", "برگشتی و ابطالی",
+                    "اسناد برگشتی به تفکیک نوع سند — تعداد و جمع مبلغ هر نوع (خروجیِ انبار، برگشت از مشتری و …)", true,
+                    new Col[]{c("label", "نوع برگشت", T_TEXT), c("docs", "تعداد سند", T_NUM),
+                            c("total", "جمع مبلغ", T_MONEY)},
+                    C_DONUT, "label", "total"),
+            s("returns_list", "فهرست اسناد برگشتی", "برگشتی و ابطالی",
+                    "ریز اسناد برگشتی با شماره، تاریخ، نوع، مشتری و توضیح", true,
+                    new Col[]{c("no", "شماره", T_TEXT), c("date", "تاریخ", T_DATE),
+                            c("kind", "نوع", T_TEXT), c("customer", "مشتری", T_TEXT),
+                            c("total", "مبلغ", T_MONEY), c("descr", "توضیح", T_TEXT)},
+                    C_NONE, null, null),
             // ---- بانک ----
             s("bank_turnover", "گردش بانک‌ها", "بانک و صندوق", "ورودی/خروجی هر حساب بانکی در بازه", true,
                     new Col[]{c("bank", "بانک", T_TEXT), c("in", "ورودی", T_MONEY), c("out", "خروجی", T_MONEY), c("count", "سند", T_NUM)},
@@ -308,6 +319,8 @@ public final class ReportCatalog {
         if ("profit_costs".equals(id)) return MasterQueries.profitCosts(m, ff);
         if ("sales_notconfirmed".equals(id)) { ff.status = "not_confirmed"; return Queries.factorList(m, true, ff); }
         if ("buy_notconfirmed".equals(id)) { ff.status = "not_confirmed"; return Queries.factorList(m, false, ff); }
+        if ("returns_by_kind".equals(id)) return MasterQueries.returnsByKind(m, ff);
+        if ("returns_list".equals(id)) return MasterQueries.returnsList(m, ff);
         if ("bank_turnover".equals(id)) return MasterQueries.bankTurnover(m, ff);
         if ("cows".equals(id)) return MasterQueries.cowList(m);
         if ("fleeing_customers".equals(id)) return MasterQueries.fleeingCustomers(m, ff);

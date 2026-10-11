@@ -87,6 +87,8 @@ public class ReportsScreen extends Screen {
         if ("بانک و صندوق".equals(section)) return Theme.INFO;
         if ("کاربران و نظارت".equals(section)) return Theme.STEEL;
         if ("هوشمند".equals(section)) return Theme.TEAL;
+        if ("هزینه‌ها".equals(section)) return Theme.ROSE;
+        if ("برگشتی و ابطالی".equals(section)) return Theme.DANGER;
         return Theme.MUTED;
     }
 
@@ -103,6 +105,8 @@ public class ReportsScreen extends Screen {
         if ("بانک و صندوق".equals(section)) return R.drawable.mi_account_balance;
         if ("کاربران و نظارت".equals(section)) return R.drawable.mi_admin_panel_settings;
         if ("هوشمند".equals(section)) return R.drawable.mi_lightbulb;
+        if ("هزینه‌ها".equals(section)) return R.drawable.mi_trending_down;
+        if ("برگشتی و ابطالی".equals(section)) return R.drawable.mi_assignment_return;
         return R.drawable.mi_widgets;
     }
 

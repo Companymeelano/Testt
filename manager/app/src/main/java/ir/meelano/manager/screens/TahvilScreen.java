@@ -7,6 +7,7 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 
 import ir.meelano.manager.MainActivity;
+import ir.meelano.manager.R;
 import ir.meelano.manager.ShareProvider;
 import ir.meelano.manager.core.AtiranAuth;
 import ir.meelano.manager.core.Jalali;
@@ -239,6 +240,73 @@ public class TahvilScreen extends Screen {
         });
     }
 
+    // ------------------------------------------------------------------
+    // Invoice-line picker.
+    //
+    // The whole row is the tap target, not a 20dp checkbox: the warehouse
+    // keeper is usually standing, often in a hurry and sometimes gloved, and
+    // a small hit area turns "tick the items" into a source of wrong
+    // deliveries. A 56dp card with the state carried by colour as well as by
+    // the tick is readable at arm's length.
+    // ------------------------------------------------------------------
+    private View pickRow(final Row it, boolean on, View.OnClickListener toggle) {
+        int accent = on ? Theme.SUCCESS : Theme.MUTED;
+        LinearLayout row = a.kit.h();
+        row.setBackground(pickBg(on));
+        row.setPadding(Theme.dp(12), Theme.dp(10), Theme.dp(12), Theme.dp(10));
+        row.setMinimumHeight(Theme.dp(56));
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        row.setClickable(true);
+        row.setFocusable(true);
+        row.setOnClickListener(toggle);
+        Theme.pressable(row);
+
+        android.widget.ImageView tick = new android.widget.ImageView(a);
+        tick.setImageResource(on ? R.drawable.mi_task_alt : R.drawable.mi_radio_button_unchecked);
+        tick.setColorFilter(accent);
+        tick.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+        int d = Theme.dp(26);
+        row.addView(tick, new LinearLayout.LayoutParams(d, d));
+        row.addView(a.kit.space(10));
+
+        LinearLayout mid = a.kit.v();
+        String name = it.s("name");
+        android.widget.TextView nm = a.kit.text(name.isEmpty() ? "کالا" : name,
+                14f, on ? Theme.TEXT : Theme.MUTED, true);
+        nm.setSingleLine(true);
+        nm.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        mid.addView(nm, a.kit.lp(-1, -2));
+        String unit = it.s("unit");
+        android.widget.TextView mt = a.kit.text(unit.isEmpty() ? "بدون واحد" : unit,
+                11.5f, on ? Theme.SUCCESS : Theme.MUTED, false);
+        mt.setSingleLine(true);
+        mid.addView(mt, a.kit.lp(-1, -2));
+        row.addView(mid, a.kit.wlp(1f));
+
+        String qty = it.s("qty");
+        if (!qty.isEmpty()) {
+            row.addView(a.kit.space(8));
+            row.addView(a.kit.pill(Money.fa(qty), accent), a.kit.lp(-2, -2));
+        }
+        return row;
+    }
+
+    private android.graphics.drawable.GradientDrawable pickBg(boolean on) {
+        android.graphics.drawable.GradientDrawable g = new android.graphics.drawable.GradientDrawable();
+        g.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+        g.setCornerRadius(Theme.dp(12));
+        g.setStroke(Math.max(1, Theme.dp(on ? 1.6f : 1f)), on ? Theme.SUCCESS : Theme.MUTED);
+        // رنگِ پرکننده از خودِ Theme مشتق می‌شود تا با تغییرِ پوست هماهنگ بماند
+        g.setColor(on ? ((Theme.SUCCESS & 0x00FFFFFF) | 0x1A000000) : 0x00000000);
+        return g;
+    }
+
+    private LinearLayout.LayoutParams itemRowLp() {
+        LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
+        p.setMargins(0, 0, 0, Theme.dp(8));
+        return p;
+    }
+
     private void handoverDialog(final Row f, final List<Row> items) {
         LinearLayout body = a.kit.v();
         body.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(16));
@@ -253,37 +321,32 @@ public class TahvilScreen extends Screen {
         for (int x = 0; x < marked.length; x++) marked[x] = true;
 if (!items.isEmpty()) {
             LinearLayout head = a.kit.h();
-            head.addView(a.kit.text("اقلام فاکتور (علامت بزنید)", 13f, Theme.TEXT, true),
+            head.addView(a.kit.text("اقلام فاکتور (برای تغییر لمس کنید)", 13f, Theme.TEXT, true),
                     a.kit.wlp(1f));
-            final TextView tally = a.kit.text("", 12f, Theme.MUTED, false);
+            final TextView tally = a.kit.text("", 11.5f, Theme.SUCCESS, true);
             head.addView(tally, a.kit.lp(-2, -2));
             body.addView(head, a.kit.lp(-1, -2));
             final LinearLayout itemBox = a.kit.v();
+            // نگه‌دارنده برای خود-ارجاعی: یک متغیر محلی نمی‌تواند در مقداردهیِ خودش خوانده شود
+            final Runnable[] paintRef = new Runnable[1];
             final Runnable repaint = () -> {
                 itemBox.removeAllViews();
                 for (int x = 0; x < items.size(); x++) {
                     final int idx = x;
-                    final Row it = items.get(x);
-                    String qty = it.s("qty");
-                    String unit = it.s("unit");
-                    String label = it.s("name")
-                            + (qty.isEmpty() ? "" : "  × " + Money.fa(qty))
-                            + (unit.isEmpty() ? "" : " " + unit);
-                    android.widget.CheckBox cb = new android.widget.CheckBox(a);
-                    cb.setChecked(marked[idx]);
-                    cb.setText(label);
-                    cb.setTextColor(Theme.TEXT);
-                    cb.setTextSize(13f * Theme.fontScale() * Theme.typeScale());
-                    cb.setTypeface(Theme.face(false));
-                    try { cb.setLayoutDirection(View.LAYOUT_DIRECTION_RTL); } catch (Exception ignored) { }
-                    cb.setOnCheckedChangeListener((btn, on) -> marked[idx] = on);
-                    itemBox.addView(cb, a.kit.lp(-1, -2));
+                    itemBox.addView(pickRow(items.get(x), marked[idx], v -> {
+                        marked[idx] = !marked[idx];
+                        paintRef[0].run();
+                    }), itemRowLp());
                 }
                 int n = 0;
                 for (boolean bb : marked) if (bb) n++;
                 tally.setText(Money.fa(String.valueOf(n)) + " از "
                         + Money.fa(String.valueOf(items.size())));
+                // رنگِ شمارنده وضعیت را می‌گوید: کامل، ناقص، یا خالی
+                tally.setTextColor(n == 0 ? Theme.WARNING
+                        : (n == items.size() ? Theme.SUCCESS : Theme.INFO));
             };
+            paintRef[0] = repaint;
             repaint.run();
             body.addView(itemBox, a.kit.lp(-1, -2));
             LinearLayout allRow = a.kit.h();

@@ -40,8 +40,22 @@ public final class MoneyQueries {
         return d;
     }
 
-    private static String darTotal(String a, Dar d) {
-        return "(" + Sql.num(a, d.cash) + "+" + Sql.num(a, d.pos) + "+" + Sql.num(a, d.havaleh) + "+" + Sql.num(a, d.cheque) + ")";
+    /**
+     * Receipt / payment amount.
+     *
+     * Atiran's own Daryaft procedure stores the voucher total in dar.mab, and that is the
+     * number Atiran itself shows. Summing the four components (cash + POS + transfer +
+     * cheques) agrees with it for receipts written through this app, but receipts entered
+     * directly in Atiran can also carry a discount (tafif) or OtherPrice, and then the sum
+     * of components no longer matches the booked total. Prefer mab, fall back to the sum.
+     */
+    private static String darTotal(String a, Dar d, Meta m) {
+        String parts = Sql.num(a, d.cash) + "+" + Sql.num(a, d.pos) + "+"
+                + Sql.num(a, d.havaleh) + "+" + Sql.num(a, d.cheque);
+        String mab = m.col("dar", "mab", "Mab", "MAB");
+        if (mab == null) return "(" + parts + ")";
+        String ref = (a == null || a.trim().isEmpty()) ? "[" + mab + "]" : a + ".[" + mab + "]";
+        return "COALESCE(TRY_CONVERT(decimal(19,2)," + ref + "),(" + parts + "))";
     }
 
     private static String darKindExpr(Meta m, String a, Dar d) {
@@ -68,7 +82,7 @@ public final class MoneyQueries {
         List<Object> binds = new ArrayList<>();
         binds.add(p);
         binds.add(day);
-        String sql = "SELECT " + Sql.lit(day) + " AS d, ISNULL(SUM(" + darTotal("h", d) + "),0) AS total"
+        String sql = "SELECT " + Sql.lit(day) + " AS d, ISNULL(SUM(" + darTotal("h", d, m) + "),0) AS total"
                 + ", ISNULL(SUM(" + Sql.num("h", d.cash) + "),0) AS cash"
                 + ", ISNULL(SUM(" + Sql.num("h", d.pos) + "),0) AS pos"
                 + ", ISNULL(SUM(" + Sql.num("h", d.havaleh) + "),0) AS havaleh"
@@ -86,7 +100,7 @@ public final class MoneyQueries {
         List<Object> binds = new ArrayList<>();
         binds.add(p);
         binds.add(day == null ? "" : day);
-        String sql = "SELECT " + Sql.lit(day == null ? "" : day) + " AS d, ISNULL(SUM(" + darTotal("h", d) + "),0) AS total"
+        String sql = "SELECT " + Sql.lit(day == null ? "" : day) + " AS d, ISNULL(SUM(" + darTotal("h", d, m) + "),0) AS total"
                 + ", COUNT_BIG(1) AS count FROM dbo.dar h WHERE h.[p]=?"
                 + " AND " + Sql.dateKey(Sql.date10("h", d.date)) + "=?"
                 + Sql.activeAnd(cols, "h") + Sql.softAnd(cols, "h");
@@ -114,7 +128,7 @@ public final class MoneyQueries {
         String dc = Sql.dateCond(Sql.date10("h", d.date), from, to, binds);
         if (!dc.isEmpty()) conds.add(dc);
         String day = Sql.dateKey(Sql.date10("h", d.date));
-        return new Queries.Q("SELECT " + day + " AS day, ISNULL(SUM(" + darTotal("h", d) + "),0) AS total"
+        return new Queries.Q("SELECT " + day + " AS day, ISNULL(SUM(" + darTotal("h", d, m) + "),0) AS total"
                 + ", COUNT_BIG(1) AS count FROM dbo.dar h WHERE " + Sql.join(conds, " AND ")
                 + Sql.activeAnd(cols, "h") + Sql.softAnd(cols, "h") + " GROUP BY " + day + " ORDER BY " + day, binds);
     }
@@ -129,7 +143,7 @@ public final class MoneyQueries {
         conds.add("h.[p]=?");
         String dc = Sql.dateCond(Sql.date10("h", d.date), f.from, f.to, binds);
         if (!dc.isEmpty()) conds.add(dc);
-        return new Queries.Q("SELECT ISNULL(SUM(" + darTotal("h", d) + "),0) AS total"
+        return new Queries.Q("SELECT ISNULL(SUM(" + darTotal("h", d, m) + "),0) AS total"
                 + ", ISNULL(SUM(" + Sql.num("h", d.cash) + "),0) AS cash"
                 + ", ISNULL(SUM(" + Sql.num("h", d.pos) + "),0) AS pos"
                 + ", ISNULL(SUM(" + Sql.num("h", d.havaleh) + "),0) AS havaleh"
@@ -165,7 +179,7 @@ public final class MoneyQueries {
                 + ", " + Sql.date10("h", d.date) + " AS date"
                 + ", " + (d.shmo == null ? "CAST(NULL AS nvarchar(100))" : Sql.txt("h", d.shmo, 100)) + " AS code"
                 + ", " + Queries.custNameExpr(m, "h", d.shmo, "cu") + " AS customer"
-                + ", " + darTotal("h", d) + " AS total"
+                + ", " + darTotal("h", d, m) + " AS total"
                 + ", " + Sql.num("h", d.cash) + " AS cash, " + Sql.num("h", d.pos) + " AS pos"
                 + ", " + Sql.num("h", d.havaleh) + " AS havaleh, " + Sql.num("h", d.cheque) + " AS cheque"
                 + ", " + (d.chkCount == null ? "CAST(0 AS int)" : "TRY_CONVERT(int,h.[" + d.chkCount + "])") + " AS chkCount"
@@ -193,7 +207,7 @@ public final class MoneyQueries {
                 + ", " + (d.done == null ? "CAST(NULL AS nvarchar(10))" : Sql.date10("h", d.done)) + " AS doneDate"
                 + ", " + (d.shmo == null ? "CAST(NULL AS nvarchar(100))" : Sql.txt("h", d.shmo, 100)) + " AS code"
                 + ", " + Queries.custNameExpr(m, "h", d.shmo, "cu") + " AS customer"
-                + ", " + darTotal("h", d) + " AS total"
+                + ", " + darTotal("h", d, m) + " AS total"
                 + ", " + Sql.num("h", d.cash) + " AS cash, " + Sql.num("h", d.pos) + " AS pos"
                 + ", " + Sql.num("h", d.havaleh) + " AS havaleh, " + Sql.num("h", d.cheque) + " AS cheque"
                 + ", " + (d.chkCount == null ? "CAST(0 AS int)" : "TRY_CONVERT(int,h.[" + d.chkCount + "])") + " AS chkCount"
@@ -318,7 +332,7 @@ public final class MoneyQueries {
         List<String> parts = new ArrayList<>();
         if (d.shfac != null) {
             parts.add("SELECT " + Sql.txt("dr", d.ghno, 60) + " AS ghno, " + Sql.date10("dr", d.date) + " AS date"
-                    + ", " + darTotal("dr", d) + " AS total, CAST(0 AS decimal(19,2)) AS settled"
+                    + ", " + darTotal("dr", d, m) + " AS total, CAST(0 AS decimal(19,2)) AS settled"
                     + " FROM dbo.dar dr WHERE dr.[p]=? AND TRY_CONVERT(nvarchar(80),dr.[" + d.shfac + "])=?"
                     + " AND NULLIF(TRY_CONVERT(nvarchar(80),dr.[" + d.shfac + "]),N'0') IS NOT NULL");
             binds.add(p);
@@ -326,7 +340,7 @@ public final class MoneyQueries {
         }
         if (multiGh != null && multiNo != null && m.table(multi)) {
             parts.add("SELECT " + Sql.txt("dr", d.ghno, 60) + " AS ghno, " + Sql.date10("dr", d.date) + " AS date"
-                    + ", " + darTotal("dr", d) + " AS total, " + Sql.num("mf", multiPrice) + " AS settled"
+                    + ", " + darTotal("dr", d, m) + " AS total, " + Sql.num("mf", multiPrice) + " AS settled"
                     + " FROM dbo.[" + multi + "] mf JOIN dbo.dar dr"
                     + " ON TRY_CONVERT(nvarchar(60),dr.[" + d.ghno + "])=TRY_CONVERT(nvarchar(60),mf.[" + multiGh + "]) AND dr.[p]=?"
                     + " WHERE TRY_CONVERT(nvarchar(80),mf.[" + multiNo + "])=?");

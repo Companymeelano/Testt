@@ -98,14 +98,14 @@ public final class Sql {
         if (c == null) return "";
         String p = alias == null || alias.trim().isEmpty() ? "" : alias + ".";
         String field = p + q(c);
+        // Atiran's own procedures are the reference here, and they are strict:
+        //   dbo.dar      -> "WHERE p=0 AND Active = 1"   (integer 1)
+        //   dbo.sailfact -> "WHERE active = 't'"          (text 't')
+        // So a row counts ONLY on a positive active marker. An earlier change relaxed this
+        // into a deny-list, which let NULL / 0 / unexpected values through and would have
+        // counted deleted vouchers as real money. Restored deliberately.
         String n = "UPPER(LTRIM(RTRIM(TRY_CONVERT(nvarchar(20)," + field + "))))";
-        // Keep the row unless there is *positive* evidence that it is inactive.
-        // It used to be an allow-list (only 'T/TRUE/Y/YES/1' survived), so every row
-        // whose [active] meant something else — or was NULL, 0 or empty — silently
-        // disappeared and section totals came out far too low. A deny-list can only
-        // ever add rows back, never lose more.
-        return " AND ISNULL(CASE WHEN " + n + " IN (N'F',N'FALSE',N'N',N'NO',N'0') THEN 1"
-                + " WHEN TRY_CONVERT(int," + field + ")=0 THEN 1 ELSE 0 END,0)=0";
+        return " AND (" + n + " IN (N'T',N'TRUE',N'Y',N'YES',N'1') OR TRY_CONVERT(int," + field + ")=1)";
     }
 
     /** AND not-deleted / not-cancelled guards, or "" when no such columns exist. */

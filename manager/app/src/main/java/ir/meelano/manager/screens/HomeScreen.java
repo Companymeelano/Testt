@@ -47,6 +47,7 @@ public class HomeScreen extends Screen {
     public int accent() { return Theme.GOLD; }
 
     private static final class Data {
+        String snapshotDay = "";
         Row salesDay = new Row();
         Row buyDay = new Row();
         Row inDay = new Row();
@@ -87,6 +88,7 @@ public class HomeScreen extends Screen {
             d.debtors = soft(d.notes, "بدهکاران", () -> Repo.exec(c, Queries.topDebtors(m, 5)));
             d.overdue = soft(d.notes, "معوق‌ها", () -> Repo.exec(c, Queries.overdueInvoices(m, 5)));
             final String to = Jalali.todayStr();
+            d.snapshotDay = to;
             // 31 calendar days let the executive overview compare today against
             // yesterday plus rolling 7- and 30-day baselines; the chart itself stays 14 days.
             final String from = Jalali.addDays(to, -30);
@@ -146,7 +148,7 @@ public class HomeScreen extends Screen {
         });
     }
 
-    // ---------------- offline cache (manager cues, top items and timestamp) ----------------
+    // ---------------- offline cache (manager cues, top items, sales history and timestamp) ----------------
     private void saveCache(Data d) {
         try {
             Calendar c = Calendar.getInstance();
@@ -154,6 +156,7 @@ public class HomeScreen extends Screen {
                     c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE));
             StringBuilder s = new StringBuilder("ts=")
                     .append(esc(a.kit.todayLine() + " ساعت " + hm))
+                    .append("|sd=").append(esc(d.snapshotDay))
                     .append("|sales=").append(rowStr(d.salesDay))
                     .append("|buy=").append(rowStr(d.buyDay))
                     .append("|in=").append(rowStr(d.inDay))
@@ -162,6 +165,10 @@ public class HomeScreen extends Screen {
             if (d.topItems != null) {
                 for (int i = 0; i < Math.min(5, d.topItems.size()); i++)
                     s.append("|top").append(i).append('=').append(rowStr(d.topItems.get(i)));
+            }
+            if (d.salesDaily != null) {
+                for (int i = 0; i < Math.min(31, d.salesDaily.size()); i++)
+                    s.append("|trend").append(i).append('=').append(rowStr(d.salesDaily.get(i)));
             }
             a.settings.saveHomeCache(s.toString());
             pokeWidget();
@@ -197,12 +204,14 @@ public class HomeScreen extends Screen {
                 String k = part.substring(0, eq);
                 String v = part.substring(eq + 1);
                 if ("ts".equals(k)) tsOut[0] = unesc(v);
+                else if ("sd".equals(k)) d.snapshotDay = unesc(v);
                 else if ("sales".equals(k)) { d.salesDay = rowFrom(v); any = true; }
                 else if ("buy".equals(k)) { d.buyDay = rowFrom(v); any = true; }
                 else if ("in".equals(k)) { d.inDay = rowFrom(v); any = true; }
                 else if ("out".equals(k)) { d.outDay = rowFrom(v); any = true; }
                 else if ("cust".equals(k)) { d.custSum = rowFrom(v); any = true; }
                 else if (k.matches("top[0-4]")) { d.topItems.add(rowFrom(v)); any = true; }
+                else if (k.matches("trend(?:[0-9]|[12][0-9]|30)")) { d.salesDaily.add(rowFrom(v)); any = true; }
             }
             return any ? d : null;
         } catch (Exception e) {
@@ -242,6 +251,17 @@ public class HomeScreen extends Screen {
     private String firstNote(Map<String, String> notes) {
         for (String v : notes.values()) return v;
         return "داده‌ای دریافت نشد";
+    }
+
+    private String snapshotDay(Data d) {
+        String day = d == null ? "" : Jalali.disp(d.snapshotDay);
+        return day.isEmpty() ? Jalali.todayStr() : day;
+    }
+
+    private String snapshotLabel(Data d) {
+        String day = d == null ? "" : Jalali.disp(d.snapshotDay);
+        if (day.isEmpty()) return "آخرین داده";
+        return day.equals(Jalali.todayStr()) ? "امروز" : "روز " + Jalali.shortLabel(day);
     }
 
     private View greetingHero() {
@@ -385,15 +405,16 @@ public class HomeScreen extends Screen {
         content.addView(a.kit.kpiGrid(kpis, 2), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(12));
         if (d.salesDaily != null && !d.salesDaily.isEmpty()) {
-            String today = Jalali.todayStr();
-            double todaySales = salesOnDay(d.salesDaily, today);
-            double yesterday = salesOnDay(d.salesDaily, Jalali.addDays(today, -1));
-            double avg7 = averageSalesBefore(d.salesDaily, today, 7);
-            double avg30 = averageSalesBefore(d.salesDaily, today, 30);
+            String compareDay = snapshotDay(d);
+            String compareLabel = snapshotLabel(d);
+            double todaySales = salesOnDay(d.salesDaily, compareDay);
+            double yesterday = salesOnDay(d.salesDaily, Jalali.addDays(compareDay, -1));
+            double avg7 = averageSalesBefore(d.salesDaily, compareDay, 7);
+            double avg30 = averageSalesBefore(d.salesDaily, compareDay, 30);
             LinearLayout compare = a.kit.card(Theme.GOLD);
-            compare.addView(a.kit.sectionHead("فروش امروز در مقایسه", "فروش ›", v -> a.nav("sales")),
+            compare.addView(a.kit.sectionHead("فروش " + compareLabel + " در مقایسه", "فروش ›", v -> a.nav("sales")),
                     a.kit.lp(-1, -2));
-            compare.addView(a.kit.kv("امروز", Money.compactRial(todaySales), Theme.GOLD), a.kit.lp(-1, -2));
+            compare.addView(a.kit.kv(compareLabel, Money.compactRial(todaySales), Theme.GOLD), a.kit.lp(-1, -2));
             compare.addView(a.kit.kv("دیروز", Money.compactRial(yesterday), Theme.TEXT), a.kit.lp(-1, -2));
             compare.addView(a.kit.kv("میانگین ۷ روز تقویمی قبل", Money.compactRial(avg7), Theme.INFO), a.kit.lp(-1, -2));
             compare.addView(a.kit.kv("میانگین ۳۰ روز تقویمی قبل", Money.compactRial(avg30), Theme.INFO), a.kit.lp(-1, -2));
@@ -492,13 +513,14 @@ public class HomeScreen extends Screen {
         a.kit.addCard(content, c);
     }
 
-    /** Top five by today's invoiced sales, following the inventory dashboard benchmark. */
+    /** Top five by the snapshot day's invoiced sales, following the dashboard benchmark. */
     private void secTopItems(LinearLayout content, Data d) {
+        String period = snapshotLabel(d);
         LinearLayout c = a.kit.card(Theme.GOLD);
-        c.addView(a.kit.sectionHead("پرفروش‌ترین کالاهای امروز", "گزارش کامل ›", v -> a.nav("reports")),
+        c.addView(a.kit.sectionHead("پرفروش‌ترین کالاهای " + period, "گزارش کامل ›", v -> a.nav("reports")),
                 a.kit.lp(-1, -2));
         if (d.topItems == null || d.topItems.isEmpty()) {
-            c.addView(a.kit.text("امروز کالایی برای رتبه‌بندی در دسترس نیست.", 11.5f, Theme.MUTED, false),
+            c.addView(a.kit.text("دادهٔ کالای پرفروش برای " + period + " در دسترس نیست.", 11.5f, Theme.MUTED, false),
                     a.kit.lp(-1, -2));
         } else {
             int show = Math.min(5, d.topItems.size());
@@ -531,7 +553,7 @@ public class HomeScreen extends Screen {
                 c.addView(row, a.kit.lp(-1, -2));
                 if (i + 1 < show) c.addView(a.kit.gap(8));
             }
-            c.addView(a.kit.hint("رتبه‌بندی بر پایهٔ مبلغ فروش امروز"), a.kit.lp(-1, -2));
+            c.addView(a.kit.hint("رتبه‌بندی بر پایهٔ مبلغ فروش " + period), a.kit.lp(-1, -2));
         }
         a.kit.addCard(content, c);
     }
@@ -539,10 +561,12 @@ public class HomeScreen extends Screen {
     private void secTrend(LinearLayout content, Data d) {
         // ---- 14-day sales trend ----
         if (d.salesDaily != null && !d.salesDaily.isEmpty()) {
+            String endDay = snapshotDay(d);
+            String period = snapshotLabel(d);
             LinearLayout c = a.kit.card(Theme.GOLD);
-            c.addView(a.kit.sectionHead("روند ۱۴ روزه فروش", "فروش ›", v -> a.nav("sales")), a.kit.lp(-1, -2));
+            c.addView(a.kit.sectionHead("روند ۱۴ روزه فروش تا " + period, "فروش ›", v -> a.nav("sales")), a.kit.lp(-1, -2));
             Charts.Area ch = new Charts.Area(a);
-            List<Charts.Point> pts = filled(d.salesDaily);
+            List<Charts.Point> pts = filled(d.salesDaily, endDay);
             final TextView cap = a.kit.text(pts.isEmpty() ? "" : lastCap(pts), 11f, Theme.MUTED, false);
             ch.setData(pts, Theme.GOLD, Charts.COMPACT);
             ch.setListener((idx, p) -> cap.setText(Money.fa(p.label) + " • " + Money.rial(p.value)));
@@ -770,15 +794,16 @@ public class HomeScreen extends Screen {
         return total / days;
     }
 
-    /** Fill missing days with 0 for a smooth 14-day chart. */
-    private List<Charts.Point> filled(List<Row> rows) {
+    /** Fill missing days with 0 for a smooth 14-day chart ending on the saved snapshot day. */
+    private List<Charts.Point> filled(List<Row> rows, String endDay) {
         Map<String, Double> map = new HashMap<>();
         if (rows != null) for (Row r : rows) {
             String k = Jalali.disp(r.s("day"));
             if (!k.isEmpty()) map.put(k, r.d("total"));
         }
         List<Charts.Point> out = new ArrayList<>();
-        String to = Jalali.todayStr();
+        String to = Jalali.disp(endDay);
+        if (to.isEmpty()) to = Jalali.todayStr();
         String from = Jalali.addDays(to, -13);
         int d0 = Jalali.parse(from);
         for (int i = 0; i < 14 && d0 >= 0; i++) {

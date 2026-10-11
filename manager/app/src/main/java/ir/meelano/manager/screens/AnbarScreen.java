@@ -1,5 +1,6 @@
 package ir.meelano.manager.screens;
 
+import android.view.View;
 import android.widget.LinearLayout;
 
 import ir.meelano.manager.MainActivity;
@@ -40,34 +41,31 @@ public class AnbarScreen extends Screen {
     public void render(LinearLayout content) {
         content.removeAllViews();
         content.addView(topCard(), a.kit.lp(-1, -2));
-        content.addView(a.kit.gap(10));
+        content.addView(a.kit.gap(12));
+        content.addView(a.kit.sectionHead("خلاصهٔ امروز", null, null), a.kit.lp(-1, -2));
         final LinearLayout kpiBox = a.kit.v();
         content.addView(kpiBox, a.kit.lp(-1, -2));
-        content.addView(a.kit.gap(12));
-        content.addView(a.kit.text("کارهای انبار", 14.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
-        content.addView(a.kit.gap(6));
+        content.addView(a.kit.gap(14));
+
+        content.addView(a.kit.sectionHead("عملیات پرکاربرد", "همه بخش‌ها", v -> a.nav("more")),
+                a.kit.lp(-1, -2));
         String[][] links = {
                 {"tahvil", "تحویل فاکتور به مشتری و موزع + رسید"},
-                {"resid", "رسید کالا: خرید و برگشتی‌ها (فقط تعداد)"},
+                {"resid", "رسید کالا و پیش‌نویس‌های انبار"},
                 {"shomarsh", "شمارش قفسه و مغایرت‌گیری"},
-                {"score", "امتیاز تأمین‌کنندگان"},
-                {"products", "کالاها و موجودی"},
-                {"customers", "مشتریان و تأمین‌کنندگان"},
+                {"score", "ارزیابی و امتیاز تأمین‌کنندگان"},
+                {"products", "جست‌وجو و گردش موجودی کالا"},
+                {"customers", "پرونده مشتریان و تأمین‌کنندگان"},
         };
-        for (String[] l : links) {
-            final String lid = l[0];
-            Screen s = a.screen(lid);
-            if (s == null) continue;
-            content.addView(a.kit.navRow(s.glyph(), s.title(), l[1], s.accent(), v -> a.nav(lid)),
-                    a.kit.lp(-1, -2));
-        }
-        content.addView(a.kit.gap(12));
+        addActionGrid(content, links);
+        content.addView(a.kit.gap(14));
+        content.addView(a.kit.sectionHead("وضعیت موجودی", null, null), a.kit.lp(-1, -2));
         final LinearLayout shortBox = a.kit.v();
         content.addView(shortBox, a.kit.lp(-1, -2));
-        content.addView(a.kit.gap(10));
-        content.addView(a.kit.btnGhost("📊 گزارش پایان روز انبار", Theme.INFO, v -> eodReport()),
-                a.kit.lp(-1, -2));
         loadShortage(shortBox);
+        content.addView(a.kit.gap(8));
+        content.addView(a.kit.btnGold("📊 گزارش پایان روز انبار", v -> eodReport()),
+                a.kit.lp(-1, -2));
         a.repo.run(c -> {
             Meta m = new Meta(c);
             return Repo.exec(c, MasterQueries.whTodayStats(m));
@@ -94,16 +92,72 @@ public class AnbarScreen extends Screen {
         });
     }
 
+    /** Responsive two/three-column shortcuts for the warehouse workbench. */
+    private void addActionGrid(LinearLayout parent, String[][] links) {
+        int cols = a.kit.isWide() ? 3 : 2;
+        LinearLayout grid = a.kit.v();
+        LinearLayout row = null;
+        int shown = 0;
+        for (String[] link : links) {
+            final String id = link[0];
+            final String description = link[1];
+            final Screen destination = a.screen(id);
+            if (destination == null || !ir.meelano.manager.core.RoleStore.allowed(a, id)) continue;
+            if (shown % cols == 0) {
+                row = a.kit.h();
+                LinearLayout.LayoutParams rp = a.kit.lp(-1, -2);
+                if (shown > 0) rp.setMargins(0, Theme.dp(8), 0, 0);
+                grid.addView(row, rp);
+            } else {
+                row.addView(a.kit.space(8));
+            }
+            row.addView(actionTile(destination, description), a.kit.wlp(1f));
+            shown++;
+        }
+        if (shown % cols != 0 && row != null) row.addView(a.kit.space(8), a.kit.wlp(1f));
+        if (shown == 0) grid.addView(a.kit.empty("بخشی برای این نقش در دسترس نیست", null), a.kit.lp(-1, -2));
+        parent.addView(grid, a.kit.lp(-1, -2));
+    }
+
+    /** Large touch-friendly tile; the screen glyph is rendered from the shared vector icon set. */
+    private View actionTile(final Screen destination, String description) {
+        int accent = destination.accent();
+        LinearLayout tile = a.kit.card(accent);
+        tile.setGravity(android.view.Gravity.CENTER);
+        tile.setMinimumHeight(Theme.dp(126));
+        tile.setPadding(Theme.dp(10), Theme.dp(12), Theme.dp(10), Theme.dp(10));
+
+        android.widget.TextView icon = a.kit.text(destination.glyph(), 27f, accent, true);
+        icon.setGravity(android.view.Gravity.CENTER);
+        icon.setBackground(Theme.avatar(Theme.alpha(accent, 48)));
+        tile.addView(icon, new LinearLayout.LayoutParams(Theme.dp(46), Theme.dp(46)));
+        tile.addView(a.kit.gap(5));
+
+        android.widget.TextView title = a.kit.text(destination.title(), 13f, Theme.TEXT, true);
+        title.setGravity(android.view.Gravity.CENTER);
+        title.setMaxLines(2);
+        title.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        tile.addView(title, a.kit.lp(-1, -2));
+
+        android.widget.TextView detail = a.kit.text(description, 10f, Theme.MUTED, false);
+        detail.setGravity(android.view.Gravity.CENTER);
+        detail.setMaxLines(2);
+        detail.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        tile.addView(detail, a.kit.lp(-1, -2));
+
+        tile.setContentDescription(destination.title() + "؛ " + description + "؛ باز کردن");
+        Theme.pressable(tile);
+        tile.setOnClickListener(v -> a.nav(destination.id()));
+        return tile;
+    }
+
     // ================= shortage alerts + auto buy draft =================
 
     private List<Row> shortage = new ArrayList<>();
 
     private void loadShortage(final LinearLayout box) {
-        box.addView(a.kit.text("⚠ کسری‌ها (موجودی ≤ نقطه سفارش)", 14f, Theme.TEXT, true),
-                a.kit.lp(-1, -2));
-        final LinearLayout list = a.kit.v();
-        box.addView(list, a.kit.lp(-1, -2));
-        list.addView(a.kit.hint("در حال بررسی…"), a.kit.lp(-1, -2));
+        box.removeAllViews();
+        box.addView(a.kit.loading("در حال بررسی نقطه‌های سفارش…"), a.kit.lp(-1, -2));
         a.repo.run(c -> {
             Meta m = new Meta(c);
             return Repo.exec(c, MasterQueries.whShortage(m));
@@ -111,28 +165,59 @@ public class AnbarScreen extends Screen {
             @Override
             public void ok(List<Row> rows) {
                 shortage = rows == null ? new ArrayList<Row>() : rows;
-                list.removeAllViews();
-                if (shortage.isEmpty()) {
-                    list.addView(a.kit.hint("✓ کسری ندارید؛ همه قلم‌ها بالای نقطه سفارش‌اند"),
-                            a.kit.lp(-1, -2));
-                    return;
+                box.removeAllViews();
+                final boolean clear = shortage.isEmpty();
+                final int accent = clear ? Theme.SUCCESS : Theme.WARNING;
+                LinearLayout card = a.kit.card(accent);
+
+                LinearLayout head = a.kit.h();
+                head.setGravity(android.view.Gravity.CENTER_VERTICAL);
+                android.widget.TextView mark = a.kit.text(clear ? "✓" : "⚠", 21f, accent, true);
+                mark.setGravity(android.view.Gravity.CENTER);
+                mark.setBackground(Theme.avatar(Theme.alpha(accent, 48)));
+                head.addView(mark, new LinearLayout.LayoutParams(Theme.dp(42), Theme.dp(42)));
+                head.addView(a.kit.space(9));
+                android.widget.TextView title = a.kit.text(
+                        clear ? "وضعیت موجودی مطلوب" : "نیازمند سفارش مجدد",
+                        14f, Theme.TEXT, true);
+                title.setMaxLines(2);
+                title.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                head.addView(title, a.kit.wlp(1f));
+                if (!clear) {
+                    head.addView(a.kit.pill(Money.fa(String.valueOf(shortage.size())) + " کالا", accent),
+                            a.kit.lp(-2, -2));
                 }
-                for (Row r : shortage) {
-                    list.addView(a.kit.kv(r.s("name"),
-                            "موجودی " + Money.fa(fmtNum(r.d("stock"))) + " / سفارش از "
-                                    + Money.fa(fmtNum(r.d("reopoint")))
-                                    + (r.s("unit").isEmpty() ? "" : " " + r.s("unit")),
-                            Theme.TEXT), a.kit.lp(-1, -2));
+                card.addView(head, a.kit.lp(-1, -2));
+                card.addView(a.kit.gap(6));
+
+                if (clear) {
+                    card.addView(a.kit.text("همهٔ اقلام بالاتر از نقطهٔ سفارش‌اند.",
+                            12.5f, Theme.SUCCESS, false), a.kit.lp(-1, -2));
+                } else {
+                    for (Row r : shortage) {
+                        String detail = "موجودی " + Money.fa(fmtNum(r.d("stock")))
+                                + " • نقطه سفارش " + Money.fa(fmtNum(r.d("reopoint")))
+                                + (r.s("unit").isEmpty() ? "" : " " + r.s("unit"));
+                        card.addView(a.kit.kv(r.s("name"), detail, Theme.WARNING), a.kit.lp(-1, -2));
+                    }
+                    card.addView(a.kit.gap(8));
+                    card.addView(a.kit.btnGold("🧾 ساخت پیش‌نویس خرید از کسری‌ها",
+                            v -> autoBuyDraft()), a.kit.lp(-1, -2));
                 }
-                list.addView(a.kit.gap(6));
-                list.addView(a.kit.btn("🧾 ساخت پیش‌نویس خرید از کسری‌ها",
-                        v -> autoBuyDraft()), a.kit.lp(-1, -2));
+                a.kit.addCard(box, card);
             }
 
             @Override
             public void fail(String faError) {
-                list.removeAllViews();
-                list.addView(a.kit.hint("بررسی کسری ممکن نشد"), a.kit.lp(-1, -2));
+                box.removeAllViews();
+                LinearLayout card = a.kit.card(Theme.DANGER);
+                card.addView(a.kit.text("وضعیت موجودی دریافت نشد", 14f, Theme.TEXT, true),
+                        a.kit.lp(-1, -2));
+                card.addView(a.kit.hint(faError == null || faError.trim().isEmpty()
+                        ? "ارتباط را بررسی و دوباره تلاش کنید." : faError), a.kit.lp(-1, -2));
+                card.addView(a.kit.btnGhost("⟳ تلاش دوباره", Theme.DANGER,
+                        v -> loadShortage(box)), a.kit.lp(-1, -2));
+                a.kit.addCard(box, card);
             }
         });
     }
@@ -225,13 +310,10 @@ public class AnbarScreen extends Screen {
     }
 
     private android.view.View topCard() {
-        LinearLayout card = a.kit.card(Theme.GOLD);
         String keeper = AtiranAuth.sessionName(a);
         if (keeper.isEmpty()) keeper = AtiranAuth.sessionUser(a);
-        card.addView(a.kit.text("📦 انبار", 17f, Theme.TEXT, true), a.kit.lp(-1, -2));
         String sub = "امروز " + Money.fa(Jalali.todayStr());
         if (!keeper.isEmpty()) sub += " • انباردار: " + keeper;
-        card.addView(a.kit.text(sub, 12f, Theme.MUTED, false), a.kit.lp(-1, -2));
-        return card;
+        return a.kit.hero("📦", "میزکار انبار", sub, Theme.GOLD);
     }
 }

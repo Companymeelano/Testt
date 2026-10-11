@@ -117,8 +117,10 @@ public final class RoleStore {
      * a one-line change in AtiranAuth.phaseOpen.
      */
     public static String[] tabsFor(String role) {
+        // The warehouse keeper gets the four highest-frequency destinations;
+        // counts, supplier score and the rest remain one tap away in «همه بخش‌ها».
         if (WAREHOUSE.equals(role))
-            return new String[]{"anbar", "tahvil", "resid", "shomarsh", "score", "more"};
+            return new String[]{"anbar", "tahvil", "resid", "more"};
         if (SELLER.equals(role))
             return new String[]{"home", "sales", "customers", "products", "dues", "more"};
         if (ACCOUNTANT.equals(role))
@@ -129,7 +131,9 @@ public final class RoleStore {
             return new String[]{"sales", "customers", "cheques", "dues", "more"};
         if (MOADIAN.equals(role))
             return new String[]{"sales", "customers", "reports", "more"};
-        return new String[]{"home", "sales", "products", "customers", "reports", "more"};
+        // Manager's five steady destinations: move products into the grouped
+        // «کالا و عملیات انبار» hub so the bottom bar is comfortable on phones.
+        return new String[]{"home", "sales", "customers", "reports", "more"};
     }
 
     /** Short tab label (some screen titles are too long for a tab). */

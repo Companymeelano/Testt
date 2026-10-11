@@ -234,9 +234,20 @@ public final class ReportCatalog {
                     new Col[]{c("label", "کالا", T_TEXT), c("qty", "مقدار", T_NUM), c("sales", "فروش", T_MONEY),
                             c("cogs", "بهای تمام‌شده", T_MONEY), c("profit", "سود", T_MONEY)},
                     C_BARS, "label", "profit"),
-            s("profit_costs", "سایر هزینه‌ها", "سود و زیان", "هزینه‌های جانبی، غیرمستقیم و کسری انبار", true,
-                    new Col[]{c("label", "سرفصل", T_TEXT), c("total", "جمع", T_MONEY)},
+            s("profit_costs", "سرفصل‌ها و هزینه‌ها", "هزینه‌ها",
+                    "هزینه‌های جانبی، غیرمستقیم و کسری انبار به تفکیک سرفصل — سهم هر سرفصل در نمودار", true,
+                    new Col[]{c("label", "سرفصل", T_TEXT), c("total", "جمع", T_MONEY), c("docs", "تعداد سند", T_NUM)},
                     C_DONUT, "label", "total"),
+            s("sales_notconfirmed", "فاکتورهای فروش تأییدنشده / ابطالی", "برگشتی و ابطالی",
+                    "فاکتورهای فروشی که تأیید نهایی نشده‌اند (Status غیر از ۱) — باید تعیین تکلیف شوند", true,
+                    new Col[]{c("no", "شماره", T_TEXT), c("date", "تاریخ", T_DATE), c("customer", "مشتری", T_TEXT),
+                            c("total", "مبلغ", T_MONEY), c("paid", "دریافتی", T_MONEY), c("remain", "مانده", T_MONEY)},
+                    C_NONE, null, null),
+            s("buy_notconfirmed", "فاکتورهای خرید تأییدنشده / ابطالی", "برگشتی و ابطالی",
+                    "فاکتورهای خریدی که تأیید نهایی نشده‌اند (Status غیر از ۱) — باید تعیین تکلیف شوند", true,
+                    new Col[]{c("no", "شماره", T_TEXT), c("date", "تاریخ", T_DATE), c("customer", "طرف‌حساب", T_TEXT),
+                            c("total", "مبلغ", T_MONEY), c("paid", "پرداختی", T_MONEY), c("remain", "مانده", T_MONEY)},
+                    C_NONE, null, null),
             // ---- بانک ----
             s("bank_turnover", "گردش بانک‌ها", "بانک و صندوق", "ورودی/خروجی هر حساب بانکی در بازه", true,
                     new Col[]{c("bank", "بانک", T_TEXT), c("in", "ورودی", T_MONEY), c("out", "خروجی", T_MONEY), c("count", "سند", T_NUM)},
@@ -295,6 +306,8 @@ public final class ReportCatalog {
         if ("profit_daily".equals(id)) return MasterQueries.profitDaily(m, ff);
         if ("profit_by_product".equals(id)) return MasterQueries.profitByProduct(m, ff, 50);
         if ("profit_costs".equals(id)) return MasterQueries.profitCosts(m, ff);
+        if ("sales_notconfirmed".equals(id)) { ff.status = "not_confirmed"; return Queries.factorList(m, true, ff); }
+        if ("buy_notconfirmed".equals(id)) { ff.status = "not_confirmed"; return Queries.factorList(m, false, ff); }
         if ("bank_turnover".equals(id)) return MasterQueries.bankTurnover(m, ff);
         if ("cows".equals(id)) return MasterQueries.cowList(m);
         if ("fleeing_customers".equals(id)) return MasterQueries.fleeingCustomers(m, ff);

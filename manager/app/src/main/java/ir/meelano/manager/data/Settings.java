@@ -259,7 +259,7 @@ public final class Settings {
     public void setWhDirect(boolean on) { p.edit().putBoolean("wh_direct", on).apply(); }
 
     // ---------------- home dashboard order ----------------
-    public static final String HOME_ORDER_DEFAULT = "kpis,alerts,trend,donut,debtors,visitors,due,shortcuts";
+    public static final String HOME_ORDER_DEFAULT = "kpis,alerts,trend,donut,debtors,visitors,due,invstatus,shortcuts";
 
     public String homeOrder() {
         String v = p.getString("home_order", HOME_ORDER_DEFAULT);

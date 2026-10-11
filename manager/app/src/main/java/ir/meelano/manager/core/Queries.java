@@ -406,6 +406,16 @@ public final class Queries {
         String tol = String.valueOf(AtiranSchema.SETTLE_TOLERANCE);
         if ("settled".equals(f.status)) conds.add("(ABS((" + totalExpr + ")-(" + paidExpr + "))<=" + tol + (tasviehCol == null ? "" : " OR h.[" + tasviehCol + "]='t'") + ")");
         if ("unsettled".equals(f.status)) conds.add("(ABS((" + totalExpr + ")-(" + paidExpr + "))>" + tol + (tasviehCol == null ? "" : " AND ISNULL(h.[" + tasviehCol + "],'f')<>'t'") + ")");
+        // Confirmation state. dbo.FactorConfirmation stamps Status=1 on a final
+        // invoice, so anything else is still provisional — an invoice that never
+        // made it past confirmation. NOTE: softAnd() already drops rows carrying a
+        // cancel/void marker, which is why this cannot be phrased as "cancelled":
+        // those rows never reach the query at all.
+        if ("not_confirmed".equals(f.status)) {
+            String statusCol = Sql.pick(cols, "Status");
+            if (statusCol == null) throw new Missing("ستون وضعیت در «" + AtiranSchema.faTitle(table) + "» پیدا نشد");
+            conds.add("ISNULL(TRY_CONVERT(int,h.[" + statusCol + "]),0)<>1");
+        }
         if (f.search != null && !f.search.trim().isEmpty()) {
             List<String> exprs = new ArrayList<>();
             exprs.add(Sql.txt("h", numberCol, 80));
@@ -437,6 +447,43 @@ public final class Queries {
                 + pageClause(binds, f.page, f.top);
         return new Q(sql, binds);
     }
+
+    /**
+     * Invoice counts and amounts split by confirmation state: «تأییدشده» against
+     * «تأییدنشده / ابطالی». dbo.FactorConfirmation stamps Status=1 on a final
+     * invoice, so anything else never made it past confirmation.
+     *
+     * Rows already dropped by softAnd() — those carrying a cancel or void marker —
+     * are invisible here too, which is why the label says «تأییدنشده / ابطالی»
+     * rather than claiming to list every cancelled invoice.
+     */
+    public static Q factorStatusSummary(Meta m, boolean sales, String from, String to) throws Missing {
+        String table = sales ? "sailfact" : "buyfact";
+        Set<String> cols = m.columns(table);
+        String dateCol = sales ? m.must(table, "\u062a\u0627\u0631\u06cc\u062e", "date")
+                : m.must(table, "\u062a\u0627\u0631\u06cc\u062e", "DATE", "date");
+        String amountCol = m.must(table, "\u0645\u0628\u0644\u063a", "all");
+        String numberCol = sales ? m.must(table, "\u0634\u0645\u0627\u0631\u0647 \u0641\u0627\u06a9\u062a\u0648\u0631", "shfacfo")
+                : m.must(table, "\u0634\u0645\u0627\u0631\u0647 \u0641\u0627\u06a9\u062a\u0648\u0631", "shfackh", "shfac");
+        String statusCol = Sql.pick(cols, "Status");
+        String st = statusCol == null ? "CAST(0 AS int)" : "ISNULL(TRY_CONVERT(int,h.[" + statusCol + "]),0)";
+        String lbl = "CASE WHEN " + st + "=1 THEN N'\u062a\u0623\u06cc\u06cc\u062f\u0634\u062f\u0647' ELSE N'\u062a\u0623\u06cc\u06cc\u062f\u0646\u0634\u062f\u0647 / \u0627\u0628\u0637\u0627\u0644\u06cc' END";
+        List<Object> binds = new ArrayList<>();
+        String dc = Sql.dateCond(Sql.date10("h", dateCol), from, to, binds);
+        String act = Sql.activeAnd(cols, "h") + Sql.softAnd(cols, "h");
+        String where;
+        if (dc.isEmpty()) where = act.isEmpty() ? "" : act.replaceFirst(" AND ", " WHERE ");
+        else where = " WHERE " + dc + act;
+        // A numeric code travels with the label: matching Persian text between SQL
+        // and Java is hostage to ي/ی normalisation, a number is not.
+        return new Q("SELECT CASE WHEN " + st + "=1 THEN 1 ELSE 0 END AS state, "
+                + lbl + " AS label, COUNT_BIG(1) AS docs"
+                + ", ISNULL(SUM(" + Sql.num("h", amountCol) + "),0) AS total"
+                + " FROM " + Sql.dedupe(table, numberCol, "h", "")
+                + where + " GROUP BY CASE WHEN " + st + "=1 THEN 1 ELSE 0 END, " + lbl
+                + " ORDER BY 4 DESC", binds);
+    }
+
 
     /** Invoice header (all key fields + joined names). */
     public static Q factorHeader(Meta m, boolean sales, String no) throws Missing {

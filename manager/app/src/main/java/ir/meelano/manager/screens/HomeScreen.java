@@ -58,6 +58,10 @@ public class HomeScreen extends Screen {
         List<Row> visitors = new ArrayList<>();
         List<Row> dueIn = new ArrayList<>();
         List<Row> dueOut = new ArrayList<>();
+        /** Sales invoices split by confirmation state (تأییدشده / تأییدنشده). */
+        List<Row> saleState = new ArrayList<>();
+        /** Purchase invoices split the same way. */
+        List<Row> buyState = new ArrayList<>();
         Map<String, String> notes = new LinkedHashMap<>();
     }
 
@@ -88,6 +92,9 @@ public class HomeScreen extends Screen {
             d.visitors = soft(d.notes, "ویزیتورها", () -> Repo.exec(c, MasterQueries.visitorsPerf(m, vf)));
             d.dueIn = soft(d.notes, "سررسید دریافتی", () -> Repo.exec(c, MoneyQueries.chequeDue(m, true, 3)));
             d.dueOut = soft(d.notes, "سررسید پرداختی", () -> Repo.exec(c, MoneyQueries.chequeDue(m, false, 3)));
+            String stFrom = Jalali.addDays(to, -29);
+            d.saleState = soft(d.notes, "وضعیت فروش", () -> Repo.exec(c, Queries.factorStatusSummary(m, true, stFrom, to)));
+            d.buyState = soft(d.notes, "وضعیت خرید", () -> Repo.exec(c, Queries.factorStatusSummary(m, false, stFrom, to)));
             if (d.salesDay == null && d.inDay == null && d.custSum == null && d.buyDay == null && d.outDay == null)
                 throw new Exception(firstNote(d.notes));
             return d;
@@ -232,6 +239,7 @@ public class HomeScreen extends Screen {
             else if ("debtors".equals(key)) secDebtors(content, d);
             else if ("visitors".equals(key)) secVisitors(content, d);
             else if ("due".equals(key)) secDue(content, d);
+            else if ("invstatus".equals(key)) secInvStatus(content, d);
             else if ("eod".equals(key)) secEod(content);
             else if ("shortcuts".equals(key)) secShortcuts(content, d);
         }
@@ -241,7 +249,7 @@ public class HomeScreen extends Screen {
     /** Dashboard order from settings; unknown keys dropped, missing sections appended. */
     private List<String> orderedKeys() {
         List<String> out = new ArrayList<>();
-        String[] known = {"kpis", "alerts", "trend", "donut", "debtors", "visitors", "due", "eod", "shortcuts"};
+        String[] known = {"kpis", "alerts", "trend", "donut", "debtors", "visitors", "due", "invstatus", "eod", "shortcuts"};
         for (String k : a.settings.homeOrder().split(",")) {
             String t = k == null ? "" : k.trim();
             if (!t.isEmpty() && !out.contains(t)) {
@@ -287,6 +295,40 @@ public class HomeScreen extends Screen {
         }
         if (n == 0) alerts.addView(a.kit.text("فعلاً هشدار مهمی وجود ندارد.", 11.5f, Theme.MUTED, false), a.kit.lp(-1, -2));
         a.kit.addCard(content, alerts);
+    }
+
+    /**
+     * Confirmation state of the last 30 days' invoices. An invoice that never
+     * reached Status=1 is still provisional: it sits in the ledger without ever
+     * having been finalised, and nobody is told. Surfacing the count with a tap
+     * through to the full list is what makes it actionable.
+     */
+    private void secInvStatus(LinearLayout content, Data d) {
+        LinearLayout c = a.kit.card(Theme.WARNING);
+        c.addView(a.kit.sectionHead("وضعیت فاکتورهای ۳۰ روز اخیر", "گزارش ›", v -> a.nav("reports")),
+                a.kit.lp(-1, -2));
+        addState(c, "فروش", d.saleState);
+        addState(c, "خرید", d.buyState);
+        if ((d.saleState == null || d.saleState.isEmpty()) && (d.buyState == null || d.buyState.isEmpty()))
+            c.addView(a.kit.text("داده‌ای برای این بازه یافت نشد.", 11.5f, Theme.MUTED, false), a.kit.lp(-1, -2));
+        a.kit.addCard(content, c);
+    }
+
+    /** One line per state of one side (sales or purchases): how many, and for how much. */
+    private void addState(LinearLayout c, String side, List<Row> rows) {
+        if (rows == null || rows.isEmpty()) return;
+        long pendingN = 0;
+        double pendingSum = 0;
+        for (Row r : rows) {
+            if (r.i("state") == 1) continue; // 1 = confirmed, the rest are provisional
+            pendingN += r.l("docs");
+            pendingSum += r.d("total");
+        }
+        int col = pendingN > 0 ? Theme.WARNING : Theme.SUCCESS;
+        String txt = side + ": " + (pendingN > 0
+                ? Money.fa(String.valueOf(pendingN)) + " فاکتور تأییدنشده (" + Money.compactMoney(pendingSum) + ")"
+                : "همه تأیید شده‌اند");
+        c.addView(a.kit.kv(txt, pendingN > 0 ? "نیاز به بررسی" : "✓", col), a.kit.lp(-1, -2));
     }
 
     private void secTrend(LinearLayout content, Data d) {

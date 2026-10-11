@@ -755,6 +755,7 @@ public final class MasterQueries {
                 if (!dc.isEmpty()) conds.add(dc);
             }
             legs.add("SELECT " + Sql.lit(s[1]) + " AS label, ISNULL(SUM(" + Sql.num("h", amount) + "),0) AS total"
+                    + ", COUNT_BIG(1) AS docs"
                     + " FROM dbo.[" + s[0] + "] h" + (conds.isEmpty() ? "" : " WHERE " + Sql.join(conds, " AND ")));
         }
         if (legs.isEmpty()) throw new Queries.Missing("هیچ جدول هزینه‌ای با ساختار شناخته‌شده پیدا نشد");

@@ -17,6 +17,7 @@ import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.MoneyQueries;
 import ir.meelano.manager.core.Queries;
+import ir.meelano.manager.core.WarehouseWriter;
 import ir.meelano.manager.data.Company;
 import ir.meelano.manager.data.Meta;
 import ir.meelano.manager.data.Repo;
@@ -32,8 +33,8 @@ import java.util.List;
 /** Shop TV mode: landscape, fullscreen, auto-rotating KPI slides with live Atiran data. */
 public class TvActivity extends Activity {
     private static final long SLIDE_MS = 12000;
-    private static final long REFRESH_MS = 5 * 60 * 1000;
-    private static final int SLIDES = 6;
+    private static final long REFRESH_MS = 2 * 60 * 1000;
+    private static final int SLIDES = 7;
 
     private Kit kit;
     private Repo repo;
@@ -57,6 +58,7 @@ public class TvActivity extends Activity {
         List<Row> debtors = new ArrayList<>();
         List<Row> dueIn = new ArrayList<>();
         List<Row> dueOut = new ArrayList<>();
+        List<Row> whToday = new ArrayList<>();
     }
 
     @Override
@@ -193,6 +195,9 @@ public class TvActivity extends Activity {
             try {
                 d.prodSum = Repo.one(c, MasterQueries.productsSummary(m));
             } catch (Exception ignored) { }
+            try {
+                d.whToday = Repo.exec(c, MasterQueries.whDeliveries(m, Jalali.todayStr()));
+            } catch (Exception ignored) { }
             return d;
         }, new Repo.Cb<TvData>() {
             @Override
@@ -230,6 +235,7 @@ public class TvActivity extends Activity {
         else if (slide == 2) slideDebtors();
         else if (slide == 3) slideDue();
         else if (slide == 4) slideAlerts();
+        else if (slide == 5) slideWarehouse();
         else slideShop();
     }
 
@@ -344,6 +350,90 @@ public class TvActivity extends Activity {
         t2.setGravity(Gravity.CENTER);
         c.addView(t2, kit.lp(-1, -2));
         slideBox.addView(c, kit.lp(-1, -2));
+    }
+
+    /**
+     * Hand-over board: every sales invoice of today with its customer and
+     * whether the warehouse has handed it over yet. Outstanding ones are listed
+     * first and in gold, because they are the ones still waiting for somebody.
+     */
+    private void slideWarehouse() {
+        List<Row> pending = new ArrayList<>();
+        List<Row> handed = new ArrayList<>();
+        if (data.whToday != null) {
+            for (Row r : data.whToday) {
+                if (WarehouseWriter.handedToday(this, r.s("id"))) handed.add(r);
+                else pending.add(r);
+            }
+        }
+        int total = pending.size() + handed.size();
+        slideBox.addView(big("تحویل امروز",
+                Money.fa(String.valueOf(handed.size())) + " از " + Money.fa(String.valueOf(total)),
+                total == 0 ? "فاکتوری ثبت نشده است"
+                        : Money.fa(String.valueOf(pending.size())) + " فاکتور در انتظار تحویل",
+                pending.isEmpty() ? Theme.SUCCESS : Theme.WARNING), kit.lp(-1, -2));
+        slideBox.addView(kit.gap(10));
+        if (total == 0) {
+            slideBox.addView(kit.empty("فاکتوری برای امروز ثبت نشده است", null), kit.lp(-1, -2));
+            return;
+        }
+        List<Row> rows = new ArrayList<>(pending);
+        rows.addAll(handed);
+        LinearLayout c = kit.card(Theme.SUCCESS);
+        int shown = Math.min(rows.size(), 9);
+        for (int i = 0; i < shown; i++) {
+            if (i > 0) c.addView(kit.gap(6));
+            c.addView(whRow(rows.get(i), i < pending.size()), kit.lp(-1, -2));
+        }
+        if (rows.size() > shown) {
+            c.addView(kit.gap(6));
+            TextView more = kit.text("و " + Money.fa(String.valueOf(rows.size() - shown)) + " فاکتور دیگر",
+                    14f, Theme.MUTED, false);
+            more.setGravity(Gravity.CENTER);
+            c.addView(more, kit.lp(-1, -2));
+        }
+        // Hand-over marks live in this device's storage, not in Atiran. If this
+        // device has never recorded one, showing a board of unticked invoices
+        // would read as "nothing was delivered" when it really means "nothing
+        // was recorded here" — so say which it is.
+        if (handed.isEmpty()) {
+            boolean ever = false;
+            try {
+                ever = WarehouseWriter.handlog(this).length() > 0;
+            } catch (Exception ignored) { }
+            if (!ever) {
+                c.addView(kit.gap(6));
+                TextView note = kit.text("تیک‌ها فقط تحویل‌های ثبت‌شده روی همین دستگاه را نشان می‌دهند",
+                        13f, Theme.WARNING, false);
+                note.setGravity(Gravity.CENTER);
+                c.addView(note, kit.lp(-1, -2));
+            }
+        }
+        slideBox.addView(c, kit.lp(-1, -2));
+    }
+
+    /** One invoice: tick state, number, customer, amount — readable from across the shop. */
+    private View whRow(Row r, boolean handed) {
+        LinearLayout row = kit.h();
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(Theme.dp(12), Theme.dp(8), Theme.dp(12), Theme.dp(8));
+        TextView tick = kit.text(handed ? "✔" : "○", 26, handed ? Theme.SUCCESS : Theme.GOLD, true);
+        tick.setGravity(Gravity.CENTER);
+        row.addView(tick, new LinearLayout.LayoutParams(Theme.dp(44), -2));
+        row.addView(kit.space(10));
+        LinearLayout mid = kit.v();
+        mid.addView(kit.text("فاکتور " + Money.fa(r.s("id")), 18f, Theme.TEXT, true), kit.lp(-1, -2));
+        String sub = r.s("cust");
+        if (sub == null || sub.isEmpty()) sub = "—";
+        if (!r.s("visitor").isEmpty()) sub = sub + " • " + r.s("visitor");
+        mid.addView(kit.text(sub, 14f, Theme.MUTED, false), kit.lp(-1, -2));
+        row.addView(mid, kit.wlp(1f));
+        row.addView(kit.space(10));
+        TextView amt = kit.text(Money.compactRial(r.d("amount")), 17f,
+                handed ? Theme.MUTED : Theme.GOLD, true);
+        amt.setGravity(Gravity.END);
+        row.addView(amt, kit.lp(-2, -2));
+        return row;
     }
 
     /** Big TV banner: title + giant value + subtitle. */

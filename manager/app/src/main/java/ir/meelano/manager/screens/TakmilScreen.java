@@ -261,7 +261,7 @@ public class TakmilScreen extends Screen {
                     + d.optString(WarehouseWriter.D_PNAME, "")
                     + "  •  سند: " + docNo
                     + "  •  تاریخ: " + d.optString(WarehouseWriter.D_DATE, "")
-                    + "  •  جمع: " + Money.compact(total) + " تومان";
+                    + "  •  جمع: " + Money.compactMoney(total);
             JSONArray ls = d.optJSONArray(WarehouseWriter.D_LINES);
             List<Row> rows = new ArrayList<>();
             if (ls != null) {

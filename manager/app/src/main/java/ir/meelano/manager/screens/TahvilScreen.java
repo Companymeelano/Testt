@@ -160,7 +160,7 @@ public class TahvilScreen extends Screen {
                     sub += " \u2022 " + Money.fa(Jalali.disp(row.s("dt")));
                     View v = a.kit.personRow("فاکتور " + Money.fa(no),
                             sub.isEmpty() ? "\u2014" : sub,
-                            Money.fa(Money.compact(row.d("amount"))) + " تومان",
+                            Money.compactMoney(row.d("amount")),
                             handed ? "\u2713 تحویل شد" : "منتظر تحویل",
                             handed ? Theme.SUCCESS : Theme.GOLD,
                             v2 -> openHandover(row));
@@ -247,7 +247,7 @@ public class TahvilScreen extends Screen {
                 a.kit.lp(-1, -2));
         if (!f.s("phone").isEmpty())
             body.addView(a.kit.kv("تلفن", Money.fa(f.s("phone")), Theme.TEXT), a.kit.lp(-1, -2));
-        body.addView(a.kit.kv("مبلغ", Money.fa(Money.compact(f.d("amount"))) + " تومان", Theme.TEXT),
+        body.addView(a.kit.kv("مبلغ", Money.compactMoney(f.d("amount")), Theme.TEXT),
                 a.kit.lp(-1, -2));
                 final boolean[] marked = new boolean[items.size()];
         for (int x = 0; x < marked.length; x++) marked[x] = true;
@@ -507,7 +507,7 @@ if (!items.isEmpty()) {
             String sub = "مشتری: " + f.s("cust") + "  •  " + receiver
                     + (workerName.isEmpty() ? "" : "  •  کارگر: " + workerName)
                     + "  •  تحویل‌دهنده: " + keeper + "  •  تاریخ: " + Jalali.todayStr()
-                    + "  •  مبلغ: " + Money.compact(f.d("amount")) + " تومان";
+                    + "  •  مبلغ: " + Money.compactMoney(f.d("amount"));
             ReportCatalog.Col[] cols = new ReportCatalog.Col[]{
                     new ReportCatalog.Col("name", "کالا", ReportCatalog.T_TEXT),
                     new ReportCatalog.Col("qty", "تعداد", ReportCatalog.T_TEXT),

@@ -42,11 +42,23 @@ public final class Kit {
     public TextView text(String s, float sp, int color, boolean bold) {
         TextView t = new TextView(a);
         t.setText(s == null ? "" : s);
-        // v37: legibility floor, then two multipliers. fontScale is the user's own zoom
-        // choice; typeScale grows type with the screen so labels stay readable on the large
-        // displays of high-end phones. Only type is scaled - layout metrics stay in dp.
-        float base = sp < 12.5f ? 12.5f : sp;
-        t.setTextSize(base * Theme.fontScale() * Theme.typeScale());
+        // Legibility floor, then two multipliers. fontScale is the user's own zoom
+        // choice; typeScale grows type with the screen so labels stay readable on the
+        // large displays of high-end phones. Only type is scaled - layout metrics
+        // stay in dp.
+        //
+        // v37.1: micro type (tile labels, captions, badges) is small ON PURPOSE — it
+        // sits under a value inside a tile that has a fixed share of the row. The old
+        // rule floored everything below 12.5 and then grew it again by typeScale, so a
+        // 10sp caption rendered at ~14.8sp: the tiles overflowed, captions collided
+        // with their values, and the value/label ratio collapsed from ~1.8x to ~1.3x,
+        // which is what made the top of the dashboard read as a jumble. Micro type now
+        // keeps its designed size and takes the user's zoom only — never the extra
+        // screen-driven growth.
+        boolean micro = sp < 12f;
+        float base = micro ? (sp < 9f ? 9f : sp) : (sp < 12.5f ? 12.5f : sp);
+        float grow = micro ? Theme.fontScale() : Theme.fontScale() * Theme.typeScale();
+        t.setTextSize(base * grow);
         t.setTextColor(color);
         t.setTypeface(Theme.face(bold));
         t.setLineSpacing(Theme.dp(1.5f), 1.0f);

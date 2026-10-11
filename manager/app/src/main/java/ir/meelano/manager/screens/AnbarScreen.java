@@ -80,7 +80,7 @@ public class AnbarScreen extends Screen {
                 long pish = r == null ? 0 : r.l("pishN");
                 List<Kit.Kpi> kpis = new ArrayList<>();
                 kpis.add(new Kit.Kpi("فاکتور امروز", Money.fa(String.valueOf(n)), "فقره", Theme.GOLD));
-                kpis.add(new Kit.Kpi("مبلغ امروز", Money.fa(Money.compact(sum)), "تومان", Theme.SUCCESS));
+                kpis.add(new Kit.Kpi("مبلغ امروز", Money.compactMoney(sum), "", Theme.SUCCESS));
                 kpis.add(new Kit.Kpi("پیش‌فاکتور خرید باز", Money.fa(String.valueOf(pish)), "سند", Theme.INFO));
                 kpiBox.removeAllViews();
                 kpiBox.addView(a.kit.kpiGrid(kpis, 3), a.kit.lp(-1, -2));

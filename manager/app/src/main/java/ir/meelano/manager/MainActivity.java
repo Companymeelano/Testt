@@ -118,6 +118,9 @@ public class MainActivity extends Activity {
         Usage.opened(this);
         kit = new Kit(this);
         settings = new Settings(this);
+        // Amounts are stored in Rials everywhere; pick up the chosen display unit
+        // before anything renders so no screen shows the wrong one.
+        Money.setUnit(settings.moneyUnit());
         repo = new Repo(this, settings);
         splash();
     }

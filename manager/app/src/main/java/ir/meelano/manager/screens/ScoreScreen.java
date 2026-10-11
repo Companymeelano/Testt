@@ -73,7 +73,7 @@ public class ScoreScreen extends Screen {
                 List<Kit.Kpi> kpis = new ArrayList<>();
                 kpis.add(new Kit.Kpi("تأمین‌کننده", Money.fa(String.valueOf(rows.size())), "",
                         Theme.TEAL));
-                kpis.add(new Kit.Kpi("جمع خریدها", Money.fa(Money.compact(total)), "تومان",
+                kpis.add(new Kit.Kpi("جمع خریدها", Money.compactMoney(total), "",
                         Theme.GOLD));
                 box.addView(a.kit.kpiGrid(kpis, 2), a.kit.lp(-1, -2));
                 box.addView(a.kit.gap(10));
@@ -85,7 +85,7 @@ public class ScoreScreen extends Screen {
                     Row r = rows.get(i);
                     String medal = i < 3 ? medals[i] + " " : "";
                     String sub = Money.fa(String.valueOf(r.l("buyN"))) + " خرید • "
-                            + Money.fa(Money.compact(r.d("buySum"))) + " تومان";
+                            + Money.compactMoney(r.d("buySum"));
                     if (r.l("pishN") > 0)
                         sub += " • " + Money.fa(String.valueOf(r.l("pishN"))) + " پیش‌فاکتور باز";
                     View v = a.kit.personRow(medal + r.s("name"), sub,

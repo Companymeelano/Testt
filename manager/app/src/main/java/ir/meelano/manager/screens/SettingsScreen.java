@@ -151,6 +151,15 @@ public class SettingsScreen extends Screen {
             a.cycleZoom();
             render(content);
         }), a.kit.lp(-1, -2));
+        final boolean toman = ir.meelano.manager.core.Money.isToman();
+        th.addView(a.kit.btnGhost("💰 واحد نمایش مبالغ: " + (toman ? "تومان" : "ریال") + " (برای تغییر بزنید)", Theme.SUCCESS, v -> {
+            int next = toman ? ir.meelano.manager.core.Money.UNIT_RIAL
+                    : ir.meelano.manager.core.Money.UNIT_TOMAN;
+            a.settings.setMoneyUnit(next);
+            ir.meelano.manager.core.Money.setUnit(next);
+            a.kit.toast(next == ir.meelano.manager.core.Money.UNIT_TOMAN ? "مبالغ به تومان نمایش داده می‌شود" : "مبالغ به ریال نمایش داده می‌شود");
+            a.refreshTheme();
+        }), a.kit.lp(-1, -2));
         final boolean sn = a.settings.seasonalOn();
         th.addView(a.kit.btnGhost("🌸 تم مناسبتی خودکار: " + (sn ? "روشن" : "خاموش"), Theme.TEAL, v -> {
             a.settings.setSeasonalOn(!sn);

@@ -321,6 +321,15 @@ public final class Settings {
 
     public void setGuardSeen(String v) { p.edit().putString("guard_seen", v == null ? "" : v).apply(); }
 
+    /**
+     * Display unit for amounts: {@link ir.meelano.manager.core.Money#UNIT_TOMAN}
+     * (default) or {@link ir.meelano.manager.core.Money#UNIT_RIAL}. Atiran always
+     * stores Rials; this only changes how amounts are shown.
+     */
+    public int moneyUnit() { return p.getInt("money_unit", ir.meelano.manager.core.Money.UNIT_TOMAN); }
+
+    public void setMoneyUnit(int u) { p.edit().putInt("money_unit", u).apply(); }
+
     /** Alert the warehouse keeper the moment a new sales invoice is registered. */
     public boolean whNewOn() { return p.getBoolean("wh_new_on", true); }
 

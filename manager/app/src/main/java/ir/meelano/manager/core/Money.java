@@ -10,6 +10,26 @@ import java.util.Locale;
 public final class Money {
     private Money() { }
 
+    /**
+     * Display unit. Atiran stores every amount in Rials, but Iranian speakers
+     * read and say Tomans, so a column of Rial figures is routinely misread by a
+     * factor of ten. Defaulting to Toman and converting on the way out keeps the
+     * stored data untouched while making the tables readable.
+     */
+    public static final int UNIT_RIAL = 0;
+    public static final int UNIT_TOMAN = 1;
+    private static int unit = UNIT_TOMAN;
+
+    public static void setUnit(int u) { unit = (u == UNIT_RIAL) ? UNIT_RIAL : UNIT_TOMAN; }
+    public static int unit() { return unit; }
+    public static boolean isToman() { return unit == UNIT_TOMAN; }
+
+    /** Rial amount → amount in the selected display unit. */
+    public static double toUnit(double rial) { return unit == UNIT_TOMAN ? rial / 10.0 : rial; }
+
+    /** «تومان» or «ریال». */
+    public static String unitName() { return unit == UNIT_TOMAN ? "تومان" : "ریال"; }
+
     /** Latin digits → Persian digits. */
     public static String fa(String s) {
         if (s == null) return "";
@@ -35,9 +55,14 @@ public final class Money {
         return f.format(v).replace(',', '٬').replace('-', '−');
     }
 
-    /** «۱۲٬۴۵۰٬۰۰۰ ریال» */
+    /** «۱۲٬۴۵۰٬۰۰۰ ریال» — or the Toman equivalent when Toman is selected. */
     public static String rial(double v) {
-        return fa(group(Math.round(v))) + " ریال";
+        return fa(group(Math.round(toUnit(v)))) + " " + unitName();
+    }
+
+    /** Compact amount WITH the current unit for tiles/cards: «۱۲٫۴ میلیون تومان». */
+    public static String compactMoney(double v) {
+        return compact(toUnit(v)) + " " + unitName();
     }
 
     /** «۱۲٬۴۵۰٬۰۰۰» */
@@ -84,16 +109,9 @@ public final class Money {
         return fa(s);
     }
 
-    /** Compact amount WITH the Rial unit for tiles/cards: «۱۲٫۴ میلیون ریال». */
+    /** Compact amount WITH the current unit for tiles/cards: «۱۲٫۴ میلیون تومان». */
     public static String compactRial(double v) {
-        double a = Math.abs(v);
-        String s;
-        if (a >= 1e12) s = trim(v / 1e12) + " هزار میلیارد ریال";
-        else if (a >= 1e9) s = trim(v / 1e9) + " میلیارد ریال";
-        else if (a >= 1e6) s = trim(v / 1e6) + " میلیون ریال";
-        else if (a >= 1e3) s = trim(v / 1e3) + " هزار ریال";
-        else s = trim(v) + " ریال";
-        return fa(s);
+        return compactMoney(v);
     }
 
     private static String trim(double v) {

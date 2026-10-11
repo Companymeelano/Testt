@@ -1544,17 +1544,33 @@ public final class MasterQueries {
         String all = m.col("sailfact", "all", "All", "sumall");
         String tas = m.col("sailfact", "tasvieh", "Tasvieh");
         String custJoin = "";
+        String routeJoin = "";
         String custExpr = "N''";
         String phoneExpr = "N''";
+        String routeIdExpr = "N''";
+        String routeNameExpr = "N''";
         if (shmo != null && m.table("CUSTOMERS")) {
             String cid = m.colFlex("CUSTOMERS", "shmo", "SHMO");
             String cnm = m.colFlex("CUSTOMERS", "moname", "MONAME", "name");
             String ccl = m.colFlex("CUSTOMERS", "cell", "tell1");
-            if (cid != null && cnm != null) {
+            String customerRoute = m.col("CUSTOMERS", "RDF_masir", "rdf_masir");
+            String routeKey = m.col("masir", "rdf_masir");
+            String routeName = m.col("masir", "name");
+            boolean canRoute = customerRoute != null && routeKey != null && m.table("masir");
+            if (cid != null && (cnm != null || canRoute)) {
                 custJoin = " LEFT JOIN dbo.CUSTOMERS cu ON TRY_CONVERT(nvarchar(60),cu.[" + cid + "])"
                         + "=TRY_CONVERT(nvarchar(60),f.[" + shmo + "])";
-                custExpr = Sql.txt("cu", cnm, 200);
-                phoneExpr = "COALESCE(" + Sql.txt("cu", ccl == null ? cnm : ccl, 60) + ",N'')";
+                if (cnm != null) {
+                    custExpr = Sql.txt("cu", cnm, 200);
+                    phoneExpr = "COALESCE(" + Sql.txt("cu", ccl == null ? cnm : ccl, 60) + ",N'')";
+                }
+                if (canRoute) {
+                    routeIdExpr = "COALESCE(" + Sql.txt("cu", customerRoute, 60) + ",N'')";
+                    routeNameExpr = routeName == null ? routeIdExpr
+                            : "COALESCE(" + Sql.txt("ms", routeName, 150) + "," + routeIdExpr + ",N'')";
+                    routeJoin = " LEFT JOIN dbo.masir ms ON TRY_CONVERT(nvarchar(60),ms.[" + routeKey + "])"
+                            + "=TRY_CONVERT(nvarchar(60),cu.[" + customerRoute + "])";
+                }
             }
         }
         String visJoin = "";
@@ -1569,18 +1585,21 @@ public final class MasterQueries {
             }
         }
         List<Object> binds = new ArrayList<>();
-        String where = "";
+        List<String> conds = new ArrayList<>();
+        Set<String> cols = m.columns("sailfact");
         if (day != null && !day.trim().isEmpty()) {
-            where = " WHERE " + Sql.dateKey(Sql.date10("f", dt)) + "=?";
+            conds.add(Sql.dateKey(Sql.date10("f", dt)) + "=?");
             binds.add(day.trim());
         }
+        String where = " WHERE " + (conds.isEmpty() ? "1=1" : Sql.join(conds, " AND "))
+                + Sql.activeAnd(cols, "f") + Sql.softAnd(cols, "f");
         return new Queries.Q("SELECT TOP " + Math.max(1, Math.min(500, limit))
                 + " TRY_CONVERT(bigint,f.[" + no + "]) AS id, "
                 + Sql.date10("f", dt) + " AS dt, " + custExpr + " AS cust, " + phoneExpr + " AS phone, "
-                + visExpr + " AS visitor, "
+                + visExpr + " AS visitor, " + routeIdExpr + " AS routeId, " + routeNameExpr + " AS route, "
                 + (all == null ? "0" : "TRY_CONVERT(money,f.[" + all + "])") + " AS amount, "
                 + (tas == null ? "N''" : "COALESCE(" + Sql.txt("f", tas, 10) + ",N'')") + " AS settled"
-                + " FROM dbo.sailfact f" + custJoin + visJoin + where
+                + " FROM dbo.sailfact f" + custJoin + routeJoin + visJoin + where
                 + " ORDER BY f.[" + no + "] DESC", binds);
     }
 

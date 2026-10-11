@@ -30,6 +30,7 @@ public class ManagerAlertsScreen extends Screen {
     private EditText stockCover;
     private LinearLayout content;
     private LinearLayout results;
+    private int checkSequence;
 
     private static final class AlertItem {
         String title;
@@ -119,6 +120,7 @@ public class ManagerAlertsScreen extends Screen {
         final int drop = a.getSharedPreferences(PREFS, 0).getInt("sales_drop", DEFAULT_DROP);
         final int margin = a.getSharedPreferences(PREFS, 0).getInt("margin_floor", DEFAULT_MARGIN);
         final int cover = a.getSharedPreferences(PREFS, 0).getInt("stock_cover", DEFAULT_COVER);
+        final int sequence = ++checkSequence;
         final String today = Jalali.todayStr();
         results.removeAllViews();
         results.addView(a.kit.loading("در حال محاسبه هشدارها…"), a.kit.lp(-1, -2));
@@ -146,11 +148,11 @@ public class ManagerAlertsScreen extends Screen {
             return d;
         }, new Repo.Cb<Data>() {
             @Override public void ok(Data d) {
-                if (content == null) return;
+                if (content == null || sequence != checkSequence) return;
                 showResults(d, drop, margin, cover);
             }
             @Override public void fail(String faError) {
-                if (content == null) return;
+                if (content == null || sequence != checkSequence) return;
                 results.removeAllViews();
                 LinearLayout card = a.kit.card(Theme.DANGER);
                 card.addView(a.kit.text("بررسی هشدارها ناموفق بود", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
@@ -185,7 +187,8 @@ public class ManagerAlertsScreen extends Screen {
         List<AlertItem> alerts = new ArrayList<>();
         double today = d.today.d("total");
         double average7 = d.previous.d("total") / 7.0;
-        if (dropThreshold > 0 && average7 > 0) {
+        boolean salesAvailable = !hasNote(d, "فروش امروز") && !hasNote(d, "فروش ۷ روز قبل");
+        if (dropThreshold > 0 && salesAvailable && average7 > 0) {
             double drop = (average7 - today) * 100.0 / average7;
             if (drop >= dropThreshold) {
                 alerts.add(new AlertItem("افت فروش امروز: " + Money.pct(drop),
@@ -202,7 +205,7 @@ public class ManagerAlertsScreen extends Screen {
                 if (pct < marginThreshold) {
                     alerts.add(new AlertItem("حاشیه سود پایین: " + r.s("label"),
                             "حاشیه " + Money.pct(pct) + " • فروش " + Money.compactRial(sales)
-                                    + " • سود " + Money.compactRial(r.d("profit")), "profit", Theme.WARNING));
+                                    + " • سود " + Money.compactRial(r.d("profit")), "products", Theme.WARNING));
                     shown++;
                     if (shown >= 5) break;
                 }
@@ -224,10 +227,14 @@ public class ManagerAlertsScreen extends Screen {
             }
         }
         if (alerts.isEmpty()) {
-            box.addView(a.kit.text("✓ موردی از آستانه‌های فعال عبور نکرده است", 13f, Theme.SUCCESS, true),
+            boolean incomplete = !d.notes.isEmpty();
+            box.addView(a.kit.text(incomplete ? "⚠ بررسی هشدارها کامل نشد" : "✓ موردی از آستانه‌های فعال عبور نکرده است",
+                    13f, incomplete ? Theme.WARNING : Theme.SUCCESS, true), a.kit.lp(-1, -2));
+            box.addView(a.kit.hint(salesAvailable
+                    ? "فروش امروز " + Money.compactRial(today)
+                            + " • میانگین روزانهٔ ۷ روز قبل " + Money.compactRial(average7)
+                    : "مقایسهٔ فروش نامشخص است؛ دادهٔ ناقص به‌عنوان فروش صفر تفسیر نمی‌شود."),
                     a.kit.lp(-1, -2));
-            box.addView(a.kit.hint("فروش امروز " + Money.compactRial(today)
-                    + " • میانگین روزانهٔ ۷ روز قبل " + Money.compactRial(average7)), a.kit.lp(-1, -2));
         } else {
             box.addView(a.kit.text(Money.fa(String.valueOf(alerts.size())) + " هشدار نیازمند اقدام", 13f,
                     Theme.WARNING, true), a.kit.lp(-1, -2));
@@ -243,6 +250,11 @@ public class ManagerAlertsScreen extends Screen {
             box.addView(a.kit.hint("بعضی هشدارها کامل بررسی نشدند: " + join(d.notes)), a.kit.lp(-1, -2));
         }
         results.addView(box, a.kit.lp(-1, -2));
+    }
+
+    private boolean hasNote(Data d, String prefix) {
+        for (String note : d.notes) if (note != null && note.startsWith(prefix + ":")) return true;
+        return false;
     }
 
     private String join(List<String> v) {

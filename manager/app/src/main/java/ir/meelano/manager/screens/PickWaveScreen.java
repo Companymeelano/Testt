@@ -32,6 +32,8 @@ import org.json.JSONObject;
 public class PickWaveScreen extends Screen {
     private String day = Jalali.todayStr();
     private String distributor = "";
+    private String routeFilterId = "";
+    private String routeFilterName = "";
     private LinearLayout content;
     private LinearLayout invoiceBox;
     private LinearLayout pickBox;
@@ -86,7 +88,13 @@ public class PickWaveScreen extends Screen {
         if (!distributor.isEmpty()) controls.addView(a.kit.btnGhost("پاک‌کردن فیلتر موزع",
                 Theme.STEEL, v -> { distributor = ""; selected.clear(); pickLines.clear(); render(content); }),
                 a.kit.lp(-1, -2));
-        routeLabel = a.kit.edit("نام مسیر / نوبت (اختیاری)", routeText);
+        controls.addView(a.kit.btnGhost(routeFilterName.isEmpty()
+                ? "فیلتر بر اساس مسیر آتیران (اختیاری)" : "مسیر: " + routeFilterName + " • تغییر",
+                Theme.VIOLET, v -> chooseRoute()), a.kit.lp(-1, -2));
+        if (!routeFilterId.isEmpty()) controls.addView(a.kit.btnGhost("پاک‌کردن فیلتر مسیر",
+                Theme.STEEL, v -> { routeFilterId = ""; routeFilterName = ""; selected.clear(); pickLines.clear(); render(content); }),
+                a.kit.lp(-1, -2));
+        routeLabel = a.kit.edit("برچسب موج / نوبت (اختیاری)", routeText);
         routeLabel.addTextChangedListener(new android.text.TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
@@ -95,7 +103,7 @@ public class PickWaveScreen extends Screen {
             @Override public void afterTextChanged(android.text.Editable e) { }
         });
         controls.addView(routeLabel, a.kit.lp(-1, -2));
-        controls.addView(a.kit.hint("فیلتر موزع فقط از نام‌های تشخیص‌داده‌شده به‌عنوان موزع استفاده می‌کند؛ برچسب مسیر را می‌توانید دستی وارد کنید."),
+        controls.addView(a.kit.hint("می‌توانید فاکتورها را با مسیر آتیران یا موزع محدود کنید؛ انتخاب هم‌زمان هر دو هم ممکن است. موزع فقط از نقش‌های شناسایی‌شده نشان داده می‌شود."),
                 a.kit.lp(-1, -2));
         content.addView(controls, a.kit.lp(-1, -2));
         content.addView(a.kit.gap(8));
@@ -106,6 +114,7 @@ public class PickWaveScreen extends Screen {
         selectedCount = a.kit.text("۰ انتخاب", 11f, Theme.GOLD, true);
         invoiceHead.addView(selectedCount, a.kit.lp(-2, -2));
         invoiceCard.addView(invoiceHead, a.kit.lp(-1, -2));
+        invoiceCard.addView(a.kit.hint("فهرست روز، حداکثر شامل ۵۰۰ فاکتور بازِ فعال است."), a.kit.lp(-1, -2));
         LinearLayout allRow = a.kit.h();
         allRow.addView(a.kit.btnGhost("انتخاب همه", Theme.GOLD, v -> selectAll(true)), a.kit.wlp(1f));
         allRow.addView(a.kit.space(8));
@@ -142,6 +151,7 @@ public class PickWaveScreen extends Screen {
         invoiceBox.addView(a.kit.loading("در حال دریافت فاکتورهای روز…"), a.kit.lp(-1, -2));
         final String selectedDay = day;
         final String selectedDistributor = distributor;
+        final String selectedRouteId = routeFilterId;
         a.repo.run(c -> {
             Meta m = new Meta(c);
             List<Row> rows = Repo.exec(c, MasterQueries.whDeliveriesForPicking(m, selectedDay));
@@ -154,18 +164,21 @@ public class PickWaveScreen extends Screen {
                 if (handed.contains(no)) continue;
                 if (!selectedDistributor.isEmpty()
                         && !selectedDistributor.equalsIgnoreCase(r.s("visitor").trim())) continue;
+                if (!selectedRouteId.isEmpty()
+                        && !selectedRouteId.equalsIgnoreCase(r.s("routeId").trim())) continue;
                 out.add(r);
             }
             return out;
         }, new Repo.Cb<List<Row>>() {
             @Override public void ok(List<Row> rows) {
-                if (content == null || !selectedDay.equals(day) || !selectedDistributor.equals(distributor)) return;
+                if (content == null || !selectedDay.equals(day) || !selectedDistributor.equals(distributor)
+                        || !selectedRouteId.equals(routeFilterId)) return;
                 shownInvoices = rows == null ? new ArrayList<Row>() : rows;
                 drawInvoices();
             }
             @Override public void fail(String faError) {
                 if (invoiceBox == null || !selectedDay.equals(day)
-                        || !selectedDistributor.equals(distributor)) return;
+                        || !selectedDistributor.equals(distributor) || !selectedRouteId.equals(routeFilterId)) return;
                 invoiceBox.removeAllViews();
                 invoiceBox.addView(a.kit.empty("فاکتورها دریافت نشدند", faError), a.kit.lp(-1, -2));
             }
@@ -176,9 +189,11 @@ public class PickWaveScreen extends Screen {
         if (invoiceBox == null) return;
         invoiceBox.removeAllViews();
         if (shownInvoices.isEmpty()) {
-            String msg = distributor.isEmpty()
-                    ? "فاکتورِ تحویل‌نشده‌ای برای این روز پیدا نشد."
-                    : "فاکتورِ بازِ این روز برای «" + distributor + "» پیدا نشد؛ فیلتر موزع را پاک کنید یا روز دیگری را ببینید.";
+            String filters = (routeFilterName.isEmpty() ? "" : "مسیر «" + routeFilterName + "»")
+                    + (!routeFilterName.isEmpty() && !distributor.isEmpty() ? " و " : "")
+                    + (distributor.isEmpty() ? "" : "موزع «" + distributor + "»");
+            String msg = filters.isEmpty() ? "فاکتورِ تحویل‌نشده‌ای برای این روز پیدا نشد."
+                    : "فاکتورِ بازِ این روز برای " + filters + " پیدا نشد؛ فیلترها را پاک کنید یا روز دیگری را ببینید.";
             invoiceBox.addView(a.kit.empty(msg, "فهرست فقط تا ۵۰۰ فاکتور روز بارگذاری می‌شود."), a.kit.lp(-1, -2));
             updateCount();
             return;
@@ -244,6 +259,29 @@ public class PickWaveScreen extends Screen {
         });
     }
 
+    private void chooseRoute() {
+        a.repo.run(c -> {
+            Meta m = new Meta(c);
+            return Repo.exec(c, MasterQueries.lookupRoutes(m));
+        }, new Repo.Cb<List<Row>>() {
+            @Override public void ok(List<Row> rows) {
+                if (rows == null || rows.isEmpty()) {
+                    a.kit.toast("مسیری در آتیران یافت نشد");
+                    return;
+                }
+                a.kit.searchPicker("انتخاب مسیر", rows, new String[]{"name"}, picked -> {
+                    routeFilterId = picked.s("id").trim();
+                    routeFilterName = picked.s("name");
+                    selected.clear();
+                    pickLines.clear();
+                    if (routeLabel != null) routeText = routeLabel.getText().toString();
+                    if (content != null) render(content);
+                }).show();
+            }
+            @Override public void fail(String faError) { a.kit.toast(faError); }
+        });
+    }
+
     private void makePickList() {
         if (loadingPick) return;
         final List<Row> chosen = new ArrayList<>();
@@ -252,6 +290,9 @@ public class PickWaveScreen extends Screen {
             a.kit.toast("حداقل یک فاکتور را انتخاب کنید");
             return;
         }
+        final String waveDay = day;
+        final String waveDistributor = distributor;
+        final String waveRouteId = routeFilterId;
         loadingPick = true;
         pickBox.removeAllViews();
         pickBox.addView(a.kit.loading("در حال تجمیع اقلام انتخاب‌شده…"), a.kit.lp(-1, -2));
@@ -280,7 +321,8 @@ public class PickWaveScreen extends Screen {
         }, new Repo.Cb<List<PickLine>>() {
             @Override public void ok(List<PickLine> rows) {
                 loadingPick = false;
-                if (content == null) return;
+                if (content == null || !waveDay.equals(day) || !waveDistributor.equals(distributor)
+                        || !waveRouteId.equals(routeFilterId)) return;
                 pickLines = rows == null ? new ArrayList<PickLine>() : rows;
                 lineByCode.clear();
                 for (PickLine line : pickLines) if (!line.code.isEmpty()) lineByCode.put(line.code, line);
@@ -288,6 +330,8 @@ public class PickWaveScreen extends Screen {
             }
             @Override public void fail(String faError) {
                 loadingPick = false;
+                if (content == null || !waveDay.equals(day) || !waveDistributor.equals(distributor)
+                        || !waveRouteId.equals(routeFilterId)) return;
                 pickBox.removeAllViews();
                 pickBox.addView(a.kit.error(faError, () -> makePickList()), a.kit.lp(-1, -2));
             }
@@ -385,8 +429,11 @@ public class PickWaveScreen extends Screen {
             JSONObject wave = new JSONObject();
             wave.put("day", day);
             wave.put("distributor", distributor);
+            wave.put("routeId", routeFilterId);
+            wave.put("routeName", routeFilterName);
             String route = routeLabel == null ? routeText.trim() : routeLabel.getText().toString().trim();
-            if (route.isEmpty()) route = distributor.isEmpty() ? "موج " + day : distributor;
+            if (route.isEmpty()) route = !routeFilterName.isEmpty() ? routeFilterName
+                    : (distributor.isEmpty() ? "موج " + day : distributor);
             wave.put("route", route);
             String keeper = AtiranAuth.sessionName(a);
             if (keeper.isEmpty()) keeper = AtiranAuth.sessionUser(a);

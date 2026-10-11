@@ -198,6 +198,18 @@ public class ShomarshScreen extends Screen {
         catch (Exception ignored) { return new JSONArray(); }
     }
 
+    private boolean hasVarianceWithoutReason(JSONObject doc) {
+        JSONArray ls = parseLines(doc == null ? "[]" : doc.optString("lines", "[]"));
+        for (int i = 0; i < ls.length(); i++) {
+            JSONObject ln = ls.optJSONObject(i);
+            if (ln == null) continue;
+            double stock = ln.optDouble(WarehouseWriter.L_STOCK, 0);
+            double counted = ln.optDouble(WarehouseWriter.L_COUNTED, 0);
+            if (Math.abs(counted - stock) > 0.001 && ln.optString("reason", "").trim().isEmpty()) return true;
+        }
+        return false;
+    }
+
     private void reviewDialog(final JSONObject doc) {
         if (!isManager()) return;
         LinearLayout body = a.kit.v();
@@ -212,21 +224,27 @@ public class ShomarshScreen extends Screen {
             double stock = ln.optDouble(WarehouseWriter.L_STOCK, 0);
             double counted = ln.optDouble(WarehouseWriter.L_COUNTED, 0);
             double diff = counted - stock;
-            body.addView(a.kit.kv(ln.optString(WarehouseWriter.L_NAKA, "—"),
-                    "کد " + ln.optString(WarehouseWriter.L_SHKA, "")
-                            + " • سیستم " + Money.fa(fmtNum(stock))
-                            + " • شمرده " + Money.fa(fmtNum(counted))
-                            + " • اختلاف " + Money.fa(fmtNum(diff)),
+            String detail = "کد " + ln.optString(WarehouseWriter.L_SHKA, "")
+                    + " • سیستم " + Money.fa(fmtNum(stock))
+                    + " • شمرده " + Money.fa(fmtNum(counted))
+                    + " • اختلاف " + Money.fa(fmtNum(diff));
+            String reason = ln.optString("reason", "").trim();
+            if (!reason.isEmpty()) detail += " • علت/توضیح انباردار: " + reason;
+            body.addView(a.kit.kv(ln.optString(WarehouseWriter.L_NAKA, "—"), detail,
                     Math.abs(diff) > 0.001 ? Theme.WARNING : Theme.SUCCESS), a.kit.lp(-1, -2));
         }
-        body.addView(a.kit.hint("تأیید فقط وضعیت بررسی را ثبت می‌کند؛ تعدیل موجودی مستقیماً ارسال نمی‌شود."),
+        body.addView(a.kit.hint("تأیید فقط وضعیت بررسی را ثبت می‌کند؛ تعدیل موجودی مستقیماً ارسال نمی‌شود. اگر علت مغایرتی ثبت نشده، پیش از تأیید علت یا اقدام مدیر را یادداشت کنید."),
                 a.kit.lp(-1, -2));
-        final EditText note = a.kit.edit("یادداشت مدیر؛ علت رد اجباری است", "");
+        final EditText note = a.kit.edit("علت مغایرتِ بی‌توضیح / اقدام مدیر (رد اجباری)", "");
         body.addView(note, a.kit.lp(-1, -2));
         final AlertDialog[] dialog = new AlertDialog[1];
         LinearLayout actions = a.kit.h();
         actions.addView(a.kit.btnGold("تأیید بررسی", v -> {
             String memo = note.getText().toString().trim();
+            if (hasVarianceWithoutReason(doc) && memo.isEmpty()) {
+                a.kit.toast("برای تأیید، علت یا اقدامِ مغایرتِ بی‌توضیح را ثبت کنید");
+                return;
+            }
             dialog[0].dismiss();
             submitReview(doc.optString("id", ""), true, memo);
         }), a.kit.wlp(1f));
@@ -356,13 +374,37 @@ public class ShomarshScreen extends Screen {
                     a.kit.lp(-1, -2));
         }
         final EditText e = a.kit.editNum("تعداد شمرده‌شده *", "");
+        e.setInputType(android.text.InputType.TYPE_CLASS_NUMBER
+                | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+                | android.text.InputType.TYPE_NUMBER_FLAG_SIGNED);
         b.addView(e, a.kit.lp(-1, -2));
+        final EditText reason = a.kit.edit("توضیح/علت احتمالی اختلاف (اختیاری در شمارش کور)", "");
+        reason.setMinLines(2);
+        b.addView(reason, a.kit.lp(-1, -2));
         final AlertDialog[] box = new AlertDialog[1];
         b.addView(a.kit.btn("ثبت شمارش", v -> {
-            double c = 0;
+            String raw = Money.en(e.getText().toString()).trim()
+                    .replace("٬", "").replace('٫', '.').replace(',', '.');
+            if (raw.isEmpty()) {
+                a.kit.toast("تعداد شمرده‌شده را وارد کنید");
+                return;
+            }
+            final double c;
             try {
-                c = Double.parseDouble(Money.en(e.getText().toString()).trim());
-            } catch (Exception ignored) { }
+                c = Double.parseDouble(raw);
+            } catch (Exception invalid) {
+                a.kit.toast("تعداد معتبر نیست");
+                return;
+            }
+            if (Double.isNaN(c) || Double.isInfinite(c) || c < 0) {
+                a.kit.toast("تعداد باید عددی معتبر و صفر یا بیشتر باشد");
+                return;
+            }
+            String cause = reason.getText().toString().trim();
+            if (!blindMode() && Math.abs(c - stock) > 0.001 && cause.isEmpty()) {
+                a.kit.toast("برای شمارشی که مغایرت دارد علت یا توضیح را ثبت کنید");
+                return;
+            }
             try {
                 JSONObject ln = new JSONObject();
                 ln.put(WarehouseWriter.L_SHKA, code);
@@ -370,7 +412,23 @@ public class ShomarshScreen extends Screen {
                 ln.put(WarehouseWriter.L_UNIT, unit == null ? "" : unit);
                 ln.put(WarehouseWriter.L_STOCK, stock);
                 ln.put(WarehouseWriter.L_COUNTED, c);
-                lines.put(ln);
+                ln.put("reason", cause);
+                boolean replaced = false;
+                if (code != null && !code.trim().isEmpty()) {
+                    for (int i = 0; i < lines.length(); i++) {
+                        JSONObject old = lines.optJSONObject(i);
+                        if (old != null && code.equals(old.optString(WarehouseWriter.L_SHKA, ""))) {
+                            old.put(WarehouseWriter.L_NAKA, name);
+                            old.put(WarehouseWriter.L_UNIT, unit == null ? "" : unit);
+                            old.put(WarehouseWriter.L_STOCK, stock);
+                            old.put(WarehouseWriter.L_COUNTED, c);
+                            old.put("reason", cause);
+                            replaced = true;
+                            break;
+                        }
+                    }
+                }
+                if (!replaced) lines.put(ln);
                 try {
                     box[0].dismiss();
                 } catch (Exception ignored) { }

@@ -766,15 +766,15 @@ public final class Kit {
                     if (showKeys != null) {
                         for (String k : showKeys) {
                             if (k == null) continue;
-                            String v = r.s(k);
-                            if (v == null || v.trim().isEmpty()) continue;
+                            String cell = r.s(k);
+                            if (cell == null || cell.trim().isEmpty()) continue;
                             if (label.length() > 0) label.append("  \u2022  ");
-                            label.append(v);
+                            label.append(cell);
                         }
                     }
                     if (label.length() == 0) label.append("\u2014");
                     list.addView(btnGhost(label.toString(), Theme.GOLD, new View.OnClickListener() {
-                        @Override public void onClick(View v) {
+                        @Override public void onClick(View tapped) {
                             try { box[0].dismiss(); } catch (Exception ignored) { }
                             if (onPick != null) onPick.onPick(r);
                         }

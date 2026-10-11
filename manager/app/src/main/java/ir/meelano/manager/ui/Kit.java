@@ -40,10 +40,11 @@ public final class Kit {
     public TextView text(String s, float sp, int color, boolean bold) {
         TextView t = new TextView(a);
         t.setText(s == null ? "" : s);
-        // v35: legibility floor. Tiny labels were being shrunk to fit; 11sp is the smallest
-        // size that stays readable, and the layout wraps instead of shrinking.
-        float base = sp < 11f ? 11f : sp;
-        t.setTextSize(base * Theme.fontScale());
+        // v37: legibility floor, then two multipliers. fontScale is the user's own zoom
+        // choice; typeScale grows type with the screen so labels stay readable on the large
+        // displays of high-end phones. Only type is scaled - layout metrics stay in dp.
+        float base = sp < 12.5f ? 12.5f : sp;
+        t.setTextSize(base * Theme.fontScale() * Theme.typeScale());
         t.setTextColor(color);
         t.setTypeface(Theme.face(bold));
         t.setLineSpacing(Theme.dp(1.5f), 1.0f);
@@ -775,6 +776,11 @@ public final class Kit {
             v.setImageResource(a.getResources().getIdentifier("meelano_3d", "drawable", a.getPackageName()));
         } catch (Exception ignored) { }
         v.setAdjustViewBounds(true);
+        v.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        // Honour the requested size: the argument used to be accepted and then ignored, so a
+        // caller that relied on it got an unsized ImageView and the artwork rendered at its
+        // raw pixel size instead.
+        if (sizeDp > 0) v.setLayoutParams(new LinearLayout.LayoutParams(Theme.dp(sizeDp), Theme.dp(sizeDp)));
         return v;
     }
 

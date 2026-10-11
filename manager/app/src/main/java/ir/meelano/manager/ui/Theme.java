@@ -45,6 +45,13 @@ public final class Theme {
     private static String accentKey = "gold";
     private static float fontScale = 1f;
     private static float density = 3f;
+    /**
+     * Type grows slightly with the screen so labels are not lost on the large, dense
+     * displays of high-end phones - a 13sp line that reads fine on a 5" screen looks lost on
+     * a 6.8" one. Only type is scaled; layout metrics stay in plain dp so nothing can
+     * overflow horizontally.
+     */
+    private static float typeScale = 1f;
     private static Typeface regular;
     private static Typeface bold;
 
@@ -77,6 +84,9 @@ public final class Theme {
 
     /** 1.0 normal, 1.3 large-text mode (applied in Kit.text). */
     public static float fontScale() { return fontScale; }
+
+    /** Screen-aware type multiplier (1.00 on small phones, up to 1.18 on large ones). */
+    public static float typeScale() { return typeScale; }
 
     /** Seasonal accent key from the Jalali date (v14 «تم مناسبتی»). */
     public static String seasonAccentKey() {
@@ -114,7 +124,10 @@ public final class Theme {
     }
 
     public static void init(Context c) {
-        density = c.getResources().getDisplayMetrics().density;
+        android.util.DisplayMetrics dm0 = c.getResources().getDisplayMetrics();
+        density = dm0.density;
+        float wDp = density > 0 ? dm0.widthPixels / density : 360f;
+        typeScale = wDp < 380f ? 1.00f : wDp < 440f ? 1.06f : wDp < 520f ? 1.12f : 1.18f;
         try {
             regular = Typeface.createFromAsset(c.getAssets(), "fonts/Vazirmatn-Regular.ttf");
             bold = Typeface.createFromAsset(c.getAssets(), "fonts/Vazirmatn-Bold.ttf");

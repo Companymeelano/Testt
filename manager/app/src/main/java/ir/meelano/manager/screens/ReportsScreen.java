@@ -4,6 +4,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.TextView;
 import ir.meelano.manager.core.CacheStore;
 
 import ir.meelano.manager.MainActivity;
@@ -23,11 +24,13 @@ import ir.meelano.manager.ui.Theme;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Reports center: 48 management reports, category landing, charts, tables, PDF/Excel/print. */
+/** Reports center: 52 management reports, search, category landing, charts, tables and export. */
 public class ReportsScreen extends Screen {
     private final Filter filter = new Filter();
     private ReportCatalog.Spec sel;
     private String selCat;
+    /** Browse search is separate from the report's date/status filter. */
+    private String browseQuery = "";
     private LinearLayout contentRef;
 
     public ReportsScreen(MainActivity a) {
@@ -117,54 +120,218 @@ public class ReportsScreen extends Screen {
         else renderReport(content, sel);
     }
 
-    private void renderList(LinearLayout content) {
+    private void renderList(final LinearLayout content) {
         content.removeAllViews();
+        content.addView(a.kit.hero(glyph(), title(),
+                Money.fa(String.valueOf(ReportCatalog.ALL.length)) + " گزارش مدیریتی • جست‌وجوی سریع و دسته‌بندی‌شده",
+                accent()), a.kit.lp(-1, -2));
+        content.addView(a.kit.gap(10));
+        content.addView(a.kit.searchBar("جست‌وجوی نام، کاربرد یا دستهٔ گزارش…", browseQuery, q -> {
+            browseQuery = q == null ? "" : q.trim();
+            selCat = null;
+            render(contentRef);
+        }), a.kit.lp(-1, -2));
+        content.addView(a.kit.gap(10));
+
+        if (!normalize(browseQuery).isEmpty()) {
+            List<ReportCatalog.Spec> results = filteredReports(browseQuery, null);
+            content.addView(a.kit.sectionHead("نتایج جست‌وجو",
+                    Money.fa(String.valueOf(results.size())) + " گزارش", null), a.kit.lp(-1, -2));
+            content.addView(a.kit.gap(6));
+            if (results.isEmpty()) {
+                content.addView(a.kit.empty("گزارشی با این عبارت پیدا نشد",
+                        "نام گزارش، دسته یا کاربرد آن را کوتاه‌تر جست‌وجو کنید."), a.kit.lp(-1, -2));
+                return;
+            }
+            addReportRows(content, results);
+            return;
+        }
+
         if (selCat == null) {
-            content.addView(a.kit.hero(glyph(), title(), "دسته گزارش را انتخاب کنید", accent()), a.kit.lp(-1, -2));
-            content.addView(a.kit.gap(12));
             java.util.List<String> secs = new java.util.ArrayList<>();
             java.util.List<Integer> counts = new java.util.ArrayList<>();
-            for (ReportCatalog.Spec s : ReportCatalog.ALL) {
-                int ix = secs.indexOf(s.section);
+            for (ReportCatalog.Spec spec : ReportCatalog.ALL) {
+                int ix = secs.indexOf(spec.section);
                 if (ix < 0) {
-                    secs.add(s.section);
+                    secs.add(spec.section);
                     counts.add(1);
                 } else counts.set(ix, counts.get(ix) + 1);
             }
-            for (int i = 0; i < secs.size(); i += 2) {
-                if (i > 0) content.addView(a.kit.gap(10));
-                LinearLayout gr = a.kit.h();
-                gr.addView(catCard(secs.get(i), counts.get(i)), a.kit.wlp(1f));
-                gr.addView(a.kit.space(10));
-                if (i + 1 < secs.size()) gr.addView(catCard(secs.get(i + 1), counts.get(i + 1)), a.kit.wlp(1f));
-                else gr.addView(a.kit.space(10), a.kit.wlp(1f));
-                content.addView(gr, a.kit.lp(-1, -2));
+            int cols = a.kit.isWide() ? 3 : 2;
+            LinearLayout grid = a.kit.v();
+            LinearLayout row = null;
+            for (int i = 0; i < secs.size(); i++) {
+                if (i % cols == 0) {
+                    row = a.kit.h();
+                    LinearLayout.LayoutParams rp = a.kit.lp(-1, -2);
+                    if (i > 0) rp.setMargins(0, Theme.dp(10), 0, 0);
+                    grid.addView(row, rp);
+                } else {
+                    row.addView(a.kit.space(10));
+                }
+                row.addView(catCard(secs.get(i), counts.get(i)), a.kit.wlp(1f));
             }
+            if (secs.size() % cols != 0 && row != null)
+                row.addView(a.kit.space(10), a.kit.wlp(1f));
+            content.addView(grid, a.kit.lp(-1, -2));
             return;
         }
+
         content.addView(a.kit.btnGhost("‹ همه دسته‌ها", Theme.GOLD, v -> {
             selCat = null;
             render(contentRef);
         }), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
-        content.addView(a.kit.hero("▤", selCat, "گزارش‌های این دسته، به ترتیب اولویت", sectionAccent(selCat)), a.kit.lp(-1, -2));
+        content.addView(a.kit.hero("▤", selCat,
+                "گزارش‌های این دسته • " + Money.fa(String.valueOf(countInSection(selCat))) + " مورد",
+                sectionAccent(selCat)), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(12));
-        for (final ReportCatalog.Spec s : ReportCatalog.ALL) {
-            if (!s.section.equals(selCat)) continue;
-            View r = a.kit.navRow("▤", s.title, s.desc + (s.needsRange ? " • بازه‌دار" : ""), sectionAccent(s.section), v -> {
-                sel = s;
-                a.refreshChrome();
-                render(contentRef);
-            });
+        addReportRows(content, filteredReports("", selCat));
+    }
+
+    private int countInSection(String section) {
+        int n = 0;
+        for (ReportCatalog.Spec spec : ReportCatalog.ALL)
+            if (section.equals(spec.section)) n++;
+        return n;
+    }
+
+    private List<ReportCatalog.Spec> filteredReports(String query, String section) {
+        List<ReportCatalog.Spec> out = new ArrayList<>();
+        String q = normalize(query);
+        for (ReportCatalog.Spec spec : ReportCatalog.ALL) {
+            if (section != null && !section.equals(spec.section)) continue;
+            if (!q.isEmpty() && !normalize(spec.title + " " + spec.desc + " " + spec.section + " " + spec.id).contains(q))
+                continue;
+            out.add(spec);
+        }
+        return out;
+    }
+
+    private void addReportRows(LinearLayout content, List<ReportCatalog.Spec> rows) {
+        for (final ReportCatalog.Spec spec : rows) {
+            View r = reportRow(spec);
             LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
-            p.setMargins(0, 0, 0, Theme.dp(10));
+            p.setMargins(0, 0, 0, Theme.dp(9));
             content.addView(r, p);
+        }
+    }
+
+    /** Search and category browse use the same Persian-aware normalization. */
+    private static String normalize(String s) {
+        if (s == null) return "";
+        return s.replace('ي', 'ی').replace('ك', 'ک').replace("\u200c", "")
+                .toLowerCase(java.util.Locale.ROOT).trim();
+    }
+
+    private View reportRow(final ReportCatalog.Spec spec) {
+        final int color = sectionAccent(spec.section);
+        LinearLayout c = a.kit.h();
+        c.setGravity(Gravity.CENTER_VERTICAL);
+        c.setBackground(Theme.card());
+        c.setPadding(Theme.dp(12), Theme.dp(11), Theme.dp(12), Theme.dp(11));
+        c.setElevation(Theme.cardElevation());
+
+        ImageView icon = new ImageView(a);
+        icon.setImageResource(reportIcon(spec));
+        icon.setColorFilter(color);
+        icon.setBackground(Theme.avatar(Theme.alpha(color, 48)));
+        icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        c.addView(icon, new LinearLayout.LayoutParams(Theme.dp(48), Theme.dp(48)));
+        c.addView(a.kit.space(10));
+
+        LinearLayout copy = a.kit.v();
+        TextView title = a.kit.text(spec.title, 13.5f, Theme.TEXT, true);
+        title.setMaxLines(2);
+        title.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        copy.addView(title, a.kit.lp(-1, -2));
+        String meta = spec.section + " • " + (spec.needsRange ? "بازه‌دار" : "گزارش کلی");
+        TextView detail = a.kit.text(meta + " • " + spec.desc, 10.5f, Theme.MUTED, false);
+        detail.setMaxLines(2);
+        detail.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        copy.addView(detail, a.kit.lp(-1, -2));
+        c.addView(copy, a.kit.wlp(1f));
+        c.addView(a.kit.space(6));
+
+        ImageView arrow = new ImageView(a);
+        arrow.setImageResource(R.drawable.mi_chevron_left);
+        arrow.setColorFilter(Theme.MUTED);
+        arrow.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        c.addView(arrow, new LinearLayout.LayoutParams(Theme.dp(24), Theme.dp(40)));
+        c.setContentDescription(spec.title + "؛ " + spec.section + "؛ بازه‌دار: "
+                + (spec.needsRange ? "بله" : "خیر") + "؛ باز کردن گزارش");
+        Theme.pressable(c);
+        c.setOnClickListener(v -> {
+            sel = spec;
+            a.refreshChrome();
+            render(contentRef);
+        });
+        return c;
+    }
+
+    /** One purpose-matched vector icon for each report entry. */
+    private int reportIcon(ReportCatalog.Spec spec) {
+        switch (spec.id) {
+            case "today_top": return R.drawable.mi_point_of_sale;
+            case "cheques_today": return R.drawable.mi_schedule;
+            case "dying_stock": return R.drawable.mi_hourglass_top;
+            case "fresh_debtors": return R.drawable.mi_person_search;
+            case "fleeing_customers": return R.drawable.mi_directions_car;
+            case "lost_basket": return R.drawable.mi_shopping_bag;
+            case "cheque_reliability": return R.drawable.mi_verified_user;
+            case "visitor_yield": return R.drawable.mi_badge;
+            case "golden_hours": return R.drawable.mi_bolt;
+            case "sleeping_capital": return R.drawable.mi_account_balance_wallet;
+            case "stock_forecast": return R.drawable.mi_trending_down;
+            case "order_suggest": return R.drawable.mi_add_shopping_cart;
+            case "invoice_profit": return R.drawable.mi_request_quote;
+            case "sales_daily": return R.drawable.mi_calendar_month;
+            case "sales_top_products": return R.drawable.mi_star_fill;
+            case "sales_by_customer": return R.drawable.mi_group;
+            case "sales_monthly": return R.drawable.mi_event;
+            case "yoy_sales": return R.drawable.mi_compare_arrows;
+            case "sales_by_visitor": return R.drawable.mi_directions_car;
+            case "sales_by_route": return R.drawable.mi_location_on;
+            case "sales_by_group": return R.drawable.mi_category;
+            case "unsettled": return R.drawable.mi_assignment_late;
+            case "aging": return R.drawable.mi_history;
+            case "buy_daily": return R.drawable.mi_shopping_cart;
+            case "buy_top_products": return R.drawable.mi_shopping_cart_fill;
+            case "buy_monthly": return R.drawable.mi_work_history;
+            case "buy_by_party": return R.drawable.mi_storefront;
+            case "in_daily": return R.drawable.mi_download;
+            case "out_daily": return R.drawable.mi_upload;
+            case "pos_by_bank": return R.drawable.mi_credit_card;
+            case "cheque_due_in": return R.drawable.mi_schedule;
+            case "cheque_due_out": return R.drawable.mi_timer;
+            case "cheque_bounced_in": return R.drawable.mi_error;
+            case "out_of_stock": return R.drawable.mi_block;
+            case "low_stock": return R.drawable.mi_warning;
+            case "stock_value": return R.drawable.mi_inventory_2;
+            case "debtors": return R.drawable.mi_person_search;
+            case "creditors": return R.drawable.mi_account_balance_wallet;
+            case "new_customers": return R.drawable.mi_person;
+            case "inactive_customers": return R.drawable.mi_visibility_off;
+            case "visitor_perf": return R.drawable.mi_directions_car;
+            case "users": return R.drawable.mi_admin_panel_settings;
+            case "changes": return R.drawable.mi_history;
+            case "profit_daily": return R.drawable.mi_trending_up;
+            case "profit_by_product": return R.drawable.mi_sell;
+            case "profit_costs": return R.drawable.mi_trending_down;
+            case "sales_notconfirmed": return R.drawable.mi_pending;
+            case "buy_notconfirmed": return R.drawable.mi_assignment_late;
+            case "returns_by_kind": return R.drawable.mi_assignment_return;
+            case "returns_list": return R.drawable.mi_receipt_long;
+            case "bank_turnover": return R.drawable.mi_account_balance;
+            case "cows": return R.drawable.mi_store;
+            default: return sectionIcon(spec.section);
         }
     }
 
     private View catCard(final String section, int count) {
         LinearLayout c = a.kit.card(sectionAccent(section));
         c.setGravity(Gravity.CENTER_HORIZONTAL);
+        c.setMinimumHeight(Theme.dp(122));
         ImageView iv = new ImageView(a);
         try {
             iv.setImageResource(sectionIcon(section));
@@ -175,10 +342,14 @@ public class ReportsScreen extends Screen {
         c.addView(a.kit.gap(6));
         android.widget.TextView t = a.kit.text(section, 14f, Theme.TEXT, true);
         t.setGravity(Gravity.CENTER);
+        t.setMaxLines(2);
+        t.setEllipsize(android.text.TextUtils.TruncateAt.END);
         c.addView(t, a.kit.lp(-1, -2));
         android.widget.TextView u = a.kit.text(Money.fa(String.valueOf(count)) + " گزارش", 11.5f, Theme.MUTED, false);
         u.setGravity(Gravity.CENTER);
+        u.setSingleLine(true);
         c.addView(u, a.kit.lp(-1, -2));
+        c.setContentDescription(section + "؛ " + Money.fa(String.valueOf(count)) + " گزارش");
         c.addView(a.kit.gap(2));
         Theme.pressable(c);
         c.setOnClickListener(v -> {

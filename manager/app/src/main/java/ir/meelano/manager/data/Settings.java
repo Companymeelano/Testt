@@ -270,6 +270,13 @@ public final class Settings {
         p.edit().putString("home_order", csv == null ? HOME_ORDER_DEFAULT : csv).apply();
     }
 
+    /** Whether the manager dashboard's lower-priority analysis cards are expanded. */
+    public boolean homeDetailsExpanded() { return p.getBoolean("home_details_expanded", false); }
+
+    public void setHomeDetailsExpanded(boolean expanded) {
+        p.edit().putBoolean("home_details_expanded", expanded).apply();
+    }
+
     // ---------------- stock alerts + auto backup (v18) ----------------
     public boolean stockOn() { return p.getBoolean("stock_on", true); }
 

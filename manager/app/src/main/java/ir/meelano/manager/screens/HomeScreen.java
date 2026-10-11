@@ -12,6 +12,7 @@ import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.RoleStore;
 import ir.meelano.manager.core.MoneyQueries;
+import ir.meelano.manager.R;
 import ir.meelano.manager.core.Queries;
 import ir.meelano.manager.data.Meta;
 import ir.meelano.manager.data.Repo;
@@ -237,20 +238,102 @@ public class HomeScreen extends Screen {
         content.removeAllViews();
         content.addView(greetingHero(), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(12));
+
+        // Render each dashboard section into its own container so the lower-priority
+        // analysis panels can collapse without changing the user's saved order.
+        List<LinearLayout> blocks = new ArrayList<>();
+        List<Boolean> essential = new ArrayList<>();
+        int detailCount = 0;
         for (String key : orderedKeys()) {
-            if ("kpis".equals(key)) secKpis(content, d);
-            else if ("alerts".equals(key)) secAlerts(content, d);
-            else if ("trend".equals(key)) secTrend(content, d);
-            else if ("donut".equals(key)) secDonut(content, d);
-            else if ("debtors".equals(key)) secDebtors(content, d);
-            else if ("visitors".equals(key)) secVisitors(content, d);
-            else if ("due".equals(key)) secDue(content, d);
-            else if ("invstatus".equals(key)) secInvStatus(content, d);
-            else if ("returns".equals(key)) secReturns(content, d);
-            else if ("eod".equals(key)) secEod(content);
-            else if ("shortcuts".equals(key)) secShortcuts(content, d);
+            LinearLayout block = a.kit.v();
+            renderHomeSection(block, d, key);
+            if (block.getChildCount() == 0) continue;
+            boolean keepVisible = isEssentialHomeSection(key);
+            blocks.add(block);
+            essential.add(keepVisible);
+            if (!keepVisible) detailCount++;
+        }
+
+        boolean expanded = a.settings.homeDetailsExpanded();
+        boolean toggleAdded = false;
+        for (int i = 0; i < blocks.size(); i++) {
+            if (!essential.get(i) && !toggleAdded && detailCount > 0) {
+                content.addView(homeDetailsToggle(blocks, essential, detailCount, expanded), a.kit.lp(-1, -2));
+                toggleAdded = true;
+            }
+            LinearLayout block = blocks.get(i);
+            if (!essential.get(i) && !expanded) block.setVisibility(View.GONE);
+            content.addView(block, a.kit.lp(-1, -2));
         }
         renderNotes(content, d.notes);
+    }
+
+    private void renderHomeSection(LinearLayout content, Data d, String key) {
+        if ("kpis".equals(key)) secKpis(content, d);
+        else if ("alerts".equals(key)) secAlerts(content, d);
+        else if ("trend".equals(key)) secTrend(content, d);
+        else if ("donut".equals(key)) secDonut(content, d);
+        else if ("debtors".equals(key)) secDebtors(content, d);
+        else if ("visitors".equals(key)) secVisitors(content, d);
+        else if ("due".equals(key)) secDue(content, d);
+        else if ("invstatus".equals(key)) secInvStatus(content, d);
+        else if ("returns".equals(key)) secReturns(content, d);
+        else if ("eod".equals(key)) secEod(content);
+        else if ("shortcuts".equals(key)) secShortcuts(content, d);
+    }
+
+    private boolean isEssentialHomeSection(String key) {
+        return "kpis".equals(key) || "alerts".equals(key) || "due".equals(key)
+                || "invstatus".equals(key) || "returns".equals(key);
+    }
+
+    private View homeDetailsToggle(final List<LinearLayout> blocks, final List<Boolean> essential,
+                                  final int detailCount, boolean expandedInitially) {
+        final boolean[] expanded = {expandedInitially};
+        final LinearLayout card = a.kit.card(Theme.INFO);
+        card.setPadding(Theme.dp(14), Theme.dp(11), Theme.dp(14), Theme.dp(11));
+        LinearLayout row = a.kit.h();
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+
+        TextView icon = a.kit.text("▦", 21f, Theme.INFO, true);
+        icon.setGravity(android.view.Gravity.CENTER);
+        icon.setBackground(Theme.avatar(Theme.alpha(Theme.INFO, 50)));
+        row.addView(icon, new LinearLayout.LayoutParams(Theme.dp(46), Theme.dp(46)));
+        row.addView(a.kit.space(10));
+
+        LinearLayout copy = a.kit.v();
+        TextView title = a.kit.text("جزئیات تکمیلی داشبورد", 13.5f, Theme.TEXT, true);
+        TextView subtitle = a.kit.text("", 10.5f, Theme.MUTED, false);
+        subtitle.setMaxLines(2);
+        copy.addView(title, a.kit.lp(-1, -2));
+        copy.addView(subtitle, a.kit.lp(-1, -2));
+        row.addView(copy, a.kit.wlp(1f));
+        row.addView(a.kit.space(8));
+
+        android.widget.ImageView action = new android.widget.ImageView(a);
+        action.setColorFilter(Theme.INFO);
+        action.setScaleType(android.widget.ImageView.ScaleType.CENTER_INSIDE);
+        row.addView(action, new LinearLayout.LayoutParams(Theme.dp(28), Theme.dp(36)));
+        card.addView(row, a.kit.lp(-1, -2));
+
+        final Runnable refresh = () -> {
+            subtitle.setText(expanded[0]
+                    ? "نمایش داده می‌شود؛ برای جمع‌کردن لمس کنید"
+                    : Money.fa(String.valueOf(detailCount)) + " بخش تحلیلی و میان‌بر • برای نمایش لمس کنید");
+            action.setImageResource(expanded[0] ? R.drawable.mi_remove : R.drawable.mi_add);
+            card.setContentDescription(expanded[0] ? "جمع‌کردن جزئیات داشبورد" : "نمایش جزئیات داشبورد");
+        };
+        refresh.run();
+        Theme.pressable(card);
+        card.setOnClickListener(v -> {
+            expanded[0] = !expanded[0];
+            a.settings.setHomeDetailsExpanded(expanded[0]);
+            for (int i = 0; i < blocks.size(); i++) {
+                if (!essential.get(i)) blocks.get(i).setVisibility(expanded[0] ? View.VISIBLE : View.GONE);
+            }
+            refresh.run();
+        });
+        return card;
     }
 
     /** Dashboard order from settings; unknown keys dropped, missing sections appended. */

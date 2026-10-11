@@ -369,6 +369,15 @@ public final class AtiranAuth {
         return s != null && s.contains(sub);
     }
 
+    /**
+     * True when a name reads as a distributor, using exactly the keywords mapRole uses to
+     * assign the DISTRIBUTOR role. The warehouse hands goods to distributors, so the picker
+     * filters the visitor list down to them instead of offering every name on file.
+     */
+    public static boolean isDistributorName(String n) {
+        return RoleStore.DISTRIBUTOR.equals(mapRole(0, n));
+    }
+
     // ================= local stores (private prefs) =================
 
     private static SharedPreferences prefs(Context c) {

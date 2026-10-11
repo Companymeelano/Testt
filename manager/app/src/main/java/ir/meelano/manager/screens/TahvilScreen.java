@@ -49,26 +49,69 @@ public class TahvilScreen extends Screen {
 
     private List<Row> factors = new ArrayList<>();
     private LinearLayout content;
+    /** Day being worked, «YYYY/MM/DD». Empty means "not chosen yet" -> today. */
+    private String day = "";
 
     @Override
     public void render(LinearLayout content) {
         this.content = content;
+        if (day == null || day.isEmpty()) day = Jalali.todayStr();
         content.removeAllViews();
         content.addView(topCard(), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
         final LinearLayout box = a.kit.v();
+        content.addView(dateRow(), a.kit.lp(-1, -2));
+        content.addView(a.kit.gap(10));
         content.addView(box, a.kit.lp(-1, -2));
+        load(box);
+    }
+
+    /**
+     * Day strip. The warehouse works today's invoices, so today is the default; the arrows
+     * step to an earlier or later day when a past delivery still has to be recorded.
+     */
+    private View dateRow() {
+        LinearLayout row = a.kit.h();
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        row.addView(a.kit.text("تاریخ فاکتورها", 13f, Theme.TEXT, true), a.kit.wlp(1f));
+        row.addView(a.kit.btnGhost("\u25c0", Theme.GOLD, v -> {
+            day = Jalali.addDays(day, -1);
+            if (content != null) render(content);
+        }), new LinearLayout.LayoutParams(Theme.dp(46), -2));
+        row.addView(a.kit.space(6));
+        boolean isToday = Jalali.todayStr().equals(day);
+        TextView lbl = a.kit.text(Jalali.disp(day) + (isToday ? " (امروز)" : ""),
+                13f, Theme.GOLD_SOFT, true);
+        lbl.setGravity(android.view.Gravity.CENTER);
+        row.addView(lbl, a.kit.lp(-2, -2));
+        row.addView(a.kit.space(6));
+        row.addView(a.kit.btnGhost("\u25b6", Theme.GOLD, v -> {
+            if (Jalali.todayStr().equals(day)) return;
+            day = Jalali.addDays(day, 1);
+            if (content != null) render(content);
+        }), new LinearLayout.LayoutParams(Theme.dp(46), -2));
+        row.addView(a.kit.space(6));
+        row.addView(a.kit.btnGhost("امروز", isToday ? Theme.MUTED : Theme.SUCCESS, v -> {
+            day = Jalali.todayStr();
+            if (content != null) render(content);
+        }), a.kit.lp(-2, -2));
+        return row;
+    }
+
+    private void load(final LinearLayout box) {
+        box.removeAllViews();
         box.addView(a.kit.hint("در حال دریافت فاکتورها…"), a.kit.lp(-1, -2));
+        final String want = day;
         a.repo.run(c -> {
             Meta m = new Meta(c);
-            return Repo.exec(c, MasterQueries.whDeliveries(m));
+            return Repo.exec(c, MasterQueries.whDeliveries(m, want));
         }, new Repo.Cb<List<Row>>() {
             @Override
             public void ok(List<Row> rows) {
                 factors = rows == null ? new ArrayList<Row>() : rows;
                 box.removeAllViews();
                 if (factors.isEmpty()) {
-                    box.addView(a.kit.empty("فاکتوری یافت نشد", null), a.kit.lp(-1, -2));
+                    box.addView(a.kit.empty("فاکتوری برای این تاریخ یافت نشد", null), a.kit.lp(-1, -2));
                     return;
                 }
                 List<Kit.Kpi> kpis = new ArrayList<>();
@@ -81,12 +124,12 @@ public class TahvilScreen extends Screen {
                     String no = row.s("id");
                     boolean handed = WarehouseWriter.handedToday(a, no);
                     String sub = row.s("cust");
-                    if (!row.s("visitor").isEmpty()) sub += " • " + row.s("visitor");
-                    sub += " • " + Money.fa(Jalali.disp(row.s("dt")));
+                    if (!row.s("visitor").isEmpty()) sub += " \u2022 " + row.s("visitor");
+                    sub += " \u2022 " + Money.fa(Jalali.disp(row.s("dt")));
                     View v = a.kit.personRow("فاکتور " + Money.fa(no),
-                            sub.isEmpty() ? "—" : sub,
+                            sub.isEmpty() ? "\u2014" : sub,
                             Money.fa(Money.compact(row.d("amount"))) + " تومان",
-                            handed ? "✓ تحویل شد" : "منتظر تحویل",
+                            handed ? "\u2713 تحویل شد" : "منتظر تحویل",
                             handed ? Theme.SUCCESS : Theme.GOLD,
                             v2 -> openHandover(row));
                     LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
@@ -207,13 +250,44 @@ if (!items.isEmpty()) {
             bIn[0].setAlpha(isIn ? 1f : 0.55f);
             bOut[0].setAlpha(!isIn ? 1f : 0.55f);
         };
+        final String[] walkName = {f.s("cust")};
+        final LinearLayout walkBox = a.kit.v();
+        final android.widget.TextView walkLabel = a.kit.text(
+                walkName[0].isEmpty() ? "انتخاب نشده" : walkName[0], 12.5f, Theme.TEXT, false);
+        walkBox.addView(a.kit.btnGhost("انتخاب مشتری حضوری", Theme.GOLD, vw -> {
+            a.kit.toast("در حال دریافت مشتریان…");
+            a.repo.run(c -> {
+                Meta m = new Meta(c);
+                return Repo.exec(c, MasterQueries.whCustomers(m, ""));
+            }, new Repo.Cb<List<Row>>() {
+                @Override public void ok(List<Row> rows) {
+                    if (rows == null || rows.isEmpty()) {
+                        a.kit.toast("مشتری‌ای یافت نشد");
+                        return;
+                    }
+                    a.kit.searchPicker("انتخاب مشتری حضوری", rows, new String[]{"name", "cell"},
+                            new Kit.PickerListener() {
+                                @Override public void onPick(Row r) {
+                                    walkName[0] = r.s("name");
+                                    walkLabel.setText(walkName[0]);
+                                    walkLabel.setTextColor(Theme.TEXT);
+                                }
+                            }).show();
+                }
+                @Override public void fail(String faError) { a.kit.toast(faError); }
+            });
+        }), a.kit.lp(-1, -2));
+        walkBox.addView(walkLabel, a.kit.lp(-1, -2));
+        final Runnable syncWalk = () -> walkBox.setVisibility("in".equals(mode[0]) ? View.VISIBLE : View.GONE);
         bIn[0] = a.kit.btn("🧍 مشتری حضوری ✓", v -> {
             mode[0] = "in";
             paint.run();
+            syncWalk.run();
         });
         bOut[0] = a.kit.btnGhost("🛻 موزع", Theme.GOLD, v -> {
             mode[0] = "out";
             paint.run();
+            syncWalk.run();
             pickDistributor(distName, distCell, () -> {
             });
         });
@@ -221,6 +295,12 @@ if (!items.isEmpty()) {
         row.addView(a.kit.space(8));
         row.addView(bOut[0], a.kit.wlp(1f));
         body.addView(row, a.kit.lp(-1, -2));
+        body.addView(walkBox, a.kit.lp(-1, -2));
+        syncWalk.run();
+        guessWalkIn(walkName, walkLabel);
+        body.addView(a.kit.gap(6));
+        // Walk-in customer. Defaults to the standing account of the logged-in user and can
+        // be changed to any other customer.
         body.addView(a.kit.gap(6));
         body.addView(a.kit.gap(6));
         final String[] worker = {""};
@@ -288,7 +368,19 @@ if (!items.isEmpty()) {
         body.addView(proofStatus, a.kit.lp(-1, -2));
         final AlertDialog[] box = new AlertDialog[1];
         body.addView(a.kit.gap(8));
-        body.addView(a.kit.btn("ثبت تحویل + رسید PDF", v -> {
+        // The receipt is opt-in. Making the keeper route through a PDF share on every
+        // handover was the slowest part of the job; the default path now records the
+        // delivery and drops straight back to the invoice list.
+        final android.widget.CheckBox pdfBox = new android.widget.CheckBox(a);
+        pdfBox.setChecked(false);
+        pdfBox.setText("دریافت رسید PDF (اختیاری)");
+        pdfBox.setTextColor(Theme.MUTED);
+        pdfBox.setTextSize(12.5f * Theme.fontScale() * Theme.typeScale());
+        pdfBox.setTypeface(Theme.face(false));
+        try { pdfBox.setLayoutDirection(View.LAYOUT_DIRECTION_RTL); } catch (Exception ignored) { }
+        body.addView(pdfBox, a.kit.lp(-1, -2));
+        body.addView(a.kit.gap(6));
+        body.addView(a.kit.btn("ثبت تحویل", v -> {
             String receiver;
             if ("out".equals(mode[0])) {
                 if (distName[0].isEmpty()) {
@@ -298,7 +390,8 @@ if (!items.isEmpty()) {
                 receiver = "موزع: " + distName[0]
                         + (distCell[0].isEmpty() ? "" : " (" + distCell[0] + ")");
             } else {
-                receiver = "مشتری حضوری: " + (f.s("cust").isEmpty() ? "—" : f.s("cust"));
+                receiver = "مشتری حضوری: "
+                        + (walkName[0].isEmpty() ? (f.s("cust").isEmpty() ? "—" : f.s("cust")) : walkName[0]);
             }
             try {
                 box[0].dismiss();
@@ -342,9 +435,13 @@ if (!items.isEmpty()) {
                 savePng("tahvil-" + f.s("id") + "-photo.png", photoBmp[0]);
                 images.add(new Pdf.Img(photoBmp[0], "عکس تحویل"));
             }
-            if (images.isEmpty()) a.sharePdf("رسید تحویل فاکتور " + f.s("id"), sub, cols, taken);
-            else a.sharePdfImages("رسید تحویل فاکتور " + f.s("id"), sub, cols, taken, images);
+            // Record first, drop back to the list, then share only if it was asked for.
             if (content != null) render(content);
+            a.kit.toast("تحویل فاکتور " + Money.fa(f.s("id")) + " ثبت شد");
+            if (pdfBox.isChecked()) {
+                if (images.isEmpty()) a.sharePdf("رسید تحویل فاکتور " + f.s("id"), sub, cols, taken);
+                else a.sharePdfImages("رسید تحویل فاکتور " + f.s("id"), sub, cols, taken, images);
+            }
         }), a.kit.lp(-1, -2));
         ScrollView sv = new ScrollView(a);
         sv.addView(body);
@@ -416,6 +513,41 @@ if (!items.isEmpty()) {
         } catch (Exception ignored) { }
     }
 
+    /**
+     * Pre-select the standing walk-in account for whoever is logged in.
+     *
+     * The counter users each keep one («مشتریان ویزیتور محمودی»، «مشتریان ویزیتور نظری»), so
+     * walk-in sales do not have to be typed in by hand every time. A match is only used as a
+     * default - it stays editable through the picker.
+     */
+    private void guessWalkIn(String[] out, final android.widget.TextView lbl) {
+        String me = AtiranAuth.sessionName(a);
+        if (me == null || me.trim().isEmpty()) me = AtiranAuth.sessionUser(a);
+        if (me == null || me.trim().isEmpty()) return;
+        String[] parts = me.trim().split("\\s+");
+        final String last = parts.length > 0 ? parts[parts.length - 1] : "";
+        if (last.isEmpty()) return;
+        a.repo.run(c -> {
+            Meta m = new Meta(c);
+            return Repo.exec(c, MasterQueries.whCustomers(m, last));
+        }, new Repo.Cb<List<Row>>() {
+            @Override public void ok(List<Row> rows) {
+                if (rows == null || rows.isEmpty()) return;
+                Row best = null;
+                for (Row r : rows) {
+                    if (r == null) continue;
+                    if (r.s("name").contains("\u0645\u0634\u062a\u0631\u06cc\u0627\u0646 \u0648\u06cc\u0632\u06cc\u062a\u0648\u0631")) { best = r; break; }
+                    if (best == null) best = r;
+                }
+                if (best == null) return;
+                out[0] = best.s("name");
+                lbl.setText(out[0]);
+                lbl.setTextColor(Theme.TEXT);
+            }
+            @Override public void fail(String faError) { }
+        });
+    }
+
     private void pickDistributor(final String[] name, final String[] cell, final Runnable done) {
         a.kit.toast("در حال دریافت موزع‌ها…");
         a.repo.run(c -> {
@@ -428,25 +560,23 @@ if (!items.isEmpty()) {
                     a.kit.toast("موزعی یافت نشد");
                     return;
                 }
-                LinearLayout b = a.kit.v();
-                b.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(16));
-                final AlertDialog[] box = new AlertDialog[1];
+                // Only distributors. The warehouse hands loads to distributors, so offering
+                // every visitor on file was wrong. Falls back to the full list when no name
+                // reads as a distributor, so the picker can never come up empty by mistake.
+                List<Row> dist = new ArrayList<>();
                 for (Row r : rows) {
-                    final Row row = r;
-                    String label = row.s("name")
-                            + (row.s("cell").isEmpty() ? "" : " • " + row.s("cell"));
-                    b.addView(a.kit.btnGhost(label, Theme.GOLD, v -> {
-                        name[0] = row.s("name");
-                        cell[0] = row.s("cell");
-                        try {
-                            box[0].dismiss();
-                        } catch (Exception ignored) { }
-                        a.kit.toast("موزع: " + name[0]);
-                        done.run();
-                    }), a.kit.lp(-1, -2));
+                    if (r != null && AtiranAuth.isDistributorName(r.s("name"))) dist.add(r);
                 }
-                box[0] = a.kit.dialog("انتخاب موزع", a.kit.scrollWrap(b, 420), true);
-                box[0].show();
+                if (dist.isEmpty()) dist = rows;
+                a.kit.searchPicker("انتخاب موزع", dist, new String[]{"name", "cell"},
+                        new Kit.PickerListener() {
+                            @Override public void onPick(Row r) {
+                                name[0] = r.s("name");
+                                cell[0] = r.s("cell");
+                                a.kit.toast("موزع: " + name[0]);
+                                done.run();
+                            }
+                        }).show();
             }
 
             @Override

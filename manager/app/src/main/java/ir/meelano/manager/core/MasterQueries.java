@@ -1455,7 +1455,19 @@ public final class MasterQueries {
     }
 
     /** Recent sales invoices ready for warehouse handover (newest first). */
+    /** Back-compat: every recent invoice, no date bound. */
     public static Queries.Q whDeliveries(Meta m) throws Queries.Missing {
+        return whDeliveries(m, null);
+    }
+
+    /**
+     * Invoices waiting to be handed over.
+     *
+     * @param day Jalali day «YYYY/MM/DD» to restrict to, or null/empty for all recent ones.
+     *            The warehouse works today's invoices, so the screen passes today by default
+     *            and only widens the range when a past delivery needs to be recorded.
+     */
+    public static Queries.Q whDeliveries(Meta m, String day) throws Queries.Missing {
         String no = m.must("sailfact", "شماره فاکتور", "shfacfo", "shFacFo");
         String dt = m.must("sailfact", "تاریخ فاکتور", "date");
         String shmo = m.col("sailfact", "shmo", "SHMO");
@@ -1487,13 +1499,19 @@ public final class MasterQueries {
                 visExpr = "COALESCE(" + Sql.txt("v", vnm, 120) + ",N'')";
             }
         }
+        List<Object> binds = new ArrayList<>();
+        String where = "";
+        if (day != null && !day.trim().isEmpty()) {
+            where = " WHERE " + Sql.dateKey(Sql.date10("f", dt)) + "=?";
+            binds.add(day.trim());
+        }
         return new Queries.Q("SELECT TOP 60 TRY_CONVERT(bigint,f.[" + no + "]) AS id, "
                 + Sql.date10("f", dt) + " AS dt, " + custExpr + " AS cust, " + phoneExpr + " AS phone, "
                 + visExpr + " AS visitor, "
                 + (all == null ? "0" : "TRY_CONVERT(money,f.[" + all + "])") + " AS amount, "
                 + (tas == null ? "N''" : "COALESCE(" + Sql.txt("f", tas, 10) + ",N'')") + " AS settled"
-                + " FROM dbo.sailfact f" + custJoin + visJoin
-                + " ORDER BY f.[" + no + "] DESC");
+                + " FROM dbo.sailfact f" + custJoin + visJoin + where
+                + " ORDER BY f.[" + no + "] DESC", binds);
     }
 
     /** Lines of one sales invoice (for the handover receipt). */

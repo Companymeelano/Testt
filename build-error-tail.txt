@@ -17,16 +17,16 @@ Starting a Gradle Daemon (subsequent builds will be faster)
 > Task :licensing:classes
 > Task :licensing:jar
 > Task :app:javaPreCompileDebug
-> Task :app:checkDebugAarMetadata
 > Task :app:generateDebugResValues
+> Task :app:checkDebugAarMetadata
 > Task :app:mapDebugSourceSetPaths
 > Task :app:generateDebugResources
-> Task :app:mergeDebugResources
 > Task :app:packageDebugResources
+> Task :app:mergeDebugResources
 > Task :app:createDebugCompatibleScreenManifests
 > Task :app:extractDeepLinksDebug
-> Task :app:parseDebugLocalResources
 > Task :app:processDebugMainManifest
+> Task :app:parseDebugLocalResources
 > Task :app:processDebugManifest
 > Task :app:mergeDebugShaders
 > Task :app:compileDebugShaders NO-SOURCE
@@ -43,20 +43,17 @@ Starting a Gradle Daemon (subsequent builds will be faster)
 > Task :app:mergeExtDexDebug
 
 > Task :app:compileDebugJavaWithJavac
-/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/screens/TahvilScreen.java:149: error: cannot find symbol
-            final TextView tally = a.kit.text("", 12f, Theme.MUTED, false);
-                  ^
-  symbol:   class TextView
-  location: class TahvilScreen
-/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/screens/TahvilScreen.java:253: error: void cannot be dereferenced
-                            }).show();
+/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/core/InvoiceWatch.java:11: error: cannot find symbol
+import ir.meelano.manager.data.Filter;
                               ^
+  symbol:   class Filter
+  location: package ir.meelano.manager.data
 Note: Some input files use or override a deprecated API.
 Note: Recompile with -Xlint:deprecation for details.
-2 errors
+1 error
 
 > Task :app:compileDebugJavaWithJavac FAILED
-gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1791684605837.json
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1791693676336.json
 [Incubating] Problems report is available at: file:///home/runner/work/Testt/Testt/manager/build/reports/problems/problems-report.html
 
 FAILURE: Build failed with an exception.
@@ -64,17 +61,14 @@ FAILURE: Build failed with an exception.
 * What went wrong:
 Execution failed for task ':app:compileDebugJavaWithJavac'.
 > Compilation failed; see the compiler output below.
-  /home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/screens/TahvilScreen.java:253: error: void cannot be dereferenced
-                              }).show();
-                                ^
   Note: Recompile with -Xlint:deprecation for details.
   Note: Some input files use or override a deprecated API.
-  /home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/screens/TahvilScreen.java:149: error: cannot find symbol
-              final TextView tally = a.kit.text("", 12f, Theme.MUTED, false);
-                    ^
-    symbol:   class TextView
-    location: class TahvilScreen
-  2 errors
+  /home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/core/InvoiceWatch.java:11: error: cannot find symbol
+  import ir.meelano.manager.data.Filter;
+                                ^
+    symbol:   class Filter
+    location: package ir.meelano.manager.data
+  1 error
 
 * Try:
 > Check your code and dependencies to fix the compilation error(s)
@@ -114,17 +108,14 @@ org.gradle.api.tasks.TaskExecutionException: Execution failed for task ':app:com
 	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)
 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:48)
 Caused by: org.gradle.api.internal.tasks.compile.CompilationFailedException: Compilation failed; see the compiler output below.
-/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/screens/TahvilScreen.java:253: error: void cannot be dereferenced
-                            }).show();
-                              ^
 Note: Recompile with -Xlint:deprecation for details.
 Note: Some input files use or override a deprecated API.
-/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/screens/TahvilScreen.java:149: error: cannot find symbol
-            final TextView tally = a.kit.text("", 12f, Theme.MUTED, false);
-                  ^
-  symbol:   class TextView
-  location: class TahvilScreen
-2 errors
+/home/runner/work/Testt/Testt/manager/app/src/main/java/ir/meelano/manager/core/InvoiceWatch.java:11: error: cannot find symbol
+import ir.meelano.manager.data.Filter;
+                              ^
+  symbol:   class Filter
+  location: package ir.meelano.manager.data
+1 error
 	at org.gradle.api.internal.tasks.compile.JdkJavaCompiler.execute(JdkJavaCompiler.java:84)
 	at org.gradle.api.internal.tasks.compile.JdkJavaCompiler.execute(JdkJavaCompiler.java:46)
 	at org.gradle.api.internal.tasks.compile.NormalizingJavaCompiler.delegateAndHandleErrors(NormalizingJavaCompiler.java:98)
@@ -278,5 +269,5 @@ Note: Some input files use or override a deprecated API.
 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:48)
 
 
-BUILD FAILED in 47s
+BUILD FAILED in 43s
 25 actionable tasks: 25 executed

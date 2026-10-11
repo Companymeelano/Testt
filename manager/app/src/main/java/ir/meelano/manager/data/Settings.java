@@ -259,11 +259,19 @@ public final class Settings {
     public void setWhDirect(boolean on) { p.edit().putBoolean("wh_direct", on).apply(); }
 
     // ---------------- home dashboard order ----------------
-    public static final String HOME_ORDER_DEFAULT = "kpis,alerts,trend,donut,debtors,visitors,due,invstatus,returns,shortcuts";
+    public static final String HOME_ORDER_DEFAULT = "kpis,alerts,due,invstatus,returns,today_top,trend,debtors,visitors,donut,eod,shortcuts";
+    private static final String HOME_ORDER_PREVIOUS_DEFAULT = "kpis,alerts,trend,donut,debtors,visitors,due,invstatus,returns,shortcuts";
 
     public String homeOrder() {
-        String v = p.getString("home_order", HOME_ORDER_DEFAULT);
-        return v == null || v.trim().isEmpty() ? HOME_ORDER_DEFAULT : v;
+        String v = p.getString("home_order", null);
+        if (v == null || v.trim().isEmpty()) return HOME_ORDER_DEFAULT;
+        // Move installations still using the untouched old default to the new
+        // manager-first order, while preserving any order the user customized.
+        if (HOME_ORDER_PREVIOUS_DEFAULT.equals(v.trim())) {
+            p.edit().putString("home_order", HOME_ORDER_DEFAULT).apply();
+            return HOME_ORDER_DEFAULT;
+        }
+        return v;
     }
 
     public void setHomeOrder(String csv) {

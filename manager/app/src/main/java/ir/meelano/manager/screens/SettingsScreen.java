@@ -381,14 +381,15 @@ public class SettingsScreen extends Screen {
         final String[][] secs = {
                 {"kpis", "شاخص‌های روز"},
                 {"alerts", "هشدار امروز"},
-                {"trend", "روند ۱۴ روزه فروش"},
-                {"donut", "ترکیب دریافت"},
-                {"debtors", "بدهکاران اولویت‌دار"},
-                {"visitors", "عملکرد ویزیتورها"},
                 {"due", "سررسید چک‌ها"},
-                {"eod", "جمع‌بندی پایان روز"},
                 {"invstatus", "وضعیت فاکتورها"},
                 {"returns", "برگشتی‌ها"},
+                {"today_top", "پرفروش‌ترین کالاهای امروز"},
+                {"trend", "روند ۱۴ روزه فروش"},
+                {"debtors", "بدهکاران اولویت‌دار"},
+                {"visitors", "عملکرد ویزیتورها"},
+                {"donut", "ترکیب دریافت"},
+                {"eod", "جمع‌بندی پایان روز"},
                 {"shortcuts", "دسترسی سریع"},
         };
         final java.util.List<String> order = new java.util.ArrayList<>();

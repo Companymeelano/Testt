@@ -56,6 +56,7 @@ public class HomeScreen extends Screen {
         List<Row> overdue = new ArrayList<>();
         List<Row> salesDaily = new ArrayList<>();
         List<Row> inDaily = new ArrayList<>();
+        List<Row> topItems = new ArrayList<>();
         List<Row> visitors = new ArrayList<>();
         List<Row> dueIn = new ArrayList<>();
         List<Row> dueOut = new ArrayList<>();
@@ -86,9 +87,18 @@ public class HomeScreen extends Screen {
             d.debtors = soft(d.notes, "بدهکاران", () -> Repo.exec(c, Queries.topDebtors(m, 5)));
             d.overdue = soft(d.notes, "معوق‌ها", () -> Repo.exec(c, Queries.overdueInvoices(m, 5)));
             final String to = Jalali.todayStr();
-            final String from = Jalali.addDays(to, -13);
+            // 31 calendar days let the executive overview compare today against
+            // yesterday plus rolling 7- and 30-day baselines; the chart itself stays 14 days.
+            final String from = Jalali.addDays(to, -30);
+            final String inFrom = Jalali.addDays(to, -13);
             d.salesDaily = soft(d.notes, "روند فروش", () -> Repo.exec(c, Queries.factorDaily(m, true, from, to)));
-            d.inDaily = soft(d.notes, "روند دریافت", () -> Repo.exec(c, MoneyQueries.darDaily(m, 0, from, to)));
+            d.inDaily = soft(d.notes, "روند دریافت", () -> Repo.exec(c, MoneyQueries.darDaily(m, 0, inFrom, to)));
+            Filter todayFilter = new Filter();
+            todayFilter.from = to;
+            todayFilter.to = to;
+            todayFilter.top = 5;
+            d.topItems = soft(d.notes, "پرفروش‌ترین کالاهای امروز",
+                    () -> Repo.exec(c, Queries.factorTopProducts(m, true, todayFilter, 5)));
             Filter vf = new Filter();
             vf.preset = Filter.P_LAST30;
             vf.applyPreset();
@@ -136,19 +146,24 @@ public class HomeScreen extends Screen {
         });
     }
 
-    // ---------------- offline cache (summary rows + timestamp) ----------------
+    // ---------------- offline cache (manager cues, top items and timestamp) ----------------
     private void saveCache(Data d) {
         try {
             Calendar c = Calendar.getInstance();
             String hm = String.format(java.util.Locale.US, "%02d:%02d",
                     c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE));
-            String s = "ts=" + esc(a.kit.todayLine() + " ساعت " + hm)
-                    + "|sales=" + rowStr(d.salesDay)
-                    + "|buy=" + rowStr(d.buyDay)
-                    + "|in=" + rowStr(d.inDay)
-                    + "|out=" + rowStr(d.outDay)
-                    + "|cust=" + rowStr(d.custSum);
-            a.settings.saveHomeCache(s);
+            StringBuilder s = new StringBuilder("ts=")
+                    .append(esc(a.kit.todayLine() + " ساعت " + hm))
+                    .append("|sales=").append(rowStr(d.salesDay))
+                    .append("|buy=").append(rowStr(d.buyDay))
+                    .append("|in=").append(rowStr(d.inDay))
+                    .append("|out=").append(rowStr(d.outDay))
+                    .append("|cust=").append(rowStr(d.custSum));
+            if (d.topItems != null) {
+                for (int i = 0; i < Math.min(5, d.topItems.size()); i++)
+                    s.append("|top").append(i).append('=').append(rowStr(d.topItems.get(i)));
+            }
+            a.settings.saveHomeCache(s.toString());
             pokeWidget();
         } catch (Exception ignored) { }
     }
@@ -187,6 +202,7 @@ public class HomeScreen extends Screen {
                 else if ("in".equals(k)) { d.inDay = rowFrom(v); any = true; }
                 else if ("out".equals(k)) { d.outDay = rowFrom(v); any = true; }
                 else if ("cust".equals(k)) { d.custSum = rowFrom(v); any = true; }
+                else if (k.matches("top[0-4]")) { d.topItems.add(rowFrom(v)); any = true; }
             }
             return any ? d : null;
         } catch (Exception e) {
@@ -231,7 +247,7 @@ public class HomeScreen extends Screen {
     private View greetingHero() {
         int hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
         String g = hour < 5 ? "شب بخیر" : (hour < 12 ? "صبح بخیر" : (hour < 15 ? "روز بخیر" : (hour < 19 ? "عصر بخیر" : "شب بخیر")));
-        return a.kit.hero("♛", g + " مدیر", a.kit.todayLine() + " • نمای زنده آتیران", Theme.GOLD);
+        return a.kit.hero("♛", g + " مدیر", a.kit.todayLine() + " • فروش، نقدینگی و اقدام‌های امروز", Theme.GOLD);
     }
 
     private void build(LinearLayout content, Data d) {
@@ -273,6 +289,7 @@ public class HomeScreen extends Screen {
         else if ("alerts".equals(key)) secAlerts(content, d);
         else if ("trend".equals(key)) secTrend(content, d);
         else if ("donut".equals(key)) secDonut(content, d);
+        else if ("today_top".equals(key)) secTopItems(content, d);
         else if ("debtors".equals(key)) secDebtors(content, d);
         else if ("visitors".equals(key)) secVisitors(content, d);
         else if ("due".equals(key)) secDue(content, d);
@@ -284,7 +301,7 @@ public class HomeScreen extends Screen {
 
     private boolean isEssentialHomeSection(String key) {
         return "kpis".equals(key) || "alerts".equals(key) || "due".equals(key)
-                || "invstatus".equals(key) || "returns".equals(key);
+                || "invstatus".equals(key) || "returns".equals(key) || "today_top".equals(key);
     }
 
     private View homeDetailsToggle(final List<LinearLayout> blocks, final List<Boolean> essential,
@@ -339,7 +356,7 @@ public class HomeScreen extends Screen {
     /** Dashboard order from settings; unknown keys dropped, missing sections appended. */
     private List<String> orderedKeys() {
         List<String> out = new ArrayList<>();
-        String[] known = {"kpis", "alerts", "trend", "donut", "debtors", "visitors", "due", "invstatus", "returns", "eod", "shortcuts"};
+        String[] known = {"kpis", "alerts", "due", "invstatus", "returns", "today_top", "trend", "debtors", "visitors", "donut", "eod", "shortcuts"};
         for (String k : a.settings.homeOrder().split(",")) {
             String t = k == null ? "" : k.trim();
             if (!t.isEmpty() && !out.contains(t)) {
@@ -367,6 +384,24 @@ public class HomeScreen extends Screen {
                 () -> gotoDay("dar_out", d.outDay)));
         content.addView(a.kit.kpiGrid(kpis, 2), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(12));
+        if (d.salesDaily != null && !d.salesDaily.isEmpty()) {
+            String today = Jalali.todayStr();
+            double todaySales = salesOnDay(d.salesDaily, today);
+            double yesterday = salesOnDay(d.salesDaily, Jalali.addDays(today, -1));
+            double avg7 = averageSalesBefore(d.salesDaily, today, 7);
+            double avg30 = averageSalesBefore(d.salesDaily, today, 30);
+            LinearLayout compare = a.kit.card(Theme.GOLD);
+            compare.addView(a.kit.sectionHead("فروش امروز در مقایسه", "فروش ›", v -> a.nav("sales")),
+                    a.kit.lp(-1, -2));
+            compare.addView(a.kit.kv("امروز", Money.compactRial(todaySales), Theme.GOLD), a.kit.lp(-1, -2));
+            compare.addView(a.kit.kv("دیروز", Money.compactRial(yesterday), Theme.TEXT), a.kit.lp(-1, -2));
+            compare.addView(a.kit.kv("میانگین ۷ روز تقویمی قبل", Money.compactRial(avg7), Theme.INFO), a.kit.lp(-1, -2));
+            compare.addView(a.kit.kv("میانگین ۳۰ روز تقویمی قبل", Money.compactRial(avg30), Theme.INFO), a.kit.lp(-1, -2));
+            String delta = avg7 > 0 ? Money.pct((todaySales - avg7) * 100.0 / avg7) : "—";
+            int deltaColor = avg7 <= 0 ? Theme.MUTED : (todaySales >= avg7 ? Theme.SUCCESS : Theme.WARNING);
+            compare.addView(a.kit.kv("تغییر نسبت به میانگین ۷روزه", delta, deltaColor), a.kit.lp(-1, -2));
+            a.kit.addCard(content, compare);
+        }
     }
 
     private void secAlerts(LinearLayout content, Data d) {
@@ -453,6 +488,50 @@ public class HomeScreen extends Screen {
                         Money.fa(String.valueOf(r.l("docs"))) + " سند • " + Money.compactMoney(r.d("total")),
                         Theme.TEXT), a.kit.lp(-1, -2));
             }
+        }
+        a.kit.addCard(content, c);
+    }
+
+    /** Top five by today's invoiced sales, following the inventory dashboard benchmark. */
+    private void secTopItems(LinearLayout content, Data d) {
+        LinearLayout c = a.kit.card(Theme.GOLD);
+        c.addView(a.kit.sectionHead("پرفروش‌ترین کالاهای امروز", "گزارش کامل ›", v -> a.nav("reports")),
+                a.kit.lp(-1, -2));
+        if (d.topItems == null || d.topItems.isEmpty()) {
+            c.addView(a.kit.text("امروز کالایی برای رتبه‌بندی در دسترس نیست.", 11.5f, Theme.MUTED, false),
+                    a.kit.lp(-1, -2));
+        } else {
+            int show = Math.min(5, d.topItems.size());
+            for (int i = 0; i < show; i++) {
+                Row item = d.topItems.get(i);
+                LinearLayout row = a.kit.h();
+                row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+                TextView rank = a.kit.text(Money.fa(String.valueOf(i + 1)), 11f, Theme.GOLD, true);
+                rank.setGravity(android.view.Gravity.CENTER);
+                rank.setBackground(Theme.avatar(Theme.alpha(Theme.GOLD, 44)));
+                row.addView(rank, new LinearLayout.LayoutParams(Theme.dp(32), Theme.dp(32)));
+                row.addView(a.kit.space(8));
+
+                LinearLayout copy = a.kit.v();
+                TextView name = a.kit.text(item.s("label"), 12f, Theme.TEXT, true);
+                name.setSingleLine(true);
+                name.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                copy.addView(name, a.kit.lp(-1, -2));
+                String detail = Money.qty(item.d("qty")) + " واحد • "
+                        + Money.fa(String.valueOf(item.l("docs"))) + " ردیف فروش";
+                copy.addView(a.kit.text(detail, 10f, Theme.MUTED, false), a.kit.lp(-1, -2));
+                row.addView(copy, a.kit.wlp(1f));
+                row.addView(a.kit.space(8));
+
+                TextView total = a.kit.text(Money.compactRial(item.d("total")), 11.5f, Theme.GOLD, true);
+                total.setGravity(android.view.Gravity.END | android.view.Gravity.CENTER_VERTICAL);
+                total.setMaxLines(1);
+                total.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                row.addView(total, a.kit.lp(-2, -2));
+                c.addView(row, a.kit.lp(-1, -2));
+                if (i + 1 < show) c.addView(a.kit.gap(8));
+            }
+            c.addView(a.kit.hint("رتبه‌بندی بر پایهٔ مبلغ فروش امروز"), a.kit.lp(-1, -2));
         }
         a.kit.addCard(content, c);
     }
@@ -663,6 +742,32 @@ public class HomeScreen extends Screen {
         double s = 0;
         if (rows != null) for (Row r : rows) s += r.d("amount");
         return s;
+    }
+
+    private double salesOnDay(List<Row> rows, String day) {
+        if (rows == null || day == null || day.isEmpty()) return 0;
+        String target = Jalali.disp(day);
+        for (Row r : rows)
+            if (target.equals(Jalali.disp(r.s("day")))) return r.d("total");
+        return 0;
+    }
+
+    /** Average across calendar days before today, counting days without sales as zero. */
+    private double averageSalesBefore(List<Row> rows, String today, int days) {
+        if (rows == null || days <= 0) return 0;
+        Map<String, Double> byDay = new HashMap<>();
+        for (Row r : rows) {
+            String d = Jalali.disp(r.s("day"));
+            if (!d.isEmpty()) byDay.put(d, r.d("total"));
+        }
+        int first = Jalali.parse(Jalali.addDays(today, -days));
+        if (first < 0) return 0;
+        double total = 0;
+        for (int i = 0; i < days; i++) {
+            Double amount = byDay.get(Jalali.format(first + i));
+            if (amount != null) total += amount;
+        }
+        return total / days;
     }
 
     /** Fill missing days with 0 for a smooth 14-day chart. */

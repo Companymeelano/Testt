@@ -248,6 +248,13 @@ public final class MasterQueries {
         String b = "TRY_CONVERT(decimal(19,2),c.[" + bal + "])";
         List<Object> binds = new ArrayList<>();
         List<String> conds = new ArrayList<>();
+        // A search has to reach every customer. The page cap would otherwise hide
+        // any match that sorts below the first page, which reads as "not found".
+        // Visitor / route / group / status still apply — they narrow the full
+        // matching set, they do not shrink what the search is allowed to look at.
+        final boolean searching = f.search != null && !f.search.trim().isEmpty();
+        final int top = searching ? Queries.clampTop(500) : f.top;
+        final int page = searching ? 0 : f.page;
         if ("debt".equals(f.status)) conds.add(b + ">0");
         if ("credit".equals(f.status)) conds.add(b + "<0");
         if ("settled".equals(f.status)) conds.add("ABS(COALESCE(" + b + ",0))<=1");
@@ -263,7 +270,8 @@ public final class MasterQueries {
             if (tell != null) exprs.add(Sql.txt("c", tell, 100));
             if (addr != null) exprs.add(Sql.txt("c", addr, 500));
             exprs.add(Sql.txt("c", shmo, 100));
-            String sc = Queries.searchCond(binds, f.search, exprs.toArray(new String[0]));
+            // Every token must match (AND), so extra words narrow the result.
+            String sc = Queries.searchCondAll(binds, f.search, exprs.toArray(new String[0]));
             if (!sc.isEmpty()) conds.add(sc);
         }
         String where = conds.isEmpty() ? "" : " WHERE " + Sql.join(conds, " AND ");
@@ -271,6 +279,22 @@ public final class MasterQueries {
         if ("top".equals(f.sort) && canSales) order = "sf.total DESC";
         if ("debt".equals(f.sort)) order = b + " DESC";
         if ("balance_asc".equals(f.sort)) order = b + " ASC";
+        if (searching) {
+            // Relevance first: exact code, then a name starting with the term,
+            // then any name containing it. The customer you meant lands on top
+            // instead of being buried under the chosen sort order.
+            String cd = Sql.txt("c", shmo, 100);
+            String nm = name == null ? Sql.txt("c", shmo, 250) : Sql.txt("c", name, 250);
+            String term = Queries.digitsToAscii(f.search.trim().replaceAll("\\s+", " "));
+            order = "CASE WHEN " + cd + "=? THEN 0"
+                    + " WHEN LEFT(" + nm + ",LEN(?))=? THEN 1"
+                    + " WHEN CHARINDEX(?," + nm + ")>0 THEN 2"
+                    + " ELSE 3 END, " + order;
+            binds.add(term);
+            binds.add(term);
+            binds.add(term);
+            binds.add(term);
+        }
         String join = "";
         if (route != null && routeName != null && routeKey != null && m.table("masir"))
             join += " LEFT JOIN dbo.masir ms ON TRY_CONVERT(nvarchar(50),ms.[" + routeKey + "])=TRY_CONVERT(nvarchar(50),c.[" + route + "])";
@@ -291,7 +315,7 @@ public final class MasterQueries {
                 + ", ISNULL(sf.total,0) AS salesTotal, ISNULL(sf.cnt,0) AS salesCount, ISNULL(sf.lastDay,N'') AS lastSale"
                 + ", ISNULL(ch.total,0) AS chequeTotal"
                 + " FROM dbo.CUSTOMERS c " + saleApply + " " + chkApply + join + where
-                + " ORDER BY " + order + Queries.pageClause(binds, f.page, f.top);
+                + " ORDER BY " + order + Queries.pageClause(binds, page, top);
         return new Queries.Q(sql, binds);
     }
 

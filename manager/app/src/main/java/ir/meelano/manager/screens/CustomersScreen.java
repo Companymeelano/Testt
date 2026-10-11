@@ -63,18 +63,16 @@ public class CustomersScreen extends Screen {
     public FilterSheet.Config filterConfig() {
         FilterSheet.Config c = new FilterSheet.Config();
         c.searchHint = "نام، کد یا موبایل…";
+        // Date range is off: the customer query has no date clause, so showing the
+        // preset chips and the two date fields was a control that did nothing.
+        c.range = false;
         c.visitors = true;
         c.routes = true;
         c.custGroups = true;
-        c.statusTitle = "وضعیت حساب";
-        c.status = new FilterSheet.Opt[]{
-                new FilterSheet.Opt("", "همه"),
-                new FilterSheet.Opt("debt", "بدهکار"),
-                new FilterSheet.Opt("credit", "بستانکار"),
-                new FilterSheet.Opt("settled", "تسویه"),
-                new FilterSheet.Opt("no_buy", "بدون خرید"),
-                new FilterSheet.Opt("blocked", "مسدود"),
-        };
+        // Status is deliberately NOT offered here: the six buckets are already
+        // on the screen as one-tap chips above the list. Having both meant the
+        // same choice in two places, and one of the two was always stale.
+        c.status = null;
         c.sortTitle = "مرتب‌سازی";
         c.sort = new FilterSheet.Opt[]{
                 new FilterSheet.Opt("", "نام"),
@@ -190,9 +188,22 @@ public class CustomersScreen extends Screen {
         }), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
 
+        // While a search is active the query ignores paging and returns every
+        // match, so a pager here would promise pages that cannot exist.
+        final boolean searching = filter.search != null && !filter.search.trim().isEmpty();
+
         if (d.list == null || d.list.isEmpty()) {
-            content.addView(a.kit.empty("مشتری‌ای یافت نشد", "فیلتر را تغییر دهید"), a.kit.lp(-1, -2));
+            content.addView(a.kit.empty("مشتری‌ای یافت نشد",
+                    searching ? "عبارت جستجو را تغییر دهید" : "فیلتر را تغییر دهید"), a.kit.lp(-1, -2));
         } else {
+            if (searching) {
+                content.addView(a.kit.text(
+                        Money.fa(String.valueOf(d.list.size())) + " مشتری با جستجوی «"
+                                + filter.search.trim() + "» یافت شد"
+                                + (d.list.size() >= 500 ? " (فقط ۵۰۰ مورد اول)" : ""),
+                        12f, Theme.MUTED, false), a.kit.lp(-1, -2));
+                content.addView(a.kit.gap(8));
+            }
             for (Row r : d.list) {
                 final String code = r.s("code");
                 double bal = r.d("balance");
@@ -206,10 +217,12 @@ public class CustomersScreen extends Screen {
                 p.setMargins(0, 0, 0, Theme.dp(10));
                 content.addView(v, p);
             }
-            final boolean hasMore = d.list.size() >= Math.max(1, filter.top);
-            content.addView(a.kit.pager(filter.page, hasMore,
-                    () -> { filter.page = Math.max(0, filter.page - 1); render(content); },
-                    () -> { filter.page = filter.page + 1; render(content); }), a.kit.lp(-1, -2));
+            if (!searching) {
+                final boolean hasMore = d.list.size() >= Math.max(1, filter.top);
+                content.addView(a.kit.pager(filter.page, hasMore,
+                        () -> { filter.page = Math.max(0, filter.page - 1); render(content); },
+                        () -> { filter.page = filter.page + 1; render(content); }), a.kit.lp(-1, -2));
+            }
         }
 
         renderNotes(content, d.notes);

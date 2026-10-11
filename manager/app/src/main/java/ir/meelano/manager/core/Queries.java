@@ -57,7 +57,27 @@ public final class Queries {
         if (!v.equals(t)) out.add(v);
         String v2 = t.replace('ی', 'ي').replace('ک', 'ك');
         if (!v2.equals(t) && !v2.equals(v)) out.add(v2);
+        // Persian/Arabic digits typed on a Persian keyboard must find rows stored
+        // with ASCII digits, and vice versa. Only added when it actually differs,
+        // so a purely textual term does not double the LIKE fan-out for nothing.
+        for (String base : new String[]{t, v, v2}) {
+            String dv = digitsToAscii(base);
+            if (!dv.equals(base) && !out.contains(dv)) out.add(dv);
+        }
         return out;
+    }
+
+    /** Persian (۰-۹) and Arabic (٠-٩) digits to ASCII 0-9; other chars untouched. */
+    public static String digitsToAscii(String s) {
+        if (s == null) return "";
+        StringBuilder b = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c >= '۰' && c <= '۹') b.append((char) ('0' + (c - '۰')));
+            else if (c >= '٠' && c <= '٩') b.append((char) ('0' + (c - '٠')));
+            else b.append(c);
+        }
+        return b.toString();
     }
 
     /** (expr LIKE N'%v%' OR …) across expressions × variants. */
@@ -70,6 +90,35 @@ public final class Queries {
             for (String v : vars) { parts.add(e + " LIKE N'%' + ? + N'%' ESCAPE N'\\'"); binds.add(escapeLike(v)); }
         }
         return parts.isEmpty() ? "" : "(" + Sql.join(parts, " OR ") + ")";
+    }
+
+    /**
+     * Every whitespace-separated token must match somewhere (AND across tokens),
+     * while variants of one token stay ORed. Typing «علی 0912» therefore narrows
+     * instead of widening, which is what makes a search feel precise on a list of
+     * thousands. Falls back to {@link #searchCond} for a single-token term.
+     */
+    public static String searchCondAll(List<Object> binds, String search, String... exprs) {
+        List<String> tokens = searchTokens(search);
+        if (tokens.size() <= 1) return searchCond(binds, search, exprs);
+        List<String> groups = new ArrayList<>();
+        for (String t : tokens) {
+            String g = searchCond(binds, t, exprs);
+            if (!g.isEmpty()) groups.add(g);
+        }
+        return groups.isEmpty() ? "" : "(" + Sql.join(groups, " AND ") + ")";
+    }
+
+    /** Whitespace-split tokens of a search term, de-duplicated, order preserved. */
+    public static List<String> searchTokens(String s) {
+        List<String> out = new ArrayList<>();
+        String t = s == null ? "" : s.trim().replaceAll("\\s+", " ");
+        if (t.isEmpty()) return out;
+        for (String p : t.split(" ")) {
+            if (p.isEmpty()) continue;
+            if (!out.contains(p)) out.add(p);
+        }
+        return out;
     }
 
     /** Escape LIKE wildcards so a literal % _ [ \ typed by the user matches itself. */

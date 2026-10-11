@@ -8,7 +8,6 @@ import android.content.Intent;
 
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.R;
-import ir.meelano.manager.data.Filter;
 import ir.meelano.manager.data.Meta;
 import ir.meelano.manager.data.Repo;
 import ir.meelano.manager.data.Row;

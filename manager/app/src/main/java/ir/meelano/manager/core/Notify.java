@@ -44,6 +44,9 @@ public final class Notify {
     static final String ACT_GUARD = "ir.meelano.manager.GUARD";
     private static final int GUARD_REQ = 7009;
     static final int GUARD_NOTIF_ID = 7010;
+    static final String ACT_NEWINV = "ir.meelano.manager.NEWINV";
+    private static final int NEWINV_REQ = 7011;
+    static final int NEWINV_NOTIF_ID = 7012;
     private static boolean launched = false;
 
     /** Create channel, schedule the daily alarm, ask permission, run one launch check. */
@@ -57,6 +60,7 @@ public final class Notify {
             if (s.weeklyOn()) scheduleWeeklyReport(a);
             if (s.eodOn()) scheduleEod(a);
             if (s.guardOn()) scheduleGuard(a);
+            if (s.whNewOn()) scheduleNewInv(a);
             if (Build.VERSION.SDK_INT >= 33
                     && a.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
                     != android.content.pm.PackageManager.PERMISSION_GRANTED) {
@@ -220,6 +224,37 @@ public final class Notify {
             Intent i = new Intent(c, NotifyReceiver.class);
             i.setAction(ACT_GUARD);
             PendingIntent pi = PendingIntent.getBroadcast(c, GUARD_REQ, i,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            if (am != null) am.cancel(pi);
+        } catch (Exception ignored) { }
+    }
+
+    /**
+     * New-sales-invoice watch. Fifteen minutes is the finest inexact repeating
+     * interval Android offers, which is as close to "live" as a battery-friendly
+     * alarm gets; the list itself refreshes on screen, so this only has to cover
+     * the case where the app is not open at all.
+     */
+    public static void scheduleNewInv(Context c) {
+        try {
+            AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
+            if (am == null) return;
+            Intent i = new Intent(c, NotifyReceiver.class);
+            i.setAction(ACT_NEWINV);
+            PendingIntent pi = PendingIntent.getBroadcast(c, NEWINV_REQ, i,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            am.setInexactRepeating(AlarmManager.RTC_WAKEUP,
+                    System.currentTimeMillis() + AlarmManager.INTERVAL_FIFTEEN_MINUTES,
+                    AlarmManager.INTERVAL_FIFTEEN_MINUTES, pi);
+        } catch (Exception ignored) { }
+    }
+
+    public static void cancelNewInv(Context c) {
+        try {
+            AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
+            Intent i = new Intent(c, NotifyReceiver.class);
+            i.setAction(ACT_NEWINV);
+            PendingIntent pi = PendingIntent.getBroadcast(c, NEWINV_REQ, i,
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             if (am != null) am.cancel(pi);
         } catch (Exception ignored) { }
@@ -587,6 +622,13 @@ final class NotifyReceiver extends BroadcastReceiver {
                 } else finishPr(pr);
                 return;
             }
+            if (Notify.ACT_NEWINV.equals(act)) {
+                if (s.whNewOn()) {
+                    Notify.scheduleNewInv(c);
+                    InvoiceWatch.checkNow(c, () -> finishPr(pr));
+                } else finishPr(pr);
+                return;
+            }
             if (!s.notifOn()) {
                 finishPr(pr);
                 return;
@@ -596,6 +638,7 @@ final class NotifyReceiver extends BroadcastReceiver {
             if (s.weeklyOn()) Notify.scheduleWeeklyReport(c);
             if (s.eodOn()) Notify.scheduleEod(c);
             if (s.guardOn()) Notify.scheduleGuard(c);
+            if (s.whNewOn()) Notify.scheduleNewInv(c);
             AutoBackup.reschedule(c);
             Notify.checkNow(c, () -> finishPr(pr));
         } catch (Exception ignored) {

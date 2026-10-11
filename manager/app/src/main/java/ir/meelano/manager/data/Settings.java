@@ -321,6 +321,25 @@ public final class Settings {
 
     public void setGuardSeen(String v) { p.edit().putString("guard_seen", v == null ? "" : v).apply(); }
 
+    /** Alert the warehouse keeper the moment a new sales invoice is registered. */
+    public boolean whNewOn() { return p.getBoolean("wh_new_on", true); }
+
+    public void setWhNewOn(boolean on) { p.edit().putBoolean("wh_new_on", on).apply(); }
+
+    /** Sales invoice numbers already notified today («no;no…», pruned to 300). */
+    public String whSeen() { return p.getString("wh_seen", ""); }
+
+    public void setWhSeen(String v) { p.edit().putString("wh_seen", v == null ? "" : v).apply(); }
+
+    /**
+     * Jalali day the {@link #whSeen()} set belongs to. Empty means "never
+     * primed", which makes the first run seed the set silently instead of
+     * firing a notification for every invoice the day already had.
+     */
+    public String whSeenDay() { return p.getString("wh_seen_day", ""); }
+
+    public void setWhSeenDay(String v) { p.edit().putString("wh_seen_day", v == null ? "" : v).apply(); }
+
     /** Text zoom level: 0 = 90٪, 1 = 100٪, 2 = 115٪, 3 = 130٪. */
     public int zoomIdx() {
         try {

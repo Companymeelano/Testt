@@ -49,6 +49,12 @@ public class TahvilScreen extends Screen {
 
     private List<Row> factors = new ArrayList<>();
     private LinearLayout content;
+    /** The list container only, so a live refresh does not rebuild the header. */
+    private LinearLayout listBox;
+    /** Live refresh interval while the screen is in the foreground. */
+    private static final long REFRESH_MS = 30000L;
+    private final android.os.Handler watch = new android.os.Handler(android.os.Looper.getMainLooper());
+    private Runnable watchTick;
     /** Day being worked, «YYYY/MM/DD». Empty means "not chosen yet" -> today. */
     private String day = "";
 
@@ -63,6 +69,7 @@ public class TahvilScreen extends Screen {
         content.addView(dateRow(), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
         content.addView(box, a.kit.lp(-1, -2));
+        listBox = box;
         load(box);
     }
 
@@ -99,8 +106,16 @@ public class TahvilScreen extends Screen {
     }
 
     private void load(final LinearLayout box) {
+        load(box, false);
+    }
+
+    /**
+     * @param quiet skip the "loading" placeholder. The live refresh uses this so
+     *              the list does not blink every 30 s while the keeper reads it.
+     */
+    private void load(final LinearLayout box, final boolean quiet) {
         box.removeAllViews();
-        box.addView(a.kit.hint("در حال دریافت فاکتورها…"), a.kit.lp(-1, -2));
+        if (!quiet) box.addView(a.kit.hint("در حال دریافت فاکتورها…"), a.kit.lp(-1, -2));
         final String want = day;
         a.repo.run(c -> {
             Meta m = new Meta(c);
@@ -155,6 +170,39 @@ public class TahvilScreen extends Screen {
     }
 
     // ================= handover =================
+
+    /**
+     * Live list. The warehouse has to see a sale the moment it is registered,
+     * so while this screen is in the foreground the list re-reads from Atiran on
+     * a timer. Only the list is rebuilt — the handover form is a separate dialog
+     * and is never disturbed. The timer is dropped the instant we lose focus.
+     */
+    @Override
+    public void onShown() {
+        stopWatch();
+        watchTick = new Runnable() {
+            @Override
+            public void run() {
+                if (listBox != null && day != null && !day.isEmpty()) load(listBox, true);
+                watch.postDelayed(this, REFRESH_MS);
+            }
+        };
+        watch.postDelayed(watchTick, REFRESH_MS);
+    }
+
+    @Override
+    public void onHidden() {
+        stopWatch();
+    }
+
+    private void stopWatch() {
+        if (watchTick != null) {
+            try {
+                watch.removeCallbacks(watchTick);
+            } catch (Exception ignored) { }
+            watchTick = null;
+        }
+    }
 
     private void openHandover(final Row f) {
         a.kit.toast("در حال دریافت اقلام…");

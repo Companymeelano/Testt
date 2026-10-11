@@ -96,6 +96,8 @@ public class MainActivity extends Activity {
     private final Map<String, Screen> screens = new LinkedHashMap<>();
     private final List<String> history = new ArrayList<>();
     private String currentId = "home";
+    /** Intent extra: open this screen instead of the default one. */
+    public static final String EXTRA_SCREEN = "ir.meelano.manager.SCREEN";
     private boolean rolePicked;
     private boolean shellStarted;
     private TextView userChip;
@@ -130,10 +132,12 @@ public class MainActivity extends Activity {
         Usage.touch(this);
         refreshLicChip();
         refreshUserChip();
+        dispatchShown(true);
     }
 
     @Override
     protected void onPause() {
+        dispatchShown(false);
         Usage.paused(this);
         super.onPause();
     }
@@ -612,6 +616,15 @@ public class MainActivity extends Activity {
 
         buildBottom();
         nav(screens.containsKey(currentId) ? currentId : "home");
+        // Deep link from a notification (a new sales invoice opens the handover
+        // list). Applied after nav() so every screen is registered and the
+        // content view is already built.
+        String want = null;
+        try {
+            android.content.Intent gi = getIntent();
+            if (gi != null) want = gi.getStringExtra(EXTRA_SCREEN);
+        } catch (Exception ignored) { }
+        if (want != null && !want.isEmpty() && screens.containsKey(want)) nav(want);
         styleBars();
         checkConn();
         refreshCompany();
@@ -878,6 +891,21 @@ public class MainActivity extends Activity {
                     logoGlyph.setVisibility(View.VISIBLE);
                 }
             }
+        } catch (Exception ignored) { }
+    }
+
+    /**
+     * Hand the foreground/foreground change to the current screen so it can
+     * start or stop live refreshing. One screen at a time, and never held
+     * across a pause — whatever a screen starts in onShown() it must stop
+     * in onHidden().
+     */
+    private void dispatchShown(boolean shown) {
+        try {
+            Screen s = screens.get(currentId);
+            if (s == null) return;
+            if (shown) s.onShown();
+            else s.onHidden();
         } catch (Exception ignored) { }
     }
 

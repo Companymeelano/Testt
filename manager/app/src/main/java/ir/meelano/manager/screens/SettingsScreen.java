@@ -219,6 +219,14 @@ public class SettingsScreen extends Screen {
             a.kit.toast(!grd ? "نگهبان فروش روشن شد؛ هر ۳۰ دقیقه بررسی می‌شود" : "نگهبان فروش خاموش شد");
             render(content);
         }), a.kit.lp(-1, -2));
+        final boolean whn = a.settings.whNewOn();
+        nt.addView(a.kit.btnGhost("🧾 اعلان فاکتور فروش جدید (انبار): " + (whn ? "روشن" : "خاموش"), Theme.SUCCESS, v -> {
+            a.settings.setWhNewOn(!whn);
+            if (!whn) ir.meelano.manager.core.Notify.scheduleNewInv(a);
+            else ir.meelano.manager.core.Notify.cancelNewInv(a);
+            a.kit.toast(!whn ? "اعلان فاکتور جدید روشن شد؛ هر ۱۵ دقیقه بررسی می‌شود" : "اعلان فاکتور جدید خاموش شد");
+            render(content);
+        }), a.kit.lp(-1, -2));
         companyInfo(nt, content);
         nt.addView(a.kit.btnGhost("🪪 ساخت کارت ویزیت دیجیتال", Theme.VIOLET, v -> ShopCard.show(a)), a.kit.lp(-1, -2));
         nt.addView(a.kit.btnGhost("📺 حالت تلویزیون فروشگاه", Theme.SUCCESS, v -> a.startTv()), a.kit.lp(-1, -2));

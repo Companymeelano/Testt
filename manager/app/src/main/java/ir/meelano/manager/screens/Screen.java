@@ -63,6 +63,20 @@ public abstract class Screen {
     public void onSmsPermission(boolean granted) {
     }
 
+    /**
+     * MainActivity came to the foreground. Override to start live refreshing;
+     * the default does nothing, so every other screen is untouched.
+     */
+    public void onShown() {
+    }
+
+    /**
+     * MainActivity left the foreground. Override to stop any timer started in
+     * {@link #onShown()} — nothing may keep running while the user is away.
+     */
+    public void onHidden() {
+    }
+
     // ---------------- soft parts ----------------
     public interface Soft<T> {
         T run() throws Exception;

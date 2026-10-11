@@ -64,10 +64,11 @@ public final class HandoverDb {
      * Record one hand-over. The first record for a day+invoice wins, so a retry
      * or a second device cannot overwrite who actually received the goods.
      */
-    public static void mark(Connection c, String day, String no, String cust,
+    public static boolean mark(Connection c, String day, String no, String cust,
             String receiver, String worker, String items, String user, String device) {
         try {
             ensure(c);
+            if (!available(c)) return false;
             try (PreparedStatement ps = c.prepareStatement(
                     "IF NOT EXISTS (SELECT 1 FROM dbo." + TABLE + " WHERE [day]=? AND [no]=?) "
                             + "INSERT INTO dbo." + TABLE
@@ -86,7 +87,11 @@ public final class HandoverDb {
                 ps.setLong(11, System.currentTimeMillis());
                 ps.executeUpdate();
             }
-        } catch (Exception ignored) { }
+            Set<String> marked = markedSet(c, day);
+            return marked != null && marked.contains(str(no).trim());
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     /**

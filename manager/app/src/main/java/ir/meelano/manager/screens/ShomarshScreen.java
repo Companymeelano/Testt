@@ -7,11 +7,15 @@ import android.widget.LinearLayout;
 
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.core.AtiranAuth;
+import ir.meelano.manager.core.DeviceId;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.ReportCatalog;
 import ir.meelano.manager.core.WarehouseWriter;
+import ir.meelano.manager.core.WarehouseCountDb;
+import ir.meelano.manager.core.WarehouseSync;
+import ir.meelano.manager.core.RoleStore;
 import ir.meelano.manager.data.Meta;
 import ir.meelano.manager.data.Repo;
 import ir.meelano.manager.data.Row;
@@ -50,13 +54,30 @@ public class ShomarshScreen extends Screen {
     private String anbarName = "";
     private JSONArray lines = new JSONArray();
 
+    private String activeRole() {
+        String role = AtiranAuth.sessionRole(a);
+        if (role == null || role.isEmpty())
+            role = RoleStore.enabled(a) ? RoleStore.current(a) : RoleStore.ADMIN;
+        return role;
+    }
+
+    private boolean isManager() { return RoleStore.ADMIN.equals(activeRole()); }
+    private boolean blindMode() { return RoleStore.WAREHOUSE.equals(activeRole()); }
+
     @Override
     public void render(LinearLayout content) {
         this.content = content;
         content.removeAllViews();
+        if (isManager()) {
+            LinearLayout reviews = a.kit.v();
+            content.addView(reviews, a.kit.lp(-1, -2));
+            loadReviews(reviews);
+        }
         LinearLayout hero = a.kit.card(Theme.VIOLET);
         hero.addView(a.kit.text("🔢 شمارش انبار", 17f, Theme.TEXT, true), a.kit.lp(-1, -2));
-        hero.addView(a.kit.text("بشمارید؛ مغایرت با سیستم را همان‌جا ببینید",
+        hero.addView(a.kit.text(blindMode()
+                        ? "شمارش کور؛ موجودی و مغایرت تا بررسی مدیر پنهان می‌ماند"
+                        : "بشمارید؛ مغایرت با سیستم را برای بررسی مدیر ثبت کنید",
                 12f, Theme.MUTED, false), a.kit.lp(-1, -2));
         content.addView(hero, a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
@@ -72,6 +93,8 @@ public class ShomarshScreen extends Screen {
         LinearLayout card = a.kit.card(Theme.SUCCESS);
         card.addView(a.kit.text("شمارش‌ها (" + Money.fa(String.valueOf(lines.length())) + ")",
                 13.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        if (blindMode()) card.addView(a.kit.hint("موجودی سیستم و اختلاف برای انباردار نمایش داده نمی‌شود."),
+                a.kit.lp(-1, -2));
         for (int i = 0; i < lines.length(); i++) {
             final int idx = i;
             JSONObject ln = lines.optJSONObject(i);
@@ -79,11 +102,13 @@ public class ShomarshScreen extends Screen {
             double counted = ln.optDouble(WarehouseWriter.L_COUNTED, 0);
             double stock = ln.optDouble(WarehouseWriter.L_STOCK, 0);
             double diff = counted - stock;
-            String pill = Math.abs(diff) < 0.001 ? "✓" : Money.fa(fmtNum(diff));
+            boolean blind = blindMode();
+            String detail = blind ? "شمرده " + Money.fa(fmtNum(counted))
+                    : "سیستم " + Money.fa(fmtNum(stock)) + " • شمرده " + Money.fa(fmtNum(counted));
+            String pill = blind ? "ثبت‌شده" : (Math.abs(diff) < 0.001 ? "✓" : Money.fa(fmtNum(diff)));
             View v = a.kit.personRow(ln.optString(WarehouseWriter.L_NAKA, "—"),
-                    "سیستم " + Money.fa(fmtNum(stock)) + " • شمرده " + Money.fa(fmtNum(counted)),
-                    "مغایرت " + pill,
-                    "✕", Math.abs(diff) < 0.001 ? Theme.SUCCESS : Theme.DANGER,
+                    detail, blind ? "" : "مغایرت " + pill,
+                    "✕", blind ? Theme.INFO : (Math.abs(diff) < 0.001 ? Theme.SUCCESS : Theme.DANGER),
                     v2 -> {
                         JSONArray keep = new JSONArray();
                         for (int k = 0; k < lines.length(); k++) {
@@ -104,6 +129,133 @@ public class ShomarshScreen extends Screen {
         act.addView(a.kit.gap(6));
         act.addView(a.kit.btnGhost("🧾 گزارش PDF", Theme.INFO, v -> countPdf()), a.kit.lp(-1, -2));
         content.addView(act, a.kit.lp(-1, -2));
+    }
+
+    private static final class ReviewResult {
+        List<JSONObject> rows = new ArrayList<>();
+        String error = "";
+    }
+
+    private void loadReviews(final LinearLayout box) {
+        box.removeAllViews();
+        box.addView(a.kit.loading("در حال دریافت شمارش‌های منتظر تأیید…"), a.kit.lp(-1, -2));
+        a.repo.run(c -> {
+            ReviewResult result = new ReviewResult();
+            WarehouseCountDb.ensure(c);
+            if (!WarehouseCountDb.available(c)) {
+                result.error = "صف تأیید سرور در دسترس نیست.";
+                return result;
+            }
+            result.rows = WarehouseCountDb.pending(c);
+            return result;
+        }, new Repo.Cb<ReviewResult>() {
+            @Override public void ok(ReviewResult result) {
+                if (content == null || box.getParent() == null) return;
+                box.removeAllViews();
+                LinearLayout card = a.kit.card(result.error.isEmpty() && !result.rows.isEmpty()
+                        ? Theme.WARNING : Theme.INFO);
+                card.addView(a.kit.sectionHead("تأیید شمارش‌های کور",
+                        null, null), a.kit.lp(-1, -2));
+                if (!result.error.isEmpty()) {
+                    card.addView(a.kit.hint(result.error), a.kit.lp(-1, -2));
+                } else if (result.rows.isEmpty()) {
+                    card.addView(a.kit.hint("شمارشِ منتظر بررسی ندارید."), a.kit.lp(-1, -2));
+                } else {
+                    card.addView(a.kit.hint("تأیید، ثبت بررسی مدیر است و موجودی آتیران را تغییر نمی‌دهد؛ جدول تعدیل تا تأیید schema عمداً دست‌نخورده می‌ماند."),
+                            a.kit.lp(-1, -2));
+                    for (JSONObject row : result.rows) {
+                        final JSONObject doc = row;
+                        JSONArray ls = parseLines(doc.optString("lines", "[]"));
+                        int variance = 0;
+                        for (int i = 0; i < ls.length(); i++) {
+                            JSONObject ln = ls.optJSONObject(i);
+                            if (ln != null && Math.abs(ln.optDouble(WarehouseWriter.L_COUNTED, 0)
+                                    - ln.optDouble(WarehouseWriter.L_STOCK, 0)) > 0.001) variance++;
+                        }
+                        String sub = Money.fa(doc.optString("day", "")) + " • "
+                                + doc.optString("anbar", "سراسری") + " • "
+                                + doc.optString("keeper", "—");
+                        card.addView(a.kit.personRow("شمارش " + Money.fa(String.valueOf(ls.length())) + " قلم",
+                                sub, Money.fa(String.valueOf(variance)) + " مغایرت",
+                                "بررسی", variance > 0 ? Theme.WARNING : Theme.SUCCESS,
+                                v -> reviewDialog(doc)), a.kit.lp(-1, -2));
+                        card.addView(a.kit.gap(6));
+                    }
+                }
+                box.addView(card, a.kit.lp(-1, -2));
+                box.addView(a.kit.gap(8));
+            }
+            @Override public void fail(String faError) {
+                if (content == null || box.getParent() == null) return;
+                box.removeAllViews();
+                box.addView(a.kit.error(faError, () -> loadReviews(box)), a.kit.lp(-1, -2));
+            }
+        });
+    }
+
+    private JSONArray parseLines(String json) {
+        try { return new JSONArray(json == null || json.isEmpty() ? "[]" : json); }
+        catch (Exception ignored) { return new JSONArray(); }
+    }
+
+    private void reviewDialog(final JSONObject doc) {
+        if (!isManager()) return;
+        LinearLayout body = a.kit.v();
+        body.setPadding(Theme.dp(16), Theme.dp(12), Theme.dp(16), Theme.dp(12));
+        body.addView(a.kit.kv("ثبت‌کننده / تاریخ", doc.optString("keeper", "—") + " • "
+                + Money.fa(doc.optString("day", "")), Theme.TEXT), a.kit.lp(-1, -2));
+        body.addView(a.kit.kv("انبار", doc.optString("anbar", "سراسری"), Theme.TEXT), a.kit.lp(-1, -2));
+        JSONArray ls = parseLines(doc.optString("lines", "[]"));
+        for (int i = 0; i < ls.length(); i++) {
+            JSONObject ln = ls.optJSONObject(i);
+            if (ln == null) continue;
+            double stock = ln.optDouble(WarehouseWriter.L_STOCK, 0);
+            double counted = ln.optDouble(WarehouseWriter.L_COUNTED, 0);
+            double diff = counted - stock;
+            body.addView(a.kit.kv(ln.optString(WarehouseWriter.L_NAKA, "—"),
+                    "کد " + ln.optString(WarehouseWriter.L_SHKA, "")
+                            + " • سیستم " + Money.fa(fmtNum(stock))
+                            + " • شمرده " + Money.fa(fmtNum(counted))
+                            + " • اختلاف " + Money.fa(fmtNum(diff)),
+                    Math.abs(diff) > 0.001 ? Theme.WARNING : Theme.SUCCESS), a.kit.lp(-1, -2));
+        }
+        body.addView(a.kit.hint("تأیید فقط وضعیت بررسی را ثبت می‌کند؛ تعدیل موجودی مستقیماً ارسال نمی‌شود."),
+                a.kit.lp(-1, -2));
+        final EditText note = a.kit.edit("یادداشت مدیر؛ علت رد اجباری است", "");
+        body.addView(note, a.kit.lp(-1, -2));
+        final AlertDialog[] dialog = new AlertDialog[1];
+        LinearLayout actions = a.kit.h();
+        actions.addView(a.kit.btnGold("تأیید بررسی", v -> {
+            String memo = note.getText().toString().trim();
+            dialog[0].dismiss();
+            submitReview(doc.optString("id", ""), true, memo);
+        }), a.kit.wlp(1f));
+        actions.addView(a.kit.space(8));
+        actions.addView(a.kit.btnGhost("رد با علت", Theme.DANGER, v -> {
+            String memo = note.getText().toString().trim();
+            if (memo.isEmpty()) { a.kit.toast("برای رد، علت را بنویسید"); return; }
+            dialog[0].dismiss();
+            submitReview(doc.optString("id", ""), false, memo);
+        }), a.kit.wlp(1f));
+        body.addView(actions, a.kit.lp(-1, -2));
+        dialog[0] = a.kit.dialog("بررسی شمارش کور", a.kit.scrollWrap(body, 520), true);
+        dialog[0].show();
+    }
+
+    private void submitReview(final String id, final boolean approve, final String note) {
+        String reviewer = AtiranAuth.sessionName(a);
+        if (reviewer.isEmpty()) reviewer = AtiranAuth.sessionUser(a);
+        if (reviewer.isEmpty()) reviewer = "مدیر";
+        final String who = reviewer;
+        a.repo.run(c -> WarehouseCountDb.review(c, id, approve, who, note), new Repo.Cb<Boolean>() {
+            @Override public void ok(Boolean saved) {
+                if (Boolean.TRUE.equals(saved)) a.kit.toast(approve
+                        ? "بررسی شمارش تأیید شد؛ موجودی تغییر نکرد" : "شمارش با علت ثبت‌شده رد شد");
+                else a.kit.toast("ثبت تصمیم ممکن نشد؛ شاید مورد قبلاً بررسی شده باشد");
+                if (content != null) render(content);
+            }
+            @Override public void fail(String faError) { a.kit.toast(faError); }
+        });
     }
 
     private String fmtNum(double v) {
@@ -170,8 +322,8 @@ public class ShomarshScreen extends Screen {
                     }
                     for (Row r : rows) {
                         final Row row = r;
-                        String label = row.s("name") + " • سیستم: "
-                                + Money.fa(fmtNum(row.d("stock")));
+                        String label = blindMode() ? row.s("name") + " • کد " + row.s("code")
+                                : row.s("name") + " • سیستم: " + Money.fa(fmtNum(row.d("stock")));
                         results.addView(a.kit.btnGhost(label, Theme.GOLD, v -> {
                             try {
                                 box[0].dismiss();
@@ -199,8 +351,10 @@ public class ShomarshScreen extends Screen {
         LinearLayout b = a.kit.v();
         b.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(16));
         b.addView(a.kit.kv("کالا", name.isEmpty() ? "—" : name, Theme.TEXT), a.kit.lp(-1, -2));
-        b.addView(a.kit.kv("موجودی سیستم", Money.fa(fmtNum(stock)) + " " + unit, Theme.TEXT),
-                a.kit.lp(-1, -2));
+        if (!blindMode()) {
+            b.addView(a.kit.kv("موجودی سیستم", Money.fa(fmtNum(stock)) + " " + unit, Theme.TEXT),
+                    a.kit.lp(-1, -2));
+        }
         final EditText e = a.kit.editNum("تعداد شمرده‌شده *", "");
         b.addView(e, a.kit.lp(-1, -2));
         final AlertDialog[] box = new AlertDialog[1];
@@ -222,13 +376,13 @@ public class ShomarshScreen extends Screen {
                 } catch (Exception ignored) { }
                 if (content != null) render(content);
                 double diff = c - stock;
-                if (Math.abs(diff) > 0.001)
+                if (!blindMode() && Math.abs(diff) > 0.001)
                     a.kit.toast("⚠ مغایرت: " + Money.fa(fmtNum(diff)));
             } catch (Exception ex) {
                 a.kit.toast("ثبت ممکن نشد");
             }
         }), a.kit.lp(-1, -2));
-        box[0] = a.kit.dialog("شمارش", b, true);
+        box[0] = a.kit.dialog(blindMode() ? "شمارش کور" : "شمارش", b, true);
         box[0].show();
     }
 
@@ -248,9 +402,25 @@ public class ShomarshScreen extends Screen {
             d.put(WarehouseWriter.D_USER, keeper);
             d.put(WarehouseWriter.D_LINES, new JSONArray(lines.toString()));
             int no = WarehouseWriter.saveDraft(a, d);
-            a.kit.toast("گزارش شمارش " + Money.fa(String.valueOf(no)) + " ذخیره شد");
+            if (no <= 0) {
+                a.kit.toast("ذخیرهٔ محلی انجام نشد؛ شمارش‌ها پاک نشدند");
+                return;
+            }
+            JSONObject saved = WarehouseWriter.getDraft(a, no);
+            if (saved != null) {
+                saved.put("reviewId", DeviceId.code(a) + "-" + saved.optLong(WarehouseWriter.D_CREATED,
+                        System.currentTimeMillis()) + "-" + no);
+                saved.put("device", DeviceId.code(a));
+                saved.put("approvalSync", "pending");
+                WarehouseWriter.saveDraft(a, saved);
+            }
+            a.kit.toast("گزارش شمارش " + Money.fa(String.valueOf(no)) + " ذخیره شد؛ برای تأیید مدیر در صف قرار گرفت");
             lines = new JSONArray();
             if (content != null) render(content);
+            WarehouseSync.retry(a, (handovers, counts, pending, error) -> {
+                if (counts > 0) a.kit.toast("شمارش برای بررسی مدیر ارسال شد");
+                else if (pending > 0) a.kit.toast("شمارش محلی ماند؛ در صف همگام‌سازی منتظر است");
+            });
         } catch (Exception e) {
             a.kit.toast("ذخیره ممکن نشد");
         }
@@ -272,12 +442,19 @@ public class ShomarshScreen extends Screen {
                 double counted = ln.optDouble(WarehouseWriter.L_COUNTED, 0);
                 Row r = new Row();
                 r.put("name", ln.optString(WarehouseWriter.L_NAKA, ""));
-                r.put("stock", Money.fa(fmtNum(stock)));
-                r.put("counted", Money.fa(fmtNum(counted)));
-                r.put("diff", Money.fa(fmtNum(counted - stock)));
+                if (!blindMode()) {
+                    r.put("stock", Money.fa(fmtNum(stock)));
+                    r.put("counted", Money.fa(fmtNum(counted)));
+                    r.put("diff", Money.fa(fmtNum(counted - stock)));
+                } else {
+                    r.put("counted", Money.fa(fmtNum(counted)));
+                }
                 rows.add(r);
             }
-            ReportCatalog.Col[] cols = new ReportCatalog.Col[]{
+            ReportCatalog.Col[] cols = blindMode() ? new ReportCatalog.Col[]{
+                    new ReportCatalog.Col("name", "کالا", ReportCatalog.T_TEXT),
+                    new ReportCatalog.Col("counted", "تعداد شمرده‌شده", ReportCatalog.T_TEXT),
+            } : new ReportCatalog.Col[]{
                     new ReportCatalog.Col("name", "کالا", ReportCatalog.T_TEXT),
                     new ReportCatalog.Col("stock", "سیستم", ReportCatalog.T_TEXT),
                     new ReportCatalog.Col("counted", "شمرده", ReportCatalog.T_TEXT),

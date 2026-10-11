@@ -51,8 +51,12 @@ public class AnbarScreen extends Screen {
                 a.kit.lp(-1, -2));
         String[][] links = {
                 {"tahvil", "تحویل فاکتور به مشتری و موزع + رسید"},
+                {"pick_wave", "برداشت دسته‌ای بر اساس موزع یا مسیر + اسکن"},
+                {"sync_queue", "صف بادوام تحویل و شمارش؛ "
+                        + ir.meelano.manager.core.Money.fa(String.valueOf(
+                        ir.meelano.manager.core.WarehouseSync.pendingCount(a))) + " مورد منتظر"},
                 {"resid", "رسید کالا و پیش‌نویس‌های انبار"},
-                {"shomarsh", "شمارش قفسه و مغایرت‌گیری"},
+                {"shomarsh", "شمارش کور و مغایرت‌گیری با تأیید مدیر"},
                 {"score", "ارزیابی و امتیاز تأمین‌کنندگان"},
                 {"products", "جست‌وجو و گردش موجودی کالا"},
                 {"customers", "پرونده مشتریان و تأمین‌کنندگان"},

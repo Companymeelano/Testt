@@ -735,6 +735,41 @@ public final class MasterQueries {
                 + " GROUP BY " + label + " ORDER BY 5 DESC", binds);
     }
 
+    /** Lowest-margin products in the selected period: label,qty,sales,cogs,profit,margin. */
+    public static Queries.Q lowMarginProducts(Meta m, Filter f, int top) throws Queries.Missing {
+        Set<String> cols = m.columns("sailfact");
+        String dateCol = m.must("sailfact", "تاریخ", "date");
+        String numberCol = m.must("sailfact", "شماره فاکتور", "shfacfo");
+        String linkCol = m.must("subsailfact", "شماره فاکتور", "shfacfo");
+        String shka = m.must("subsailfact", "کد کالا", "SHKA", "shka");
+        String qty = m.must("subsailfact", "تعداد", "TEDVAH", "tedvah");
+        String sum = m.must("subsailfact", "جمع ردیف", "LINESUM", "linesum");
+        String buy = cogsBuyCol(m);
+        String invShka = cogsShka(m);
+        String invName = m.col("inventory", "naka", "NAKA");
+        List<Object> binds = new ArrayList<>();
+        String dc = Sql.dateCond(Sql.date10("x", dateCol), f.from, f.to, binds);
+        String inner = "WHERE " + (dc.isEmpty() ? "1=1" : dc)
+                + Sql.activeAnd(cols, "x") + Sql.softAnd(cols, "x");
+        String label = "COALESCE(" + (invName == null ? "" : Sql.txt("i", invName, 250) + ",")
+                + Sql.txt("d", shka, 120) + ",N'—')";
+        String sales = "ISNULL(SUM(" + Sql.num("d", sum) + "),0)";
+        String cogs = "ISNULL(SUM(TRY_CONVERT(decimal(19,3),d.[" + qty
+                + "])*COALESCE(TRY_CONVERT(decimal(19,2),i.[" + buy + "]),0)),0)";
+        String profit = "(" + sales + "-" + cogs + ")";
+        String margin = "CASE WHEN " + sales + "<>0 THEN ROUND(" + profit
+                + "*100.0/" + sales + ",1) ELSE 0 END";
+        return new Queries.Q("SELECT TOP (" + Queries.clampTop(top) + ") " + label + " AS label"
+                + ", ISNULL(SUM(TRY_CONVERT(decimal(19,3),d.[" + qty + "])),0) AS qty"
+                + ", " + sales + " AS sales, " + cogs + " AS cogs, " + profit + " AS profit"
+                + ", " + margin + " AS margin FROM " + Sql.dedupe("sailfact", numberCol, "h", inner)
+                + " JOIN dbo.subsailfact d ON TRY_CONVERT(nvarchar(100),d.[" + linkCol
+                + "])=TRY_CONVERT(nvarchar(100),h.[" + numberCol + "])"
+                + " LEFT JOIN dbo.inventory i ON TRY_CONVERT(nvarchar(100),i.[" + invShka
+                + "])=TRY_CONVERT(nvarchar(100),d.[" + shka + "])"
+                + " GROUP BY " + label + " HAVING " + sales + ">0 ORDER BY 6 ASC", binds);
+    }
+
     /** Other costs (UNION of resolvable sources): label,total. */
     public static Queries.Q profitCosts(Meta m, Filter f) throws Queries.Missing {
         String[][] sources = {
@@ -1493,6 +1528,15 @@ public final class MasterQueries {
      *            and only widens the range when a past delivery needs to be recorded.
      */
     public static Queries.Q whDeliveries(Meta m, String day) throws Queries.Missing {
+        return whDeliveries(m, day, 60);
+    }
+
+    /** Expanded daily manifest for pick waves, with a higher but bounded row cap. */
+    public static Queries.Q whDeliveriesForPicking(Meta m, String day) throws Queries.Missing {
+        return whDeliveries(m, day, 500);
+    }
+
+    private static Queries.Q whDeliveries(Meta m, String day, int limit) throws Queries.Missing {
         String no = m.must("sailfact", "شماره فاکتور", "shfacfo", "shFacFo");
         String dt = m.must("sailfact", "تاریخ فاکتور", "date");
         String shmo = m.col("sailfact", "shmo", "SHMO");
@@ -1530,13 +1574,74 @@ public final class MasterQueries {
             where = " WHERE " + Sql.dateKey(Sql.date10("f", dt)) + "=?";
             binds.add(day.trim());
         }
-        return new Queries.Q("SELECT TOP 60 TRY_CONVERT(bigint,f.[" + no + "]) AS id, "
+        return new Queries.Q("SELECT TOP " + Math.max(1, Math.min(500, limit))
+                + " TRY_CONVERT(bigint,f.[" + no + "]) AS id, "
                 + Sql.date10("f", dt) + " AS dt, " + custExpr + " AS cust, " + phoneExpr + " AS phone, "
                 + visExpr + " AS visitor, "
                 + (all == null ? "0" : "TRY_CONVERT(money,f.[" + all + "])") + " AS amount, "
                 + (tas == null ? "N''" : "COALESCE(" + Sql.txt("f", tas, 10) + ",N'')") + " AS settled"
                 + " FROM dbo.sailfact f" + custJoin + visJoin + where
                 + " ORDER BY f.[" + no + "] DESC", binds);
+    }
+
+    /**
+     * Daily sales-invoice handover reconciliation. Delivery marks live in our additive
+     * MeelanoHandover table, never in an assumed Atiran column. With sharedAvailable=false,
+     * counts and amount are still exact, but delivery state is deliberately reported unknown.
+     */
+    public static Queries.Q whDeliverySummary(Meta m, String day, boolean sharedAvailable)
+            throws Queries.Missing {
+        Set<String> cols = m.columns("sailfact");
+        String no = m.must("sailfact", "شماره فاکتور", "shfacfo", "shFacFo");
+        String dt = m.must("sailfact", "تاریخ فاکتور", "date");
+        String all = m.col("sailfact", "all", "All", "sumall");
+        List<Object> binds = new ArrayList<>();
+        String dc = Sql.dateCond(Sql.date10("x", dt), day, day, binds);
+        String inner = "WHERE " + dc + Sql.activeAnd(cols, "x") + Sql.softAnd(cols, "x");
+        String src = Sql.dedupe("sailfact", no, "f", inner);
+        String amount = all == null ? "CAST(0 AS decimal(19,2))" : Sql.num("f", all);
+        String join = "";
+        String handed = "0";
+        String open = "0";
+        if (sharedAvailable) {
+            join = " LEFT JOIN dbo." + ir.meelano.manager.core.HandoverDb.TABLE + " wh"
+                    + " ON wh.[day]=? AND TRY_CONVERT(nvarchar(80),wh.[no])"
+                    + "=TRY_CONVERT(nvarchar(80),f.[" + no + "])";
+            binds.add(day);
+            handed = "CASE WHEN wh.[no] IS NOT NULL THEN 1 ELSE 0 END";
+            open = "CASE WHEN wh.[no] IS NULL THEN 1 ELSE 0 END";
+        }
+        String sql = "SELECT COUNT_BIG(1) AS totalDocs, ISNULL(SUM(" + amount + "),0) AS totalAmount"
+                + ", " + (sharedAvailable ? "ISNULL(SUM(" + handed + "),0)" : "CAST(NULL AS bigint)")
+                + " AS deliveredDocs, "
+                + (sharedAvailable ? "ISNULL(SUM(CASE WHEN wh.[no] IS NOT NULL THEN " + amount + " ELSE 0 END),0)"
+                    : "CAST(NULL AS decimal(19,2))") + " AS deliveredAmount, "
+                + (sharedAvailable ? "ISNULL(SUM(" + open + "),0)" : "CAST(NULL AS bigint)")
+                + " AS openDocs, "
+                + (sharedAvailable ? "ISNULL(SUM(CASE WHEN wh.[no] IS NULL THEN " + amount + " ELSE 0 END),0)"
+                    : "CAST(NULL AS decimal(19,2))") + " AS openAmount, "
+                + (sharedAvailable ? "1" : "0") + " AS sharedAvailable FROM " + src + " f" + join;
+        return new Queries.Q(sql, binds);
+    }
+
+    /** Exact SKU/barcode scan lookup; barcode column names are discovered, never assumed. */
+    public static Queries.Q whProductScan(Meta m, String scanned) throws Queries.Missing {
+        String ka = m.must("inventory", "کد کالا", "shka", "SHKA");
+        String nk = m.must("inventory", "نام کالا", "naka", "NAKA");
+        String un = m.col("inventory", "vahsanj", "VAHSANJ", "unit");
+        String barcode = m.col("inventory", "barcode", "bar_code", "barcod", "BARKOD", "BARCODE",
+                "barkod", "kodbar", "codebar", "shkode");
+        List<Object> binds = new ArrayList<>();
+        String where = "TRY_CONVERT(nvarchar(120),i.[" + ka + "])=?";
+        binds.add(scanned == null ? "" : scanned.trim());
+        if (barcode != null && !barcode.equalsIgnoreCase(ka)) {
+            where += " OR TRY_CONVERT(nvarchar(120),i.[" + barcode + "])=?";
+            binds.add(scanned == null ? "" : scanned.trim());
+        }
+        return new Queries.Q("SELECT TOP (1) TRY_CONVERT(nvarchar(80),i.[" + ka + "]) AS code, "
+                + Sql.txt("i", nk, 250) + " AS name, "
+                + (un == null ? "N''" : "COALESCE(" + Sql.txt("i", un, 80) + ",N'')")
+                + " AS unit FROM dbo.inventory i WHERE " + where, binds);
     }
 
     /** Lines of one sales invoice (for the handover receipt). */
@@ -1855,6 +1960,14 @@ public final class MasterQueries {
                 + " FROM dbo.[back_sanad] h" + kj[1] + where
                 + " GROUP BY " + kj[0]
                 + " ORDER BY 3 DESC", binds);
+    }
+
+    /** Date-bounded return groups for a day close; never substitute all-time returns. */
+    public static Queries.Q returnsByKindOn(Meta m, Filter f) throws Queries.Missing {
+        RetCols r = retCols(m);
+        if (r.date == null)
+            throw new Queries.Missing("ستون تاریخ در «اسناد برگشتی» پیدا نشد؛ جمع همه‌زمانی جای گزارش روزانه را نمی‌گیرد");
+        return returnsByKind(m, f);
     }
 
     /** The return documents themselves, newest first. */

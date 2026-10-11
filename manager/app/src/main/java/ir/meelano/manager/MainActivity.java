@@ -23,6 +23,7 @@ import ir.meelano.manager.data.NetRoute;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.Notify;
 import ir.meelano.manager.core.Queries;
+import ir.meelano.manager.core.WarehouseSync;
 import ir.meelano.manager.core.ReportCatalog;
 import ir.meelano.manager.core.SmsIo;
 import ir.meelano.manager.core.Usage;
@@ -33,6 +34,10 @@ import ir.meelano.manager.data.Row;
 import ir.meelano.manager.data.Settings;
 import ir.meelano.manager.screens.AnbarScreen;
 import ir.meelano.manager.screens.CashScreen;
+import ir.meelano.manager.screens.CloseoutScreen;
+import ir.meelano.manager.screens.ManagerAlertsScreen;
+import ir.meelano.manager.screens.PickWaveScreen;
+import ir.meelano.manager.screens.SyncQueueScreen;
 import ir.meelano.manager.screens.ChequesScreen;
 import ir.meelano.manager.screens.CustomersScreen;
 import ir.meelano.manager.screens.DuesScreen;
@@ -133,6 +138,8 @@ public class MainActivity extends Activity {
         if (!isFinishing() && !LicenseStore.unlocked(this)) toLicense();
         if (!isFinishing() && AtiranAuth.gate(this)) toLogin();
         Usage.touch(this);
+        if (repo != null && !isFinishing() && RoleStore.WAREHOUSE.equals(effRole()))
+            WarehouseSync.retry(this, null);
         refreshLicChip();
         refreshUserChip();
         dispatchShown(true);
@@ -616,6 +623,10 @@ public class MainActivity extends Activity {
         reg(new TakmilScreen(this));
         reg(new ShomarshScreen(this));
         reg(new ScoreScreen(this));
+        reg(new CloseoutScreen(this));
+        reg(new ManagerAlertsScreen(this));
+        reg(new SyncQueueScreen(this));
+        reg(new PickWaveScreen(this));
 
         buildBottom();
         nav(screens.containsKey(currentId) ? currentId : "home");

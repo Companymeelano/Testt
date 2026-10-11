@@ -615,6 +615,15 @@ public final class MoneyQueries {
         return new Queries.Q(sql, binds);
     }
 
+    /** Date-bounded cheque list for a closeout; never degrade to an all-time list. */
+    public static Queries.Q chequeListOn(Meta m, boolean incoming, Filter f) throws Queries.Missing {
+        Chq c = chq(m, incoming);
+        if (c.getdate == null)
+            throw new Queries.Missing("ستون تاریخ ثبت در «" + AtiranSchema.faTitle(c.table)
+                    + "» پیدا نشد؛ فهرست همه‌زمانی به‌عنوان روزانه نمایش داده نمی‌شود");
+        return chequeList(m, incoming, f, "");
+    }
+
     /** Shared WHERE for outstanding cheques due within [today, today+daysAhead]. */
     private static final class DueCtx {
         Chq c;

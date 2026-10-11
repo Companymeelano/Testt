@@ -161,37 +161,118 @@ public final class WarehouseWriter {
     /** Back-compat form without a worker or an item breakdown. */
     public static void markHanded(Context c, String shfacfo, String cust,
             String receiver, String user) {
-        markHanded(c, shfacfo, cust, receiver, user, "", "");
+        markHanded(c, Jalali.todayStr(), shfacfo, cust, receiver, user, "", "");
+    }
+
+    /** Back-compat form with a worker and item breakdown, dated today. */
+    public static void markHanded(Context c, String shfacfo, String cust,
+            String receiver, String user, String worker, String items) {
+        markHanded(c, Jalali.todayStr(), shfacfo, cust, receiver, user, worker, items);
     }
 
     /**
-     * Record a handover: who received it, which worker physically carried the load out and
-     * exactly which items were ticked. Everything lands in the local handover log so the
-     * warehouse can search past deliveries when a customer disputes one.
+     * Record a handover locally before attempting the network. The supplied invoice day is
+     * preserved (older, still-unconfirmed deliveries can be recorded honestly), and every
+     * event is placed in a durable outbox until the shared side table confirms it.
      */
-    public static void markHanded(Context c, String shfacfo, String cust,
+    public static void markHanded(Context c, String day, String shfacfo, String cust,
             String receiver, String user, String worker, String items) {
         try {
-            String day = Jalali.todayStr();
-            String key = "hand_" + day.replace("/", "");
+            String d = Jalali.normalizeDate(day);
+            String no = shfacfo == null ? "" : shfacfo.trim();
+            if (no.isEmpty()) return;
+            String key = "hand_" + d.replace("/", "");
             String cur = prefs(c).getString(key, ",");
-            if (!cur.contains("," + shfacfo + ",")) {
-                prefs(c).edit().putString(key, cur + shfacfo + ",").apply();
+            if (!cur.contains("," + no + ",")) {
+                prefs(c).edit().putString(key, cur + no + ",").apply();
             }
-            JSONArray log = new JSONArray(prefs(c).getString("handlog", "[]"));
             JSONObject e = new JSONObject();
-            e.put("dt", day);
-            e.put("no", shfacfo);
+            e.put("dt", d);
+            e.put("no", no);
             e.put("cust", cust == null ? "" : cust);
             e.put("receiver", receiver == null ? "" : receiver);
             e.put("user", user == null ? "" : user);
             e.put("worker", worker == null ? "" : worker);
             e.put("items", items == null ? "" : items);
             e.put("ts", System.currentTimeMillis());
+            e.put("sync", "pending");
+
+            JSONArray log = new JSONArray(prefs(c).getString("handlog", "[]"));
             log.put(e);
             while (log.length() > 300) log.remove(0);
-            prefs(c).edit().putString("handlog", log.toString()).apply();
+            JSONArray outbox = new JSONArray(prefs(c).getString("handover_outbox", "[]"));
+            if (!hasHandover(outbox, d, no)) outbox.put(new JSONObject(e.toString()));
+            prefs(c).edit()
+                    .putString("handlog", log.toString())
+                    .putString("handover_outbox", outbox.toString())
+                    .apply();
         } catch (Exception ignored) { }
+    }
+
+    /** Durable local handover events which have not yet been confirmed on the shared table. */
+    public static List<JSONObject> pendingHandovers(Context c) {
+        List<JSONObject> out = new ArrayList<>();
+        try {
+            SharedPreferences p = prefs(c);
+            JSONArray queue = new JSONArray(p.getString("handover_outbox", "[]"));
+            // Migrate handovers made by an older build. HandoverDb is idempotent, so retrying
+            // historical rows only fills in the shared status on other devices.
+            if (!p.getBoolean("handover_outbox_migrated", false)) {
+                JSONArray log = new JSONArray(p.getString("handlog", "[]"));
+                for (int i = 0; i < log.length(); i++) {
+                    JSONObject e = log.optJSONObject(i);
+                    if (e == null) continue;
+                    String d = e.optString("dt", "").trim();
+                    String no = e.optString("no", "").trim();
+                    if (!d.isEmpty() && !no.isEmpty() && !"synced".equals(e.optString("sync", ""))
+                            && !hasHandover(queue, d, no)) {
+                        JSONObject copy = new JSONObject(e.toString());
+                        copy.put("sync", "pending");
+                        queue.put(copy);
+                    }
+                }
+                p.edit().putString("handover_outbox", queue.toString())
+                        .putBoolean("handover_outbox_migrated", true).apply();
+            }
+            for (int i = 0; i < queue.length(); i++) {
+                JSONObject e = queue.optJSONObject(i);
+                if (e != null) out.add(new JSONObject(e.toString()));
+            }
+        } catch (Exception ignored) { }
+        return out;
+    }
+
+    /** Drop one confirmed event from the durable outbox and mark its history row synced. */
+    public static void markHandoverSynced(Context c, String day, String shfacfo) {
+        try {
+            String d = Jalali.normalizeDate(day);
+            String no = shfacfo == null ? "" : shfacfo.trim();
+            JSONArray queue = new JSONArray(prefs(c).getString("handover_outbox", "[]"));
+            JSONArray keep = new JSONArray();
+            for (int i = 0; i < queue.length(); i++) {
+                JSONObject e = queue.optJSONObject(i);
+                if (e == null) continue;
+                if (!d.equals(e.optString("dt", "")) || !no.equals(e.optString("no", ""))) keep.put(e);
+            }
+            JSONArray log = new JSONArray(prefs(c).getString("handlog", "[]"));
+            for (int i = 0; i < log.length(); i++) {
+                JSONObject e = log.optJSONObject(i);
+                if (e != null && d.equals(e.optString("dt", "")) && no.equals(e.optString("no", "")))
+                    e.put("sync", "synced");
+            }
+            prefs(c).edit().putString("handover_outbox", keep.toString())
+                    .putString("handlog", log.toString()).apply();
+        } catch (Exception ignored) { }
+    }
+
+    private static boolean hasHandover(JSONArray arr, String day, String no) {
+        if (arr == null) return false;
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject e = arr.optJSONObject(i);
+            if (e != null && day.equals(e.optString("dt", "")) && no.equals(e.optString("no", "")))
+                return true;
+        }
+        return false;
     }
 
     /**

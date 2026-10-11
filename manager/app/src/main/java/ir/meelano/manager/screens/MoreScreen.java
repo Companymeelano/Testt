@@ -56,6 +56,8 @@ public class MoreScreen extends Screen {
             new Group("operations", "مدیریت روزانه و فروش", "فاکتورها، مشتریان و پیگیری روزانه", "♛", "gold",
                     new Entry[]{
                             e("home", "شاخص‌ها و هشدارهای امروز"),
+                            e("closeout", "تطبیق روزانهٔ فروش، دریافت، پرداخت، چک، برگشتی و تحویل باز"),
+                            e("manager_alerts", "آستانه‌های هشدار قابل تنظیم با دسترسی مستقیم به اقدام"),
                             e("sales", "فاکتورهای فروش و پیگیری‌ها"),
                             e("buy", "فاکتورهای خرید و طرف‌حساب‌ها"),
                             e("customers", "پرونده و گردش حساب مشتریان"),
@@ -74,6 +76,8 @@ public class MoreScreen extends Screen {
                             e("products", "موجودی، کم‌موجودی و گردش کالا"),
                             e("anbar", "میزکار و هشدارهای انبار"),
                             e("tahvil", "تحویل فاکتور و ثبت گیرنده"),
+                            e("pick_wave", "برداشت چند فاکتور، جمع کالا و اسکن بارگیری"),
+                            e("sync_queue", "تحویل و شمارش‌های منتظر همگام‌سازی"),
                             e("resid", "رسید کالا و پیش‌نویس‌های انبار"),
                             e("takmil", "تکمیل پیش‌فاکتور"),
                             e("shomarsh", "شمارش انبار و مغایرت‌گیری"),
@@ -245,7 +249,12 @@ public class MoreScreen extends Screen {
         label.setEllipsize(TextUtils.TruncateAt.END);
         tile.addView(label, a.kit.lp(-1, -2));
 
-        TextView desc = a.kit.text(entry.description, 10f, Theme.MUTED, false);
+        String detail = entry.description;
+        if ("sync_queue".equals(entry.id)) {
+            int pending = ir.meelano.manager.core.WarehouseSync.pendingCount(a);
+            detail += " • " + Money.fa(String.valueOf(pending)) + " منتظر";
+        }
+        TextView desc = a.kit.text(detail, 10f, Theme.MUTED, false);
         desc.setGravity(Gravity.CENTER);
         desc.setMaxLines(2);
         desc.setEllipsize(TextUtils.TruncateAt.END);

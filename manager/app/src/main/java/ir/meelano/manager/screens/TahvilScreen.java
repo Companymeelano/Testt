@@ -14,7 +14,6 @@ import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.ReportCatalog;
-import ir.meelano.manager.core.DeviceId;
 import ir.meelano.manager.core.HandoverDb;
 import ir.meelano.manager.core.WarehouseWriter;
 import ir.meelano.manager.data.Meta;
@@ -543,33 +542,18 @@ if (!items.isEmpty()) {
                 return;
             }
             String workerName = worker[0] == null ? "" : worker[0];
-            WarehouseWriter.markHanded(a, f.s("id"), f.s("cust"), receiver, keeper,
+            final String handoverDay = Jalali.normalizeDate(day);
+            WarehouseWriter.markHanded(a, handoverDay, f.s("id"), f.s("cust"), receiver, keeper,
                     workerName, takenText.toString());
-            // Share the mark so every device — the shop TV included — shows the
-            // same tick state. Local storage above is immediate and works offline;
-            // this is the part that makes the other devices agree.
-            final String shNo = f.s("id");
-            final String shCust = f.s("cust");
-            final String shReceiver = receiver;
-            final String shWorker = workerName;
-            final String shItems = takenText.toString();
-            final String shKeeper = keeper;
-            a.repo.run(c -> {
-                HandoverDb.mark(c, Jalali.todayStr(), shNo, shCust, shReceiver,
-                        shWorker, shItems, shKeeper, DeviceId.code(a));
-                return Boolean.TRUE;
-            }, new Repo.Cb<Boolean>() {
-                @Override
-                public void ok(Boolean v) { }
-
-                @Override
-                public void fail(String faError) {
-                    a.kit.toast("تحویل ثبت شد، ولی همگام‌سازی با سرور انجام نشد");
-                }
+            // The local handover is immediate. The durable outbox retries the shared
+            // Meelano side table until another device can read the confirmed mark.
+            ir.meelano.manager.core.WarehouseSync.retry(a, (handovers, counts, pending, error) -> {
+                if (pending > 0 && error != null && !error.isEmpty())
+                    a.kit.toast("تحویل ثبت شد؛ همگام‌سازی در صفِ تلاشِ دوباره ماند");
             });
             String sub = "مشتری: " + f.s("cust") + "  •  " + receiver
                     + (workerName.isEmpty() ? "" : "  •  کارگر: " + workerName)
-                    + "  •  تحویل‌دهنده: " + keeper + "  •  تاریخ: " + Jalali.todayStr()
+                    + "  •  تحویل‌دهنده: " + keeper + "  •  تاریخ: " + Money.fa(handoverDay)
                     + "  •  مبلغ: " + Money.compactMoney(f.d("amount"));
             ReportCatalog.Col[] cols = new ReportCatalog.Col[]{
                     new ReportCatalog.Col("name", "کالا", ReportCatalog.T_TEXT),
@@ -710,14 +694,15 @@ if (!items.isEmpty()) {
                     a.kit.toast("موزعی یافت نشد");
                     return;
                 }
-                // Only distributors. The warehouse hands loads to distributors, so offering
-                // every visitor on file was wrong. Falls back to the full list when no name
-                // reads as a distributor, so the picker can never come up empty by mistake.
+                // This is a distributor-only picker: never silently offer visitors or staff.
                 List<Row> dist = new ArrayList<>();
                 for (Row r : rows) {
                     if (r != null && AtiranAuth.isDistributorName(r.s("name"))) dist.add(r);
                 }
-                if (dist.isEmpty()) dist = rows;
+                if (dist.isEmpty()) {
+                    a.kit.toast("موزعی با نقش مشخص در فهرست یافت نشد؛ ابتدا نقش موزع را در آتیران بررسی کنید");
+                    return;
+                }
                 a.kit.searchPicker("انتخاب موزع", dist, new String[]{"name", "cell"},
                         new Kit.PickerListener() {
                             @Override public void onPick(Row r) {

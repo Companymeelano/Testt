@@ -32,13 +32,14 @@ Starting a Gradle Daemon (subsequent builds will be faster)
 > Task :app:compileDebugShaders NO-SOURCE
 > Task :app:generateDebugAssets UP-TO-DATE
 > Task :app:mergeDebugAssets
+> Task :app:processDebugManifestForPackage
 > Task :app:processDebugJavaRes NO-SOURCE
 > Task :app:compressDebugAssets
 > Task :app:desugarDebugFileDependencies
-> Task :app:processDebugManifestForPackage
 > Task :app:checkDebugDuplicateClasses
-> Task :app:mergeDebugJavaResource
+> Task :app:mergeDebugJniLibFolders
 > Task :app:processDebugResources
+> Task :app:mergeDebugJavaResource
 > Task :app:mergeExtDexDebug
 
 > Task :app:compileDebugJavaWithJavac
@@ -55,7 +56,7 @@ Note: Recompile with -Xlint:deprecation for details.
 2 errors
 
 > Task :app:compileDebugJavaWithJavac FAILED
-gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1791684285381.json
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1791684605837.json
 [Incubating] Problems report is available at: file:///home/runner/work/Testt/Testt/manager/build/reports/problems/problems-report.html
 
 FAILURE: Build failed with an exception.
@@ -277,5 +278,5 @@ Note: Some input files use or override a deprecated API.
 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:48)
 
 
-BUILD FAILED in 44s
-24 actionable tasks: 24 executed
+BUILD FAILED in 47s
+25 actionable tasks: 25 executed

@@ -736,7 +736,7 @@ public final class Kit {
      * @param showKeys row fields to display, joined with a separator; every value in the
      *                 row is searched, not only the displayed ones.
      */
-    public void searchPicker(String title, final List<Row> rows, final String[] showKeys,
+    public AlertDialog searchPicker(String title, final List<Row> rows, final String[] showKeys,
             final PickerListener onPick) {
         final List<Row> all = rows == null ? new ArrayList<Row>() : rows;
         LinearLayout root = v();
@@ -793,6 +793,7 @@ public final class Kit {
         paint.run();
         root.addView(scrollWrap(list, 430), lp(-1, -2));
         box[0] = dialog(title, root, true);
+        return box[0];
     }
 
     /** Every value of a row, flattened for search matching. */

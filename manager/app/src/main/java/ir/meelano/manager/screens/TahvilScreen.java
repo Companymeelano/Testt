@@ -4,6 +4,7 @@ import android.app.AlertDialog;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
+import android.widget.TextView;
 
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.ShareProvider;

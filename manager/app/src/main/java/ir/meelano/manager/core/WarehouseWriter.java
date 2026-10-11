@@ -156,8 +156,19 @@ public final class WarehouseWriter {
 
     // ---- handover log (which invoices were handed over, per day) ----
 
+    /** Back-compat form without a worker or an item breakdown. */
     public static void markHanded(Context c, String shfacfo, String cust,
             String receiver, String user) {
+        markHanded(c, shfacfo, cust, receiver, user, "", "");
+    }
+
+    /**
+     * Record a handover: who received it, which worker physically carried the load out and
+     * exactly which items were ticked. Everything lands in the local handover log so the
+     * warehouse can search past deliveries when a customer disputes one.
+     */
+    public static void markHanded(Context c, String shfacfo, String cust,
+            String receiver, String user, String worker, String items) {
         try {
             String day = Jalali.todayStr();
             String key = "hand_" + day.replace("/", "");
@@ -172,6 +183,9 @@ public final class WarehouseWriter {
             e.put("cust", cust == null ? "" : cust);
             e.put("receiver", receiver == null ? "" : receiver);
             e.put("user", user == null ? "" : user);
+            e.put("worker", worker == null ? "" : worker);
+            e.put("items", items == null ? "" : items);
+            e.put("ts", System.currentTimeMillis());
             log.put(e);
             while (log.length() > 300) log.remove(0);
             prefs(c).edit().putString("handlog", log.toString()).apply();

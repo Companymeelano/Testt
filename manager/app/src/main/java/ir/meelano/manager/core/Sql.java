@@ -158,6 +158,34 @@ public final class Sql {
         return null;
     }
 
+    /**
+     * Spacing-insensitive, Persian/Arabic-tolerant key for filtering lists in memory.
+     * «علي رضايي» and «علی رضایی» collapse to the same key, Persian digits match Latin
+     * ones, and every non-alphanumeric character is dropped so punctuation never blocks a
+     * match. Used by the searchable pickers.
+     */
+    /**
+     * Spacing-insensitive, Persian/Arabic-tolerant key for filtering lists in memory.
+     * Collapses the Arabic and Persian spellings of the same letter, folds Persian and
+     * Arabic digits onto Latin ones and drops everything that is not alphanumeric, so
+     * punctuation can never block a match. Used by the searchable pickers.
+     */
+    public static String searchKey(String s) {
+        if (s == null) return "";
+        StringBuilder b = new StringBuilder();
+        for (char ch : s.toCharArray()) {
+            if (ch == 'ي' || ch == 'ی') b.append('ی');
+            else if (ch == 'ك' || ch == 'ک') b.append('ک');
+            else if (ch == 'ة') b.append('ه');
+            else if (ch == 'ؤ') b.append('و');
+            else if (ch == 'إ' || ch == 'أ' || ch == 'آ') b.append('ا');
+            else if (ch >= '٠' && ch <= '٩') b.append((char) ('0' + (ch - '٠')));
+            else if (ch >= '۰' && ch <= '۹') b.append((char) ('0' + (ch - '۰')));
+            else if (Character.isLetterOrDigit(ch)) b.append(Character.toLowerCase(ch));
+        }
+        return b.toString();
+    }
+
     private static String norm(String s) {
         if (s == null) return "";
         StringBuilder b = new StringBuilder();

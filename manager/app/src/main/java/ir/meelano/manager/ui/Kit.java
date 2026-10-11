@@ -23,9 +23,11 @@ import android.widget.Toast;
 
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.Money;
+import ir.meelano.manager.core.Sql;
 import ir.meelano.manager.core.ReportCatalog;
 import ir.meelano.manager.data.Row;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /** Luxury view builders shared by all screens. */
@@ -717,6 +719,90 @@ public final class Kit {
     // ---------------- misc ----------------
     public void toast(String msg) {
         Toast.makeText(a, msg, Toast.LENGTH_SHORT).show();
+    }
+
+    /** Selection callback for {@link #searchPicker}. */
+    public interface PickerListener { void onPick(Row r); }
+
+    /**
+     * Searchable selection dialog.
+     *
+     * Several pickers were plain button lists with no way to filter, which is unusable once
+     * a list outgrows the screen - the supplier list runs to thousands of rows. Every
+     * selection now gets a filter field that narrows the list as you type. Matching uses
+     * Sql.searchKey, so the Arabic and Persian spellings of a name are interchangeable,
+     * digits typed in either script match, and punctuation is ignored.
+     *
+     * @param showKeys row fields to display, joined with a separator; every value in the
+     *                 row is searched, not only the displayed ones.
+     */
+    public void searchPicker(String title, final List<Row> rows, final String[] showKeys,
+            final PickerListener onPick) {
+        final List<Row> all = rows == null ? new ArrayList<Row>() : rows;
+        LinearLayout root = v();
+        root.setPadding(Theme.dp(16), Theme.dp(14), Theme.dp(16), Theme.dp(12));
+        final android.widget.EditText q = edit("\u062c\u0633\u062a\u200c\u0648\u062c\u0648\u2026", "");
+        try {
+            q.setSingleLine(true);
+            q.setTextDirection(View.TEXT_DIRECTION_RTL);
+        } catch (Exception ignored) { }
+        root.addView(q, lp(-1, -2));
+        final TextView count = text("", 11.5f, Theme.MUTED, false);
+        root.addView(count, lp(-1, -2));
+        root.addView(gap(8));
+        final LinearLayout list = v();
+        final AlertDialog[] box = new AlertDialog[1];
+        final Runnable paint = new Runnable() {
+            @Override public void run() {
+                String needle = Sql.searchKey(q.getText() == null ? "" : q.getText().toString());
+                list.removeAllViews();
+                int shown = 0;
+                for (int i = 0; i < all.size(); i++) {
+                    final Row r = all.get(i);
+                    if (r == null) continue;
+                    if (!needle.isEmpty() && !Sql.searchKey(rowSearchText(r)).contains(needle)) continue;
+                    shown++;
+                    StringBuilder label = new StringBuilder();
+                    if (showKeys != null) {
+                        for (String k : showKeys) {
+                            if (k == null) continue;
+                            String v = r.s(k);
+                            if (v == null || v.trim().isEmpty()) continue;
+                            if (label.length() > 0) label.append("  \u2022  ");
+                            label.append(v);
+                        }
+                    }
+                    if (label.length() == 0) label.append("\u2014");
+                    list.addView(btnGhost(label.toString(), Theme.GOLD, new View.OnClickListener() {
+                        @Override public void onClick(View v) {
+                            try { box[0].dismiss(); } catch (Exception ignored) { }
+                            if (onPick != null) onPick.onPick(r);
+                        }
+                    }), lp(-1, -2));
+                }
+                count.setText(Money.fa(String.valueOf(shown)) + " \u0627\u0632 "
+                        + Money.fa(String.valueOf(all.size())) + " \u0645\u0648\u0631\u062f");
+                if (shown == 0) list.addView(empty("\u0645\u0648\u0631\u062f\u06cc \u06cc\u0627\u0641\u062a \u0646\u0634\u062f", null), lp(-1, -2));
+            }
+        };
+        q.addTextChangedListener(new android.text.TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int a2, int b2, int c2) { }
+            @Override public void onTextChanged(CharSequence s2, int a2, int b2, int c2) { paint.run(); }
+            @Override public void afterTextChanged(android.text.Editable e2) { }
+        });
+        paint.run();
+        root.addView(scrollWrap(list, 430), lp(-1, -2));
+        box[0] = dialog(title, root, true);
+    }
+
+    /** Every value of a row, flattened for search matching. */
+    private static String rowSearchText(Row r) {
+        StringBuilder b = new StringBuilder();
+        for (Object v : r.values()) {
+            if (v == null) continue;
+            b.append(' ').append(v);
+        }
+        return b.toString();
     }
 
     public AlertDialog dialog(String title, View body, boolean cancelable) {

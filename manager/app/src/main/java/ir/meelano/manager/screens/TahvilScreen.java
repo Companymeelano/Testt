@@ -140,16 +140,55 @@ public class TahvilScreen extends Screen {
             body.addView(a.kit.kv("تلفن", Money.fa(f.s("phone")), Theme.TEXT), a.kit.lp(-1, -2));
         body.addView(a.kit.kv("مبلغ", Money.fa(Money.compact(f.d("amount"))) + " تومان", Theme.TEXT),
                 a.kit.lp(-1, -2));
-        if (!items.isEmpty()) {
-            body.addView(a.kit.text("اقلام (" + Money.fa(String.valueOf(items.size())) + ")",
-                    13f, Theme.TEXT, true), a.kit.lp(-1, -2));
-            ReportCatalog.Col[] cols = new ReportCatalog.Col[]{
-                    new ReportCatalog.Col("name", "کالا", ReportCatalog.T_TEXT),
-                    new ReportCatalog.Col("qty", "تعداد", ReportCatalog.T_TEXT),
-                    new ReportCatalog.Col("unit", "واحد", ReportCatalog.T_TEXT),
+                final boolean[] marked = new boolean[items.size()];
+        for (int x = 0; x < marked.length; x++) marked[x] = true;
+if (!items.isEmpty()) {
+            LinearLayout head = a.kit.h();
+            head.addView(a.kit.text("اقلام فاکتور (علامت بزنید)", 13f, Theme.TEXT, true),
+                    a.kit.wlp(1f));
+            final TextView tally = a.kit.text("", 12f, Theme.MUTED, false);
+            head.addView(tally, a.kit.lp(-2, -2));
+            body.addView(head, a.kit.lp(-1, -2));
+            final LinearLayout itemBox = a.kit.v();
+            final Runnable repaint = () -> {
+                itemBox.removeAllViews();
+                for (int x = 0; x < items.size(); x++) {
+                    final int idx = x;
+                    final Row it = items.get(x);
+                    String qty = it.s("qty");
+                    String unit = it.s("unit");
+                    String label = it.s("name")
+                            + (qty.isEmpty() ? "" : "  × " + Money.fa(qty))
+                            + (unit.isEmpty() ? "" : " " + unit);
+                    android.widget.CheckBox cb = new android.widget.CheckBox(a);
+                    cb.setChecked(marked[idx]);
+                    cb.setText(label);
+                    cb.setTextColor(Theme.TEXT);
+                    cb.setTextSize(13f * Theme.fontScale() * Theme.typeScale());
+                    cb.setTypeface(Theme.face(false));
+                    try { cb.setLayoutDirection(View.LAYOUT_DIRECTION_RTL); } catch (Exception ignored) { }
+                    cb.setOnCheckedChangeListener((btn, on) -> marked[idx] = on);
+                    itemBox.addView(cb, a.kit.lp(-1, -2));
+                }
+                int n = 0;
+                for (boolean bb : marked) if (bb) n++;
+                tally.setText(Money.fa(String.valueOf(n)) + " از "
+                        + Money.fa(String.valueOf(items.size())));
             };
-            body.addView(a.kit.dataTable(cols, items, null), a.kit.lp(-1, -2));
-        } else {
+            repaint.run();
+            body.addView(itemBox, a.kit.lp(-1, -2));
+            LinearLayout allRow = a.kit.h();
+            allRow.addView(a.kit.btnGhost("✓ انتخاب همه", Theme.SUCCESS, v3 -> {
+                for (int x = 0; x < marked.length; x++) marked[x] = true;
+                repaint.run();
+            }), a.kit.wlp(1f));
+            allRow.addView(a.kit.space(8));
+            allRow.addView(a.kit.btnGhost("○ هیچ‌کدام", Theme.MUTED, v4 -> {
+                for (int x = 0; x < marked.length; x++) marked[x] = false;
+                repaint.run();
+            }), a.kit.wlp(1f));
+            body.addView(allRow, a.kit.lp(-1, -2));
+} else {
             body.addView(a.kit.hint("قلمی برای این فاکتور یافت نشد"), a.kit.lp(-1, -2));
         }
         body.addView(a.kit.gap(8));
@@ -182,6 +221,41 @@ public class TahvilScreen extends Screen {
         row.addView(bOut[0], a.kit.wlp(1f));
         body.addView(row, a.kit.lp(-1, -2));
         body.addView(a.kit.gap(6));
+        body.addView(a.kit.gap(6));
+        final String[] worker = {""};
+        body.addView(a.kit.text("تحویل‌دهنده (کارگر)", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        final android.widget.TextView workerLabel = a.kit.text("انتخاب نشده", 12.5f, Theme.MUTED, false);
+        body.addView(a.kit.btnGhost("کارگر را انتخاب کن", Theme.SUCCESS, v2 -> {
+            a.kit.toast("در حال دریافت کارکنان…");
+            a.repo.run(c -> {
+                Meta m = new Meta(c);
+                return Repo.exec(c, MasterQueries.lookupUsers(m));
+            }, new Repo.Cb<List<Row>>() {
+                @Override public void ok(List<Row> rows) {
+                    if (rows == null || rows.isEmpty()) {
+                        a.kit.toast("کاربری در آتیران یافت نشد");
+                        return;
+                    }
+                    List<Row> all = new ArrayList<>();
+                    Row none = new Row();
+                    none.put("id", "");
+                    none.put("name", "بدون کارگر");
+                    all.add(none);
+                    all.addAll(rows);
+                    a.kit.searchPicker("انتخاب کارگر", all, new String[]{"name"},
+                            new Kit.PickerListener() {
+                                @Override public void onPick(Row r) {
+                                    worker[0] = r.s("name");
+                                    if ("بدون کارگر".equals(worker[0])) worker[0] = "";
+                                    workerLabel.setText(worker[0].isEmpty() ? "انتخاب نشده" : worker[0]);
+                                    workerLabel.setTextColor(worker[0].isEmpty() ? Theme.MUTED : Theme.TEXT);
+                                }
+                            }).show();
+                }
+                @Override public void fail(String faError) { a.kit.toast(faError); }
+            });
+        }), a.kit.lp(-1, -2));
+        body.addView(workerLabel, a.kit.lp(-1, -2));
         body.addView(a.kit.text("مدرک تحویل (اختیاری)", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
         final android.graphics.Bitmap[] signBmp = {null};
         final android.graphics.Bitmap[] photoBmp = {null};
@@ -230,8 +304,27 @@ public class TahvilScreen extends Screen {
             } catch (Exception ignored) { }
             String keeper = AtiranAuth.sessionName(a);
             if (keeper.isEmpty()) keeper = AtiranAuth.sessionUser(a);
-            WarehouseWriter.markHanded(a, f.s("id"), f.s("cust"), receiver, keeper);
+            // Only the ticked items go on the receipt and into the handover record, so a
+            // partly delivered invoice is exactly that - partly delivered.
+            List<Row> taken = new ArrayList<>();
+            StringBuilder takenText = new StringBuilder();
+            for (int x = 0; x < items.size(); x++) {
+                if (!marked[x]) continue;
+                Row it = items.get(x);
+                taken.add(it);
+                if (takenText.length() > 0) takenText.append("، ");
+                takenText.append(it.s("name"))
+                        .append(it.s("qty").isEmpty() ? "" : " × " + it.s("qty"));
+            }
+            if (taken.isEmpty()) {
+                a.kit.toast("هیچ کالایی علامت نخورده است");
+                return;
+            }
+            String workerName = worker[0] == null ? "" : worker[0];
+            WarehouseWriter.markHanded(a, f.s("id"), f.s("cust"), receiver, keeper,
+                    workerName, takenText.toString());
             String sub = "مشتری: " + f.s("cust") + "  •  " + receiver
+                    + (workerName.isEmpty() ? "" : "  •  کارگر: " + workerName)
                     + "  •  تحویل‌دهنده: " + keeper + "  •  تاریخ: " + Jalali.todayStr()
                     + "  •  مبلغ: " + Money.compact(f.d("amount")) + " تومان";
             ReportCatalog.Col[] cols = new ReportCatalog.Col[]{
@@ -248,8 +341,8 @@ public class TahvilScreen extends Screen {
                 savePng("tahvil-" + f.s("id") + "-photo.png", photoBmp[0]);
                 images.add(new Pdf.Img(photoBmp[0], "عکس تحویل"));
             }
-            if (images.isEmpty()) a.sharePdf("رسید تحویل فاکتور " + f.s("id"), sub, cols, items);
-            else a.sharePdfImages("رسید تحویل فاکتور " + f.s("id"), sub, cols, items, images);
+            if (images.isEmpty()) a.sharePdf("رسید تحویل فاکتور " + f.s("id"), sub, cols, taken);
+            else a.sharePdfImages("رسید تحویل فاکتور " + f.s("id"), sub, cols, taken, images);
             if (content != null) render(content);
         }), a.kit.lp(-1, -2));
         ScrollView sv = new ScrollView(a);

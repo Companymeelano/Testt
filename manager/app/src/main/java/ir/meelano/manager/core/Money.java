@@ -6,7 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-/** Persian money / number formatting. Amounts are always shown in full rials. */
+/** Persian money / number formatting. Atiran stores Rials; the UI uses the selected display unit. */
 public final class Money {
     private Money() { }
 
@@ -142,10 +142,11 @@ public final class Money {
         return b.toString();
     }
 
-    /** 52500000 → «پنجاه و دو میلیون و پانصد هزار ریال» */
+    /** Amount in words follows the selected display unit (database values stay in Rials). */
     public static String words(double value) {
-        long v = Math.abs(Math.round(value));
-        if (v == 0) return "صفر ریال";
+        double selected = toUnit(value);
+        long v = Math.abs(Math.round(selected));
+        if (v == 0) return "صفر " + unitName();
         if (v >= 1_000_000_000_000_000L) return rial(value);
         List<String> parts = new ArrayList<>();
         int scale = 0;
@@ -156,6 +157,6 @@ public final class Money {
         }
         StringBuilder b = new StringBuilder();
         for (int i = 0; i < parts.size(); i++) { if (i > 0) b.append(" و "); b.append(parts.get(i)); }
-        return (value < 0 ? "منفی " : "") + b + " ریال";
+        return (selected < 0 ? "منفی " : "") + b + " " + unitName();
     }
 }

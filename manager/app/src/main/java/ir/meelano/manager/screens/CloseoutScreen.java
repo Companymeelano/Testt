@@ -8,6 +8,7 @@ import android.widget.LinearLayout;
 
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.core.AtiranAuth;
+import ir.meelano.manager.core.AtiranSchema;
 import ir.meelano.manager.core.CloseoutDb;
 import ir.meelano.manager.core.HandoverDb;
 import ir.meelano.manager.core.Jalali;
@@ -198,8 +199,8 @@ public class CloseoutScreen extends Screen {
         content.addView(money, a.kit.lp(-1, -2));
         content.addView(a.kit.gap(8));
 
-        addChecks("چک‌های دریافتی ثبت‌شده", "چک‌های دریافتیِ ثبت‌شده در روز", d.incomingChecks, Theme.INFO, d);
-        addChecks("چک‌های پرداختی ثبت‌شده", "چک‌های پرداختیِ ثبت‌شده در روز", d.outgoingChecks, Theme.DANGER, d);
+        addChecks("چک‌های دریافتی ثبت‌شده", "چک‌های دریافتیِ ثبت‌شده در روز", d.incomingChecks, Theme.INFO, d, true);
+        addChecks("چک‌های پرداختی ثبت‌شده", "چک‌های پرداختیِ ثبت‌شده در روز", d.outgoingChecks, Theme.DANGER, d, false);
         addReturns(d.returns, d);
         addDeliveries(d);
         addCloseAction(d);
@@ -208,7 +209,7 @@ public class CloseoutScreen extends Screen {
                 + "مبالغ با واحد «" + Money.unitName() + "» نمایش داده شده‌اند."), a.kit.lp(-1, -2));
     }
 
-    private void addChecks(String title, String source, List<Row> rows, int accent, Data d) {
+    private void addChecks(String title, String source, List<Row> rows, int accent, Data d, boolean incoming) {
         LinearLayout card = a.kit.card(accent);
         long count = rows == null ? 0 : rows.size();
         double total = 0;
@@ -222,8 +223,19 @@ public class CloseoutScreen extends Screen {
         else {
             for (int i = 0; i < Math.min(5, rows.size()); i++) {
                 Row r = rows.get(i);
-                card.addView(a.kit.kv("چک " + r.s("num") + " • " + r.s("customer"),
-                        Money.compactRial(r.d("amount")) + (r.s("st").isEmpty() ? "" : " • وضعیت " + r.s("st")),
+                String status = r.s("statusLabel");
+                if (status.isEmpty()) status = incoming
+                        ? AtiranSchema.chequeInStatusFa(r.s("st"), r.s("back"))
+                        : AtiranSchema.chequeOutStatusFa(r.s("st"));
+                String eventDate = Jalali.disp(r.s("getdate"));
+                String dueDate = Jalali.disp(r.s("sardate"));
+                if (!eventDate.isEmpty()) eventDate = Money.fa(eventDate);
+                if (!dueDate.isEmpty()) dueDate = Money.fa(dueDate);
+                String extra = Money.compactRial(r.d("amount"));
+                if (!eventDate.isEmpty()) extra += " • " + (incoming ? "دریافت " : "صدور ") + eventDate;
+                if (!dueDate.isEmpty()) extra += " • سررسید " + dueDate;
+                if (!status.isEmpty()) extra += " • " + status;
+                card.addView(a.kit.kv("چک " + r.s("num") + " • " + r.s("customer"), extra,
                         accent), a.kit.lp(-1, -2));
             }
             if (rows.size() > 5) card.addView(a.kit.hint("و "

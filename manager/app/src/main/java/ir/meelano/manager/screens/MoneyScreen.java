@@ -131,11 +131,11 @@ public class MoneyScreen extends Screen {
         m.put("list", d.list);
         m.put("banks", d.banks);
         m.put("tab", d.snapTab);
-        CacheStore.saveData(a, "cx_money_" + id(), cacheNow(), m);
+        CacheStore.saveData(a, "cx_money_v2_" + id(), cacheNow(), m);
     }
 
     private Data loadCache(String[] lab) {
-        java.util.Map<String, Object> m = CacheStore.loadData(a, "cx_money_" + id(), lab);
+        java.util.Map<String, Object> m = CacheStore.loadData(a, "cx_money_v2_" + id(), lab);
         if (m == null) return null;
         Data d = new Data();
         d.summary = CacheStore.row(m, "sum");
@@ -175,7 +175,7 @@ public class MoneyScreen extends Screen {
             a.kit.addCard(content, c);
         }
 
-        content.addView(a.kit.chips(new String[]{"فهرست", "گردش کارت بانک‌ها"}, d.snapTab, idx -> {
+        content.addView(a.kit.chips(new String[]{"فهرست", "کارت و حواله"}, d.snapTab, idx -> {
             tab = idx;
             filter.page = 0;
             render(content);
@@ -213,7 +213,11 @@ public class MoneyScreen extends Screen {
                 new ReportCatalog.Col("ghno", "قبض", ReportCatalog.T_TEXT),
                 new ReportCatalog.Col("date", "تاریخ", ReportCatalog.T_DATE),
                 new ReportCatalog.Col("customer", "طرف‌حساب", ReportCatalog.T_TEXT),
-                new ReportCatalog.Col("total", "مبلغ", ReportCatalog.T_MONEY),
+                new ReportCatalog.Col("cash", "نقد", ReportCatalog.T_MONEY),
+                new ReportCatalog.Col("pos", "کارت", ReportCatalog.T_MONEY),
+                new ReportCatalog.Col("havaleh", "حواله", ReportCatalog.T_MONEY),
+                new ReportCatalog.Col("cheque", "چک", ReportCatalog.T_MONEY),
+                new ReportCatalog.Col("total", "جمع", ReportCatalog.T_MONEY),
         };
         content.addView(a.exportBar(p == 0 ? "فهرست قبوض دریافت" : "فهرست قبوض پرداخت",
                 filter.rangeFa(), expCols, d.list), a.kit.lp(-1, -2));
@@ -225,17 +229,21 @@ public class MoneyScreen extends Screen {
             return;
         }
         LinearLayout c = a.kit.card(Theme.INFO);
-        c.addView(a.kit.text("گردش کارت به تفکیک بانک", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        c.addView(a.kit.text("گردش کارت و حواله به تفکیک بانک", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
         Charts.Donut dn = new Charts.Donut(a);
         List<Charts.Point> pts = new ArrayList<>();
-        for (int i = 0; i < Math.min(8, d.banks.size()); i++)
-            pts.add(new Charts.Point(d.banks.get(i).s("bank"), d.banks.get(i).d("total"), Charts.palette(i)));
+        for (int i = 0; i < Math.min(8, d.banks.size()); i++) {
+            Row r = d.banks.get(i);
+            String label = r.s("bank") + (r.s("kind").isEmpty() ? "" : " • " + r.s("kind"));
+            pts.add(new Charts.Point(label, r.d("total"), Charts.palette(i)));
+        }
         double sum = 0;
         for (Row r : d.banks) sum += r.d("total");
         dn.setData(pts, "جمع گردش", Money.compactRial(sum));
         c.addView(dn, new LinearLayout.LayoutParams(-1, Theme.dp(300)));
         ReportCatalog.Col[] cols = new ReportCatalog.Col[]{
                 new ReportCatalog.Col("bank", "بانک", ReportCatalog.T_TEXT),
+                new ReportCatalog.Col("kind", "روش", ReportCatalog.T_TEXT),
                 new ReportCatalog.Col("total", "مبلغ", ReportCatalog.T_MONEY),
                 new ReportCatalog.Col("count", "تعداد", ReportCatalog.T_NUM),
         };
@@ -326,8 +334,9 @@ public class MoneyScreen extends Screen {
         }
 
         if (!dt.pos.isEmpty()) {
-            body.addView(a.kit.text("کارت / حواله", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
+            body.addView(a.kit.text("ریز کارت و حواله", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
             ReportCatalog.Col[] cols = new ReportCatalog.Col[]{
+                    new ReportCatalog.Col("kind", "روش", ReportCatalog.T_TEXT),
                     new ReportCatalog.Col("bank", "بانک", ReportCatalog.T_TEXT),
                     new ReportCatalog.Col("amount", "مبلغ", ReportCatalog.T_MONEY),
                     new ReportCatalog.Col("tracking", "پیگیری", ReportCatalog.T_TEXT),
@@ -343,6 +352,7 @@ public class MoneyScreen extends Screen {
             ReportCatalog.Col[] cols = new ReportCatalog.Col[]{
                     new ReportCatalog.Col("num", "شماره", ReportCatalog.T_TEXT),
                     new ReportCatalog.Col("amount", "مبلغ", ReportCatalog.T_MONEY),
+                    new ReportCatalog.Col("getdate", inChq ? "تاریخ دریافت" : "تاریخ صدور", ReportCatalog.T_DATE),
                     new ReportCatalog.Col("sardate", "سررسید", ReportCatalog.T_DATE),
                     new ReportCatalog.Col("stLabel", "وضعیت", ReportCatalog.T_TEXT),
             };

@@ -61,13 +61,14 @@ public final class Sql {
     /**
      * Normalise Atiran's date text to a sortable «YYYY/MM/DD».
      *
-     * Most rows are stored zero-padded, but a real minority is not («1403/5/12»). Range
-     * filters compare these as text, and «1403/5/12» sorts after «1403/12/29», so those
-     * rows fell outside every range and quietly vanished from the reports.
+     * Most rows are stored zero-padded, but some use one-digit components or bare YYYYMMDD.
+     * Normalize them before range comparisons; otherwise dates can sort outside their month.
      */
     public static String dateKey(String dateExpr) {
-        String d = dateExpr;
+        String d = "LTRIM(RTRIM(" + dateExpr + "))";
         return "(CASE"
+                + " WHEN " + d + " LIKE N'[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]'"
+                + " THEN LEFT(" + d + ",4)+N'/'+SUBSTRING(" + d + ",5,2)+N'/'+RIGHT(" + d + ",2)"
                 + " WHEN " + d + " LIKE N'[0-9][0-9][0-9][0-9]/[0-9]/[0-9]'"
                 + " THEN LEFT(" + d + ",5)+N'0'+SUBSTRING(" + d + ",6,1)+N'/0'+SUBSTRING(" + d + ",8,1)"
                 + " WHEN " + d + " LIKE N'[0-9][0-9][0-9][0-9]/[0-9]/[0-9][0-9]'"

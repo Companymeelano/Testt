@@ -57,7 +57,10 @@ public class ChequesScreen extends Screen {
     public FilterSheet.Config filterConfig() {
         FilterSheet.Config c = new FilterSheet.Config();
         c.searchHint = "شماره، مشتری، شناسه صیادی…";
-        c.range = true;
+        // The ordinary list's range is the cheque's receipt/issue date. Due and calendar
+        // modes have their own explicit due-date window/month and must not offer a range
+        // control that those queries would silently ignore.
+        c.range = !calMode && !"due".equals(bucket);
         c.banks = true;
         return c;
     }
@@ -90,6 +93,13 @@ public class ChequesScreen extends Screen {
                 : AtiranSchema.chequeOutStatusFa(r.s("st"));
     }
 
+    private String dateHint(boolean inc, String selectedBucket, boolean calendar) {
+        if (calendar) return "تقویم بر اساس سررسید چک است؛ تاریخ دریافت/صدور در جزئیات جدا آمده است.";
+        if ("due".equals(selectedBucket)) return "این فهرست، چک‌های باز با سررسید در ۳۰ روز آینده را نشان می‌دهد.";
+        return "بازهٔ فهرست بر اساس تاریخ " + (inc ? "دریافت" : "صدور")
+                + " چک است؛ تاریخ سررسید جداگانه نمایش داده می‌شود.";
+    }
+
     private static final class Data {
         boolean snapIn;
         String snapBucket = "";
@@ -104,13 +114,27 @@ public class ChequesScreen extends Screen {
     public void render(final LinearLayout content) {
         content.removeAllViews();
         content.addView(heroCard(), a.kit.lp(-1, -2));
-        content.addView(a.kit.hint("مبنای بازه تاریخی: تاریخ " + (incoming ? "دریافت" : "صدور") + " چک"), a.kit.lp(-1, -2));
+        content.addView(a.kit.hint(dateHint(incoming, bucket, calMode)), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(12));
         content.addView(a.kit.loading("در حال دریافت چک‌ها…"), a.kit.lp(-1, -2));
         final boolean myIn = incoming;
         final String myBucket = bucket;
         final boolean myCal = calMode;
         final Filter f = filter.copy();
+        final Filter dueFilter = f.copy();
+        if (myCal) {
+            ensureCalMonth();
+            dueFilter.preset = Filter.P_CUSTOM;
+            dueFilter.from = String.format(java.util.Locale.US, "%04d/%02d/01", calY, calM);
+            dueFilter.to = String.format(java.util.Locale.US, "%04d/%02d/%02d", calY, calM,
+                    Jalali.daysInMonth(calY, calM));
+        } else if ("due".equals(myBucket)) {
+            // The due chip is a rolling future window, independent of the ordinary list's
+            // receive/issue-date range. Keep text and bank filters, but not a stale date range.
+            dueFilter.preset = Filter.P_ALL;
+            dueFilter.from = "";
+            dueFilter.to = "";
+        }
 
         a.repo.run(c -> {
             Meta m = new Meta(c);
@@ -118,11 +142,13 @@ public class ChequesScreen extends Screen {
             d.snapIn = myIn;
             d.snapBucket = myBucket;
             d.snapCal = myCal;
-            d.groups = soft(d.notes, "خلاصه وضعیت‌ها", () -> Repo.exec(c, MoneyQueries.chequeGroups(m, myIn, f)));
+            if (!myCal && !"due".equals(myBucket))
+                d.groups = soft(d.notes, "خلاصه وضعیت‌ها", () -> Repo.exec(c, MoneyQueries.chequeGroups(m, myIn, f)));
+            else d.groups = new ArrayList<>();
             if (myCal) {
-                d.cal = soft(d.notes, "تقویم", () -> Repo.exec(c, MoneyQueries.chequeDue(m, myIn, 62)));
+                d.cal = soft(d.notes, "تقویم", () -> Repo.exec(c, MoneyQueries.chequeDue(m, myIn, 62, dueFilter)));
             } else if ("due".equals(myBucket)) {
-                d.list = soft(d.notes, "سررسیدها", () -> Repo.exec(c, MoneyQueries.chequeDue(m, myIn, 30)));
+                d.list = soft(d.notes, "سررسیدها", () -> Repo.exec(c, MoneyQueries.chequeDue(m, myIn, 30, dueFilter)));
             } else {
                 d.list = soft(d.notes, "فهرست", () -> Repo.exec(c, MoneyQueries.chequeList(m, myIn, f, myBucket)));
             }
@@ -172,11 +198,11 @@ public class ChequesScreen extends Screen {
         meta.put("bucket", d.snapBucket);
         meta.put("cal", d.snapCal ? "1" : "0");
         m.put("meta", meta);
-        CacheStore.saveData(a, "cx_cheques", cacheNow(), m);
+        CacheStore.saveData(a, "cx_cheques_v2", cacheNow(), m);
     }
 
     private Data loadCache(String[] lab) {
-        java.util.Map<String, Object> m = CacheStore.loadData(a, "cx_cheques", lab);
+        java.util.Map<String, Object> m = CacheStore.loadData(a, "cx_cheques_v2", lab);
         if (m == null) return null;
         Data d = new Data();
         d.groups = CacheStore.rows(m, "groups");
@@ -194,7 +220,7 @@ public class ChequesScreen extends Screen {
         final String myBucket = d.snapBucket == null ? "" : d.snapBucket;
         content.removeAllViews();
         content.addView(heroCard(), a.kit.lp(-1, -2));
-        content.addView(a.kit.hint("مبنای بازه تاریخی: تاریخ " + (myIn ? "دریافت" : "صدور") + " چک"), a.kit.lp(-1, -2));
+        content.addView(a.kit.hint(dateHint(myIn, myBucket, d.snapCal)), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
         addSearchRow(content);
 
@@ -266,11 +292,25 @@ public class ChequesScreen extends Screen {
         } else {
             for (Row r : d.list) {
                 final Row row = r;
-                String pill = "due".equals(myBucket) ? ("سررسید " + Jalali.shortLabel(row.s("sardate")))
-                        : rowLabel(myIn, row);
+                String eventDate = Jalali.disp(row.s("getdate"));
+                String dueDate = Jalali.disp(row.s("sardate"));
+                if (!eventDate.isEmpty()) eventDate = Money.fa(eventDate);
+                if (!dueDate.isEmpty()) dueDate = Money.fa(dueDate);
+                String eventLabel = myIn ? "دریافت " : "صدور ";
+                String eventText = eventDate.isEmpty() ? "" : eventLabel + eventDate;
+                String dueText = dueDate.isEmpty() ? "" : "سررسید " + dueDate;
+                String rowDate;
+                if ("due".equals(myBucket)) {
+                    rowDate = dueText;
+                    if (!eventText.isEmpty()) rowDate += (rowDate.isEmpty() ? "" : "\n") + eventText;
+                } else {
+                    rowDate = eventText;
+                    if (!dueText.isEmpty()) rowDate += (rowDate.isEmpty() ? "" : "\n") + dueText;
+                }
+                String pill = rowLabel(myIn, row);
                 View v = a.kit.docRow("چک " + Money.fa(row.s("num")), row.s("customer"),
-                        Jalali.shortLabel(row.s("sardate")), Money.rial(row.d("amount")),
-                        pill, v2 -> openDetail(row, myIn));
+                        rowDate, Money.rial(row.d("amount")), pill,
+                        v2 -> openDetail(row, myIn));
                 LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
                 p.setMargins(0, 0, 0, Theme.dp(10));
                 content.addView(v, p);
@@ -286,17 +326,21 @@ public class ChequesScreen extends Screen {
         renderNotes(content, d.notes);
     }
 
+    private void ensureCalMonth() {
+        if (calY > 0 && calM > 0) return;
+        String t = Jalali.todayStr();
+        try {
+            calY = Integer.parseInt(t.substring(0, 4));
+            calM = Integer.parseInt(t.substring(5, 7));
+        } catch (Exception e) {
+            calY = 1405;
+            calM = 1;
+        }
+    }
+
     /** F2: Jalali due-date calendar for the current side (Saturday-first grid). */
     private void buildCalendar(LinearLayout content, Data d, final boolean myIn) {
-        if (calY <= 0) {
-            String t = Jalali.todayStr();
-            try {
-                calY = Integer.parseInt(t.substring(0, 4));
-                calM = Integer.parseInt(t.substring(5, 7));
-            } catch (Exception e) {
-                calY = 1405; calM = 1;
-            }
-        }
+        ensureCalMonth();
         java.util.Map<String, java.util.List<Row>> byDay = new java.util.LinkedHashMap<>();
         if (d.cal != null) for (Row r : d.cal) {
             String day = Jalali.disp(r.s("sardate"));
@@ -388,8 +432,11 @@ public class ChequesScreen extends Screen {
         body.addView(a.kit.kv("روز", Jalali.dispFa(key) + " • " + Jalali.weekday(key), Theme.TEXT), a.kit.lp(-1, -2));
         body.addView(a.kit.kv("جمع", Money.rial(tot), Theme.GOLD_SOFT), a.kit.lp(-1, -2));
         for (final Row r : rows) {
+            String eventDate = Jalali.disp(r.s("getdate"));
+            String dates = "سررسید " + Jalali.dispFa(r.s("sardate"));
+            if (!eventDate.isEmpty()) dates += "\n" + (inc ? "دریافت " : "صدور ") + Money.fa(eventDate);
             View v = a.kit.docRow("چک " + Money.fa(r.s("num")), r.s("customer"),
-                    "", Money.rial(r.d("amount")), rowLabel(inc, r), v2 -> openDetail(r, inc));
+                    dates, Money.rial(r.d("amount")), rowLabel(inc, r), v2 -> openDetail(r, inc));
             LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
             p.setMargins(0, 0, 0, Theme.dp(8));
             body.addView(v, p);

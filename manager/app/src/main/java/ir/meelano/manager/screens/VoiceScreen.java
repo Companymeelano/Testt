@@ -123,7 +123,7 @@ public class VoiceScreen extends Screen {
                 } else {
                     Row r = rows.get(0);
                     lastA = "بزرگ‌ترین بدهکار «" + r.s("party") + "» با مانده "
-                            + Money.words(r.d("amount")) + " ریال است."
+                            + Money.words(r.d("amount")) + " است."
                             + (rows.size() > 1 ? " " + Money.fa(String.valueOf(rows.size())) + " بدهکار اولویت‌دار در فهرست است." : "");
                 }
                 speak(lastA);

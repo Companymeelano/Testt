@@ -13,6 +13,8 @@ import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.ReportCatalog;
+import ir.meelano.manager.core.DeviceId;
+import ir.meelano.manager.core.HandoverDb;
 import ir.meelano.manager.core.WarehouseWriter;
 import ir.meelano.manager.data.Meta;
 import ir.meelano.manager.data.Repo;
@@ -23,7 +25,9 @@ import ir.meelano.manager.ui.SignView;
 import ir.meelano.manager.ui.Theme;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Invoice handover (v28): sales invoices to walk-in customers and to the
@@ -113,17 +117,30 @@ public class TahvilScreen extends Screen {
      * @param quiet skip the "loading" placeholder. The live refresh uses this so
      *              the list does not blink every 30 s while the keeper reads it.
      */
+    /** Rows for the day plus the hand-over marks, shared and local merged. */
+    private static final class Loaded {
+        List<Row> rows = new ArrayList<>();
+        Set<String> handed = new HashSet<>();
+    }
+
     private void load(final LinearLayout box, final boolean quiet) {
         box.removeAllViews();
         if (!quiet) box.addView(a.kit.hint("در حال دریافت فاکتورها…"), a.kit.lp(-1, -2));
         final String want = day;
         a.repo.run(c -> {
             Meta m = new Meta(c);
-            return Repo.exec(c, MasterQueries.whDeliveries(m, want));
-        }, new Repo.Cb<List<Row>>() {
+            Loaded d = new Loaded();
+            d.rows = Repo.exec(c, MasterQueries.whDeliveries(m, want));
+            // Shared first, then this device's own marks. Either source alone can
+            // be incomplete; together they are correct on every device.
+            Set<String> shared = HandoverDb.markedSet(c, want);
+            if (shared != null) d.handed.addAll(shared);
+            d.handed.addAll(WarehouseWriter.handedOn(a, want));
+            return d;
+        }, new Repo.Cb<Loaded>() {
             @Override
-            public void ok(List<Row> rows) {
-                factors = rows == null ? new ArrayList<Row>() : rows;
+            public void ok(Loaded d) {
+                factors = d.rows == null ? new ArrayList<Row>() : d.rows;
                 box.removeAllViews();
                 if (factors.isEmpty()) {
                     box.addView(a.kit.empty("فاکتوری برای این تاریخ یافت نشد", null), a.kit.lp(-1, -2));
@@ -137,7 +154,7 @@ public class TahvilScreen extends Screen {
                 for (Row r : factors) {
                     final Row row = r;
                     String no = row.s("id");
-                    boolean handed = WarehouseWriter.handedToday(a, no);
+                    boolean handed = d.handed.contains(no);
                     String sub = row.s("cust");
                     if (!row.s("visitor").isEmpty()) sub += " \u2022 " + row.s("visitor");
                     sub += " \u2022 " + Money.fa(Jalali.disp(row.s("dt")));
@@ -465,6 +482,28 @@ if (!items.isEmpty()) {
             String workerName = worker[0] == null ? "" : worker[0];
             WarehouseWriter.markHanded(a, f.s("id"), f.s("cust"), receiver, keeper,
                     workerName, takenText.toString());
+            // Share the mark so every device — the shop TV included — shows the
+            // same tick state. Local storage above is immediate and works offline;
+            // this is the part that makes the other devices agree.
+            final String shNo = f.s("id");
+            final String shCust = f.s("cust");
+            final String shReceiver = receiver;
+            final String shWorker = workerName;
+            final String shItems = takenText.toString();
+            final String shKeeper = keeper;
+            a.repo.run(c -> {
+                HandoverDb.mark(c, Jalali.todayStr(), shNo, shCust, shReceiver,
+                        shWorker, shItems, shKeeper, DeviceId.code(a));
+                return Boolean.TRUE;
+            }, new Repo.Cb<Boolean>() {
+                @Override
+                public void ok(Boolean v) { }
+
+                @Override
+                public void fail(String faError) {
+                    a.kit.toast("تحویل ثبت شد، ولی همگام‌سازی با سرور انجام نشد");
+                }
+            });
             String sub = "مشتری: " + f.s("cust") + "  •  " + receiver
                     + (workerName.isEmpty() ? "" : "  •  کارگر: " + workerName)
                     + "  •  تحویل‌دهنده: " + keeper + "  •  تاریخ: " + Jalali.todayStr()

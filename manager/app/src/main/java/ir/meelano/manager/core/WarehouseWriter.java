@@ -10,7 +10,9 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -192,14 +194,22 @@ public final class WarehouseWriter {
         } catch (Exception ignored) { }
     }
 
-    public static boolean handedToday(Context c, String shfacfo) {
+    /**
+     * Invoice numbers handed over on a given Jalali day, from this device's own
+     * log. This is the offline source of truth and the fallback whenever the
+     * shared table cannot be reached.
+     */
+    public static Set<String> handedOn(Context c, String day) {
+        Set<String> out = new HashSet<>();
         try {
-            String day = Jalali.todayStr();
             String cur = prefs(c).getString("hand_" + day.replace("/", ""), ",");
-            return cur.contains("," + shfacfo + ",");
-        } catch (Exception e) {
-            return false;
-        }
+            for (String p : cur.split(",")) if (!p.isEmpty()) out.add(p);
+        } catch (Exception ignored) { }
+        return out;
+    }
+
+    public static boolean handedToday(Context c, String shfacfo) {
+        return handedOn(c, Jalali.todayStr()).contains(shfacfo);
     }
 
     // ================= live schema =================

@@ -17,6 +17,7 @@ import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.MoneyQueries;
 import ir.meelano.manager.core.Queries;
+import ir.meelano.manager.core.HandoverDb;
 import ir.meelano.manager.core.WarehouseWriter;
 import ir.meelano.manager.data.Company;
 import ir.meelano.manager.data.Meta;
@@ -28,7 +29,9 @@ import ir.meelano.manager.ui.Kit;
 import ir.meelano.manager.ui.Theme;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /** Shop TV mode: landscape, fullscreen, auto-rotating KPI slides with live Atiran data. */
 public class TvActivity extends Activity {
@@ -59,6 +62,8 @@ public class TvActivity extends Activity {
         List<Row> dueIn = new ArrayList<>();
         List<Row> dueOut = new ArrayList<>();
         List<Row> whToday = new ArrayList<>();
+        /** Hand-over marks for today: shared table merged with this device's own. */
+        Set<String> handed = new HashSet<>();
     }
 
     @Override
@@ -196,7 +201,11 @@ public class TvActivity extends Activity {
                 d.prodSum = Repo.one(c, MasterQueries.productsSummary(m));
             } catch (Exception ignored) { }
             try {
-                d.whToday = Repo.exec(c, MasterQueries.whDeliveries(m, Jalali.todayStr()));
+                String today = Jalali.todayStr();
+                d.whToday = Repo.exec(c, MasterQueries.whDeliveries(m, today));
+                Set<String> shared = HandoverDb.markedSet(c, today);
+                if (shared != null) d.handed.addAll(shared);
+                d.handed.addAll(WarehouseWriter.handedOn(TvActivity.this, today));
             } catch (Exception ignored) { }
             return d;
         }, new Repo.Cb<TvData>() {
@@ -362,7 +371,7 @@ public class TvActivity extends Activity {
         List<Row> handed = new ArrayList<>();
         if (data.whToday != null) {
             for (Row r : data.whToday) {
-                if (WarehouseWriter.handedToday(this, r.s("id"))) handed.add(r);
+                if (data.handed.contains(r.s("id"))) handed.add(r);
                 else pending.add(r);
             }
         }

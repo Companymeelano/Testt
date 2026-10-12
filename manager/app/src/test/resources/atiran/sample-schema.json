@@ -120912,10 +120912,8 @@
     {
       "table": "LoginDetails",
       "schema": "security",
-      "status": "missing-columns",
-      "missingColumns": [
-        "user_id"
-      ]
+      "status": "ok",
+      "missingColumns": []
     },
     {
       "table": "BANK",

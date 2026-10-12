@@ -11,6 +11,7 @@ import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.core.AtiranAuth;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.RoleStore;
+import ir.meelano.manager.ui.MeelanoIcons;
 import ir.meelano.manager.ui.Theme;
 
 import java.util.ArrayList;
@@ -155,10 +156,8 @@ public class MoreScreen extends Screen {
         header.setFocusable(true);
         header.setContentDescription(group.title + "، " + (open ? "بستن" : "بازکردن"));
 
-        TextView icon = a.kit.text(group.glyph, 21f, accent, true);
-        icon.setGravity(Gravity.CENTER);
-        icon.setBackground(Theme.avatar(Theme.alpha(accent, 46)));
-        header.addView(icon, new LinearLayout.LayoutParams(Theme.dp(46), Theme.dp(46)));
+        header.addView(iconBadge(group.glyph, accent, 46),
+                new LinearLayout.LayoutParams(Theme.dp(46), Theme.dp(46)));
         header.addView(a.kit.space(10));
 
         LinearLayout copy = a.kit.v();
@@ -237,10 +236,8 @@ public class MoreScreen extends Screen {
         tile.setMinimumHeight(Theme.dp(122));
         tile.setPadding(Theme.dp(10), Theme.dp(12), Theme.dp(10), Theme.dp(10));
 
-        TextView icon = a.kit.text(glyph, 25f, accent, true);
-        icon.setGravity(Gravity.CENTER);
-        icon.setBackground(Theme.avatar(Theme.alpha(accent, 42)));
-        tile.addView(icon, new LinearLayout.LayoutParams(Theme.dp(44), Theme.dp(44)));
+        tile.addView(iconBadge(glyph, accent, 44),
+                new LinearLayout.LayoutParams(Theme.dp(44), Theme.dp(44)));
         tile.addView(a.kit.gap(5));
 
         TextView label = a.kit.text(title, 12.5f, Theme.TEXT, true);
@@ -266,6 +263,28 @@ public class MoreScreen extends Screen {
             else a.nav(entry.id);
         });
         return tile;
+    }
+
+    private View iconBadge(String glyph, int accent, int sizeDp) {
+        android.widget.FrameLayout badge = new android.widget.FrameLayout(a);
+        badge.setBackground(Theme.avatar(Theme.alpha(accent, Theme.isLight() ? 34 : 46)));
+        badge.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        int iconRes = MeelanoIcons.iconFor(glyph);
+        if (iconRes != 0) {
+            ImageView image = new ImageView(a);
+            image.setImageResource(iconRes);
+            image.setColorFilter(accent);
+            image.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+            int inside = Math.max(18, Math.round(sizeDp * 0.52f));
+            android.widget.FrameLayout.LayoutParams ip = new android.widget.FrameLayout.LayoutParams(
+                    Theme.dp(inside), Theme.dp(inside), Gravity.CENTER);
+            badge.addView(image, ip);
+        } else {
+            TextView fallback = a.kit.text(glyph, sizeDp * 0.48f, accent, true);
+            fallback.setGravity(Gravity.CENTER);
+            badge.addView(fallback, new android.widget.FrameLayout.LayoutParams(-1, -1));
+        }
+        return badge;
     }
 
     private boolean isAllowed(String id) {

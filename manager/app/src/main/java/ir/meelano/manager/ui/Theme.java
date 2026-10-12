@@ -273,6 +273,45 @@ public final class Theme {
         return d;
     }
 
+    /** Executive dashboard hero: layered midnight/champagne glass with a quiet metallic edge. */
+    public static GradientDrawable executiveHero() {
+        int accent = GOLD;
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{alpha(accent, light ? 56 : 82), alpha(SURFACE, 250), BG});
+        d.setCornerRadius(dp(28));
+        d.setStroke(dp(1), alpha(accent, light ? 150 : 125));
+        return d;
+    }
+
+    /** Selected destination on the premium bottom navigation rail. */
+    public static GradientDrawable bottomNavSelected() {
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{alpha(GOLD, light ? 34 : 28), alpha(GOLD, light ? 15 : 12)});
+        d.setCornerRadius(dp(20));
+        d.setStroke(dp(1), alpha(GOLD, light ? 105 : 90));
+        return d;
+    }
+
+    /** Active icon capsule in the bottom navigation. */
+    public static GradientDrawable bottomNavIconSelected() {
+        // In Ivory Royal, GOLD is a dark ink-like accent; a translucent champagne
+        // capsule keeps the dark active icon readable instead of placing it on solid gold.
+        int[] colors = light
+                ? new int[]{alpha(GOLD, 58), alpha(GOLD, 88)}
+                : new int[]{shade(GOLD, -0.12f), GOLD};
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, colors);
+        d.setCornerRadius(dp(14));
+        return d;
+    }
+
+    /** Small active marker under each bottom-nav label. */
+    public static GradientDrawable bottomNavMarker() {
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{shade(GOLD, -0.08f), GOLD, shade(GOLD, 0.20f)});
+        d.setCornerRadius(dp(99));
+        return d;
+    }
+
     /** KPI tile background. */
     public static GradientDrawable kpi(int accent) {
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR,

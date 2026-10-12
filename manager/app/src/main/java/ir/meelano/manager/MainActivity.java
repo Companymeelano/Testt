@@ -698,19 +698,34 @@ public class MainActivity extends Activity {
             if (s == null) continue;
             LinearLayout b = kit.v();
             b.setGravity(Gravity.CENTER);
-            b.setPadding(0, Theme.dp(4), 0, Theme.dp(2));
+            b.setMinimumHeight(Theme.dp(64));
+            b.setPadding(Theme.dp(2), Theme.dp(4), Theme.dp(2), Theme.dp(2));
             LinearLayout badge = new LinearLayout(this);
             badge.setGravity(Gravity.CENTER);
-            TextView g = kit.text(s.glyph(), 20, Theme.MUTED, true);
-            g.setGravity(Gravity.CENTER);
-            badge.addView(g, kit.lp(-2, -2));
-            b.addView(badge, new LinearLayout.LayoutParams(Theme.dp(52), Theme.dp(40)));
+            int iconRes = MeelanoIcons.iconFor(s.glyph());
+            if (iconRes != 0) {
+                android.widget.ImageView symbol = kit.icon(iconRes, Theme.MUTED, 22);
+                badge.addView(symbol, new LinearLayout.LayoutParams(Theme.dp(24), Theme.dp(24)));
+            } else {
+                TextView symbol = kit.text(s.glyph(), 20, Theme.MUTED, true);
+                symbol.setGravity(Gravity.CENTER);
+                badge.addView(symbol, kit.lp(-2, -2));
+            }
+            b.addView(badge, new LinearLayout.LayoutParams(Theme.dp(46), Theme.dp(36)));
             String tl = RoleStore.tabLabel(id);
-            TextView l = kit.text(tl != null ? tl : s.title(), 9.5f, Theme.MUTED, true);
+            TextView l = kit.text(tl != null ? tl : s.title(), 10.5f, Theme.MUTED, true);
             l.setGravity(Gravity.CENTER);
             l.setSingleLine(true);
+            l.setEllipsize(android.text.TextUtils.TruncateAt.END);
             b.addView(l, kit.lp(-1, -2));
+            View marker = new View(this);
+            marker.setVisibility(View.INVISIBLE);
+            marker.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+            LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(Theme.dp(18), Theme.dp(2));
+            mp.setMargins(0, Theme.dp(3), 0, 0);
+            b.addView(marker, mp);
             b.setTag(id);
+            b.setContentDescription((tl != null ? tl : s.title()) + "، رفتن به بخش");
             if (!RoleStore.allowed(this, id)) b.setAlpha(0.35f);
             Theme.pressable(b);
             b.setOnClickListener(v -> nav(id));
@@ -725,11 +740,23 @@ public class MainActivity extends Activity {
             boolean on = i < tabs.length && (tabs[i].equals(currentId)
                     || ("more".equals(tabs[i]) && !isTab(currentId)));
             LinearLayout badge = (LinearLayout) b.getChildAt(0);
-            badge.setBackground(on ? Theme.avatar(Theme.GOLD) : null);
-            ((TextView) badge.getChildAt(0)).setTextColor(on ? 0xFFFFFFFF : Theme.MUTED);
-            ((TextView) b.getChildAt(1)).setTextColor(on ? Theme.GOLD : Theme.MUTED);
-            b.setBackground(null);
-            Theme.pressable(b); // setBackground replaced the ripple — wrap it again
+            badge.setBackground(on ? Theme.bottomNavIconSelected() : null);
+            View symbol = badge.getChildAt(0);
+            if (symbol instanceof android.widget.ImageView) {
+                ((android.widget.ImageView) symbol).setColorFilter(on ? Theme.onAccent() : Theme.MUTED);
+            } else if (symbol instanceof TextView) {
+                ((TextView) symbol).setTextColor(on ? Theme.onAccent() : Theme.MUTED);
+            }
+            TextView label = (TextView) b.getChildAt(1);
+            label.setTextColor(on ? Theme.GOLD_SOFT : Theme.MUTED);
+            label.setTextSize(on ? 11f : 10.5f);
+            b.getChildAt(2).setVisibility(on ? View.VISIBLE : View.INVISIBLE);
+            b.getChildAt(2).setBackground(on ? Theme.bottomNavMarker() : null);
+            b.setBackground(on ? Theme.bottomNavSelected() : null);
+            b.setSelected(on);
+            b.setElevation(on ? Theme.dp(2) : 0f);
+            b.setContentDescription(label.getText() + (on ? "، بخش فعال" : "، رفتن به بخش"));
+            Theme.pressable(b); // Re-wrap the selected-state background with touch feedback.
         }
     }
 

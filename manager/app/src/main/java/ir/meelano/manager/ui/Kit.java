@@ -21,6 +21,7 @@ import android.widget.Space;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import ir.meelano.manager.R;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.Sql;
@@ -161,19 +162,67 @@ public final class Kit {
     }
 
     public View sectionHead(String title, String actionLabel, View.OnClickListener action) {
+        final int accent = sectionAccent(title);
         LinearLayout r = h();
-        r.setPadding(Theme.dp(4), Theme.dp(4), Theme.dp(4), Theme.dp(6));
-        TextView t = text(title, 14f, Theme.GOLD_SOFT, true);
+        r.setGravity(Gravity.CENTER_VERTICAL);
+        r.setPadding(Theme.dp(3), Theme.dp(4), Theme.dp(3), Theme.dp(7));
+
+        FrameLayout badge = new FrameLayout(a);
+        badge.setBackground(Theme.avatar(Theme.alpha(accent, Theme.isLight() ? 38 : 48)));
+        ImageView symbol = icon(sectionIcon(title), accent, 17);
+        FrameLayout.LayoutParams sp = new FrameLayout.LayoutParams(Theme.dp(20), Theme.dp(20), Gravity.CENTER);
+        badge.addView(symbol, sp);
+        r.addView(badge, new LinearLayout.LayoutParams(Theme.dp(34), Theme.dp(34)));
+        r.addView(space(8));
+
+        TextView t = text(title, 14f, accent, true);
+        t.setMaxLines(2);
+        t.setEllipsize(TextUtils.TruncateAt.END);
         r.addView(t, wlp(1f));
         if (actionLabel != null && action != null) {
-            TextView b = text(actionLabel, 11.5f, Theme.INFO, true);
-            b.setPadding(Theme.dp(10), Theme.dp(6), Theme.dp(10), Theme.dp(6));
-            b.setBackground(Theme.ghostButton(Theme.INFO));
+            TextView b = text(actionLabel, 10.5f, accent, true);
+            b.setPadding(Theme.dp(9), Theme.dp(6), Theme.dp(9), Theme.dp(6));
+            b.setBackground(Theme.ghostButton(accent));
+            b.setContentDescription(actionLabel.replace("›", "") + "؛ باز کردن");
             Theme.pressable(b);
             b.setOnClickListener(action);
+            r.addView(space(6));
             r.addView(b, lp(-2, -2));
         }
         return r;
+    }
+
+    private int sectionIcon(String title) {
+        String s = title == null ? "" : title.replace('ي', 'ی').replace('ك', 'ک');
+        if (s.contains("هشدار")) return R.drawable.mi_warning;
+        if (s.contains("برگشت")) return R.drawable.mi_assignment_return;
+        if (s.contains("ویزیتور")) return R.drawable.mi_person_search;
+        if (s.contains("مشتری") || s.contains("بدهکار") || s.contains("طرف‌حساب")) return R.drawable.mi_group;
+        if (s.contains("انبار") || s.contains("موجودی") || s.contains("کالا")) return R.drawable.mi_inventory_2;
+        if (s.contains("دریافت")) return R.drawable.mi_payments;
+        if (s.contains("پرداخت") || s.contains("نقدینگی")) return R.drawable.mi_account_balance_wallet;
+        if (s.contains("چک") || s.contains("سررسید")) return R.drawable.mi_receipt_long;
+        if (s.contains("خرید")) return R.drawable.mi_shopping_cart;
+        if (s.contains("فروش")) return R.drawable.mi_sell;
+        if (s.contains("فاکتور")) return R.drawable.mi_receipt_long;
+        if (s.contains("کاربر")) return R.drawable.mi_person;
+        if (s.contains("گزارش") || s.contains("تحلیل") || s.contains("روند") || s.contains("عملکرد")) return R.drawable.mi_bar_chart;
+        if (s.contains("تنظیم")) return R.drawable.mi_settings;
+        if (s.contains("پیگیری")) return R.drawable.mi_schedule;
+        if (s.contains("روز")) return R.drawable.mi_calendar_month;
+        return R.drawable.mi_star_shine;
+    }
+
+    private int sectionAccent(String title) {
+        String s = title == null ? "" : title.replace('ي', 'ی').replace('ك', 'ک');
+        if (s.contains("هشدار") || s.contains("برگشت") || s.contains("معوق")) return Theme.DANGER;
+        if (s.contains("دریافت") || s.contains("وصول")) return Theme.SUCCESS;
+        if (s.contains("پرداخت") || s.contains("نقدینگی")) return Theme.INFO;
+        if (s.contains("خرید")) return Theme.VIOLET;
+        if (s.contains("انبار") || s.contains("موجودی") || s.contains("کالا")) return Theme.TEAL;
+        if (s.contains("ویزیتور") || s.contains("گزارش") || s.contains("تحلیل") || s.contains("روند")) return Theme.INFO;
+        if (s.contains("مشتری") || s.contains("بدهکار")) return Theme.WARNING;
+        return Theme.GOLD;
     }
 
     // ---------------- KPI ----------------

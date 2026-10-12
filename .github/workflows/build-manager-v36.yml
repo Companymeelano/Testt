@@ -1,4 +1,4 @@
-name: MEELANO Manager v36.21.0 debug APK
+name: MEELANO Manager v36.22.0 debug APK
 
 on:
   push:
@@ -38,7 +38,7 @@ jobs:
         with:
           gradle-version: 8.11.1
 
-      - name: Run manager unit tests and build v36.21.0
+      - name: Run manager unit tests and build v36.22.0
         working-directory: manager
         run: |
           set -o pipefail
@@ -77,7 +77,7 @@ jobs:
           cp manager/app/build/outputs/apk/debug/app-debug.apk dist/meelano-manager-v36-debug-6.apk
           BT="$ANDROID_HOME/build-tools/35.0.0"
           "$BT/aapt" dump badging dist/meelano-manager-v36-debug-6.apk | tee manager-badging.txt
-          grep -F "package: name='ir.meelano.manager.debug' versionCode='53' versionName='36.21.0'" manager-badging.txt
+          grep -F "package: name='ir.meelano.manager.debug' versionCode='54' versionName='36.22.0'" manager-badging.txt
           "$BT/apksigner" verify --verbose --print-certs dist/meelano-manager-v36-debug-6.apk | tee manager-signing.txt
           unzip -t dist/meelano-manager-v36-debug-6.apk | tail -1
           sha256sum dist/meelano-manager-v36-debug-6.apk
@@ -94,7 +94,7 @@ jobs:
         run: |
           set -euo pipefail
           {
-            echo "MEELANO Manager v36.21.0 (versionCode 53)"
+            echo "MEELANO Manager v36.22.0 (versionCode 54)"
             echo "Package: ir.meelano.manager.debug"
             echo "Build run: ${GITHUB_RUN_ID}"
             echo "Commit: $(git rev-parse --short HEAD)"
@@ -103,5 +103,5 @@ jobs:
           git config user.name "arena-ci"
           git config user.email "arena-ci@local"
           git add -f dist/meelano-manager-v36-debug-6.apk dist/manager-v36-build-info.txt
-          git commit -m "dist: MEELANO Manager v36.21.0 debug APK"
+          git commit -m "dist: MEELANO Manager v36.22.0 debug APK"
           git push origin HEAD:arena/c192ed08-testt

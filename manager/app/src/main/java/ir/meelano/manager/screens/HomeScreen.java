@@ -1,9 +1,14 @@
 package ir.meelano.manager.screens;
 
+import android.view.Gravity;
 import android.view.View;
+import android.widget.FrameLayout;
+import android.widget.HorizontalScrollView;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import ir.meelano.manager.core.AtiranAuth;
 import ir.meelano.manager.core.AtiranSchema;
 import ir.meelano.manager.core.Filter;
 import ir.meelano.manager.core.FollowUps;
@@ -19,6 +24,7 @@ import ir.meelano.manager.data.Repo;
 import ir.meelano.manager.data.Row;
 import ir.meelano.manager.ui.Charts;
 import ir.meelano.manager.ui.Kit;
+import ir.meelano.manager.ui.MeelanoIcons;
 import ir.meelano.manager.ui.Theme;
 
 import java.util.ArrayList;
@@ -74,7 +80,9 @@ public class HomeScreen extends Screen {
     public void render(final LinearLayout content) {
         content.removeAllViews();
         content.addView(greetingHero(), a.kit.lp(-1, -2));
-        content.addView(a.kit.gap(12));
+        content.addView(a.kit.gap(10));
+        addExecutiveDock(content);
+        content.addView(a.kit.gap(6));
         content.addView(a.kit.loading("در حال دریافت داشبورد مدیریتی…"), a.kit.lp(-1, -2));
 
         a.repo.run(c -> {
@@ -142,7 +150,9 @@ public class HomeScreen extends Screen {
                 }
                 content.removeAllViews();
                 content.addView(greetingHero(), a.kit.lp(-1, -2));
-                content.addView(a.kit.gap(12));
+                content.addView(a.kit.gap(10));
+                addExecutiveDock(content);
+                content.addView(a.kit.gap(8));
                 content.addView(a.kit.error(faError, () -> render(content)), a.kit.lp(-1, -2));
             }
         });
@@ -266,14 +276,136 @@ public class HomeScreen extends Screen {
 
     private View greetingHero() {
         int hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
-        String g = hour < 5 ? "شب بخیر" : (hour < 12 ? "صبح بخیر" : (hour < 15 ? "روز بخیر" : (hour < 19 ? "عصر بخیر" : "شب بخیر")));
-        return a.kit.hero("♛", g + " مدیر", a.kit.todayLine() + " • فروش، نقدینگی و اقدام‌های امروز", Theme.GOLD);
+        String greeting = hour < 5 ? "شب بخیر" : (hour < 12 ? "صبح بخیر"
+                : (hour < 15 ? "روز بخیر" : (hour < 19 ? "عصر بخیر" : "شب بخیر")));
+        String role = AtiranAuth.sessionRole(a);
+        if (role == null || role.isEmpty()) role = RoleStore.current(a);
+        String roleName = RoleStore.faName(role);
+
+        LinearLayout hero = a.kit.v();
+        hero.setBackground(Theme.executiveHero());
+        hero.setPadding(Theme.dp(18), Theme.dp(17), Theme.dp(18), Theme.dp(14));
+        hero.setElevation(Theme.cardElevation() + Theme.dp(1));
+
+        LinearLayout top = a.kit.h();
+        FrameLayout crest = new FrameLayout(a);
+        crest.setBackground(Theme.bottomNavIconSelected());
+        crest.setElevation(Theme.dp(3));
+        ImageView mark = a.kit.icon(R.drawable.mi_admin_panel_settings, Theme.onAccent(), 30);
+        FrameLayout.LayoutParams mp = new FrameLayout.LayoutParams(Theme.dp(30), Theme.dp(30), Gravity.CENTER);
+        crest.addView(mark, mp);
+        top.addView(crest, new LinearLayout.LayoutParams(Theme.dp(58), Theme.dp(58)));
+        top.addView(a.kit.space(12));
+
+        LinearLayout copy = a.kit.v();
+        TextView overline = a.kit.text("MEELANO  •  اتاق فرمان", 10.5f, Theme.GOLD_SOFT, true);
+        overline.setSingleLine(true);
+        copy.addView(overline, a.kit.lp(-1, -2));
+        TextView headline = a.kit.text(greeting + "، " + roleName, 21.5f, Theme.TEXT, true);
+        headline.setMaxLines(1);
+        headline.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        LinearLayout.LayoutParams hp = a.kit.lp(-1, -2);
+        hp.setMargins(0, Theme.dp(2), 0, 0);
+        copy.addView(headline, hp);
+        TextView description = a.kit.text("تصویر روشن از فروش، مالی و عملیات", 11f, Theme.MUTED, false);
+        description.setSingleLine(true);
+        description.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        copy.addView(description, a.kit.lp(-1, -2));
+        top.addView(copy, a.kit.wlp(1f));
+        hero.addView(top, a.kit.lp(-1, -2));
+        hero.addView(a.kit.gap(13));
+
+        View divider = new View(a);
+        divider.setBackgroundColor(Theme.alpha(Theme.GOLD, Theme.isLight() ? 78 : 62));
+        hero.addView(divider, a.kit.lp(-1, Theme.dp(1)));
+        hero.addView(a.kit.gap(9));
+        LinearLayout footer = a.kit.h();
+        footer.addView(a.kit.icon(R.drawable.mi_calendar_month, Theme.GOLD_SOFT, 16),
+                new LinearLayout.LayoutParams(Theme.dp(16), Theme.dp(16)));
+        footer.addView(a.kit.space(6));
+        TextView date = a.kit.text(a.kit.todayLine(), 11.5f, Theme.TEXT, true);
+        date.setSingleLine(true);
+        footer.addView(date, a.kit.wlp(1f));
+        TextView edition = a.kit.text(RoleStore.editionFa(role), 10.5f, Theme.GOLD_SOFT, true);
+        edition.setSingleLine(true);
+        edition.setPadding(Theme.dp(10), Theme.dp(5), Theme.dp(10), Theme.dp(5));
+        edition.setBackground(Theme.ghostButton(Theme.GOLD));
+        footer.addView(edition, a.kit.lp(-2, -2));
+        hero.addView(footer, a.kit.lp(-1, -2));
+        return hero;
+    }
+
+    /** A compact luxury launchpad to the five high-frequency management destinations. */
+    private void addExecutiveDock(LinearLayout content) {
+        String[][] suggested = {
+                {"sales", "فاکتورها", "فروش و پیگیری"},
+                {"cash", "خزانه", "نقدینگی و گردش"},
+                {"closeout", "بستن روز", "تطبیق مدیریتی"},
+                {"anbar", "انبار", "موجودی و عملیات"},
+                {"reports", "گزارش‌ها", "تحلیل تصمیم‌ها"},
+        };
+        List<String[]> available = new ArrayList<>();
+        for (String[] item : suggested)
+            if (a.screen(item[0]) != null && RoleStore.allowed(a, item[0])) available.add(item);
+        if (available.isEmpty()) return;
+
+        content.addView(a.kit.sectionHead("دسترسی فوری", "همه بخش‌ها ›", v -> a.nav("more")),
+                a.kit.lp(-1, -2));
+        HorizontalScrollView strip = new HorizontalScrollView(a);
+        strip.setHorizontalScrollBarEnabled(false);
+        strip.setClipToPadding(false);
+        strip.setPadding(Theme.dp(1), Theme.dp(1), Theme.dp(1), Theme.dp(4));
+        LinearLayout row = a.kit.h();
+        for (String[] item : available) {
+            Screen destination = a.screen(item[0]);
+            int accent = destination.accent();
+            LinearLayout tile = a.kit.h();
+            tile.setGravity(Gravity.CENTER_VERTICAL);
+            tile.setPadding(Theme.dp(10), Theme.dp(9), Theme.dp(10), Theme.dp(9));
+            tile.setMinimumHeight(Theme.dp(68));
+            tile.setBackground(Theme.cardAccent(accent));
+
+            FrameLayout iconBadge = new FrameLayout(a);
+            iconBadge.setBackground(Theme.avatar(Theme.alpha(accent, Theme.isLight() ? 34 : 48)));
+            int iconRes = MeelanoIcons.iconFor(destination.glyph());
+            if (iconRes != 0) {
+                ImageView image = a.kit.icon(iconRes, accent, 19);
+                iconBadge.addView(image, new FrameLayout.LayoutParams(Theme.dp(22), Theme.dp(22), Gravity.CENTER));
+            } else {
+                TextView fallback = a.kit.text(destination.glyph(), 19f, accent, true);
+                fallback.setGravity(Gravity.CENTER);
+                iconBadge.addView(fallback, new FrameLayout.LayoutParams(-1, -1));
+            }
+            tile.addView(iconBadge, new LinearLayout.LayoutParams(Theme.dp(40), Theme.dp(40)));
+            tile.addView(a.kit.space(8));
+
+            LinearLayout labels = a.kit.v();
+            TextView title = a.kit.text(item[1], 12.5f, Theme.TEXT, true);
+            title.setSingleLine(true);
+            title.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            labels.addView(title, a.kit.lp(-1, -2));
+            TextView sub = a.kit.text(item[2], 10.5f, Theme.MUTED, false);
+            sub.setSingleLine(true);
+            sub.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            labels.addView(sub, a.kit.lp(-1, -2));
+            tile.addView(labels, a.kit.wlp(1f));
+            tile.setContentDescription(item[1] + "؛ " + item[2] + "؛ باز کردن");
+            Theme.pressable(tile);
+            tile.setOnClickListener(v -> a.nav(item[0]));
+            LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(Theme.dp(142), Theme.dp(68));
+            tp.setMarginEnd(Theme.dp(8));
+            row.addView(tile, tp);
+        }
+        strip.addView(row, new HorizontalScrollView.LayoutParams(-2, -2));
+        content.addView(strip, a.kit.lp(-1, -2));
     }
 
     private void build(LinearLayout content, Data d) {
         content.removeAllViews();
         content.addView(greetingHero(), a.kit.lp(-1, -2));
-        content.addView(a.kit.gap(12));
+        content.addView(a.kit.gap(10));
+        addExecutiveDock(content);
+        content.addView(a.kit.gap(8));
 
         // Render each dashboard section into its own container so the lower-priority
         // analysis panels can collapse without changing the user's saved order.
@@ -676,14 +808,14 @@ public class HomeScreen extends Screen {
     }
 
     private void secShortcuts(LinearLayout content, Data d) {
-        // ---- shortcuts (glyph/title/accent always mirror the destination screen) ----
-        content.addView(a.kit.sectionHead("دسترسی سریع", null, null), a.kit.lp(-1, -2));
+        // ---- secondary management centers (daily destinations live in the top launchpad) ----
+        content.addView(a.kit.sectionHead("مراکز تخصصی", null, null), a.kit.lp(-1, -2));
         String[][] links = {
-                {"sales", "فاکتورها، معوق‌ها و تحلیل فروش"},
+                {"customers", "پرونده، مانده و گردش حساب"},
                 {"cheques", "دریافتی، پرداختی و سررسیدها"},
-                {"customers", "پرونده کامل و گردش حساب"},
                 {"profit", "حاشیه سود و هزینه‌ها"},
-                {"reports", "فهرست کامل گزارش‌های مدیریتی"},
+                {"visitors", "عملکرد و وصول ویزیتورها"},
+                {"users", "کاربران و فعالیت‌های سیستم"},
         };
         for (int i = 0; i < links.length; i++) {
             final String id = links[i][0];

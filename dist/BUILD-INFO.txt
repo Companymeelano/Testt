@@ -1,19 +1,19 @@
 نسخه: 7.0.0 (versionCode 200)
-کامیت: dcdf2b8
-تاریخ build: 2026-10-12T10:36:08Z
+کامیت: 17b9b59
+تاریخ build: 2026-10-12T10:40:59Z
 Gradle: Gradle 8.13
 فایل‌ها:
-drwxr-xr-x  2 runner runner    4096 Oct 12 10:36 .
-drwxr-xr-x 12 runner runner    4096 Oct 12 10:36 ..
--rw-r--r--  1 runner runner     130 Oct 12 10:36 BUILD-INFO.txt
--rw-r--r--  1 runner runner 3366837 Oct 12 10:36 app-manager-debug.apk
--rw-r--r--  1 runner runner 3021117 Oct 12 10:36 app-staff-debug.apk
--rw-r--r--  1 runner runner 3030877 Oct 12 10:36 app-store-debug.apk
--rw-r--r--  1 runner runner 3073605 Oct 12 10:36 app-tax-debug.apk
--rw-r--r--  1 runner runner 3058937 Oct 12 10:36 app-visitor-debug.apk
+drwxr-xr-x  2 runner runner    4096 Oct 12 10:40 .
+drwxr-xr-x 12 runner runner    4096 Oct 12 10:40 ..
+-rw-r--r--  1 runner runner     130 Oct 12 10:41 BUILD-INFO.txt
+-rw-r--r--  1 runner runner 3366873 Oct 12 10:40 app-manager-debug.apk
+-rw-r--r--  1 runner runner 3021185 Oct 12 10:40 app-staff-debug.apk
+-rw-r--r--  1 runner runner 3030945 Oct 12 10:40 app-store-debug.apk
+-rw-r--r--  1 runner runner 3073681 Oct 12 10:40 app-tax-debug.apk
+-rw-r--r--  1 runner runner 3058969 Oct 12 10:40 app-visitor-debug.apk
 --- sha256 ---
-95d596d60c30e1d60ca5c5f904c9066adce2ccff1d6c6947cdeb4a12a2409036  app-manager-debug.apk
-cbc494c801de1f0dda6b2bfa31ecd20f55fb14031ad8f60d28e181d569d0cb5a  app-staff-debug.apk
-f22ba788d61e4cf0bd6a3d085f97df5458834e7349f3c86acaea2339a0e4bf44  app-store-debug.apk
-5eb284fada4f6cb2b6662a57283880dca161b026ddff5e074ed32bd73901dea5  app-tax-debug.apk
-9ea209750d3d5de77d854a5e46bca3bf69844fdfdf6e603bfd79c5bd117a8172  app-visitor-debug.apk
+53bc5a9e8ec37e6f2da590b57d4c60a353b2d3ef6b699e6250b35aab9b64f732  app-manager-debug.apk
+673634d4ba814911aa86ee66b5f9d057d2f90c3f63b3188ad5d667d79152de8c  app-staff-debug.apk
+8d253ba263eeee8105963a32caa193de80b4b6ea7fa333778351b86131c673d8  app-store-debug.apk
+528fa67b1b6c6f6f463d67eddbd072dc54b11960285f3fed5d59259ae6cd0bf6  app-tax-debug.apk
+6aff1fbfad762d0cf9b81c729b75bf4b53f8eda7879c8afc35faf773cb788226  app-visitor-debug.apk

@@ -240,7 +240,7 @@ public final class MoneyQueries {
     }
 
     private static boolean chequeDetailsAvailable(Meta m, int p) {
-        Chq c = optionalVoucherCheques(m, p == 0);
+        Chq c = optionalVoucherCheques(m, p);
         return c != null && c.ghno != null && c.amount != null && c.from != null;
     }
 

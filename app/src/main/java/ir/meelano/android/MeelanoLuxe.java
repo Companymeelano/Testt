@@ -1034,9 +1034,13 @@ final class MeelanoLuxe {
                 clp.setMargins(0, 0, h.dp(6), 0);
                 rail.addView(c, clp);
             }
+            // چیپ‌ها در قاب افقی می‌نشینند تا روی گوشی‌های باریک هم چیزی بریده نشود.
+            android.widget.HorizontalScrollView scroller = new android.widget.HorizontalScrollView(h.ctx());
+            scroller.setHorizontalScrollBarEnabled(false);
+            scroller.addView(rail, new android.widget.FrameLayout.LayoutParams(-2, -2));
             LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(-1, -2);
             rlp.setMargins(0, h.dp(11), 0, 0);
-            card.addView(rail, rlp);
+            card.addView(scroller, rlp);
         }
 
         FrameLayout wrap = new FrameLayout(h.ctx());

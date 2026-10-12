@@ -1,54 +1,0 @@
-Atiran sample schema probe failed; schema-only diagnostics follow.
---- probe log ---
-Atiran schema probe failed: unexpected sqlcmd row shape (1 fields): (2 rows affected)
---- SQL Server container log ---
-2026-10-12 12:58:02.73 spid35s     Attribute synchronization manager initialized
-2026-10-12 12:58:02.73 spid19s     SQL Server Audit is starting the audits. This is an informational message. No user action is required.
-2026-10-12 12:58:02.74 spid19s     SQL Server Audit has started the audits. This is an informational message. No user action is required.
-2026-10-12 12:58:02.75 spid19s     SQL Trace ID 1 was started by login "sa".
-2026-10-12 12:58:02.75 spid19s     Server name is 'd71a9029e573'. This is an informational message only. No user action is required.
-2026-10-12 12:58:02.77 spid22s     Clearing tempdb database.
-2026-10-12 12:58:02.77 spid43s     [4]. Feature Status: PVS: 0. CTR: 0. ConcurrentPFSUpdate: 1. ConcurrentGAMUpdate: 1. ConcurrentSGAMUpdate: 1, CleanupUnderUserTransaction: 0. TranLevelPVS: 0
-2026-10-12 12:58:02.77 spid45s     Always On: The availability replica manager is starting. This is an informational message only. No user action is required.
-2026-10-12 12:58:02.77 spid43s     Starting up database 'msdb'.
-2026-10-12 12:58:02.78 spid45s     Always On: The availability replica manager is waiting for the instance of SQL Server to allow client connections. This is an informational message only. No user action is required.
-2026-10-12 12:58:02.94 spid43s     Converting database 'msdb' from version 927 to the current version 957.
-2026-10-12 12:58:02.94 spid43s     Database 'msdb' running the upgrade step from version 927 to version 928.
-2026-10-12 12:58:03.01 spid43s     Database 'msdb' running the upgrade step from version 928 to version 929.
-2026-10-12 12:58:03.20 spid22s     [2]. Feature Status: PVS: 0. CTR: 0. ConcurrentPFSUpdate: 1. ConcurrentGAMUpdate: 1. ConcurrentSGAMUpdate: 1, CleanupUnderUserTransaction: 0. TranLevelPVS: 0
-2026-10-12 12:58:03.20 spid22s     Starting up database 'tempdb'.
-2026-10-12 12:58:03.22 spid43s     Database 'msdb' running the upgrade step from version 929 to version 930.
-2026-10-12 12:58:03.23 spid43s     Database 'msdb' running the upgrade step from version 930 to version 931.
-2026-10-12 12:58:03.23 spid43s     Database 'msdb' running the upgrade step from version 931 to version 932.
-2026-10-12 12:58:03.24 spid43s     Database 'msdb' running the upgrade step from version 932 to version 933.
-2026-10-12 12:58:03.24 spid43s     Database 'msdb' running the upgrade step from version 933 to version 934.
-2026-10-12 12:58:03.24 spid43s     Database 'msdb' running the upgrade step from version 934 to version 935.
-2026-10-12 12:58:03.25 spid43s     Database 'msdb' running the upgrade step from version 935 to version 936.
-2026-10-12 12:58:03.25 spid43s     Database 'msdb' running the upgrade step from version 936 to version 937.
-2026-10-12 12:58:03.25 spid43s     Database 'msdb' running the upgrade step from version 937 to version 938.
-2026-10-12 12:58:03.25 spid43s     Database 'msdb' running the upgrade step from version 938 to version 939.
-2026-10-12 12:58:03.26 spid43s     Database 'msdb' running the upgrade step from version 939 to version 940.
-2026-10-12 12:58:03.26 spid43s     Database 'msdb' running the upgrade step from version 940 to version 941.
-2026-10-12 12:58:03.26 spid43s     Database 'msdb' running the upgrade step from version 941 to version 942.
-2026-10-12 12:58:03.26 spid43s     Database 'msdb' running the upgrade step from version 942 to version 943.
-2026-10-12 12:58:03.28 spid43s     Database 'msdb' running the upgrade step from version 943 to version 944.
-2026-10-12 12:58:03.29 spid43s     Database 'msdb' running the upgrade step from version 944 to version 945.
-2026-10-12 12:58:03.30 spid22s     The tempdb database has 1 data file(s).
-2026-10-12 12:58:03.30 spid43s     Database 'msdb' running the upgrade step from version 945 to version 946.
-2026-10-12 12:58:03.30 spid45s     The Service Broker endpoint is in disabled or stopped state.
-2026-10-12 12:58:03.30 spid45s     The Database Mirroring endpoint is in disabled or stopped state.
-2026-10-12 12:58:03.31 spid43s     Database 'msdb' running the upgrade step from version 946 to version 947.
-2026-10-12 12:58:03.31 spid43s     Database 'msdb' running the upgrade step from version 947 to version 948.
-2026-10-12 12:58:03.32 spid43s     Database 'msdb' running the upgrade step from version 948 to version 949.
-2026-10-12 12:58:03.33 spid45s     Service Broker manager has started.
-2026-10-12 12:58:03.33 spid43s     Database 'msdb' running the upgrade step from version 949 to version 950.
-2026-10-12 12:58:03.33 spid43s     Database 'msdb' running the upgrade step from version 950 to version 951.
-2026-10-12 12:58:03.35 spid43s     Database 'msdb' running the upgrade step from version 951 to version 952.
-2026-10-12 12:58:03.35 spid43s     Database 'msdb' running the upgrade step from version 952 to version 953.
-2026-10-12 12:58:03.36 spid43s     Database 'msdb' running the upgrade step from version 953 to version 954.
-2026-10-12 12:58:03.36 spid43s     Database 'msdb' running the upgrade step from version 954 to version 955.
-2026-10-12 12:58:03.36 spid43s     Database 'msdb' running the upgrade step from version 955 to version 956.
-2026-10-12 12:58:03.38 spid43s     Database 'msdb' running the upgrade step from version 956 to version 957.
-2026-10-12 12:58:03.41 spid19s     Recovery is complete. This is an informational message only. No user action is required.
-2026-10-12 12:58:03.42 spid30s     The default language (LCID 0) has been set for engine and full-text services.
-2026-10-12 12:58:03.53 spid30s     The tempdb database has 4 data file(s).

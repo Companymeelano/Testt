@@ -73,6 +73,8 @@ def rows(stdout: str, expected_fields: int) -> list[list[str]]:
         line = line.rstrip("\r\n")
         if not line.strip():
             continue
+        if re.fullmatch(r"\(\d+ rows? affected\)", line.strip(), flags=re.IGNORECASE):
+            continue
         fields = [part.strip() for part in line.split(DELIM)]
         if len(fields) != expected_fields:
             # sqlcmd can include harmless blank/separator lines; anything else is
@@ -90,7 +92,7 @@ def sql_lit(value: str) -> str:
 
 def restore_sample(container: str, password: str, executable: str, backup: str,
                    database: str) -> None:
-    filelist_sql = f"RESTORE FILELISTONLY FROM DISK = {sql_lit(backup)};"
+    filelist_sql = f"SET NOCOUNT ON; RESTORE FILELISTONLY FROM DISK = {sql_lit(backup)};"
     file_rows = rows(sql(container, password, executable, filelist_sql), 22)
     files = [(r[0], r[2], r[6]) for r in file_rows if r[2] in {"D", "L", "F"}]
     if not files:

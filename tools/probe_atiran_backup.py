@@ -22,7 +22,6 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Iterable
 
 SQLCMD_CANDIDATES = (
     "/opt/mssql-tools18/bin/sqlcmd",
@@ -62,7 +61,7 @@ def sql(container: str, password: str, executable: str, statement: str,
     args = [
         "docker", "exec", "-e", "SQLCMDPASSWORD", container, executable,
         "-S", "localhost", "-U", "sa", "-C", "-b",
-        "-h", "-1", "-W", "-w", "65535", "-s", DELIM, "-y", "0",
+        "-h", "-1", "-W", "-w", "65535", "-s", DELIM,
         "-Q", statement,
     ]
     return run(args, timeout=timeout, env=env).stdout

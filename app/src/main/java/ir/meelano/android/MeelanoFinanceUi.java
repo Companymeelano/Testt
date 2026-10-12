@@ -284,7 +284,7 @@ final class MeelanoFinanceUi {
 
         MeelanoUiKit.gap(h, page, 8);
         page.addView(MeelanoUiKit.buttonRow(h,
-                new String[]{"⬇  خروجی CSV اولویت وصول", "↻  تازه‌سازی داده"},
+                new String[][]{{"csv", "⬇  خروجی CSV اولویت وصول"}, {"refresh", "↻  تازه‌سازی داده"}},
                 new int[]{p.accent, p.info}, new boolean[]{true, false}, new Runnable[]{
                         new Runnable() {
                             @Override public void run() {

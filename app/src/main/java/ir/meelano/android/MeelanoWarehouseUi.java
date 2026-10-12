@@ -296,7 +296,7 @@ final class MeelanoWarehouseUi {
         MeelanoUiKit.gap(h, page, 8);
 
         JSONArray matrix = analysis.optJSONArray("matrix");
-        if (matrix != null && !matrix.isEmpty()) {
+        if (matrix != null && matrix.length() > 0) {
             LinearLayout card = MeelanoUiKit.card(h, p.accent);
             card.addView(MeelanoUiKit.text(h, "خانه‌های تصمیم (A×گردش)", 12.2f, p.text, true), MeelanoUiKit.lp(-1, -2));
             MeelanoUiKit.gap(h, card, 6);

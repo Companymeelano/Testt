@@ -30,10 +30,10 @@ final class ManagerAnalytics {
     // ============================ metadata kit (same validation semantics as MainActivity) ============================
     /** کش ستون‌ها/وجود جدول برای طول عمر برنامه — متادیتای آتیران عملاً تغییر نمی‌کند و
      *  هر صفحه ده‌ها کوئری INFORMATION_SCHEMA می‌زد؛ با این کش، باز شدن صفحه‌ها محسوس سریع‌تر می‌شود. */
-    private static final Map<String, Set<String>> COLUMN_CACHE = new HashMap<>();
-    private static final Map<String, Boolean> TABLE_CACHE = new HashMap<>();
+    private static final Map<String, Set<String>> COLUMN_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final Map<String, Boolean> TABLE_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
     private static final long CACHE_TTL_MS = 15L * 60L * 1000L;
-    private static long cacheStamp = 0L;
+    private static volatile long cacheStamp = 0L;
 
     /** پاک‌کردن کش متادیتا (مثلاً بعد از تغییر ساختار پایگاه داده یا قطع/وصل اتصال). */
     static void clearMetadataCache() {

@@ -14,6 +14,8 @@
   ۸) جای‌خالی‌های ناتمام (TODO/FIXME/not implemented) در کد تازه
   ۹) موتورهای QR و بارکد در برابر مرجع
   ۱۰) وجود اسناد فارسی و بستهٔ خروجی
+  ۱۱) متغیر محلی تکراری در یک متد و isEmpty() روی JSONArray/JSONObject
+      (دو خطای واقعی javac که javalang از آن‌ها رد می‌شود) + خودآزمون همین کنترل
 """
 from __future__ import annotations
 
@@ -672,6 +674,56 @@ def check_comma_in_comment():
     report('کاما/آکولاد ناشی از کامنت‌ها', not problems, 'پاک است' if not problems else '؛ '.join(problems[:5]))
 
 
+# ---------------------------------------------------------------- ۱۸) سایه‌اندازی متغیر محلی + isEmpty روی JSON
+def check_shadow_and_json():
+    """دو کلاس خطای واقعی javac که javalang از آن‌ها رد می‌شود:
+
+    * «متغیر محلی تکراری» (variable x is already defined in method …)
+    * «isEmpty() روی JSONArray/JSONObject» — چنین متدی در org.json اندروید نیست.
+    خودآزمون: فایل مصنوعی با هر دو خطا باید هر دو را برگرداند.
+    """
+    sys.path.insert(0, os.path.join(ROOT, 'tools'))
+    try:
+        import shadow_check
+    except Exception as e:  # pragma: no cover
+        report('متغیر تکراری/JSON isEmpty', False, 'واردکردن ابزار ناموفق: %s' % e)
+        return
+    problems, checked = [], 0
+    for f in java_files():
+        try:
+            hits = shadow_check.collect(f)
+        except Exception:
+            continue  # فایل‌های فراتر از توان javalang (MeelanoQr) در کنترل ۱ سنجیده شده‌اند
+        checked += 1
+        problems.extend(hits)
+    sample = os.path.join(ROOT, 'tools', '_selftest_shadow.java')
+    bad_src = ('package x;\nimport org.json.JSONArray;\nclass Bad {\n'
+               '  void kardex(Object r) {\n    String act = "1";\n    while (true) {\n'
+               '      int act = 2;\n      System.out.println(act);\n    }\n  }\n'
+               '  void other(JSONArray matrix) {\n'
+               '    if (matrix != null && !matrix.isEmpty()) { System.out.println(1); }\n  }\n'
+               '  void clean() {\n    for (int j = 0; j < 3; j++) { }\n    for (int j = 0; j < 3; j++) { }\n  }\n}\n')
+    caught = []
+    try:
+        fh = open(sample, 'w', encoding='utf-8')
+        fh.write(bad_src)
+        fh.close()
+        caught = shadow_check.collect(sample)
+    except Exception as e:
+        caught = ['SELFTEST-ERROR %s' % e]
+    finally:
+        if os.path.exists(sample):
+            os.remove(sample)
+    selftest_ok = len(caught) >= 2
+    if not selftest_ok:
+        detail = 'خودآزمون کنترل ناموفق (انتظار ≥۲ ایراد در فایل مصنوعی): %s' % caught
+    elif problems:
+        detail = '؛ '.join(problems[:4])
+    else:
+        detail = 'پاک است (%d فایل)' % checked
+    report('متغیر تکراری/JSON isEmpty', (not problems) and selftest_ok, detail)
+
+
 def main():
     print('════════ بازبینی جامع پروژهٔ Meelano ════════')
     check_syntax()
@@ -687,6 +739,7 @@ def main():
     check_sql_balance()
     check_tooling_selftest()
     check_comma_in_comment()
+    check_shadow_and_json()
     check_engines()
     check_docs()
     failed = [n for n, ok, _ in RESULTS if not ok]

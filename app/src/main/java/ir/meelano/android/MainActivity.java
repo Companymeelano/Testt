@@ -4625,6 +4625,7 @@ public class MainActivity extends Activity {
         new android.app.AlertDialog.Builder(this).setView(box).setTitle("تنظیم اتصال سرور")
             .setPositiveButton("ذخیره و تلاش مجدد", (d, w) -> {
                 prefs.edit().putString("db_host_override", eh.getText().toString().trim()).putString("db_port_override", ep.getText().toString().trim()).apply();
+                ManagerAnalytics.clearMetadataCache();   // سرور دیگری ⇒ متادیتای کش‌شده بی‌اعتبار است
                 retry.run();
             }).setNegativeButton("انصراف", null).show();
     }

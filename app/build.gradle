@@ -17,13 +17,17 @@ if (keystorePropsFile.exists()) {
     keystorePropsFile.withInputStream { keystoreProps.load(it) }
 }
 
+// نسخهٔ SDK قابل تنظیم از خط فرمان (برای CI یا SDK قدیمی‌تر):
+//   gradle assembleDebug -PmeelanoCompileSdk=35
+def meelanoSdk = (findProperty('meelanoCompileSdk') ?: '36').toString().toInteger()
+
 android {
     namespace 'ir.meelano.android'
-    compileSdk 36
+    compileSdk meelanoSdk
 
     defaultConfig {
         minSdk 24
-        targetSdk 36
+        targetSdk meelanoSdk
         versionCode 200
         versionName '7.0.0'
         resourceConfigurations += ['fa', 'en']

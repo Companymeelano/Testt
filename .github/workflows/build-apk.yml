@@ -1,0 +1,114 @@
+name: MEELANO v7 — build APKs (warehouse + finance)
+
+# این workflow روی شاخهٔ این سشن اجرا می‌شود و APKهای نهایی را:
+#   ۱) به‌عنوان Artifact و Release در گیت‌هاب می‌گذارد،
+#   ۲) در پوشهٔ dist/ داخل همین شاخه کامیت می‌کند تا از محیط سندباکس هم قابل برداشت باشد.
+# در صورت خطای build، دنبالهٔ کامل لاگ در build-error-tail.txt همان شاخه ذخیره می‌شود.
+
+on:
+  push:
+    branches: ["arena/c192ed08-testt"]
+    paths:
+      - "app/**"
+      - "gradle/**"
+      - "*.gradle"
+      - "gradle.properties"
+      - ".github/workflows/build-apk.yml"
+  pull_request:
+    paths:
+      - "app/**"
+      - "*.gradle"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: "17"
+          distribution: temurin
+
+      - name: Install Android platforms + build-tools
+        run: |
+          SDKMAN="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMAN" --licenses > /dev/null || true
+          "$SDKMAN" "platforms;android-36" "build-tools;36.0.0" "platforms;android-35" "build-tools;35.0.0" "platform-tools" || \
+          "$SDKMAN" "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+
+      - name: Set up Gradle 8.13
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.13
+
+      - name: Build debug APKs (all five editions)
+        run: |
+          set -o pipefail
+          gradle assembleDebug --stacktrace --no-daemon 2>&1 | tee build-full.log | tail -60
+
+      - name: Collect APKs
+        run: |
+          mkdir -p dist
+          rm -f dist/*.apk
+          find app/build/outputs/apk -name "*.apk" -print -exec cp {} dist/ \;
+          ls -la dist/
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: meelano-v7-apks-debug
+          path: dist/*.apk
+          if-no-files-found: warn
+
+      - name: Publish rolling release (download link for the phone)
+        if: success()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-v7-c192ed08
+          prerelease: true
+          name: MEELANO v7.0.0 — انبار هوشمند و اتاق فرمان مالی (دیباگ)
+          body: |
+            نسخهٔ ۷.۰.۰ — پنج نسخهٔ برنامه، همه با امضای دیباگ (مستقیم روی گوشی نصب می‌شوند):
+            • `meelano-manager-debug.apk` — نسخهٔ **مدیر** (اصلی): انبار هوشمند، اتاق فرمان مالی، برچسب QR/بارکد
+            • دیگر نسخه‌ها: ویزیتور، پرسنل، فروشگاه، مودیان
+
+            چون این بیلد با کلید دیباگ امضا شده، در کنار برنامهٔ فعلی نصب می‌شود (شناسهٔ جداگانه)
+            و یک‌بار باید اطلاعات اتصال را وارد کنید.
+          files: dist/*.apk
+
+      - name: Commit APKs + build info to dist/ (delivery into the session branch)
+        if: success()
+        run: |
+          git config user.name "arena-ci"
+          git config user.email "arena-ci@local"
+          {
+            echo "نسخه: 7.0.0 (versionCode 200)"
+            echo "کامیت: $(git rev-parse --short HEAD)"
+            echo "تاریخ build: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "Gradle: $(gradle --version | grep Gradle | head -1)"
+            echo "فایل‌ها:"
+            ls -la dist/ | tail -n +2
+            echo "--- sha256 ---"
+            (cd dist && sha256sum *.apk)
+          } > dist/BUILD-INFO.txt
+          git add -A -f dist/
+          git commit -m "dist: APKهای نسخهٔ ۷.۰.۰ (ساخت خودکار CI)" || true
+          git pull --rebase --strategy-option=ours origin arena/c192ed08-testt || true
+          git push origin HEAD:arena/c192ed08-testt || true
+
+      - name: Save diagnostics on failure (so the agent can read the real error)
+        if: failure()
+        run: |
+          { echo "=== commit: $(git rev-parse --short HEAD) ==="; tail -c 300000 build-full.log; } > build-error-tail.txt || echo "no log" > build-error-tail.txt
+          git config user.name "arena-ci"
+          git config user.email "arena-ci@local"
+          git add -f build-error-tail.txt
+          git commit -m "CI diagnostics: build failure tail (temporary)" || true
+          git pull --rebase --strategy-option=ours origin arena/c192ed08-testt || true
+          git push origin HEAD:arena/c192ed08-testt || true

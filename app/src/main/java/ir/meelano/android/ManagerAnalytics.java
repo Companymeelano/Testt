@@ -575,8 +575,10 @@ final class ManagerAnalytics {
         String where = "WHERE [tasvieh]='f' AND NULLIF([t_date],'') IS NOT NULL" + activeAnd(cols, "");
         String soft = softDeleteCondition(cols, ""); if (!soft.isEmpty()) where += " AND " + soft;
         String daysExpr = "dbo.dif_date_alan([t_date])";
+        // توجه: در بخش بیرونی باید از نام مستعار جدول مشتق‌شده (d) استفاده شود؛ ارجاع دوباره به [t_date]
+        // در بیرون زیرپرس‌وجو «Invalid column name» می‌دهد.
         String sql = "SELECT TOP (" + Math.max(1, cap) + ") p, ISNULL(SUM(amount),0), COUNT_BIG(*), " +
-                "ISNULL(MAX(CASE WHEN " + daysExpr + " < 0 THEN -" + daysExpr + " ELSE 0 END),0) " +
+                "ISNULL(MAX(CASE WHEN d < 0 THEN -d ELSE 0 END),0) " +
                 "FROM (SELECT TRY_CONVERT(nvarchar(60),[" + party + "]) p, (" + remain + ") amount, " + daysExpr + " d FROM dbo.sailfact " + where + ") g " +
                 "WHERE amount>0 GROUP BY p ORDER BY 2 DESC";
         Map<String, String> names = customerNames(c);

@@ -12787,11 +12787,6 @@ public class MainActivity extends Activity {
         });
     }
 
-    private double parseNumber(String raw, double fallback) {
-        String v = normalizeDigits(raw == null ? "" : raw).replace(',', '').replace('٬', '').replace(' ', '').trim();
-        try { return v.isEmpty() ? fallback : Double.parseDouble(v); } catch (Exception e) { return fallback; }
-    }
-
     private void renderManagerCredit(JSONArray rows) {
         content.removeAllViews();
         addHero("اعتبار مشتریان", "مانده در برابر حد اعتبار از Sys_Mandeh_Customer — بدون برآورد.");

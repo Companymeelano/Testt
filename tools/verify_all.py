@@ -703,7 +703,8 @@ def check_shadow_and_json():
                '      int act = 2;\n      System.out.println(act);\n    }\n  }\n'
                '  void other(JSONArray matrix) {\n'
                '    if (matrix != null && !matrix.isEmpty()) { System.out.println(1); }\n  }\n'
-               '  void clean() {\n    for (int j = 0; j < 3; j++) { }\n    for (int j = 0; j < 3; j++) { }\n  }\n}\n')
+               '  void clean() {\n    for (int j = 0; j < 3; j++) { }\n    for (int j = 0; j < 3; j++) { }\n  }\n'
+               '  void sizing(Object v) {\n    float sizePx = 3f;\n    v.setMinimumWidth(sizePx);\n  }\n}\n')
     caught = []
     try:
         fh = open(sample, 'w', encoding='utf-8')
@@ -715,9 +716,9 @@ def check_shadow_and_json():
     finally:
         if os.path.exists(sample):
             os.remove(sample)
-    selftest_ok = len(caught) >= 2
+    selftest_ok = len(caught) >= 3      # سایه‌اندازی متغیر + isEmpty روی JSON + تبدیل float به int
     if not selftest_ok:
-        detail = 'خودآزمون کنترل ناموفق (انتظار ≥۲ ایراد در فایل مصنوعی): %s' % caught
+        detail = 'خودآزمون کنترل ناموفق (انتظار ≥۳ ایراد در فایل مصنوعی): %s' % caught
     elif problems:
         detail = '؛ '.join(problems[:4])
     else:

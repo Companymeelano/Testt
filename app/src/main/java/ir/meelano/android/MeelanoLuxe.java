@@ -151,7 +151,7 @@ final class MeelanoLuxe {
         private final Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint glow = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Path path = new Path();
-        private float sizePx;
+        private final int sizePx;          // پیکسل پیش‌فرض آیکون (setMinimumWidth عدد صحیح می‌خواهد)
 
         IconView(Context ctx, MeelanoPalette pal, I kind, int accent, int sizePx) {
             super(ctx);
@@ -843,14 +843,17 @@ final class MeelanoLuxe {
             super(ctx);
             this.pal = pal;
             setLayerType(LAYER_TYPE_SOFTWARE, null);
-            anim = ValueAnimator.ofFloat(-0.45f, 1.55f);
-            anim.setDuration(3400);
+            anim = ValueAnimator.ofFloat(-0.45f, 1.50f);
+            anim.setDuration(5200);
             anim.setRepeatCount(ValueAnimator.INFINITE);
             anim.setStartDelay(1100);
             anim.setInterpolator(new LinearInterpolator());
             anim.addUpdateListener(animation -> {
                 if (!isAttachedToWindow()) return;      // جلوگیری از کار بی‌فایده پس از ترک صفحه
-                phase = (Float) animation.getAnimatedValue();
+                float v = (Float) animation.getAnimatedValue();
+                // وقتی نوار از کادر بیرون رفته، بازترسیم لازم نیست (صرفه‌جویی در باتری و پردازنده).
+                if (v > 1.42f) return;
+                phase = v;
                 invalidate();
             });
             anim.start();

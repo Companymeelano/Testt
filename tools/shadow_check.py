@@ -8,7 +8,7 @@
 اجرا:  python3 tools/shadow_check.py [مسیر…]
 خروجی: فهرست HIT‌ها. کد بازگشت همیشه ۰ (قضاوت با verify_all).
 """
-import io, os, sys
+import io, os, re, sys
 
 try:
     import javalang
@@ -208,6 +208,56 @@ def collect(path):
             if t in ("JSONArray", "JSONObject"):
                 errs.append("%s:%d %s.isEmpty() — org.json اندروید isEmpty ندارد (length()/has() استفاده کن)" %
                             (os.path.basename(path), n.position.line, q))
+
+    # ------------------------------------------------ ۳) تبدیل پرخطر float به int
+    # javac این را خطا می‌گیرد («possible lossy conversion from float to int») و javalang نمی‌بیند.
+    # نکتهٔ دقت: نوع متغیر «در همان متد» سنجیده می‌شود تا هم‌نام‌های متدهای دیگر اشتباه گرفته نشوند.
+    int_only = {"setMinimumWidth", "setMinimumHeight", "setPadding", "setPaddingRelative", "setLines",
+                "setMaxLines", "setCompoundDrawablePadding", "setMargins", "setGravity", "setId",
+                "setVisibility", "setImageLevel", "setImportantForAccessibility", "setSelection", "setEms"}
+    float_fields = set()
+    float_locals = {}
+    float_params = {}
+    for n in nodes:
+        if tnode(n) == "FieldDeclaration" and type_name(n.type) == "float":
+            for d in n.declarators:
+                float_fields.add(d.name)
+        elif tnode(n) == "VariableDeclarator":
+            par = parent_of.get(id(n))
+            if par is not None and tnode(par) in ("LocalVariableDeclaration", "VariableDeclaration") \
+                    and type_name(par.type) == "float":
+                mm = method_of(n)
+                if mm is not None:
+                    float_locals.setdefault(id(mm), set()).add(n.name)
+        elif tnode(n) == "FormalParameter" and type_name(n.type) == "float":
+            mm = method_of(n)
+            if mm is not None:
+                float_params.setdefault(id(mm), set()).add(n.name)
+    for n in nodes:
+        if tnode(n) != "MethodInvocation" or n.position is None or n.member not in int_only or not n.arguments:
+            continue
+        mm = method_of(n)
+        names = set(float_fields)
+        if mm is not None:
+            names |= float_locals.get(id(mm), set())
+            names |= float_params.get(id(mm), set())
+        for a in n.arguments:
+            name = None
+            if tnode(a) == "MemberReference":
+                name = a.member
+            elif tnode(a) == "Literal" and isinstance(getattr(a, "value", None), str):
+                name = a.value
+            elif tnode(a) == "BinaryOperation":
+                name = getattr(a.operandl, "member", None) or getattr(a.operandr, "member", None)
+            if name is None:
+                continue
+            if name in names or name.endswith(("f", "F")) and not name.isidentifier():
+                errs.append("%s:%d %s(%s) — تبدیل پرخطر float به int (خطای javac)" %
+                            (os.path.basename(path), n.position.line, n.member, name))
+    # اعلان int که «تمام سمت راستش» یک عدد اعشاری است (بدون تبدیل صریح) — خطای javac
+    for m in re.finditer(r'\bint\s+\w+\s*=\s*-?\d+\.\d+[fF]?\s*;', src):
+        line = src[:m.start()].count("\n") + 1
+        errs.append("%s:%d اعلان int از عدد اعشاری بدون تبدیل صریح (خطای javac)" % (os.path.basename(path), line))
     return errs
 
 

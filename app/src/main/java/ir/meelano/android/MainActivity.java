@@ -4233,31 +4233,152 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2); lp.setMargins(0, 0, 0, dp(10)); parent.addView(c, lp);
     }
 
+    // ================================================================ لایهٔ لوکس مدیریت
+    /**
+     * آیکون لوکس مناسب هر بخش — بر پایهٔ «معنای عنوان» انتخاب می‌شود (نه شمارهٔ صفحه)،
+     * پس هر صفحهٔ تازه هم به‌صورت خودکار آیکون معنادار می‌گیرد.
+     */
+    /** شمارهٔ ترتیبی بخش‌های هر صفحه (برای مدالیون شمارهٔ «لایهٔ لوکس»). */
+    private int luxSectionSeq = 0;
+
+    private MeelanoLuxe.I luxIconFor(String title) {
+        return MeelanoLuxe.iconFor(title);
+    }
+
+    /** افزودن یک بلوک لوکس به صفحه با فاصلهٔ پایین مشخص. */
+    private void luxAdd(View view, float bottomDp) {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+        lp.setMargins(0, 0, 0, dp(bottomDp));
+        content.addView(view, lp);
+        MeelanoLuxe.stagger(uiHost, view, content.getChildCount());
+    }
+
+    /** تبدیل روند ۷ روزه به آرایهٔ عددی برای جرقهٔ خطی. */
+    private double[] trendValues(JSONArray trend) {
+        if (trend == null || trend.length() == 0) return new double[0];
+        double[] out = new double[trend.length()];
+        for (int i = 0; i < trend.length(); i++) {
+            JSONObject o = trend.optJSONObject(i);
+            out[i] = o == null ? 0 : o.optDouble("value", 0);
+        }
+        return out;
+    }
+
+    /**
+     * «میز فرمان مدیر» — شش کاشی لوکس با آیکون گرادیانی، توضیح یک‌خطی و فلش ورود.
+     * هر کاشی یک بخش واقعی برنامه را باز می‌کند؛ هیچ اقلام تزئینیِ بی‌عمل وجود ندارد.
+     */
+    private void addManagerCommandCenter() {
+        luxAdd(MeelanoLuxe.section(uiHost, "۱", "میز فرمان مدیر",
+                "شش بخش اصلی، هر کدام یک لمس فاصله — همهٔ اعداد از آتیران و بدون داده ساختگی.",
+                MeelanoLuxe.I.GAUGE, GOLD), 10f);
+        java.util.List<View> tiles = new java.util.ArrayList<>();
+        tiles.add(MeelanoLuxe.tile(uiHost, MeelanoLuxe.I.TREND, "اتاق فروش",
+                "فروش و حاشیهٔ بازه، بهترین مشتریان، مقایسه با دورهٔ قبل و رکوردهای واقعی اسناد.",
+                "فروش و بازار", GOLD, () -> showApp("mgr_cockpit")));
+        tiles.add(MeelanoLuxe.tile(uiHost, MeelanoLuxe.I.WALLET, "مرکز وصول",
+                "سبد سنی مطالبات، اولویت تماس امروز، ریسک اعتباری مشتریان و پیش‌نویس پیام وصول.",
+                "وصول مطالبات", WARNING, () -> showApp("mgr_collection")));
+        tiles.add(MeelanoLuxe.tile(uiHost, MeelanoLuxe.I.ROUTE, "عملکرد ویزیتورها",
+                "فروش هر ویزیتور، هدف مسیر، درصد تحقق و کیفیت پوشش میدانی.",
+                "میدان و فروش", INFO, () -> showApp("mgr_visits")));
+        tiles.add(MeelanoLuxe.tile(uiHost, MeelanoLuxe.I.TAG, "هوش کالا",
+                "کالاهای طلا، موجودی صفر، کالای بی‌فروش و طبقه‌بندی سودآوری هر قلم.",
+                "کالا و سود", SUCCESS, () -> showApp("mgr_products")));
+        tiles.add(MeelanoLuxe.tile(uiHost, MeelanoLuxe.I.BOXES, "انبار هوشمند",
+                "چند‌انباری زنده از دفتر انبار، شمارش و مغایرت، انتقال بین انبارها و سرمایهٔ راکد.",
+                "انبار و موجودی", GOLD_2, () -> showApp("warehouse")));
+        tiles.add(MeelanoLuxe.tile(uiHost, MeelanoLuxe.I.COIN, "اتاق فرمان مالی",
+                "سود و زیان دوره، نقطهٔ سربه‌سر، جریان نقدی چهار هفته، چک‌ها و قیمت‌گذاری هدف.",
+                "مالی و نقدینگی", DANGER, () -> showApp("finance")));
+        luxAdd(MeelanoLuxe.tileGrid(uiHost, tiles, 2, 10f), 14f);
+    }
+
+    /**
+     * «نبض کسب‌وکار» — یک عقربهٔ حلقه‌ای (درصد تحقق هدف ویزیتورها، یا سهم اسناد جاری
+     * چک‌ها) به‌همراه سه عدد کلیدی و جرقهٔ خطی روند فروش؛ همه از دادهٔ همان بارگذاری.
+     */
+    private void addManagerPulse(JSONObject m) {
+        if (m == null) return;
+        JSONArray trend = m.optJSONArray("trend");
+        JSONArray visitors = m.optJSONArray("visitors");
+        double goalSum = 0, achievedSum = 0;
+        if (visitors != null) {
+            for (int i = 0; i < visitors.length(); i++) {
+                JSONObject o = visitors.optJSONObject(i);
+                if (o == null) continue;
+                goalSum += o.optDouble("goal", 0);
+                achievedSum += o.optDouble("achieved", 0);
+            }
+        }
+        JSONObject chk = m.optJSONObject("checkBuckets");
+        double vok = chk == null || chk.optJSONObject("ok") == null ? 0 : chk.optJSONObject("ok").optDouble("total", 0);
+        double vsoon = chk == null || chk.optJSONObject("soon") == null ? 0 : chk.optJSONObject("soon").optDouble("total", 0);
+        double vover = chk == null || chk.optJSONObject("over") == null ? 0 : chk.optJSONObject("over").optDouble("total", 0);
+        boolean goalMode = goalSum > 0;
+        double ratio = goalMode ? (achievedSum / goalSum)
+                                : (vok + vsoon + vover > 0 ? vok / (vok + vsoon + vover) : 0);
+        JSONObject sales = m.optJSONObject("sales");
+        JSONObject recv = m.optJSONObject("receivables");
+        double salesTotal = sales == null ? 0 : sales.optDouble("total", 0);
+        double recvTotal = recv == null ? 0 : recv.optDouble("total", 0);
+        long recvCount = recv == null ? 0 : recv.optLong("count", 0);
+        String center = goalMode ? MeelanoCharts.compact(achievedSum) : MeelanoCharts.compact(vok);
+        String[][] facts = new String[][]{
+                {"فروش بازه", salesTotal > 0 ? MeelanoCharts.compact(salesTotal) : "—"},
+                {"مطالبات فعال", recvTotal > 0 ? MeelanoCharts.compact(recvTotal) : "—"},
+                {"چک سررسیددار", vover > 0 ? MeelanoCharts.compact(vover) : "بدون مورد"}
+        };
+        String caption = goalMode
+                ? "تحقق هدف ویزیتورها در بازهٔ انتخابی (مجموع اهداف ثبت‌شدهٔ vis_goals)"
+                : "پوشش چک‌های جاری نسبت به کل چک‌های در جریان";
+        LinearLayout pulse = MeelanoLuxe.ringCard(uiHost, "نبض کسب‌وکار", caption, ratio, center, facts, GOLD);
+        double[] tv = trendValues(trend);
+        if (tv.length > 1) {
+            MeelanoLuxe.Spark spark = new MeelanoLuxe.Spark(this, meelanoPalette(), INFO);
+            spark.setValues(tv);
+            LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(-1, dp(44));
+            slp.setMargins(0, dp(9), 0, 0);
+            pulse.addView(MeelanoLuxe.value(uiHost, "روند ۷ روز اخیر فروش — بیشترین و کمترین روز در همین نمودار دیده می‌شود", 9.8f, 8.4f, MUTED, false),
+                    new LinearLayout.LayoutParams(-1, -2));
+            pulse.addView(spark, slp);
+        }
+        if (recvCount > 0) {
+            TextView hint = text("مشتریان بدهکار فعال: " + faDigits(String.valueOf(recvCount)) + " — برای جزئیات، «مرکز وصول» را باز کنید.", 9.6f, MUTED, Typeface.NORMAL);
+            LinearLayout.LayoutParams hp = new LinearLayout.LayoutParams(-1, -2);
+            hp.setMargins(0, dp(8), 0, 0);
+            pulse.addView(hint, hp);
+        }
+        luxAdd(pulse, 14f);
+    }
+
     private void addHero(String title, String text) {
         if (VISITOR_EDITION) { addVisitorHero(title, text); return; }
-        LinearLayout hero = card();
+        // از این نسخه، هدر همهٔ صفحه‌ها با «لایهٔ لوکس» ساخته می‌شود: مدالیون آیکون گرادیانی،
+        // گوشه‌های طلایی، درخشش گذرنده و چیپ‌های وضعیت (نسخه، تم، تراکم، حرکت).
         int accent = themeAccent(title);
-        hero.setBackground(gradient(new int[]{alpha(Color.WHITE, isLightTheme() ? 36 : 18), alpha(accent, 24), HERO_START, HERO_END}, GradientDrawable.Orientation.TL_BR, 26));
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        TextView img = report3dIcon(semanticGlyph(title), accent);
-        row.addView(img, new LinearLayout.LayoutParams(dp(60), dp(60)));
-        LinearLayout copy = new LinearLayout(this);
-        copy.setOrientation(LinearLayout.VERTICAL);
-        copy.setPadding(dp(10), 0, dp(10), 0);
-        TextView h = this.text(title, 22, TEXT, Typeface.BOLD);
-        TextView s = this.text(text, 12, MUTED, Typeface.NORMAL);
-        s.setLineSpacing(dp(2), 1.05f);
-        copy.addView(h, new LinearLayout.LayoutParams(-1, -2));
-        copy.addView(s, new LinearLayout.LayoutParams(-1, -2));
-        row.addView(copy, new LinearLayout.LayoutParams(0, -2, 1f));
-        hero.addView(row, new LinearLayout.LayoutParams(-1, -2));
-        addHeroBeautyChips(hero, title, accent);
-        addLuxuryRoad(hero, accent);
+        String page = activePage == null || activePage.trim().isEmpty() ? "dashboard" : activePage;
+        String pageLabel = MeelanoDesignKit.label(page);
+        // صفحهٔ خانه با سلام شخصی شروع می‌شود؛ بقیهٔ صفحه‌ها فقط نام نسخه و بخش را نشان می‌دهند.
+        String badge = editionTitle();
+        if ("dashboard".equals(page)) {
+            String who = headerPersonName();
+            badge = who == null || who.trim().isEmpty() ? "خوش آمدید" : "سلام، " + who.trim();
+        } else if (pageLabel != null && !pageLabel.trim().isEmpty()) {
+            badge = badge + " • " + pageLabel;
+        }
+        String[] chips = new String[]{
+                pageLabel,
+                themeName(currentThemeId()),
+                compactUi() ? "نمای فشرده" : "نمای استاندارد",
+                motionAllowed() ? "حرکت نرم" : "بدون حرکت"
+        };
+        luxSectionSeq = 0;   // هر صفحه از «بخش ۱» شروع می‌کند
+        LinearLayout hero = MeelanoLuxe.hero(uiHost, title, text, badge, luxIconFor(title), accent, chips);
         LinearLayout.LayoutParams hp = new LinearLayout.LayoutParams(-1, -2);
         hp.setMargins(0, 0, 0, dp(12));
         content.addView(hero, hp);
+        MeelanoLuxe.stagger(uiHost, hero, 0);
     }
 
     private void addVisitorHero(String title, String body) {
@@ -12162,10 +12283,13 @@ public class MainActivity extends Activity {
 
     private LinearLayout addReportCard(String title, String glyph, int accent) {
         LinearLayout c = card();
-        c.setBackground(themedSectionBg("reports", 26));
-        c.addView(visitorSectionTitle(title, glyph, accent), new LinearLayout.LayoutParams(-1, -2));
+        c.setBackground(MeelanoLuxe.glass(meelanoPalette(), accent, dp(26)));
+        String num = MeelanoCharts.fa(String.valueOf(++luxSectionSeq));
+        c.addView(MeelanoLuxe.section(uiHost, num, title, null, luxIconFor(title), accent),
+                new LinearLayout.LayoutParams(-1, -2));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2); lp.setMargins(0, 0, 0, dp(12));
         content.addView(c, lp);
+        MeelanoLuxe.stagger(uiHost, c, content.getChildCount());
         return c;
     }
 
@@ -12855,11 +12979,47 @@ public class MainActivity extends Activity {
         return out;
     }
 
+    /** آیکون معنایی برای هر جملهٔ بینش (بر پایهٔ کلیدواژه‌های همان جمله). */
+    private MeelanoLuxe.I insightIcon(String line) {
+        String t = line == null ? "" : line;
+        if (t.contains("بدهکار") || t.contains("مطالبات") || t.contains("وصول")) return MeelanoLuxe.I.WALLET;
+        if (t.contains("فروش") || t.contains("رشد") || t.contains("افت")) return MeelanoLuxe.I.TREND;
+        if (t.contains("ویزیتور") || t.contains("هدف") || t.contains("vis_goals")) return MeelanoLuxe.I.ROUTE;
+        if (t.contains("انبار") || t.contains("موجودی")) return MeelanoLuxe.I.BOXES;
+        if (t.contains("کالا")) return MeelanoLuxe.I.TAG;
+        if (t.contains("چک")) return MeelanoLuxe.I.RECEIPT;
+        if (t.contains("حاشیه") || t.contains("سود")) return MeelanoLuxe.I.COIN;
+        if (t.contains("مشتری")) return MeelanoLuxe.I.USERS;
+        return MeelanoLuxe.I.SPARKLE;
+    }
+
+    /** رنگ معنایی جملهٔ بینش: هشدار برای ریسک، سبز برای فرصت، آبی برای اطلاع. */
+    private int insightAccent(String line) {
+        String t = line == null ? "" : line;
+        if (t.contains("معوق") || t.contains("بدهکار") || t.contains("افت") || t.contains("نداشته")) return WARNING;
+        if (t.contains("رشد") || t.contains("بیشترین تحقق")) return SUCCESS;
+        if (t.contains("ثبت نشده") || t.contains("هدف")) return INFO;
+        return GOLD;
+    }
+
+    /**
+     * «بینش‌های مدیریتی» — چند جملهٔ کوتاه و قابل‌اقدام که از همان دادهٔ بارگذاری‌شده ساخته
+     * می‌شود (تحلیل میلو). هر سطر یک مدالیون معنایی و رنگ هشدار/فرصت دارد.
+     */
     private void addInsightsCard(JSONObject m) {
         java.util.List<String> ins = managerInsights(m);
-        if (ins.isEmpty()) return;
-        LinearLayout c = addReportCard("تحلیل میلو — از اعداد واقعی", "✦", INFO);
-        for (String line : ins) addReportLine(c, line, "", TEXT);
+        if (ins == null || ins.isEmpty()) return;
+        luxAdd(MeelanoLuxe.section(uiHost, MeelanoCharts.fa(String.valueOf(++luxSectionSeq)),
+                "بینش‌های مدیریتی", "جمله‌های کوتاه و قابل‌اقدام، ساخته‌شده از اعداد واقعی همین بارگذاری.",
+                MeelanoLuxe.I.SPARKLE, INFO), 10f);
+        LinearLayout card = card();
+        card.setBackground(MeelanoLuxe.glass(meelanoPalette(), INFO, dp(24)));
+        for (int i = 0; i < ins.size(); i++) {
+            String line = ins.get(i);
+            card.addView(MeelanoLuxe.insight(uiHost, line, insightIcon(line), insightAccent(line)),
+                    new LinearLayout.LayoutParams(-1, -2));
+        }
+        luxAdd(card, 14f);
     }
 
     private String managerIntelJson() throws Exception {
@@ -13311,20 +13471,22 @@ public class MainActivity extends Activity {
     private double pctDelta(double now, double prev) { return prev > 0 ? (now - prev) / prev * 100.0 : Double.NaN; }
 
     private void addKpiCard(LinearLayout parent, String title, String glyph, int accent, String value, String delta, String sub, String drillKind) {
-        LinearLayout c = card();
-        c.setBackground(unifiedCardBg(accent, 20, false));
-        LinearLayout head = new LinearLayout(this); head.setOrientation(LinearLayout.HORIZONTAL); head.setGravity(Gravity.CENTER_VERTICAL);
-        head.addView(text(glyph, 13, tc(accent), Typeface.BOLD), new LinearLayout.LayoutParams(-2, -2));
-        TextView tt = text(title, 10.6f, MUTED, Typeface.BOLD);
-        LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(0, -2, 1f); tp.setMargins(dp(6), 0, 0, 0);
-        head.addView(tt, tp);
-        c.addView(head, new LinearLayout.LayoutParams(-1, -2));
-        c.addView(fitText(value, 17, 12, TEXT), new LinearLayout.LayoutParams(-1, dp(30)));
-        if (delta != null && !delta.isEmpty()) { TextView dv = text(delta, 10.2f, delta.contains("▼") ? tc(DANGER) : tc(SUCCESS), Typeface.BOLD); dv.setSingleLine(true); dv.setEllipsize(TextUtils.TruncateAt.END); c.addView(dv, new LinearLayout.LayoutParams(-1, -2)); }
-        if (sub != null && !sub.isEmpty()) { TextView sv2 = text(sub, 9.6f, MUTED, Typeface.NORMAL); sv2.setSingleLine(true); sv2.setEllipsize(TextUtils.TruncateAt.END); c.addView(sv2, new LinearLayout.LayoutParams(-1, -2)); }
-        if (drillKind != null) { c.setClickable(true); applyTouchFeedback(c); c.setOnClickListener(v -> { managerDrillKind = drillKind; showApp("mgr_drill"); }); c.setContentDescription(title + " — نمایش جزئیات"); }
+        // کارت شاخص با «لایهٔ لوکس»: مدالیون آیکون گرادیانی، عدد بزرگ با فونت تطبیقی و رنگ معنایی.
+        final String drill = drillKind;
+        Runnable tap = null;
+        if (drill != null) tap = () -> { managerDrillKind = drill; showApp("mgr_drill"); };
+        LinearLayout c = MeelanoLuxe.stat(uiHost, luxIconFor(title), title, value, delta, null, accent, tap);
+        if (sub != null && !sub.isEmpty()) {
+            TextView sv2 = text(sub, 9.6f, MUTED, Typeface.NORMAL);
+            sv2.setSingleLine(true);
+            sv2.setEllipsize(TextUtils.TruncateAt.END);
+            LinearLayout.LayoutParams sp2 = new LinearLayout.LayoutParams(-1, -2);
+            sp2.setMargins(0, dp(4), 0, 0);
+            c.addView(sv2, sp2);
+        }
         c.setMinimumWidth(dp(140));
         parent.addView(c, new LinearLayout.LayoutParams(0, -2, 1f));
+        MeelanoLuxe.stagger(uiHost, c, parent.getChildCount());
     }
 
     private void addBarLine(LinearLayout parent, String label, String valueText, double value, double max, int color) {
@@ -13340,10 +13502,13 @@ public class MainActivity extends Activity {
         row.addView(lt, llp);
         LinearLayout barWrap = new LinearLayout(this); barWrap.setOrientation(LinearLayout.HORIZONTAL);
         barWrap.setBackground(rounded(alpha(MUTED, 26), 999));
-        View bar = new View(this); bar.setBackground(rounded(color, 999));
+        View bar = new View(this);
+        // میلهٔ گرادیانی با خط نور بالای آن — همان زبان بصری «لایهٔ لوکس».
+        bar.setBackground(gradient(new int[]{mix(color, Color.WHITE, 0.40f), color, mix(color, Color.BLACK, isLightTheme() ? 0f : 0.18f)},
+                GradientDrawable.Orientation.LEFT_RIGHT, 999));
         double safeMax = max > 0 ? max : 1;
-        barWrap.addView(bar, new LinearLayout.LayoutParams(0, dp(10), (float) Math.max(0.06, Math.min(1, value / safeMax))));
-        barWrap.addView(new View(this), new LinearLayout.LayoutParams(0, dp(10), 1f));
+        barWrap.addView(bar, new LinearLayout.LayoutParams(0, dp(11), (float) Math.max(0.06, Math.min(1, value / safeMax))));
+        barWrap.addView(new View(this), new LinearLayout.LayoutParams(0, dp(11), 1f));
         LinearLayout.LayoutParams wp = new LinearLayout.LayoutParams(0, -2, 1f); wp.setMargins(dp(2), 0, dp(5), 0);
         row.addView(barWrap, wp);
         TextView vt = text(valueText, 10.2f, TEXT, Typeface.BOLD);
@@ -13354,15 +13519,16 @@ public class MainActivity extends Activity {
     }
 
     private void addTodayTile(LinearLayout parent, String title, String value, String sub, int accent, final String drill) {
-        LinearLayout t = new LinearLayout(this); t.setOrientation(LinearLayout.VERTICAL);
-        t.setBackground(unifiedCardBg(accent, 16, false));
-        int pad = dp(10); t.setPadding(pad, pad, pad, pad);
-        t.addView(text(title, 9.6f, MUTED, Typeface.NORMAL), new LinearLayout.LayoutParams(-1, -2));
-        TextView v = text(value, 16.5f, TEXT, Typeface.BOLD); v.setSingleLine(true); v.setEllipsize(TextUtils.TruncateAt.END);
-        LinearLayout.LayoutParams vp = new LinearLayout.LayoutParams(-1, -2); vp.setMargins(0, dp(4), 0, 0);
-        t.addView(v, vp);
-        t.addView(text(sub, 9.2f, tc(accent), Typeface.BOLD), new LinearLayout.LayoutParams(-1, -2));
-        if (drill != null) { t.setClickable(true); applyTouchFeedback(t); t.setOnClickListener(vv -> { managerDrillKind = drill; showApp("mgr_drill"); }); }
+        final String drillKindLocal = drill;
+        Runnable tap = null;
+        if (drillKindLocal != null) tap = () -> { managerDrillKind = drillKindLocal; showApp("mgr_drill"); };
+        LinearLayout t = MeelanoLuxe.stat(uiHost, luxIconFor(title + " " + sub), title, value, null, null, accent, tap);
+        if (sub != null && !sub.isEmpty()) {
+            TextView sv = text(sub, 9.2f, tc(accent), Typeface.BOLD);
+            sv.setSingleLine(true);
+            sv.setEllipsize(TextUtils.TruncateAt.END);
+            t.addView(sv, new LinearLayout.LayoutParams(-1, -2));
+        }
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -2, 1f); lp.setMargins(dp(3), dp(6), dp(3), 0);
         parent.addView(t, lp);
     }
@@ -13383,29 +13549,11 @@ public class MainActivity extends Activity {
         final int reorder = totals.optInt("reorderCount");
         final int lowCover = totals.optInt("lowCount");   // کلید واقعی خروجی تحلیل انبار
         if (dead + reorder + lowCover == 0) return;
-        LinearLayout strip = new LinearLayout(this);
-        strip.setOrientation(LinearLayout.HORIZONTAL);
-        strip.setGravity(Gravity.CENTER_VERTICAL);
-        strip.setPadding(dp(8), dp(8), dp(8), dp(8));
-        strip.setBackground(unifiedCardBg(GOLD, 18, false));
-        strip.addView(report3dIcon("◈", GOLD), new LinearLayout.LayoutParams(dp(38), dp(38)));
-        LinearLayout copy = new LinearLayout(this);
-        copy.setOrientation(LinearLayout.VERTICAL);
-        copy.setPadding(dp(8), 0, dp(8), 0);
-        copy.addView(text("هشدارهای انبار (از آخرین تحلیل)", 11.6f, TEXT, Typeface.BOLD), new LinearLayout.LayoutParams(-1, -2));
-        copy.addView(text("نیازمند تأمین: " + faDigits(String.valueOf(reorder)) + " قلم • کالای راکد: " + faDigits(String.valueOf(dead))
-                + (lowCover > 0 ? " • پوشش بحرانی: " + faDigits(String.valueOf(lowCover)) + " قلم" : ""), 9.6f, MUTED, Typeface.NORMAL),
-                new LinearLayout.LayoutParams(-1, -2));
-        strip.addView(copy, new LinearLayout.LayoutParams(0, -2, 1f));
-        Button open = secondaryButton("انبار هوشمند");
-        open.setTextSize(fs(9.6f));
-        open.setOnClickListener(v -> showApp("warehouse"));
-        strip.addView(open, new LinearLayout.LayoutParams(dp(104), dp(42)));
-        applyTouchFeedback(strip);
-        strip.setOnClickListener(v -> showApp("warehouse"));
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
-        lp.setMargins(0, 0, 0, dp(10));
-        content.addView(strip, lp);
+        String body = "نیازمند تأمین: " + faDigits(String.valueOf(reorder)) + " قلم • کالای راکد: " + faDigits(String.valueOf(dead))
+                + (lowCover > 0 ? " • پوشش بحرانی: " + faDigits(String.valueOf(lowCover)) + " قلم" : "");
+        LinearLayout strip = MeelanoLuxe.alert(uiHost, MeelanoLuxe.I.BOXES, "هشدارهای انبار — از آخرین تحلیل",
+                body, "انبار هوشمند", GOLD, () -> showApp("warehouse"));
+        luxAdd(strip, 10f);
     }
 
     private void renderManagerExecutive(JSONObject m) {
@@ -13415,20 +13563,14 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(-1, -2); dlp.setMargins(0, 0, 0, dp(10));
         content.addView(dateLine, dlp);
         content.addView(managerRangeRow(() -> loadManagerExecutive()));
-        LinearLayout quick = new LinearLayout(this); quick.setOrientation(LinearLayout.HORIZONTAL);
-        Button q1 = secondaryButton("اتاق فروش"); q1.setTextSize(fs(9.6f)); q1.setOnClickListener(v -> showApp("mgr_cockpit")); quick.addView(q1, weightedButtonLp());
-        Button q2 = secondaryButton("وصول"); q2.setTextSize(fs(9.6f)); q2.setOnClickListener(v -> showApp("mgr_collection")); quick.addView(q2, weightedButtonLp());
-        Button q3 = secondaryButton("ویزیتورها"); q3.setTextSize(fs(9.6f)); q3.setOnClickListener(v -> showApp("mgr_visits")); quick.addView(q3, weightedButtonLp());
-        Button q4 = secondaryButton("کالا"); q4.setTextSize(fs(9.6f)); q4.setOnClickListener(v -> showApp("mgr_products")); quick.addView(q4, weightedButtonLp());
-        Button q5 = secondaryButton("انبار"); q5.setTextSize(fs(9.6f)); q5.setOnClickListener(v -> showApp("warehouse")); quick.addView(q5, weightedButtonLp());
-        Button q6 = secondaryButton("مالی"); q6.setTextSize(fs(9.6f)); q6.setOnClickListener(v -> showApp("finance")); quick.addView(q6, weightedButtonLp());
+        addManagerCommandCenter();
+        addManagerPulse(m);
+        addInsightsCard(m);
         addWarehouseAlertStrip();
-        for (int qi = 0; qi < quick.getChildCount(); qi++) quick.getChildAt(qi).setMinimumWidth(dp(92));
-        content.addView(hScrollWrap(quick), new LinearLayout.LayoutParams(-1, -2));
         LinearLayout export = new LinearLayout(this); export.setOrientation(LinearLayout.HORIZONTAL);
         Button pdf = primaryButton("گزارش PDF مدیریت"); pdf.setTextSize(fs(10.2f)); pdf.setOnClickListener(v -> exportManagerIntelPdf()); export.addView(pdf, weightedButtonLp());
         Button csv = secondaryButton("CSV"); csv.setTextSize(fs(10.2f)); csv.setOnClickListener(v -> exportManagerIntelCsv()); export.addView(csv, weightedButtonLp());
-        LinearLayout.LayoutParams ep = new LinearLayout.LayoutParams(-1, -2); ep.setMargins(0, dp(8), 0, dp(12));
+        LinearLayout.LayoutParams ep = new LinearLayout.LayoutParams(-1, -2); ep.setMargins(0, dp(4), 0, dp(12));
         for (int ei = 0; ei < export.getChildCount(); ei++) export.getChildAt(ei).setMinimumWidth(dp(150));
         content.addView(hScrollWrap(export), ep);
 
@@ -13441,8 +13583,10 @@ public class MainActivity extends Activity {
         double tp = tPur == null ? 0 : tPur.optDouble("total", 0);
         LinearLayout band = card();
         band.setOrientation(LinearLayout.VERTICAL);
-        band.setBackground(unifiedCardBg(GOLD, 24, false));
-        band.addView(text("امروز در یک نگاه", 12.5f, tc(GOLD), Typeface.BOLD), new LinearLayout.LayoutParams(-1, -2));
+        band.setBackground(MeelanoLuxe.glass(meelanoPalette(), GOLD, dp(24)));
+        band.addView(MeelanoLuxe.section(uiHost, MeelanoCharts.fa(String.valueOf(++luxSectionSeq)),
+                "امروز در یک نگاه", "فروش، سند و خرید همان روز از دفتر واقعی آتیران.",
+                MeelanoLuxe.I.CLOCK, GOLD), new LinearLayout.LayoutParams(-1, -2));
         LinearLayout trow = new LinearLayout(this); trow.setOrientation(LinearLayout.HORIZONTAL);
         addTodayTile(trow, "فروش روز", ts > 0 ? MeelanoCharts.compact(ts) : "—", ts > 0 ? "ریال • آخرین روز کاری" : "بدون سند", GOLD, "sales");
         addTodayTile(trow, "اسناد روز", tDocs > 0 ? faDigits(String.valueOf(tDocs)) : "—", faDigits(String.valueOf(tParties)) + " مشتری", INFO, "sales");
@@ -13454,7 +13598,10 @@ public class MainActivity extends Activity {
         JSONArray trend = m.optJSONArray("trend");
         if (trend != null && trend.length() > 1) {
             LinearLayout c = card();
-            c.addView(text("نبض فروش — روند ۷ روز اخیر", 12.5f, tc(INFO), Typeface.BOLD), new LinearLayout.LayoutParams(-1, -2));
+            c.setBackground(MeelanoLuxe.glass(meelanoPalette(), INFO, dp(26)));
+            c.addView(MeelanoLuxe.section(uiHost, MeelanoCharts.fa(String.valueOf(++luxSectionSeq)),
+                    "نبض فروش", "روند ۷ روز اخیر فروش؛ بلندی هر روز، ارزش اسناد همان روز است.",
+                    MeelanoLuxe.I.PULSE, INFO), new LinearLayout.LayoutParams(-1, -2));
             java.util.List<MeelanoCharts.Point> pts = new java.util.ArrayList<>();
             for (int i = 0; i < trend.length(); i++) { JSONObject o = trend.optJSONObject(i); if (o != null) pts.add(new MeelanoCharts.Point(o.optString("label", "—"), o.optDouble("value", 0))); }
             MeelanoCharts.Area area = new MeelanoCharts.Area(this, INFO, TEXT, MUTED, null);
@@ -13477,7 +13624,10 @@ public class MainActivity extends Activity {
             double vsoon = bsoon == null ? 0 : bsoon.optDouble("total", bsoon.optDouble("amount", 0));
             double vover = bover == null ? 0 : bover.optDouble("total", bover.optDouble("amount", 0));
             LinearLayout c = card();
-            c.addView(text("وضعیت وصول — سررسید چک‌ها", 12.5f, tc(SUCCESS), Typeface.BOLD), new LinearLayout.LayoutParams(-1, -2));
+            c.setBackground(MeelanoLuxe.glass(meelanoPalette(), SUCCESS, dp(26)));
+            c.addView(MeelanoLuxe.section(uiHost, MeelanoCharts.fa(String.valueOf(++luxSectionSeq)),
+                    "وضعیت وصول", "توزیع چک‌ها: جاری، نزدیک سررسید و سررسید گذشته.",
+                    MeelanoLuxe.I.RECEIPT, SUCCESS), new LinearLayout.LayoutParams(-1, -2));
             LinearLayout h = new LinearLayout(this); h.setOrientation(LinearLayout.HORIZONTAL); h.setGravity(Gravity.CENTER_VERTICAL);
             MeelanoCharts.Donut donut = new MeelanoCharts.Donut(this, GOLD, TEXT, MUTED, null);
             java.util.List<MeelanoCharts.Point> dp2 = new java.util.ArrayList<>();
@@ -13504,7 +13654,10 @@ public class MainActivity extends Activity {
         JSONArray debtors = m.optJSONArray("debtors");
         if (debtors != null && debtors.length() > 0) {
             LinearLayout c = card();
-            c.addView(text("بدهکاران برتر — مطالبات فعال", 12.5f, tc(DANGER), Typeface.BOLD), new LinearLayout.LayoutParams(-1, -2));
+            c.setBackground(MeelanoLuxe.glass(meelanoPalette(), DANGER, dp(26)));
+            c.addView(MeelanoLuxe.section(uiHost, MeelanoCharts.fa(String.valueOf(++luxSectionSeq)),
+                    "بدهکاران برتر", "بیشترین مطالبات فعال؛ ستون بلندتر یعنی اولویت تماس بالاتر.",
+                    MeelanoLuxe.I.ALERT, DANGER), new LinearLayout.LayoutParams(-1, -2));
             java.util.List<MeelanoCharts.Point> pts = new java.util.ArrayList<>();
             int n = 0;
             for (int i = 0; i < debtors.length() && n < 5; i++) { JSONObject o = debtors.optJSONObject(i); if (o != null) { pts.add(new MeelanoCharts.Point(o.optString("party", o.optString("name", "—")), o.optDouble("amount", o.optDouble("total", 0)), DANGER)); n++; } }
@@ -13521,7 +13674,10 @@ public class MainActivity extends Activity {
         JSONObject sales = m.optJSONObject("sales"), recv = m.optJSONObject("receivables");
         LinearLayout cat = card();
         cat.setOrientation(LinearLayout.VERTICAL);
-        cat.addView(text("دسته‌بندی روزانه", 12.5f, tc(GOLD), Typeface.BOLD), new LinearLayout.LayoutParams(-1, -2));
+        cat.setBackground(MeelanoLuxe.glass(meelanoPalette(), GOLD, dp(26)));
+        cat.addView(MeelanoLuxe.section(uiHost, MeelanoCharts.fa(String.valueOf(++luxSectionSeq)),
+                "دسته‌بندی روزانه", "سه میدان اصلی مدیر: فروش، وصول و میدان فروش.",
+                MeelanoLuxe.I.LAYERS, GOLD), new LinearLayout.LayoutParams(-1, -2));
         double sv = sales == null ? 0 : sales.optDouble("total", 0);
         double pv = m.optJSONObject("purchases") == null ? 0 : m.optJSONObject("purchases").optDouble("total", 0);
         addCatRow(cat, "فروش و اسناد", GOLD, "فروش بازه: " + (sv > 0 ? MeelanoCharts.rial(sv) : "—") + " • خرید: " + (pv > 0 ? MeelanoCharts.compact(pv) : "—") + " • حاشیه: " + MeelanoCharts.compact(sv - pv), "mgr_cockpit");
@@ -13552,16 +13708,16 @@ public class MainActivity extends Activity {
 
     private void addCatRow(LinearLayout parent, String title, int accent, String detail, final String target) {
         LinearLayout r = new LinearLayout(this); r.setOrientation(LinearLayout.HORIZONTAL); r.setGravity(Gravity.CENTER_VERTICAL);
-        r.setBackground(unifiedCardBg(accent, 14, false));
-        int pad = dp(9); r.setPadding(pad, pad, dp(4), pad);
-        r.addView(text("◆", 11, tc(accent), Typeface.BOLD), new LinearLayout.LayoutParams(-2, -2));
+        r.setBackground(MeelanoLuxe.glass(meelanoPalette(), accent, dp(16)));
+        int pad = dp(9); r.setPadding(pad, pad, dp(6), pad);
+        r.addView(MeelanoLuxe.medallion(uiHost, luxIconFor(title), accent, 32), new LinearLayout.LayoutParams(dp(32), dp(32)));
         LinearLayout tt = new LinearLayout(this); tt.setOrientation(LinearLayout.VERTICAL);
         LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(0, -2, 1f); tp.setMargins(dp(8), 0, 0, 0);
         tt.addView(text(title, 11f, TEXT, Typeface.BOLD), new LinearLayout.LayoutParams(-1, -2));
         TextView d = text(detail, 9.6f, MUTED, Typeface.NORMAL); d.setLineSpacing(dp(2), 1f);
         tt.addView(d, new LinearLayout.LayoutParams(-1, -2));
         r.addView(tt, tp);
-        r.addView(text("‹", 14, tc(accent), Typeface.BOLD), new LinearLayout.LayoutParams(-2, -2));
+        r.addView(MeelanoLuxe.icon(uiHost, MeelanoLuxe.I.CHEVRON, accent, 16), new LinearLayout.LayoutParams(dp(16), dp(16)));
         r.setClickable(true); applyTouchFeedback(r);
         r.setOnClickListener(v -> showApp(target));
         r.setContentDescription(title + " — باز کردن بخش");

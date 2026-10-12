@@ -15,6 +15,7 @@
   ۹) موتورهای QR و بارکد در برابر مرجع
   ۱۰) وجود اسناد فارسی و بستهٔ خروجی
   ۱۱) متغیر محلی تکراری در یک متد و isEmpty() روی JSONArray/JSONObject
+  ۱۲) سازگاری فراخوانی‌های «لایهٔ لوکس» (MeelanoLuxe): نام متد، تعداد آرگومان و ثابت‌های آیکون
       (دو خطای واقعی javac که javalang از آن‌ها رد می‌شود) + خودآزمون همین کنترل
 """
 from __future__ import annotations
@@ -724,6 +725,30 @@ def check_shadow_and_json():
     report('متغیر تکراری/JSON isEmpty', (not problems) and selftest_ok, detail)
 
 
+# ---------------------------------------------------------------- ۱۹) سازگاری API لایهٔ لوکس
+def check_lux_api():
+    """هر فراخوانی MeelanoLuxe.X باید نام موجود و «تعداد آرگومان درست» داشته باشد.
+
+    javalang نحو را می‌سنجد و این کلاس خطاها را نمی‌گیرد (مثل String[][] در برابر String[])؛
+    این کنترل همان شکاف را برای API تازه می‌بندد و خودآزمون هم دارد.
+    """
+    script = os.path.join(ROOT, 'tools', 'lux_api_check.py')
+    if not os.path.exists(script):
+        report('سازگاری API لایهٔ لوکس', False, 'tools/lux_api_check.py پیدا نشد')
+        return
+    try:
+        out = subprocess.run([sys.executable, script], cwd=ROOT, capture_output=True, text=True, timeout=180)
+    except Exception as e:
+        report('سازگاری API لایهٔ لوکس', False, 'اجرای ابزار ناموفق: %s' % e)
+        return
+    text = (out.stdout or '') + (out.stderr or '')
+    bad = [ln for ln in text.splitlines() if ln.startswith('🔴')]
+    tail = [ln for ln in text.splitlines() if ln.startswith('lux api check')]
+    ok = not bad and bool(tail)
+    detail = 'همهٔ فراخوانی‌ها با امضا می‌خوانند — ' + (tail[0] if tail else '') if ok else '؛ '.join(bad[:4])
+    report('سازگاری API لایهٔ لوکس', ok, detail)
+
+
 def main():
     print('════════ بازبینی جامع پروژهٔ Meelano ════════')
     check_syntax()
@@ -740,6 +765,7 @@ def main():
     check_tooling_selftest()
     check_comma_in_comment()
     check_shadow_and_json()
+    check_lux_api()
     check_engines()
     check_docs()
     failed = [n for n, ok, _ in RESULTS if not ok]

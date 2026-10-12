@@ -153,88 +153,34 @@ final class MeelanoUiKit {
     // ================================================================ هدر و عنوان
     /** عنوان بخش با آیکون، خط تزئینی و زیرعنوان. */
     static LinearLayout sectionHeader(MeelanoUiHost h, String title, String subtitle, String glyph, int accent) {
-        LinearLayout box = card(h, accent);
-        LinearLayout head = row(h);
-        TextView icon = text(h, glyph, 17f, accent, true);
-        icon.setGravity(Gravity.CENTER);
-        icon.setBackground(stroke(h.colors().alpha(accent, h.colors().light ? 30 : 46), h.dp(14), h.colors().alpha(accent, 90)));
-        head.addView(icon, lp(h.dp(40), h.dp(40)));
-        LinearLayout copy = column(h);
-        copy.setPadding(h.dp(9), 0, h.dp(4), 0);
-        TextView t = text(h, title, 14.6f, h.colors().text, true);
-        copy.addView(t, lp(-1, -2));
-        if (subtitle != null && !subtitle.isEmpty()) {
-            TextView s = text(h, subtitle, 9.7f, h.colors().muted, false);
-            s.setMaxLines(3);
-            copy.addView(s, lp(-1, -2));
-        }
-        head.addView(copy, lp(0, -2, 1f));
-        box.addView(head, lp(-1, -2));
+        // سرتیتر بخش با «لایهٔ لوکس»: مدالیون گرادیانی + خط طلایی زیر عنوان.
+        LinearLayout box = column(h);
+        box.addView(MeelanoLuxe.section(h, null, title, subtitle, MeelanoLuxe.iconFor(title), accent), lp(-1, -2));
         return box;
     }
 
     /** هدر قهرمان با گرادیان برند — برای بالای صفحه‌های کلیدی. */
     static LinearLayout hero(MeelanoUiHost h, String title, String subtitle, String glyph, int accent, String badge) {
-        MeelanoPalette p = h.colors();
-        LinearLayout box = column(h);
-        GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{
-                p.alpha(p.mix(p.bg, accent, p.light ? 0.12f : 0.26f), 255),
-                p.alpha(p.mix(p.surface2, p.accent2, p.light ? 0.18f : 0.22f), 250),
-                p.alpha(p.mix(p.bg, p.accent2, p.light ? 0.08f : 0.18f), 255)});
-        bg.setCornerRadius(h.dp(24));
-        bg.setStroke(1, p.alpha(p.mix(accent, Color.WHITE, 0.30f), p.light ? 120 : 90));
-        box.setBackground(bg);
-        box.setPadding(h.dp(14), h.dp(13), h.dp(14), h.dp(13));
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) box.setElevation(h.dp(7));
-
-        LinearLayout head = row(h);
-        TextView icon = text(h, glyph, 19f, p.onColorFor(accent), true);
-        icon.setGravity(Gravity.CENTER);
-        icon.setBackground(solid(accent, h.dp(16)));
-        head.addView(icon, lp(h.dp(46), h.dp(46)));
-        LinearLayout copy = column(h);
-        copy.setPadding(h.dp(10), 0, 0, 0);
-        copy.addView(text(h, title, 17.2f, p.text, true), lp(-1, -2));
-        TextView sub = text(h, subtitle == null ? "" : subtitle, 9.9f, p.muted, true);
-        sub.setMaxLines(3);
-        copy.addView(sub, lp(-1, -2));
-        head.addView(copy, lp(0, -2, 1f));
-        if (badge != null && !badge.isEmpty()) head.addView(pill(h, badge, accent, true), lp(-2, h.dp(26)));
-        box.addView(head, lp(-1, -2));
-        return box;
+        // هدر همهٔ ماژول‌ها (انبار، مالی، …) هم با «لایهٔ لوکس» ساخته می‌شود تا زبان بصری یکی باشد.
+        String[] chips = new String[]{
+                h.colors().light ? "تم روشن" : "تم تیره",
+                h.compactUi() ? "نمای فشرده" : "نمای استاندارد",
+                h.motionAllowed() ? "حرکت نرم" : "بدون حرکت"
+        };
+        return MeelanoLuxe.hero(h, title, subtitle, badge, MeelanoLuxe.iconFor(title), accent, chips);
     }
 
     // ================================================================ کارت عددی (KPI)
     /** یک شاخص کلیدی: عدد بزرگ، عنوان، توضیح و آیکون رنگی. */
     static LinearLayout kpi(MeelanoUiHost h, String label, String value, String hint, String glyph, int accent, final Runnable onClick) {
-        MeelanoPalette p = h.colors();
-        LinearLayout c = column(h);
-        c.setBackground(cardBg(p, accent, h.dp(18)));
-        c.setPadding(h.dp(11), h.dp(10), h.dp(11), h.dp(10));
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) c.setElevation(h.dp(5));
-        LinearLayout top = row(h);
-        TextView icon = text(h, glyph, 13.5f, accent, true);
-        icon.setGravity(Gravity.CENTER);
-        icon.setBackground(solid(p.alpha(accent, p.light ? 28 : 48), h.dp(12)));
-        top.addView(icon, lp(h.dp(30), h.dp(30)));
-        TextView lab = text(h, label, 9.5f, p.muted, true);
-        lab.setSingleLine(false);
-        lab.setMaxLines(2);
-        lab.setPadding(h.dp(7), 0, 0, 0);
-        top.addView(lab, lp(0, -2, 1f));
-        c.addView(top, lp(-1, -2));
-        TextView val = text(h, value, 15.4f, p.text, true);
-        val.setPadding(0, h.dp(6), 0, 0);
-        val.setSingleLine(false);
-        c.addView(val, lp(-1, -2));
+        // کارت شاخص با «لایهٔ لوکس»: مدالیون گرادیانی، عدد بزرگ با اندازهٔ تطبیقی و رنگ معنایی.
+        LinearLayout c = MeelanoLuxe.stat(h, MeelanoLuxe.iconFor(label), label, value, null, null, accent, onClick);
         if (hint != null && !hint.isEmpty()) {
-            TextView s = text(h, hint, 8.9f, p.muted, false);
+            TextView s = text(h, hint, 8.9f, h.colors().muted, false);
             s.setMaxLines(2);
-            c.addView(s, lp(-1, -2));
-        }
-        if (onClick != null) {
-            press(c, h);
-            c.setOnClickListener(new View.OnClickListener() { @Override public void onClick(View v) { onClick.run(); } });
+            LinearLayout.LayoutParams sp = lp(-1, -2);
+            sp.topMargin = h.dp(3);
+            c.addView(s, sp);
         }
         return c;
     }

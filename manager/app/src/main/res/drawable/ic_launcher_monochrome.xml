@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Themed-icon (Android 13+) silhouette: the letter M (Meelano). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M34,76 L34,32 L42,32 L54,56 L66,32 L74,32 L74,76 L66,76 L66,46 L54,68 L42,46 L42,76 Z"/>
+</vector>

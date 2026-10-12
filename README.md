@@ -3,6 +3,14 @@
 برنامهٔ اندروید مدیریت، انبار و حسابداری که مستقیم به **SQL Server آتیران** وصل می‌شود.
 یک کد مشترک با شش flavor: ویزیتور، **برنامهٔ یکپارچهٔ اصلیِ لایسنس‌دار** (`ir.meelano.visitor`)، مدیر، پرسنل، فروشگاه و مودیان. برای به‌روزرسانی نصب اصلی، فایل `MEELANO-v7.0.0-release.apk` را بگیرید؛ APK مدیر debug برنامهٔ جداگانه است.
 
+## مبنای ارتقای این نوبت: مدیر v36
+
+سورس مستقل برنامهٔ مدیر در `manager/` نگه‌داری می‌شود تا با flavorهای پروژهٔ v7 اشتباه نشود. پایهٔ بازیابی‌شده `ir.meelano.manager.debug` بود (`36.20.1` / کد ۵۲)؛ این ارتقا به `36.21.0` / کد ۵۳ می‌رسد و خروجی جدید `meelano-manager-v36-debug-6.apk` نام دارد (باینری جدید، نه ادعای بازیابی APK تاریخی). workflow جداگانهٔ [build-manager-v36.yml](.github/workflows/build-manager-v36.yml) تست‌ها و APK مدیر را می‌سازد. این فایل مدیر جداست و جایگزین APK اصلی یکپارچهٔ `ir.meelano.visitor` نیست.
+
+```bash
+./gradlew -p manager :app:testDebugUnitTest :app:assembleDebug
+```
+
 ## چه چیزی در این نسخه تازه است
 
 - **انبار هوشمند** (`warehouse`): تحلیل ABC، ماتریس ABC×گردش، نقطهٔ سفارش/EOQ/ذخیرهٔ اطمینان،
@@ -30,6 +38,7 @@ app/
   src/test/java/…               تست‌های واحد (MeelanoTaxTest، MeelanoHrTest)
 tools/                          ابزارهای بازبینی و تولید جدول (پایتون، بدون وابستگی به اندروید)
 docs/                           سند تحلیلی و گزارش پیاده‌سازی
+manager/                        پروژهٔ مستقل مدیر v36؛ workflow و آزمون جدا از flavorهای ریشه
 gradle/, gradlew, *.gradle      پیکربندی Gradle 8.13 و AGP 8.10.1
 ```
 

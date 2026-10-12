@@ -1,0 +1,61 @@
+name: MEELANO Manager v36.21.0 debug APK
+
+on:
+  push:
+    branches: ["arena/c192ed08-testt"]
+    paths:
+      - "manager/**"
+      - ".github/workflows/build-manager-v36.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-manager-v36:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: "17"
+          distribution: temurin
+
+      - name: Install Android SDK 35
+        run: |
+          SDKMAN="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMAN" --licenses > /dev/null || true
+          "$SDKMAN" "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+
+      - name: Set up Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.11.1
+
+      - name: Run manager unit tests and build v36.21.0
+        working-directory: manager
+        run: |
+          set -o pipefail
+          gradle :app:testDebugUnitTest :app:assembleDebug --stacktrace --no-daemon 2>&1 | tee ../manager-build.log | tail -80
+
+      - name: Verify APK identity, version and signature
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cp manager/app/build/outputs/apk/debug/app-debug.apk dist/meelano-manager-v36-debug-6.apk
+          BT="$ANDROID_HOME/build-tools/35.0.0"
+          "$BT/aapt" dump badging dist/meelano-manager-v36-debug-6.apk | tee manager-badging.txt
+          grep -F "package: name='ir.meelano.manager.debug' versionCode='53' versionName='36.21.0'" manager-badging.txt
+          "$BT/apksigner" verify --verbose --print-certs dist/meelano-manager-v36-debug-6.apk | tee manager-signing.txt
+          unzip -t dist/meelano-manager-v36-debug-6.apk | tail -1
+          sha256sum dist/meelano-manager-v36-debug-6.apk
+
+      - name: Upload manager APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: meelano-manager-v36-debug-6
+          path: dist/meelano-manager-v36-debug-6.apk
+          if-no-files-found: error
+          retention-days: 30

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 3D violet/teal direct-SMS bubbles (request card). Hand-tuned, not generated. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="96dp" android:height="96dp"
+    android:viewportWidth="96" android:viewportHeight="96">
+    <!-- main bubble -->
+    <path
+        android:pathData="M18,14 h48 a10,10 0,0 1,10 10 V50 a10,10 0,0 1,-10 10 H38 L24,74 L26.5,60 H18 a10,10 0,0 1,-10 -10 V24 a10,10 0,0 1,10 -10 Z"
+        android:strokeWidth="2.5"
+        android:strokeColor="#3B1470">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:endX="42" android:endY="74"
+                android:startX="42" android:startY="14"
+                android:type="linear">
+                <item android:color="#E4D6FF" android:offset="0" />
+                <item android:color="#9A7BFF" android:offset="0.5" />
+                <item android:color="#6D3DF5" android:offset="0.85" />
+                <item android:color="#551FCE" android:offset="1" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- text lines -->
+    <path
+        android:fillAlpha="0.85"
+        android:fillColor="#FFFFFF"
+        android:pathData="M20,28 h30 a3,3 0,0 1,0 6 H20 a3,3 0,0 1,0 -6 Z" />
+    <path
+        android:fillAlpha="0.6"
+        android:fillColor="#FFFFFF"
+        android:pathData="M20,39 h20 a3,3 0,0 1,0 6 H20 a3,3 0,0 1,0 -6 Z" />
+    <!-- satellite bubble -->
+    <path
+        android:pathData="M68,58m-13,0a13,13 0,1 1,26 0a13,13 0,1 1,-26 0"
+        android:strokeWidth="2.5"
+        android:strokeColor="#064E42">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:endX="68" android:endY="71"
+                android:startX="68" android:startY="45"
+                android:type="linear">
+                <item android:color="#C8FFF4" android:offset="0" />
+                <item android:color="#3ED6C5" android:offset="0.55" />
+                <item android:color="#0E9E8F" android:offset="1" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path
+        android:fillColor="#064E42"
+        android:pathData="M68,51 L73,60 L68,68 L63,60 Z" />
+</vector>

@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/w_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/widget_bg"
+    android:orientation="vertical"
+    android:padding="12dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="میلانو • امروز"
+            android:textColor="#E8C172"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/w_date"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="—"
+            android:textColor="#8A94A8"
+            android:textSize="10sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="فروش"
+            android:textColor="#8A94A8"
+            android:textSize="11sp" />
+
+        <TextView
+            android:id="@+id/w_sales"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="—"
+            android:textColor="#35C26E"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="دریافت"
+            android:textColor="#8A94A8"
+            android:textSize="11sp" />
+
+        <TextView
+            android:id="@+id/w_in"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="—"
+            android:textColor="#EDEDED"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="پرداخت"
+            android:textColor="#8A94A8"
+            android:textSize="11sp" />
+
+        <TextView
+            android:id="@+id/w_out"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="—"
+            android:textColor="#F27B7B"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/w_ts"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:text="—"
+        android:textColor="#6B7488"
+        android:textSize="9sp" />
+</LinearLayout>

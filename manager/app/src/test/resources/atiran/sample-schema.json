@@ -4,7 +4,7 @@
     "backupArchive": "Atiran2-1405-7-14-15-21-49.zip",
     "restoredDatabase": "AtiranSample",
     "scope": "schema metadata only; no business rows exported",
-    "expectedSchema": "dbo for app-mapped objects"
+    "schemaResolution": "dbo preferred when ambiguous; actual schema recorded for every object"
   },
   "objectCount": 651,
   "columnCount": 9001,

@@ -100,6 +100,7 @@ jobs:
         if: failure()
         shell: bash
         run: |
+          set -euo pipefail
           {
             echo "## Atiran sample schema probe failed"
             echo "The probe reads schema metadata only. Diagnostics follow (last 100 lines):"
@@ -114,6 +115,22 @@ jobs:
               echo '```'
             fi
           } >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "Atiran sample schema probe failed; schema-only diagnostics follow."
+            if [[ -f atiran-schema-probe.log ]]; then
+              echo "--- probe log ---"
+              tail -n 100 atiran-schema-probe.log
+            fi
+            if docker inspect atiran-sample >/dev/null 2>&1; then
+              echo "--- SQL Server container log ---"
+              docker logs --tail 50 atiran-sample 2>&1 || true
+            fi
+          } > atiran-schema-probe-diagnostics.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- atiran-schema-probe-diagnostics.txt
+          git commit -m "ci: capture Atiran schema probe diagnostics"
+          git push origin HEAD:arena/c192ed08-testt
 
       - name: Remove disposable SQL Server
         if: always()

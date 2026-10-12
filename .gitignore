@@ -1,0 +1,31 @@
+# --- Gradle / Android ---
+.gradle/
+build/
+app/build/
+local.properties
+captures/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+*.log
+release-notes.html
+
+# --- کلیدهای امضا (هرگز در گیت نباشند) ---
+keystore.properties
+*.jks
+*.keystore
+**/signing/*.p12
+
+# --- ابزارهای محلی ---
+__pycache__/
+*.pyc
+.idea/
+*.iml
+.DS_Store
+node_modules/
+*.zip.bak
+
+# --- دادهٔ ورودی کاربر و بسته‌های خروجی (حجیم، داخل گیت لازم نیست) ---
+/*.zip

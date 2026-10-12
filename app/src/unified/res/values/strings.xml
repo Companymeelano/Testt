@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Keep the original one-app brand/label; no manager-only launch identity. -->
+    <string name="app_name">پخش درخشان ویزیتور</string>
+    <string name="web_url_hint">ورود پخش درخشان</string>
+    <string name="android_subtitle">نسخهٔ یکپارچهٔ پخش درخشان</string>
+</resources>

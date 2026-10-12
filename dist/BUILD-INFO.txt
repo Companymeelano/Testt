@@ -1,0 +1,26 @@
+نسخهٔ برنامهٔ یکپارچه: 7.0.0 (versionCode 200; package ir.meelano.visitor)
+گواهی امضا: نسخهٔ نصب فعلی / Pakhsh Derakhshan (fingerprint را CI بررسی می‌کند)
+APK اصلی: MEELANO-v7.0.0-release.apk
+کامیت: 57e412b
+تاریخ build: 2026-10-12T11:19:49Z
+Gradle: Gradle 8.13
+فایل‌ها:
+drwxr-xr-x  2 runner runner    4096 Oct 12 11:19 .
+drwxr-xr-x 12 runner runner    4096 Oct 12 11:19 ..
+-rw-r--r--  1 runner runner     346 Oct 12 11:19 BUILD-INFO.txt
+-rw-r--r--  1 runner runner 2685756 Oct 12 11:19 MEELANO-v7.0.0-release.apk
+-rw-r--r--  1 runner runner 3371717 Oct 12 11:19 app-manager-debug.apk
+-rw-r--r--  1 runner runner 3025997 Oct 12 11:19 app-staff-debug.apk
+-rw-r--r--  1 runner runner 3035765 Oct 12 11:19 app-store-debug.apk
+-rw-r--r--  1 runner runner 3078497 Oct 12 11:19 app-tax-debug.apk
+-rw-r--r--  1 runner runner 3063853 Oct 12 11:19 app-unified-debug.apk
+-rw-r--r--  1 runner runner 3063817 Oct 12 11:19 app-visitor-debug.apk
+-rw-r--r--  1 runner runner     151 Oct 12 11:19 latest-unified.json
+--- sha256 ---
+5880264bb01ba9e07a4f5bc31b92a6847b61a81d1349a0c8816b846fd6953ce8  MEELANO-v7.0.0-release.apk
+81a6d8e1434d8d11847f682ac6af9907acb06fe3d0c428b67171158d47dd8899  app-manager-debug.apk
+d0f217d045a30d886a502552df1ba3c60d8ca47b8ceadba886c6ea606d084bc2  app-staff-debug.apk
+6d9a4f9890529ed0f2b306551a0fa52e68e6903a871fcb75c2c1d98eb97a7709  app-store-debug.apk
+85a776d01a11e06aaca1e711d90c3b132a6e9b0df3cda9d204b60fd3bffa31ac  app-tax-debug.apk
+6d3a4a8bea02a5e3a90632a7eae0732b36b4aac2d3edde2ac0362ddeae5eb25d  app-unified-debug.apk
+eec75d716638b15a48cb4de8c5b58330355ef4c4e85887e517d2d095eeb62c6d  app-visitor-debug.apk

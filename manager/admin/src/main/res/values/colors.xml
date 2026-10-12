@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="lux_bg">#0C1220</color>
+    <color name="lux_surface">#151D31</color>
+    <color name="lux_gold">#D9AE5A</color>
+    <color name="lux_gold_soft">#F1D493</color>
+    <color name="lux_text">#F4EFE4</color>
+    <color name="lux_muted">#9AA3B5</color>
+</resources>

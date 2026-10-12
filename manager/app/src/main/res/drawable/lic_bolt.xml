@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 3D teal auto-apply bolt (SMS auto-activation). Hand-tuned, not generated. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="96dp" android:height="96dp"
+    android:viewportWidth="96" android:viewportHeight="96">
+    <path
+        android:pathData="M56,4 L20,53.5 L41,53.5 L38,92 L76,39.5 L54,39.5 Z"
+        android:strokeLineJoin="round"
+        android:strokeWidth="3"
+        android:strokeColor="#064E42">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:endX="76" android:endY="92"
+                android:startX="38" android:startY="4"
+                android:type="linear">
+                <item android:color="#C8FFF4" android:offset="0" />
+                <item android:color="#3ED6C5" android:offset="0.45" />
+                <item android:color="#0E9E8F" android:offset="0.8" />
+                <item android:color="#0B6E5F" android:offset="1" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- glass slash -->
+    <path
+        android:fillAlpha="0.35"
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,10 L30,46 L38,46 L58,12 Z" />
+</vector>

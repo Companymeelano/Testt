@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- آیکون «شمارش و بازبینی» (دست‌ساز، هم‌سبک با ست mi_*؛ برای تب شمارش انبار). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <!-- کادر برگهٔ شمارش (قاب توخالی با fillType=evenOdd) -->
+    <path android:fillColor="#FF000000" android:fillType="evenOdd"
+        android:pathData="M3,2h18v20h-18z M5,4v16h14v-16z" />
+    <!-- خطوط فهرست -->
+    <path android:fillColor="#FF000000"
+        android:pathData="M8,6.5h9v1.6h-9zM8,10h9v1.6h-9z" />
+    <!-- تیک بازبینی -->
+    <path android:fillColor="#FF000000"
+        android:pathData="M11.2,18.4l-3.9,-3.9 1.5,-1.5 2.4,2.4 4.6,-4.6 1.5,1.5z" />
+</vector>

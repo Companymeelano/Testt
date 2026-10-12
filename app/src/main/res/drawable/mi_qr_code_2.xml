@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- آیکون QR کد (دست‌ساز، هم‌سبک با ست mi_*؛ برای دکمهٔ «برچسب و بارکد» در انبار هوشمند). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <!-- سه نشانگر گوشه‌ای (finder) به‌صورت حلقهٔ توخالی با fillType=evenOdd -->
+    <path android:fillColor="#FF000000" android:fillType="evenOdd"
+        android:pathData="M3,3h7v7h-7zM5,5v3h3v-3z" />
+    <path android:fillColor="#FF000000" android:fillType="evenOdd"
+        android:pathData="M14,3h7v7h-7zM16,5v3h3v-3z" />
+    <path android:fillColor="#FF000000" android:fillType="evenOdd"
+        android:pathData="M3,14h7v7h-7zM5,16v3h3v-3z" />
+    <!-- ماژول‌های داده در گوشهٔ پایین-راست -->
+    <path android:fillColor="#FF000000"
+        android:pathData="M14,14h3v3h-3zM18,14h3v3h-3zM14,18h3v3h-3zM19,19h2v2h-2z" />
+</vector>

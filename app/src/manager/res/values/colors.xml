@@ -1,0 +1,9 @@
+<resources>
+    <!-- Manager app («پخش درخشان مدیریت»): light «pearl platinum» start-up colours, taken from its
+         pearl/gold launcher icon, so the first frame already looks like the app theme. -->
+    <color name="meelano_navy">#F5F7FB</color>
+    <color name="meelano_surface">#FFFFFF</color>
+    <color name="meelano_gold">#A87A2C</color>
+    <color name="meelano_gold_light">#3060B0</color>
+    <color name="white">#FFFFFF</color>
+</resources>

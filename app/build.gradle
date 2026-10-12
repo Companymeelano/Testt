@@ -1,0 +1,123 @@
+// ============================================================================
+//  MEELANO-Android — ماژول اپلیکیشن
+//  یک ماژول، پنج نسخه (flavour): ویزیتور، مدیر، پرسنل، فروشگاه، مودیان
+//  همه کدها در src/main هستند و هر flavour فقط منابع (رنگ/نام/آیکون) خودش را
+//  از src/<flavour>/res تزریق می‌کند — همان معماری قبلی پروژه، فقط ساختار
+//  Gradle که گم شده بود بازسازی شد تا پروژه واقعاً build شود.
+// ============================================================================
+plugins {
+    id 'com.android.application'
+}
+
+// کلید امضا: از keystore.properties خوانده می‌شود (این فایل در گیت نیست).
+// اگر فایل نباشد، نسخهٔ release با کلید debug امضا می‌شود تا build متوقف نشود.
+def keystoreProps = new Properties()
+def keystorePropsFile = rootProject.file('keystore.properties')
+if (keystorePropsFile.exists()) {
+    keystorePropsFile.withInputStream { keystoreProps.load(it) }
+}
+
+android {
+    namespace 'ir.meelano.android'
+    compileSdk 36
+
+    defaultConfig {
+        minSdk 24
+        targetSdk 36
+        versionCode 200
+        versionName '7.0.0'
+        resourceConfigurations += ['fa', 'en']
+        vectorDrawables.useSupportLibrary = false
+    }
+
+    if (keystoreProps.getProperty('storeFile')) {
+        signingConfigs {
+            release {
+                storeFile rootProject.file(keystoreProps.getProperty('storeFile'))
+                storePassword keystoreProps.getProperty('storePassword')
+                keyAlias keystoreProps.getProperty('keyAlias')
+                keyPassword keystoreProps.getProperty('keyPassword')
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            applicationIdSuffix '.debug'
+            versionNameSuffix '-debug'
+            minifyEnabled false
+        }
+        release {
+            // به‌عمد خاموش: کوچک‌سازی (R8) روی این کد (jTDS + reflection + JSON) بدون
+            // تست دستی روی دستگاه ریسک دارد. برای روشن‌کردن: minifyEnabled true و
+            // قواعد نگه‌داری jTDS در proguard-rules.pro (از قبل آماده است).
+            minifyEnabled false
+            shrinkResources false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (keystoreProps.getProperty('storeFile')) signingConfig signingConfigs.release
+        }
+    }
+
+    flavorDimensions += 'edition'
+    productFlavors {
+        visitor {
+            dimension 'edition'
+            applicationId 'ir.meelano.android'
+            resValue 'string', 'meelano_edition_key', 'visitor'
+        }
+        manager {
+            dimension 'edition'
+            applicationId 'ir.meelano.manager'
+            resValue 'string', 'meelano_edition_key', 'manager'
+        }
+        staff {
+            dimension 'edition'
+            applicationId 'ir.meelano.staff'
+            resValue 'string', 'meelano_edition_key', 'staff'
+        }
+        store {
+            dimension 'edition'
+            applicationId 'ir.meelano.store'
+            resValue 'string', 'meelano_edition_key', 'store'
+        }
+        tax {
+            dimension 'edition'
+            applicationId 'ir.meelano.tax'
+            resValue 'string', 'meelano_edition_key', 'tax'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    packagingOptions {
+        resources.excludes += ['META-INF/*.kotlin_module', 'META-INF/DEPENDENCIES', 'META-INF/INDEX.LIST']
+    }
+
+    testOptions {
+        unitTests.returnDefaultValues = true   // android.jar استاب‌ها به‌جای خطا مقدار پیش‌فرض می‌دهند
+        unitTests.includeAndroidResources = false
+    }
+
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
+    }
+
+    buildFeatures {
+        buildConfig true
+        resValues true
+    }
+}
+
+dependencies {
+    // درایور SQL Server (jTDS) — اتصال مستقیم به آتیران
+    implementation 'net.sourceforge.jtds:jtds:1.3.1'
+    // هر jar دستی که کنار پروژه گذاشته شود (اگر خواستید نسخهٔ دیگری از درایور را بگذارید)
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.json:json:20240303'
+}

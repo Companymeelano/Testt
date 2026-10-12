@@ -521,19 +521,13 @@ public class HomeScreen extends Screen {
 
     private void secKpis(LinearLayout content, Data d) {
         // ---- day KPIs (tap a tile → that day's detail list) ----
+        // soft() deliberately returns null when one optional query fails. Keep the
+        // remaining KPIs visible, but make the missing metric explicit and inert.
         List<Kit.Kpi> kpis = new ArrayList<>();
-        kpis.add(new Kit.Kpi("فروش " + dayOf(d.salesDay), Money.compactRial(d.salesDay.d("total")),
-                Money.fa(String.valueOf(d.salesDay.l("docs"))) + " فاکتور", Theme.GOLD,
-                () -> gotoDay("sales", d.salesDay)));
-        kpis.add(new Kit.Kpi("خرید " + dayOf(d.buyDay), Money.compactRial(d.buyDay.d("total")),
-                Money.fa(String.valueOf(d.buyDay.l("docs"))) + " فاکتور", Theme.INFO,
-                () -> gotoDay("buy", d.buyDay)));
-        kpis.add(new Kit.Kpi("دریافت " + dayOf(d.inDay), Money.compactRial(d.inDay.d("total")),
-                Money.fa(String.valueOf(d.inDay.l("count"))) + " قبض", Theme.SUCCESS,
-                () -> gotoDay("dar_in", d.inDay)));
-        kpis.add(new Kit.Kpi("پرداخت " + dayOf(d.outDay), Money.compactRial(d.outDay.d("total")),
-                Money.fa(String.valueOf(d.outDay.l("count"))) + " قبض", Theme.WARNING,
-                () -> gotoDay("dar_out", d.outDay)));
+        kpis.add(dayKpi("فروش", "sales", d.salesDay, "docs", "فاکتور", Theme.GOLD));
+        kpis.add(dayKpi("خرید", "buy", d.buyDay, "docs", "فاکتور", Theme.INFO));
+        kpis.add(dayKpi("دریافت", "dar_in", d.inDay, "count", "قبض", Theme.SUCCESS));
+        kpis.add(dayKpi("پرداخت", "dar_out", d.outDay, "count", "قبض", Theme.WARNING));
         content.addView(a.kit.kpiGrid(kpis, 2), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(12));
         if (d.salesDaily != null && !d.salesDaily.isEmpty()) {
@@ -555,6 +549,18 @@ public class HomeScreen extends Screen {
             compare.addView(a.kit.kv("تغییر نسبت به میانگین ۷روزه", delta, deltaColor), a.kit.lp(-1, -2));
             a.kit.addCard(content, compare);
         }
+    }
+
+    Kit.Kpi dayKpi(String title, String target, Row row, String countKey,
+                   String countLabel, int accent) {
+        String day = dayOf(row);
+        String label = day.isEmpty() ? title : title + " " + day;
+        if (row == null) {
+            return new Kit.Kpi(label, "—", "داده در دسترس نیست", accent);
+        }
+        return new Kit.Kpi(label, Money.compactRial(row.d("total")),
+                Money.fa(String.valueOf(row.l(countKey))) + " " + countLabel, accent,
+                () -> gotoDay(target, row));
     }
 
     private void secAlerts(LinearLayout content, Data d) {

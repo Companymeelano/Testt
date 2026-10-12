@@ -294,7 +294,7 @@ ORDER BY s.name,o.name,p.parameter_id;
             "backupArchive": source_backup,
             "restoredDatabase": database,
             "scope": "schema metadata only; no business rows exported",
-            "expectedSchema": "dbo for app-mapped objects",
+            "schemaResolution": "dbo preferred when ambiguous; actual schema recorded for every object",
         },
         "objectCount": len(objects),
         "columnCount": sum(len(obj["columns"]) for obj in objects.values()),

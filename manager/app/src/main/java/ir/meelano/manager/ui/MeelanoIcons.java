@@ -68,7 +68,11 @@ public final class MeelanoIcons {
         any("◼", R.drawable.mi_category); any("▦", R.drawable.mi_grid_view); any("▣", R.drawable.mi_widgets);
         any("▤", R.drawable.mi_receipt_long); any("📋", R.drawable.mi_assignment); any("◷", R.drawable.mi_schedule);
         any("⏱", R.drawable.mi_timer); any("⟳", R.drawable.mi_refresh); any("⇅", R.drawable.mi_sync); any("🔄", R.drawable.mi_sync);
-        any("↺", R.drawable.mi_restart_alt); any("⇄", R.drawable.mi_compare_arrows); any("⌕", R.drawable.mi_search);
+        any("↺", R.drawable.mi_restart_alt); any("⇄", R.drawable.mi_compare_arrows);
+        any("↔", R.drawable.mi_compare_arrows); any("↕", R.drawable.mi_swap_vert);
+        any("←", R.drawable.mi_chevron_left); any("→", R.drawable.mi_arrow_forward);
+        any("⨯", R.drawable.mi_close); any("⚑", R.drawable.mi_flag);
+        any("💰", R.drawable.mi_payments); any("⌕", R.drawable.mi_search);
         any("⚙", R.drawable.mi_settings); any("◎", R.drawable.mi_track_changes); any("◉", R.drawable.mi_account_balance);
         any("⌁", R.drawable.mi_bolt); any("🔐", R.drawable.mi_lock); any("🛒", R.drawable.mi_shopping_cart);
         any("⊕", R.drawable.mi_add_shopping_cart); any("🏬", R.drawable.mi_store); any("🏷", R.drawable.mi_sell);

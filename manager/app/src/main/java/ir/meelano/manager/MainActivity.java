@@ -525,8 +525,8 @@ public class MainActivity extends Activity {
         }
         refreshUserChip();
         logoBox = new android.widget.FrameLayout(this);
-        logoBox.setBackground(Theme.avatar(Theme.GOLD));
-        logoGlyph = kit.text("♛", 20, 0xFFFFFFFF, true);
+        logoBox.setBackground(Theme.accentAvatar(Theme.GOLD));
+        logoGlyph = kit.text("♛", 20, Theme.onAccent(), true);
         logoGlyph.setGravity(Gravity.CENTER);
         logoBox.addView(logoGlyph, new android.widget.FrameLayout.LayoutParams(-1, -1));
         logoImg = new android.widget.ImageView(this);
@@ -792,9 +792,9 @@ public class MainActivity extends Activity {
             badge.setBackground(on ? Theme.bottomNavIconSelected() : null);
             View symbol = badge.getChildAt(0);
             if (symbol instanceof android.widget.ImageView) {
-                ((android.widget.ImageView) symbol).setColorFilter(on ? Theme.onAccent() : Theme.MUTED);
+                ((android.widget.ImageView) symbol).setColorFilter(on ? Theme.selectedNavInk() : Theme.MUTED);
             } else if (symbol instanceof TextView) {
-                ((TextView) symbol).setTextColor(on ? Theme.onAccent() : Theme.MUTED);
+                ((TextView) symbol).setTextColor(on ? Theme.selectedNavInk() : Theme.MUTED);
             }
             TextView label = (TextView) b.getChildAt(1);
             label.setTextColor(on ? Theme.GOLD_SOFT : Theme.MUTED);
@@ -1053,9 +1053,9 @@ public class MainActivity extends Activity {
         } catch (Exception ignored) {
         }
         backFab = null;
-        TextView f = kit.text("\u2192", 26, 0xFFFFFFFF, true);
+        TextView f = kit.text("\u2192", 26, Theme.onAccent(), true);
         f.setGravity(Gravity.CENTER);
-        f.setBackground(Theme.avatar(Theme.GOLD));
+        f.setBackground(Theme.accentAvatar(Theme.GOLD));
         f.setElevation(Theme.dp(6));
         f.setContentDescription("برگشت");
         Theme.pressable(f);

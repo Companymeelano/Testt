@@ -39,8 +39,13 @@ public final class ShopCard {
         Kit k = a.kit;
         LinearLayout c = k.v();
         c.setGravity(Gravity.CENTER);
+        boolean darkInk = Theme.darkAccentInk(Theme.GOLD);
         GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{Theme.shade(Theme.GOLD, -0.32f), Theme.GOLD, Theme.shade(Theme.GOLD, 0.18f)});
+                darkInk
+                        ? new int[]{Theme.shade(Theme.GOLD, 0.04f), Theme.GOLD,
+                                Theme.shade(Theme.GOLD, 0.12f)}
+                        : new int[]{Theme.shade(Theme.GOLD, -0.22f),
+                                Theme.shade(Theme.GOLD, -0.08f), Theme.GOLD});
         bg.setCornerRadius(hiRes ? 84 : Theme.dp(28));
         bg.setStroke(hiRes ? 4 : Theme.dp(1), Theme.alpha(0xFFFFFFFF, 120));
         c.setBackground(bg);

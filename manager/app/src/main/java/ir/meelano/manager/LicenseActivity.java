@@ -323,11 +323,12 @@ public class LicenseActivity extends Activity {
             cell.setGravity(Gravity.CENTER);
             boolean done = idx < active;
             boolean on = idx == active;
+            int stepColor = done ? Theme.SUCCESS : (on ? Theme.TEAL : Theme.SURFACE2);
             TextView dot = kit.text(done ? "✓" : String.valueOf(idx), 14,
-                    done || on ? 0xFF0B1220 : Theme.MUTED, true);
+                    done || on ? Theme.onAccent(stepColor) : Theme.MUTED, true);
             dot.setGravity(Gravity.CENTER);
-            dot.setBackground(Theme.avatar(done ? Theme.SUCCESS
-                    : (on ? Theme.TEAL : Theme.SURFACE2)));
+            dot.setBackground(done || on ? Theme.accentAvatar(stepColor)
+                    : Theme.avatar(stepColor));
             int d = Theme.dp(34);
             LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(d, d);
             dlp.gravity = Gravity.CENTER;

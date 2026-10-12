@@ -17,8 +17,8 @@ android {
         applicationId 'ir.meelano.manager'
         minSdk 26
         targetSdk 34
-        versionCode 56
-        versionName '36.24.0'
+        versionCode 57
+        versionName '36.25.0'
     }
 
     signingConfigs {

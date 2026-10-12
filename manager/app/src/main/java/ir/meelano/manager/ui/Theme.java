@@ -57,13 +57,17 @@ public final class Theme {
 
     /** Accent: key, Persian label, dark, darkSoft, light, lightSoft. */
     private static final String[][] ACCENTS = {
-            {"gold", "طلایی", "FFD9AE5A", "FFF1D493", "FFA86F14", "FF7A5410"},
-            {"emerald", "زمردی", "FF3ED598", "FF9BF0C8", "FF0E9F6E", "FF046C4E"},
-            {"sapphire", "یاقوت آبی", "FF4FA3FF", "FFB3D4FF", "FF1C64F2", "FF1E429F"},
-            {"ruby", "یاقوتی", "FFF2617A", "FFFFB3C0", "FFD61F4A", "FF8F0F2E"},
+            {"gold", "طلایی", "FFD9AE5A", "FFF1D493", "FF925D0B", "FF76500B"},
+            {"emerald", "زمردی", "FF3ED598", "FF9BF0C8", "FF087A53", "FF046C4E"},
+            {"sapphire", "یاقوت آبی", "FF4FA3FF", "FFB3D4FF", "FF1C60E0", "FF1E429F"},
+            {"ruby", "یاقوتی", "FFF2617A", "FFFFB3C0", "FFC51E46", "FF8F0F2E"},
             {"violet", "بنفش سلطنتی", "FF9A7BFF", "FFCDBFFF", "FF7C3AED", "FF5B21B6"},
-            {"teal", "فیروزه‌ای", "FF3ED6C5", "FFA7F3EA", "FF0E9E8F", "FF065F56"},
+            {"teal", "فیروزه‌ای", "FF3ED6C5", "FFA7F3EA", "FF08776E", "FF065F56"},
     };
+
+    /** Deep ink and warm ivory chosen to keep accent controls legible in both skins. */
+    private static final int ACCENT_INK = 0xFF111827;
+    private static final int ACCENT_PAPER = 0xFFFFFCF5;
 
     public static String[][] accents() { return ACCENTS; }
 
@@ -168,13 +172,13 @@ public final class Theme {
             GOLD_SOFT = liteSoft;
             TEXT = 0xFF1B2333;
             MUTED = 0xFF5C6678;
-            SUCCESS = 0xFF15924F;
-            DANGER = 0xFFCE363C;
-            WARNING = 0xFFD97E06;
-            INFO = 0xFF2A7BDC;
-            VIOLET = 0xFF7A5AF8;
-            TEAL = 0xFF0C9B8C;
-            STEEL = 0xFF5F6B82;
+            SUCCESS = 0xFF12753F;
+            DANGER = 0xFFB42332;
+            WARNING = 0xFF985600;
+            INFO = 0xFF1D5FA8;
+            VIOLET = 0xFF6343D6;
+            TEAL = 0xFF007268;
+            STEEL = 0xFF546177;
         } else {
             BG = 0xFF0C1220;
             SURFACE = 0xFF151D31;
@@ -193,9 +197,24 @@ public final class Theme {
         }
     }
 
-    /** Text color readable ON the accent gradient (gold → dark ink, jewel tones → white). */
+    /** Choose the foreground with the stronger contrast against an accent surface. */
+    public static int onAccent(int background) {
+        return darkAccentInk(background) ? ACCENT_INK : ACCENT_PAPER;
+    }
+
+    /** Text color readable on the current accent. */
     public static int onAccent() {
-        return "gold".equals(accentKey) ? 0xFF1A1206 : 0xFFFFFFFF;
+        return onAccent(GOLD);
+    }
+
+    /** Conservative WCAG-style luminance split for the light and dark accent inks. */
+    public static boolean darkAccentInk(int background) {
+        return Color.luminance(background) >= 0.195f;
+    }
+
+    /** Foreground for the selected navigation capsule (neutral in light mode). */
+    public static int selectedNavInk() {
+        return light ? GOLD : onAccent(GOLD);
     }
 
     public static int dp(float v) {
@@ -250,9 +269,14 @@ public final class Theme {
         return dp(light ? 2 : 3);
     }
 
-    /** Standard glass card. */
+    /** Standard glass card with a restrained top sheen and warm hairline edge. */
     public static GradientDrawable card() {
-        return base(SURFACE, 20, dp(1), alpha(light ? TEXT : GOLD, light ? 26 : 40));
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{shade(SURFACE, light ? 0.012f : 0.07f), SURFACE,
+                        shade(SURFACE, light ? -0.012f : -0.045f)});
+        d.setCornerRadius(dp(20));
+        d.setStroke(dp(1), alpha(GOLD, light ? 44 : 48));
+        return d;
     }
 
     /** Card with an accent glow edge. */
@@ -294,13 +318,14 @@ public final class Theme {
 
     /** Active icon capsule in the bottom navigation. */
     public static GradientDrawable bottomNavIconSelected() {
-        // In Ivory Royal, GOLD is a dark ink-like accent; a translucent champagne
-        // capsule keeps the dark active icon readable instead of placing it on solid gold.
+        // Ivory Royal uses a neutral champagne capsule with the accent itself as
+        // the foreground; Midnight Gold uses a luminous accent capsule and ink.
         int[] colors = light
-                ? new int[]{alpha(GOLD, 58), alpha(GOLD, 88)}
-                : new int[]{shade(GOLD, -0.12f), GOLD};
+                ? new int[]{shade(SURFACE2, 0.025f), SURFACE2}
+                : new int[]{shade(GOLD, 0.04f), shade(GOLD, 0.12f)};
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, colors);
         d.setCornerRadius(dp(14));
+        d.setStroke(dp(1), alpha(GOLD, light ? 96 : 72));
         return d;
     }
 
@@ -321,22 +346,31 @@ public final class Theme {
         return d;
     }
 
-    /** Primary button gradient, built from the current accent. */
+    /** Primary button gradient, toned toward a high-contrast ink/paper foreground. */
     public static GradientDrawable goldButton() {
+        boolean darkInk = darkAccentInk(GOLD);
+        float direction = darkInk ? 1f : -1f;
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
-                new int[]{shade(GOLD, -0.18f), GOLD, shade(GOLD, 0.28f)});
-        d.setCornerRadius(dp(16));
+                new int[]{shade(GOLD, direction * 0.04f),
+                        shade(GOLD, direction * 0.12f),
+                        shade(GOLD, direction * 0.07f)});
+        d.setCornerRadius(dp(18));
+        d.setStroke(dp(1), alpha(ACCENT_PAPER, 82));
         return d;
     }
 
     /** Controlled rose-gold for the primary start CTA (v34). */
     public static final int ROSE = 0xFFC2527E;
 
-    /** Primary start button: restrained gold-to-rose diagonal, same radius as gold buttons. */
+    /** Primary start button: gold-to-rose sheen, both stops matched to the active ink. */
     public static GradientDrawable startButton() {
+        boolean darkInk = darkAccentInk(GOLD);
+        int gold = shade(GOLD, darkInk ? 0.04f : -0.08f);
+        int rose = shade(ROSE, darkInk ? 0.22f : -0.18f);
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{shade(GOLD, -0.10f), ROSE});
-        d.setCornerRadius(dp(16));
+                new int[]{gold, rose});
+        d.setCornerRadius(dp(18));
+        d.setStroke(dp(1), alpha(ACCENT_PAPER, 82));
         return d;
     }
 
@@ -361,9 +395,11 @@ public final class Theme {
 
     public static GradientDrawable chip(boolean selected, int accent) {
         if (selected) {
+            float relief = darkAccentInk(accent) ? 0.08f : -0.08f;
             GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
-                    new int[]{alpha(accent, 220), alpha(accent, 160)});
+                    new int[]{accent, shade(accent, relief)});
             d.setCornerRadius(dp(999));
+            d.setStroke(dp(1), alpha(onAccent(accent), 86));
             return d;
         }
         return base(alpha(SURFACE2, 255), 999, dp(1), alpha(accent, 70));
@@ -377,10 +413,22 @@ public final class Theme {
         return base(SURFACE2, 16, dp(1), alpha(GOLD, light ? 70 : 46));
     }
 
+    /** Semi-transparent glyph capsule for secondary icons. */
     public static GradientDrawable avatar(int color) {
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
                 new int[]{color, alpha(color, 140)});
         d.setCornerRadius(dp(999));
+        d.setStroke(dp(1), alpha(color, light ? 110 : 90));
+        return d;
+    }
+
+    /** Opaque accent capsule with both gradient stops matched to its foreground. */
+    public static GradientDrawable accentAvatar(int accent) {
+        float relief = darkAccentInk(accent) ? 0.08f : -0.08f;
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{accent, shade(accent, relief)});
+        d.setCornerRadius(dp(999));
+        d.setStroke(dp(1), alpha(onAccent(accent), 86));
         return d;
     }
 

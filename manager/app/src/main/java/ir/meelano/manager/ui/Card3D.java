@@ -42,12 +42,15 @@ public final class Card3D {
     public static LinearLayout stepRow(Context ctx, Kit kit, String numeral, int accent, String title) {
         LinearLayout row = kit.h();
         row.setGravity(Gravity.CENTER_VERTICAL);
-        TextView badge = kit.text(numeral, 15, 0xFFFFFFFF, true);
+        int badgeInk = Theme.onAccent(accent);
+        float relief = Theme.darkAccentInk(accent) ? 0.12f : -0.12f;
+        TextView badge = kit.text(numeral, 15, badgeInk, true);
         badge.setGravity(Gravity.CENTER);
         GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{Theme.shade(accent, 0.30f), accent, Theme.shade(accent, -0.30f)});
+                new int[]{Theme.shade(accent, relief), accent,
+                        Theme.shade(accent, relief * 0.5f)});
         bg.setShape(GradientDrawable.OVAL);
-        bg.setStroke(Theme.dp(1), Theme.alpha(0xFFFFFFFF, Theme.isLight() ? 120 : 70));
+        bg.setStroke(Theme.dp(1), Theme.alpha(badgeInk, 100));
         badge.setBackground(bg);
         try {
             badge.setElevation(Theme.dp(3));
@@ -67,6 +70,7 @@ public final class Card3D {
         iv.setLayoutParams(new LinearLayout.LayoutParams(sz, sz));
         iv.setBackground(radialGlow(glow, sizeDp));
         iv.setImageResource(iconRes);
+        iv.setColorFilter(Theme.TEXT);
         int pad = Theme.dp(Math.max(4, sizeDp / 7));
         iv.setPadding(pad, pad, pad, pad);
         return iv;

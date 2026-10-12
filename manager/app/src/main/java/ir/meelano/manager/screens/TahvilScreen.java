@@ -85,7 +85,7 @@ public class TahvilScreen extends Screen {
         LinearLayout row = a.kit.h();
         row.setGravity(android.view.Gravity.CENTER_VERTICAL);
         row.addView(a.kit.text("تاریخ فاکتورها", 13f, Theme.TEXT, true), a.kit.wlp(1f));
-        row.addView(a.kit.btnGhost("\u25c0", Theme.GOLD, v -> {
+        row.addView(a.kit.btnGhost("‹", Theme.GOLD, v -> {
             day = Jalali.addDays(day, -1);
             if (content != null) render(content);
         }), new LinearLayout.LayoutParams(Theme.dp(46), -2));
@@ -96,7 +96,7 @@ public class TahvilScreen extends Screen {
         lbl.setGravity(android.view.Gravity.CENTER);
         row.addView(lbl, a.kit.lp(-2, -2));
         row.addView(a.kit.space(6));
-        row.addView(a.kit.btnGhost("\u25b6", Theme.GOLD, v -> {
+        row.addView(a.kit.btnGhost("›", Theme.GOLD, v -> {
             if (Jalali.todayStr().equals(day)) return;
             day = Jalali.addDays(day, 1);
             if (content != null) render(content);

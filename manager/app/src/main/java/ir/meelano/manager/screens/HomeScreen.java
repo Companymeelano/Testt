@@ -291,7 +291,7 @@ public class HomeScreen extends Screen {
         FrameLayout crest = new FrameLayout(a);
         crest.setBackground(Theme.bottomNavIconSelected());
         crest.setElevation(Theme.dp(3));
-        ImageView mark = a.kit.icon(R.drawable.mi_admin_panel_settings, Theme.onAccent(), 30);
+        ImageView mark = a.kit.icon(R.drawable.mi_admin_panel_settings, Theme.selectedNavInk(), 30);
         FrameLayout.LayoutParams mp = new FrameLayout.LayoutParams(Theme.dp(30), Theme.dp(30), Gravity.CENTER);
         crest.addView(mark, mp);
         top.addView(crest, new LinearLayout.LayoutParams(Theme.dp(58), Theme.dp(58)));

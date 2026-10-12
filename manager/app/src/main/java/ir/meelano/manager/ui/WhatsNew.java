@@ -103,7 +103,7 @@ public final class WhatsNew {
         // ---- header: floating ✦ badge + title + version line ----
         TextView badge = kit.text("✦", 32, Theme.onAccent(), true);
         badge.setGravity(Gravity.CENTER);
-        badge.setBackground(Theme.avatar(Theme.GOLD));
+        badge.setBackground(Theme.accentAvatar(Theme.GOLD));
         try {
             badge.setElevation(Theme.dp(10));
         } catch (Exception ignored) { }

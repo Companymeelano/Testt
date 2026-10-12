@@ -55,15 +55,17 @@ def sqlcmd_path(container: str) -> str:
 
 
 def sql(container: str, password: str, executable: str, statement: str,
-        *, timeout: int = 300) -> str:
+        *, timeout: int = 300, database: str | None = None) -> str:
     env = os.environ.copy()
     env["SQLCMDPASSWORD"] = password
     args = [
         "docker", "exec", "-e", "SQLCMDPASSWORD", container, executable,
         "-S", "localhost", "-U", "sa", "-C", "-b",
         "-h", "-1", "-W", "-w", "65535", "-s", DELIM,
-        "-Q", statement,
     ]
+    if database:
+        args.extend(["-d", database])
+    args.extend(["-Q", statement])
     return run(args, timeout=timeout, env=env).stdout
 
 
@@ -137,7 +139,7 @@ def load_required_checks() -> tuple[dict[str, list[str]], list[str]]:
     return module.TABLES, list(module.VIEWS)
 
 
-def dump_schema(container: str, password: str, executable: str,
+def dump_schema(container: str, password: str, executable: str, database: str,
                 output: Path, source_backup: str) -> dict:
     column_sql = """
 SET NOCOUNT ON;
@@ -164,7 +166,9 @@ JOIN sys.columns c ON c.object_id=o.object_id
 WHERE o.type IN ('U','V') AND o.is_ms_shipped=0
 ORDER BY s.name,o.name,c.column_id;
 """
-    column_rows = rows(sql(container, password, executable, column_sql), 12)
+    column_rows = rows(sql(container, password, executable, column_sql, database=database), 12)
+    if not column_rows:
+        raise RuntimeError(f"database {database!r} returned no user-table/view columns; refusing an empty manifest")
     objects: dict[tuple[str, str], dict] = {}
     for r in column_rows:
         schema, name, kind = r[0], r[1], r[2]
@@ -198,7 +202,7 @@ WHERE fk.is_ms_shipped=0
 ORDER BY ps.name,pt.name,fk.name,fkc.constraint_column_id;
 """
     foreign_keys = []
-    for r in rows(sql(container, password, executable, fk_sql), 7):
+    for r in rows(sql(container, password, executable, fk_sql, database=database), 7):
         foreign_keys.append({
             "from": {"schema": r[0], "table": r[1], "column": r[2]},
             "to": {"schema": r[3], "table": r[4], "column": r[5]},
@@ -227,6 +231,7 @@ ORDER BY ps.name,pt.name,fk.name,fkc.constraint_column_id;
         "formatVersion": 1,
         "source": {
             "backupArchive": source_backup,
+            "restoredDatabase": database,
             "scope": "schema metadata only; no business rows exported",
             "expectedSchema": "dbo for app-mapped objects",
         },
@@ -274,7 +279,8 @@ def main() -> int:
                     raise
                 time.sleep(2)
         restore_sample(args.container, password, executable, args.backup, args.database)
-        dump_schema(args.container, password, executable, Path(args.output), args.source_archive)
+        dump_schema(args.container, password, executable, args.database,
+                    Path(args.output), args.source_archive)
         return 0
     except Exception as exc:
         print(f"Atiran schema probe failed: {exc}", file=sys.stderr)

@@ -209,23 +209,80 @@ ORDER BY ps.name,pt.name,fk.name,fkc.constraint_column_id;
             "name": r[6],
         })
 
+    function_sql = """
+SET NOCOUNT ON;
+SELECT s.name,o.name,o.type_desc,
+       COALESCE(p.parameter_id,-1),COALESCE(p.name,N''),
+       COALESCE(TYPE_NAME(p.user_type_id),N''),COALESCE(p.max_length,0),
+       COALESCE(p.precision,0),COALESCE(p.scale,0),COALESCE(p.is_output,0)
+FROM sys.objects o
+JOIN sys.schemas s ON s.schema_id=o.schema_id
+LEFT JOIN sys.parameters p ON p.object_id=o.object_id
+WHERE o.type IN ('FN','IF','TF','FS','FT') AND o.is_ms_shipped=0
+ORDER BY s.name,o.name,p.parameter_id;
+"""
+    functions: dict[tuple[str, str], dict] = {}
+    for r in rows(sql(container, password, executable, function_sql, database=database), 10):
+        key = (r[0], r[1])
+        fn = functions.setdefault(key, {"schema": r[0], "name": r[1],
+                                        "kind": r[2], "parameters": []})
+        if r[3] != "-1":
+            fn["parameters"].append({
+                "ordinal": int(r[3]),
+                "name": r[4],
+                "type": r[5],
+                "maxLengthBytes": int(r[6]),
+                "precision": int(r[7]),
+                "scale": int(r[8]),
+                "output": r[9] == "1",
+            })
+
     by_name = {(schema.lower(), name.lower()): obj for (schema, name), obj in objects.items()}
+
+    def resolve_object(name: str) -> dict | None:
+        obj = by_name.get(("dbo", name.lower()))
+        if obj:
+            return obj
+        matches = [value for (schema, object_name), value in by_name.items()
+                   if object_name == name.lower()]
+        return sorted(matches, key=lambda value: value["schema"].lower())[0] if matches else None
+
     required, views = load_required_checks()
+    # dif_date_alan is a scalar function, not a table; older probe versions listed it as one.
+    required = {name: columns for name, columns in required.items()
+                if name.lower() != "dif_date_alan"}
     known_checks = []
     for table, wanted in required.items():
-        obj = by_name.get(("dbo", table.lower()))
+        obj = resolve_object(table)
         if not obj:
             known_checks.append({"table": table, "status": "missing-table",
                                  "missingColumns": list(wanted)})
             continue
         actual = {c["name"].lower() for c in obj["columns"]}
         missing = [c for c in wanted if c.lower() not in actual]
-        known_checks.append({"table": table,
+        known_checks.append({"table": table, "schema": obj["schema"],
                              "status": "ok" if not missing else "missing-columns",
                              "missingColumns": missing})
     for view in views:
-        obj = by_name.get(("dbo", view.lower()))
-        known_checks.append({"view": view, "status": "ok" if obj and obj["kind"] == "VIEW" else "missing-view"})
+        obj = resolve_object(view)
+        known_checks.append({"view": view, "schema": obj["schema"] if obj else None,
+                             "status": "ok" if obj and obj["kind"] == "VIEW" else "missing-view"})
+
+    function_by_name = {(schema.lower(), name.lower()): fn for (schema, name), fn in functions.items()}
+    app_function_checks = []
+    for function in ("dif_date_alan", "UDF_Persian_To_Julian"):
+        found = next((function_by_name[(schema.lower(), function.lower())]
+                      for schema in ("dbo", "")
+                      if (schema.lower(), function.lower()) in function_by_name), None)
+        if found is None:
+            found = next((fn for (schema, name), fn in functions.items()
+                          if name.lower() == function.lower()), None)
+        app_function_checks.append({
+            "function": function,
+            "status": "ok" if found else "missing-function",
+            "schema": found["schema"] if found else None,
+            "kind": found["kind"] if found else None,
+        })
 
     manifest = {
         "formatVersion": 1,
@@ -238,16 +295,23 @@ ORDER BY ps.name,pt.name,fk.name,fkc.constraint_column_id;
         "objectCount": len(objects),
         "columnCount": sum(len(obj["columns"]) for obj in objects.values()),
         "foreignKeyCount": len(foreign_keys),
+        "functionCount": len(functions),
         "objects": sorted(objects.values(), key=lambda x: (x["schema"].lower(), x["name"].lower())),
         "foreignKeys": foreign_keys,
+        "functions": sorted(functions.values(), key=lambda x: (x["schema"].lower(), x["name"].lower())),
         "appProbeChecks": known_checks,
+        "appFunctionChecks": app_function_checks,
     }
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     good = sum(1 for row in known_checks if row["status"] == "ok")
     bad = len(known_checks) - good
     print(f"Schema export: {manifest['objectCount']} objects, {manifest['columnCount']} columns, "
-          f"{manifest['foreignKeyCount']} foreign keys; app probe checks {good}/{len(known_checks)} OK, {bad} warnings.")
+          f"{manifest['foreignKeyCount']} foreign keys, {manifest['functionCount']} functions; "
+          f"app probe checks {good}/{len(known_checks)} OK, {bad} warnings.")
+    for row in app_function_checks:
+        if row["status"] != "ok":
+            print(f"SCHEMA-WARN function {row['function']}: {row['status']}")
     for row in known_checks:
         if row["status"] != "ok":
             name = row.get("table", row.get("view", "?"))

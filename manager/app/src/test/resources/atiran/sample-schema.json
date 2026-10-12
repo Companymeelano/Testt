@@ -1,0 +1,235 @@
+{
+  "formatVersion": 1,
+  "source": {
+    "backupArchive": "Atiran2-1405-7-14-15-21-49.zip",
+    "scope": "schema metadata only; no business rows exported",
+    "expectedSchema": "dbo for app-mapped objects"
+  },
+  "objectCount": 0,
+  "columnCount": 0,
+  "foreignKeyCount": 0,
+  "objects": [],
+  "foreignKeys": [],
+  "appProbeChecks": [
+    {
+      "table": "sailfact",
+      "status": "missing-table",
+      "missingColumns": [
+        "date",
+        "shfacfo",
+        "all",
+        "shmo",
+        "t_date",
+        "tasvieh",
+        "vis_rdf"
+      ]
+    },
+    {
+      "table": "buyfact",
+      "status": "missing-table",
+      "missingColumns": [
+        "date"
+      ]
+    },
+    {
+      "table": "subsailfact",
+      "status": "missing-table",
+      "missingColumns": [
+        "shfacfo",
+        "SHKA",
+        "TEDVAH",
+        "LINESUM"
+      ]
+    },
+    {
+      "table": "dar",
+      "status": "missing-table",
+      "missingColumns": [
+        "ghno",
+        "date",
+        "shmo"
+      ]
+    },
+    {
+      "table": "PosDetails",
+      "status": "missing-table",
+      "missingColumns": [
+        "ghno",
+        "MabPos",
+        "PosBankRdf"
+      ]
+    },
+    {
+      "table": "darDescriptionType",
+      "status": "missing-table",
+      "missingColumns": []
+    },
+    {
+      "table": "getchk",
+      "status": "missing-table",
+      "missingColumns": []
+    },
+    {
+      "table": "putchk",
+      "status": "missing-table",
+      "missingColumns": []
+    },
+    {
+      "table": "CheckTypes",
+      "status": "missing-table",
+      "missingColumns": []
+    },
+    {
+      "table": "CUSTOMERS",
+      "status": "missing-table",
+      "missingColumns": [
+        "SHMO",
+        "man"
+      ]
+    },
+    {
+      "table": "cust_act",
+      "status": "missing-table",
+      "missingColumns": [
+        "shmo",
+        "date",
+        "act_bed",
+        "act_bes"
+      ]
+    },
+    {
+      "table": "custgroup",
+      "status": "missing-table",
+      "missingColumns": [
+        "group_rdf"
+      ]
+    },
+    {
+      "table": "masir",
+      "status": "missing-table",
+      "missingColumns": [
+        "rdf_masir"
+      ]
+    },
+    {
+      "table": "inventory",
+      "status": "missing-table",
+      "missingColumns": [
+        "shka",
+        "naka",
+        "mojkavah"
+      ]
+    },
+    {
+      "table": "ka_act",
+      "status": "missing-table",
+      "missingColumns": [
+        "shka"
+      ]
+    },
+    {
+      "table": "kagroup",
+      "status": "missing-table",
+      "missingColumns": [
+        "group_rdf"
+      ]
+    },
+    {
+      "table": "anbars",
+      "status": "missing-table",
+      "missingColumns": [
+        "rdf_anbar"
+      ]
+    },
+    {
+      "table": "inventory_anbars",
+      "status": "missing-table",
+      "missingColumns": []
+    },
+    {
+      "table": "visitors",
+      "status": "missing-table",
+      "missingColumns": [
+        "vis_rdf"
+      ]
+    },
+    {
+      "table": "vis_goals",
+      "status": "missing-table",
+      "missingColumns": []
+    },
+    {
+      "table": "sys_users",
+      "status": "missing-table",
+      "missingColumns": [
+        "user_id"
+      ]
+    },
+    {
+      "table": "LoginDetails",
+      "status": "missing-table",
+      "missingColumns": [
+        "user_id"
+      ]
+    },
+    {
+      "table": "BANK",
+      "status": "missing-table",
+      "missingColumns": [
+        "RDF"
+      ]
+    },
+    {
+      "table": "ban_act",
+      "status": "missing-table",
+      "missingColumns": [
+        "bank_rdf"
+      ]
+    },
+    {
+      "table": "ActNames",
+      "status": "missing-table",
+      "missingColumns": []
+    },
+    {
+      "table": "COW",
+      "status": "missing-table",
+      "missingColumns": []
+    },
+    {
+      "table": "dif_date_alan",
+      "status": "missing-table",
+      "missingColumns": []
+    },
+    {
+      "table": "TableChanges",
+      "status": "missing-table",
+      "missingColumns": []
+    },
+    {
+      "table": "Log",
+      "status": "missing-table",
+      "missingColumns": []
+    },
+    {
+      "view": "VW_GainDetails",
+      "status": "missing-view"
+    },
+    {
+      "view": "VW_CustomersGain",
+      "status": "missing-view"
+    },
+    {
+      "view": "VW_InventoryAnbars",
+      "status": "missing-view"
+    },
+    {
+      "view": "VW_getchk",
+      "status": "missing-view"
+    },
+    {
+      "view": "VW_Putchk",
+      "status": "missing-view"
+    }
+  ]
+}

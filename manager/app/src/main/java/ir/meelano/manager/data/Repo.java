@@ -13,8 +13,9 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Background database runner. Screens describe WHAT they need (a Task using
@@ -36,7 +37,13 @@ public final class Repo {
         Connection open() throws Exception;
     }
 
-    private final ExecutorService pool = Executors.newFixedThreadPool(3);
+    // Fixed workers with a hard queue bound: rapid refreshes on a slow server
+    // must not retain an unlimited number of screen callbacks/results in memory.
+    private static final int MAX_PENDING_TASKS = 12;
+    private final ThreadPoolExecutor pool = new ThreadPoolExecutor(
+            3, 3, 0L, TimeUnit.MILLISECONDS,
+            new ArrayBlockingQueue<>(MAX_PENDING_TASKS),
+            new ThreadPoolExecutor.AbortPolicy());
     private final Handler main = new Handler(Looper.getMainLooper());
     private final Settings settings;
     private final Context appCtx;
@@ -90,7 +97,7 @@ public final class Repo {
         try {
             pool.execute(job);
         } catch (java.util.concurrent.RejectedExecutionException rej) {
-            main.post(() -> cb.fail("برنامه در حال بستن است؛ دوباره تلاش کنید"));
+            main.post(() -> cb.fail("برنامه مشغول است؛ پس از پایان درخواست‌های جاری دوباره تلاش کنید"));
         }
     }
 

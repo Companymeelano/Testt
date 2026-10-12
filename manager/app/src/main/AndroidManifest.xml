@@ -18,6 +18,7 @@
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application
+        android:name=".ManagerApplication"
         android:allowBackup="true"
         android:fullBackupContent="@xml/backup_rules"
         android:hardwareAccelerated="true"
@@ -79,7 +80,6 @@
             android:configChanges="keyboard|keyboardHidden|screenSize|uiMode"
             android:exported="true"
             android:label="فعال‌سازی میلانو"
-            android:screenOrientation="portrait"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -90,14 +90,12 @@
             android:name=".MainActivity"
             android:configChanges="keyboard|keyboardHidden|screenSize|uiMode"
             android:exported="false"
-            android:screenOrientation="portrait"
             android:windowSoftInputMode="adjustResize" />
         <activity
             android:name=".LoginActivity"
             android:configChanges="keyboard|keyboardHidden|screenSize|uiMode"
             android:exported="false"
             android:label="ورود کاربر"
-            android:screenOrientation="portrait"
             android:windowSoftInputMode="adjustResize" />
     </application>
 </manifest>

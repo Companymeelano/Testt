@@ -21,9 +21,20 @@ public final class Settings {
     /** Outside-network address (mobile data / public IP): raw, never displayed. */
     public String wan() { return p.getString("db_wan", "").trim(); }
 
+    /** The last successful saved endpoint, falling back to the other profile or legacy host. */
+    public String savedHost() {
+        String last = linkLast();
+        if ("wan".equals(last) && !wan().isEmpty()) return wan();
+        if ("lan".equals(last) && !lan().isEmpty()) return lan();
+        if (!lan().isEmpty()) return lan();
+        if (!wan().isEmpty()) return wan();
+        return host();
+    }
+
     /** Server address with all but the last segment masked (safe to display). */
     public String maskedHost() {
-        return mask(effHost().trim());
+        String h = savedHost();
+        return mask(h.isEmpty() ? effHost().trim() : h.trim());
     }
 
     /** Masked inside address ("" when unset). */
@@ -57,6 +68,17 @@ public final class Settings {
         } catch (Exception ignored) {
             return Atiran.DEFAULT_PORT;
         }
+    }
+
+    /**
+     * Forget the saved server endpoints and selected database so setup starts
+     * fresh. Preserve the SQL driver/login preferences and all license/account
+     * state; changing an endpoint never changes the direct SQL auth method.
+     */
+    public void clearSavedServer() {
+        p.edit().remove("db_host").remove("db_lan").remove("db_wan")
+                .remove("db_name").remove("link_last")
+                .putString("link_mode", "auto").apply();
     }
 
     public void saveConnection(String host, String port, String db, String user, String pass) {

@@ -112,7 +112,18 @@ public class LoginActivity extends Activity {
         verLine.setGravity(Gravity.CENTER);
         root.addView(verLine, kit.lp(-1, -2));
 
-        setContentView(sv);
+        if (getResources().getConfiguration().smallestScreenWidthDp >= 600
+                || getResources().getDisplayMetrics().widthPixels > Theme.dp(720)) {
+            android.widget.FrameLayout frame = new android.widget.FrameLayout(this);
+            frame.setBackgroundColor(Theme.BG);
+            android.widget.FrameLayout.LayoutParams fp = new android.widget.FrameLayout.LayoutParams(
+                    Math.min(Theme.dp(480), getResources().getDisplayMetrics().widthPixels), -1,
+                    Gravity.CENTER);
+            frame.addView(sv, fp);
+            setContentView(frame);
+        } else {
+            setContentView(sv);
+        }
     }
 
     private void paintRemember() {

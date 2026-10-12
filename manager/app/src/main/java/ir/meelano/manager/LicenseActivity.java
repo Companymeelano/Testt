@@ -29,6 +29,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import ir.meelano.manager.core.Brand;
+import ir.meelano.manager.core.CrashReporter;
 import ir.meelano.manager.core.DeviceId;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.LanDiscover;
@@ -77,6 +78,12 @@ public class LicenseActivity extends Activity {
     };
     private String pendingSmsPhone = "";
     private String pendingSmsText = "";
+    private boolean editingConnection;
+    private EditText connectionIp;
+    private String restoredConnectionIp;
+
+    /** Intent extra used by Settings to reopen server/database selection. */
+    public static final String EXTRA_EDIT_CONNECTION = "ir.meelano.manager.EDIT_CONNECTION";
 
     private Kit kit;
     private Settings settings;
@@ -145,6 +152,10 @@ public class LicenseActivity extends Activity {
         } catch (Exception ignored) { }
         kit = new Kit(this);
         settings = new Settings(this);
+        editingConnection = getIntent() != null
+                && getIntent().getBooleanExtra(EXTRA_EDIT_CONNECTION, false);
+        if (savedInstanceState != null && savedInstanceState.containsKey("manager_connection_ip"))
+            restoredConnectionIp = savedInstanceState.getString("manager_connection_ip", "");
         repo = new Repo(this, settings);
         try {
             device = DeviceId.code(this);
@@ -153,6 +164,15 @@ public class LicenseActivity extends Activity {
         }
         buildUi();
         ensureRecvPerm();
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        try {
+            if (connectionIp != null) outState.putString("manager_connection_ip",
+                    connectionIp.getText().toString());
+        } catch (Exception ignored) { }
+        super.onSaveInstanceState(outState);
     }
 
     @Override
@@ -195,6 +215,9 @@ public class LicenseActivity extends Activity {
     @Override
     protected void onDestroy() {
         stopDots();
+        try {
+            if (repo != null) repo.close();
+        } catch (Exception ignored) { }
         super.onDestroy();
     }
 
@@ -225,6 +248,10 @@ public class LicenseActivity extends Activity {
     // ---------- UI ----------
 
     private void buildUi() {
+        try {
+            if (connectionIp != null) restoredConnectionIp = connectionIp.getText().toString();
+        } catch (Exception ignored) { }
+        connectionIp = null;
         LinearLayout box = kit.v();
         int pad = Theme.dp(16);
         box.setPadding(pad, pad, pad, pad);
@@ -238,9 +265,10 @@ public class LicenseActivity extends Activity {
         boolean conn = connConfigured();
         if (!s.ok && !LicenseStore.requested(this)) buildRequestPage(box);
         else if (!s.ok) buildWaitPage(box);
-        else if (!conn) buildConnPage(box, s);
+        else if (editingConnection || !conn) buildConnPage(box, s);
         else buildDonePage(box, s);
 
+        addCrashReportCard(box);
         if (Tamper.isRooted()) {
             box.addView(kit.hint("⚠ گوشی روت شده است؛ در صورت مشکل با پشتیبانی در میان بگذارید."),
                     kit.lp(-1, -2));
@@ -795,9 +823,40 @@ public class LicenseActivity extends Activity {
         return v;
     }
 
+    /** Crash diagnostics are available from the launch/license screen as well as Settings. */
+    private void addCrashReportCard(LinearLayout box) {
+        if (!CrashReporter.hasReport(this)) return;
+        LinearLayout c = Card3D.card(this, Theme.DANGER);
+        c.addView(kit.text("گزارش خطای اخیر", 14f, Theme.TEXT, true), kit.lp(-1, -2));
+        c.addView(kit.hint("برای هنگ‌های بدون گزارش Java همچنان Logcat لازم است. این گزارش محلی است و پیام خطا، IP، رمز یا اطلاعات فروش را شامل نمی‌شود."),
+                kit.lp(-1, -2));
+        c.addView(kit.btnGhost("کپی گزارش فنی", Theme.INFO, v -> {
+            String report = CrashReporter.readReport(this);
+            if (report.isEmpty()) {
+                kit.toast("گزارش فنی در دسترس نیست");
+            } else {
+                kit.toast(copyText("گزارش خطای میلانو", report)
+                        ? "گزارش کپی شد؛ برای پشتیبانی بفرستید" : "کپی گزارش ممکن نشد");
+            }
+        }), kit.lp(-1, -2));
+        c.addView(kit.btnGhost("پاک‌کردن گزارش", Theme.DANGER, v -> {
+            CrashReporter.clearReport(this);
+            kit.toast("گزارش پاک شد");
+            buildUi();
+        }), kit.lp(-1, -2));
+        Card3D.mount(box, c);
+    }
+
     private void buildConnPage(LinearLayout box, LicenseStore.Status s) {
         box.addView(stepBar(2), kit.lp(-1, -2));
         box.addView(kit.gap(10));
+        box.addView(Card3D.hero(this, kit, R.drawable.mi_database, Theme.GOLD,
+                editingConnection ? "تغییر سرور اختصاصی" : "اتصال اختصاصی فروشگاه",
+                editingConnection ? "آدرس فعلی را جایگزین کنید و دیتابیس را دوباره انتخاب کنید."
+                        : "IP سرور را وارد کنید؛ سپس دیتابیس سازگار را با یک لمس انتخاب کنید.",
+                editingConnection ? "ویرایش اتصال" : "گام ۲ • اتصال", Theme.GOLD_SOFT),
+                kit.lp(-1, -2));
+        box.addView(kit.gap(8));
         LinearLayout lc = Card3D.card(this, Theme.SUCCESS);
         lc.addView(Card3D.stepRow(this, kit, "✓", Theme.SUCCESS, "لایسنس"), kit.lp(-1, -2));
         lc.addView(kit.kv("وضعیت", "✓ فعال", Theme.SUCCESS), kit.lp(-1, -2));
@@ -829,14 +888,23 @@ public class LicenseActivity extends Activity {
         connStage.setVisibility(View.GONE);
         c.addView(connStage, kit.lp(-1, -2));
         c.addView(kit.gap(6));
-        final EditText fIp = kit.edit("IP سرور اختصاصی", "");
+        String initialIp = restoredConnectionIp;
+        if (initialIp == null) initialIp = editingConnection ? settings.savedHost() : "";
+        connectionIp = kit.edit("IP سرور اختصاصی", initialIp);
+        restoredConnectionIp = null;
+        final EditText fIp = connectionIp;
         try {
+            fIp.setSingleLine(true);
             fIp.setInputType(android.text.InputType.TYPE_CLASS_TEXT
                     | android.text.InputType.TYPE_TEXT_VARIATION_URI);
         } catch (Exception ignored) { }
         c.addView(iconField(fIp, R.drawable.mi_my_location), kit.lp(-1, -2));
         c.addView(kit.text("پس از اتصال مستقیم، دیتابیس‌های دارای ساختار آتیران برای انتخاب نمایش داده می‌شوند.",
                 11.5f, Theme.MUTED, false), kit.lp(-1, -2));
+        if (editingConnection) {
+            c.addView(kit.hint("برای اتصال به سرور دیگر، آدرس بالا را کامل جایگزین کنید؛ دیتابیس قبلی به‌صورت خودکار انتخاب نمی‌شود."),
+                    kit.lp(-1, -2));
+        }
         c.addView(kit.gap(4));
         final android.widget.Button[] btn = new android.widget.Button[1];
         btn[0] = kit.btnGold("✦ اتصال و نمایش دیتابیس‌ها",
@@ -856,6 +924,10 @@ public class LicenseActivity extends Activity {
             wbtn[0].setMinHeight(Theme.dp(48));
         } catch (Exception ignored) { }
         c.addView(wbtn[0], kit.lp(-1, -2));
+        if (editingConnection) {
+            c.addView(kit.btnGhost("انصراف • بازگشت به برنامه", Theme.MUTED, v -> finish()),
+                    kit.lp(-1, -2));
+        }
         Card3D.mount(box, c);
         buildDevFooter(box);
     }
@@ -1173,6 +1245,12 @@ public class LicenseActivity extends Activity {
             settings.setLinkLast(lan.isEmpty() ? SmartLink.WAN : SmartLink.LAN);
             saveConnSummary(host, tables);
         } catch (Exception ignored) { }
+        editingConnection = false;
+        connectionIp = null;
+        restoredConnectionIp = null;
+        try {
+            if (getIntent() != null) getIntent().removeExtra(EXTRA_EDIT_CONNECTION);
+        } catch (Exception ignored) { }
         buzz();
         kit.toast("✓ وصل شد • " + Money.fa(String.valueOf(tables)) + " بخش پایه آماده");
         copySiteLine(host, LanDiscover.PORT, db);
@@ -1250,6 +1328,14 @@ public class LicenseActivity extends Activity {
             c.addView(kit.kv("جدول‌های آتیران", Money.fa(stn), Theme.TEXT), kit.lp(-1, -2));
         c.addView(kit.gap(4));
         c.addView(kit.btnGold("ورود به برنامه ⇤", v -> enterApp()), kit.lp(-1, -2));
+        c.addView(kit.gap(6));
+        c.addView(kit.btnGhost("تغییر IP / انتخاب دیتابیس دیگر", Theme.GOLD, v -> {
+            editingConnection = true;
+            try {
+                getIntent().putExtra(EXTRA_EDIT_CONNECTION, true);
+            } catch (Exception ignored) { }
+            buildUi();
+        }), kit.lp(-1, -2));
         Card3D.mount(box, c);
         buildDevFooter(box);
     }

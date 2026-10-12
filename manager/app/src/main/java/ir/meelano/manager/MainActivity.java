@@ -106,12 +106,23 @@ public class MainActivity extends Activity {
     public static final String EXTRA_SCREEN = "ir.meelano.manager.SCREEN";
     private boolean rolePicked;
     private boolean shellStarted;
+    private boolean restoredScreen;
     private TextView userChip;
+    private android.widget.ImageView compactUserAction;
     private boolean unlocked = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        if (savedInstanceState != null) {
+            String savedScreen = savedInstanceState.getString("manager_current_screen", "");
+            if (!savedScreen.isEmpty()) {
+                currentId = savedScreen;
+                restoredScreen = true;
+            }
+            ArrayList<String> savedHistory = savedInstanceState.getStringArrayList("manager_screen_history");
+            if (savedHistory != null) history.addAll(savedHistory);
+        }
         if (!LicenseStore.unlocked(this)) {
             toLicense();
             return;
@@ -151,6 +162,13 @@ public class MainActivity extends Activity {
         refreshLicChip();
         refreshUserChip();
         dispatchShown(true);
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        outState.putString("manager_current_screen", currentId);
+        outState.putStringArrayList("manager_screen_history", new ArrayList<>(history));
+        super.onSaveInstanceState(outState);
     }
 
     @Override
@@ -444,7 +462,7 @@ public class MainActivity extends Activity {
             AtiranAuth.applySessionRole(this);
             if (AtiranAuth.hasSession(this)) {
                 rolePicked = true;
-                currentId = AtiranAuth.startScreen(this);
+                if (!restoredScreen) currentId = AtiranAuth.startScreen(this);
             }
         }
         if (RoleStore.enabled(this) && !rolePicked) {
@@ -457,13 +475,12 @@ public class MainActivity extends Activity {
         root.setBackgroundColor(Theme.BG);
 
         // header: connection dot + company logo (from Atiran) + company name + tools
-        // The tool group (search / theme / refresh / settings / zoom) used to be the last
-        // child, so on narrow phones the fixed-width chips in front of it ate the row and
-        // pushed the settings button off the right edge. Measure the row first and drop the
-        // optional chips instead - the tools are never sacrificed.
+        // On narrow phones, drop the long license/name chips first. On the tiniest
+        // widths also hide secondary search/theme/zoom tools, keeping refresh, settings
+        // and the account/logout shortcut reachable without overflowing the header.
         android.util.DisplayMetrics dm = getResources().getDisplayMetrics();
         int widthDp = dm.widthPixels * 160 / dm.densityDpi;
-        final boolean compact = widthDp < 420;
+        final boolean compact = widthDp < 520;
         final boolean tiny = widthDp < 360;
         LinearLayout header = kit.h();
         header.setGravity(Gravity.CENTER_VERTICAL);
@@ -487,6 +504,7 @@ public class MainActivity extends Activity {
         licChip.setBackground(Theme.ghostButton(Theme.GOLD));
         licChip.setPadding(Theme.dp(9), Theme.dp(4), Theme.dp(9), Theme.dp(4));
         licChip.setSingleLine(true);
+        licChip.setMaxWidth(Theme.dp(96));
         Theme.pressable(licChip);
         licChip.setOnClickListener(v -> openLicense());
         if (!compact) {
@@ -541,8 +559,10 @@ public class MainActivity extends Activity {
         Theme.pressable(gsearch);
         gsearch.setOnClickListener(v -> nav("search"));
         MeelanoIcons.iconize(gsearch);
-        tools.addView(gsearch, kit.lp(-2, -2));
-        tools.addView(vdiv(), kit.lp(Theme.dp(1), Theme.dp(22)));
+        if (!tiny) {
+            tools.addView(gsearch, kit.lp(-2, -2));
+            tools.addView(vdiv(), kit.lp(Theme.dp(1), Theme.dp(22)));
+        }
         TextView themeBtn = kit.text("◐", 18, Theme.GOLD, true);
         themeBtn.setPadding(Theme.dp(11), Theme.dp(6), Theme.dp(11), Theme.dp(6));
         themeBtn.setContentDescription("تغییر تم روشن / تیره");
@@ -554,8 +574,10 @@ public class MainActivity extends Activity {
             refreshTheme();
         });
         MeelanoIcons.iconize(themeBtn);
-        tools.addView(themeBtn, kit.lp(-2, -2));
-        tools.addView(vdiv(), kit.lp(Theme.dp(1), Theme.dp(22)));
+        if (!tiny) {
+            tools.addView(themeBtn, kit.lp(-2, -2));
+            tools.addView(vdiv(), kit.lp(Theme.dp(1), Theme.dp(22)));
+        }
         TextView refresh = kit.text("⟳", 18, Theme.GOLD_SOFT, true);
         refresh.setPadding(Theme.dp(11), Theme.dp(6), Theme.dp(11), Theme.dp(6));
         Theme.pressable(refresh);
@@ -570,7 +592,6 @@ public class MainActivity extends Activity {
         sett.setOnClickListener(v -> nav("settings"));
         MeelanoIcons.iconize(sett);
         tools.addView(sett, kit.lp(-2, -2));
-        tools.addView(vdiv(), kit.lp(Theme.dp(1), Theme.dp(22)));
         android.widget.ImageView zoom = new android.widget.ImageView(this);
         try {
             zoom.setImageResource(R.drawable.mi_zoom);
@@ -580,8 +601,29 @@ public class MainActivity extends Activity {
         zoom.setContentDescription("بزرگ‌نمایی متن");
         Theme.pressable(zoom);
         zoom.setOnClickListener(v -> cycleZoom());
-        if (!tiny) tools.addView(zoom, new LinearLayout.LayoutParams(Theme.dp(42), Theme.dp(36)));
+        if (compact) {
+            tools.addView(vdiv(), kit.lp(Theme.dp(1), Theme.dp(22)));
+            compactUserAction = new android.widget.ImageView(this);
+            try {
+                compactUserAction.setImageResource(R.drawable.mi_person);
+                compactUserAction.setColorFilter(Theme.GOLD_SOFT);
+            } catch (Exception ignored) { }
+            compactUserAction.setBackground(Theme.ghostButton(Theme.GOLD));
+            compactUserAction.setPadding(Theme.dp(9), Theme.dp(7), Theme.dp(9), Theme.dp(7));
+            compactUserAction.setContentDescription("حساب کاربری؛ خروج یا تغییر کاربر");
+            Theme.pressable(compactUserAction);
+            compactUserAction.setOnClickListener(v -> userMenu());
+            tools.addView(compactUserAction,
+                    new LinearLayout.LayoutParams(Theme.dp(40), Theme.dp(36)));
+        } else {
+            compactUserAction = null;
+            if (!tiny) {
+                tools.addView(vdiv(), kit.lp(Theme.dp(1), Theme.dp(22)));
+                tools.addView(zoom, new LinearLayout.LayoutParams(Theme.dp(42), Theme.dp(36)));
+            }
+        }
         header.addView(tools, kit.lp(-2, -2));
+        refreshUserChip();
         root.addView(header, kit.lp(-1, -2));
         refreshLicChip();
 
@@ -1262,18 +1304,55 @@ public class MainActivity extends Activity {
         } catch (Exception ignored) { }
     }
 
+    /** Open the license connection flow directly in edit mode, preserving the current session. */
+    public void openConnectionSetup() {
+        openConnectionSetup(false, settings != null && settings.connConfigured());
+    }
+
+    private void openConnectionSetup(boolean clearTask, boolean editExisting) {
+        try {
+            Intent i = new Intent(this, LicenseActivity.class);
+            i.putExtra(LicenseActivity.EXTRA_EDIT_CONNECTION, editExisting);
+            if (clearTask) i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(i);
+            if (clearTask) finish();
+        } catch (Exception e) {
+            kit.toast("صفحهٔ تنظیم اتصال باز نشد");
+        }
+    }
+
+    /** Forget the saved IP/database and return to setup without touching the license or account. */
+    public void disconnectConnection() {
+        try {
+            settings.clearSavedServer();
+            getSharedPreferences("meelano_license_ui", MODE_PRIVATE).edit()
+                    .remove("conn_summary").apply();
+            kit.toast("آدرس‌های سرور پاک شد؛ اطلاعات ورود SQL و حساب محلی حفظ شدند");
+            openConnectionSetup(true, false);
+        } catch (Exception e) {
+            kit.toast("پاک‌کردن آدرس سرور ممکن نشد");
+        }
+    }
+
     public void refreshUserChip() {
         try {
-            if (userChip == null) return;
-            if (!AtiranAuth.hasSession(this)) {
-                userChip.setVisibility(View.GONE);
-                return;
+            boolean hasSession = AtiranAuth.hasSession(this);
+            if (userChip != null) {
+                if (!hasSession) {
+                    userChip.setVisibility(View.GONE);
+                } else {
+                    userChip.setVisibility(View.VISIBLE);
+                    String nm = AtiranAuth.sessionName(this);
+                    if (nm.isEmpty()) nm = AtiranAuth.sessionUser(this);
+                    if (nm.isEmpty()) nm = RoleStore.faName(AtiranAuth.sessionRole(this));
+                    ir.meelano.manager.ui.MeelanoIcons.set(userChip, "\uD83D\uDC64 " + nm);
+                }
             }
-            userChip.setVisibility(View.VISIBLE);
-            String nm = AtiranAuth.sessionName(this);
-            if (nm.isEmpty()) nm = AtiranAuth.sessionUser(this);
-            if (nm.isEmpty()) nm = RoleStore.faName(AtiranAuth.sessionRole(this));
-            ir.meelano.manager.ui.MeelanoIcons.set(userChip, "\uD83D\uDC64 " + nm);
+            if (compactUserAction != null) {
+                compactUserAction.setVisibility(hasSession ? View.VISIBLE : View.GONE);
+                compactUserAction.setContentDescription(hasSession
+                        ? "حساب کاربری؛ خروج یا تغییر کاربر" : "ورود به حساب کاربری");
+            }
         } catch (Exception ignored) { }
     }
 
@@ -1300,7 +1379,7 @@ public class MainActivity extends Activity {
                     } catch (Exception ignored) { }
                     nav("users");
                 }), kit.lp(-1, -2));
-            body.addView(kit.btn("خروج / تغییر کاربر", v -> {
+            body.addView(kit.btnGhost("↪ خروج از حساب / تغییر کاربر", Theme.DANGER, v -> {
                 try {
                     box[0].dismiss();
                 } catch (Exception ignored) { }

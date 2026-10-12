@@ -42,8 +42,8 @@ public class SettingsScreen extends Screen {
         // ---- connection ----
         LinearLayout c = a.kit.card(Theme.GOLD);
         c.addView(a.kit.text("🔒 اتصال به آتیران", 14.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
-        // Locked by design: the server address and credentials live only inside the
-        // seller's encrypted connection card and are never shown or typed here.
+        // Only a masked address is shown here. Server/IP edits happen in the
+        // license connection flow; the existing direct SQL login is unchanged.
         final boolean cfg = a.settings.connConfigured();
         c.addView(a.kit.kv("وضعیت", cfg ? "✓ تنظیم‌شده توسط فروشنده" : "✕ هنوز تنظیم نشده",
                 cfg ? Theme.SUCCESS : Theme.DANGER), a.kit.lp(-1, -2));
@@ -66,8 +66,7 @@ public class SettingsScreen extends Screen {
             } catch (Exception ignored) { }
             render(content);
         }), a.kit.lp(-1, -2));
-        LinearLayout row = a.kit.h();
-        row.addView(a.kit.btn("تست اتصال", v -> {
+        c.addView(a.kit.btn("تست اتصال", v -> {
             a.kit.toast("در حال تست اتصال…");
             a.testConnection(new Repo.Cb<String>() {
                 @Override
@@ -80,17 +79,19 @@ public class SettingsScreen extends Screen {
                     a.kit.toast(faError);
                 }
             });
-        }), a.kit.wlp(1f));
-        row.addView(a.kit.space(8));
-        row.addView(a.kit.btnGhost("تنظیم با کارت فروشنده", Theme.GOLD, v -> {
-            try {
-                a.startActivity(new android.content.Intent(a,
-                        ir.meelano.manager.LicenseActivity.class));
-            } catch (Exception e) {
-                a.kit.toast("ممکن نشد");
-            }
-        }), a.kit.wlp(1f));
-        c.addView(row, a.kit.lp(-1, -2));
+        }), a.kit.lp(-1, -2));
+        c.addView(a.kit.btnGhost(cfg ? "✦ تغییر IP / دیتابیس" : "✦ تنظیم IP / دیتابیس",
+                Theme.GOLD, v -> a.openConnectionSetup()), a.kit.lp(-1, -2));
+        if (cfg) {
+            c.addView(a.kit.btnGhost("⨯ قطع اتصال و پاک‌کردن IP ذخیره‌شده", Theme.DANGER, v -> {
+                new AlertDialog.Builder(a)
+                        .setTitle("پاک‌کردن اتصال ذخیره‌شده؟")
+                        .setMessage("IPهای سرور و دیتابیس انتخاب‌شده پاک می‌شوند. لایسنس، حساب محلی و اطلاعات ورود SQL حفظ خواهند شد.")
+                        .setNegativeButton("انصراف", null)
+                        .setPositiveButton("پاک‌کردن IP", (dialog, which) -> a.disconnectConnection())
+                        .show();
+            }), a.kit.lp(-1, -2));
+        }
         c.addView(a.kit.btnGhost("🛠 عیب‌یابی هوشمند اتصال", Theme.TEAL, v -> {
             try {
                 ir.meelano.manager.ui.LinkPanel.showDiagnose(a, a.settings);
@@ -108,6 +109,34 @@ public class SettingsScreen extends Screen {
         }), a.kit.lp(-1, -2));
         c.addView(a.kit.hint("اگر فیلترشکن مسیر سرور را می‌بندد، «اتصال مستقیم» را روشن کنید تا برنامه از شبکه عادی عبور کند."), a.kit.lp(-1, -2));
         a.kit.addCard(content, c);
+
+        // Local-only crash breadcrumb; users copy it deliberately when support asks.
+        if (ir.meelano.manager.core.CrashReporter.hasReport(a)) {
+            LinearLayout crash = a.kit.card(Theme.DANGER);
+            crash.addView(a.kit.text("گزارش خطای اخیر", 14.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
+            crash.addView(a.kit.hint("گزارش فقط شامل نوع خطا، نسخه و محل کد است؛ پیام استثنا، IP، رمزها و اطلاعات فروش ذخیره نمی‌شوند. کپی به‌صورت دستی انجام می‌شود و چیزی خودکار ارسال نمی‌شود."), a.kit.lp(-1, -2));
+            crash.addView(a.kit.btnGhost("کپی گزارش فنی برای پشتیبانی", Theme.INFO, v -> {
+                String report = ir.meelano.manager.core.CrashReporter.readReport(a);
+                try {
+                    android.content.ClipboardManager cm = (android.content.ClipboardManager)
+                            a.getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+                    if (cm == null || report.isEmpty()) {
+                        a.kit.toast("گزارش فنی در دسترس نیست");
+                        return;
+                    }
+                    cm.setPrimaryClip(android.content.ClipData.newPlainText("گزارش خطای میلانو", report));
+                    a.kit.toast("گزارش کپی شد؛ آن را برای پشتیبانی بفرستید");
+                } catch (Exception e) {
+                    a.kit.toast("کپی گزارش ممکن نشد");
+                }
+            }), a.kit.lp(-1, -2));
+            crash.addView(a.kit.btnGhost("پاک‌کردن گزارش ذخیره‌شده", Theme.DANGER, v -> {
+                ir.meelano.manager.core.CrashReporter.clearReport(a);
+                a.kit.toast("گزارش پاک شد");
+                render(content);
+            }), a.kit.lp(-1, -2));
+            a.kit.addCard(content, crash);
+        }
 
         // ---- luxury theme ----
         LinearLayout th = a.kit.card(Theme.GOLD);

@@ -40,6 +40,27 @@ jobs:
           set -o pipefail
           gradle :app:testDebugUnitTest :app:assembleDebug --stacktrace --no-daemon 2>&1 | tee ../manager-build.log | tail -80
 
+      - name: Include Gradle diagnostics in job summary
+        if: failure()
+        run: |
+          if [ -f manager-build.log ]; then
+            {
+              echo '### Manager Gradle diagnostics (last 150 lines)'
+              echo '```text'
+              tail -n 150 manager-build.log
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload manager build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: manager-v36-build-log
+          path: manager-build.log
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Verify APK identity, version and signature
         run: |
           set -euo pipefail

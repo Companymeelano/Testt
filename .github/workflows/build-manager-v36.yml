@@ -50,6 +50,11 @@ jobs:
               tail -n 150 manager-build.log
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
+            while IFS= read -r line; do
+              escaped=${line//'%'/'%25'}
+              escaped=${escaped//$'\r'/'%0D'}
+              echo "::notice file=.github/workflows/build-manager-v36.yml,title=Gradle diagnostic::$escaped"
+            done < <(tail -n 35 manager-build.log)
           fi
 
       - name: Upload manager build log

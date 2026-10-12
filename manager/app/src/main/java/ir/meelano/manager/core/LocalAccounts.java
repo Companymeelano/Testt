@@ -3,8 +3,9 @@ package ir.meelano.manager.core;
 /**
  * Fixed local accounts — added at the customer's explicit request (2026-10-10).
  *
- * These two names are accepted without touching the Atiran database, because the
- * real password check cannot be completed: Atiran stores `user_password` as a
+ * These two names are accepted locally (only after license and selected-server/
+ * database setup), without touching the Atiran user table, because the real
+ * password check cannot be completed: Atiran stores `user_password` as a
  * proprietary binary hash whose algorithm is not public, so neither
  * {@code pwdcompare()} nor any standard digest matches it (see AtiranAuth).
  *
@@ -55,11 +56,21 @@ public final class LocalAccounts {
         return null;
     }
 
-    /** True when this name is one of the fixed accounts (used for messaging). */
+    /** True when this is a reserved local username (do not send it to Atiran auth). */
     public static boolean isLocal(String user) {
         if (user == null) return false;
         String u = Money.en(user).trim();
         for (Acc a : ACCOUNTS) if (a.user.equalsIgnoreCase(u)) return true;
+        return false;
+    }
+
+    /** True only for a session created from the matching fixed local identity. */
+    public static boolean isLocalSession(String user, int uid, String role) {
+        if (user == null || role == null) return false;
+        String u = Money.en(user).trim();
+        for (Acc a : ACCOUNTS) {
+            if (a.uid == uid && a.user.equalsIgnoreCase(u) && a.role.equals(role)) return true;
+        }
         return false;
     }
 

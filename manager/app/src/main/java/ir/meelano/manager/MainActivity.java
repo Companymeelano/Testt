@@ -116,6 +116,11 @@ public class MainActivity extends Activity {
             toLicense();
             return;
         }
+        // License → explicit server/database selection → account login.
+        if (!new Settings(this).connConfigured()) {
+            toLicense();
+            return;
+        }
         if (AtiranAuth.gate(this)) {
             toLogin();
             return;
@@ -137,6 +142,8 @@ public class MainActivity extends Activity {
         // Re-validate the license every time the app comes to the foreground
         // (expired / clock-tampered devices fall back to the activation screen).
         if (!isFinishing() && !LicenseStore.unlocked(this)) toLicense();
+        if (!isFinishing() && LicenseStore.unlocked(this)
+                && !new Settings(this).connConfigured()) toLicense();
         if (!isFinishing() && AtiranAuth.gate(this)) toLogin();
         Usage.touch(this);
         if (repo != null && !isFinishing() && RoleStore.WAREHOUSE.equals(effRole()))

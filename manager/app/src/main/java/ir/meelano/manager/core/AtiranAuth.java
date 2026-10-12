@@ -385,7 +385,7 @@ public final class AtiranAuth {
         return c.getSharedPreferences("meelano_login", Context.MODE_PRIVATE);
     }
 
-    /** Master switch (default ON). Admins can turn the login screen off. */
+    /** Legacy preference retained for migration; it cannot bypass the local account gate. */
     public static boolean enabled(Context c) {
         try {
             return prefs(c).getBoolean("login_on", true);
@@ -400,7 +400,7 @@ public final class AtiranAuth {
         } catch (Exception ignored) { }
     }
 
-    /** True when this database cannot do Atiran login (no sys_users). */
+    /** Legacy marker from older builds; it no longer bypasses the app account gate. */
     public static boolean noTable(Context c) {
         try {
             return prefs(c).getBoolean("no_table", false);
@@ -421,12 +421,14 @@ public final class AtiranAuth {
         } catch (Exception ignored) { }
     }
 
-    /** Should MainActivity bounce to LoginActivity right now? */
+    /** Require a valid local manager/warehouse account session in this standalone build. */
     public static boolean gate(Context c) {
         try {
-            return enabled(c) && !noTable(c) && !validSession(c);
+            if (!validSession(c)) return true;
+            return !LocalAccounts.isLocalSession(
+                    sessionUser(c), sessionUid(c), sessionRole(c));
         } catch (Exception e) {
-            return false;
+            return true;
         }
     }
 

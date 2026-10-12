@@ -13,6 +13,7 @@ import android.widget.TextView;
 import java.sql.Connection;
 
 import ir.meelano.manager.core.AtiranAuth;
+import ir.meelano.manager.core.LicenseStore;
 import ir.meelano.manager.core.LocalAccounts;
 import ir.meelano.manager.core.RoleStore;
 import ir.meelano.manager.data.Settings;
@@ -21,18 +22,11 @@ import ir.meelano.manager.ui.Kit;
 import ir.meelano.manager.ui.Theme;
 
 /**
- * Atiran user login (v26). Shown after license + connection setup, before
- * the shell. Username + password are checked against the shop's own
- * `sys_users` table; the in-app role comes from the Atiran role name.
- *
- * Strict since v27: login accepts ONLY the real Atiran password (server
- * pwdcompare() + the full standard-hash try) — no bootstrap, no app-PIN
- * fallback here. After the first online login the verifier is cached, so
- * the same real-password check also works offline.
- * One app, many editions (v30): the Atiran role routes each user to his
- * own edition (admin -> management, warehouse -> anbar …). Roles whose
- * edition is not published yet get a «coming soon» gate instead of an
- * error (see AtiranAuth.phaseOpen).
+ * Manager-app account gate. Shown only after a valid license and an explicitly
+ * selected server/database. The fixed local accounts are the only route into
+ * the manager and warehouse editions; those reserved names and roles are never
+ * authenticated through Atiran's user table. A missing Atiran login table never
+ * opens the shell without authentication.
  */
 public class LoginActivity extends Activity {
 
@@ -56,6 +50,10 @@ public class LoginActivity extends Activity {
         } catch (Exception ignored) { }
         kit = new Kit(this);
         settings = new Settings(this);
+        if (!LicenseStore.unlocked(this) || !settings.connConfigured()) {
+            toLicenseSetup();
+            return;
+        }
 
         ScrollView sv = new ScrollView(this);
         sv.setBackgroundColor(Theme.BG);
@@ -67,17 +65,18 @@ public class LoginActivity extends Activity {
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(Theme.dp(92), Theme.dp(92));
         lp.gravity = Gravity.CENTER;
         root.addView(kit.logo(92), lp);
-        TextView t = kit.text("ورود مدیر", 23, Theme.TEXT, true);
+        TextView t = kit.text("ورود به میلانو", 23, Theme.TEXT, true);
         t.setGravity(Gravity.CENTER);
         root.addView(t, kit.lp(-1, -2));
-        TextView s = kit.text("نام کاربری و رمز واقعی آتیران", 12.5f, Theme.MUTED, false);
+        TextView s = kit.text("پس از انتخاب دیتابیس، با حساب مدیریت یا انبارداری وارد شوید",
+                12.5f, Theme.MUTED, false);
         s.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams sp = kit.lp(-1, -2);
         sp.setMargins(0, Theme.dp(6), 0, Theme.dp(16));
         root.addView(s, sp);
 
         LinearLayout card = kit.card(Theme.GOLD);
-        eUser = kit.edit("نام کاربری آتیران", "");
+        eUser = kit.edit("نام کاربری", "");
         try {
             eUser.setTextDirection(View.TEXT_DIRECTION_ANY_RTL);
         } catch (Exception ignored) { }
@@ -106,7 +105,7 @@ public class LoginActivity extends Activity {
         loginBtn = kit.btn("ورود", v -> doLogin());
         root.addView(loginBtn, kit.lp(-1, -2));
         root.addView(kit.gap(10));
-        root.addView(kit.hint("با نام کاربری و رمز آتیران خودتان وارد شوید؛ به نسخه مخصوص نقش‌تان می‌روید."),
+        root.addView(kit.hint("با حساب محلی مدیریت یا انبارداری وارد شوید؛ محیط متناسب با نقش شما باز می‌شود."),
                 kit.lp(-1, -2));
         root.addView(kit.gap(6));
         TextView verLine = kit.text("میلانو • " + appVer(), 10.5f, Theme.MUTED, false);
@@ -139,6 +138,11 @@ public class LoginActivity extends Activity {
 
     // ================= login flow =================
 
+    /** Management and warehouse editions are reserved for the fixed local app accounts. */
+    private boolean requiresLocalAccount(String role) {
+        return RoleStore.ADMIN.equals(role) || RoleStore.WAREHOUSE.equals(role);
+    }
+
     private void doLogin() {
         if (busy) return;
         final String user = eUser.getText().toString().trim();
@@ -153,12 +157,18 @@ public class LoginActivity extends Activity {
         }
         showErr(null);
         final boolean rem = remember;
-        // Fixed local accounts (customer request 2026-10-10): accepted here, before any
-        // database work, so the app is usable while the Atiran hash stays unresolved.
+        // Fixed local accounts are checked only after the license and database gates;
+        // they do not query Atiran's sys_users table.
         LocalAccounts.Acc la = LocalAccounts.match(user, pass);
         if (la != null) {
             uiSuccess(la.uid, la.user, la.name, la.role, rem, false,
                     "خوش آمدید " + la.name);
+            return;
+        }
+        // These two reserved account names are app-local only; never pass them
+        // through to the Atiran user-table verifier when their local secret is wrong.
+        if (LocalAccounts.isLocal(user)) {
+            showErr("رمز حساب محلی نادرست است");
             return;
         }
         setBusy(true);
@@ -192,32 +202,29 @@ public class LoginActivity extends Activity {
                     uiFail("این حساب در آتیران غیرفعال است");
                     return;
                 }
-                // Cache the verifier now: enables the same real-password check offline.
-                AtiranAuth.putPwCache(LoginActivity.this, u.uid, u.pw);
+                // STRICT: the real Atiran password, and nothing else.
+                if (!serverOk && !AtiranAuth.verifyPassword(u.pw, pass, u.userName)) {
+                    uiPwFail(u, false);
+                    return;
+                }
                 String role = AtiranAuth.effectiveRole(LoginActivity.this, u.uid, u.appRole);
+                if (requiresLocalAccount(role)) {
+                    uiFail("برای بخش مدیریت و انبارداری از حساب محلی همین اپ استفاده کنید.");
+                    return;
+                }
                 if (!AtiranAuth.phaseOpen(LoginActivity.this, role)) {
                     uiFail("نسخه «" + RoleStore.faName(role)
                             + "» به‌زودی به همین برنامه اضافه می‌شود 🌱");
                     return;
                 }
-                // STRICT: the real Atiran password, and nothing else.
-                if (serverOk || AtiranAuth.verifyPassword(u.pw, pass, u.userName)) {
-                    uiSuccess(u.uid, u.userName, u.displayName, role, rem, false,
-                            "خوش آمدید " + u.displayName);
-                    return;
-                }
-                uiPwFail(u, serverOk);
+                // Cache a verified Atiran credential only for roles that use this path.
+                AtiranAuth.putPwCache(LoginActivity.this, u.uid, u.pw);
+                uiSuccess(u.uid, u.userName, u.displayName, role, rem, false,
+                        "خوش آمدید " + u.displayName);
             } catch (AtiranAuth.NoTable nt) {
-                // This database has no login tables: don't trap the user here.
-                try {
-                    AtiranAuth.setNoTable(LoginActivity.this);
-                } catch (Exception ignored) { }
-                runOnUiThread(() -> {
-                    if (isFinishing()) return;
-                    setBusy(false);
-                    kit.toast("ورود آتیران در این دیتابیس پشتیبانی نمی‌شود؛ بدون ورود وارد شدید");
-                    goMain();
-                });
+                // Local accounts were checked first; never let a missing Atiran
+                // user table bypass the selected-account gate.
+                uiFail("جدول کاربران در این دیتابیس یافت نشد؛ حساب محلی مدیریت یا انبارداری را وارد کنید.");
             } catch (Exception connErr) {
                 // ---- offline fallback: cached user + app PIN ----
                 offlineTry(user, pass, rem);
@@ -231,13 +238,17 @@ public class LoginActivity extends Activity {
             if (uid != -999) {
                 String role = AtiranAuth.cachedRole(LoginActivity.this, uid);
                 if (role.isEmpty()) role = RoleStore.ADMIN;
-                if (!AtiranAuth.phaseOpen(LoginActivity.this, role)) {
-                    uiFail("نسخه «" + RoleStore.faName(role)
-                            + "» به‌زودی به همین برنامه اضافه می‌شود 🌱");
-                    return;
-                }
                 byte[] cached = AtiranAuth.cachedPw(LoginActivity.this, uid);
                 if (cached != null && AtiranAuth.verifyPassword(cached, pass, user)) {
+                    if (requiresLocalAccount(role)) {
+                        uiFail("برای بخش مدیریت و انبارداری از حساب محلی همین اپ استفاده کنید.");
+                        return;
+                    }
+                    if (!AtiranAuth.phaseOpen(LoginActivity.this, role)) {
+                        uiFail("نسخه «" + RoleStore.faName(role)
+                                + "» به‌زودی به همین برنامه اضافه می‌شود 🌱");
+                        return;
+                    }
                     String nm = AtiranAuth.cachedName(LoginActivity.this, uid);
                     if (nm.isEmpty()) nm = user;
                     uiSuccess(uid, user, nm, role, rem, false,
@@ -353,6 +364,15 @@ public class LoginActivity extends Activity {
         } catch (Exception e) {
             return "";
         }
+    }
+
+    private void toLicenseSetup() {
+        try {
+            Intent i = new Intent(this, LicenseActivity.class);
+            i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(i);
+        } catch (Exception ignored) { }
+        finish();
     }
 
     private void goMain() {

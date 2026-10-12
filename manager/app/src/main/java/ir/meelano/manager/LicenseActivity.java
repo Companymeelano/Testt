@@ -57,9 +57,8 @@ import ir.meelano.licensing.License;
 /**
  * Offline license gate (v31 steps): page 1 asks ONLY the name + contact
  * number, then a beautiful fixed waiting page holds until the license
- * lands; page 2 asks ONLY the server address + DB name and finds the
- * reachable SQL Server itself (typed host, transplanted subnet, gateway,
- * common octets — port 1433 hidden). Everything activates silently:
+ * lands; page 2 asks for the server address, lists compatible databases,
+ * and lets the user choose one before entering the app. Everything activates silently:
  * no mechanism talk, no notification. Remote revoke/block enforcement
  * stays, plus the luxury gold designer signature on every page.
  * Blocks MainActivity until {@link LicenseStore#unlocked}.
@@ -660,7 +659,7 @@ public class LicenseActivity extends Activity {
     }
 
 
-    // ================= page 2: server + DB, the app finds the rest =================
+    // ================= page 2: server IP, then explicit database choice =================
 
     /**
      * Luxury manual recall (v32): no mechanism talk — the button says the
@@ -814,10 +813,10 @@ public class LicenseActivity extends Activity {
         LinearLayout c = Card3D.card(this, Theme.GOLD);
         LinearLayout chead = kit.h();
         chead.setGravity(Gravity.CENTER_VERTICAL);
-        chead.addView(Card3D.stepRow(this, kit, "✦", Theme.GOLD, "اتصال به فروشگاه"), kit.wlp(1f));
+        chead.addView(Card3D.stepRow(this, kit, "✦", Theme.GOLD, "اتصال به سرور"), kit.wlp(1f));
         chead.addView(refreshIconView(), kit.lp(-2, -2));
         c.addView(chead, kit.lp(-1, -2));
-        c.addView(kit.text("کلید رسید ✦ حالا آدرس فروشگاه را بنویسید.",
+        c.addView(kit.text("لایسنس فعال است؛ IP سرور را وارد کنید تا دیتابیس‌های سازگار نمایش داده شوند.",
                 13f, Theme.TEXT, false), kit.lp(-1, -2));
         connRadar = new RadarView(this);
         LinearLayout.LayoutParams rlp =
@@ -830,17 +829,18 @@ public class LicenseActivity extends Activity {
         connStage.setVisibility(View.GONE);
         c.addView(connStage, kit.lp(-1, -2));
         c.addView(kit.gap(6));
-        final EditText fIp = kit.edit("آدرس سرور", "");
+        final EditText fIp = kit.edit("IP سرور اختصاصی", "");
         try {
             fIp.setInputType(android.text.InputType.TYPE_CLASS_TEXT
                     | android.text.InputType.TYPE_TEXT_VARIATION_URI);
         } catch (Exception ignored) { }
         c.addView(iconField(fIp, R.drawable.mi_my_location), kit.lp(-1, -2));
-        final EditText fDb = kit.edit("نام دیتابیس", "");
-        c.addView(iconField(fDb, R.drawable.mi_database), kit.lp(-1, -2));
+        c.addView(kit.text("پس از اتصال مستقیم، دیتابیس‌های دارای ساختار آتیران برای انتخاب نمایش داده می‌شوند.",
+                11.5f, Theme.MUTED, false), kit.lp(-1, -2));
         c.addView(kit.gap(4));
         final android.widget.Button[] btn = new android.widget.Button[1];
-        btn[0] = kit.btnGold("✦ اتصال", v -> connectSmart(txt(fIp), txt(fDb), btn[0]));
+        btn[0] = kit.btnGold("✦ اتصال و نمایش دیتابیس‌ها",
+                v -> connectManual(txt(fIp), btn[0]));
         c.addView(btn[0], kit.lp(-1, -2));
         c.addView(kit.gap(6));
         final android.widget.Button[] wbtn = new android.widget.Button[1];
@@ -890,116 +890,120 @@ public class LicenseActivity extends Activity {
     }
 
     /**
-     * One address in, a working SQL Server out: the typed host first, then
-     * the phone's own subnet (transplanted octet, gateway, common octets).
-     * Login probes run in parallel — the first winner is saved as lan/wan
-     * by its nature. Port 1433 is never shown.
+     * Manual connection stays on the existing direct SQL Server/jTDS path.
+     * The entered host is used as-is: databases are read from master, checked
+     * for Atiran tables, and shown in the existing picker before saving.
      */
-    private void connectSmart(String ip, String db, final android.widget.Button btn) {
+    private void connectManual(String ip, final android.widget.Button btn) {
         final String fIp = LanDiscover.clean(ip);
-        final String fDb = db == null ? "" : db.trim();
         if (fIp.isEmpty()) {
-            kit.toast("آدرس سرور را وارد کنید");
-            return;
-        }
-        if (fDb.isEmpty()) {
-            kit.toast("نام دیتابیس را وارد کنید");
+            kit.toast("IP سرور را وارد کنید");
             return;
         }
         if (!Net.online(this)) {
-            kit.toast("اینترنت قطع است — وصل شوید و دوباره بزنید");
+            kit.toast("شبکه قطع است — به وای‌فای یا دیتای موبایل وصل شوید");
             return;
         }
         try {
             btn.setEnabled(false);
-            btn.setText("در حال یافتن سرور…");
+            btn.setText("در حال دریافت دیتابیس‌ها…");
         } catch (Exception ignored) { }
-        showRadar("در حال بررسی آدرس شما…");
+        showRadar("در حال اتصال مستقیم به سرور…");
         new Thread(() -> {
-            List<String> cands = LanDiscover.find(fIp, LanDiscover.PORT);
-            if (cands.isEmpty()) stage("در حال گشتن در شبکه فروشگاه…");
-            else stage(Money.fa(String.valueOf(cands.size())) + " مسیر پیدا شد؛ در حال ورود…");
-            String winner = null;
-            int tables = -1;
-            if (!cands.isEmpty()) {
-                ExecutorService pool =
-                        Executors.newFixedThreadPool(Math.min(6, cands.size()));
-                try {
-                    List<Future<int[]>> fs = new ArrayList<>();
-                    for (final String h : cands) {
-                        fs.add(pool.submit(() -> {
-                            try {
-                                int n = SmartLink.probeTables(h, LanDiscover.PORT, fDb,
-                                        License.SQL_USER, License.SQL_PASS);
-                                return new int[]{n};
-                            } catch (Exception e) {
-                                return new int[]{-1};
-                            }
-                        }));
-                    }
-                    long deadline = System.currentTimeMillis() + 20000;
-                    for (int i = 0; i < fs.size(); i++) {
-                        long left = deadline - System.currentTimeMillis();
-                        if (left <= 0) break;
-                        try {
-                            int[] r = fs.get(i).get(left, TimeUnit.MILLISECONDS);
-                            if (r != null && r[0] >= 0) {
-                                winner = cands.get(i);
-                                tables = r[0];
-                                break;
-                            }
-                        } catch (Exception ignored) { }
-                    }
-                } finally {
-                    pool.shutdownNow();
-                }
-            }
-            final String win = winner;
-            final int winN = tables;
-            runOnUiThread(() -> {
-                try {
-                    btn.setEnabled(true);
-                    ir.meelano.manager.ui.MeelanoIcons.set(btn, "✦ اتصال");
-                } catch (Exception ignored) { }
-                if (isFinishing()) return;
-                hideRadar();
-                if (win == null) {
+            List<String> databases = LanDiscover.listDatabases(fIp, LanDiscover.PORT,
+                    License.SQL_USER, License.SQL_PASS);
+            if (databases == null || databases.isEmpty()) {
+                runOnUiThread(() -> {
+                    hideRadar();
+                    restoreManualBtn(btn);
+                    if (isFinishing()) return;
+                    kit.toast("فهرست دیتابیس‌ها دریافت نشد؛ اتصال و دسترسی را بررسی کنید");
+                    Boolean priv = SmartLink.isPrivate(fIp);
+                    final String lan = (priv == null || priv) ? fIp : "";
+                    final String wan = (priv != null && !priv) ? fIp : "";
                     boolean vpn = NetRoute.isVpnActive(LicenseActivity.this);
-                    kit.toast("سرور پیدا نشد");
-                    SmartLink.diagnoseExplicit(LicenseActivity.this, "", fIp,
-                            LanDiscover.PORT, fDb,
-                            License.SQL_USER, License.SQL_PASS, vpn, r -> {
+                    SmartLink.diagnoseExplicit(LicenseActivity.this, lan, wan,
+                            LanDiscover.PORT, "master", License.SQL_USER,
+                            License.SQL_PASS, vpn, r -> {
                                 if (isFinishing()) return;
                                 LinkPanel.showFixSheet(LicenseActivity.this, r,
-                                        () -> connectSmart(fIp, fDb, btn),
+                                        () -> connectManual(fIp, btn),
                                         () -> LinkPanel.showDiagnoseExplicit(
-                                                LicenseActivity.this, "", fIp,
-                                                LanDiscover.PORT, fDb,
+                                                LicenseActivity.this, lan, wan,
+                                                LanDiscover.PORT, "master",
                                                 License.SQL_USER, License.SQL_PASS));
                             });
+                });
+                return;
+            }
+
+            stage("دیتابیس‌ها دریافت شدند؛ در حال بررسی سازگاری آتیران…");
+            List<String[]> pairs = new ArrayList<>();
+            for (String db : databases) {
+                if (pairs.size() >= 24) break;
+                if (db != null && !db.trim().isEmpty()) pairs.add(new String[]{fIp, db.trim()});
+            }
+            if (pairs.isEmpty()) {
+                runOnUiThread(() -> {
+                    hideRadar();
+                    restoreManualBtn(btn);
+                    if (!isFinishing()) kit.toast("نام دیتابیسی از سرور دریافت نشد");
+                });
+                return;
+            }
+            List<String[]> compatible = new ArrayList<>();
+            List<Integer> tableCounts = new ArrayList<>();
+            ExecutorService pool = Executors.newFixedThreadPool(Math.min(8, pairs.size()));
+            try {
+                List<Future<Integer>> fs = new ArrayList<>();
+                for (final String[] pair : pairs) {
+                    fs.add(pool.submit(() -> {
+                        try {
+                            return SmartLink.probeTables(pair[0], LanDiscover.PORT, pair[1],
+                                    License.SQL_USER, License.SQL_PASS);
+                        } catch (Exception e) {
+                            return -1;
+                        }
+                    }));
+                }
+                long deadline = System.currentTimeMillis() + 25000;
+                for (int i = 0; i < fs.size(); i++) {
+                    long left = deadline - System.currentTimeMillis();
+                    if (left <= 0) break;
+                    try {
+                        int n = fs.get(i).get(left, TimeUnit.MILLISECONDS);
+                        if (n > 0) {
+                            compatible.add(pairs.get(i));
+                            tableCounts.add(n);
+                        }
+                    } catch (Exception ignored) { }
+                }
+            } finally {
+                pool.shutdownNow();
+            }
+
+            final List<String[]> found = compatible;
+            final List<Integer> counts = tableCounts;
+            runOnUiThread(() -> {
+                hideRadar();
+                restoreManualBtn(btn);
+                if (isFinishing()) return;
+                if (found.isEmpty()) {
+                    kit.toast("دیتابیس سازگار با ساختار آتیران روی این سرور پیدا نشد");
                     return;
                 }
-                try {
-                    Boolean priv = SmartLink.isPrivate(win);
-                    boolean wifi = Net.wifi(LicenseActivity.this);
-                    String lan = (priv == null || priv) ? win : "";
-                    String wan = (priv != null && !priv) ? win : "";
-                    if (!lan.isEmpty() && !win.equals(fIp)) {
-                        Boolean tp = SmartLink.isPrivate(fIp);
-                        if (tp != null && !tp) wan = fIp;
-                    }
-                    settings.saveSmart(lan, wan, String.valueOf(LanDiscover.PORT), fDb,
-                            License.SQL_USER, License.SQL_PASS);
-                    settings.setLinkLast(!lan.isEmpty() && (wifi || wan.isEmpty())
-                            ? SmartLink.LAN : SmartLink.WAN);
-                } catch (Exception ignored) { }
-                saveConnSummary(win, winN);
-                buzz();
-                kit.toast("✓ وصل شد • " + Money.fa(String.valueOf(winN)) + " بخش پایه آماده");
-                copySiteLine(win, LanDiscover.PORT, fDb);
-                buildUi();
+                // Even a single result is shown for confirmation, so the user
+                // explicitly sees and selects the database before proceeding.
+                dbPickerDialog(found, counts);
             });
         }).start();
+    }
+
+    private void restoreManualBtn(android.widget.Button btn) {
+        try {
+            btn.setEnabled(true);
+            ir.meelano.manager.ui.MeelanoIcons.set(btn, "✦ اتصال و نمایش دیتابیس‌ها");
+        } catch (Exception ignored) { }
     }
 
     /** Wi-Fi connect (v33): find the server, list its databases, user picks one. */

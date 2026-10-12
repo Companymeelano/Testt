@@ -36,9 +36,10 @@ public final class Settings {
         return ir.meelano.manager.core.SmartLink.maskHost(h);
     }
 
-    /** True once the seller's connection card has been applied on this phone. */
+    /** True only after both a server address and an explicitly selected DB are saved. */
     public boolean connConfigured() {
-        return !lan().isEmpty() || !wan().isEmpty() || !host().isEmpty();
+        boolean hostSet = !lan().isEmpty() || !wan().isEmpty() || !host().isEmpty();
+        return hostSet && !db().isEmpty();
     }
     public String port() { return p.getString("db_port", "").trim(); }
     public String db() { return p.getString("db_name", "").trim(); }

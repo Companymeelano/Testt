@@ -92,6 +92,10 @@ def sql_lit(value: str) -> str:
     return "N'" + value.replace("'", "''") + "'"
 
 
+def normalize_identifier(value: str) -> str:
+    return "".join(ch.casefold() for ch in value if ch.isalnum())
+
+
 def restore_sample(container: str, password: str, executable: str, backup: str,
                    database: str) -> None:
     filelist_sql = f"SET NOCOUNT ON; RESTORE FILELISTONLY FROM DISK = {sql_lit(backup)};"
@@ -258,8 +262,8 @@ ORDER BY s.name,o.name,p.parameter_id;
             known_checks.append({"table": table, "status": "missing-table",
                                  "missingColumns": list(wanted)})
             continue
-        actual = {c["name"].lower() for c in obj["columns"]}
-        missing = [c for c in wanted if c.lower() not in actual]
+        actual = {normalize_identifier(c["name"]) for c in obj["columns"]}
+        missing = [c for c in wanted if normalize_identifier(c) not in actual]
         known_checks.append({"table": table, "schema": obj["schema"],
                              "status": "ok" if not missing else "missing-columns",
                              "missingColumns": missing})

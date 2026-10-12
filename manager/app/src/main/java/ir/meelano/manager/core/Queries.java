@@ -261,7 +261,7 @@ public final class Queries {
 
     /**
      * Overdue invoices: code,party,amount,dueDate,days(-1 when unknown),visitor,invoice.
-     * Uses dbo.dif_date_alan when present, else Jalali string comparison (days computed on device).
+     * Uses the discovered dif_date_alan schema when present, else Jalali string comparison (days computed on device).
      */
     public static Q overdueInvoices(Meta m, int top) throws Missing {
         Set<String> sail = m.columns("sailfact");
@@ -279,11 +279,12 @@ public final class Queries {
         List<String> where = new ArrayList<>();
         where.add("s.[tasvieh]='f'");
         where.add("NULLIF(s.[t_date],'') IS NOT NULL");
-        boolean hasFn = m.function("dif_date_alan");
+        String dateDiffFn = m.qFunction("dif_date_alan");
+        boolean hasFn = dateDiffFn != null;
         String daysExpr;
         if (hasFn) {
-            where.add("dbo.dif_date_alan(s.[t_date])<0");
-            daysExpr = "-dbo.dif_date_alan(s.[t_date])";
+            where.add(dateDiffFn + "(s.[t_date])<0");
+            daysExpr = "-" + dateDiffFn + "(s.[t_date])";
         } else {
             where.add("LEFT(TRY_CONVERT(nvarchar(30),s.[t_date]),10)<" + Sql.lit(Jalali.todayStr()));
             daysExpr = "CAST(-1 AS bigint)";
@@ -294,7 +295,7 @@ public final class Queries {
                 + ", " + visitorExpr + " AS visitor, " + numExpr + " AS invoice"
                 + " FROM dbo.sailfact s" + joinSql + " WHERE " + Sql.join(where, " AND ")
                 + Sql.activeAnd(sail, "s")
-                + (hasFn ? " ORDER BY -dbo.dif_date_alan(s.[t_date]) DESC" : " ORDER BY s.[t_date]");
+                + (hasFn ? " ORDER BY -" + dateDiffFn + "(s.[t_date]) DESC" : " ORDER BY s.[t_date]");
         return new Q(sql);
     }
 
@@ -326,13 +327,14 @@ public final class Queries {
 
     /** Aging buckets via dif_date_alan (only call when the function exists): k,amount,count. */
     public static Q agingBuckets(Meta m) throws Missing {
-        if (!m.function("dif_date_alan")) throw new Missing("تابع محاسبه سررسید در دیتابیس نیست");
+        String dateDiffFn = m.qFunction("dif_date_alan");
+        if (dateDiffFn == null) throw new Missing("تابع محاسبه سررسید در دیتابیس نیست");
         m.must("sailfact", "تاریخ تسویه", "t_date");
         m.must("sailfact", "وضعیت تسویه", "tasvieh");
         String amountCol = m.must("sailfact", "مبلغ", "all");
         return new Q("SELECT k AS k, ISNULL(SUM(amount),0) AS amount, COUNT_BIG(1) AS count FROM (SELECT"
-                + " CASE WHEN dbo.dif_date_alan([t_date])<0 THEN 0 WHEN dbo.dif_date_alan([t_date])<=30 THEN 1"
-                + " WHEN dbo.dif_date_alan([t_date])<=60 THEN 2 WHEN dbo.dif_date_alan([t_date])<=90 THEN 3 ELSE 4 END AS k"
+                + " CASE WHEN " + dateDiffFn + "([t_date])<0 THEN 0 WHEN " + dateDiffFn + "([t_date])<=30 THEN 1"
+                + " WHEN " + dateDiffFn + "([t_date])<=60 THEN 2 WHEN " + dateDiffFn + "([t_date])<=90 THEN 3 ELSE 4 END AS k"
                 + ", TRY_CONVERT(decimal(19,2),[all]) AS amount FROM dbo.sailfact"
                 + " WHERE [tasvieh]='f' AND NULLIF([t_date],'') IS NOT NULL) g GROUP BY k ORDER BY k");
     }

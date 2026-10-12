@@ -582,31 +582,35 @@ public final class MasterQueries {
         // Role name (best-effort over role / Roles).
         String roleExpr = role == null ? "N''" : "COALESCE(" + Sql.txt("u", role, 80) + ",N'')";
         String roleJoin = "";
-        for (String rt : new String[]{"role", "Roles"}) {
-            if (!m.table(rt)) continue;
-            String rid = m.colFlex(rt, "role_id", "roleid", "id");
-            String rnm = m.colFlex(rt, "name", "role_name", "title", "onvan");
-            if (rid != null && rnm != null && role != null) {
-                roleJoin = " LEFT JOIN dbo.[" + rt + "] r ON TRY_CONVERT(nvarchar(60),r.[" + rid + "])=TRY_CONVERT(nvarchar(60),u.[" + role + "])";
+        // dbo.Roles is the referenced Atiran role table in the sample backup; keep the legacy EMS.role fallback second.
+        for (String rt : new String[]{"Roles", "role"}) {
+            if (!m.table(rt) || !m.canSelect(rt)) continue;
+            String rid = m.colFlex(rt, "role_id", "roleid", "id", "RollID");
+            String rnm = m.colFlex(rt, "name", "role_name", "title", "onvan", "RollName");
+            String roleTable = m.qTable(rt);
+            if (rid != null && rnm != null && role != null && roleTable != null) {
+                roleJoin = " LEFT JOIN " + roleTable + " r ON TRY_CONVERT(nvarchar(60),r.[" + rid + "])=TRY_CONVERT(nvarchar(60),u.[" + role + "])";
                 roleExpr = "COALESCE(" + Sql.txt("r", rnm, 150) + "," + Sql.txt("u", role, 80) + ",N'')";
                 break;
             }
         }
-        // Last login (best-effort).
+        // Last login (best-effort); Atiran's sample keeps these in security.LoginDetails.
         String loginUser = m.colFlex("LoginDetails", "user_id", "userid", "username", "user_name");
-        String loginDate = m.colFlex("LoginDetails", "login_date", "logindate", "date", "event_time", "time");
-        String loginApply = loginUser != null && loginDate != null && m.table("LoginDetails")
-                ? "OUTER APPLY (SELECT MAX(" + Sql.date10("lg", loginDate) + ") lastDay FROM dbo.LoginDetails lg"
+        String loginDate = m.colFlex("LoginDetails", "DateServer", "DateClient", "login_date", "logindate", "date", "event_time", "time");
+        String loginTable = m.table("LoginDetails") && m.canSelect("LoginDetails") ? m.qTable("LoginDetails") : null;
+        String loginApply = loginUser != null && loginDate != null && loginTable != null
+                ? "OUTER APPLY (SELECT MAX(" + Sql.date10("lg", loginDate) + ") lastDay FROM " + loginTable + " lg"
                 + " WHERE TRY_CONVERT(nvarchar(100),lg.[" + loginUser + "]) IN (TRY_CONVERT(nvarchar(100),u.[" + id + "])"
                 + (uname == null ? "" : ",TRY_CONVERT(nvarchar(100),u.[" + uname + "])") + ")) ll"
                 : "OUTER APPLY (SELECT CAST(NULL AS nvarchar(10)) lastDay) ll";
-        // Today's actions (best-effort).
+        // Today's actions (best-effort); the sample keeps these in security.Log.
         String logUser = m.colFlex("Log", "user_id", "userid", "username", "user_name");
         String logDate = m.colFlex("Log", "date", "event_time", "time", "logdate");
+        String logTable = m.table("Log") && m.canSelect("Log") ? m.qTable("Log") : null;
         // Log dates may be Jalali text or Gregorian datetime — accept today's date in both.
         String todayBoth = logDate == null ? "" : "(" + Sql.date10("lo", logDate) + " IN (" + Sql.lit(Jalali.todayStr()) + "," + Sql.lit(Jalali.todayGregorian()) + "))";
-        String logApply = logUser != null && logDate != null && m.table("Log")
-                ? "OUTER APPLY (SELECT COUNT_BIG(1) n FROM dbo.Log lo WHERE " + todayBoth
+        String logApply = logUser != null && logDate != null && logTable != null
+                ? "OUTER APPLY (SELECT COUNT_BIG(1) n FROM " + logTable + " lo WHERE " + todayBoth
                 + " AND TRY_CONVERT(nvarchar(100),lo.[" + logUser + "]) IN (TRY_CONVERT(nvarchar(100),u.[" + id + "])"
                 + (uname == null ? "" : ",TRY_CONVERT(nvarchar(100),u.[" + uname + "])") + ")) la"
                 : "OUTER APPLY (SELECT CAST(0 AS bigint) n) la";
@@ -615,23 +619,24 @@ public final class MasterQueries {
                 + ", " + (active == null ? "N''" : "CASE WHEN " + boolTrue("u.[" + active + "]") + " THEN N'✓ فعال' ELSE N'✕ غیرفعال' END") + " AS active"
                 + ", " + (phone == null ? "N''" : "COALESCE(" + Sql.txt("u", phone, 100) + ",N'')") + " AS phone"
                 + ", ll.lastDay AS lastLogin, ISNULL(la.n,0) AS todayN"
-                + " FROM dbo.sys_users u" + roleJoin + " " + loginApply + " " + logApply + " ORDER BY 2");
+                + " FROM " + m.qTable("sys_users") + " u" + roleJoin + " " + loginApply + " " + logApply + " ORDER BY 2");
     }
 
     /** A user's recent logins (best-effort columns). */
     public static Queries.Q userLogins(Meta m, String userId) throws Queries.Missing {
-        if (!m.table("LoginDetails")) throw new Queries.Missing("«ورودهای کاربران» در دیتابیس پیدا نشد");
+        if (!m.table("LoginDetails") || !m.canSelect("LoginDetails"))
+            throw new Queries.Missing("جدول «ورودهای کاربران» پیدا نشد یا مجوز خواندن آن داده نشده است");
         String user = m.must("LoginDetails", "کاربر", "user_id", "UserID", "userid", "username", "user_name");
-        String date = m.colFlex("LoginDetails", "login_date", "logindate", "date", "event_time", "time", "datetime");
-        String ip = m.colFlex("LoginDetails", "ip", "ipaddress", "host", "computer", "system");
-        String desc = m.colFlex("LoginDetails", "description", "desc", "detail", "sharh");
+        String date = m.colFlex("LoginDetails", "DateServer", "DateClient", "login_date", "logindate", "date", "event_time", "time", "datetime");
+        String ip = m.colFlex("LoginDetails", "ComputerIP", "ip", "ipaddress", "host", "computer", "system");
+        String desc = m.colFlex("LoginDetails", "ComputerName", "description", "desc", "detail", "sharh");
         if (date == null && desc == null) throw new Queries.Missing("ساختار «ورودهای کاربران» قابل تشخیص نیست");
         List<Object> binds = new ArrayList<>();
         binds.add(userId);
         return new Queries.Q("SELECT TOP (100) " + (date == null ? "CAST(NULL AS nvarchar(16))" : "LEFT(TRY_CONVERT(nvarchar(30),[" + date + "]),16)") + " AS at"
                 + ", " + (ip == null ? "N''" : "COALESCE(" + Sql.txt(null, ip, 120) + ",N'')") + " AS ip"
                 + ", " + (desc == null ? "N''" : "COALESCE(" + Sql.txt(null, desc, 400) + ",N'')") + " AS descrip"
-                + " FROM dbo.LoginDetails WHERE TRY_CONVERT(nvarchar(100),[" + user + "])=?"
+                + " FROM " + m.qTable("LoginDetails") + " WHERE TRY_CONVERT(nvarchar(100),[" + user + "])=?"
                 + (date == null ? "" : " ORDER BY [" + date + "] DESC"), binds);
     }
 
@@ -804,9 +809,10 @@ public final class MasterQueries {
         String id = m.must("visitors", "کد ویزیتور", "vis_rdf", "rdf");
         String name = m.col("visitors", "vis_name", "name");
         String active = m.col("visitors", "active", "Active");
+        String table = m.qTable("visitors");
         return new Queries.Q("SELECT " + Sql.txt("t", id, 60) + " AS id, "
                 + (name == null ? Sql.txt("t", id, 60) : "COALESCE(" + Sql.txt("t", name, 150) + "," + Sql.txt("t", id, 60) + ")") + " AS name"
-                + " FROM dbo.visitors t ORDER BY "
+                + " FROM " + table + " t ORDER BY "
                 + (active == null ? "" : "CASE WHEN UPPER(LTRIM(RTRIM(TRY_CONVERT(nvarchar(20),[" + active + "])))) IN (N'T',N'1',N'TRUE',N'Y') THEN 0 ELSE 1 END, ")
                 + (name == null ? "1" : "2"));
     }
@@ -814,50 +820,56 @@ public final class MasterQueries {
     public static Queries.Q lookupRoutes(Meta m) throws Queries.Missing {
         String id = m.must("masir", "کد مسیر", "rdf_masir");
         String name = m.col("masir", "name");
+        String table = m.qTable("masir");
         return new Queries.Q("SELECT " + Sql.txt("t", id, 60) + " AS id, "
                 + (name == null ? Sql.txt("t", id, 60) : "COALESCE(" + Sql.txt("t", name, 150) + "," + Sql.txt("t", id, 60) + ")") + " AS name"
-                + " FROM dbo.masir t ORDER BY 2");
+                + " FROM " + table + " t ORDER BY 2");
     }
 
     public static Queries.Q lookupCustGroups(Meta m) throws Queries.Missing {
         String id = m.must("custgroup", "کد گروه", "group_rdf");
         String name = m.col("custgroup", "group_name");
+        String table = m.qTable("custgroup");
         return new Queries.Q("SELECT " + Sql.txt("t", id, 60) + " AS id, "
                 + (name == null ? Sql.txt("t", id, 60) : "COALESCE(" + Sql.txt("t", name, 150) + "," + Sql.txt("t", id, 60) + ")") + " AS name"
-                + " FROM dbo.custgroup t ORDER BY 2");
+                + " FROM " + table + " t ORDER BY 2");
     }
 
     public static Queries.Q lookupKalaGroups(Meta m) throws Queries.Missing {
         String id = m.must("kagroup", "کد گروه", "group_rdf");
         String name = m.col("kagroup", "group_name");
+        String table = m.qTable("kagroup");
         return new Queries.Q("SELECT " + Sql.txt("t", id, 60) + " AS id, "
                 + (name == null ? Sql.txt("t", id, 60) : "COALESCE(" + Sql.txt("t", name, 150) + "," + Sql.txt("t", id, 60) + ")") + " AS name"
-                + " FROM dbo.kagroup t ORDER BY 2");
+                + " FROM " + table + " t ORDER BY 2");
     }
 
     public static Queries.Q lookupWarehouses(Meta m) throws Queries.Missing {
         String id = m.must("anbars", "کد انبار", "rdf_anbar");
         String name = m.col("anbars", "name");
+        String table = m.qTable("anbars");
         return new Queries.Q("SELECT " + Sql.txt("t", id, 60) + " AS id, "
                 + (name == null ? Sql.txt("t", id, 60) : "COALESCE(" + Sql.txt("t", name, 150) + "," + Sql.txt("t", id, 60) + ")") + " AS name"
-                + " FROM dbo.anbars t ORDER BY 2");
+                + " FROM " + table + " t ORDER BY 2");
     }
 
     public static Queries.Q lookupBanks(Meta m) throws Queries.Missing {
         String id = m.must("BANK", "کد بانک", "RDF", "rdf");
         String name = m.colFlex("BANK", "name", "bankname", "title", "onvan");
+        String table = m.qTable("BANK");
         return new Queries.Q("SELECT " + Sql.txt("t", id, 60) + " AS id, "
                 + (name == null ? Sql.txt("t", id, 60) : "COALESCE(" + Sql.txt("t", name, 150) + "," + Sql.txt("t", id, 60) + ")") + " AS name"
-                + " FROM dbo.BANK t ORDER BY 2");
+                + " FROM " + table + " t ORDER BY 2");
     }
 
     public static Queries.Q lookupUsers(Meta m) throws Queries.Missing {
         String id = m.must("sys_users", "کد کاربر", "user_id", "UserID", "userid");
         String uname = m.col("sys_users", "user_name", "Username", "username");
         String lname = m.col("sys_users", "user_lname");
+        String table = m.qTable("sys_users");
         String nm = lname != null ? "COALESCE(" + Sql.txt("t", lname, 120) + "," + (uname == null ? Sql.txt("t", id, 60) : Sql.txt("t", uname, 120)) + ")"
                 : (uname == null ? Sql.txt("t", id, 60) : "COALESCE(" + Sql.txt("t", uname, 120) + "," + Sql.txt("t", id, 60) + ")");
-        return new Queries.Q("SELECT " + Sql.txt("t", id, 60) + " AS id, " + nm + " AS name FROM dbo.sys_users t ORDER BY 2");
+        return new Queries.Q("SELECT " + Sql.txt("t", id, 60) + " AS id, " + nm + " AS name FROM " + table + " t ORDER BY 2");
     }
 
     // =====================================================================================
@@ -1257,9 +1269,10 @@ public final class MasterQueries {
                     + ", " + total + " AS total, COUNT_BIG(1) AS docs FROM " + src
                     + " WHERE " + hh + " BETWEEN 0 AND 23 GROUP BY " + hh + " ORDER BY " + hh, binds);
         }
-        if (!m.function("dif_date_alan")) throw new Queries.Missing("ستون ساعت در فاکتور ثبت نشده و تابع تبدیل تاریخ هم در دیتابیس نیست");
+        String dateDiffFn = m.qFunction("dif_date_alan");
+        if (dateDiffFn == null) throw new Queries.Missing("ستون ساعت در فاکتور ثبت نشده و تابع تبدیل تاریخ هم در دیتابیس نیست");
         // 2024-01-06 was a Saturday: deterministic weekday without depending on DATEFIRST.
-        String gdate = "DATEADD(day,dbo.dif_date_alan(" + Sql.date10("h", dateCol) + "),CAST(GETDATE() AS date))";
+        String gdate = "DATEADD(day," + dateDiffFn + "(" + Sql.date10("h", dateCol) + "),CAST(GETDATE() AS date))";
         String wd = "(DATEDIFF(day,'2024-01-06'," + gdate + ")%7+7)%7";
         String slot = "CASE " + wd + " WHEN 0 THEN N'شنبه' WHEN 1 THEN N'یکشنبه' WHEN 2 THEN N'دوشنبه'"
                 + " WHEN 3 THEN N'سه‌شنبه' WHEN 4 THEN N'چهارشنبه' WHEN 5 THEN N'پنجشنبه' ELSE N'جمعه' END";
@@ -1733,6 +1746,7 @@ public final class MasterQueries {
         String tel = m.col("CUSTOMERS", "tell1", "TELL1");
         String ad = m.col("CUSTOMERS", "addre", "ADDRE", "address");
         String man = m.col("CUSTOMERS", "man", "MAN");
+        String table = m.qTable("CUSTOMERS");
         String t = q == null ? "" : q.trim();
         String where = "";
         java.util.List<Object> binds = new java.util.ArrayList<>();
@@ -1750,36 +1764,40 @@ public final class MasterQueries {
                 + (tel == null ? "N''" : "COALESCE(" + Sql.txt("c", tel, 60) + ",N'')") + " AS tell, "
                 + (ad == null ? "N''" : "COALESCE(" + Sql.txt("c", ad, 300) + ",N'')") + " AS addr, "
                 + (man == null ? "0" : "TRY_CONVERT(money,c.[" + man + "])") + " AS bal"
-                + " FROM dbo.CUSTOMERS c" + where + " ORDER BY c.[" + id + "] DESC", binds);
+                + " FROM " + table + " c" + where + " ORDER BY c.[" + id + "] DESC", binds);
     }
 
     public static Queries.Q whCustGroups(Meta m) throws Queries.Missing {
         String id = m.must("custgroup", "کد گروه", "group_rdf");
         String nm = m.must("custgroup", "نام گروه", "group_name", "name");
+        String table = m.qTable("custgroup");
         return new Queries.Q("SELECT TRY_CONVERT(int,[" + id + "]) AS id, "
-                + Sql.txt(null, nm, 150) + " AS name FROM dbo.custgroup ORDER BY 2");
+                + Sql.txt(null, nm, 150) + " AS name FROM " + table + " ORDER BY 2");
     }
 
     public static Queries.Q whProductGroups(Meta m) throws Queries.Missing {
         String id = m.must("kagroup", "کد گروه", "group_rdf");
         String nm = m.must("kagroup", "نام گروه", "group_name", "name");
+        String table = m.qTable("kagroup");
         return new Queries.Q("SELECT TRY_CONVERT(int,[" + id + "]) AS id, "
-                + Sql.txt(null, nm, 150) + " AS name FROM dbo.kagroup ORDER BY 2");
+                + Sql.txt(null, nm, 150) + " AS name FROM " + table + " ORDER BY 2");
     }
 
     public static Queries.Q whUnits(Meta m) throws Queries.Missing {
         String nm = m.must("UNITS", "نام واحد", "UNIT_NAME", "unit_name", "name");
-        return new Queries.Q("SELECT " + Sql.txt(null, nm, 80) + " AS name FROM dbo.UNITS ORDER BY 1");
+        String table = m.qTable("UNITS");
+        return new Queries.Q("SELECT " + Sql.txt(null, nm, 80) + " AS name FROM " + table + " ORDER BY 1");
     }
 
     public static Queries.Q whVisitors(Meta m) throws Queries.Missing {
         String id = m.must("visitors", "کد ویزیتور", "vis_rdf");
         String nm = m.must("visitors", "نام ویزیتور", "vis_name", "name");
         String cell = m.col("visitors", "vis_cell", "cell");
+        String table = m.qTable("visitors");
         return new Queries.Q("SELECT TRY_CONVERT(int,[" + id + "]) AS id, "
                 + Sql.txt(null, nm, 150) + " AS name, "
                 + (cell == null ? "N''" : "COALESCE(" + Sql.txt(null, cell, 60) + ",N'')")
-                + " AS cell FROM dbo.visitors ORDER BY 2");
+                + " AS cell FROM " + table + " ORDER BY 2");
     }
 
     public static Queries.Q whAnbars(Meta m) throws Queries.Missing {
@@ -1787,11 +1805,12 @@ public final class MasterQueries {
         String nm = m.must("anbars", "نام انبار", "name");
         String kp = m.col("anbars", "anbardar");
         String bs = m.col("anbars", "Base", "base");
+        String table = m.qTable("anbars");
         return new Queries.Q("SELECT TRY_CONVERT(int,[" + id + "]) AS id, "
                 + Sql.txt(null, nm, 150) + " AS name, "
                 + (kp == null ? "N''" : "COALESCE(" + Sql.txt(null, kp, 150) + ",N'')") + " AS keeper, "
                 + (bs == null ? "0" : "CASE WHEN " + boolTrue("[" + bs + "]") + " THEN 1 ELSE 0 END")
-                + " AS isbase FROM dbo.anbars ORDER BY 4 DESC, 2");
+                + " AS isbase FROM " + table + " ORDER BY 4 DESC, 2");
     }
 
     /** Warehouse hub numbers: today's sales count/sum + open purchase pre-invoices. */

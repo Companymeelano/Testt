@@ -5,7 +5,6 @@ import android.os.Handler;
 import android.os.Looper;
 
 import ir.meelano.manager.data.Atiran;
-import ir.meelano.manager.data.Meta;
 import ir.meelano.manager.data.Settings;
 
 import java.net.InetSocketAddress;
@@ -211,15 +210,10 @@ public final class SmartLink {
         }
     }
 
-    /** Full login + count of core Atiran tables (activation tests). */
+    /** Full login + read-only core table/column compatibility preflight (activation tests). */
     public static int probeTables(String host, int port, String db, String user, String pass) throws Exception {
         try (Connection c = Atiran.open(host, port, db, user, pass, 3000, 6, false)) {
-            Meta m = new Meta(c);
-            int n = 0;
-            for (String t : new String[]{"sailfact", "buyfact", "dar", "getchk",
-                    "putchk", "CUSTOMERS", "inventory", "visitors"})
-                if (m.table(t)) n++;
-            return n;
+            return AtiranPreflight.inspect(c).readySections;
         }
     }
 

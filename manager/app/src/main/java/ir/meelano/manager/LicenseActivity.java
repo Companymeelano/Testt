@@ -995,7 +995,7 @@ public class LicenseActivity extends Activity {
                 } catch (Exception ignored) { }
                 saveConnSummary(win, winN);
                 buzz();
-                kit.toast("✓ وصل شد • " + Money.fa(String.valueOf(winN)) + " جدول در دسترس");
+                kit.toast("✓ وصل شد • " + Money.fa(String.valueOf(winN)) + " بخش پایه آماده");
                 copySiteLine(win, LanDiscover.PORT, fDb);
                 buildUi();
             });
@@ -1133,7 +1133,7 @@ public class LicenseActivity extends Activity {
             r.addView(kit.space(8));
             LinearLayout tx = kit.v();
             tx.addView(kit.text(pairs.get(i)[1], 14f, Theme.TEXT, true), kit.lp(-1, -2));
-            tx.addView(kit.text("✓ " + Money.fa(String.valueOf(counts.get(i))) + " جدول آتیران",
+            tx.addView(kit.text("✓ " + Money.fa(String.valueOf(counts.get(i))) + " بخش پایه آماده",
                     11.5f, Theme.SUCCESS, false), kit.lp(-1, -2));
             r.addView(tx, kit.wlp(1f));
             Theme.pressable(r);
@@ -1170,7 +1170,7 @@ public class LicenseActivity extends Activity {
             saveConnSummary(host, tables);
         } catch (Exception ignored) { }
         buzz();
-        kit.toast("✓ وصل شد • " + Money.fa(String.valueOf(tables)) + " جدول در دسترس");
+        kit.toast("✓ وصل شد • " + Money.fa(String.valueOf(tables)) + " بخش پایه آماده");
         copySiteLine(host, LanDiscover.PORT, db);
         buildUi();
     }

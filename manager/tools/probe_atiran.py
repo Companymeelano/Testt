@@ -53,11 +53,21 @@ TABLES = {
     "ban_act": ["bank_rdf"],
     "ActNames": [],
     "COW": [],
-    "dif_date_alan": [],
     "TableChanges": [],
     "Log": [],
 }
 VIEWS = ["VW_GainDetails", "VW_CustomersGain", "VW_InventoryAnbars", "VW_getchk", "VW_Putchk"]
+FUNCTIONS = ["dif_date_alan", "UDF_Persian_To_Julian"]
+
+
+def ident(name):
+    """Quote a catalog-provided SQL Server identifier."""
+    return "[" + str(name).replace("]", "]]") + "]"
+
+
+def norm(name):
+    """Mirror Meta.colFlex: ignore case and non-alphanumeric separators."""
+    return "".join(ch.casefold() for ch in str(name) if ch.isalnum())
 
 
 def main():
@@ -93,27 +103,39 @@ def main():
     ok_tables = 0
     print("== MEELANO Manager — Atiran probe ==\n-- tables --")
     for t, musts in TABLES.items():
-        cur.execute("SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES "
-                    "WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME=%s", (t,))
-        exists = cur.fetchone()[0] > 0
-        if not exists:
-            print(f"[MISS] {t}: not found")
+        cur.execute("SELECT TABLE_SCHEMA,TABLE_NAME FROM INFORMATION_SCHEMA.TABLES "
+                    "WHERE LOWER(TABLE_NAME)=LOWER(%s) "
+                    "ORDER BY CASE WHEN LOWER(TABLE_SCHEMA)=N'dbo' THEN 0 ELSE 1 END,TABLE_SCHEMA,TABLE_NAME", (t,))
+        found = cur.fetchone()
+        if not found:
+            print(f"[MISS] {t}: not found in any schema")
             continue
-        cur.execute(f"SELECT COUNT_BIG(1) FROM dbo.[{t}]")
+        schema, actual_name = found[0], found[1]
+        qualified = ident(schema) + "." + ident(actual_name)
+        cur.execute(f"SELECT COUNT_BIG(1) FROM {qualified}")
         n = cur.fetchone()[0]
         cur.execute("SELECT LOWER(COLUMN_NAME) FROM INFORMATION_SCHEMA.COLUMNS "
-                    "WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME=%s", (t,))
-        cols = {r[0] for r in cur.fetchall()}
-        missing = [c for c in musts if c.lower() not in cols]
+                    "WHERE TABLE_SCHEMA=%s AND TABLE_NAME=%s", (schema, actual_name))
+        cols = {norm(r[0]) for r in cur.fetchall()}
+        missing = [c for c in musts if norm(c) not in cols]
         ok_tables += 1
         flag = "OK " if not missing else "WARN"
         extra = "" if not missing else f"  MISSING COLS: {', '.join(missing)}"
-        print(f"[{flag}] {t}: {n} rows, {len(cols)} cols{extra}")
+        print(f"[{flag}] {schema}.{actual_name}: {n} rows, {len(cols)} cols{extra}")
     print("\n-- views --")
     for v in VIEWS:
-        cur.execute("SELECT COUNT(*) FROM INFORMATION_SCHEMA.VIEWS "
-                    "WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME=%s", (v,))
-        print(f"[{'OK ' if cur.fetchone()[0] else 'MISS'}] {v}")
+        cur.execute("SELECT TABLE_SCHEMA,TABLE_NAME FROM INFORMATION_SCHEMA.VIEWS "
+                    "WHERE LOWER(TABLE_NAME)=LOWER(%s) "
+                    "ORDER BY CASE WHEN LOWER(TABLE_SCHEMA)=N'dbo' THEN 0 ELSE 1 END,TABLE_SCHEMA,TABLE_NAME", (v,))
+        found = cur.fetchone()
+        print(f"[{'OK ' if found else 'MISS'}] {found[0]+'.'+found[1] if found else v}")
+    print("\n-- functions --")
+    for fn in FUNCTIONS:
+        cur.execute("SELECT s.name,o.name FROM sys.objects o JOIN sys.schemas s ON s.schema_id=o.schema_id "
+                    "WHERE o.type IN ('FN','IF','TF','FS','FT') AND LOWER(o.name)=LOWER(%s) "
+                    "ORDER BY CASE WHEN LOWER(s.name)=N'dbo' THEN 0 ELSE 1 END,s.name,o.name", (fn,))
+        found = cur.fetchone()
+        print(f"[{'OK ' if found else 'MISS'}] {found[0]+'.'+found[1] if found else fn}")
     conn.close()
     print(f"\n{a.db}: {ok_tables}/{len(TABLES)} tables present.")
     print("MISS = that app card will show a Persian 'unavailable' note; app keeps working.")
@@ -126,16 +148,35 @@ def pw_dump(conn, cur, username):
     print("WARNING: only for a THROWAWAY test user. Delete that user afterwards.")
     print(f"user: {username}")
     try:
-        cur.execute("SELECT DATALENGTH(user_password) FROM dbo.sys_users "
-                    "WHERE user_name=%s", (username,))
+        cur.execute("SELECT TABLE_SCHEMA,TABLE_NAME FROM INFORMATION_SCHEMA.TABLES "
+                    "WHERE LOWER(TABLE_NAME)=LOWER(%s) "
+                    "ORDER BY CASE WHEN LOWER(TABLE_SCHEMA)=N'dbo' THEN 0 ELSE 1 END,TABLE_SCHEMA,TABLE_NAME",
+                    ("sys_users",))
+        found = cur.fetchone()
+        if not found:
+            print("sys_users table not found in any schema.")
+            conn.close()
+            return 1
+        schema, table = found[0], found[1]
+        qualified = ident(schema) + "." + ident(table)
+        cur.execute("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS "
+                    "WHERE TABLE_SCHEMA=%s AND TABLE_NAME=%s", (schema, table))
+        columns = {norm(row[0]): row[0] for row in cur.fetchall()}
+        user_col = columns.get("username") or columns.get("name")
+        pass_col = columns.get("userpassword")
+        if not user_col or not pass_col:
+            print("sys_users has no recognized username/password column pair.")
+            conn.close()
+            return 1
+        quser, qpass = ident(user_col), ident(pass_col)
+        cur.execute(f"SELECT DATALENGTH({qpass}) FROM {qualified} WHERE {quser}=%s", (username,))
         row = cur.fetchone()
         if not row:
             print("no such user in sys_users.")
             conn.close()
             return 1
         print(f"stored length: {row[0]} bytes")
-        cur.execute("SELECT CONVERT(VARCHAR(MAX), user_password, 2) FROM dbo.sys_users "
-                    "WHERE user_name=%s", (username,))
+        cur.execute(f"SELECT CONVERT(VARCHAR(MAX), {qpass}, 2) FROM {qualified} WHERE {quser}=%s", (username,))
         hx = cur.fetchone()[0]
         print(f"stored hex: {hx}")
     except Exception as e:
@@ -222,70 +263,82 @@ def auth_dump(conn, cur, db):
     have = {}
     for t in AUTH_TABLES:
         try:
-            cur.execute("SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES "
-                        "WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME=%s", (t,))
-            exists = cur.fetchone()[0] > 0
+            cur.execute("SELECT TABLE_SCHEMA,TABLE_NAME FROM INFORMATION_SCHEMA.TABLES "
+                        "WHERE LOWER(TABLE_NAME)=LOWER(%s) "
+                        "ORDER BY CASE WHEN LOWER(TABLE_SCHEMA)=N'dbo' THEN 0 ELSE 1 END,TABLE_SCHEMA,TABLE_NAME", (t,))
+            found = cur.fetchone()
         except Exception as e:
             print(f"[ERR ] {t}: {e}")
             continue
-        have[t] = exists
-        if not exists:
+        if not found:
+            have[t] = None
             print(f"[MISS] {t}")
             continue
-        cur.execute(f"SELECT COUNT_BIG(1) FROM dbo.[{t}]")
+        schema, actual_name = found[0], found[1]
+        qualified = ident(schema) + "." + ident(actual_name)
+        have[t] = (schema, actual_name, qualified)
+        cur.execute(f"SELECT COUNT_BIG(1) FROM {qualified}")
         n = cur.fetchone()[0]
         cur.execute("SELECT COLUMN_NAME + ':' + DATA_TYPE "
                     "FROM INFORMATION_SCHEMA.COLUMNS "
-                    "WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME=%s "
-                    "ORDER BY ORDINAL_POSITION", (t,))
+                    "WHERE TABLE_SCHEMA=%s AND TABLE_NAME=%s "
+                    "ORDER BY ORDINAL_POSITION", (schema, actual_name))
         cols = [r[0] for r in cur.fetchall()]
-        print(f"[OK  ] {t}: {n} rows\n      cols: {', '.join(cols)}")
+        print(f"[OK  ] {schema}.{actual_name}: {n} rows\n      cols: {', '.join(cols)}")
     if have.get("sys_users"):
+        schema, actual_name, qualified = have["sys_users"]
         print("\n-- sys_users sample (id / username / active / role) --")
         try:
             cur.execute("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS "
-                        "WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME='sys_users'")
-            cols = {r[0].lower() for r in cur.fetchall()}
-            idc = next((c for c in cols if c in ("user_id", "userid", "id")), None)
-            unc = next((c for c in cols if c in ("user_name", "username", "name")), None)
-            acc = next((c for c in cols if c in ("active", "isactive")), None)
-            rlc = next((c for c in cols if c in ("role_id", "roleid")), None)
-            sel = ", ".join(x for x in [idc, unc, acc, rlc] if x) or "TOP 0 *"
-            cur.execute(f"SELECT TOP 20 {sel} FROM dbo.sys_users")
+                        "WHERE TABLE_SCHEMA=%s AND TABLE_NAME=%s", (schema, actual_name))
+            cols = [(r[0], norm(r[0])) for r in cur.fetchall()]
+            idc = next((c for c, n in cols if n in ("userid", "id")), None)
+            unc = next((c for c, n in cols if n in ("username", "name")), None)
+            acc = next((c for c, n in cols if n in ("active", "isactive")), None)
+            rlc = next((c for c, n in cols if n in ("roleid",)), None)
+            sel = ", ".join(ident(x) for x in [idc, unc, acc, rlc] if x) or "TOP 0 *"
+            cur.execute(f"SELECT TOP 20 {sel} FROM {qualified}")
             for r in cur.fetchall():
                 print("      " + " | ".join("" if v is None else str(v) for v in r))
         except Exception as e:
             print(f"      [ERR] {e}")
         print("\n-- user_password byte-length distribution (lengths only!) --")
         try:
-            cur.execute("SELECT DATALENGTH(user_password) AS L, COUNT_BIG(1) AS N "
-                        "FROM dbo.sys_users GROUP BY DATALENGTH(user_password)")
-            for length, n in cur.fetchall():
-                print(f"      len={length}: {n} users")
+            password_col = next((c for c, n in cols if n == "userpassword"), None)
+            if password_col is None:
+                print("      user_password column not found")
+            else:
+                qpw = ident(password_col)
+                cur.execute(f"SELECT DATALENGTH({qpw}) AS L, COUNT_BIG(1) AS N "
+                            f"FROM {qualified} GROUP BY DATALENGTH({qpw})")
+                for length, n in cur.fetchall():
+                    print(f"      len={length}: {n} users")
         except Exception as e:
             print(f"      [ERR] {e}")
     for t in ("Roles", "role"):
         if have.get(t):
-            print(f"\n-- {t} rows (id + name auto-detected) --")
+            schema, actual_name, qualified = have[t]
+            print(f"\n-- {schema}.{actual_name} rows (id + name auto-detected) --")
             try:
                 cur.execute("SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS "
-                            "WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME=%s "
-                            "ORDER BY ORDINAL_POSITION", (t,))
+                            "WHERE TABLE_SCHEMA=%s AND TABLE_NAME=%s "
+                            "ORDER BY ORDINAL_POSITION", (schema, actual_name))
                 spec = [(r[0], r[1].lower()) for r in cur.fetchall()]
                 idc = next((c for c, d in spec if "int" in d), spec[0][0] if spec else None)
                 nmc = next((c for c, d in spec
                             if d in ("nvarchar", "varchar", "nchar", "char", "ntext", "text")),
                            spec[-1][0] if spec else None)
                 print(f"      using {idc} / {nmc}")
-                cur.execute(f"SELECT [{idc}], [{nmc}] FROM dbo.[{t}] ORDER BY 1")
-                for r in cur.fetchall():
-                    print(f"      {r[0]} | {r[1]}")
+                if idc and nmc:
+                    cur.execute(f"SELECT {ident(idc)}, {ident(nmc)} FROM {qualified} ORDER BY 1")
+                    for r in cur.fetchall():
+                        print(f"      {r[0]} | {r[1]}")
             except Exception as e:
                 print(f"      [ERR] {e}")
     if have.get("UserAppAccess"):
         print("\n-- UserAppAccess sample --")
         try:
-            cur.execute("SELECT TOP 20 * FROM dbo.UserAppAccess")
+            cur.execute(f"SELECT TOP 20 * FROM {have['UserAppAccess'][2]}")
             for r in cur.fetchall():
                 print("      " + " | ".join("" if v is None else str(v) for v in r))
         except Exception as e:

@@ -13,7 +13,7 @@ public final class Sql {
 
     /** [col] */
     public static String q(String col) {
-        return col == null ? "NULL" : "[" + col.replace("]", "") + "]";
+        return col == null ? "NULL" : "[" + col.replace("]", "]]") + "]";
     }
 
     private static String ref(String alias, String col) {

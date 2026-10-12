@@ -11,6 +11,7 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 
 import ir.meelano.manager.core.AtiranAuth;
+import ir.meelano.manager.core.AtiranPreflight;
 import ir.meelano.manager.core.Filter;
 import ir.meelano.manager.core.Finger;
 import ir.meelano.manager.core.LicenseStore;
@@ -1331,21 +1332,20 @@ public class MainActivity extends Activity {
         } catch (Exception ignored) { }
         SmartLink.diagnose(this, settings, vpn, r -> {
             try {
-                if (r.anyOk) cb.ok("✓ متصل از مسیر " + SmartLink.kindShort(r.activeKind));
-                else cb.fail(r.verdict);
+                if (r.anyOk) {
+                    repo.run(c -> AtiranPreflight.inspect(c).persianSummary()
+                            + " • مسیر " + SmartLink.kindShort(r.activeKind), cb);
+                } else {
+                    cb.fail(r.verdict);
+                }
             } catch (Exception ignored) { }
         });
     }
 
     /** Probe explicit (possibly unsaved) connection values. */
     public void testConnection(String host, int port, String db, String user, String pass, final Repo.Cb<String> cb) {
-        repo.runWith(host, port, db, user, pass, c -> {
-            Meta m = new Meta(c);
-            int n = 0;
-            for (String t : new String[]{"sailfact", "buyfact", "dar", "getchk", "putchk", "CUSTOMERS", "inventory", "visitors"})
-                if (m.table(t)) n++;
-            return "اتصال برقرار شد • " + Money.fa(String.valueOf(n)) + " جدول اصلی در دسترس";
-        }, cb);
+        repo.runWith(host, port, db, user, pass,
+                c -> AtiranPreflight.inspect(c).persianSummary(), cb);
     }
 
     public void sharePdf(final String title, final String subtitle, final ReportCatalog.Col[] cols, final List<Row> rows) {

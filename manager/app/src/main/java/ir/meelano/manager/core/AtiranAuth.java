@@ -88,15 +88,16 @@ public final class AtiranAuth {
         String pwCol = m.col("sys_users", "user_password");
 
         StringBuilder sb = new StringBuilder("SELECT TOP 1 ");
-        sb.append(idCol).append(" AS a_id, ").append(unCol).append(" AS a_un");
-        if (fnCol != null) sb.append(", ").append(fnCol).append(" AS a_fn");
-        if (lnCol != null) sb.append(", ").append(lnCol).append(" AS a_ln");
-        if (roleCol != null) sb.append(", ").append(roleCol).append(" AS a_role");
-        if (actCol != null) sb.append(", ").append(actCol).append(" AS a_act");
-        if (lockCol != null) sb.append(", ").append(lockCol).append(" AS a_lock");
-        if (phoneCol != null) sb.append(", ").append(phoneCol).append(" AS a_phone");
-        if (pwCol != null) sb.append(", ").append(pwCol).append(" AS a_pw");
-        sb.append(" FROM sys_users WHERE ").append(unCol).append(" = ?");
+        sb.append(Sql.q(idCol)).append(" AS a_id, ").append(Sql.q(unCol)).append(" AS a_un");
+        if (fnCol != null) sb.append(", ").append(Sql.q(fnCol)).append(" AS a_fn");
+        if (lnCol != null) sb.append(", ").append(Sql.q(lnCol)).append(" AS a_ln");
+        if (roleCol != null) sb.append(", ").append(Sql.q(roleCol)).append(" AS a_role");
+        if (actCol != null) sb.append(", ").append(Sql.q(actCol)).append(" AS a_act");
+        if (lockCol != null) sb.append(", ").append(Sql.q(lockCol)).append(" AS a_lock");
+        if (phoneCol != null) sb.append(", ").append(Sql.q(phoneCol)).append(" AS a_phone");
+        if (pwCol != null) sb.append(", ").append(Sql.q(pwCol)).append(" AS a_pw");
+        sb.append(" FROM ").append(m.qTable("sys_users"))
+                .append(" WHERE ").append(Sql.q(unCol)).append(" = ?");
 
         AuthUser u = new AuthUser();
         PreparedStatement ps = null;
@@ -142,24 +143,24 @@ public final class AtiranAuth {
     public static String roleNameOf(Connection c, Meta m, int roleId) {
         String[] tables = {"Roles", "role"};
         String[] ids = {"ID", "id", "RoleID", "role_id", "RoleId", "RoleCode",
-                "roleCode", "Code", "code", "RoleRdf", "role_rdf"};
+                "roleCode", "Code", "code", "RoleRdf", "role_rdf", "RollID"};
         String[] nms = {"Name", "name", "RoleName", "role_name", "Title",
-                "title", "RoleTitle", "roleTitle", "Role", "role", "RoleText"};
+                "title", "RoleTitle", "roleTitle", "Role", "role", "RoleText", "RollName"};
         for (String t : tables) {
             String idCol, nmCol;
             try {
                 if (!m.table(t)) continue;
                 idCol = m.col(t, ids);
                 nmCol = m.col(t, nms);
-                if (idCol == null || nmCol == null) continue;
+                if (idCol == null || nmCol == null || !m.canSelect(t)) continue;
             } catch (Exception e) {
                 continue;
             }
             PreparedStatement ps = null;
             ResultSet rs = null;
             try {
-                ps = c.prepareStatement("SELECT TOP 1 " + nmCol + " FROM " + t
-                        + " WHERE " + idCol + " = ?");
+                ps = c.prepareStatement("SELECT TOP 1 " + Sql.q(nmCol) + " FROM " + m.qTable(t)
+                        + " WHERE " + Sql.q(idCol) + " = ?");
                 ps.setInt(1, roleId);
                 rs = ps.executeQuery();
                 if (rs.next()) {
@@ -276,8 +277,8 @@ public final class AtiranAuth {
             String un = m.col("sys_users", "user_name");
             String pw = m.col("sys_users", "user_password");
             if (un == null || pw == null || typed == null || typed.isEmpty()) return false;
-            ps = c.prepareStatement("SELECT TOP 1 pwdcompare(?, " + pw
-                    + ") FROM sys_users WHERE " + un + " = ?");
+            ps = c.prepareStatement("SELECT TOP 1 pwdcompare(?, " + Sql.q(pw)
+                    + ") FROM " + m.qTable("sys_users") + " WHERE " + Sql.q(un) + " = ?");
             ps.setString(1, typed);
             ps.setString(2, username == null ? "" : username.trim());
             rs = ps.executeQuery();

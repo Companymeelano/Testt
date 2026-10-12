@@ -511,7 +511,8 @@ public final class MoneyQueries {
         if (column == null) return "CAST(NULL AS bigint)";
         String raw = Sql.date10(alias, column);
         String jalaliKey = Sql.dateKey(raw);
-        if (!m.function("UDF_Persian_To_Julian")) return jalaliKey;
+        String persianToJulian = m.qFunction("UDF_Persian_To_Julian");
+        if (persianToJulian == null) return jalaliKey;
         String year = "TRY_CONVERT(int,SUBSTRING(" + jalaliKey + ",1,4))";
         String month = "TRY_CONVERT(int,SUBSTRING(" + jalaliKey + ",6,2))";
         String day = "TRY_CONVERT(int,SUBSTRING(" + jalaliKey + ",9,2))";
@@ -524,7 +525,7 @@ public final class MoneyQueries {
         String gregKey = "CONVERT(bigint,DATEDIFF(day," + epoch + ",";
         String gregKeyEnd = ")+1721426)";
         return "CASE WHEN " + year + " BETWEEN 1300 AND 1600 AND " + month + " BETWEEN 1 AND 12 AND "
-                + day + " BETWEEN 1 AND 31 THEN dbo.UDF_Persian_To_Julian(" + year + "," + month + "," + day + ")"
+                + day + " BETWEEN 1 AND 31 THEN " + persianToJulian + "(" + year + "," + month + "," + day + ")"
                 + " WHEN " + greg + " IS NOT NULL THEN " + gregKey + greg + gregKeyEnd
                 + " WHEN " + fallbackGreg + " IS NOT NULL THEN " + gregKey + fallbackGreg + gregKeyEnd
                 + " ELSE CAST(NULL AS bigint) END";

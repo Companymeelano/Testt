@@ -5,6 +5,7 @@ on:
     branches: ["arena/c192ed08-testt"]
     paths:
       - "manager/**"
+      - "tools/audit_manager_schema.py"
       - ".github/workflows/build-manager-v36.yml"
   workflow_dispatch:
 
@@ -16,6 +17,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Audit required manager columns against the Atiran sample schema
+        run: python3 tools/audit_manager_schema.py --manifest manager/app/src/test/resources/atiran/sample-schema.json
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5

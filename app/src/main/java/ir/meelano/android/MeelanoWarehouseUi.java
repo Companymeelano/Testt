@@ -90,7 +90,7 @@ final class MeelanoWarehouseUi {
         MeelanoUiKit.gap(h, page, 9);
         if ("abc".equals(tab)) renderAbc(h, page, analysis, products);
         else if ("supply".equals(tab)) renderSupply(h, page, analysis);
-        else if ("dead".equals(tab)) renderDead(h, page, analysis);
+        else if ("dead".equals(tab)) renderDead(h, page, analysis, data);
         else if ("kardex".equals(tab)) renderKardex(h, page, data, products);
         else if ("labels".equals(tab)) renderLabels(h, page, products);
         else renderCockpit(h, page, analysis, snapshot, products);
@@ -408,7 +408,7 @@ final class MeelanoWarehouseUi {
     }
 
     // ================================================================ ۴) سرمایهٔ راکد
-    private static void renderDead(final MeelanoUiHost h, LinearLayout page, JSONObject analysis) {
+    private static void renderDead(final MeelanoUiHost h, LinearLayout page, JSONObject analysis, JSONObject data) {
         MeelanoPalette p = h.colors();
         page.addView(MeelanoUiKit.sectionHeader(h, "سرمایهٔ راکد انبار",
                 "کالاهایی که در انبار مانده‌اند و فروشی ندارند — هر ریال از این موجودی، ریال خوابیده است",
@@ -418,6 +418,7 @@ final class MeelanoWarehouseUi {
         if (dead == null || dead.length() == 0) {
             page.addView(MeelanoUiKit.emptyState(h, "✓", "کالای راکد ندارید",
                     "همهٔ کالاهای موجود سابقهٔ فروش دارند. گردش انبار در وضعیت سالمی است.", null, null), MeelanoUiKit.lp(-1, -2));
+            expiryCard(h, page, data);
             return;
         }
         JSONObject totals = analysis.optJSONObject("totals");
@@ -444,6 +445,30 @@ final class MeelanoWarehouseUi {
             }
         }), MeelanoUiKit.lp(-1, -2));
         pager(h, page, dead.length());
+        expiryCard(h, page, data);
+    }
+
+    /** سری‌های دارای تاریخ انقضا (جدول سری‌دار آتیران: Batch/BatchLocation). */
+    private static void expiryCard(final MeelanoUiHost h, LinearLayout page, JSONObject data) {
+        JSONObject snapshot = data == null ? null : data.optJSONObject("snapshot");
+        JSONArray expiring = snapshot == null ? null : snapshot.optJSONArray("expiring");
+        if (expiring == null || expiring.length() == 0) return;
+        MeelanoPalette p = h.colors();
+        MeelanoUiKit.gap(h, page, 9);
+        List<String[]> rows = new ArrayList<>();
+        for (int i = 0; i < expiring.length() && i < 15; i++) {
+            JSONObject o = expiring.optJSONObject(i);
+            if (o == null) continue;
+            rows.add(new String[]{o.optString("name", o.optString("code", "—")),
+                    h.fa(o.optString("expiry", "—").replace('-', '/')),
+                    h.grouped(o.optDouble("qty")),
+                    o.optString("location", "—")});
+        }
+        page.addView(MeelanoUiKit.table(h, "⌛  سری‌های دارای تاریخ انقضا",
+                new String[]{"کالا", "تاریخ انقضا", "تعداد", "سری/محل"}, rows, p.warning, null), MeelanoUiKit.lp(-1, -2));
+        MeelanoUiKit.gap(h, page, 6);
+        page.addView(MeelanoUiKit.text(h, "ℹ  منبع: جدول Batch/BatchLocation آتیران. اگر این جدول در نسخهٔ شما فعال نباشد، این کارت نمایش داده نمی‌شود.",
+                8.7f, p.muted, false), MeelanoUiKit.lp(-1, -2));
     }
 
     // ================================================================ ۵) کارت گردش کالا

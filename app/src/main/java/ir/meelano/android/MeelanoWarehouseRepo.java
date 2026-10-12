@@ -345,8 +345,11 @@ final class MeelanoWarehouseRepo {
                 : ManagerAnalytics.tableExists(c, "BatchLocation") ? "BatchLocation" : null;
         if (table == null) return arr;
         Set<String> cols = ManagerAnalytics.columns(c, table);
-        String exp = ManagerAnalytics.resolveFlexible(cols, "ExpDate", "exp_date", "ExpireDate", "expire", "tarikh_engheza", "تاریخ_انقضا");
+        // نام ستون‌های واقعی آتیران برای تاریخ انقضا (jalali برای نمایش، gregorian برای مرتب‌سازی)
+        String exp = ManagerAnalytics.resolveFlexible(cols, "ExpDate", "ExpDa", "exp_date", "ExpireDate", "expire", "DateExpiration",
+                "tarikh_engheza", "تاریخ_انقضا", "ExpDateG", "ExpDateGregor", "ExpDateGregorian");
         if (exp == null) return arr;
+        String expSort = ManagerAnalytics.resolveFlexible(cols, "ExpDateG", "ExpDateGregor", "ExpDateGregorian", "ExpDate");
         String qty = quantityCol(cols);
         String key = productKey(cols);
         String loc = ManagerAnalytics.resolveFlexible(cols, "BatchLocation", "location", "loc", "sh_batch", "batch_no", "batch");
@@ -360,7 +363,8 @@ final class MeelanoWarehouseRepo {
                 + (loc == null ? ", CAST(NULL AS nvarchar(80))" : ", TRY_CONVERT(nvarchar(80),b.[" + loc + "])")
                 + (qty == null ? ", CAST(NULL AS decimal(19,3))" : ", TRY_CONVERT(decimal(19,3),b.[" + qty + "])")
                 + " FROM dbo.[" + table + "] b" + joinInv
-                + " WHERE TRY_CONVERT(nvarchar(100),b.[" + exp + "]) IS NOT NULL ORDER BY 1";
+                + " WHERE TRY_CONVERT(nvarchar(100),b.[" + exp + "]) IS NOT NULL"
+                + (expSort == null || expSort.equals(exp) ? " ORDER BY 1" : " ORDER BY TRY_CONVERT(nvarchar(100),b.[" + expSort + "])");
         try (PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setQueryTimeout(25);
             try (ResultSet r = ps.executeQuery()) {

@@ -2,6 +2,7 @@ package ir.meelano.android;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
+import java.util.HashMap;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -584,6 +585,212 @@ final class MeelanoWarehouse {
             try { out.put("ok", false); out.put("errors", errors.put("خروجی: " + shortMsg(e))); } catch (Exception ignored) { }
         }
         return out;
+    }
+
+    // ================================================================== شمارش انبار (Stocktake)
+    /**
+     * مقایسهٔ «موجودی سیستمی» با «شمارش دستی».
+     *
+     * @param products آرایهٔ کالاها (کلیدهای فارسی JSON برنامه)
+     * @param counts   نقشهٔ «کد کالا ← تعداد شمارش‌شده» (فقط کالاهای شمرده‌شده)
+     * @return {items[{code,name,unit,system,counted,diff,diffValue,buyPrice,sellPrice,status}],
+     *          counted, matched, shortages, surpluses, totalDiffValue, shortageValue, surplusValue, accuracyPercent}
+     */
+    static JSONObject stocktake(JSONArray products, JSONObject counts) {
+        JSONObject out = new JSONObject();
+        JSONArray items = new JSONArray();
+        int counted = 0, matched = 0, shortages = 0, surpluses = 0;
+        double diffValue = 0, shortageValue = 0, surplusValue = 0, systemTotal = 0;
+        try {
+            for (int i = 0; products != null && i < products.length(); i++) {
+                JSONObject p = products.optJSONObject(i);
+                if (p == null) continue;
+                Item it = Item.fromJson(p);
+                if (it.code.isEmpty() || counts == null || !counts.has(it.code)) continue;
+                double system = it.stock;
+                double count = counts.optDouble(it.code, system);
+                double diff = count - system;
+                double value = diff * (it.buyPrice > 0 ? it.buyPrice : it.sellPrice);
+                counted++;
+                systemTotal += system;
+                diffValue += value;
+                if (Math.abs(diff) < 0.0001) matched++;
+                else if (diff < 0) { shortages++; shortageValue += value; }
+                else { surpluses++; surplusValue += value; }
+                JSONObject o = new JSONObject();
+                o.put("code", it.code);
+                o.put("name", it.name);
+                o.put("unit", it.unit);
+                o.put("system", system);
+                o.put("counted", count);
+                o.put("diff", diff);
+                o.put("diffValue", value);
+                o.put("buyPrice", it.buyPrice);
+                o.put("sellPrice", it.sellPrice);
+                o.put("status", Math.abs(diff) < 0.0001 ? "ok" : diff < 0 ? "short" : "surplus");
+                items.put(o);
+            }
+            JSONArray sorted = new JSONArray();
+            List<JSONObject> list = new ArrayList<>();
+            for (int i = 0; i < items.length(); i++) if (items.optJSONObject(i) != null) list.add(items.optJSONObject(i));
+            Collections.sort(list, new Comparator<JSONObject>() {
+                @Override public int compare(JSONObject a, JSONObject b) {
+                    return Double.compare(Math.abs(b.optDouble("diffValue")), Math.abs(a.optDouble("diffValue")));
+                }
+            });
+            for (JSONObject o : list) sorted.put(o);
+            out.put("items", sorted);
+            out.put("counted", counted);
+            out.put("matched", matched);
+            out.put("shortages", shortages);
+            out.put("surpluses", surpluses);
+            out.put("totalDiffValue", diffValue);
+            out.put("shortageValue", shortageValue);
+            out.put("surplusValue", surplusValue);
+            out.put("systemTotal", systemTotal);
+            out.put("accuracyPercent", counted == 0 ? 0 : (double) matched / counted * 100.0);
+            out.put("generatedAt", System.currentTimeMillis());
+        } catch (Exception ignored) { }
+        return out;
+    }
+
+    /** CSV برگهٔ شمارش (با کالاهای شمرده‌شده و مغایرت‌ها) برای چاپ و امضا. */
+    static String stocktakeCsv(JSONObject stocktake) {
+        StringBuilder b = new StringBuilder();
+        b.append('\uFEFF');
+        b.append("کد;کالا;واحد;موجودی سیستم;شمارش دستی;مغایرت;ارزش مغایرت (ریال);وضعیت\r\n");
+        JSONArray items = stocktake == null ? null : stocktake.optJSONArray("items");
+        for (int i = 0; items != null && i < items.length(); i++) {
+            JSONObject o = items.optJSONObject(i);
+            if (o == null) continue;
+            String status = "short".equals(o.optString("status")) ? "کسری" : "surplus".equals(o.optString("status")) ? "مازاد" : "مطابق";
+            b.append(csv(o.optString("code"))).append(';')
+                    .append(csv(o.optString("name"))).append(';')
+                    .append(csv(o.optString("unit"))).append(';')
+                    .append(plain(o.optDouble("system"))).append(';')
+                    .append(plain(o.optDouble("counted"))).append(';')
+                    .append(plain(o.optDouble("diff"))).append(';')
+                    .append(Math.round(o.optDouble("diffValue"))).append(';')
+                    .append(status).append("\r\n");
+        }
+        return b.toString();
+    }
+
+    // ================================================================== انتقال بین انبارها
+    /**
+     * توزیع موجودی هر کالا بین انبارها + پیشنهاد انتقال.
+     *
+     * <p>منطق پیشنهاد: اگر یک انبار بیش از ۸۰٪ موجودی کالا را در خود داشته باشد و انبار دوم
+     * (که آن کالا را هم نگه می‌دارد) کمتر از ۱۰٪ داشته باشد، پیشنهاد می‌شود بخشی از تمرکز
+     * انبار اصلی به انبار دوم منتقل شود تا فروش/ارسال از انبار نزدیک‌تر ممکن باشد.</p>
+     *
+     * @param stockRows ردیف‌های «کالا × انبار» (خروجی MeelanoWarehouseRepo.stockRows)
+     * @return {products[{code,name,total,warehouses[{name,qty,share}],hint,from,to,moveQty}], unbalanced, value, rows}
+     */
+    static JSONObject transferPlan(JSONArray stockRows, double unitPriceHint) {
+        JSONObject out = new JSONObject();
+        try {
+            Map<String, List<JSONObject>> byProduct = new HashMap<>();
+            Map<String, String> names = new HashMap<>();
+            double value = 0;
+            for (int i = 0; stockRows != null && i < stockRows.length(); i++) {
+                JSONObject r = stockRows.optJSONObject(i);
+                if (r == null) continue;
+                double qty = r.optDouble("qty", 0);
+                if (Math.abs(qty) < 0.0001) continue;
+                String code = r.optString("code", "");
+                if (code.isEmpty()) continue;
+                String name = r.optString("name", "");
+                if (!name.isEmpty() && !names.containsKey(code)) names.put(code, name);
+                List<JSONObject> list = byProduct.get(code);
+                if (list == null) { list = new ArrayList<>(); byProduct.put(code, list); }
+                JSONObject row = new JSONObject();
+                row.put("name", r.optString("warehouse", "—"));
+                row.put("qty", qty);
+                list.add(row);
+                value += qty * Math.max(0, unitPriceHint);
+            }
+            List<JSONObject> products = new ArrayList<>();
+            int unbalancedCount = 0;
+            for (Map.Entry<String, List<JSONObject>> e : byProduct.entrySet()) {
+                List<JSONObject> rows = e.getValue();
+                if (rows.size() < 2) continue;                       // تک‌انباری ⇒ انتقال معنایی ندارد
+                double total = 0;
+                for (JSONObject r : rows) total += r.optDouble("qty");
+                if (total <= 0) continue;
+                Collections.sort(rows, new Comparator<JSONObject>() {
+                    @Override public int compare(JSONObject a, JSONObject b) { return Double.compare(b.optDouble("qty"), a.optDouble("qty")); }
+                });
+                JSONArray ws = new JSONArray();
+                for (JSONObject r : rows) {
+                    JSONObject w = new JSONObject();
+                    double q = r.optDouble("qty");
+                    w.put("name", r.optString("name", "—"));
+                    w.put("qty", q);
+                    w.put("share", total > 0 ? q / total * 100.0 : 0);
+                    ws.put(w);
+                }
+                JSONObject top = rows.get(0);
+                JSONObject second = rows.get(rows.size() > 1 ? 1 : 0);
+                double topShare = total > 0 ? top.optDouble("qty") / total * 100.0 : 0;
+                double secondShare = total > 0 ? second.optDouble("qty") / total * 100.0 : 0;
+                boolean unbalanced = topShare >= 80.0 && secondShare <= 10.0;
+                double moveQty = unbalanced ? Math.floor((top.optDouble("qty") - total * 0.6) / Math.max(1, top.optDouble("qty")) * top.optDouble("qty") / 10.0) : 0;
+                if (moveQty <= 0 && unbalanced) moveQty = Math.max(1, Math.floor((top.optDouble("qty") - total * 0.6) / (rows.size() - 1 + 1)));
+                JSONObject p = new JSONObject();
+                p.put("code", e.getKey());
+                p.put("name", names.containsKey(e.getKey()) ? names.get(e.getKey()) : e.getKey());
+                p.put("total", total);
+                p.put("warehouses", ws);
+                p.put("topShare", topShare);
+                p.put("unbalanced", unbalanced);
+                if (unbalanced) {
+                    unbalancedCount++;
+                    p.put("from", top.optString("name", "—"));
+                    p.put("to", second.optString("name", "—"));
+                    p.put("moveQty", moveQty);
+                    p.put("hint", "تمرکز " + Math.round(topShare) + "٪ در انبار «" + top.optString("name", "—")
+                            + "» — انتقال حدود " + plain(moveQty) + " واحد به «" + second.optString("name", "—") + "»");
+                } else {
+                    p.put("hint", "توزیع متعادل (" + Math.round(topShare) + "٪ / " + Math.round(secondShare) + "٪)");
+                }
+                products.add(p);
+            }
+            Collections.sort(products, new Comparator<JSONObject>() {
+                @Override public int compare(JSONObject a, JSONObject b) {
+                    if (a.optBoolean("unbalanced") != b.optBoolean("unbalanced")) return a.optBoolean("unbalanced") ? -1 : 1;
+                    return Double.compare(b.optDouble("topShare"), a.optDouble("topShare"));
+                }
+            });
+            JSONArray arr = new JSONArray();
+            for (JSONObject p : products) arr.put(p);
+            out.put("products", arr);
+            out.put("unbalanced", unbalancedCount);
+            out.put("multiWarehouse", products.size());
+            out.put("value", value);
+            out.put("rows", stockRows == null ? 0 : stockRows.length());
+        } catch (Exception ignored) { }
+        return out;
+    }
+
+    /** CSV پیش‌نویس حوالهٔ انتقال بین انبارها. */
+    static String transferCsv(JSONObject plan) {
+        StringBuilder b = new StringBuilder();
+        b.append('\uFEFF');
+        b.append("کد;کالا;از انبار;به انبار;تعداد پیشنهادی;موجودی کل;سهم انبار مبدأ (٪)\r\n");
+        JSONArray arr = plan == null ? null : plan.optJSONArray("products");
+        for (int i = 0; arr != null && i < arr.length(); i++) {
+            JSONObject p = arr.optJSONObject(i);
+            if (p == null || !p.optBoolean("unbalanced")) continue;
+            b.append(csv(p.optString("code"))).append(';')
+                    .append(csv(p.optString("name"))).append(';')
+                    .append(csv(p.optString("from"))).append(';')
+                    .append(csv(p.optString("to"))).append(';')
+                    .append(plain(p.optDouble("moveQty"))).append(';')
+                    .append(plain(p.optDouble("total"))).append(';')
+                    .append(Math.round(p.optDouble("topShare"))).append("\r\n");
+        }
+        return b.toString();
     }
 
     private static JSONArray toArray(List<Item> list, int cap) {

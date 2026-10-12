@@ -639,6 +639,39 @@ def check_tooling_selftest():
            f'کوئری باگ‌دار یک ایراد گرفت و کوئری درست صفر' if ok else f'caught={caught} clean={clean}')
 
 
+# ---------------------------------------------------------------- ۱۴) کاما داخل کامنت
+def check_comma_in_comment():
+    """کلاس خطای واقعی که build را شکست: «,» آخر خط داخل کامنت افتاده باشد.
+
+    مثل `}} // L,` که در واقع `}}` بدون کاما است و javac خطا می‌دهد
+    ('}' expected). این کنترل با حذف کامنت‌ها، آرایه‌های چندبعدی را می‌سنجد.
+    """
+    problems = []
+    for f in java_files():
+        src = open(f, encoding='utf-8').read()
+        if '//' not in src:
+            continue
+        for i, line in enumerate(src.split('\n'), 1):
+            stripped = re.sub(r'\s*//.*$', '', line).rstrip()
+            if stripped.endswith('//'):
+                continue
+        # سنجش ساختاری: بعد از حذف کامنت‌ها، «}» نباید بلافاصله با «{» در خط بعد بیاید
+        clean = re.sub(r'//[^\n]*', '', src)
+        for m in re.finditer(r'\}\s*\n\s*\{', clean):
+            line = clean[:m.start()].count('\n') + 1
+            # موارد مجاز: بلوک مقداردهی استاتیک/نمونه در بدنهٔ کلاس
+            tail = clean[max(0, m.start() - 40):m.start()].rstrip().split('\n')[-1]
+            if re.search(r'\b(static\s*\{|\bif\s*\(|\)\s*\{)\s*$', tail) and not tail.endswith('}'):
+                continue
+            problems.append(f'{os.path.basename(f)}:{line} احتمال کاما جاافتاده بین عناصر آرایه/بلوک')
+    # کنترل مستقیم: کاما در انتهای کامنت که در واقع کاما نیست
+    for f in java_files():
+        for i, line in enumerate(open(f, encoding='utf-8').read().split('\n'), 1):
+            if re.search(r'//[^\n]*,\s*$', line) and line.strip().startswith(('{', '}', '[')):
+                problems.append(f'{os.path.basename(f)}:{i} کاما داخل کامنت افتاده (خطای javac)')
+    report('کاما/آکولاد ناشی از کامنت‌ها', not problems, 'پاک است' if not problems else '؛ '.join(problems[:5]))
+
+
 def main():
     print('════════ بازبینی جامع پروژهٔ Meelano ════════')
     check_syntax()
@@ -653,6 +686,7 @@ def main():
     check_switch_cases()
     check_sql_balance()
     check_tooling_selftest()
+    check_comma_in_comment()
     check_engines()
     check_docs()
     failed = [n for n, ok, _ in RESULTS if not ok]

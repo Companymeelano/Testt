@@ -14,10 +14,6 @@ on:
       - "*.gradle"
       - "gradle.properties"
       - ".github/workflows/build-apk.yml"
-  pull_request:
-    paths:
-      - "app/**"
-      - "*.gradle"
   workflow_dispatch:
 
 permissions:
@@ -97,6 +93,8 @@ jobs:
             echo "--- sha256 ---"
             (cd dist && sha256sum *.apk)
           } > dist/BUILD-INFO.txt
+          git rm -q --cached build-error-tail.txt 2>/dev/null || true
+          rm -f build-error-tail.txt
           git add -A -f dist/
           git commit -m "dist: APKهای نسخهٔ ۷.۰.۰ (ساخت خودکار CI)" || true
           git pull --rebase --strategy-option=ours origin arena/c192ed08-testt || true

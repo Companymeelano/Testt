@@ -84,6 +84,7 @@ final class MeelanoIcons {
         any("⋯", R.drawable.mi_more_horiz);
         any("🚗", R.drawable.mi_directions_car); any("🏁", R.drawable.mi_flag); any("☝", R.drawable.mi_fingerprint);
         any("⧗", R.drawable.mi_assignment_late); any("⌛", R.drawable.mi_work_history);
+        any("☑", R.drawable.mi_fact_check); any("⚖", R.drawable.mi_account_balance);
         any("▩", R.drawable.mi_qr_code_2); any("▥", R.drawable.mi_barcode); any("⬇", R.drawable.mi_download);
         any("↻", R.drawable.mi_refresh); any("％", R.drawable.mi_percent); any("ℹ", R.drawable.mi_help); any("⎙", R.drawable.mi_print);
         any("🚚", R.drawable.mi_local_shipping); any("✍", R.drawable.mi_edit); any("📞", R.drawable.mi_call); any("🗺", R.drawable.mi_location_on);

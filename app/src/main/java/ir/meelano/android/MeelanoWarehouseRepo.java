@@ -155,9 +155,45 @@ final class MeelanoWarehouseRepo {
     }
 
     // ---------------------------------------------------------------- موجودی به تفکیک انبار
-    /** پرمعامله‌ترین ردیف‌های «کالا × انبار» (برای نمایش جدول و انتقال بین انبارها). */
+    /**
+     * ردیف‌های «کالا × انبار» با تعداد و نام کالا — برای جدول توزیع و پیش‌نویس انتقال.
+     *
+     * <p>منبع اول، دفتر واقعی انبار آتیران ({@code ka_act} با ستون انبار) است که همیشه به‌روز است؛
+     * اگر آن در دسترس نباشد، از جدول خلاصهٔ موجودی ({@code Inventory_Anbars_Variety} و مشابه) خوانده می‌شود.</p>
+     */
     static JSONArray stockRows(Connection c, int cap) throws Exception {
         JSONArray arr = new JSONArray();
+        Set<String> invCols = ManagerAnalytics.columns(c, "inventory");
+        String invKey = productKey(invCols);
+        String invName = ManagerAnalytics.resolveFlexible(invCols, "naka", "Name", "KalaName", "ProductName", "نام", "نام_کالا");
+        String invBar = ManagerAnalytics.resolveFlexible(invCols, "StuffCode", "Code", "Barcode", "بارکد", "کد_کالا");
+        Set<String> ka = ManagerAnalytics.columns(c, "ka_act");
+        Set<String> an = ManagerAnalytics.columns(c, "anbars");
+        String aKey = ManagerAnalytics.resolveFlexible(an, "rdf_anbar", "RDF", "rdf", "ID", "anbar_id", "cod");
+        String aName = ManagerAnalytics.resolveFlexible(an, "name", "Name", "onvan", "title", "نام", "نام_انبار");
+
+        if (invKey != null && atiranLedger(c, ka, invCols) && aKey != null && aName != null) {
+            String sql = atiranStockRowsSql(aName, aKey, invKey, invName, invBar,
+                    ManagerAnalytics.resolveFlexible(ka, "RdfAnbar", "rdf_anbar", "rdf_anbars", "AnbarID", "anbar", "sh_anbar"),
+                    ManagerAnalytics.resolve(invCols, "mohvah"), invCols, cap);
+            try (PreparedStatement ps = c.prepareStatement(sql)) {
+                ps.setQueryTimeout(30);
+                try (ResultSet r = ps.executeQuery()) {
+                    while (r.next()) {
+                        JSONObject o = new JSONObject();
+                        o.put("code", safe(r.getString(1), ""));
+                        o.put("name", safe(r.getString(2), ""));
+                        o.put("barcode", safe(r.getString(3), ""));
+                        o.put("warehouse", safe(r.getString(4), "—"));
+                        o.put("qty", r.getDouble(5));
+                        arr.put(o);
+                    }
+                }
+            }
+            if (arr.length() > 0) return arr;      // دفتر انبار پاسخ داد ⇒ همین معتبر است
+        }
+
+        // ---- مسیر عمومی: جدول خلاصهٔ «کالا × انبار»
         String stockTable = null, sProduct = null, sWarehouse = null, sQty = null;
         for (String t : new String[]{"Inventory_Anbars_Variety", "Inventory_Anbars", "inventory_anbars", "InvantoryAnbar", "Inventory_Anbar"}) {
             if (!ManagerAnalytics.tableExists(c, t)) continue;
@@ -166,14 +202,8 @@ final class MeelanoWarehouseRepo {
             if (p != null && w != null && q != null) { stockTable = t; sProduct = p; sWarehouse = w; sQty = q; break; }
         }
         if (stockTable == null) return arr;
-        Set<String> an = ManagerAnalytics.columns(c, "anbars");
-        String aKey = ManagerAnalytics.resolveFlexible(an, "rdf_anbar", "RDF", "rdf", "ID", "cod");
-        String aName = ManagerAnalytics.resolveFlexible(an, "name", "Name", "onvan", "title", "نام");
-        Set<String> inv = ManagerAnalytics.columns(c, "inventory");
-        String iKey = productKey(inv);
-        String iName = ManagerAnalytics.resolveFlexible(inv, "naka", "Name", "KalaName", "ProductName", "نام", "نام_کالا");
-        String iCode = ManagerAnalytics.resolveFlexible(inv, "StuffCode", "Code", "Barcode", "بارکد", "کد_کالا");
-        String joinInv = iKey == null ? "" : " LEFT JOIN dbo.inventory k ON TRY_CONVERT(nvarchar(100),k.[" + iKey + "])=TRY_CONVERT(nvarchar(100),s.[" + sProduct + "])";
+        String iName = invName, iCode = invBar;
+        String joinInv = invKey == null ? "" : " LEFT JOIN dbo.inventory k ON TRY_CONVERT(nvarchar(100),k.[" + invKey + "])=TRY_CONVERT(nvarchar(100),s.[" + sProduct + "])";
         String joinAn = (aKey == null || aName == null) ? "" : " LEFT JOIN dbo.anbars a ON TRY_CONVERT(nvarchar(100),a.[" + aKey + "])=TRY_CONVERT(nvarchar(100),s.[" + sWarehouse + "])";
         String sql = "SELECT TOP (" + Math.max(1, cap) + ") TRY_CONVERT(nvarchar(120),s.[" + sProduct + "])"
                 + (iName == null ? ", CAST(NULL AS nvarchar(250))" : ", TRY_CONVERT(nvarchar(250),k.[" + iName + "])")
@@ -200,8 +230,26 @@ final class MeelanoWarehouseRepo {
         return arr;
     }
 
-    // ---------------------------------------------------------------- بازهٔ واقعی فروش
-    /** اولین/آخرین تاریخ فروش و تعداد روز داده، تا فرمول‌های زمان‌محور روی داده واقعی بنشینند. */
+    /** SQL «کالا × انبار» از دفتر انبار آتیران؛ تعداد به واحد شمارش و با علامت رویداد انبار. */
+    private static String atiranStockRowsSql(String aName, String aKey, String invKey, String invName, String invBar,
+                                            String kWh, String mohvah, Set<String> invCols, int cap) {
+        String sign = "CASE WHEN k.act_id IN (" + MainActivity.ATIRAN_STOCK_OUT_ACTS + ") THEN -1 ELSE 1 END";
+        String qty = "(CAST(ISNULL(k.tedvah,0) AS decimal(19,3))*ISNULL(NULLIF(TRY_CONVERT(decimal(19,3),i.[" + mohvah + "]),0),1)"
+                + "+CAST(ISNULL(k.tedjoz,0) AS decimal(19,3)))*" + sign;
+        String name = invName == null ? "CAST(NULL AS nvarchar(250))" : "TRY_CONVERT(nvarchar(250),k2.[" + invName + "])";
+        String bar = invBar == null ? "CAST(NULL AS nvarchar(80))" : "TRY_CONVERT(nvarchar(80),k2.[" + invBar + "])";
+        return "SELECT TOP (" + Math.max(1, cap) + ") TRY_CONVERT(nvarchar(120),g.shka), " + name + ", " + bar
+                + ", TRY_CONVERT(nvarchar(150),a.[" + aName + "]), ISNULL(g.qty,0)"
+                + " FROM (SELECT m.wh wh, m.shka shka, SUM(m.qty) qty FROM (SELECT k.shka shka, k.[" + kWh + "] wh, " + qty + " qty"
+                + " FROM dbo.ka_act k"
+                + " LEFT JOIN dbo.inventory i ON TRY_CONVERT(nvarchar(100),i.[" + invKey + "])=TRY_CONVERT(nvarchar(100),k.shka)"
+                + " WHERE k.active='t') m GROUP BY m.wh, m.shka) g"
+                + " LEFT JOIN dbo.anbars a ON TRY_CONVERT(nvarchar(100),a.[" + aKey + "])=TRY_CONVERT(nvarchar(100),g.wh)"
+                + " LEFT JOIN dbo.inventory k2 ON TRY_CONVERT(nvarchar(100),k2.[" + invKey + "])=TRY_CONVERT(nvarchar(100),g.shka)"
+                + " WHERE ABS(g.qty) > 0.0001"
+                + " ORDER BY ABS(g.qty) DESC";
+    }
+
     static JSONObject salesWindow(Connection c) throws Exception {
         JSONObject o = new JSONObject();
         Set<String> sail = ManagerAnalytics.columns(c, "sailfact");

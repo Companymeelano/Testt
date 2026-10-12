@@ -18,6 +18,8 @@ import java.util.List;
  * که در همان کارت توضیح داده می‌شود.</p>
  */
 final class MeelanoFinanceUi {
+    private static String csv(String v) { return v == null ? "" : v.replace(';', ',').replace('\n', ' ').trim(); }
+
     private MeelanoFinanceUi() { }
 
     static String tab = "overview";
@@ -27,6 +29,7 @@ final class MeelanoFinanceUi {
             {"collect", "وصول مطالبات", "💵"},
             {"checks", "چک و سررسید", "✓"},
             {"pricing", "قیمت‌گذاری و سود", "％"},
+            {"pnl", "سود و زیان دوره", "⚖"},
             {"cash", "جریان نقدی", "⇅"}
     };
 
@@ -63,6 +66,7 @@ final class MeelanoFinanceUi {
         if ("checks".equals(tab)) { renderChecks(h, page, checks); return; }
         if ("pricing".equals(tab)) { renderPricing(h, page, products); return; }
         if ("cash".equals(tab)) { renderCash(h, page, metrics, receivables, sales, purchases); return; }
+        if ("pnl".equals(tab)) { renderPnl(h, page, warehouseAnalysis, products, sales); return; }
 
         // ---------------- نمای کل
         List<View> tiles = new ArrayList<>();
@@ -373,6 +377,145 @@ final class MeelanoFinanceUi {
                 }
             }
         }), MeelanoUiKit.lp(-1, h.dp(44)));
+    }
+
+    // ---------------- سود و زیان دوره‌ای
+    private static void renderPnl(final MeelanoUiHost h, LinearLayout page, JSONObject analysis, JSONArray products, JSONObject sales) {
+        MeelanoPalette p = h.colors();
+        page.addView(MeelanoUiKit.sectionHeader(h, "سود و زیان دوره",
+                "درآمد، بهای تمام‌شده، سود ناخالص و حاشیه — به تفکیک گروه کالا و با شناسایی کالاهای زیان‌ده",
+                "⚖", p.success), MeelanoUiKit.lp(-1, -2));
+        MeelanoUiKit.gap(h, page, 8);
+
+        JSONObject totals = analysis == null ? null : analysis.optJSONObject("totals");
+        if (totals == null || totals.optDouble("salesValue") <= 0) {
+            page.addView(MeelanoUiKit.emptyState(h, "⚖", "دادهٔ فروش برای این دوره نیست",
+                    "برای ساخت صورت سود و زیان، باید در دورهٔ انتخابی فروش ثبت شده باشد؛ بازهٔ گزارش را در خانهٔ مدیر تغییر دهید.",
+                    null, null), MeelanoUiKit.lp(-1, -2));
+            return;
+        }
+        double revenue = totals.optDouble("salesValue");
+        double gross = totals.optDouble("grossProfit");
+        double cogs = Math.max(0, revenue - gross);
+        double margin = totals.optDouble("grossMarginPercent");
+        double prev = sales == null ? 0 : sales.optDouble("prevTotal");
+        double growth = prev > 0 ? (revenue - prev) / prev * 100.0 : 0;
+
+        List<View> tiles = new ArrayList<>();
+        tiles.add(MeelanoUiKit.kpi(h, "درآمد دوره", h.money(revenue),
+                prev > 0 ? "دورهٔ قبل: " + h.money(prev) + " (" + h.fa(String.format(java.util.Locale.US, "%.0f", growth)) + "٪)" : "بدون دورهٔ مقایسه",
+                "↗", p.success, null));
+        tiles.add(MeelanoUiKit.kpi(h, "بهای تمام‌شدهٔ کالای فروش‌رفته (برآورد)", h.money(cogs),
+                "تعداد فروش × بهای خرید ثبت‌شدهٔ هر کالا", "↙", p.warning, null));
+        tiles.add(MeelanoUiKit.kpi(h, "سود ناخالص", h.money(gross),
+                "حاشیه " + h.fa(String.format(java.util.Locale.US, "%.1f", margin)) + "٪ از درآمد", "⚖", p.success, null));
+        tiles.add(MeelanoUiKit.kpi(h, "نقطهٔ سربه‌سر فروش (برآورد)", h.money(bep(cogs, revenue)),
+                "با فرض پوشش هزینه‌های ثابت فعلی شرکت", "◎", p.info, null));
+        MeelanoUiKit.kpiGrid(h, page, tiles, 2, 8);
+
+        // ---- جدول گروه‌ها
+        JSONArray groups = analysis.optJSONArray("groups");
+        if (groups != null && groups.length() > 0) {
+            MeelanoUiKit.gap(h, page, 8);
+            List<String[]> rows = new ArrayList<>();
+            for (int i = 0; i < groups.length() && i < 18; i++) {
+                JSONObject g = groups.optJSONObject(i);
+                if (g == null) continue;
+                double gSales = g.optDouble("salesValue");
+                double gProfit = g.optDouble("grossProfit");
+                double gMargin = gSales > 0 ? gProfit / gSales * 100.0 : 0;
+                rows.add(new String[]{g.optString("name", "—"), h.money(gSales), h.money(Math.max(0, gSales - gProfit)),
+                        (gProfit >= 0 ? "+" : "−") + h.money(Math.abs(gProfit)),
+                        h.fa(String.format(java.util.Locale.US, "%.1f", gMargin)) + "٪",
+                        h.fa(String.format(java.util.Locale.US, "%.2f", g.optDouble("turnover")))});
+            }
+            page.addView(MeelanoUiKit.table(h, "⚖  سود و زیان به تفکیک گروه کالا",
+                    new String[]{"گروه", "درآمد", "بهای تمام‌شده", "سود ناخالص", "حاشیه", "گردش"}, rows, p.success, null), MeelanoUiKit.lp(-1, -2));
+        }
+
+        // ---- کالاهای زیان‌ده (قیمت فروش کمتر از بهای خرید) — مرتب بر پایهٔ زیان تقریبی دوره
+        final List<JSONObject> losersRaw = new ArrayList<>();
+        for (int i = 0; products != null && i < products.length(); i++) {
+            JSONObject o = products.optJSONObject(i);
+            if (o == null) continue;
+            double buy = o.optDouble("بهای_خرید");
+            double sell = o.optDouble("قیمت_فروش");
+            if (buy <= 0 || sell <= 0 || sell >= buy) continue;
+            double qty = o.optDouble("تعداد_فروش");
+            JSONObject row = new JSONObject();
+            try {
+                row.put("name", o.optString("نام", o.optString("کد", "—")));
+                row.put("code", o.optString("کد", ""));
+                row.put("buy", buy);
+                row.put("sell", sell);
+                row.put("qty", qty);
+                row.put("loss", (buy - sell) * Math.max(1, qty));
+            } catch (Exception ignored) { }
+            losersRaw.add(row);
+        }
+        java.util.Collections.sort(losersRaw, new java.util.Comparator<JSONObject>() {
+            @Override public int compare(JSONObject a, JSONObject b) { return Double.compare(b.optDouble("loss"), a.optDouble("loss")); }
+        });
+        if (!losersRaw.isEmpty()) {
+            MeelanoUiKit.gap(h, page, 8);
+            List<String[]> rows = new ArrayList<>();
+            for (int i = 0; i < losersRaw.size() && i < 15; i++) {
+                JSONObject o = losersRaw.get(i);
+                rows.add(new String[]{o.optString("name", "—"), h.money(o.optDouble("buy")), h.money(o.optDouble("sell")),
+                        h.money(o.optDouble("buy") - o.optDouble("sell")), h.money(o.optDouble("loss")),
+                        o.optDouble("qty") > 0 ? h.grouped(o.optDouble("qty")) : "بدون فروش"});
+            }
+            page.addView(MeelanoUiKit.table(h, "⚠  کالاهای زیان‌ده (قیمت فروش کمتر از بهای خرید)",
+                    new String[]{"کالا", "بهای خرید", "قیمت فروش", "زیان هر واحد", "زیان تقریبی دوره", "فروش دوره"},
+                    rows, p.danger, null), MeelanoUiKit.lp(-1, -2));
+        }
+
+        MeelanoUiKit.gap(h, page, 8);
+        final double revenueFinal = revenue, cogsFinal = cogs, grossFinal = gross, marginFinal = margin, prevFinal = prev;
+        final JSONArray groupsFinal = groups;
+        page.addView(MeelanoUiKit.button(h, "⬇  خروجی CSV صورت سود و زیان", p.accent, true, new Runnable() {
+            @Override public void run() {
+                try {
+                    StringBuilder b = new StringBuilder("\uFEFF");
+                    b.append("بخش;شرح;مقدار (ریال یا درصد)\r\n");
+                    b.append("خلاصه;درآمد دوره;").append(Math.round(revenueFinal)).append("\r\n");
+                    b.append("خلاصه;دورهٔ قبل;").append(Math.round(prevFinal)).append("\r\n");
+                    b.append("خلاصه;بهای تمام‌شده (برآورد);").append(Math.round(cogsFinal)).append("\r\n");
+                    b.append("خلاصه;سود ناخالص;").append(Math.round(grossFinal)).append("\r\n");
+                    b.append("خلاصه;حاشیه سود (٪);").append(String.format(java.util.Locale.US, "%.1f", marginFinal)).append("\r\n");
+                    b.append("\r\nگروه کالا;درآمد;بهای تمام‌شده;سود ناخالص;حاشیه (٪)\r\n");
+                    for (int i = 0; groupsFinal != null && i < groupsFinal.length(); i++) {
+                        JSONObject g = groupsFinal.optJSONObject(i);
+                        if (g == null) continue;
+                        double gs = g.optDouble("salesValue");
+                        double gp = g.optDouble("grossProfit");
+                        b.append(csv(g.optString("name"))).append(';').append(Math.round(gs)).append(';')
+                                .append(Math.round(Math.max(0, gs - gp))).append(';').append(Math.round(gp)).append(';')
+                                .append(String.format(java.util.Locale.US, "%.1f", gs > 0 ? gp / gs * 100.0 : 0)).append("\r\n");
+                    }
+                    b.append("\r\nکالای زیان‌ده;بهای خرید;قیمت فروش;زیان هر واحد;زیان تقریبی دوره;فروش دوره\r\n");
+                    for (int i = 0; i < losersRaw.size() && i < 60; i++) {
+                        JSONObject o = losersRaw.get(i);
+                        b.append(csv(o.optString("name"))).append(';').append(Math.round(o.optDouble("buy"))).append(';')
+                                .append(Math.round(o.optDouble("sell"))).append(';')
+                                .append(Math.round(o.optDouble("buy") - o.optDouble("sell"))).append(';')
+                                .append(Math.round(o.optDouble("loss"))).append(';').append(o.optDouble("qty")).append("\r\n");
+                    }
+                    h.shareGeneratedFile("meelano-pnl.csv", "text/csv", b.toString().getBytes("UTF-8"), "صورت سود و زیان دوره");
+                } catch (Exception e) {
+                    h.notify("خطای خروجی: " + MeelanoWarehouse.shortMsg(e));
+                }
+            }
+        }), MeelanoUiKit.lp(-1, h.dp(44)));
+        MeelanoUiKit.gap(h, page, 6);
+        page.addView(MeelanoUiKit.text(h, "ℹ  بهای تمام‌شده «برآورد» است: چون سند حسابداری بهای تمام‌شده در این نسخهٔ آتیران خوانده نمی‌شود، تعداد فروش‌رفته در بهای خرید ثبت‌شدهٔ همان کالا ضرب شده است. برای رقم رسمی، گزارش حسابداری آتیران مرجع است.",
+                8.7f, p.muted, false), MeelanoUiKit.lp(-1, -2));
+    }
+
+    /** درآمد لازم برای پوشش بهای تمام‌شده با همان نسبت حاشیهٔ فعلی (برآورد سبک). */
+    private static double bep(double cogs, double revenue) {
+        double marginRatio = revenue > 0 ? (revenue - cogs) / revenue : 0;
+        return marginRatio > 0.001 ? cogs / marginRatio : 0;
     }
 
     // ---------------- جریان نقدی

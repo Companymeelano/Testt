@@ -12720,7 +12720,7 @@ public class MainActivity extends Activity {
             JSONArray products = new JSONArray(productsJson);
             JSONObject snapshot;
             try (Connection c = openConnection()) {
-                snapshot = MeelanoWarehouseRepo.snapshot(c, MeelanoWarehouseUi.focusCode, false, 0);
+                snapshot = MeelanoWarehouseRepo.snapshot(c, MeelanoWarehouseUi.focusCode, true, 300);
             }
             JSONObject data = new JSONObject();
             data.put("analysis", MeelanoWarehouse.analyse(products, warehouseParams()));
@@ -13366,6 +13366,47 @@ public class MainActivity extends Activity {
         parent.addView(t, lp);
     }
 
+    /**
+     * نوار هشدار انبار روی «خانهٔ مدیر» — از دادهٔ ذخیره‌شدهٔ تحلیل انبار ساخته می‌شود
+     * (بدون کوئری تازه) و کاربر را با یک لمس به همان کارت می‌برد.
+     */
+    private void addWarehouseAlertStrip() {
+        if (prefs == null) return;
+        String raw = prefs.getString(KEY_CACHE_WAREHOUSE, "");
+        if (raw == null || raw.trim().isEmpty()) return;
+        JSONObject data = safeJson(raw);
+        JSONObject analysis = data.optJSONObject("analysis");
+        JSONObject totals = analysis == null ? null : analysis.optJSONObject("totals");
+        if (totals == null) return;
+        final int dead = totals.optInt("deadCount");
+        final int reorder = totals.optInt("reorderCount");
+        final int lowCover = totals.optInt("lowCount");   // کلید واقعی خروجی تحلیل انبار
+        if (dead + reorder + lowCover == 0) return;
+        LinearLayout strip = new LinearLayout(this);
+        strip.setOrientation(LinearLayout.HORIZONTAL);
+        strip.setGravity(Gravity.CENTER_VERTICAL);
+        strip.setPadding(dp(8), dp(8), dp(8), dp(8));
+        strip.setBackground(unifiedCardBg(GOLD, 18, false));
+        strip.addView(report3dIcon("◈", GOLD), new LinearLayout.LayoutParams(dp(38), dp(38)));
+        LinearLayout copy = new LinearLayout(this);
+        copy.setOrientation(LinearLayout.VERTICAL);
+        copy.setPadding(dp(8), 0, dp(8), 0);
+        copy.addView(text("هشدارهای انبار (از آخرین تحلیل)", 11.6f, TEXT, Typeface.BOLD), new LinearLayout.LayoutParams(-1, -2));
+        copy.addView(text("نیازمند تأمین: " + faDigits(String.valueOf(reorder)) + " قلم • کالای راکد: " + faDigits(String.valueOf(dead))
+                + (lowCover > 0 ? " • پوشش بحرانی: " + faDigits(String.valueOf(lowCover)) + " قلم" : ""), 9.6f, MUTED, Typeface.NORMAL),
+                new LinearLayout.LayoutParams(-1, -2));
+        strip.addView(copy, new LinearLayout.LayoutParams(0, -2, 1f));
+        Button open = secondaryButton("انبار هوشمند");
+        open.setTextSize(fs(9.6f));
+        open.setOnClickListener(v -> showApp("warehouse"));
+        strip.addView(open, new LinearLayout.LayoutParams(dp(104), dp(42)));
+        applyTouchFeedback(strip);
+        strip.setOnClickListener(v -> showApp("warehouse"));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+        lp.setMargins(0, 0, 0, dp(10));
+        content.addView(strip, lp);
+    }
+
     private void renderManagerExecutive(JSONObject m) {
         content.removeAllViews();
         addHero("خانه مدیریت", "نمای زندهٔ روزانهٔ شرکت از آتیران — فروش، وصول، چک‌ها و میدان، دسته‌بندی‌شده و همیشه قابل دریل‌داون.");
@@ -13380,6 +13421,7 @@ public class MainActivity extends Activity {
         Button q4 = secondaryButton("کالا"); q4.setTextSize(fs(9.6f)); q4.setOnClickListener(v -> showApp("mgr_products")); quick.addView(q4, weightedButtonLp());
         Button q5 = secondaryButton("انبار"); q5.setTextSize(fs(9.6f)); q5.setOnClickListener(v -> showApp("warehouse")); quick.addView(q5, weightedButtonLp());
         Button q6 = secondaryButton("مالی"); q6.setTextSize(fs(9.6f)); q6.setOnClickListener(v -> showApp("finance")); quick.addView(q6, weightedButtonLp());
+        addWarehouseAlertStrip();
         for (int qi = 0; qi < quick.getChildCount(); qi++) quick.getChildAt(qi).setMinimumWidth(dp(92));
         content.addView(hScrollWrap(quick), new LinearLayout.LayoutParams(-1, -2));
         LinearLayout export = new LinearLayout(this); export.setOrientation(LinearLayout.HORIZONTAL);

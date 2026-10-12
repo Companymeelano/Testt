@@ -46,8 +46,13 @@ final class MeelanoWarehouseUi {
             {"supply", "تأمین و سفارش", "⇅"},
             {"dead", "سرمایهٔ راکد", "⧗"},
             {"kardex", "گردش کالا", "⌛"},
+            {"stocktake", "شمارش انبار", "☑"},
+            {"transfer", "انتقال و توزیع", "⇆"},
             {"labels", "برچسب و بارکد", "▩"}
     };
+
+    /** کدهای شمارش‌شدهٔ دورهٔ جاری (کد کالا ← تعداد شمارش‌شده). در تنظیمات برنامه ذخیره می‌شود. */
+    static JSONObject counts = null;
 
     // ================================================================ رندر اصلی
     /**
@@ -92,6 +97,8 @@ final class MeelanoWarehouseUi {
         else if ("supply".equals(tab)) renderSupply(h, page, analysis);
         else if ("dead".equals(tab)) renderDead(h, page, analysis, data);
         else if ("kardex".equals(tab)) renderKardex(h, page, data, products);
+        else if ("stocktake".equals(tab)) renderStocktake(h, page, analysis, products);
+        else if ("transfer".equals(tab)) renderTransfer(h, page, data, analysis);
         else if ("labels".equals(tab)) renderLabels(h, page, products);
         else renderCockpit(h, page, analysis, snapshot, products);
 
@@ -643,6 +650,268 @@ final class MeelanoWarehouseUi {
     }
 
     // ================================================================ کمکی‌ها
+    // ================================================================ ۶) شمارش انبار
+    /** نقشهٔ شمارش را از تنظیمات می‌خواند (یک‌بار در هر اجرا). */
+    private static JSONObject countsOf(MeelanoUiHost h) {
+        if (counts == null) {
+            counts = new JSONObject();
+            String raw = h.setting("stocktake_counts", "");
+            try {
+                if (raw != null && !raw.trim().isEmpty()) counts = new JSONObject(raw);
+            } catch (Exception ignored) { }
+        }
+        return counts;
+    }
+
+    private static void saveCounts(MeelanoUiHost h, JSONObject map) {
+        counts = map;
+        h.putSetting("stocktake_counts", map == null ? "{}" : map.toString());
+    }
+
+    private static void renderStocktake(final MeelanoUiHost h, LinearLayout page, JSONObject analysis, JSONArray products) {
+        MeelanoPalette p = h.colors();
+        final JSONObject map = countsOf(h);
+        final JSONObject result = MeelanoWarehouse.stocktake(products, map);
+
+        page.addView(MeelanoUiKit.sectionHeader(h, "شمارش انبار و مغایرت‌گیری",
+                "موجودی سیستمی را کنار شمارش دستی بگذارید؛ مغایرت، ارزش ریالی و برگهٔ امضاشدنی آماده می‌شود",
+                "☑", p.info), MeelanoUiKit.lp(-1, -2));
+        MeelanoUiKit.gap(h, page, 8);
+
+        List<View> tiles = new ArrayList<>();
+        tiles.add(MeelanoUiKit.kpi(h, "کالاهای شمرده‌شده", h.fa(String.valueOf(result.optInt("counted"))),
+                "از " + h.fa(String.valueOf(products == null ? 0 : products.length())) + " کالای فهرست", "☑", p.info, null));
+        tiles.add(MeelanoUiKit.kpi(h, "مغایرت خالص (ریال)", h.money(result.optDouble("totalDiffValue")),
+                "کسری " + h.money(result.optDouble("shortageValue")) + " • مازاد " + h.money(result.optDouble("surplusValue")),
+                result.optDouble("totalDiffValue") < 0 ? "↙" : "↗", result.optDouble("totalDiffValue") < 0 ? p.danger : p.success, null));
+        tiles.add(MeelanoUiKit.kpi(h, "دقت شمارش", h.fa(String.format(java.util.Locale.US, "%.1f", result.optDouble("accuracyPercent"))) + "٪",
+                h.fa(String.valueOf(result.optInt("matched"))) + " کالا مطابق سیستم بود", "◎", p.accent, null));
+        tiles.add(MeelanoUiKit.kpi(h, "کسری / مازاد", h.fa(String.valueOf(result.optInt("shortages"))) + " / " + h.fa(String.valueOf(result.optInt("surpluses"))),
+                "تعداد کالاهای دارای اختلاف", "⚠", p.warning, null));
+        MeelanoUiKit.kpiGrid(h, page, tiles, 2, 8);
+
+        // ---- کالاهای پیشنهادی برای شمارش (پرارزش‌ترین‌ها + نیازمند تأمین + راکدها)
+        List<String[]> picks = new ArrayList<>();
+        addPicks(picks, analysis.optJSONArray("valuable"), 10);
+        addPicks(picks, analysis.optJSONArray("reorder"), 6);
+        addPicks(picks, analysis.optJSONArray("dead"), 4);
+        if (!picks.isEmpty()) {
+            MeelanoUiKit.gap(h, page, 8);
+            LinearLayout card = MeelanoUiKit.card(h, p.info);
+            card.addView(MeelanoUiKit.text(h, "⌕  کالاهای پیشنهادی برای شمارش", 11.8f, p.text, true), MeelanoUiKit.lp(-1, -2));
+            card.addView(MeelanoUiKit.text(h, "بر پایهٔ ارزش، نیاز به تأمین و راکدبودن — برای هر کالا تعداد واقعی را وارد کنید.",
+                    8.8f, p.muted, false), MeelanoUiKit.lp(-1, -2));
+            for (int i = 0; i < picks.size(); i++) {
+                final String[] pick = picks.get(i);
+                MeelanoUiKit.gap(h, card, 6);
+                LinearLayout line = MeelanoUiKit.row(h);
+                LinearLayout copy = MeelanoUiKit.column(h);
+                copy.addView(MeelanoUiKit.text(h, pick[1], 10.4f, p.text, true), MeelanoUiKit.lp(-1, -2));
+                double system = parse(pick[2]);
+                boolean has = map.has(pick[0]);
+                String sub = "کد " + h.fa(pick[0]) + " • موجودی سیستم: " + h.grouped(system)
+                        + (has ? "  |  شمارش ثبت‌شده: " + h.grouped(map.optDouble(pick[0])) : "");
+                copy.addView(MeelanoUiKit.text(h, sub, 8.8f, has ? p.success : p.muted, false), MeelanoUiKit.lp(-1, -2));
+                line.addView(copy, MeelanoUiKit.lp(0, -2, 1f));
+                line.addView(MeelanoUiKit.button(h, has ? "✎ ویرایش" : "☑ شمارش", has ? p.warning : p.info, false, new Runnable() {
+                    @Override public void run() { countSheet(h, pick[0], pick[1], parse(pick[2])); }
+                }), MeelanoUiKit.lp(h.dp(92), h.dp(40)));
+                card.addView(line, MeelanoUiKit.lp(-1, -2));
+            }
+            page.addView(card, MeelanoUiKit.lp(-1, -2));
+        }
+
+        // ---- جدول مغایرت‌ها
+        JSONArray items = result.optJSONArray("items");
+        if (items != null && items.length() > 0) {
+            MeelanoUiKit.gap(h, page, 8);
+            List<String[]> rows = new ArrayList<>();
+            for (int i = 0; i < items.length() && i < 25; i++) {
+                JSONObject o = items.optJSONObject(i);
+                if (o == null) continue;
+                double diff = o.optDouble("diff");
+                rows.add(new String[]{o.optString("name", o.optString("code", "—")),
+                        h.grouped(o.optDouble("system")),
+                        h.grouped(o.optDouble("counted")),
+                        (diff > 0 ? "+" : diff < 0 ? "−" : "") + h.grouped(Math.abs(diff)),
+                        h.money(o.optDouble("diffValue")),
+                        "ok".equals(o.optString("status")) ? "مطابق" : diff < 0 ? "کسری" : "مازاد"});
+            }
+            page.addView(MeelanoUiKit.table(h, "☑  مغایرت‌های شمارش (به ترتیب اثر ریالی)",
+                    new String[]{"کالا", "سیستم", "شمارش", "اختلاف", "ارزش اختلاف", "وضعیت"}, rows, p.warning, null), MeelanoUiKit.lp(-1, -2));
+        } else {
+            MeelanoUiKit.gap(h, page, 8);
+            page.addView(MeelanoUiKit.alert(h, "info", "هنوز چیزی شمرده نشده",
+                    "یکی از کالاهای بالا را انتخاب کنید و تعداد واقعی قفسه/انبار را وارد کنید؛ گزارش مغایرت و برگهٔ امضا خودکار ساخته می‌شود."), MeelanoUiKit.lp(-1, -2));
+        }
+
+        // ---- اقدام‌ها
+        MeelanoUiKit.gap(h, page, 9);
+        final JSONObject resultFinal = result;
+        page.addView(MeelanoUiKit.buttonRow(h,
+                new String[][]{{"csv", "⬇  برگهٔ شمارش (CSV)"}, {"txt", "🧾  خلاصهٔ متنی"}, {"reset", "✕  پایان دورهٔ شمارش"}},
+                new int[]{p.accent, p.info, p.danger}, new boolean[]{true, false, false},
+                new Runnable[]{
+                        new Runnable() {
+                            @Override public void run() {
+                                try {
+                                    String csv = MeelanoWarehouse.stocktakeCsv(resultFinal);
+                                    h.shareGeneratedFile("meelano-stocktake.csv", "text/csv", csv.getBytes("UTF-8"), "برگهٔ شمارش انبار");
+                                } catch (Exception e) {
+                                    h.notify("خطای خروجی: " + MeelanoWarehouse.shortMsg(e));
+                                }
+                            }
+                        },
+                        new Runnable() {
+                            @Override public void run() {
+                                StringBuilder b = new StringBuilder("خلاصهٔ شمارش انبار\n");
+                                b.append("کالاهای شمرده‌شده: ").append(resultFinal.optInt("counted")).append('\n');
+                                b.append("مطابق سیستم: ").append(resultFinal.optInt("matched")).append('\n');
+                                b.append("کسری: ").append(resultFinal.optInt("shortages")).append(" (ریال ").append(Math.round(resultFinal.optDouble("shortageValue"))).append(")\n");
+                                b.append("مازاد: ").append(resultFinal.optInt("surpluses")).append(" (ریال ").append(Math.round(resultFinal.optDouble("surplusValue"))).append(")\n");
+                                b.append("مغایرت خالص: ").append(Math.round(resultFinal.optDouble("totalDiffValue"))).append(" ریال\n");
+                                b.append("دقت شمارش: ").append(String.format(java.util.Locale.US, "%.1f", resultFinal.optDouble("accuracyPercent"))).append("٪\n");
+                                try {
+                                    h.shareGeneratedFile("meelano-stocktake.txt", "text/plain", b.toString().getBytes("UTF-8"), "خلاصهٔ شمارش انبار");
+                                } catch (Exception e) {
+                                    h.notify("خطای خروجی: " + MeelanoWarehouse.shortMsg(e));
+                                }
+                            }
+                        },
+                        new Runnable() {
+                            @Override public void run() {
+                                saveCounts(h, new JSONObject());
+                                h.notify("دورهٔ شمارش پاک شد؛ می‌توانید شمارش تازه‌ای شروع کنید.");
+                                h.goTo("warehouse");
+                            }
+                        }
+                }), MeelanoUiKit.lp(-1, -2));
+    }
+
+    private static void addPicks(List<String[]> picks, JSONArray arr, int cap) {
+        if (arr == null) return;
+        for (int i = 0; i < arr.length() && i < cap; i++) {
+            JSONObject o = arr.optJSONObject(i);
+            if (o == null) continue;
+            String code = o.optString("code", "");
+            if (code.isEmpty()) continue;
+            boolean dup = false;
+            for (String[] existing : picks) if (existing[0].equals(code)) { dup = true; break; }
+            if (!dup) picks.add(new String[]{code, o.optString("name", code), String.valueOf(o.optDouble("stock"))});
+        }
+    }
+
+    /** شیت ورود تعداد شمارش‌شده برای یک کالا. */
+    private static void countSheet(final MeelanoUiHost h, final String code, String name, double system) {
+        MeelanoPalette p = h.colors();
+        final JSONObject map = countsOf(h);
+        LinearLayout body = MeelanoUiKit.column(h);
+        body.addView(MeelanoUiKit.kv(h, "کالا", name, p.text), MeelanoUiKit.lp(-1, -2));
+        body.addView(MeelanoUiKit.kv(h, "موجودی سیستمی", h.grouped(system), p.muted), MeelanoUiKit.lp(-1, -2));
+        MeelanoUiKit.gap(h, body, 8);
+        final android.widget.EditText qty = MeelanoUiKit.field(h, "تعداد شمارش‌شده", String.valueOf(map.has(code) ? map.optDouble(code) : system), true);
+        body.addView(MeelanoUiKit.fieldRow(h, "تعداد واقعی شمارش‌شده", qty), MeelanoUiKit.lp(-1, -2));
+        MeelanoUiKit.gap(h, body, 8);
+        body.addView(MeelanoUiKit.alert(h, "info", "چه چیزی ثبت می‌شود؟",
+                "فقط عدد شمارش روی همین گوشی ذخیره می‌شود و مبنای «برگهٔ شمارش» و «مغایرت» است؛ سند اصلاحی روی سرور آتیران به‌صورت خودکار زده نمی‌شود."), MeelanoUiKit.lp(-1, -2));
+        MeelanoUiKit.sheet(h, "شمارش کالا", "☑", p.info, body, "ثبت شمارش", new Runnable() {
+            @Override public void run() {
+                double v = Math.max(0, MeelanoUiKit.number(qty, map.has(code) ? map.optDouble(code) : 0));
+                try {
+                    map.put(code, v);
+                    saveCounts(h, map);
+                    h.notify("شمارش ثبت شد: " + h.grouped(v));
+                    h.goTo("warehouse");
+                } catch (Exception e) {
+                    h.notify("ثبت نشد: " + MeelanoWarehouse.shortMsg(e));
+                }
+            }
+        }, "انصراف");
+    }
+
+    private static double parse(String v) {
+        try { return v == null || v.trim().isEmpty() ? 0 : Double.parseDouble(v.trim()); } catch (Exception e) { return 0; }
+    }
+
+    // ================================================================ ۷) انتقال و توزیع
+    private static void renderTransfer(final MeelanoUiHost h, LinearLayout page, JSONObject data, JSONObject analysis) {
+        MeelanoPalette p = h.colors();
+        JSONObject snapshot = data.optJSONObject("snapshot");
+        JSONArray rows = snapshot == null ? null : snapshot.optJSONArray("stockRows");
+        JSONObject totals = analysis == null ? null : analysis.optJSONObject("totals");
+        double unitHint = totals != null && totals.optDouble("stockUnits") > 0
+                ? totals.optDouble("stockValueCost") / Math.max(1, totals.optDouble("stockUnits")) : 0;
+        final JSONObject plan = MeelanoWarehouse.transferPlan(rows, unitHint);
+
+        page.addView(MeelanoUiKit.sectionHeader(h, "انتقال و توزیع بین انبارها",
+                "کدام کالا در کدام انبار مانده است و چه چیزی باید جابه‌جا شود — پیش‌نویس حوالهٔ انتقال",
+                "⇆", p.accent), MeelanoUiKit.lp(-1, -2));
+        MeelanoUiKit.gap(h, page, 8);
+
+        if (rows == null || rows.length() == 0) {
+            page.addView(MeelanoUiKit.emptyState(h, "⇆", "موجودی چند‌انباری در دسترس نیست",
+                    "برای این کارت، یا جدول موجودی به تفکیک انبار در نسخهٔ آتیران شما فعال نیست، یا هر کالا فقط در یک انبار نگه‌داری می‌شود.",
+                    "تازه‌سازی", new Runnable() { @Override public void run() { h.goTo("warehouse"); } }), MeelanoUiKit.lp(-1, -2));
+            return;
+        }
+
+        List<View> tiles = new ArrayList<>();
+        tiles.add(MeelanoUiKit.kpi(h, "کالاهای چند‌انباری", h.fa(String.valueOf(plan.optInt("multiWarehouse"))),
+                h.fa(String.valueOf(plan.optInt("rows"))) + " ردیف موجودی انبار-کالا", "◈", p.accent, null));
+        tiles.add(MeelanoUiKit.kpi(h, "توزیع نامتوازن", h.fa(String.valueOf(plan.optInt("unbalanced"))),
+                "تمرکز بالای ۸۰٪ در یک انبار", "⇆", plan.optInt("unbalanced") > 0 ? p.warning : p.success, null));
+        tiles.add(MeelanoUiKit.kpi(h, "ارزش ردیف‌های بررسی‌شده", h.money(plan.optDouble("value")),
+                "با میانگین بهای خرید", "◎", p.info, null));
+        MeelanoUiKit.kpiGrid(h, page, tiles, 2, 8);
+
+        JSONArray products = plan.optJSONArray("products");
+        if (products != null && products.length() > 0) {
+            MeelanoUiKit.gap(h, page, 8);
+            List<String[]> table = new ArrayList<>();
+            for (int i = 0; i < products.length() && i < 25; i++) {
+                JSONObject o = products.optJSONObject(i);
+                if (o == null) continue;
+                JSONArray ws = o.optJSONArray("warehouses");
+                StringBuilder dist = new StringBuilder();
+                for (int w = 0; ws != null && w < ws.length() && w < 3; w++) {
+                    JSONObject one = ws.optJSONObject(w);
+                    if (one == null) continue;
+                    if (dist.length() > 0) dist.append(" • ");
+                    dist.append(one.optString("name", "—")).append(": ").append(h.grouped(one.optDouble("qty")));
+                }
+                table.add(new String[]{o.optString("name", o.optString("code", "—")), dist.toString(),
+                        h.grouped(o.optDouble("total")), o.optString("hint", "—")});
+            }
+            page.addView(MeelanoUiKit.table(h, "⇆  توزیع موجودی و پیشنهاد انتقال",
+                    new String[]{"کالا", "موجودی هر انبار", "جمع", "پیشنهاد"}, table, p.accent, new MeelanoUiKit.RowTap() {
+                        @Override public void tap(int index, String[] row) {
+                            h.notify("برای انتقال، ابتدا حوالهٔ انبار را در آتیران صادر کنید؛ این فهرست پیش‌نویس تصمیم است.");
+                        }
+                    }), MeelanoUiKit.lp(-1, -2));
+        }
+
+        MeelanoUiKit.gap(h, page, 9);
+        page.addView(MeelanoUiKit.buttonRow(h,
+                new String[][]{{"csv", "⬇  پیش‌نویس حواله (CSV)"}, {"refresh", "↻  تازه‌سازی"}},
+                new int[]{p.accent, p.info}, new boolean[]{true, false},
+                new Runnable[]{
+                        new Runnable() {
+                            @Override public void run() {
+                                try {
+                                    String csv = MeelanoWarehouse.transferCsv(plan);
+                                    h.shareGeneratedFile("meelano-transfer.csv", "text/csv", csv.getBytes("UTF-8"), "پیش‌نویس حوالهٔ انتقال بین انبارها");
+                                } catch (Exception e) {
+                                    h.notify("خطای خروجی: " + MeelanoWarehouse.shortMsg(e));
+                                }
+                            }
+                        },
+                        new Runnable() { @Override public void run() { h.goTo("warehouse"); } }
+                }), MeelanoUiKit.lp(-1, -2));
+        MeelanoUiKit.gap(h, page, 6);
+        page.addView(MeelanoUiKit.text(h, "ℹ  این صفحه فقط «تصمیم» می‌سازد؛ صدور سند حواله در آتیران انجام می‌شود. تمرکز بالای یک انبار یعنی ریسک تأخیر ارسال و هزینهٔ حمل بیشتر.",
+                8.7f, p.muted, false), MeelanoUiKit.lp(-1, -2));
+    }
+
     private static LinearLayout productTable(final MeelanoUiHost h, String title, JSONArray items, int cap, final String[] extraHeaders) {
         MeelanoPalette p = h.colors();
         List<String[]> rows = new ArrayList<>();

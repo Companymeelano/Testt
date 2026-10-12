@@ -28,7 +28,43 @@ final class ManagerAnalytics {
     private ManagerAnalytics() { }
 
     // ============================ metadata kit (same validation semantics as MainActivity) ============================
+    /** کش ستون‌ها/وجود جدول برای طول عمر برنامه — متادیتای آتیران عملاً تغییر نمی‌کند و
+     *  هر صفحه ده‌ها کوئری INFORMATION_SCHEMA می‌زد؛ با این کش، باز شدن صفحه‌ها محسوس سریع‌تر می‌شود. */
+    private static final Map<String, Set<String>> COLUMN_CACHE = new HashMap<>();
+    private static final Map<String, Boolean> TABLE_CACHE = new HashMap<>();
+    private static final long CACHE_TTL_MS = 15L * 60L * 1000L;
+    private static long cacheStamp = 0L;
+
+    /** پاک‌کردن کش متادیتا (مثلاً بعد از تغییر ساختار پایگاه داده یا قطع/وصل اتصال). */
+    static void clearMetadataCache() {
+        COLUMN_CACHE.clear();
+        TABLE_CACHE.clear();
+        cacheStamp = 0L;
+    }
+
+    private static boolean cacheExpired() {
+        long now = System.currentTimeMillis();
+        if (cacheStamp == 0L || now - cacheStamp > CACHE_TTL_MS) {
+            COLUMN_CACHE.clear();
+            TABLE_CACHE.clear();
+            cacheStamp = now;
+            return true;
+        }
+        return false;
+    }
+
+    /** ستون‌های یک جدول (با کش). */
     static Set<String> columns(Connection c, String table) throws Exception {
+        if (table == null) return new HashSet<>();
+        cacheExpired();
+        Set<String> hit = COLUMN_CACHE.get(table);
+        if (hit != null) return hit;
+        Set<String> fresh = columnsRaw(c, table);
+        COLUMN_CACHE.put(table, fresh);
+        return fresh;
+    }
+
+    private static Set<String> columnsRaw(Connection c, String table) throws Exception {
         Set<String> set = new HashSet<>();
         try (PreparedStatement ps = c.prepareStatement("SELECT c.name FROM sys.columns c JOIN sys.objects o ON o.object_id=c.object_id JOIN sys.schemas s ON s.schema_id=o.schema_id WHERE s.name=N'dbo' AND o.type IN (N'U',N'V') AND o.name=? ORDER BY c.column_id")) {
             ps.setString(1, table);
@@ -160,10 +196,17 @@ final class ManagerAnalytics {
     }
 
     static boolean tableExists(Connection c, String table) {
+        if (table == null) return false;
+        cacheExpired();
+        Boolean hit = TABLE_CACHE.get(table);
+        if (hit != null) return hit;
+        boolean exists = false;
         try (PreparedStatement ps = c.prepareStatement("SELECT 1 FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id WHERE s.name=N'dbo' AND t.name=?")) {
             ps.setString(1, table);
-            try (ResultSet r = ps.executeQuery()) { return r.next(); }
-        } catch (Exception ignored) { return false; }
+            try (ResultSet r = ps.executeQuery()) { exists = r.next(); }
+        } catch (Exception ignored) { exists = false; }
+        TABLE_CACHE.put(table, exists);
+        return exists;
     }
 
     private static boolean hasFunction(Connection c, String name) {

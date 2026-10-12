@@ -1,7 +1,7 @@
 // ============================================================================
 //  MEELANO-Android — ماژول اپلیکیشن
-//  یک ماژول، پنج نسخه (flavour): ویزیتور، مدیر، پرسنل، فروشگاه، مودیان
-//  همه کدها در src/main هستند و هر flavour فقط منابع (رنگ/نام/آیکون) خودش را
+//  یک ماژول، شش نسخه (flavour): ویزیتور، یکپارچهٔ اصلی، مدیر، پرسنل، فروشگاه، مودیان
+//  همه کدها در src/main هستند و هر flavour فقط منابع/هویت بستهٔ خودش را
 //  از src/<flavour>/res تزریق می‌کند — همان معماری قبلی پروژه، فقط ساختار
 //  Gradle که گم شده بود بازسازی شد تا پروژه واقعاً build شود.
 // ============================================================================
@@ -68,6 +68,13 @@ android {
             dimension 'edition'
             applicationId 'ir.meelano.android'
             resValue 'string', 'meelano_edition_key', 'visitor'
+        }
+        // The original licensed all-in-one app. Keep its established package ID so it updates
+        // MEELANO v6.x in place, keeps local data/license state, and retains the original gold-D icon.
+        unified {
+            dimension 'edition'
+            applicationId 'ir.meelano.visitor'
+            resValue 'string', 'meelano_edition_key', 'unified'
         }
         manager {
             dimension 'edition'

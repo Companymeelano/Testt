@@ -1,4 +1,4 @@
-name: MEELANO v7 — build APKs (warehouse + finance)
+name: MEELANO v7 — unified licensed app + edition APKs
 
 # این workflow روی شاخهٔ این سشن اجرا می‌شود و APKهای نهایی را:
 #   ۱) به‌عنوان Artifact و Release در گیت‌هاب می‌گذارد،
@@ -43,22 +43,47 @@ jobs:
         with:
           gradle-version: 8.13
 
-      - name: Build debug APKs (all five editions)
+      - name: Prepare the original license-app signing key (never commit the extracted key)
+        # Prefer a repository secret if configured. The fallback is the original install-key passphrase
+        # already present in the upstream public signing configuration for this user-supplied p12.
+        env:
+          MEELANO_INSTALL_PASSWORD: ${{ secrets.MEELANO_INSTALL_PASSWORD || 'derakhshan-install' }}
+        run: |
+          set -euo pipefail
+          mkdir -p app/signing
+          unzip -p Test.zip Test/signing/meelano-install.p12 > app/signing/meelano-install.p12
+          test -s app/signing/meelano-install.p12
+          cat > keystore.properties <<EOF
+          storeFile=app/signing/meelano-install.p12
+          storePassword=$MEELANO_INSTALL_PASSWORD
+          keyAlias=meelano
+          keyPassword=$MEELANO_INSTALL_PASSWORD
+          EOF
+          openssl pkcs12 -in app/signing/meelano-install.p12 -nokeys -passin env:MEELANO_INSTALL_PASSWORD | openssl x509 -noout -fingerprint -sha256
+
+      - name: Build debug editions + release of the original licensed all-in-one app
         run: |
           set -o pipefail
-          gradle assembleDebug --stacktrace --no-daemon 2>&1 | tee build-full.log | tail -60
+          gradle assembleDebug assembleUnifiedRelease --stacktrace --no-daemon 2>&1 | tee build-full.log | tail -80
 
-      - name: Collect APKs
+      - name: Collect APKs and verify original installation identity/signature
         run: |
+          set -euo pipefail
           mkdir -p dist
-          rm -f dist/*.apk
-          find app/build/outputs/apk -name "*.apk" -print -exec cp {} dist/ \;
+          rm -f dist/*.apk dist/latest-unified.json
+          find app/build/outputs/apk -path '*/debug/*.apk' -type f -print -exec cp -t dist/ {} +
+          cp app/build/outputs/apk/unified/release/app-unified-release.apk dist/MEELANO-v7.0.0-release.apk
+          BT="$ANDROID_HOME/build-tools/36.0.0"
+          "$BT/aapt" dump badging dist/MEELANO-v7.0.0-release.apk | grep -F "package: name='ir.meelano.visitor' versionCode='200' versionName='7.0.0'"
+          "$BT/apksigner" verify --verbose --print-certs dist/MEELANO-v7.0.0-release.apk > signing-check.txt
+          grep -F "Signer #1 certificate SHA-256 digest: 1a2ed0dd70759d6e10c77a4641eeeb8f15972b76d99af351470216955b46d616" signing-check.txt
+          printf '{"versionCode":200,"versionName":"7.0.0","url":"https://github.com/Companymeelano/Testt/releases/download/apk-v7-c192ed08/MEELANO-v7.0.0-release.apk"}\n' > dist/latest-unified.json
           ls -la dist/
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: meelano-v7-apks-debug
+          name: meelano-v7-apks-debug-and-unified-release
           path: dist/*.apk
           if-no-files-found: warn
 
@@ -68,14 +93,14 @@ jobs:
         with:
           tag_name: apk-v7-c192ed08
           prerelease: true
-          name: MEELANO v7.0.0 — انبار هوشمند و اتاق فرمان مالی (دیباگ)
+          name: MEELANO v7.0.0 — برنامهٔ یکپارچهٔ امضاشده + نسخه‌های تخصصی
           body: |
-            نسخهٔ ۷.۰.۰ — پنج نسخهٔ برنامه، همه با امضای دیباگ (مستقیم روی گوشی نصب می‌شوند):
-            • `meelano-manager-debug.apk` — نسخهٔ **مدیر** (اصلی): انبار هوشمند، اتاق فرمان مالی، برچسب QR/بارکد
-            • دیگر نسخه‌ها: ویزیتور، پرسنل، فروشگاه، مودیان
+            ## نسخهٔ اصلاح‌شدهٔ برنامهٔ اصلیِ یکپارچه و لایسنس‌دار
+            **`MEELANO-v7.0.0-release.apk` — فایل اصلی برای به‌روزرسانی نصب فعلی**
 
-            چون این بیلد با کلید دیباگ امضا شده، در کنار برنامهٔ فعلی نصب می‌شود (شناسهٔ جداگانه)
-            و یک‌بار باید اطلاعات اتصال را وارد کنید.
+            این APK با همان شناسهٔ بستهٔ نسخهٔ یکپارچهٔ قبلی (`ir.meelano.visitor`) و همان گواهی امضای نصب قبلی ساخته شده است؛ آیکون اصلی حرف طلایی D حفظ می‌شود و نصب روی نسخهٔ قبلی باید بدون حذف برنامه/پاک‌شدن داده‌ها انجام شود. صفحهٔ مدیریت، فروش، انبار و مالی داخل همین برنامه است.
+
+            `app-manager-debug.apk` یک برنامهٔ مدیرِ جداگانه با شناسه و آیکون متفاوت است؛ **برای ارتقای نصب اصلی از آن استفاده نکنید**. نسخه‌های پرسنل/فروشگاه/مودیان هم همچنان جداگانه‌اند.
           files: dist/*.apk
 
       - name: Commit APKs + build info to dist/ (delivery into the session branch)
@@ -84,7 +109,9 @@ jobs:
           git config user.name "arena-ci"
           git config user.email "arena-ci@local"
           {
-            echo "نسخه: 7.0.0 (versionCode 200)"
+            echo "نسخهٔ برنامهٔ یکپارچه: 7.0.0 (versionCode 200; package ir.meelano.visitor)"
+            echo "گواهی امضا: نسخهٔ نصب فعلی / Pakhsh Derakhshan (fingerprint را CI بررسی می‌کند)"
+            echo "APK اصلی: MEELANO-v7.0.0-release.apk"
             echo "کامیت: $(git rev-parse --short HEAD)"
             echo "تاریخ build: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
             echo "Gradle: $(gradle --version | grep Gradle | head -1)"

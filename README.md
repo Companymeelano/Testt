@@ -1,7 +1,7 @@
 # MEELANO-Android (پخش درخشان) — نسخهٔ ۷.۰.۰
 
 برنامهٔ اندروید مدیریت، انبار و حسابداری که مستقیم به **SQL Server آتیران** وصل می‌شود.
-یک ماژول، پنج نسخه (flavor): ویزیتور (`main`)، مدیر، پرسنل، فروشگاه، مودیان.
+یک کد مشترک با شش flavor: ویزیتور، **برنامهٔ یکپارچهٔ اصلیِ لایسنس‌دار** (`ir.meelano.visitor`)، مدیر، پرسنل، فروشگاه و مودیان. برای به‌روزرسانی نصب اصلی، فایل `MEELANO-v7.0.0-release.apk` را بگیرید؛ APK مدیر debug برنامهٔ جداگانه است.
 
 ## چه چیزی در این نسخه تازه است
 
@@ -20,13 +20,13 @@
 
 ```
 app/
-  build.gradle                  پیکربندی ماژول (۵ flavor، امضا، وابستگی‌ها)
+  build.gradle                  پیکربندی ماژول (۶ flavor، package/امضا، وابستگی‌ها)
   proguard-rules.pro
-  signing/meelano-install.p12   کلید امضا (رمز در keystore.properties)
+  signing/meelano-install.p12   فایل نصب محلی (CI آن را موقتاً از Test.zip استخراج می‌کند)
   latest.json                   آخرین نسخهٔ منتشرشده
-  src/main/java/ir/meelano/android/   کد برنامه (MainActivity + ۳۹ کلاس)
+  src/main/java/ir/meelano/android/   کد برنامه (MainActivity + ماژول‌های مشترک)
   src/main/res/                 ۱۴۱ آیکون وکتور، تم‌ها، فونت وزیرمتن
-  src/{manager,staff,store,tax}/res/  منابع مخصوص هر نسخه
+  src/{unified,manager,staff,store,tax}/res/  منابع مخصوص هر نسخه؛ unified از آیکون اصلی ارث می‌برد
   src/test/java/…               تست‌های واحد (MeelanoTaxTest، MeelanoHrTest)
 tools/                          ابزارهای بازبینی و تولید جدول (پایتون، بدون وابستگی به اندروید)
 docs/                           سند تحلیلی و گزارش پیاده‌سازی
@@ -36,8 +36,10 @@ gradle/, gradlew, *.gradle      پیکربندی Gradle 8.13 و AGP 8.10.1
 ## ساخت
 
 ```bash
-cp keystore.properties.example keystore.properties   # رمزهای p12 را پر کنید
-./gradlew assembleManagerRelease     # نسخهٔ مدیر
+mkdir -p app/signing
+unzip -p Test.zip Test/signing/meelano-install.p12 > app/signing/meelano-install.p12
+cp keystore.properties.example keystore.properties   # مقادیر محلی را تنظیم کنید
+./gradlew assembleUnifiedRelease     # برنامهٔ اصلیِ یکپارچه، package ir.meelano.visitor
 ./gradlew assembleRelease            # همهٔ نسخه‌ها
 ./gradlew test                       # تست‌های واحد (JUnit)
 ```
@@ -51,7 +53,7 @@ cp keystore.properties.example keystore.properties   # رمزهای p12 را پ�
 
 | ابزار | کار |
 |---|---|
-| `verify_all.py` | **بازبین جامع**: یک فرمان، ۱۷ کنترل (نحو، ارجاع‌ها، منابع، آیکون‌ها، اتصال صفحه‌ها،
+| `verify_all.py` | **بازبین جامع**: یک فرمان، ۲۰ کنترل (نحو، ارجاع‌ها، منابع، آیکون‌ها، اتصال صفحه‌ها، هویت نسخهٔ یکپارچه،
   تعریف تکراری، SQLهای دست‌ساز، QR/بارکد) + خودآزمون کنترل‌ها |
 | `java_api_check.py` | بازبینی نحوی همهٔ فایل‌های جاوا + کنترل ارجاع‌های بین‌کلاسی (جانشین سبک `javac` در محیط بدون JDK) |
 | `qr_reference_check.py` | مقایسهٔ ماتریس‌های `MeelanoQr` با کتابخانهٔ مرجع (۲۲۴ ماتریس، ۰ اختلاف) |

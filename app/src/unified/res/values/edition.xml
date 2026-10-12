@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Main management dashboard is enabled; unified mode extends (does not replace) visitor pages. -->
+    <bool name="meelano_manager_edition">true</bool>
+    <bool name="meelano_unified_edition">true</bool>
+</resources>

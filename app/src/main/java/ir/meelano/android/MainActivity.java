@@ -145,6 +145,8 @@ public class MainActivity extends Activity {
      * visitor whitelist keeps closed, and gates the whole app to admin/manager accounts.
      */
     private boolean MANAGER_EDITION = false;
+    /** Original signed all-in-one installation: keeps its package, icon, sales and management in one APK. */
+    private boolean UNIFIED_EDITION = false;
     /** Developer credit shown on the login screen and in «درباره برنامه». */
     private static final String DEVELOPER_NAME = "Milad Yaghoobi";
     private static final String DEFAULT_THEME = "azure_diamond";
@@ -346,6 +348,8 @@ public class MainActivity extends Activity {
         try { STAFF_EDITION = getResources().getBoolean(R.bool.meelano_staff_edition); } catch (Exception ignored) { STAFF_EDITION = false; }
         if (STAFF_EDITION) STORE_EDITION = false;
         try { MANAGER_EDITION = getResources().getBoolean(R.bool.meelano_manager_edition); } catch (Exception ignored) { MANAGER_EDITION = false; }
+        try { UNIFIED_EDITION = getResources().getBoolean(R.bool.meelano_unified_edition); } catch (Exception ignored) { UNIFIED_EDITION = false; }
+        if (UNIFIED_EDITION) MANAGER_EDITION = true; // the unified home uses the new manager dashboard
         if (MANAGER_EDITION) { STORE_EDITION = false; STAFF_EDITION = false; }
         prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         managerReportRange = prefs.getInt("mgr_range", 2);
@@ -2214,7 +2218,7 @@ public class MainActivity extends Activity {
         titles.setGravity(Gravity.CENTER_VERTICAL | Gravity.RIGHT);
         titles.setPadding(dp(8), 0, dp(8), 0);
         TextView appTitle = text(editionTitle(), 15.8f, tc(GOLD_2), Typeface.BOLD);
-        if (MANAGER_EDITION) { managerAppTitle = appTitle; if (session != null) appTitle.setText("مدیریت"); }
+        if (MANAGER_EDITION) { managerAppTitle = appTitle; if (session != null && !UNIFIED_EDITION) appTitle.setText("مدیریت"); }
         if (MANAGER_EDITION && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) appTitle.setAutoSizeTextTypeUniformWithConfiguration(10, 16, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
         appTitle.setSingleLine(true);
         appTitle.setEllipsize(TextUtils.TruncateAt.END);
@@ -2254,13 +2258,13 @@ public class MainActivity extends Activity {
     }
 
     private String headerSubtitleText() {
-        if (session == null) return MANAGER_EDITION ? "ورود امن مدیر" : STAFF_EDITION ? "ورود امن پرسنل" : STORE_EDITION ? "ورود امن کارکنان فروشگاه" : "ورود امن ویزیتور";
-        return headerPersonName() + (MANAGER_EDITION ? " • مدیر" : STAFF_EDITION ? " • پرسنل" : STORE_EDITION ? " • کارمند فروشگاه" : " • ویزیتور فعال");
+        if (session == null) return UNIFIED_EDITION ? "ورود امن پخش درخشان" : MANAGER_EDITION ? "ورود امن مدیر" : STAFF_EDITION ? "ورود امن پرسنل" : STORE_EDITION ? "ورود امن کارکنان فروشگاه" : "ورود امن ویزیتور";
+        return headerPersonName() + (UNIFIED_EDITION ? " • پخش درخشان" : MANAGER_EDITION ? " • مدیر" : STAFF_EDITION ? " • پرسنل" : STORE_EDITION ? " • کارمند فروشگاه" : " • ویزیتور فعال");
     }
 
     private void refreshHeaderName() {
         if (subtitle != null) subtitle.setText(headerSubtitleText());
-        if (MANAGER_EDITION && managerAppTitle != null) managerAppTitle.setText(session == null ? editionTitle() : "مدیریت");
+        if (MANAGER_EDITION && managerAppTitle != null) managerAppTitle.setText(session == null ? editionTitle() : UNIFIED_EDITION ? getString(R.string.app_name) : "مدیریت");
     }
 
     private View headerSettingsTool, headerLogoutTool;
@@ -3068,10 +3072,10 @@ public class MainActivity extends Activity {
             LinearLayout.LayoutParams ml = new LinearLayout.LayoutParams(dp(108), dp(108));
             ml.setMargins(0, 0, 0, dp(10));
             brand.addView(mlogo, ml);
-            TextView mh = text("ورود مدیر", 22, Color.rgb(250, 244, 232), Typeface.BOLD);
+            TextView mh = text(UNIFIED_EDITION ? "ورود به پخش درخشان" : "ورود مدیر", 22, Color.rgb(250, 244, 232), Typeface.BOLD);
             mh.setGravity(Gravity.CENTER);
             brand.addView(mh, new LinearLayout.LayoutParams(-1, -2));
-            TextView msub = text("نسخهٔ اختصاصی مدیرکل و مدیر • پخش درخشان", 11.5f, alpha(GOLD_2, 235), Typeface.NORMAL);
+            TextView msub = text(UNIFIED_EDITION ? "فروش، مدیریت، انبار و مالی در یک برنامه" : "نسخهٔ اختصاصی مدیرکل و مدیر • پخش درخشان", 11.5f, alpha(GOLD_2, 235), Typeface.NORMAL);
             msub.setGravity(Gravity.CENTER);
             LinearLayout.LayoutParams msp = new LinearLayout.LayoutParams(-1, -2);
             msp.setMargins(0, dp(6), 0, 0);
@@ -3452,9 +3456,13 @@ public class MainActivity extends Activity {
         if (VISITOR_EDITION && !MANAGER_EDITION && "dashboard".equals(targetPage)) targetPage = "visitor_dashboard";
         if (STORE_EDITION && ("visitor_dashboard".equals(targetPage) || "visit".equals(targetPage) || "visitor_reports".equals(targetPage))) targetPage = "store_home";
         if (STAFF_EDITION && ("visitor_dashboard".equals(targetPage) || "visit".equals(targetPage) || "visitor_reports".equals(targetPage) || "store_home".equals(targetPage) || "dashboard".equals(targetPage))) targetPage = "staff_home";
-        if (MANAGER_EDITION && ("visitor_dashboard".equals(targetPage) || "visit".equals(targetPage) || "visitor_reports".equals(targetPage) || "store_home".equals(targetPage) || "staff_home".equals(targetPage))) targetPage = "dashboard";
+        if (MANAGER_EDITION && !UNIFIED_EDITION && ("visitor_dashboard".equals(targetPage) || "visit".equals(targetPage) || "visitor_reports".equals(targetPage) || "store_home".equals(targetPage) || "staff_home".equals(targetPage))) targetPage = "dashboard";
         if (!canOpenPage(targetPage)) {
             targetPage = firstAllowedPage();
+            if (!canOpenPage(targetPage)) {
+                showNotice("برای این حساب هیچ بخشی فعال نیست؛ با مدیر سامانه تماس بگیرید.", true);
+                return;
+            }
             showNotice("فقط بخش‌های مجاز این حساب نمایش داده می‌شود.", false);
         }
         activePage = targetPage;
@@ -3462,7 +3470,7 @@ public class MainActivity extends Activity {
         motionSerial = 0;
         setConnectionStatus("connected");
         subtitle.setText(VISITOR_EDITION || MANAGER_EDITION ? headerSubtitleText() : session.userName);
-        if (MANAGER_EDITION && managerAppTitle != null) managerAppTitle.setText("مدیریت");
+        if (MANAGER_EDITION && managerAppTitle != null) managerAppTitle.setText(UNIFIED_EDITION ? getString(R.string.app_name) : "مدیریت");
         stage.removeAllViews();
         if (VISITOR_EDITION) stage.addView(new VisitorLeatherBackgroundView(this), new FrameLayout.LayoutParams(-1, -1));
 
@@ -3589,7 +3597,13 @@ public class MainActivity extends Activity {
         bg.setStroke(dp(1), BORDER);
         bar.setBackground(bg);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) bar.setElevation(dp(8));
-        String[][] items = MANAGER_EDITION ? new String[][]{
+        String[][] items = UNIFIED_EDITION ? (isFullAccessUser() ? new String[][]{
+                {"dashboard", "مدیریت", "⌂"}, {"showcase", "کالا", "◈"}, {"cart", "فروش", "⊕"},
+                {"warehouse", "انبار", "▧"}, {"finance", "مالی", "↗"}, {"manager_more", "بیشتر", "☰"}
+        } : new String[][]{
+                {"visitor_dashboard", "خانه", "⌂"}, {"visit", "ویزیت", "✦"}, {"showcase", "کالا", "◈"},
+                {"cart", "سبد", "⊕"}, {"visitor_more", "بیشتر", "☰"}
+        }) : MANAGER_EDITION ? new String[][]{
                 {"dashboard", "خانه", "⌂"},
                 {"manager_approvals", "تأییدها", "✓"},
                 {"warehouse", "انبار", "◈"},
@@ -3658,6 +3672,11 @@ public class MainActivity extends Activity {
         if (page == null) return MANAGER_EDITION ? "dashboard" : STAFF_EDITION ? "staff_home" : STORE_EDITION ? "store_home" : "visitor_dashboard";
         if (MANAGER_EDITION) {
             if ("login".equals(page)) return "";
+            if (UNIFIED_EDITION) {
+                if ("dashboard".equals(page) || "showcase".equals(page) || "cart".equals(page) || "warehouse".equals(page) || "finance".equals(page) || "manager_more".equals(page)) return page;
+                if ("visitor_dashboard".equals(page) || "visit".equals(page) || "visitor_more".equals(page)) return page;
+                return isFullAccessUser() ? "manager_more" : "visitor_more";
+            }
             if ("dashboard".equals(page) || "manager_approvals".equals(page) || "reports".equals(page) || "personnel".equals(page)) return page;
             return "manager_more";
         }
@@ -6871,6 +6890,17 @@ public class MainActivity extends Activity {
 
     private boolean canUsePermission(String key) {
         if (key == null || key.trim().isEmpty()) return true;
+        if (UNIFIED_EDITION) {
+            String k = key.trim();
+            if (!unifiedEditionPermissionAllowed(k)) return false;
+            // Preserve the original all-in-one visitor/sales surface; only added management routes
+            // are constrained by the account's management permissions.
+            if (visitorEditionPermissionAllowed(k)) return true;
+            // «dashboard» now means the manager's consolidated view; ordinary sales accounts must not
+            // inherit it merely because the legacy role has a generic dashboard permission.
+            if ("dashboard".equals(k) && !isFullAccessUser()) return false;
+            return isFullAccessUser() || currentPermissionSet().contains(k);
+        }
         if (MANAGER_EDITION) return managerEditionPermissionAllowed(key.trim());
         if (STAFF_EDITION) return STAFF_PAGE_KEYS.contains(key.trim());
         if (STORE_EDITION && ("chat".equals(key.trim()) || "personnel".equals(key.trim()) || "attendance_admin".equals(key.trim()))) return false;
@@ -6910,6 +6940,24 @@ public class MainActivity extends Activity {
                 || "products".equals(k) || "product_detail".equals(k)
                 || "management_access".equals(k) || "manager_approvals".equals(k) || "delivery_admin".equals(k) || "assistant".equals(k)
                 || "chat".equals(k) || "settings".equals(k) || "connection_health".equals(k);
+    }
+
+    /**
+     * The licensed one-app edition is the union of the original sales/visitor surface and manager tools.
+     * Account permissions still gate non-admin users; this method only says a route belongs to this APK.
+     */
+    private boolean unifiedEditionPermissionAllowed(String key) {
+        if (key == null || key.trim().isEmpty()) return true;
+        String k = key.trim();
+        if (managerEditionPermissionAllowed(k) || visitorEditionPermissionAllowed(k) || permissionSet(allPermissionString()).contains(k)) return true;
+        return "store_home".equals(k) || "store_reports".equals(k) || "store_checkout".equals(k)
+                || "store_receipt".equals(k) || "store_me".equals(k)
+                || "staff_home".equals(k) || "staff_delivery".equals(k) || "staff_delivery_detail".equals(k) || "staff_pay".equals(k)
+                || "tax_settings".equals(k) || "tax_send".equals(k) || "tax_invoice".equals(k)
+                || "cameras".equals(k) || "alarm".equals(k) || "hardware_control".equals(k)
+                || "diagnostics".equals(k) || "sales".equals(k) || "checks".equals(k)
+                || "visitor_dashboard".equals(k) || "visitor_more".equals(k) || "visit".equals(k) || "visitor_reports".equals(k)
+                || "showcase".equals(k) || "cart".equals(k) || "manager_more".equals(k);
     }
 
     /** Manager app, non-manager account: explain and stay on the login card instead of showing an empty shell. */
@@ -7134,10 +7182,9 @@ public class MainActivity extends Activity {
         if (visitorId == null || visitorId <= 0) visitorId = resolveVisitorIdForAccount(c, login, base.userName, base.userId);
         AccessProfile profile = resolveAccessProfile(c, login, base.userName, base.userId, visitorId);
         if (!profile.enabled) throw new DbException("دسترسی این کاربر توسط مدیر غیرفعال شده است.");
-        // Manager edition: when the admin has not configured any access row for this account yet,
-        // grant provisional full access instead of hard-blocking (owner directive: never block the work;
-        // security hardening comes later). Accounts WITH an explicit configured role stay restricted.
-        if (MANAGER_EDITION && !profile.explicit && !"admin".equals(profile.role) && !"manager".equals(profile.role)) {
+        // Only the separate manager installation retains its legacy provisional-role policy.
+        // The licensed all-in-one app follows the original account profile and permissions.
+        if (MANAGER_EDITION && !UNIFIED_EDITION && !profile.explicit && !"admin".equals(profile.role) && !"manager".equals(profile.role)) {
             return new UserSession(base.userId, visitorId, base.userName, "manager", allPermissionString());
         }
         return new UserSession(base.userId, visitorId, base.userName, profile.role, profile.permissions);
@@ -7405,6 +7452,13 @@ public class MainActivity extends Activity {
 
     private String firstAllowedPage() {
         if (MANAGER_EDITION) {
+            if (UNIFIED_EDITION) {
+                String[] allInOnePages = isFullAccessUser()
+                        ? new String[]{"dashboard", "showcase", "cart", "warehouse", "finance", "manager_more", "reports", "command", "personnel", "attendance", "customers", "products", "management", "visitor_dashboard", "visit", "visitor_reports", "taxpayers", "cameras", "alarm", "assistant", "chat", "settings", "health"}
+                        : new String[]{"visitor_dashboard", "visit", "cart", "visitor_more", "showcase", "customers", "products", "reports", "command", "warehouse", "finance", "personnel", "attendance", "taxpayers", "assistant", "chat", "visitor_reports", "settings", "manager_more"};
+                for (String p : allInOnePages) if (canOpenPage(p)) return p;
+                return isFullAccessUser() ? "dashboard" : "visitor_dashboard";
+            }
             String[] managerPages = {"dashboard", "reports", "command", "personnel", "attendance", "customers", "products", "management", "manager_more", "settings", "mgr_drill", "mgr_cockpit", "mgr_collection", "mgr_visits", "mgr_products", "mgr_field", "mgr_credit", "warehouse", "finance"};
             for (String p : managerPages) if (canOpenPage(p)) return p;
             return "dashboard";
@@ -13984,6 +14038,13 @@ public class MainActivity extends Activity {
                 new VisitorToolSpec("سلامت اتصال", "وضعیت آتیران", "⚕", navAccent("health"), () -> showApp("health"), canOpenPage("health")),
                 new VisitorToolSpec("تنظیمات", "تم، امنیت و بروزرسانی", "⚙", accent, () -> showApp("settings"), canOpenPage("settings"))
         });
+        if (UNIFIED_EDITION) addVisitorMoreGroup("فروش و ویزیت", "کاتالوگ، سفارش، ماموریت و گزارش میدانی", new VisitorToolSpec[]{
+                new VisitorToolSpec("کاتالوگ کالا", "قیمت‌ها و موجودی", "◈", navAccent("showcase"), () -> showApp("showcase"), canOpenPage("showcase")),
+                new VisitorToolSpec("سبد فروش", "فاکتور و پیش‌فاکتور", "⊕", navAccent("cart"), () -> showApp("cart"), canOpenPage("cart")),
+                new VisitorToolSpec("ماموریت ویزیت", "مسیر و ثبت بازدید", "✦", navAccent("visitor_dashboard"), () -> showApp("visitor_dashboard"), canOpenPage("visitor_dashboard")),
+                new VisitorToolSpec("گزارش ویزیت", "جمع‌بندی روزانه و PDF", "↗", navAccent("visitor_reports"), () -> showApp("visitor_reports"), canOpenPage("visitor_reports")),
+                new VisitorToolSpec("مسیر امروز", "نقشهٔ مشتریان", "⌖", navAccent("visit"), () -> showApp("visit"), canOpenPage("visit"))
+        });
         addVisitorMoreGroup("نظارت بر فروش", "مشتری، کالا و تحویل بار", new VisitorToolSpec[]{
                 new VisitorToolSpec("مشتریان", "مانده حساب و گردش", "♙", navAccent("customers"), () -> showApp("customers"), canOpenPage("customers")),
                 new VisitorToolSpec("کالاها", "موجودی و قیمت", "◈", navAccent("products"), () -> showApp("products"), canOpenPage("products")),
@@ -14000,6 +14061,12 @@ public class MainActivity extends Activity {
                 new VisitorToolSpec("انبار هوشمند", "ABC، نقطهٔ سفارش، کالای راکد، کارت کالا", "◈", GOLD, () -> showApp("warehouse"), canOpenPage("warehouse")),
                 new VisitorToolSpec("اتاق فرمان مالی", "وصول، چک، قیمت‌گذاری، جریان نقدی", "☷", SUCCESS, () -> showApp("finance"), canOpenPage("finance")),
                 new VisitorToolSpec("چاپ برچسب کالا", "برگهٔ A4 بارکد و QR (PDF)", "🏷", INFO, () -> { MeelanoWarehouseUi.tab = "labels"; showApp("warehouse"); }, canOpenPage("warehouse"))
+        });
+        if (UNIFIED_EDITION) addVisitorMoreGroup("امور سازمانی و ابزارها", "مودیان، امنیت و ابزارهای تخصصی", new VisitorToolSpec[]{
+                new VisitorToolSpec("مودیان و صورتحساب", "تنظیمات و ارسال مالیاتی", "▤", navAccent("taxpayers"), () -> showApp("taxpayers"), canOpenPage("taxpayers")),
+                new VisitorToolSpec("دوربین‌ها", "نمایش و کنترل دوربین", "◉", navAccent("cameras"), () -> showApp("cameras"), canOpenPage("cameras")),
+                new VisitorToolSpec("دزدگیر", "وضعیت و فرمان‌ها", "⌑", navAccent("alarm"), () -> showApp("alarm"), canOpenPage("alarm")),
+                new VisitorToolSpec("گزارش روزانه", "مشاهده و اشتراک", "▧", navAccent("visitor_reports"), () -> showApp("visitor_reports"), canOpenPage("visitor_reports"))
         });
         addVisitorMoreGroup("هوش مدیریتی", "دریل‌داون واقعی به رکوردهای آتیران", new VisitorToolSpec[]{
                 new VisitorToolSpec("اتاق فروش", "مقایسه بازه + ترکیب کالا و روز", "↗", navAccent("reports"), () -> showApp("mgr_cockpit"), true),
@@ -14035,6 +14102,16 @@ public class MainActivity extends Activity {
                 new VisitorToolSpec("انتخاب مشتری", "برای سبد فعلی", "+", navAccent("customers"), () -> showCartCustomerPicker(""), canUsePermission("customer_select")),
                 new VisitorToolSpec("کالا", "قیمت ۱ و ۲", "◈", navAccent("showcase"), () -> showApp("showcase"), canOpenPage("showcase")),
                 new VisitorToolSpec("کدخوان", "جستجوی کالا", "⌕", navAccent("visitor_more"), () -> showBarcodeSearchDialog(), canOpenPage("showcase"))
+        });
+        if (UNIFIED_EDITION) addVisitorMoreGroup("مدیریت و بخش‌های سازمانی", "فقط بخش‌های مجاز حساب کاربری شما", new VisitorToolSpec[]{
+                new VisitorToolSpec("داشبورد مدیریت", "نبض کسب‌وکار و میز فرمان", "♛", navAccent("dashboard"), () -> showApp("dashboard"), canOpenPage("dashboard")),
+                new VisitorToolSpec("انبار هوشمند", "موجودی، تأمین و کالاهای راکد", "◈", navAccent("warehouse"), () -> showApp("warehouse"), canOpenPage("warehouse")),
+                new VisitorToolSpec("اتاق فرمان مالی", "مطالبات، چک و جریان نقدی", "☷", navAccent("finance"), () -> showApp("finance"), canOpenPage("finance")),
+                new VisitorToolSpec("گزارش‌های مدیریتی", "فروش، مشتری و بازه‌ها", "↗", navAccent("reports"), () -> showApp("reports"), canOpenPage("reports")),
+                new VisitorToolSpec("پرسنل و دسترسی", "حضور، نقش و تأیید", "♟", navAccent("personnel"), () -> showApp("personnel"), canOpenPage("personnel")),
+                new VisitorToolSpec("فرماندهی", "تحلیل و اقدام مدیریتی", "✦", navAccent("command"), () -> showApp("command"), canOpenPage("command")),
+                new VisitorToolSpec("مودیان", "صورتحساب و ارسال مالیاتی", "▤", navAccent("taxpayers"), () -> showApp("taxpayers"), canOpenPage("taxpayers")),
+                new VisitorToolSpec("تأییدها", "درخواست‌های منتظر تصمیم", "✓", navAccent("manager_approvals"), () -> showApp("manager_approvals"), canOpenPage("manager_approvals"))
         });
         addVisitorMoreGroup("ابزارهای کمکی", "پیش‌نویس، حضور، پیام و تنظیمات", new VisitorToolSpec[]{
                 new VisitorToolSpec("پیش‌نویس‌ها", formatNumber(localDrafts().length()) + " ذخیره", "✎", navAccent("visitor_more"), () -> showSavedDraftsDialog(), canUsePermission("cart_draft")),
@@ -17598,6 +17675,7 @@ public class MainActivity extends Activity {
     // "New version available" check. CI writes apk/latest.json next to each APK.
     // ---------------------------------------------------------------------------------------------
     private static final String UPDATE_MANIFEST_URL = "https://github.com/Companymeelano/Newhamrah/raw/arena/01a0e474-newhamrah/apk/latest.json";
+    private static final String UNIFIED_UPDATE_MANIFEST_URL = "https://github.com/Companymeelano/Testt/raw/arena/c192ed08-testt/dist/latest-unified.json";
     private static final String KEY_UPDATE_CHECKED_AT = "update_checked_at";
     private static final String KEY_UPDATE_LATEST = "update_latest_json";
     private static final long UPDATE_CHECK_INTERVAL_MS = 12L * 60 * 60 * 1000;
@@ -17629,7 +17707,8 @@ public class MainActivity extends Activity {
             String body = null;
             java.net.HttpURLConnection conn = null;
             try {
-                conn = (java.net.HttpURLConnection) new java.net.URL(MANAGER_EDITION ? MANAGER_UPDATE_MANIFEST_URL : STAFF_EDITION ? STAFF_UPDATE_MANIFEST_URL : STORE_EDITION ? STORE_UPDATE_MANIFEST_URL : UPDATE_MANIFEST_URL).openConnection();
+                String manifestUrl = UNIFIED_EDITION ? UNIFIED_UPDATE_MANIFEST_URL : MANAGER_EDITION ? MANAGER_UPDATE_MANIFEST_URL : STAFF_EDITION ? STAFF_UPDATE_MANIFEST_URL : STORE_EDITION ? STORE_UPDATE_MANIFEST_URL : UPDATE_MANIFEST_URL;
+                conn = (java.net.HttpURLConnection) new java.net.URL(manifestUrl).openConnection();
                 conn.setConnectTimeout(8000); conn.setReadTimeout(8000); conn.setInstanceFollowRedirects(true);
                 if (conn.getResponseCode() == 200) {
                     try (java.io.InputStream in = conn.getInputStream()) {
@@ -25613,7 +25692,7 @@ public class MainActivity extends Activity {
     /** Manager app: its own manifest, written by CI next to MEELANO-Manager-*.apk in the «modiriat» repository. */
     private static final String MANAGER_UPDATE_MANIFEST_URL = "https://github.com/Companymeelano/modiriat/raw/main/apk/latest-manager.json";
 
-    private String editionTitle() { return MANAGER_EDITION ? "پخش درخشان مدیریت" : STAFF_EDITION ? "پخش درخشان پرسنل" : STORE_EDITION ? "پخش درخشان فروشگاه" : "پخش درخشان ویزیتور"; }
+    private String editionTitle() { return UNIFIED_EDITION ? getString(R.string.app_name) : MANAGER_EDITION ? "پخش درخشان مدیریت" : STAFF_EDITION ? "پخش درخشان پرسنل" : STORE_EDITION ? "پخش درخشان فروشگاه" : "پخش درخشان ویزیتور"; }
 
     /** In the store app every order is a final invoice, so «پیش‌فاکتور» wording becomes «فاکتور». */
     private String storeWording(String s) {

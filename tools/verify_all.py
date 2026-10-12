@@ -17,6 +17,7 @@
   ۱۱) متغیر محلی تکراری در یک متد و isEmpty() روی JSONArray/JSONObject
   ۱۲) سازگاری فراخوانی‌های «لایهٔ لوکس» (MeelanoLuxe): نام متد، تعداد آرگومان و ثابت‌های آیکون
       (دو خطای واقعی javac که javalang از آن‌ها رد می‌شود) + خودآزمون همین کنترل
+  ۱۳) هویت برنامهٔ یکپارچهٔ لایسنس‌دار: package، آیکون اصلی، ادغام مجوزها و گواهی امضای به‌روزرسانی
 """
 from __future__ import annotations
 
@@ -750,6 +751,24 @@ def check_lux_api():
     report('سازگاری API لایهٔ لوکس', ok, detail)
 
 
+def check_unified_app():
+    """نسخهٔ درستِ قابل‌ارتقا باید همان هویت نصب یکپارچه را حفظ کند."""
+    script = os.path.join(ROOT, 'tools', 'unified_app_check.py')
+    if not os.path.exists(script):
+        report('هویت برنامهٔ اصلیِ یکپارچه', False, 'tools/unified_app_check.py پیدا نشد')
+        return
+    try:
+        out = subprocess.run([sys.executable, script], cwd=ROOT, capture_output=True, text=True, timeout=60)
+    except Exception as e:
+        report('هویت برنامهٔ اصلیِ یکپارچه', False, 'اجرای ابزار ناموفق: %s' % e)
+        return
+    text = (out.stdout or '') + (out.stderr or '')
+    bad = [line for line in text.splitlines() if line.startswith('🔴')]
+    tail = [line for line in text.splitlines() if line.startswith('unified app check:')]
+    ok = out.returncode == 0 and not bad and bool(tail)
+    report('هویت برنامهٔ اصلیِ یکپارچه', ok, tail[0] if ok else '؛ '.join(bad[:4]) or 'ابزار کنترل شکست خورد')
+
+
 def main():
     print('════════ بازبینی جامع پروژهٔ Meelano ════════')
     check_syntax()
@@ -767,6 +786,7 @@ def main():
     check_comma_in_comment()
     check_shadow_and_json()
     check_lux_api()
+    check_unified_app()
     check_engines()
     check_docs()
     failed = [n for n, ok, _ in RESULTS if not ok]

@@ -1,0 +1,19 @@
+نسخه: 7.0.0 (versionCode 200)
+کامیت: fa1fd86
+تاریخ build: 2026-10-12T10:12:59Z
+Gradle: Gradle 8.13
+فایل‌ها:
+drwxr-xr-x  2 runner runner    4096 Oct 12 10:12 .
+drwxr-xr-x 12 runner runner    4096 Oct 12 10:12 ..
+-rw-r--r--  1 runner runner     130 Oct 12 10:13 BUILD-INFO.txt
+-rw-r--r--  1 runner runner 3347341 Oct 12 10:12 app-manager-debug.apk
+-rw-r--r--  1 runner runner 3001637 Oct 12 10:12 app-staff-debug.apk
+-rw-r--r--  1 runner runner 3011405 Oct 12 10:12 app-store-debug.apk
+-rw-r--r--  1 runner runner 3054137 Oct 12 10:12 app-tax-debug.apk
+-rw-r--r--  1 runner runner 3039441 Oct 12 10:12 app-visitor-debug.apk
+--- sha256 ---
+51cecaa1937c44d9ff13398a1143b371f5cc442614156676591ad1a72e954661  app-manager-debug.apk
+8e971f18b91ec3c80e33e5c74f36b05a507cf5188145fe54b365533b527a7ec0  app-staff-debug.apk
+429e91c6f7f3eb4132fc8b6e17e99e7a35cf7e6010cd054e1d15337440c7d0cd  app-store-debug.apk
+39fed5bfca7a9fd6a5c75f38a8240ac09303feda54866cf20ec2313f3d4d3152  app-tax-debug.apk
+cf680a9acecc0572af286b0abdd953b5950c33f16434a481df9b66ab3ae60976  app-visitor-debug.apk

@@ -5,7 +5,7 @@
 
 ## مبنای ارتقای این نوبت: مدیر v36
 
-سورس مستقل برنامهٔ مدیر در `manager/` نگه‌داری می‌شود تا با flavorهای پروژهٔ v7 اشتباه نشود. پایهٔ بازیابی‌شده `ir.meelano.manager.debug` بود (`36.20.1` / کد ۵۲)؛ این ارتقا به `36.21.0` / کد ۵۳ می‌رسد و خروجی جدید `meelano-manager-v36-debug-6.apk` نام دارد (باینری جدید، نه ادعای بازیابی APK تاریخی). workflow جداگانهٔ [build-manager-v36.yml](.github/workflows/build-manager-v36.yml) تست‌ها و APK مدیر را می‌سازد. این فایل مدیر جداست و جایگزین APK اصلی یکپارچهٔ `ir.meelano.visitor` نیست.
+سورس مستقل برنامهٔ مدیر در `manager/` نگه‌داری می‌شود تا با flavorهای پروژهٔ v7 اشتباه نشود. پایهٔ بازیابی‌شده `ir.meelano.manager.debug` بود (`36.20.1` / کد ۵۲)؛ این ارتقا به `36.21.0` / کد ۵۳ می‌رسد و خروجی جدید `meelano-manager-v36-debug-6.apk` نام دارد (باینری جدید، نه ادعای بازیابی APK تاریخی). workflow جداگانهٔ [build-manager-v36.yml](.github/workflows/build-manager-v36.yml) تست‌ها و APK مدیر را می‌سازد و فایل تأییدشده را در `dist/` همین شاخه قرار می‌دهد تا مستقیم تحویل شود. این فایل مدیر جداست و جایگزین APK اصلی یکپارچهٔ `ir.meelano.visitor` نیست.
 
 ```bash
 ./gradlew -p manager :app:testDebugUnitTest :app:assembleDebug

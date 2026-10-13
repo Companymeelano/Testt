@@ -366,7 +366,26 @@ public class LicenseActivity extends Activity {
 
     // ================= page 1: name + contact, nothing else =================
 
+    /** Brand header for the licence pages: framed gold logo, title and a muted subtitle. */
+    private LinearLayout heroHeader(String title, String sub) {
+        LinearLayout h = kit.v();
+        h.setGravity(Gravity.CENTER_HORIZONTAL);
+        h.setPadding(0, Theme.dp(6), 0, Theme.dp(10));
+        android.widget.ImageView logo = kit.logo(88);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(Theme.dp(88), Theme.dp(88));
+        lp.gravity = Gravity.CENTER_HORIZONTAL;
+        h.addView(logo, lp);
+        TextView t = kit.text(title, 19f, Theme.GOLD_SOFT, true);
+        t.setGravity(Gravity.CENTER);
+        h.addView(t, kit.lp(-1, -2));
+        TextView s = kit.text(sub, 12.5f, Theme.MUTED, false);
+        s.setGravity(Gravity.CENTER);
+        h.addView(s, kit.lp(-1, -2));
+        return h;
+    }
+
     private void buildRequestPage(LinearLayout box) {
+        box.addView(heroHeader("فعال‌سازی مجوز", "برای شروع، نام و شماره‌تان را ثبت کنید"), kit.lp(-1, -2));
         box.addView(stepBar(1), kit.lp(-1, -2));
         box.addView(kit.gap(10));
         LinearLayout c = Card3D.card(this, Theme.GOLD);

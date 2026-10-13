@@ -6,12 +6,14 @@ import android.app.Dialog;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
+import android.content.res.ColorStateList;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
+import android.widget.CheckBox;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -47,6 +49,12 @@ public final class WhatsNew {
             }
             shownThisProcess = true;
             int cur = appCode(a);
+            if (isAutoOff(a)) {
+                // The user ticked «دیگر این پیغام را نشان نده»: stay quiet, but remember the version.
+                markSeen(a, cur);
+                done.run();
+                return;
+            }
             int last = prefs(a).getInt("last_news_code", 0);
             if (cur <= 0) {
                 done.run();
@@ -64,6 +72,16 @@ public final class WhatsNew {
                 done.run();
             } catch (Exception ignored) { }
         }
+    }
+
+    /** True when the user ticked «دیگر این پیغام را نشان نده». */
+    public static boolean isAutoOff(Context c) {
+        return prefs(c).getBoolean("auto_off", false);
+    }
+
+    /** Settings switch: false re-enables the automatic popup after upgrades. */
+    public static void setAutoOff(Context c, boolean off) {
+        prefs(c).edit().putBoolean("auto_off", off).apply();
     }
 
     /** Re-open the current version's notes (Settings » تازه‌های نسخه). */
@@ -100,27 +118,42 @@ public final class WhatsNew {
         LinearLayout content = kit.v();
         content.setPadding(Theme.dp(20), Theme.dp(16), Theme.dp(20), Theme.dp(16));
 
-        // ---- header: floating ✦ badge + title + version line ----
-        TextView badge = kit.text("✦", 32, Theme.onAccent(), true);
+        // ---- hero: gold medallion, version chip and a count of changes ----
+        LinearLayout hero = kit.v();
+        hero.setGravity(Gravity.CENTER);
+        hero.setBackground(Theme.hero(Theme.GOLD));
+        hero.setPadding(Theme.dp(18), Theme.dp(22), Theme.dp(18), Theme.dp(18));
+        TextView badge = kit.text("✦", 34, Theme.onAccent(Theme.GOLD), true);
         badge.setGravity(Gravity.CENTER);
         badge.setBackground(Theme.accentAvatar(Theme.GOLD));
         try {
-            badge.setElevation(Theme.dp(10));
+            badge.setElevation(Theme.dp(12));
         } catch (Exception ignored) { }
-        LinearLayout.LayoutParams bp =
-                new LinearLayout.LayoutParams(Theme.dp(80), Theme.dp(80));
+        LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(Theme.dp(84), Theme.dp(84));
         bp.gravity = Gravity.CENTER;
-        content.addView(badge, bp);
-        content.addView(kit.gap(8));
-        TextView title = kit.text("تازه‌های نسخه", 21, Theme.TEXT, true);
+        hero.addView(badge, bp);
+        hero.addView(kit.gap(12));
+        TextView title = kit.text("تازه‌های نسخه", 22, Theme.TEXT, true);
         title.setGravity(Gravity.CENTER);
-        content.addView(title, kit.lp(-1, -2));
+        hero.addView(title, kit.lp(-1, -2));
         Changelog.Ver latest = vers.get(0);
-        TextView sub = kit.text("نسخه " + Money.fa(latest.name) + " • " + latest.dateFa,
-                13f, Theme.MUTED, false);
-        sub.setGravity(Gravity.CENTER);
-        content.addView(sub, kit.lp(-1, -2));
-        content.addView(kit.gap(10));
+        TextView chip = kit.text("✦ نسخه " + Money.fa(latest.name) + " • " + latest.dateFa,
+                12.5f, Theme.onAccent(Theme.GOLD), true);
+        chip.setGravity(Gravity.CENTER);
+        chip.setBackground(Theme.pill(Theme.GOLD));
+        chip.setPadding(Theme.dp(14), Theme.dp(6), Theme.dp(14), Theme.dp(6));
+        LinearLayout.LayoutParams cgp = new LinearLayout.LayoutParams(-2, -2);
+        cgp.gravity = Gravity.CENTER;
+        cgp.setMargins(0, Theme.dp(10), 0, Theme.dp(6));
+        hero.addView(chip, cgp);
+        int total = 0;
+        for (Changelog.Ver v : vers) for (Object o : v.items) total++;
+        TextView count = kit.text(Money.fa(String.valueOf(total)) + " بهبود و قابلیت تازه در این به‌روزرسانی",
+                12f, Theme.MUTED, false);
+        count.setGravity(Gravity.CENTER);
+        hero.addView(count, kit.lp(-1, -2));
+        content.addView(hero, kit.lp(-1, -2));
+        content.addView(kit.gap(14));
 
         // ---- version sections + 3D item cards ----
         List<View> cards = new ArrayList<>();
@@ -171,19 +204,27 @@ public final class WhatsNew {
         sv.addView(content, new ScrollView.LayoutParams(-1, -2));
         root.addView(sv, new LinearLayout.LayoutParams(-1, 0, 1f));
 
-        // ---- sticky footer: the skip key is always one tap away ----
+        // ---- sticky footer: never-show tick, then the one-tap way in ----
         LinearLayout foot = kit.v();
-        foot.setPadding(Theme.dp(20), Theme.dp(10), Theme.dp(20), Theme.dp(16));
+        foot.setPadding(Theme.dp(20), Theme.dp(8), Theme.dp(20), Theme.dp(16));
+        final boolean[] never = {false};
+        CheckBox cb = new CheckBox(a);
+        cb.setText("دیگر این پیغام را نشان نده");
+        cb.setTextColor(Theme.TEXT);
+        cb.setTextSize(12.5f);
+        cb.setButtonTintList(ColorStateList.valueOf(Theme.GOLD));
+        cb.setOnCheckedChangeListener((x, on) -> never[0] = on);
+        foot.addView(cb, kit.lp(-1, -2));
         foot.addView(kit.btnGold("✦ ورود به برنامه", v -> {
             try {
                 d.dismiss();
             } catch (Exception ignored) { }
         }), kit.lp(-1, -2));
-        TextView re = kit.text("هر وقت خواستید: تنظیمات » تازه‌های نسخه",
+        TextView re = kit.text("همیشه در: تنظیمات » درباره » تازه‌های نسخه",
                 11f, Theme.MUTED, false);
         re.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams rp = kit.lp(-1, -2);
-        rp.setMargins(0, Theme.dp(8), 0, 0);
+        rp.setMargins(0, Theme.dp(6), 0, 0);
         foot.addView(re, rp);
         root.addView(foot, kit.lp(-1, -2));
 
@@ -195,6 +236,7 @@ public final class WhatsNew {
         d.setCancelable(true);
         d.setOnDismissListener(dd -> {
             markSeen(a, cur);
+            if (never[0]) setAutoOff(a, true);
             if (onDone != null) {
                 try {
                     onDone.run();

@@ -93,7 +93,7 @@ public class MainActivity extends Activity {
             new android.os.Handler(android.os.Looper.getMainLooper());
     private Runnable linkPending = null;
     private TextView licChip;
-    private TextView backFab;
+    private View backFab;
     private TextView companyName;
     private android.widget.FrameLayout logoBox;
     private android.widget.ImageView logoImg;
@@ -624,8 +624,8 @@ public class MainActivity extends Activity {
         LinearLayout centerWrap = kit.h();
         centerWrap.setGravity(Gravity.CENTER_HORIZONTAL);
         content = kit.v();
-        // Bottom room so the golden back button never covers the last row.
-        content.setPadding(Theme.dp(12), Theme.dp(4), Theme.dp(12), Theme.dp(96));
+        // Bottom room so the back capsule never covers the last row.
+        content.setPadding(Theme.dp(12), Theme.dp(4), Theme.dp(12), Theme.dp(128));
         scroll.addView(centerWrap, new ScrollView.LayoutParams(-1, -2));
         int sw = getResources().getDisplayMetrics().widthPixels;
         centerWrap.addView(content, new LinearLayout.LayoutParams(sw > Theme.dp(720) ? Theme.dp(640) : -1, -2));
@@ -1064,6 +1064,11 @@ public class MainActivity extends Activity {
     }
 
     /** Golden circular back button, floating above the bottom bar on every section but Home. */
+    /**
+     * The single back control for every screen: one gold capsule with a round arrow
+     * and the word «بازگشت», docked bottom-centre just above the tab bar. It stays in
+     * the same place on every page so the user always knows where to find it.
+     */
     private void syncBackFab() {
         try {
             if (backFab != null && backFab.getParent() instanceof android.view.ViewGroup)
@@ -1071,22 +1076,35 @@ public class MainActivity extends Activity {
         } catch (Exception ignored) {
         }
         backFab = null;
-        TextView f = kit.text("\u2192", 26, Theme.onAccent(), true);
-        f.setGravity(Gravity.CENTER);
-        f.setBackground(Theme.accentAvatar(Theme.GOLD));
-        f.setElevation(Theme.dp(6));
-        f.setContentDescription("برگشت");
-        Theme.pressable(f);
-        f.setOnClickListener(v -> goBack());
+        int ink = Theme.onAccent(Theme.GOLD);
+        LinearLayout pill = new LinearLayout(this);
+        pill.setOrientation(LinearLayout.HORIZONTAL);
+        pill.setGravity(Gravity.CENTER_VERTICAL);
+        pill.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        pill.setBackground(Theme.backPill());
+        pill.setPadding(Theme.dp(6), Theme.dp(6), Theme.dp(18), Theme.dp(6));
+        pill.setElevation(Theme.dp(12));
+        pill.setContentDescription("بازگشت به صفحه قبلی");
+        TextView disc = kit.text("\u2192", 18, ink, true);
+        disc.setGravity(Gravity.CENTER);
+        disc.setBackground(Theme.avatar(Theme.alpha(ink, 40)));
+        pill.addView(disc, new LinearLayout.LayoutParams(Theme.dp(36), Theme.dp(36)));
+        TextView label = kit.text("بازگشت", 14f, ink, true);
+        label.setSingleLine(true);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
+        lp.setMargins(Theme.dp(10), 0, 0, 0);
+        pill.addView(label, lp);
+        Theme.pressable(pill);
+        pill.setOnClickListener(v -> goBack());
         android.widget.FrameLayout.LayoutParams p = new android.widget.FrameLayout.LayoutParams(
-                Theme.dp(58), Theme.dp(58), Gravity.BOTTOM | Gravity.LEFT);
-        p.setMargins(Theme.dp(16), 0, 0, Theme.dp(100));
+                -2, -2, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+        p.setMargins(0, 0, 0, Theme.dp(86));
         try {
-            addContentView(f, p);
+            addContentView(pill, p);
         } catch (Exception ignored) {
             return;
         }
-        backFab = f;
+        backFab = pill;
         backFab.setVisibility("home".equals(currentId) ? View.GONE : View.VISIBLE);
     }
 

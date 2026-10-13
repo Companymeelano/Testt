@@ -101,6 +101,103 @@ public class CustomersScreen extends Screen {
         Map<String, String> notes = new LinkedHashMap<>();
     }
 
+    /** Gold hero for the customers page: medallion, title, period subtitle and the filter bar. */
+    @Override
+    protected View heroCard() {
+        LinearLayout w = a.kit.v();
+        LinearLayout hero = a.kit.h();
+        hero.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        hero.setBackground(Theme.hero(Theme.GOLD));
+        hero.setPadding(Theme.dp(14), Theme.dp(14), Theme.dp(14), Theme.dp(14));
+        android.widget.TextView medal = a.kit.text("👥", 24, Theme.onAccent(Theme.GOLD), true);
+        medal.setGravity(android.view.Gravity.CENTER);
+        medal.setBackground(Theme.accentAvatar(Theme.GOLD));
+        hero.addView(medal, new LinearLayout.LayoutParams(Theme.dp(60), Theme.dp(60)));
+        hero.addView(a.kit.space(12));
+        LinearLayout copy = a.kit.v();
+        copy.addView(a.kit.text(title(), 21f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        String sub = subtitle();
+        if (sub != null && !sub.isEmpty())
+            copy.addView(a.kit.text(sub, 12f, Theme.GOLD_SOFT, false), a.kit.lp(-1, -2));
+        hero.addView(copy, a.kit.wlp(1f));
+        w.addView(hero, a.kit.lp(-1, -2));
+        if (filterConfig() != null && filter() != null) {
+            w.addView(a.kit.gap(8));
+            Filter f = filter();
+            w.addView(a.kit.filterBar(f.describeFa(), !f.isDefault(), v -> a.openFilter()), a.kit.lp(-1, -2));
+        }
+        return w;
+    }
+
+    /** Small tinted label used on customer cards (code, route). */
+    private android.widget.TextView tag(String s, int color) {
+        android.widget.TextView t = a.kit.text(s, 10.5f, color, true);
+        t.setSingleLine(true);
+        t.setBackground(Theme.pill(Theme.alpha(color, Theme.isLight() ? 36 : 44)));
+        t.setPadding(Theme.dp(8), Theme.dp(2), Theme.dp(8), Theme.dp(2));
+        return t;
+    }
+
+    /**
+     * Customer row as a card: avatar ring in the status colour, name on its own line,
+     * code and route tags, then the balance in full width with a status pill. Nothing
+     * is squeezed beside the name, so long names and amounts stay readable.
+     */
+    private View customerCard(final Row r, final String code, final double bal) {
+        final int col = bal > 0.5 ? Theme.DANGER : (bal < -0.5 ? Theme.SUCCESS : Theme.GOLD);
+        final String name = r.s("name").isEmpty() ? "—" : r.s("name");
+        LinearLayout card = a.kit.v();
+        card.setBackground(Theme.cardAccent(col));
+        card.setPadding(Theme.dp(14), Theme.dp(12), Theme.dp(14), Theme.dp(12));
+
+        LinearLayout top = a.kit.h();
+        top.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        android.widget.TextView av = a.kit.text(a.kit.initials(name), 15f, Theme.onAccent(col), true);
+        av.setGravity(android.view.Gravity.CENTER);
+        av.setBackground(Theme.accentAvatar(col));
+        top.addView(av, new LinearLayout.LayoutParams(Theme.dp(50), Theme.dp(50)));
+        top.addView(a.kit.space(12));
+        LinearLayout copy = a.kit.v();
+        android.widget.TextView n = a.kit.text(name, 15f, Theme.TEXT, true);
+        n.setSingleLine(true);
+        n.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        copy.addView(n, a.kit.lp(-1, -2));
+        LinearLayout meta = a.kit.h();
+        meta.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        meta.addView(tag("کد " + Money.fa(code), Theme.GOLD_SOFT));
+        String route = r.s("route");
+        if (!route.isEmpty()) {
+            meta.addView(a.kit.space(6));
+            meta.addView(tag(route, Theme.TEAL));
+        }
+        LinearLayout.LayoutParams mp = a.kit.lp(-1, -2);
+        mp.setMargins(0, Theme.dp(5), 0, 0);
+        copy.addView(meta, mp);
+        top.addView(copy, a.kit.wlp(1f));
+        card.addView(top, a.kit.lp(-1, -2));
+
+        View div = a.kit.divider();
+        LinearLayout.LayoutParams dp2 = a.kit.lp(-1, Theme.dp(1));
+        dp2.setMargins(0, Theme.dp(10), 0, Theme.dp(8));
+        card.addView(div, dp2);
+
+        LinearLayout bottom = a.kit.h();
+        bottom.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        LinearLayout amt = a.kit.v();
+        amt.addView(a.kit.text(bal > 0.5 ? "مانده بدهی" : (bal < -0.5 ? "مانده بستانکاری" : "وضعیت حساب"),
+                10.5f, Theme.MUTED, false), a.kit.lp(-1, -2));
+        String amount = bal > 0.5 ? Money.rial(bal) : (bal < -0.5 ? Money.rial(-bal) : "تسویه");
+        amt.addView(a.kit.text(amount, 15f, col, true), a.kit.lp(-1, -2));
+        bottom.addView(amt, a.kit.wlp(1f));
+        String pillText = bal > 0.5 ? "بدهکار" : (bal < -0.5 ? "بستانکار" : "تسویه");
+        bottom.addView(a.kit.pill(pillText, col), a.kit.lp(-2, -2));
+        card.addView(bottom, a.kit.lp(-1, -2));
+
+        Theme.pressable(card);
+        card.setOnClickListener(v2 -> openDossier(code));
+        return card;
+    }
+
     @Override
     public void render(final LinearLayout content) {
         content.removeAllViews();
@@ -207,12 +304,7 @@ public class CustomersScreen extends Screen {
             for (Row r : d.list) {
                 final String code = r.s("code");
                 double bal = r.d("balance");
-                int col = bal > 0.5 ? Theme.DANGER : (bal < -0.5 ? Theme.SUCCESS : Theme.MUTED);
-                String side = bal > 0.5 ? Money.rial(bal) : (bal < -0.5 ? Money.rial(-bal) : "تسویه");
-                String sub = "کد " + Money.fa(code) + " • فروش " + Money.compactRial(r.d("salesTotal"));
-                if (!r.s("route").isEmpty()) sub += " • " + r.s("route");
-                View v = a.kit.personRow(r.s("name"), sub, side,
-                        bal > 0.5 ? "بدهکار" : (bal < -0.5 ? "بستانکار" : "مانده"), col, v2 -> openDossier(code));
+                View v = customerCard(r, code, bal);
                 LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
                 p.setMargins(0, 0, 0, Theme.dp(10));
                 content.addView(v, p);

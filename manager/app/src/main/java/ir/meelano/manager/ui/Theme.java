@@ -389,6 +389,15 @@ public final class Theme {
         return base(SURFACE2, 16, dp(2), DANGER);
     }
 
+    /** The one back button used on every screen: accent-gradient capsule with a light rim. */
+    public static GradientDrawable backPill() {
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{shade(GOLD, 0.08f), GOLD, shade(GOLD, -0.22f)});
+        d.setCornerRadius(dp(30));
+        d.setStroke(dp(1), alpha(0xFFFFFFFF, light ? 150 : 90));
+        return d;
+    }
+
     public static GradientDrawable ghostButton(int accent) {
         return base(alpha(accent, light ? 18 : 26), 16, dp(1), alpha(accent, light ? 130 : 110));
     }

@@ -19,6 +19,7 @@ import ir.meelano.manager.data.Repo;
 import ir.meelano.manager.data.Row;
 import ir.meelano.manager.ui.Charts;
 import ir.meelano.manager.ui.FilterSheet;
+import ir.meelano.manager.ui.FlowRow;
 import ir.meelano.manager.ui.Kit;
 import ir.meelano.manager.ui.Theme;
 
@@ -188,18 +189,55 @@ public class MoneyScreen extends Screen {
         renderNotes(content, d.notes);
     }
 
-    private void buildList(LinearLayout content, Data d) {
+    /** Selected receipt filter: "", "today", "cash", "pos", "havaleh" or "cheque". */
+    private String typeF = "";
+
+    private boolean matchType(Row r) {
+        switch (typeF) {
+            case "today":
+                return Jalali.disp(r.s("date")).startsWith(Jalali.todayStr());
+            case "cash":
+                return r.d("cash") > 0.5;
+            case "pos":
+                return r.d("pos") > 0.5;
+            case "havaleh":
+                return r.d("havaleh") > 0.5;
+            case "cheque":
+                return r.d("cheque") > 0.5;
+            default:
+                return true;
+        }
+    }
+
+    private void buildList(final LinearLayout content, Data d) {
         if (d.list == null || d.list.isEmpty()) {
             content.addView(a.kit.empty("قبضی در این بازه یافت نشد", "فیلتر را تغییر دهید"), a.kit.lp(-1, -2));
             return;
         }
+        // Type filter: narrows the receipts to one payment form, or to today's documents.
+        // Applied on the rows already fetched, so switching is instant.
+        String[][] types = {{"", "همه"}, {"today", "امروز"}, {"cash", "نقد"},
+                {"pos", "کارت"}, {"havaleh", "حواله"}, {"cheque", "چک"}};
+        FlowRow typeRow = new FlowRow(a);
+        for (String[] t : types) {
+            final String key = t[0];
+            View ch = a.kit.chip(t[1], key.equals(typeF), accent(), v -> {
+                typeF = key;
+                render(content);
+            });
+            typeRow.addView(ch, a.kit.lp(-2, -2));
+        }
+        content.addView(typeRow, a.kit.lp(-1, -2));
+        content.addView(a.kit.gap(10));
+
         for (Row r : d.list) {
+            if (!matchType(r)) continue;
             final String ghno = r.s("ghno");
             String pill = r.s("kind");
             if (pill.isEmpty()) pill = "—";
             View v = a.kit.docRow("قبض " + Money.fa(ghno), r.s("customer"),
                     Jalali.shortLabel(r.s("date")), Money.rial(r.d("total")),
-                    pill, accent(), v2 -> openDetail(ghno));
+                    pill, accent(), a.kit.docKinds(r), v2 -> openDetail(ghno));
             LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
             p.setMargins(0, 0, 0, Theme.dp(10));
             content.addView(v, p);

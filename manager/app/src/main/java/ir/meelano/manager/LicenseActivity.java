@@ -858,18 +858,7 @@ public class LicenseActivity extends Activity {
                 editingConnection ? "ویرایش اتصال" : "گام ۲ • اتصال", Theme.GOLD_SOFT),
                 kit.lp(-1, -2));
         box.addView(kit.gap(8));
-        LinearLayout lc = Card3D.card(this, Theme.SUCCESS);
-        lc.addView(Card3D.stepRow(this, kit, "✓", Theme.SUCCESS, "لایسنس"), kit.lp(-1, -2));
-        lc.addView(kit.kv("وضعیت", "✓ فعال", Theme.SUCCESS), kit.lp(-1, -2));
-        lc.addView(kit.kv("طرح", "«" + License.planFa(s.plan) + "»", Theme.GOLD_SOFT),
-                kit.lp(-1, -2));
-        if (s.plan == License.P_PERM) {
-            lc.addView(kit.kv("اعتبار", "دائمی ♾", Theme.SUCCESS), kit.lp(-1, -2));
-        } else {
-            lc.addView(kit.kv("اعتبار", Money.fa(String.valueOf(s.daysLeft)) + " روز",
-                    leftColor(s.daysLeft)), kit.lp(-1, -2));
-        }
-        Card3D.mount(box, lc);
+        Card3D.mount(box, licenseTicket(s));
         LinearLayout c = Card3D.card(this, Theme.GOLD);
         LinearLayout chead = kit.h();
         chead.setGravity(Gravity.CENTER_VERTICAL);
@@ -1351,6 +1340,54 @@ public class LicenseActivity extends Activity {
 
     // ---- status ----
 
+
+    /**
+     * Licence card as a gold ticket: medallion, plan name, a large days-left figure and a
+     * progress bar. Colours follow the customer's theme; the bar turns amber/red as the
+     * licence nears expiry.
+     */
+    private LinearLayout licenseTicket(LicenseStore.Status s) {
+        final boolean perm = s.plan == License.P_PERM;
+        final int col = perm ? Theme.SUCCESS : leftColor(s.daysLeft);
+        LinearLayout c = kit.v();
+        c.setBackground(Theme.hero(Theme.GOLD));
+        c.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(16));
+
+        LinearLayout top = kit.h();
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout medal = kit.v();
+        medal.setGravity(Gravity.CENTER);
+        medal.setBackground(Theme.accentAvatar(Theme.GOLD));
+        medal.addView(kit.icon(R.drawable.mi_verified_user, Theme.onAccent(Theme.GOLD), 28),
+                new LinearLayout.LayoutParams(Theme.dp(28), Theme.dp(28)));
+        top.addView(medal, new LinearLayout.LayoutParams(Theme.dp(60), Theme.dp(60)));
+        top.addView(kit.space(12));
+        LinearLayout copy = kit.v();
+        copy.addView(kit.text("لایسنس فعال", 17f, Theme.TEXT, true), kit.lp(-1, -2));
+        copy.addView(kit.text(perm ? "طرح دائمی" : "طرح «" + License.planFa(s.plan) + "»",
+                12.5f, Theme.GOLD_SOFT, true), kit.lp(-1, -2));
+        top.addView(copy, kit.wlp(1f));
+        top.addView(kit.pill("✓ فعال", Theme.SUCCESS), kit.lp(-2, -2));
+        c.addView(top, kit.lp(-1, -2));
+        c.addView(kit.gap(14));
+
+        if (perm) {
+            c.addView(kit.text("دائمی ♾", 26f, Theme.SUCCESS, true), kit.lp(-1, -2));
+        } else {
+            LinearLayout days = kit.h();
+            days.setGravity(Gravity.BOTTOM);
+            days.addView(kit.text(Money.fa(String.valueOf(s.daysLeft)), 32f, col, true), kit.lp(-2, -2));
+            days.addView(kit.space(8));
+            days.addView(kit.text("روز باقی‌مانده", 12f, Theme.MUTED, false), kit.lp(-2, -2));
+            c.addView(days, kit.lp(-1, -2));
+            // A licence over 30 days left is a longer plan; the bar is scaled to that.
+            double total = s.daysLeft > 30 ? 365.0 : 30.0;
+            double frac = Math.max(0, Math.min(1, s.daysLeft / total));
+            c.addView(kit.gap(8));
+            c.addView(kit.progress(frac, col), kit.lp(-1, Theme.dp(8)));
+        }
+        return c;
+    }
 
     private static int leftColor(long daysLeft) {
         if (daysLeft <= 7) return Theme.DANGER;

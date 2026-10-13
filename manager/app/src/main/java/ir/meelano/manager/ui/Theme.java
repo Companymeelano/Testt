@@ -320,12 +320,13 @@ public final class Theme {
     public static GradientDrawable bottomNavIconSelected() {
         // Ivory Royal uses a neutral champagne capsule with the accent itself as
         // the foreground; Midnight Gold uses a luminous accent capsule and ink.
+        // Three-stop gold: champagne highlight → accent → deep shade, with a bright rim.
         int[] colors = light
-                ? new int[]{shade(SURFACE2, 0.025f), SURFACE2}
-                : new int[]{shade(GOLD, 0.04f), shade(GOLD, 0.12f)};
-        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, colors);
-        d.setCornerRadius(dp(14));
-        d.setStroke(dp(1), alpha(GOLD, light ? 96 : 72));
+                ? new int[]{shade(SURFACE2, 0.05f), SURFACE2, shade(SURFACE2, -0.03f)}
+                : new int[]{shade(GOLD, 0.22f), GOLD, shade(GOLD, -0.2f)};
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR, colors);
+        d.setCornerRadius(dp(16));
+        d.setStroke(dp(1), alpha(0xFFFFFFFF, light ? 110 : 120));
         return d;
     }
 

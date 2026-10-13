@@ -730,11 +730,14 @@ public final class Kit {
     /** Deluxe scrollable table: row numbers, gold zebra, red negatives, rounded card. */
     public View dataTable(ReportCatalog.Col[] cols, List<Row> rows, final RowClick click) {
         HorizontalScrollView sv = new HorizontalScrollView(a);
+        sv.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         sv.setBackground(Theme.card());
         sv.setPadding(Theme.dp(4), Theme.dp(4), Theme.dp(4), Theme.dp(4));
         LinearLayout t = v();
+        t.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         t.setPadding(Theme.dp(2), Theme.dp(2), Theme.dp(2), Theme.dp(2));
         LinearLayout head = h();
+        head.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         head.setBackground(Theme.tableHeader());
         head.setPadding(Theme.dp(6), Theme.dp(9), Theme.dp(6), Theme.dp(9));
         TextView rn0 = text("#", 11.5f, Theme.GOLD_SOFT, true);
@@ -749,6 +752,7 @@ public final class Kit {
         for (int i = 0; i < rows.size(); i++) {
             final Row r = rows.get(i);
             LinearLayout row = h();
+            row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
             row.setPadding(Theme.dp(6), Theme.dp(10), Theme.dp(6), Theme.dp(10));
             if (i % 2 == 1) row.setBackgroundColor(Theme.alpha(Theme.GOLD, Theme.DARK ? 16 : 30));
             TextView rn = text(Money.fa(String.valueOf(i + 1)), 11f, Theme.MUTED, true);
@@ -996,11 +1000,42 @@ public final class Kit {
     }
 
     /** Generic document row with a free pill. */
+    /**
+     * Icon badges for the payment parts of one receipt (نقد، کارت، حواله، چک). Only parts
+     * with a real amount appear, so a cheque-only receipt shows just the cheque badge.
+     */
+    public View docKinds(Row r) {
+        FlowRow w = new FlowRow(a);
+        addKind(w, "نقد", R.drawable.mi_payments, Theme.SUCCESS, r.d("cash"));
+        addKind(w, "کارت", R.drawable.mi_credit_card, Theme.INFO, r.d("pos"));
+        addKind(w, "حواله", R.drawable.mi_swap_horiz, Theme.VIOLET, r.d("havaleh"));
+        addKind(w, "چک", R.drawable.mi_cheque, Theme.GOLD, r.d("cheque"));
+        return w;
+    }
+
+    private void addKind(FlowRow w, String label, int icon, int color, double amount) {
+        if (amount < 0.5) return;
+        LinearLayout chip = h();
+        chip.setGravity(Gravity.CENTER_VERTICAL);
+        chip.setBackground(Theme.pill(Theme.alpha(color, Theme.isLight() ? 34 : 44)));
+        chip.setPadding(Theme.dp(8), Theme.dp(3), Theme.dp(10), Theme.dp(3));
+        chip.addView(icon(icon, color, 14), new LinearLayout.LayoutParams(Theme.dp(14), Theme.dp(14)));
+        chip.addView(space(5));
+        chip.addView(text(label, 10.5f, color, true), lp(-2, -2));
+        w.addView(chip, lp(-2, -2));
+    }
+
     public View docRow(String title, String mid, String date, String total, String pillText, View.OnClickListener onClick) {
         return docRow(title, mid, date, total, pillText, Theme.INFO, onClick);
     }
 
     public View docRow(String title, String mid, String date, String total, String pillText, int accent, View.OnClickListener onClick) {
+        return docRow(title, mid, date, total, pillText, accent, null, onClick);
+    }
+
+    /** Document card with an optional footer (e.g. {@link #docKinds}) under its header line. */
+    public View docRow(String title, String mid, String date, String total, String pillText, int accent,
+                       View foot, View.OnClickListener onClick) {
         LinearLayout c = v();
         c.setBackground(Theme.cardAccent(accent));
         c.setPadding(Theme.dp(12), Theme.dp(11), Theme.dp(12), Theme.dp(11));
@@ -1029,6 +1064,11 @@ public final class Kit {
         }
         head.addView(side, lp(-2, -2));
         c.addView(head, lp(-1, -2));
+        if (foot != null) {
+            LinearLayout.LayoutParams fp = lp(-1, -2);
+            fp.setMargins(0, Theme.dp(8), 0, 0);
+            c.addView(foot, fp);
+        }
         if (onClick != null) {
             Theme.pressable(c);
             c.setOnClickListener(onClick);

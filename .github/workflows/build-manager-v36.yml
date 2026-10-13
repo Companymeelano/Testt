@@ -6,6 +6,8 @@ on:
     paths:
       - "manager/**"
       - "tools/audit_manager_schema.py"
+      - "tools/probe_buy_formula.py"
+      - "tools/probe_atiran_backup.py"
       - ".github/workflows/build-manager-v36.yml"
   workflow_dispatch:
 

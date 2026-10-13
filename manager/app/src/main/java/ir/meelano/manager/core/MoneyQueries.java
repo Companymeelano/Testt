@@ -27,7 +27,7 @@ public final class MoneyQueries {
         d.shmo = m.col("dar", "shmo", "SHMO");
         d.date = m.must("dar", "تاریخ", "date", "DATE");
         d.done = m.col("dar", "donedate", "done_date", "DoneDate");
-        d.desc = m.col("dar", "DarDesc", "darDesc", "description", "Explain");
+        d.desc = null; // dar has no description column in the schema
         // Verified against the attached Atiran schema (tools/atiran-money-structure.md).
         // POS and transfer amounts are not header columns of dar: they come from PosDetails
         // and havaleh through (ghno, p, Rdf_), handled in posDetailSum / darParts.
@@ -502,7 +502,8 @@ public final class MoneyQueries {
         if (!m.table("PosDetails")) throw new Queries.Missing("«جزئیات کارت/حواله» در دیتابیس پیدا نشد");
         String amount = m.must("PosDetails", "مبلغ", "MabPos", "mabPos", "mablagh");
         String bankRef = m.must("PosDetails", "بانک", "PosBankRdf", "BankRdf", "bankrdf");
-        String date = m.col("PosDetails", "date", "Date", "done_date", "DoneDate");
+        // PosDetails has no date column: the date comes from the parent dar voucher (ghno,p).
+        String date = m.col("dar", "date");
         String gh = m.col("PosDetails", "ghno", "GHNO");
         String pp = m.col("PosDetails", "p");
         String hav = m.col("PosDetails", "IsHavaleh", "isHavaleh");
@@ -519,14 +520,26 @@ public final class MoneyQueries {
         if (p >= 0 && pp != null) { conds.add("d.[" + pp + "]=?"); binds.add(p); }
         String latest = posLatestVersionCondition(m, "d", gh, pp, hav);
         if (!latest.isEmpty()) conds.add(latest);
-        if (date != null) {
-            String dc = Sql.dateCond(Sql.date10("d", date), f.from, f.to, binds);
+        String darApply = "";
+        String darGh = m.col("dar", "ghno");
+        String darP = m.col("dar", "p");
+        String darRdf = m.col("dar", "Rdf_");
+        if (date != null && darGh != null && darP != null && gh != null && pp != null) {
+            // One dar row per voucher (latest Rdf_ revision), matched on ghno and p.
+            darApply = " OUTER APPLY (SELECT TOP (1) dh.[" + date + "] AS vdate FROM dbo.dar dh"
+                    + " WHERE TRY_CONVERT(nvarchar(60),dh.[" + darGh + "])=TRY_CONVERT(nvarchar(60),d.[" + gh + "])"
+                    + " AND TRY_CONVERT(int,dh.[" + darP + "])=TRY_CONVERT(int,d.[" + pp + "])"
+                    + " ORDER BY " + (darRdf == null ? "(SELECT NULL)" : "TRY_CONVERT(bigint,dh.[" + darRdf + "]) DESC") + ") dv";
+        }
+        if (!darApply.isEmpty()) {
+            // Without the dar relation the date filter is skipped rather than applied to a non-existent column.
+            String dc = Sql.dateCond(Sql.date10("dv", "vdate"), f.from, f.to, binds);
             if (!dc.isEmpty()) conds.add(dc);
         }
         String where = conds.isEmpty() ? "" : " WHERE " + Sql.join(conds, " AND ");
         return new Queries.Q("SELECT " + label + " AS bank, " + kind + " AS kind"
                 + ", ISNULL(SUM(" + Sql.num("d", amount) + "),0) AS total"
-                + ", COUNT_BIG(1) AS count FROM dbo.PosDetails d" + join + where
+                + ", COUNT_BIG(1) AS count FROM dbo.PosDetails d" + join + darApply + where
                 + " GROUP BY " + label + ", " + kind + " ORDER BY 3 DESC", binds);
     }
 

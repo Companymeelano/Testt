@@ -54,7 +54,7 @@ public final class MasterQueries {
         boolean needGrp = (f.kalaGroup >= 0 && grp != null) || (grpName != null && grpKey != null && grp != null);
         // Warehouse filter via inventory_anbars (best-effort columns).
         String anShka = m.col("inventory_anbars", "shka", "SHKA");
-        String anWh = m.colFlex("inventory_anbars", "rdf_anbar", "anbar", "warehouse", "anbarrdf");
+        String anWh = m.col("inventory_anbars", "rdf_anbars");
         String anQty = m.colFlex("inventory_anbars", "mojkavah", "mojodi", "tedad", "qty", "meghdar");
         boolean useAnbar = f.warehouse >= 0 && anShka != null && anWh != null;
         List<Object> binds = new ArrayList<>();
@@ -140,11 +140,12 @@ public final class MasterQueries {
     public static Queries.Q productTurnover(Meta m, String shkaVal, Filter f) throws Queries.Missing {
         if (!m.table("ka_act")) throw new Queries.Missing("«گردش کالا» در دیتابیس پیدا نشد");
         String shka = m.must("ka_act", "کد کالا", "shka", "SHKA");
-        String date = m.col("ka_act", "date", "DATE", "done_date", "DoneDate");
+        String date = m.col("ka_act", "act_date", "done_date");
         String op = m.col("ka_act", "act_id", "ActID", "actid");
-        String in = m.colFlex("ka_act", "tedad_vorood", "vorood", "in_qty", "qty_in", "vared", "buy_qty");
-        String out = m.colFlex("ka_act", "tedad_khorooj", "khorooj", "out_qty", "qty_out", "sale_qty", "kharej");
-        String qty = m.colFlex("ka_act", "tedad", "qty", "meghdar", "TEDVAH", "tedvah");
+        // ka_act has no separate in/out quantity columns in the schema (only tedvah): show unavailable.
+        String in = null;
+        String out = null;
+        String qty = m.col("ka_act", "tedvah");
         String desc = m.colFlex("ka_act", "act_dis", "description", "sharh", "tozihat");
         String doc = m.colFlex("ka_act", "ghno", "shfacfo", "shfackh", "shomare", "sanad", "docnumber");
         String anbar = m.col("ka_act", "RdfAnbar", "rdf_anbar");
@@ -403,11 +404,12 @@ public final class MasterQueries {
         String ghno = m.must("dar", "شماره قبض", "ghno", "GHNO");
         String shmo = m.must("dar", "کد مشتری", "shmo", "SHMO");
         String date = m.must("dar", "تاریخ", "date", "DATE");
-        String cash = m.col("dar", "MabNaghdi", "mabNaghdi");
-        String pos = m.col("dar", "MabPos", "mabPos");
-        String hav = m.col("dar", "MabHavaleh", "mabHavaleh");
-        String chq = m.col("dar", "SumMabcheck", "sumMabcheck");
-        String desc = m.col("dar", "DarDesc", "darDesc", "description");
+        String cash = m.col("dar", "naghd", "cash");
+        // POS/transfer amounts are not dar columns (they live in PosDetails); no dar equivalent for them.
+        String pos = null;
+        String hav = null;
+        String chq = m.col("dar", "mabcheck", "MabCheck");
+        String desc = null; // dar has no description column in the schema
         List<Object> binds = new ArrayList<>();
         binds.add(p);
         binds.add(shmoVal);
@@ -893,10 +895,10 @@ public final class MasterQueries {
     public static Queries.Q bankTurnover(Meta m, Filter f) throws Queries.Missing {
         if (!m.table("ban_act")) throw new Queries.Missing("«گردش بانک» در دیتابیس پیدا نشد");
         String bank = m.must("ban_act", "بانک", "bank_rdf", "BankRdf", "bankrdf");
-        String date = m.colFlex("ban_act", "date", "tarikh", "done_date", "donedate");
+        String date = m.colFlex("ban_act", "act_date", "done_act");
         String bed = m.colFlex("ban_act", "act_bed", "bed", "bedehkar");
         String bes = m.colFlex("ban_act", "act_bes", "bes", "bestankar");
-        String single = m.colFlex("ban_act", "mablagh", "mab", "all", "total", "amount");
+        String single = null; // ban_act has act_bed/act_bes only; no single amount column
         String bankKey = m.col("BANK", "RDF", "rdf");
         String bankName = m.colFlex("BANK", "name", "bankname", "title", "onvan");
         String label = bankKey != null && bankName != null && m.table("BANK")
@@ -922,9 +924,9 @@ public final class MasterQueries {
     /** Cash boxes (best-effort): name,balance. */
     public static Queries.Q cowList(Meta m) throws Queries.Missing {
         if (!m.table("COW")) throw new Queries.Missing("«صندوق‌ها» در دیتابیس پیدا نشد");
-        String name = m.colFlex("COW", "name", "title", "onvan", "cow_name");
-        String bal = m.colFlex("COW", "man", "balance", "mande", "mojodi", "mablagh");
-        String id = m.colFlex("COW", "rdf", "id", "rowid");
+        String name = null; // COW has no name column; rows are cash movements (DIS = description)
+        String bal = null; // COW has no balance column; not derived (sign convention unverified)
+        String id = m.col("COW", "rdf");
         String label = name != null ? "COALESCE(" + Sql.txt("t", name, 200) + "," + (id == null ? "N'—'" : Sql.txt("t", id, 60)) + ")"
                 : (id == null ? "N'صندوق'" : Sql.txt("t", id, 60));
         return new Queries.Q("SELECT " + label + " AS name, "
@@ -935,11 +937,16 @@ public final class MasterQueries {
     /** Recorded changes audit (best-effort): at,tableName,username,descrip. */
     public static Queries.Q tableChanges(Meta m, Filter f) throws Queries.Missing {
         if (!m.table("TableChanges")) throw new Queries.Missing("«تغییرات ثبت‌شده» در دیتابیس پیدا نشد");
-        String date = m.colFlex("TableChanges", "date", "tarikh", "event_time", "time", "datetime", "logdate");
-        String table = m.colFlex("TableChanges", "table", "tablename", "table_name", "form", "entity");
-        String user = m.colFlex("TableChanges", "username", "user_name", "user", "operator");
-        String desc = m.colFlex("TableChanges", "description", "desc", "detail", "sharh", "action");
-        if (date == null && table == null) throw new Queries.Missing("ساختار «تغییرات ثبت‌شده» قابل تشخیص نیست");
+        // Schema: TableChanges(DateServer, TimeServer, UserID, KindID, DescriptionOfChanges, Comment)
+        // and TableChangesKinds(KindID, KindName) via FK_TableChanges_TableChangesKinds.
+        String date = m.col("TableChanges", "DateServer");
+        String kind = m.col("TableChanges", "KindID");
+        String kindName = m.col("TableChangesKinds", "KindName");
+        String user = m.col("TableChanges", "UserID");
+        String desc = m.colFlex("TableChanges", "DescriptionOfChanges", "Comment");
+        boolean joinKind = kind != null && kindName != null && m.table("TableChangesKinds")
+                && m.col("TableChangesKinds", "KindID") != null;
+        if (date == null && kind == null) throw new Queries.Missing("ساختار «تغییرات ثبت‌شده» قابل تشخیص نیست");
         List<Object> binds = new ArrayList<>();
         List<String> conds = new ArrayList<>();
         if (date != null) {
@@ -952,11 +959,12 @@ public final class MasterQueries {
         }
         String where = conds.isEmpty() ? "" : " WHERE " + Sql.join(conds, " AND ");
         String order = date == null ? "1" : "t.[" + date + "] DESC";
+        String join = joinKind ? " LEFT JOIN dbo.TableChangesKinds k ON TRY_CONVERT(nvarchar(60),k.[KindID])=TRY_CONVERT(nvarchar(60),t.[" + kind + "])" : "";
         return new Queries.Q("SELECT " + (date == null ? "CAST(NULL AS nvarchar(16))" : "LEFT(TRY_CONVERT(nvarchar(30),t.[" + date + "]),16)") + " AS at"
-                + ", " + (table == null ? "N''" : "COALESCE(" + Sql.txt("t", table, 150) + ",N'')") + " AS tableName"
+                + ", " + (joinKind ? "COALESCE(" + Sql.txt("k", kindName, 150) + ",N'')" : "N''") + " AS tableName"
                 + ", " + (user == null ? "N''" : "COALESCE(" + Sql.txt("t", user, 120) + ",N'')") + " AS username"
                 + ", " + (desc == null ? "N''" : "COALESCE(" + Sql.txt("t", desc, 400) + ",N'')") + " AS descrip"
-                + " FROM dbo.TableChanges t" + where + " ORDER BY " + order
+                + " FROM dbo.TableChanges t" + join + where + " ORDER BY " + order
                 + Queries.pageClause(binds, f.page, f.top), binds);
     }
 
@@ -1371,7 +1379,7 @@ public final class MasterQueries {
     // =====================================================================================
     /** Company profile text: name,director,addr,tell1,tell2,cell,fax,meli,egh,pos. */
     public static Queries.Q companyProfile(Meta m) throws Queries.Missing {
-        if (!m.table("company")) throw new Queries.Missing("جدول مشخصات شرکت در دیتابیس پیدا نشد");
+        if (!m.table("Company")) throw new Queries.Missing("جدول مشخصات شرکت در دیتابیس پیدا نشد");
         String[][] cols = {
                 {"name", "نام شرکت", "name", "Name", "moname", "company_name"},
                 {"director", "مدیرعامل", "modir_amel", "modir", "manager"},
@@ -1387,7 +1395,7 @@ public final class MasterQueries {
         StringBuilder sb = new StringBuilder("SELECT TOP (1) ");
         for (int i = 0; i < cols.length; i++) {
             if (i > 0) sb.append(", ");
-            String c = m.col("company", java.util.Arrays.copyOfRange(cols[i], 2, cols[i].length));
+            String c = m.col("Company", java.util.Arrays.copyOfRange(cols[i], 2, cols[i].length));
             sb.append(c == null ? "CAST(NULL AS nvarchar(400))" : Sql.txt("c", c, 400)).append(" AS ").append(cols[i][0]);
         }
         sb.append(" FROM dbo.company c");
@@ -1407,9 +1415,9 @@ public final class MasterQueries {
     }
 
     private static String companyLogoCol(Meta m) throws Queries.Missing {
-        if (!m.table("company")) throw new Queries.Missing("جدول مشخصات شرکت در دیتابیس پیدا نشد");
-        String logo = m.col("company", "logo", "Logo", "pic", "tasvir");
-        if (logo == null) logo = m.col("company", "arm", "Arm");
+        if (!m.table("Company")) throw new Queries.Missing("جدول مشخصات شرکت در دیتابیس پیدا نشد");
+        // Company.arm is the image-typed logo column in the schema.
+        String logo = m.col("Company", "arm", "Arm", "logo", "Logo", "pic", "tasvir");
         if (logo == null) throw new Queries.Missing("ستون لوگو در جدول شرکت پیدا نشد");
         return logo;
     }
@@ -1661,8 +1669,7 @@ public final class MasterQueries {
         String ka = m.must("inventory", "کد کالا", "shka", "SHKA");
         String nk = m.must("inventory", "نام کالا", "naka", "NAKA");
         String un = m.col("inventory", "vahsanj", "VAHSANJ", "unit");
-        String barcode = m.col("inventory", "barcode", "bar_code", "barcod", "BARKOD", "BARCODE",
-                "barkod", "kodbar", "codebar", "shkode");
+        String barcode = null; // inventory has no barcode column in the schema (barbari_vahed is a unit code)
         List<Object> binds = new ArrayList<>();
         String where = "TRY_CONVERT(nvarchar(120),i.[" + ka + "])=?";
         binds.add(scanned == null ? "" : scanned.trim());

@@ -161,6 +161,11 @@ public final class ReportCatalog {
             s("buy_monthly", "خرید ماهانه", "خرید", "جمع و تعداد فاکتور خرید هر ماه", false,
                     new Col[]{c("month", "ماه", T_TEXT), c("total", "جمع خرید", T_MONEY), c("docs", "اسناد", T_NUM)},
                     C_BARS, "month", "total"),
+            s("buy_price_trend", "روند قیمت خرید", "خرید", "تغییر بهای واحد آخرین خرید نسبت به خرید قبلی هر کالا (درصد)", true,
+                    new Col[]{c("label", "کالا", T_TEXT), c("prevUnit", "خرید قبلی (واحد)", T_MONEY),
+                            c("lastUnit", "خرید اخیر (واحد)", T_MONEY), c("change", "تغییر ٪", T_NUM),
+                            c("docs", "تعداد خرید", T_NUM)},
+                    C_NONE, "", ""),
             s("buy_by_party", "خرید از طرف‌حساب‌ها", "خرید", "برترین فروشندگان/تأمین‌کنندگان", true,
                     new Col[]{c("label", "طرف‌حساب", T_TEXT), c("total", "جمع خرید", T_MONEY), c("docs", "اسناد", T_NUM)},
                     C_BARS, "label", "total"),
@@ -296,6 +301,7 @@ public final class ReportCatalog {
         }
         if ("buy_daily".equals(id)) return Queries.factorDaily(m, false, ff.from, ff.to);
         if ("buy_monthly".equals(id)) return MasterQueries.monthly(m, false, 12);
+        if ("buy_price_trend".equals(id)) return Queries.buyPriceTrend(m, ff, 50);
         if ("buy_by_party".equals(id)) return Queries.factorByCustomer(m, false, ff, 50);
         if ("buy_top_products".equals(id)) return Queries.factorTopProducts(m, false, ff, 50);
         if ("in_daily".equals(id)) return MoneyQueries.darDaily(m, 0, ff.from, ff.to);

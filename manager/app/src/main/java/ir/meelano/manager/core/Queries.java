@@ -690,4 +690,60 @@ public final class Queries {
                 + (useInv ? " LEFT JOIN dbo.inventory i ON TRY_CONVERT(nvarchar(100),i.[" + invShka + "])=TRY_CONVERT(nvarchar(100),d.[" + shka + "])" : "")
                 + " GROUP BY " + label + " ORDER BY 3 DESC", binds);
     }
+
+    /**
+     * Purchase price drift per product. For each item bought in the range, the unit price
+     * (LINESUM / TEDVAH) of its latest purchase is compared with the purchase before it.
+     * Only products bought at least twice are listed; the largest moves come first.
+     * Columns are the same ones factorTopProducts already reads from buyfact/subbuyfact.
+     */
+    public static Q buyPriceTrend(Meta m, Filter f, int top) throws Missing {
+        String head = "buyfact";
+        String line = "subbuyfact";
+        Set<String> cols = m.columns(head);
+        String dateCol = m.must(head, "تاریخ", "DATE", "date");
+        String numberCol = m.must(head, "شماره فاکتور", "shfackh", "shfac");
+        Set<String> sub = m.columns(line);
+        if (sub.isEmpty()) throw new Missing("«" + AtiranSchema.faTitle(line) + "» در دیتابیس پیدا نشد");
+        String linkCol = m.must(line, "شماره فاکتور", "shfackh", "shfac");
+        String shka = m.must(line, "کد کالا", "SHKA", "shka");
+        String sum = Sql.pick(sub, "LINESUM", "linesum");
+        String qty = Sql.pick(sub, "TEDVAH", "tedvah");
+        if (sum == null || qty == null) throw new Missing("ستون مبلغ یا تعداد خط خرید پیدا نشد");
+        String invName = m.col("inventory", "naka", "NAKA");
+        String invShka = m.col("inventory", "SHKA", "shka");
+        List<Object> binds = new ArrayList<>();
+        List<String> conds = new ArrayList<>();
+        String dc = Sql.dateCond(Sql.date10("x", dateCol), f.from, f.to, binds);
+        if (!dc.isEmpty()) conds.add(dc);
+        String inner = "WHERE " + (conds.isEmpty() ? "1=1" : Sql.join(conds, " AND "))
+                + Sql.activeAnd(cols, "x") + Sql.softAnd(cols, "x");
+        String src = Sql.dedupe(head, numberCol, "h", inner);
+        boolean useInv = invName != null && invShka != null;
+        String label = "COALESCE(" + (useInv ? Sql.txt("i", invName, 250) + "," : "") + Sql.txt("d", shka, 120) + ",N'—')";
+        String unit = "CAST(" + Sql.num("d", sum) + " AS decimal(19,4)) / NULLIF(" + numNull("d", qty, "decimal(19,3)") + ",0)";
+        String sql = "WITH ln AS ("
+                + " SELECT TRY_CONVERT(nvarchar(100),d.[" + shka + "]) AS k, " + label + " AS label"
+                + ", " + Sql.dateKey(Sql.date10("h", dateCol)) + " AS dk"
+                + ", (" + unit + ") AS unit"
+                + " FROM " + src
+                + " JOIN dbo.[" + line + "] d ON TRY_CONVERT(nvarchar(100),d.[" + linkCol + "])=TRY_CONVERT(nvarchar(100),h.[" + numberCol + "])"
+                + (useInv ? " LEFT JOIN dbo.inventory i ON TRY_CONVERT(nvarchar(100),i.[" + invShka + "])=TRY_CONVERT(nvarchar(100),d.[" + shka + "])" : "")
+                + " WHERE d.[" + qty + "] IS NOT NULL"
+                + "), r AS ("
+                + " SELECT k, label, unit, dk, ROW_NUMBER() OVER (PARTITION BY k ORDER BY dk DESC) AS rn"
+                + ", COUNT(*) OVER (PARTITION BY k) AS n"
+                + " FROM ln WHERE unit IS NOT NULL AND unit > 0"
+                + ") SELECT TOP (" + clampTop(top) + ") MAX(r1.label) AS label"
+                + ", MAX(CASE WHEN r1.rn=1 THEN r1.unit END) AS lastUnit"
+                + ", MAX(CASE WHEN r1.rn=2 THEN r1.unit END) AS prevUnit"
+                + ", CAST(100.0 * (MAX(CASE WHEN r1.rn=1 THEN r1.unit END) - MAX(CASE WHEN r1.rn=2 THEN r1.unit END))"
+                + " / NULLIF(MAX(CASE WHEN r1.rn=2 THEN r1.unit END),0) AS decimal(19,2)) AS change"
+                + ", MAX(r1.n) AS docs"
+                + " FROM r r1 WHERE r1.n >= 2 GROUP BY r1.k"
+                + " HAVING MAX(CASE WHEN r1.rn=2 THEN r1.unit END) > 0"
+                + " ORDER BY ABS(100.0 * (MAX(CASE WHEN r1.rn=1 THEN r1.unit END) - MAX(CASE WHEN r1.rn=2 THEN r1.unit END))"
+                + " / MAX(CASE WHEN r1.rn=2 THEN r1.unit END)) DESC";
+        return new Q(sql, binds);
+    }
 }

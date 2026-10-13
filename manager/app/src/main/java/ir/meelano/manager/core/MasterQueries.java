@@ -643,14 +643,14 @@ public final class MasterQueries {
     // =====================================================================================
     // PROFIT — sales − COGS(buy_price basis) − discounts − costs. Basis is labelled in UI.
     // =====================================================================================
-    private static String cogsBuyCol(Meta m) throws Queries.Missing {
+    static String cogsBuyCol(Meta m) throws Queries.Missing {
         String buy = m.col("inventory", "buy_price", "pure_buy_price", "ImPureBuyPrice");
         if (buy == null) throw new Queries.Missing("ستون قیمت خرید در «کالاها» پیدا نشد؛ بهای تمام‌شده قابل محاسبه نیست");
         return buy;
     }
 
     /** Resolved inventory key for COGS joins (never a hardcoded column name). */
-    private static String cogsShka(Meta m) throws Queries.Missing {
+    static String cogsShka(Meta m) throws Queries.Missing {
         String shka = m.col("inventory", "SHKA", "shka");
         if (shka == null) throw new Queries.Missing("ستون کد کالا در «کالاها» پیدا نشد؛ بهای تمام‌شده قابل محاسبه نیست");
         return shka;

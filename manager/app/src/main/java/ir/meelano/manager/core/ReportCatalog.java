@@ -135,6 +135,11 @@ public final class ReportCatalog {
             s("yoy_sales", "مقایسه فروش با پارسال", "فروش", "فروش ماهانه امسال در برابر پارسال + درصد رشد", false,
                     new Col[]{c("mlab", "ماه", T_TEXT), c("thisY", "فروش امسال", T_MONEY), c("lastY", "فروش پارسال", T_MONEY), c("growth", "رشد ٪", T_NUM)},
                     C_BARS, "mlab", "thisY"),
+            s("sales_price_spread", "پراکندگی قیمت فروش", "فروش", "اختلاف کمترین و بیشترین بهای واحد فروش هر کالا (نشت تخفیف)", true,
+                    new Col[]{c("label", "کالا", T_TEXT), c("docs", "اسناد", T_NUM), c("qty", "مقدار", T_NUM),
+                            c("minUnit", "کمترین بها", T_MONEY), c("maxUnit", "بیشترین بها", T_MONEY),
+                            c("avgUnit", "میانگین بها", T_MONEY), c("spread", "اختلاف ٪", T_NUM)},
+                    C_NONE, "", ""),
             s("sales_by_visitor", "فروش ویزیتورها", "فروش", "سهم هر ویزیتور از فروش بازه", true,
                     new Col[]{c("label", "ویزیتور", T_TEXT), c("total", "جمع فروش", T_MONEY), c("docs", "اسناد", T_NUM)},
                     C_BARS, "label", "total"),
@@ -165,6 +170,11 @@ public final class ReportCatalog {
                     new Col[]{c("label", "کالا", T_TEXT), c("prevUnit", "خرید قبلی (واحد)", T_MONEY),
                             c("lastUnit", "خرید اخیر (واحد)", T_MONEY), c("change", "تغییر ٪", T_NUM),
                             c("docs", "تعداد خرید", T_NUM)},
+                    C_NONE, "", ""),
+            s("supplier_price_gap", "شکاف قیمت تأمین‌کنندگان", "خرید", "بهای واحد هر تأمین‌کننده نسبت به میانگین همان کالا از سایر تأمین‌کنندگان", true,
+                    new Col[]{c("label", "تأمین‌کننده", T_TEXT), c("product", "کالا", T_TEXT),
+                            c("supUnit", "بهای این تأمین‌کننده", T_MONEY), c("marketUnit", "میانگین بازار", T_MONEY),
+                            c("gap", "شکاف ٪", T_NUM), c("qty", "مقدار", T_NUM), c("sups", "تعداد تأمین‌کننده", T_NUM)},
                     C_NONE, "", ""),
             s("buy_by_party", "خرید از طرف‌حساب‌ها", "خرید", "برترین فروشندگان/تأمین‌کنندگان", true,
                     new Col[]{c("label", "طرف‌حساب", T_TEXT), c("total", "جمع خرید", T_MONEY), c("docs", "اسناد", T_NUM)},
@@ -218,6 +228,14 @@ public final class ReportCatalog {
                     new Col[]{c("code", "کد", T_TEXT), c("party", "مشتری", T_TEXT)},
                     C_NONE, "", ""),
             // ---- ویزیتور ----
+            s("visitor_profit", "سود ویزیتورها", "ویزیتورها", "فروش، بهای تمام‌شده (بر پایه قیمت خرید) و حاشیه سود هر ویزیتور", true,
+                    new Col[]{c("label", "ویزیتور", T_TEXT), c("docs", "فاکتور", T_NUM), c("sales", "فروش", T_MONEY),
+                            c("cogs", "بهای تمام‌شده", T_MONEY), c("profit", "سود", T_MONEY), c("margin", "حاشیه ٪", T_NUM)},
+                    C_NONE, "", ""),
+            s("visitor_collection", "وصول ویزیتورها", "ویزیتورها", "مبلغ فاکتور، دریافتی، مانده و نرخ وصول هر ویزیتور", true,
+                    new Col[]{c("label", "ویزیتور", T_TEXT), c("docs", "فاکتور", T_NUM), c("total", "فروش", T_MONEY),
+                            c("collected", "دریافتی", T_MONEY), c("remain", "مانده", T_MONEY), c("rate", "نرخ وصول ٪", T_NUM)},
+                    C_NONE, "", ""),
             s("visitor_perf", "عملکرد ویزیتورها", "ویزیتورها", "فروش، وصول، مشتریان و اهداف هر ویزیتور", true,
                     new Col[]{c("name", "ویزیتور", T_TEXT), c("sales", "فروش", T_MONEY), c("collected", "وصول فاکتور", T_MONEY),
                             c("invoices", "فاکتور", T_NUM), c("customers", "مشتری فعال", T_NUM), c("goals", "هدف", T_MONEY)},
@@ -289,6 +307,7 @@ public final class ReportCatalog {
         if ("sales_daily".equals(id)) return Queries.factorDaily(m, true, ff.from, ff.to);
         if ("sales_monthly".equals(id)) return MasterQueries.monthly(m, true, 12);
         if ("yoy_sales".equals(id)) return MasterQueries.monthly(m, true, 24);
+        if ("sales_price_spread".equals(id)) return AdvancedReports.salePriceSpread(m, ff, 50);
         if ("sales_by_visitor".equals(id)) return Queries.salesByVisitor(m, ff, 50);
         if ("sales_by_customer".equals(id)) return Queries.factorByCustomer(m, true, ff, 50);
         if ("sales_by_route".equals(id)) return Queries.factorByRoute(m, true, ff, 50);
@@ -302,6 +321,7 @@ public final class ReportCatalog {
         if ("buy_daily".equals(id)) return Queries.factorDaily(m, false, ff.from, ff.to);
         if ("buy_monthly".equals(id)) return MasterQueries.monthly(m, false, 12);
         if ("buy_price_trend".equals(id)) return Queries.buyPriceTrend(m, ff, 50);
+        if ("supplier_price_gap".equals(id)) return AdvancedReports.supplierPriceGap(m, ff, 50);
         if ("buy_by_party".equals(id)) return Queries.factorByCustomer(m, false, ff, 50);
         if ("buy_top_products".equals(id)) return Queries.factorTopProducts(m, false, ff, 50);
         if ("in_daily".equals(id)) return MoneyQueries.darDaily(m, 0, ff.from, ff.to);
@@ -317,6 +337,8 @@ public final class ReportCatalog {
         if ("creditors".equals(id)) { ff.status = "credit"; ff.sort = "balance_asc"; ff.top = 200; return MasterQueries.customersList(m, ff); }
         if ("new_customers".equals(id)) return MasterQueries.newCustomers(m, ff);
         if ("inactive_customers".equals(id)) return Queries.inactiveCustomers(m, 200);
+        if ("visitor_profit".equals(id)) return AdvancedReports.visitorProfit(m, ff, 50);
+        if ("visitor_collection".equals(id)) return AdvancedReports.visitorCollection(m, ff, 50);
         if ("visitor_perf".equals(id)) return MasterQueries.visitorsPerf(m, ff);
         if ("users".equals(id)) return MasterQueries.usersList(m);
         if ("changes".equals(id)) return MasterQueries.tableChanges(m, ff);

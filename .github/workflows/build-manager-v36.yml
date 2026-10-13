@@ -107,7 +107,7 @@ jobs:
           git push origin HEAD:arena/eec375ea-testt
 
   buy-formula-counts:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[buy-check]')
     name: Restore sample and count formula matches (no business rows printed)
     runs-on: ubuntu-latest
     timeout-minutes: 45

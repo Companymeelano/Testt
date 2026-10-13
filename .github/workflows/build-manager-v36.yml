@@ -2,7 +2,7 @@ name: MEELANO Manager v36.26.0 debug APK
 
 on:
   push:
-    branches: ["arena/c192ed08-testt"]
+    branches: ["arena/eec375ea-testt"]
     paths:
       - "manager/**"
       - "tools/audit_manager_schema.py"
@@ -104,4 +104,4 @@ jobs:
           git config user.email "arena-ci@local"
           git add -f dist/meelano-manager-v36-debug-9.apk dist/manager-v36-build-info.txt
           git commit -m "dist: MEELANO Manager v36.26.0 debug APK"
-          git push origin HEAD:arena/c192ed08-testt
+          git push origin HEAD:arena/eec375ea-testt

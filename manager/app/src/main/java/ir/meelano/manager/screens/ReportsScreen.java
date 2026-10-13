@@ -414,7 +414,9 @@ java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
             filterBarInto(content, spec);
                 content.addView(a.kit.gap(12));
                 String msg = faError == null || faError.isEmpty() ? "گزارش قابل تهیه نیست" : faError;
-                content.addView(a.kit.error(msg, () -> render(content)), a.kit.lp(-1, -2));
+                boolean schemaGap = faError != null && (faError.contains("پیدا نشد")
+                        || faError.contains("تأیید نشده") || faError.contains("قابل تشخیص"));
+                content.addView(schemaGap ? a.kit.unavailable(msg) : a.kit.error(msg, () -> render(content)), a.kit.lp(-1, -2));
             }
         });
     }

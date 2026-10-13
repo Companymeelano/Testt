@@ -669,6 +669,26 @@ public final class Kit {
         return c;
     }
 
+    /** Calm card for reports whose data source is not confirmed in this database (not a crash). */
+    public View unavailable(String msg) {
+        LinearLayout c = card(Theme.GOLD);
+        TextView g = text("◈", 30, Theme.GOLD, true);
+        g.setGravity(Gravity.CENTER);
+        c.addView(g, lp(-1, -2));
+        TextView t = text("این گزارش فعلاً در دسترس نیست", 14f, Theme.TEXT, true);
+        t.setGravity(Gravity.CENTER);
+        c.addView(t, lp(-1, -2));
+        TextView b = text(msg == null || msg.isEmpty() ? "ساختار دیتابیس برای این گزارش تأیید نشده است." : msg, 11.5f, Theme.MUTED, false);
+        b.setGravity(Gravity.CENTER);
+        c.addView(b, lp(-1, -2));
+        TextView n = text("پس از تأیید ساختار دیتابیس فعال می‌شود؛ اعداد نادرست نمایش داده نمی‌شوند.", 11f, Theme.MUTED, false);
+        n.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams np = lp(-1, -2);
+        np.setMargins(0, Theme.dp(8), 0, 0);
+        c.addView(n, np);
+        return c;
+    }
+
     public View error(String msg, final Runnable retry) {
         LinearLayout c = card(Theme.DANGER);
         TextView g = text("⚠", 34, Theme.DANGER, true);

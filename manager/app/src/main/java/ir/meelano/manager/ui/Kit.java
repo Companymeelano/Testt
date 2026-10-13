@@ -332,17 +332,17 @@ public final class Kit {
     }
 
     public View kv(String k, String v, int vColor) {
-        LinearLayout r = h();
-        r.setPadding(0, Theme.dp(6), 0, Theme.dp(6));
-        TextView key = text(k, 11.5f, Theme.MUTED, false);
-        key.setSingleLine(true);
-        key.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        // v35: label and value each own a share of the row, so a long product name,
-        // address or note wraps instead of squeezing the label out of the row.
-        r.addView(key, wlp(0.42f));
-        TextView val = text(v == null || v.isEmpty() ? "—" : v, 12.5f, vColor, true);
-        val.setGravity(Gravity.END);
-        r.addView(val, wlp(0.58f));
+        // Label stacked above value, both full width and right-aligned (RTL start).
+        // Side-by-side rows collided when the label and value were both long.
+        LinearLayout r = v();
+        r.setPadding(0, Theme.dp(7), 0, Theme.dp(7));
+        TextView key = text(k, 11f, Theme.MUTED, false);
+        key.setGravity(Gravity.START);
+        r.addView(key, lp(-1, -2));
+        TextView val = text(v == null || v.isEmpty() ? "—" : v, 13f, vColor, true);
+        val.setGravity(Gravity.START);
+        val.setPadding(0, Theme.dp(2), 0, 0);
+        r.addView(val, lp(-1, -2));
         return r;
     }
 

@@ -624,7 +624,8 @@ public class MainActivity extends Activity {
         LinearLayout centerWrap = kit.h();
         centerWrap.setGravity(Gravity.CENTER_HORIZONTAL);
         content = kit.v();
-        content.setPadding(Theme.dp(12), Theme.dp(4), Theme.dp(12), Theme.dp(16));
+        // Bottom room so the golden back button never covers the last row.
+        content.setPadding(Theme.dp(12), Theme.dp(4), Theme.dp(12), Theme.dp(96));
         scroll.addView(centerWrap, new ScrollView.LayoutParams(-1, -2));
         int sw = getResources().getDisplayMetrics().widthPixels;
         centerWrap.addView(content, new LinearLayout.LayoutParams(sw > Theme.dp(720) ? Theme.dp(640) : -1, -2));

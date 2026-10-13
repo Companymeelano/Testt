@@ -1,0 +1,76 @@
+{
+  "note": "counts only, no business data",
+  "dar_rows": [],
+  "dar_p_values": [
+    [
+      "0",
+      "1007"
+    ],
+    [
+      "1",
+      "179"
+    ]
+  ],
+  "posdetails_isHavaleh_values": [
+    [
+      "0",
+      "809"
+    ],
+    [
+      "1",
+      "406"
+    ]
+  ],
+  "mab_reconstruction": [
+    [
+      "1186",
+      "155",
+      "1186",
+      "461",
+      "461",
+      "876",
+      "155"
+    ]
+  ],
+  "p_vs_voucher_tables": [
+    [
+      "ghabz_e_daryaft",
+      "1",
+      "155",
+      "1"
+    ],
+    [
+      "ghabz_e_daryaft",
+      "0",
+      "978",
+      "967"
+    ],
+    [
+      "ghabz_e_pardakht",
+      "0",
+      "157",
+      "1"
+    ],
+    [
+      "ghabz_e_pardakht",
+      "1",
+      "175",
+      "153"
+    ]
+  ],
+  "cheques_link": [
+    [
+      "getchk_fullkey",
+      "18",
+      "7",
+      "7"
+    ]
+  ],
+  "putchk_link": [
+    [
+      "putchk_ghno_rdf",
+      "19",
+      "9"
+    ]
+  ]
+}

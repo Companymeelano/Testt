@@ -80,9 +80,12 @@ public final class MoneyQueries {
         boolean detailSide = p == 0 || p == 1;
         x.pos = detailSide ? posDetailSum(m, a, p, false, Sql.num(a, d.pos)) : Sql.num(a, d.pos);
         x.havaleh = detailSide ? posDetailSum(m, a, p, true, Sql.num(a, d.havaleh)) : Sql.num(a, d.havaleh);
-        x.cheque = chequeDetailSum(m, a, p, Sql.num(a, d.cheque));
-        x.chkCount = chequeDetailCount(m, a, p, d.chkCount == null
-                ? "CAST(0 AS bigint)" : "COALESCE(TRY_CONVERT(bigint," + a + ".[" + d.chkCount + "]),0)");
+        // Header is authoritative: naghd + mabcheck + POS reproduces dar.mab for every document
+        // on the attached backup (1186/1186). Detail sums matched only 30 of 54 documents, so
+        // they are not used for totals.
+        x.cheque = Sql.num(a, d.cheque);
+        x.chkCount = d.chkCount == null
+                ? "CAST(0 AS bigint)" : "COALESCE(TRY_CONVERT(bigint," + a + ".[" + d.chkCount + "]),0)";
         return x;
     }
 
@@ -412,7 +415,9 @@ public final class MoneyQueries {
                 + ", " + (c.getdate == null ? "CAST(NULL AS nvarchar(10))" : chequeDateDisplay("c", c.getdate)) + " AS getdate"
                 + ", " + (c.st == null ? "N''" : "COALESCE(" + Sql.txt("c", c.st, 40) + ",N'')") + " AS st"
                 + ", " + (c.back == null ? "N''" : "COALESCE(" + Sql.txt("c", c.back, 10) + ",N'')") + " AS back"
-                + " FROM " + c.from + " c WHERE TRY_CONVERT(nvarchar(60),c.[" + c.ghno + "])=?" + order, binds);
+                + " FROM " + c.from + " c WHERE TRY_CONVERT(nvarchar(60),c.[" + c.ghno + "])=?"
+                + (c.pCol == null ? "" : " AND TRY_CONVERT(int,c.[" + c.pCol + "])=" + (p == 0 ? 0 : 1))
+                + order, binds);
     }
 
     /** Invoices settled by a voucher: no,date,customer,total,paidSettled. */
@@ -588,6 +593,7 @@ public final class MoneyQueries {
         String table, from, amount, num, bank, branch, acc, sardate, getdate, st, back, ourBank, ghno;
         String shmo, sayad, desc, kharjTo, kharjDate, naghdDate, typeId, typeName;
         String custName, custCode, statusLabel;
+        String pCol; // getchk.p: voucher type (0 receipt, 1 payment); must match dar.p
         boolean isView;
     }
 
@@ -626,7 +632,10 @@ public final class MoneyQueries {
             c.shmo = m.col(use, "shmo");
             c.sayad = m.col(use, "ShenaseSayad");
             c.desc = m.col(use, "getchkdis", "Description", "DisGetCheck");
-            c.ghno = m.col(use, "ghno");
+            // Verified on the attached backup: getchk.GhnoPardakht + p reference dar(ghno, p).
+            // getchk.ghno alone links only 37 of 159 rows, so it is not the voucher key.
+            c.ghno = m.col(use, "GhnoPardakht", "ghno");
+            c.pCol = m.col(use, "p");
             c.kharjTo = m.col(use, "kharj_shmo");
             c.kharjDate = m.col(use, "kharj_date", "kharj_done_date");
             c.naghdDate = m.col(use, "naghddate", "naghddonedate");

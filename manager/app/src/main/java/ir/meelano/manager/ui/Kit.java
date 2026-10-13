@@ -953,7 +953,24 @@ public final class Kit {
             v.setImageResource(a.getResources().getIdentifier("meelano_3d", "drawable", a.getPackageName()));
         } catch (Exception ignored) { }
         v.setAdjustViewBounds(true);
-        v.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        v.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        // Gold ring framing: the artwork sits on a themed halo and is clipped to a circle,
+        // so the crest reads as a premium badge on both light and dark palettes.
+        try {
+            android.graphics.drawable.GradientDrawable ring = new android.graphics.drawable.GradientDrawable();
+            ring.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+            ring.setColor(Theme.alpha(Theme.GOLD, 30));
+            ring.setStroke(Theme.dp(2), Theme.alpha(Theme.GOLD, 220));
+            v.setBackground(ring);
+            v.setPadding(Theme.dp(3), Theme.dp(3), Theme.dp(3), Theme.dp(3));
+            v.setClipToOutline(true);
+            v.setOutlineProvider(new android.view.ViewOutlineProvider() {
+                @Override
+                public void getOutline(android.view.View view, android.graphics.Outline o) {
+                    o.setOval(0, 0, view.getWidth(), view.getHeight());
+                }
+            });
+        } catch (Exception ignored) { }
         // Honour the requested size: the argument used to be accepted and then ignored, so a
         // caller that relied on it got an unsized ImageView and the artwork rendered at its
         // raw pixel size instead.

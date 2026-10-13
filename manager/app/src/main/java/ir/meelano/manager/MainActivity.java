@@ -565,19 +565,9 @@ public class MainActivity extends Activity {
         tools.setBackground(Theme.ghostButton(Theme.GOLD));
         tools.setPadding(Theme.dp(3), Theme.dp(3), Theme.dp(3), Theme.dp(3));
 
-        TextView gsearch = new TextView(this);
-        gsearch.setText("⌕");
-        gsearch.setTextSize(18);
-        gsearch.setTextColor(Theme.GOLD_SOFT);
-        MeelanoIcons.iconize(gsearch);
-        if (!tiny) tools.addView(toolCell(gsearch, "جستجو", "جستجو", () -> nav("search")), toolLp());
+        if (!tiny) tools.addView(toolCell(toolIcon(R.drawable.mi_search), "جستجو", "جستجو", () -> nav("search")), toolLp());
 
-        TextView themeBtn = new TextView(this);
-        themeBtn.setText("◐");
-        themeBtn.setTextSize(18);
-        themeBtn.setTextColor(Theme.GOLD);
-        MeelanoIcons.iconize(themeBtn);
-        if (!tiny) tools.addView(toolCell(themeBtn, "تم", "تغییر تم روشن / تیره", () -> {
+        if (!tiny) tools.addView(toolCell(toolIcon(R.drawable.mi_contrast), "تم", "تغییر تم روشن / تیره", () -> {
             boolean toLight = !"light".equals(settings.themeMode());
             settings.setThemeMode(toLight ? "light" : "dark");
             kit.toast(toLight ? "تم روشن فعال شد" : "تم تیره فعال شد");
@@ -593,19 +583,8 @@ public class MainActivity extends Activity {
             tools.addView(toolCell(zoom, "بزرگ‌نمایی", "بزرگ‌نمایی متن", () -> cycleZoom()), toolLp());
         }
 
-        TextView refresh = new TextView(this);
-        refresh.setText("⟳");
-        refresh.setTextSize(18);
-        refresh.setTextColor(Theme.GOLD_SOFT);
-        MeelanoIcons.iconize(refresh);
-        tools.addView(toolCell(refresh, "تازه‌سازی", "تازه‌سازی", () -> renderCurrent()), toolLp());
-
-        TextView sett = new TextView(this);
-        sett.setText("⚙");
-        sett.setTextSize(18);
-        sett.setTextColor(Theme.GOLD_SOFT);
-        MeelanoIcons.iconize(sett);
-        tools.addView(toolCell(sett, "تنظیمات", "تنظیمات", () -> nav("settings")), toolLp());
+        tools.addView(toolCell(toolIcon(R.drawable.mi_refresh), "تازه‌سازی", "تازه‌سازی", () -> renderCurrent()), toolLp());
+        tools.addView(toolCell(toolIcon(R.drawable.mi_settings), "تنظیمات", "تنظیمات", () -> nav("settings")), toolLp());
 
         android.widget.ImageView account = new android.widget.ImageView(this);
         try {
@@ -702,6 +681,16 @@ public class MainActivity extends Activity {
     }
 
     /** One toolbar cell: icon above a small Persian label, equal width via {@link #toolLp()}. */
+    /** Gold vector icon for the header toolbar (replaces text glyphs, which rendered unevenly). */
+    private android.widget.ImageView toolIcon(int res) {
+        android.widget.ImageView iv = new android.widget.ImageView(this);
+        try {
+            iv.setImageResource(res);
+            iv.setColorFilter(Theme.GOLD_SOFT);
+        } catch (Exception ignored) { }
+        return iv;
+    }
+
     private LinearLayout toolCell(View icon, String label, String desc, Runnable onTap) {
         LinearLayout cell = new LinearLayout(this);
         cell.setOrientation(LinearLayout.VERTICAL);

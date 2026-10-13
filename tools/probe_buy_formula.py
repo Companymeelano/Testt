@@ -76,6 +76,8 @@ FROM h JOIN s ON s.k = h.k;"""
         {
             "TEDVAH*JOZPRICE": "ISNULL(TRY_CONVERT(decimal(19,4),[TEDVAH])*TRY_CONVERT(decimal(19,4),[JOZPRICE]),0)",
             "TEDJOZ*JOZPRICE": "ISNULL(TRY_CONVERT(decimal(19,4),[TEDJOZ])*TRY_CONVERT(decimal(19,4),[JOZPRICE]),0)",
+            "tamam_joz": "ISNULL(TRY_CONVERT(decimal(19,4),[tamam_joz]),0)",
+            "tamam_joz_tax": "ISNULL(TRY_CONVERT(decimal(19,4),[tamam_joz_tax]),0)",
         },
     )
     sales_control = check(

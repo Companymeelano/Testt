@@ -658,6 +658,47 @@ public final class Queries {
         return factorBreakdown(m, sales, f, "custgroup", top);
     }
 
+    /**
+     * Sales (or purchases) by product group: label,qty,total,docs. Lines are joined to the
+     * inventory and kagroup tables the same way the product list does it. Lines whose product
+     * has no group are shown as «بدون گروه».
+     */
+    public static Q factorByProductGroup(Meta m, boolean sales, Filter f, int top) throws Missing {
+        String head = sales ? "sailfact" : "buyfact";
+        String line = sales ? "subsailfact" : "subbuyfact";
+        Set<String> cols = m.columns(head);
+        String dateCol = sales ? m.must(head, "تاریخ", "date") : m.must(head, "تاریخ", "DATE", "date");
+        String numberCol = sales ? m.must(head, "شماره فاکتور", "shfacfo") : m.must(head, "شماره فاکتور", "shfackh", "shfac");
+        Set<String> sub = m.columns(line);
+        if (sub.isEmpty()) throw new Missing("«" + AtiranSchema.faTitle(line) + "» در دیتابیس پیدا نشد");
+        String linkCol = sales ? m.must(line, "شماره فاکتور", "shfacfo") : m.must(line, "شماره فاکتور", "shfackh", "shfac");
+        String shka = m.must(line, "کد کالا", "SHKA", "shka");
+        String sum = Sql.pick(sub, "LINESUM", "linesum");
+        String qty = Sql.pick(sub, "TEDVAH", "tedvah");
+        String invShka = m.col("inventory", "SHKA", "shka");
+        String grp = m.col("inventory", "group_rdf");
+        String grpName = m.col("kagroup", "group_name");
+        String grpKey = m.col("kagroup", "group_rdf");
+        if (invShka == null || grp == null || grpName == null || grpKey == null || !m.table("kagroup"))
+            throw new Missing("گروه کالا در دیتابیس پیدا نشد");
+        List<Object> binds = new ArrayList<>();
+        List<String> conds = new ArrayList<>();
+        String dc = Sql.dateCond(Sql.date10("x", dateCol), f.from, f.to, binds);
+        if (!dc.isEmpty()) conds.add(dc);
+        String inner = "WHERE " + (conds.isEmpty() ? "1=1" : Sql.join(conds, " AND "))
+                + Sql.activeAnd(cols, "x") + Sql.softAnd(cols, "x");
+        String src = Sql.dedupe(head, numberCol, "h", inner);
+        String label = "COALESCE(" + Sql.txt("g", grpName, 150) + ",N'بدون گروه')";
+        return new Q("SELECT TOP (" + clampTop(top) + ") " + label + " AS label"
+                + ", ISNULL(SUM(" + numNull("d", qty, "decimal(19,3)") + "),0) AS qty"
+                + ", ISNULL(SUM(" + Sql.num("d", sum) + "),0) AS total, COUNT_BIG(1) AS docs"
+                + " FROM " + src
+                + " JOIN dbo.[" + line + "] d ON TRY_CONVERT(nvarchar(100),d.[" + linkCol + "])=TRY_CONVERT(nvarchar(100),h.[" + numberCol + "])"
+                + " LEFT JOIN dbo.inventory i ON TRY_CONVERT(nvarchar(100),i.[" + invShka + "])=TRY_CONVERT(nvarchar(100),d.[" + shka + "])"
+                + " LEFT JOIN dbo.kagroup g ON TRY_CONVERT(nvarchar(50),g.[" + grpKey + "])=TRY_CONVERT(nvarchar(50),i.[" + grp + "])"
+                + " GROUP BY " + label + " ORDER BY 3 DESC", binds);
+    }
+
     /** Top products by sales/purchase lines: label,qty,total,docs. */
     public static Q factorTopProducts(Meta m, boolean sales, Filter f, int top) throws Missing {
         String head = sales ? "sailfact" : "buyfact";

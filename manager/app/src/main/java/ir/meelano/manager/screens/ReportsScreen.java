@@ -92,6 +92,7 @@ public class ReportsScreen extends Screen {
         if ("هوشمند".equals(section)) return Theme.TEAL;
         if ("هزینه‌ها".equals(section)) return Theme.ROSE;
         if ("برگشتی و ابطالی".equals(section)) return Theme.DANGER;
+        if ("تحلیل ویزیتور و مسیر".equals(section)) return Theme.WARNING;
         return Theme.MUTED;
     }
 
@@ -110,6 +111,7 @@ public class ReportsScreen extends Screen {
         if ("هوشمند".equals(section)) return R.drawable.mi_lightbulb;
         if ("هزینه‌ها".equals(section)) return R.drawable.mi_trending_down;
         if ("برگشتی و ابطالی".equals(section)) return R.drawable.mi_assignment_return;
+        if ("تحلیل ویزیتور و مسیر".equals(section)) return R.drawable.mi_bar_chart;
         return R.drawable.mi_widgets;
     }
 

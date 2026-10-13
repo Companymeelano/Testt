@@ -474,56 +474,19 @@ public class MainActivity extends Activity {
         root.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         root.setBackgroundColor(Theme.BG);
 
-        // header: connection dot + company logo (from Atiran) + company name + tools
-        // On narrow phones, drop the long license/name chips first. On the tiniest
-        // widths also hide secondary search/theme/zoom tools, keeping refresh, settings
-        // and the account/logout shortcut reachable without overflowing the header.
+        // header (two rows): row 1 = logo, company name (up to two lines, never squeezed
+        // to a stub) and the status line (link, licence, user); row 2 = a full-width
+        // toolbar with equal-width, labelled buttons. Nothing competes for the same width.
         android.util.DisplayMetrics dm = getResources().getDisplayMetrics();
         int widthDp = dm.widthPixels * 160 / dm.densityDpi;
-        final boolean compact = widthDp < 520;
         final boolean tiny = widthDp < 360;
-        LinearLayout header = kit.h();
-        header.setGravity(Gravity.CENTER_VERTICAL);
-        header.setPadding(Theme.dp(14), Theme.dp(10), Theme.dp(14), Theme.dp(8));
-        linkIcon = new android.widget.ImageView(this);
-        try {
-            linkIcon.setImageResource(R.drawable.link_probe);
-        } catch (Exception ignored) { }
-        linkIcon.setContentDescription("وضعیت اتصال — لمس برای جزئیات");
-        linkIcon.setPadding(Theme.dp(2), Theme.dp(2), Theme.dp(2), Theme.dp(2));
-        Theme.pressable(linkIcon);
-        linkIcon.setOnClickListener(v -> {
-            try {
-                LinkPanel.showStatus(this, settings, () -> checkConn());
-            } catch (Exception ignored) { }
-        });
-        header.addView(linkIcon, new LinearLayout.LayoutParams(Theme.dp(30), Theme.dp(30)));
-        header.addView(kit.space(8));
-        // License chip: subtle remaining-time pill, taps through to activation/support.
-        licChip = kit.text("", 10.5f, Theme.GOLD_SOFT, true);
-        licChip.setBackground(Theme.ghostButton(Theme.GOLD));
-        licChip.setPadding(Theme.dp(9), Theme.dp(4), Theme.dp(9), Theme.dp(4));
-        licChip.setSingleLine(true);
-        licChip.setMaxWidth(Theme.dp(96));
-        Theme.pressable(licChip);
-        licChip.setOnClickListener(v -> openLicense());
-        if (!compact) {
-            header.addView(licChip, kit.lp(-2, -2));
-            header.addView(kit.space(8));
-        }
-        // Atiran user chip: who is logged in, taps through to logout.
-        userChip = kit.text("", 10.5f, Theme.GOLD_SOFT, true);
-        userChip.setBackground(Theme.ghostButton(Theme.GOLD));
-        userChip.setPadding(Theme.dp(9), Theme.dp(4), Theme.dp(9), Theme.dp(4));
-        userChip.setSingleLine(true);
-        userChip.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        Theme.pressable(userChip);
-        userChip.setOnClickListener(v -> userMenu());
-        if (!compact) {
-            header.addView(userChip, kit.lp(-2, -2));
-            header.addView(kit.space(8));
-        }
-        refreshUserChip();
+        final boolean compact = widthDp < 520;
+        LinearLayout header = kit.v();
+        header.setPadding(Theme.dp(12), Theme.dp(10), Theme.dp(12), Theme.dp(8));
+
+        // ---- row 1: brand ----
+        LinearLayout brand = kit.h();
+        brand.setGravity(Gravity.CENTER_VERTICAL);
         logoBox = new android.widget.FrameLayout(this);
         logoBox.setBackground(Theme.accentAvatar(Theme.GOLD));
         logoGlyph = kit.text("♛", 20, Theme.onAccent(), true);
@@ -544,85 +507,114 @@ public class MainActivity extends Activity {
         logoImg.setPadding(lpad, lpad, lpad, lpad);
         logoImg.setVisibility(View.GONE);
         logoBox.addView(logoImg, new android.widget.FrameLayout.LayoutParams(-1, -1));
-        header.addView(logoBox, new LinearLayout.LayoutParams(Theme.dp(46), Theme.dp(46)));
-        header.addView(kit.space(8));
+        brand.addView(logoBox, new LinearLayout.LayoutParams(Theme.dp(50), Theme.dp(50)));
+        brand.addView(kit.space(10));
+
+        LinearLayout titleCol = kit.v();
         companyName = kit.text(companyTitle(), 16, Theme.TEXT, true);
-        companyName.setSingleLine(true);
+        companyName.setMaxLines(2);
         companyName.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        header.addView(companyName, kit.wlp(1f));
+        titleCol.addView(companyName, kit.lp(-1, -2));
+
+        // status line: link state, licence chip, Atiran user chip (small, always visible)
+        LinearLayout status = kit.h();
+        status.setGravity(Gravity.CENTER_VERTICAL);
+        linkIcon = new android.widget.ImageView(this);
+        try {
+            linkIcon.setImageResource(R.drawable.link_probe);
+        } catch (Exception ignored) { }
+        linkIcon.setContentDescription("وضعیت اتصال — لمس برای جزئیات");
+        linkIcon.setPadding(Theme.dp(1), Theme.dp(1), Theme.dp(1), Theme.dp(1));
+        Theme.pressable(linkIcon);
+        linkIcon.setOnClickListener(v -> {
+            try {
+                LinkPanel.showStatus(this, settings, () -> checkConn());
+            } catch (Exception ignored) { }
+        });
+        status.addView(linkIcon, new LinearLayout.LayoutParams(Theme.dp(20), Theme.dp(20)));
+        status.addView(kit.space(6));
+        licChip = kit.text("", 10.5f, Theme.GOLD_SOFT, true);
+        licChip.setBackground(Theme.ghostButton(Theme.GOLD));
+        licChip.setPadding(Theme.dp(8), Theme.dp(3), Theme.dp(8), Theme.dp(3));
+        licChip.setSingleLine(true);
+        licChip.setMaxWidth(Theme.dp(120));
+        licChip.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        Theme.pressable(licChip);
+        licChip.setOnClickListener(v -> openLicense());
+        status.addView(licChip, kit.lp(-2, -2));
+        status.addView(kit.space(6));
+        userChip = kit.text("", 10.5f, Theme.GOLD_SOFT, true);
+        userChip.setBackground(Theme.ghostButton(Theme.GOLD));
+        userChip.setPadding(Theme.dp(8), Theme.dp(3), Theme.dp(8), Theme.dp(3));
+        userChip.setSingleLine(true);
+        userChip.setMaxWidth(Theme.dp(120));
+        userChip.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        Theme.pressable(userChip);
+        userChip.setOnClickListener(v -> userMenu());
+        status.addView(userChip, kit.lp(-2, -2));
+        titleCol.addView(status, kit.lp(-2, -2));
+        brand.addView(titleCol, kit.wlp(1f));
+        header.addView(brand, kit.lp(-1, -2));
+        refreshUserChip();
+        header.addView(kit.space(8));
+
+        // ---- row 2: toolbar (equal-width cells with Persian labels) ----
         LinearLayout tools = kit.h();
         tools.setGravity(Gravity.CENTER_VERTICAL);
         tools.setBackground(Theme.ghostButton(Theme.GOLD));
-        tools.setPadding(Theme.dp(2), Theme.dp(2), Theme.dp(2), Theme.dp(2));
-        TextView gsearch = kit.text("⌕", 18, Theme.GOLD_SOFT, true);
-        gsearch.setPadding(Theme.dp(11), Theme.dp(6), Theme.dp(11), Theme.dp(6));
-        Theme.pressable(gsearch);
-        gsearch.setOnClickListener(v -> nav("search"));
+        tools.setPadding(Theme.dp(3), Theme.dp(3), Theme.dp(3), Theme.dp(3));
+
+        TextView gsearch = new TextView(this);
+        gsearch.setText("⌕");
+        gsearch.setTextSize(18);
+        gsearch.setTextColor(Theme.GOLD_SOFT);
         MeelanoIcons.iconize(gsearch);
-        if (!tiny) {
-            tools.addView(gsearch, kit.lp(-2, -2));
-            tools.addView(vdiv(), kit.lp(Theme.dp(1), Theme.dp(22)));
-        }
-        TextView themeBtn = kit.text("◐", 18, Theme.GOLD, true);
-        themeBtn.setPadding(Theme.dp(11), Theme.dp(6), Theme.dp(11), Theme.dp(6));
-        themeBtn.setContentDescription("تغییر تم روشن / تیره");
-        Theme.pressable(themeBtn);
-        themeBtn.setOnClickListener(v -> {
+        if (!tiny) tools.addView(toolCell(gsearch, "جستجو", "جستجو", () -> nav("search")), toolLp());
+
+        TextView themeBtn = new TextView(this);
+        themeBtn.setText("◐");
+        themeBtn.setTextSize(18);
+        themeBtn.setTextColor(Theme.GOLD);
+        MeelanoIcons.iconize(themeBtn);
+        if (!tiny) tools.addView(toolCell(themeBtn, "تم", "تغییر تم روشن / تیره", () -> {
             boolean toLight = !"light".equals(settings.themeMode());
             settings.setThemeMode(toLight ? "light" : "dark");
             kit.toast(toLight ? "تم روشن فعال شد" : "تم تیره فعال شد");
             refreshTheme();
-        });
-        MeelanoIcons.iconize(themeBtn);
-        if (!tiny) {
-            tools.addView(themeBtn, kit.lp(-2, -2));
-            tools.addView(vdiv(), kit.lp(Theme.dp(1), Theme.dp(22)));
-        }
-        TextView refresh = kit.text("⟳", 18, Theme.GOLD_SOFT, true);
-        refresh.setPadding(Theme.dp(11), Theme.dp(6), Theme.dp(11), Theme.dp(6));
-        Theme.pressable(refresh);
-        refresh.setOnClickListener(v -> renderCurrent());
-        MeelanoIcons.iconize(refresh);
-        tools.addView(refresh, kit.lp(-2, -2));
-        tools.addView(vdiv(), kit.lp(Theme.dp(1), Theme.dp(22)));
-        TextView sett = kit.text("⚙", 18, Theme.GOLD_SOFT, true);
-        sett.setPadding(Theme.dp(11), Theme.dp(6), Theme.dp(11), Theme.dp(6));
-        sett.setContentDescription("تنظیمات");
-        Theme.pressable(sett);
-        sett.setOnClickListener(v -> nav("settings"));
-        MeelanoIcons.iconize(sett);
-        tools.addView(sett, kit.lp(-2, -2));
-        android.widget.ImageView zoom = new android.widget.ImageView(this);
-        try {
-            zoom.setImageResource(R.drawable.mi_zoom);
-            zoom.setColorFilter(Theme.GOLD_SOFT);
-        } catch (Exception ignored) { }
-        zoom.setPadding(Theme.dp(11), Theme.dp(8), Theme.dp(11), Theme.dp(8));
-        zoom.setContentDescription("بزرگ‌نمایی متن");
-        Theme.pressable(zoom);
-        zoom.setOnClickListener(v -> cycleZoom());
-        if (compact) {
-            tools.addView(vdiv(), kit.lp(Theme.dp(1), Theme.dp(22)));
-            compactUserAction = new android.widget.ImageView(this);
+        }), toolLp());
+
+        if (!compact) {
+            android.widget.ImageView zoom = new android.widget.ImageView(this);
             try {
-                compactUserAction.setImageResource(R.drawable.mi_person);
-                compactUserAction.setColorFilter(Theme.GOLD_SOFT);
+                zoom.setImageResource(R.drawable.mi_zoom);
+                zoom.setColorFilter(Theme.GOLD_SOFT);
             } catch (Exception ignored) { }
-            compactUserAction.setBackground(Theme.ghostButton(Theme.GOLD));
-            compactUserAction.setPadding(Theme.dp(9), Theme.dp(7), Theme.dp(9), Theme.dp(7));
-            compactUserAction.setContentDescription("حساب کاربری؛ خروج یا تغییر کاربر");
-            Theme.pressable(compactUserAction);
-            compactUserAction.setOnClickListener(v -> userMenu());
-            tools.addView(compactUserAction,
-                    new LinearLayout.LayoutParams(Theme.dp(40), Theme.dp(36)));
-        } else {
-            compactUserAction = null;
-            if (!tiny) {
-                tools.addView(vdiv(), kit.lp(Theme.dp(1), Theme.dp(22)));
-                tools.addView(zoom, new LinearLayout.LayoutParams(Theme.dp(42), Theme.dp(36)));
-            }
+            tools.addView(toolCell(zoom, "بزرگ‌نمایی", "بزرگ‌نمایی متن", () -> cycleZoom()), toolLp());
         }
-        header.addView(tools, kit.lp(-2, -2));
+
+        TextView refresh = new TextView(this);
+        refresh.setText("⟳");
+        refresh.setTextSize(18);
+        refresh.setTextColor(Theme.GOLD_SOFT);
+        MeelanoIcons.iconize(refresh);
+        tools.addView(toolCell(refresh, "تازه‌سازی", "تازه‌سازی", () -> renderCurrent()), toolLp());
+
+        TextView sett = new TextView(this);
+        sett.setText("⚙");
+        sett.setTextSize(18);
+        sett.setTextColor(Theme.GOLD_SOFT);
+        MeelanoIcons.iconize(sett);
+        tools.addView(toolCell(sett, "تنظیمات", "تنظیمات", () -> nav("settings")), toolLp());
+
+        android.widget.ImageView account = new android.widget.ImageView(this);
+        try {
+            account.setImageResource(R.drawable.mi_person);
+            account.setColorFilter(Theme.GOLD_SOFT);
+        } catch (Exception ignored) { }
+        compactUserAction = account;
+        tools.addView(toolCell(account, "حساب", "حساب کاربری؛ خروج یا تغییر کاربر", () -> userMenu()), toolLp());
+
+        header.addView(tools, kit.lp(-1, -2));
         refreshUserChip();
         root.addView(header, kit.lp(-1, -2));
         refreshLicChip();
@@ -705,6 +697,31 @@ public class MainActivity extends Activity {
             WhatsNew.maybeShow(this, () -> UpdateCenter.autoCheck(this));
         } catch (Exception ignored) { }
         watchLink();
+    }
+
+    /** One toolbar cell: icon above a small Persian label, equal width via {@link #toolLp()}. */
+    private LinearLayout toolCell(View icon, String label, String desc, Runnable onTap) {
+        LinearLayout cell = new LinearLayout(this);
+        cell.setOrientation(LinearLayout.VERTICAL);
+        cell.setGravity(Gravity.CENTER);
+        cell.setContentDescription(desc);
+        cell.setMinimumHeight(Theme.dp(54));
+        Theme.pressable(cell);
+        cell.setOnClickListener(v -> onTap.run());
+        icon.setClickable(false);
+        cell.addView(icon, new LinearLayout.LayoutParams(Theme.dp(26), Theme.dp(24)));
+        TextView t = new TextView(this);
+        t.setText(label);
+        t.setTextSize(10);
+        t.setTextColor(Theme.MUTED);
+        t.setGravity(Gravity.CENTER);
+        t.setSingleLine(true);
+        cell.addView(t, new LinearLayout.LayoutParams(-2, -2));
+        return cell;
+    }
+
+    private LinearLayout.LayoutParams toolLp() {
+        return new LinearLayout.LayoutParams(0, Theme.dp(54), 1f);
     }
 
     /** Hairline divider between header tool buttons. */

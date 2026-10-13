@@ -467,9 +467,14 @@ public final class Queries {
         String amountCol = m.must(table, "\u0645\u0628\u0644\u063a", "all");
         String numberCol = sales ? m.must(table, "\u0634\u0645\u0627\u0631\u0647 \u0641\u0627\u06a9\u062a\u0648\u0631", "shfacfo")
                 : m.must(table, "\u0634\u0645\u0627\u0631\u0647 \u0641\u0627\u06a9\u062a\u0648\u0631", "shfackh", "shfac");
-        String statusCol = Sql.pick(cols, "Status");
+        // Sales: sailfact.Status (1 = confirmed). Purchases: buyfact has no Status column;
+        // its confirmation flag is taeed (int). Same convention (1 = confirmed) is assumed
+        // here and must be verified against Atiran's own confirmation screen.
+        String statusCol = sales ? Sql.pick(cols, "Status") : Sql.pick(cols, "taeed", "Taeed");
         String st = statusCol == null ? "CAST(0 AS int)" : "ISNULL(TRY_CONVERT(int,h.[" + statusCol + "]),0)";
-        String lbl = "CASE WHEN " + st + "=1 THEN N'\u062a\u0623\u06cc\u06cc\u062f\u0634\u062f\u0647' ELSE N'\u062a\u0623\u06cc\u06cc\u062f\u0646\u0634\u062f\u0647 / \u0627\u0628\u0637\u0627\u0644\u06cc' END";
+        String lbl = statusCol == null
+                ? "N'\u0648\u0636\u0639\u06cc\u062a \u062b\u0628\u062a\u200c\u0646\u0634\u062f\u0647 \u062f\u0631 \u062f\u06cc\u062a\u0627\u0628\u06cc\u0633'"
+                : "CASE WHEN " + st + "=1 THEN N'\u062a\u0623\u06cc\u06cc\u062f\u0634\u062f\u0647' ELSE N'\u062a\u0623\u06cc\u06cc\u062f\u0646\u0634\u062f\u0647 / \u0627\u0628\u0637\u0627\u0644\u06cc' END";
         List<Object> binds = new ArrayList<>();
         String dc = Sql.dateCond(Sql.date10("h", dateCol), from, to, binds);
         String act = Sql.activeAnd(cols, "h") + Sql.softAnd(cols, "h");
@@ -478,11 +483,15 @@ public final class Queries {
         else where = " WHERE " + dc + act;
         // A numeric code travels with the label: matching Persian text between SQL
         // and Java is hostage to ي/ی normalisation, a number is not.
-        return new Q("SELECT CASE WHEN " + st + "=1 THEN 1 ELSE 0 END AS state, "
+        String head = "SELECT CASE WHEN " + st + "=1 THEN 1 ELSE 0 END AS state, "
                 + lbl + " AS label, COUNT_BIG(1) AS docs"
                 + ", ISNULL(SUM(" + Sql.num("h", amountCol) + "),0) AS total"
                 + " FROM " + Sql.dedupe(table, numberCol, "h", "")
-                + where + " GROUP BY CASE WHEN " + st + "=1 THEN 1 ELSE 0 END, " + lbl
+                + where;
+        // Without a status column every row falls into one constant group: a GROUP BY on a
+        // constant is rejected by SQL Server, so the single aggregate row is returned directly.
+        if (statusCol == null) return new Q(head, binds);
+        return new Q(head + " GROUP BY CASE WHEN " + st + "=1 THEN 1 ELSE 0 END, " + lbl
                 + " ORDER BY 4 DESC", binds);
     }
 

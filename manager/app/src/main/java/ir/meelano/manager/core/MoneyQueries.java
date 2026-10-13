@@ -180,15 +180,30 @@ public final class MoneyQueries {
         List<Object> binds = new ArrayList<>();
         binds.add(p);
         binds.add(day);
-        String sql = "SELECT " + Sql.lit(day) + " AS d, ISNULL(SUM(" + darTotal("h", d, m) + "),0) AS total"
-                + ", ISNULL(SUM(" + parts.cash + "),0) AS cash"
-                + ", ISNULL(SUM(" + parts.pos + "),0) AS pos"
-                + ", ISNULL(SUM(" + parts.havaleh + "),0) AS havaleh"
-                + ", ISNULL(SUM(" + parts.cheque + "),0) AS cheque"
-                + ", COUNT_BIG(1) AS count FROM dbo.dar h WHERE h.[p]=?"
-                + " AND " + Sql.dateKey(Sql.date10("h", d.date)) + "=?"
-                + Sql.activeAnd(cols, "h") + Sql.softAnd(cols, "h");
+        String rows = darRows(d, m, parts, cols,
+                "h.[p]=? AND " + Sql.dateKey(Sql.date10("h", d.date)) + "=?");
+        String sql = "SELECT " + Sql.lit(day) + " AS d, ISNULL(SUM(x.tot),0) AS total"
+                + ", ISNULL(SUM(x.cash),0) AS cash"
+                + ", ISNULL(SUM(x.pos),0) AS pos"
+                + ", ISNULL(SUM(x.havaleh),0) AS havaleh"
+                + ", ISNULL(SUM(x.cheque),0) AS cheque"
+                + ", COUNT_BIG(1) AS count FROM (" + rows + ") x";
         return new Queries.Q(sql, binds);
+    }
+
+    /**
+     * One row per voucher. The correlated detail lookups (PosDetails, getchk/putchk)
+     * are scalar subqueries; SQL Server rejects them inside SUM(). They therefore live
+     * in this derived table and every aggregate runs in the outer query.
+     */
+    private static String darRows(Dar d, Meta m, DarParts parts, Set<String> cols, String where) {
+        return "SELECT " + darTotal("h", d, m) + " AS tot"
+                + ", " + parts.cash + " AS cash"
+                + ", " + parts.pos + " AS pos"
+                + ", " + parts.havaleh + " AS havaleh"
+                + ", " + parts.cheque + " AS cheque"
+                + " FROM dbo.dar h WHERE " + where
+                + Sql.activeAnd(cols, "h") + Sql.softAnd(cols, "h");
     }
 
     /** Day block for an explicit Atiran «YYYY/MM/DD» (morning report): d,total,count. */
@@ -264,14 +279,14 @@ public final class MoneyQueries {
         if (!dc.isEmpty()) conds.add(dc);
         DarParts parts = darParts(m, d, "h", p);
         int breakdownAvailable = darBreakdownAvailable(m, d, p) ? 1 : 0;
-        return new Queries.Q("SELECT ISNULL(SUM(" + darTotal("h", d, m) + "),0) AS total"
-                + ", ISNULL(SUM(" + parts.cash + "),0) AS cash"
-                + ", ISNULL(SUM(" + parts.pos + "),0) AS pos"
-                + ", ISNULL(SUM(" + parts.havaleh + "),0) AS havaleh"
-                + ", ISNULL(SUM(" + parts.cheque + "),0) AS cheque"
+        String rows = darRows(d, m, parts, cols, Sql.join(conds, " AND "));
+        return new Queries.Q("SELECT ISNULL(SUM(x.tot),0) AS total"
+                + ", ISNULL(SUM(x.cash),0) AS cash"
+                + ", ISNULL(SUM(x.pos),0) AS pos"
+                + ", ISNULL(SUM(x.havaleh),0) AS havaleh"
+                + ", ISNULL(SUM(x.cheque),0) AS cheque"
                 + ", CAST(" + breakdownAvailable + " AS int) AS breakdownAvailable"
-                + ", COUNT_BIG(1) AS count FROM dbo.dar h WHERE " + Sql.join(conds, " AND ")
-                + Sql.activeAnd(cols, "h") + Sql.softAnd(cols, "h"), binds);
+                + ", COUNT_BIG(1) AS count FROM (" + rows + ") x", binds);
     }
 
     /** Voucher list: ghno,date,code,customer,total,cash,pos,havaleh,cheque,chkCount,desc,kind,linkNo,multiCount. */

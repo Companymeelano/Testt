@@ -508,7 +508,7 @@ public class MainActivity extends Activity {
         logoImg.setPadding(lpad, lpad, lpad, lpad);
         logoImg.setVisibility(View.GONE);
         logoBox.addView(logoImg, new android.widget.FrameLayout.LayoutParams(-1, -1));
-        brand.addView(logoBox, new LinearLayout.LayoutParams(Theme.dp(50), Theme.dp(50)));
+        brand.addView(logoBox, new LinearLayout.LayoutParams(Theme.dp(64), Theme.dp(64)));
         brand.addView(kit.space(10));
 
         LinearLayout titleCol = kit.v();

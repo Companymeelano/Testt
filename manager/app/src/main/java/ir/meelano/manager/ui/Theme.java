@@ -57,7 +57,7 @@ public final class Theme {
 
     /** Accent: key, Persian label, dark, darkSoft, light, lightSoft. */
     private static final String[][] ACCENTS = {
-            {"gold", "طلایی", "FFD9AE5A", "FFF1D493", "FF925D0B", "FF76500B"},
+            {"gold", "طلایی", "FFE0B765", "FFF5DFA6", "FF8A6320", "FF7A5612"},
             {"emerald", "زمردی", "FF3ED598", "FF9BF0C8", "FF087A53", "FF046C4E"},
             {"sapphire", "یاقوت آبی", "FF4FA3FF", "FFB3D4FF", "FF1C60E0", "FF1E429F"},
             {"ruby", "یاقوتی", "FFF2617A", "FFFFB3C0", "FFC51E46", "FF8F0F2E"},
@@ -165,32 +165,34 @@ public final class Theme {
             }
         }
         if (light) {
-            BG = 0xFFF6F0E1;
-            SURFACE = 0xFFFFFDF6;
-            SURFACE2 = 0xFFF1E4C8;
+            // «عاج سلطنتی»: warm pearl background, near-white cards, clear separation.
+            BG = 0xFFF7F3EA;
+            SURFACE = 0xFFFFFDF8;
+            SURFACE2 = 0xFFF3EBDA;
             GOLD = lite;
             GOLD_SOFT = liteSoft;
-            TEXT = 0xFF1B2333;
-            MUTED = 0xFF5C6678;
-            SUCCESS = 0xFF12753F;
-            DANGER = 0xFFB42332;
-            WARNING = 0xFF985600;
-            INFO = 0xFF1D5FA8;
+            TEXT = 0xFF141B2D;
+            MUTED = 0xFF5A6378;
+            SUCCESS = 0xFF1B7A4B;
+            DANGER = 0xFFB3261E;
+            WARNING = 0xFF9A5B00;
+            INFO = 0xFF1F5FAD;
             VIOLET = 0xFF6343D6;
             TEAL = 0xFF007268;
             STEEL = 0xFF546177;
         } else {
-            BG = 0xFF0C1220;
-            SURFACE = 0xFF151D31;
-            SURFACE2 = 0xFF1D2742;
+            // «نیمه‌شب طلایی»: deeper ink background, luminous gold accents.
+            BG = 0xFF0A0F1C;
+            SURFACE = 0xFF121A2C;
+            SURFACE2 = 0xFF1B2640;
             GOLD = dark;
             GOLD_SOFT = darkSoft;
-            TEXT = 0xFFF4EFE4;
-            MUTED = 0xFF9AA3B5;
-            SUCCESS = 0xFF35C26E;
-            DANGER = 0xFFE5484D;
-            WARNING = 0xFFF5A524;
-            INFO = 0xFF4FA3FF;
+            TEXT = 0xFFF5F1E8;
+            MUTED = 0xFFA3ACBF;
+            SUCCESS = 0xFF3DD68C;
+            DANGER = 0xFFFF5C61;
+            WARNING = 0xFFFFB020;
+            INFO = 0xFF5AA9FF;
             VIOLET = 0xFF9A7BFF;
             TEAL = 0xFF3ED6C5;
             STEEL = 0xFF7C8DA6;

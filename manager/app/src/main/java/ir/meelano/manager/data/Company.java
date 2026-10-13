@@ -120,7 +120,7 @@ public final class Company {
             o.inJustDecodeBounds = true;
             BitmapFactory.decodeFile(f.getAbsolutePath(), o);
             int s = 1;
-            while ((o.outWidth / s > 256 || o.outHeight / s > 256) && s < 8) s *= 2;
+            while ((o.outWidth / s > 512 || o.outHeight / s > 512) && s < 8) s *= 2;
             o.inJustDecodeBounds = false;
             o.inSampleSize = s;
             logoMem = BitmapFactory.decodeFile(f.getAbsolutePath(), o);

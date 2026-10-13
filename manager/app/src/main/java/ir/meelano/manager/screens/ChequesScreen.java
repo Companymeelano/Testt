@@ -486,6 +486,17 @@ public class ChequesScreen extends Screen {
         if (dlg.getWindow() != null)
             dlg.getWindow().setBackgroundDrawable(Theme.dialogBg());
         LinearLayout footer = a.kit.h();
+        if (!r.s("code").isEmpty() && !"0".equals(r.s("code"))) {
+            final String custCode = r.s("code");
+            footer.addView(a.kit.btn("حساب مشتری", v -> {
+                dlg.dismiss();
+                // Same order as Home: load the dossier into the Customers screen, then open it.
+                Screen cs = a.screen("customers");
+                if (cs instanceof CustomersScreen) ((CustomersScreen) cs).openDossier(custCode);
+                a.nav("customers");
+            }), a.kit.wlp(1f));
+            footer.addView(a.kit.space(8));
+        }
         if (!r.s("ghno").isEmpty() && !"0".equals(r.s("ghno"))) {
             final String ghno = r.s("ghno");
             footer.addView(a.kit.btn("مشاهده در قبوض", v -> {

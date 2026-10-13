@@ -1,6 +1,10 @@
 {
   "note": "counts only, no business data",
-  "dar_rows": [],
+  "dar_rows": [
+    [
+      "1186"
+    ]
+  ],
   "dar_p_values": [
     [
       "0",
@@ -71,6 +75,41 @@
       "putchk_ghno_rdf",
       "19",
       "9"
+    ]
+  ],
+  "cheque_variants": [
+    [
+      "docs_with_mabcheck",
+      "125"
+    ],
+    [
+      "getchk_rows",
+      "159"
+    ],
+    [
+      "getchk_rows_linked_by_ghno_p",
+      "37"
+    ],
+    [
+      "getchk_rows_linked_by_GhnoPardakht_p",
+      "140"
+    ]
+  ],
+  "cheque_amount_variants": [
+    [
+      "getchk_by_ghno_p",
+      "22",
+      "6"
+    ],
+    [
+      "getchk_by_GhnoPardakht_p",
+      "54",
+      "30"
+    ],
+    [
+      "putchk_by_ghno_p1",
+      "10",
+      "8"
     ]
   ]
 }

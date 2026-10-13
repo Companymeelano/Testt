@@ -74,6 +74,28 @@ pk AS (SELECT {K.format('ghno')} gh, {K.format('Rdf_')} rr, SUM({D.format('putch
 SELECT 'putchk_ghno_rdf' AS k, COUNT(*) AS docs_with_rows,
   SUM(CASE WHEN ABS(pk.amt-d.c)<1 THEN 1 ELSE 0 END) AS amount_equal
 FROM d JOIN pk ON pk.gh=d.gh AND pk.rr=d.rr;""",
+    # Cheque linkage variants. Which key reproduces dar.mabcheck, and how many cheque rows link at all.
+    "cheque_variants": f"""
+WITH d AS (SELECT {K.format('ghno')} gh, {K.format('p')} pp, {K.format('Rdf_')} rr, {D.format('mabcheck')} c FROM dbo.dar)
+SELECT 'docs_with_mabcheck' AS k, COUNT(*) AS n FROM d WHERE c>0
+UNION ALL SELECT 'getchk_rows', COUNT(*) FROM dbo.getchk
+UNION ALL SELECT 'getchk_rows_linked_by_ghno_p', COUNT(*) FROM dbo.getchk g
+  WHERE EXISTS (SELECT 1 FROM d WHERE d.gh={K.format('g.ghno')} AND d.pp={K.format('g.p')})
+UNION ALL SELECT 'getchk_rows_linked_by_GhnoPardakht_p', COUNT(*) FROM dbo.getchk g
+  WHERE EXISTS (SELECT 1 FROM d WHERE d.gh={K.format('g.GhnoPardakht')} AND d.pp={K.format('g.p')});""",
+    "cheque_amount_variants": f"""
+WITH d AS (SELECT {K.format('ghno')} gh, {K.format('p')} pp, {K.format('Rdf_')} rr, {D.format('mabcheck')} c FROM dbo.dar),
+gp AS (SELECT {K.format('ghno')} gh, {K.format('p')} pp, SUM({D.format('getchkmab')}) amt, COUNT(*) n FROM dbo.getchk GROUP BY {K.format('ghno')}, {K.format('p')}),
+ga AS (SELECT {K.format('GhnoPardakht')} gh, {K.format('p')} pp, SUM({D.format('getchkmab')}) amt FROM dbo.getchk GROUP BY {K.format('GhnoPardakht')}, {K.format('p')})
+SELECT 'getchk_by_ghno_p' AS k, COUNT(*) AS docs, SUM(CASE WHEN ABS(gp.amt-d.c)<1 THEN 1 ELSE 0 END) AS eq
+FROM d JOIN gp ON gp.gh=d.gh AND gp.pp=d.pp
+UNION ALL
+SELECT 'getchk_by_GhnoPardakht_p', COUNT(*), SUM(CASE WHEN ABS(ga.amt-d.c)<1 THEN 1 ELSE 0 END)
+FROM d JOIN ga ON ga.gh=d.gh AND ga.pp=d.pp
+UNION ALL
+SELECT 'putchk_by_ghno_p1', COUNT(*), SUM(CASE WHEN ABS(pk.amt-d.c)<1 THEN 1 ELSE 0 END)
+FROM d JOIN (SELECT {K.format('ghno')} gh, SUM({D.format('putchkmab')}) amt FROM dbo.putchk GROUP BY {K.format('ghno')}) pk
+  ON pk.gh=d.gh WHERE d.pp=1;""",
 }
 
 
@@ -102,9 +124,9 @@ def main() -> int:
     for name, q in SQL.items():
         out = base.sql(args.container, password, executable, "SET NOCOUNT ON;\n" + q, database=args.database)
         # Field count is inferred from the first row; sqlcmd tab-free delimiter keeps it exact.
-        first = [ln for ln in out.splitlines() if ln.strip() and "|" in ln]
-        width = first[0].count("|") + 1 if first else 1
-        report[name] = [r for r in base.rows(out, width)] if first else []
+        lines = [ln for ln in out.splitlines() if ln.strip()]
+        width = lines[0].count("|") + 1 if lines else 1
+        report[name] = base.rows(out, width) if lines else []
     Path(args.output).write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return 0

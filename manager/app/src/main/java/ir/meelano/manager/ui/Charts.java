@@ -64,6 +64,33 @@ public final class Charts {
         return p[Math.abs(i) % p.length];
     }
 
+
+    /** Pseudo-3D block: front face with gradient, lighter top face, darker side face (light from upper-left). */
+    static void drawBar3D(Canvas g, RectF r, int col, float radius) {
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        float d = Theme.dp(5);
+        Path side = new Path();
+        side.moveTo(r.right, r.top + radius);
+        side.lineTo(r.right + d, r.top + radius - d);
+        side.lineTo(r.right + d, r.bottom - d);
+        side.lineTo(r.right, r.bottom);
+        side.close();
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Theme.shade(col, -0.38f));
+        g.drawPath(side, paint);
+        Path top = new Path();
+        top.moveTo(r.left + radius, r.top);
+        top.lineTo(r.left + radius + d, r.top - d);
+        top.lineTo(r.right + d - radius, r.top - d);
+        top.lineTo(r.right - radius, r.top);
+        top.close();
+        paint.setColor(Theme.shade(col, 0.28f));
+        g.drawPath(top, paint);
+        paint.setShader(new LinearGradient(0, r.top, 0, r.bottom, Theme.shade(col, 0.08f), Theme.shade(col, -0.22f), Shader.TileMode.CLAMP));
+        g.drawRoundRect(r, radius, radius, paint);
+        paint.setShader(null);
+    }
+
     // ================= base =================
     abstract static class Base extends View {
         final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -374,9 +401,7 @@ public final class Charts {
                 float bot = Math.max(yv, zeroY);
                 if (bot - top < Theme.dp(3)) bot = top + Theme.dp(3);
                 RectF r = new RectF(cx - bw / 2f, top, cx + bw / 2f, bot);
-                paint.setShader(new LinearGradient(0, top, 0, bot, col, Theme.alpha(col, 120), Shader.TileMode.CLAMP));
-                g.drawRoundRect(r, Theme.dp(6), Theme.dp(6), paint);
-                paint.setShader(null);
+                drawBar3D(g, r, col, Theme.dp(6));
                 if (i % step == 0) {
                     text.setColor(Theme.MUTED);
                     g.drawText(Money.fa(ellipsize(p.label, 7)), cx, plot.bottom + Theme.dp(16), text);
@@ -479,7 +504,21 @@ public final class Charts {
             paint.setStyle(Paint.Style.STROKE);
             paint.setStrokeWidth(radius * 0.34f);
             paint.setStrokeCap(Paint.Cap.BUTT);
+            // extruded depth: darker copy of the ring offset downward, then the lit top ring
+            float depth = Theme.dp(6);
+            RectF od = new RectF(o.left, o.top + depth, o.right, o.bottom + depth);
             float start = -90f;
+            for (int i = 0; i < data.size(); i++) {
+                Point p = data.get(i);
+                float sweep = (float) (360.0 * Math.max(0, p.value) / sum * progress);
+                int col = p.color != 0 ? p.color : palette(i);
+                if (sweep > 1f) {
+                    paint.setColor(Theme.shade(col, -0.4f));
+                    g.drawArc(od, start + 1.2f, sweep - 2.4f, false, paint);
+                }
+                start += (float) (360.0 * Math.max(0, p.value) / sum);
+            }
+            start = -90f;
             for (int i = 0; i < data.size(); i++) {
                 Point p = data.get(i);
                 float sweep = (float) (360.0 * Math.max(0, p.value) / sum * progress);

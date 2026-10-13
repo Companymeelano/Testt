@@ -643,6 +643,36 @@ public class SettingsScreen extends Screen {
         }
         ab.addView(a.kit.hint("همه بخش‌ها داده زنده نمایش می‌دهند؛ بدون اتصال، اطلاع‌رسانی می‌شود."), a.kit.lp(-1, -2));
         a.kit.addCard(content, ab);
+        buildChangelog(content);
+    }
+
+    /** Full version history from the bundled changelog; the newest versions open by default. */
+    private void buildChangelog(LinearLayout content) {
+        ir.meelano.manager.ui.Changelog.Ver[] all = ir.meelano.manager.ui.Changelog.ALL;
+        LinearLayout box = a.kit.card(Theme.GOLD);
+        box.addView(a.kit.text("تاریخچهٔ نسخه‌ها", 15f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        box.addView(a.kit.hint("هر نسخه را لمس کنید تا تغییرات آن باز شود. نسخهٔ فعلی: " + appVersion()),
+                a.kit.lp(-1, -2));
+        for (int i = 0; i < all.length; i++) {
+            final ir.meelano.manager.ui.Changelog.Ver v = all[i];
+            final boolean open = i < 3;
+            final LinearLayout body = a.kit.v();
+            body.setVisibility(open ? View.VISIBLE : View.GONE);
+            for (ir.meelano.manager.ui.Changelog.Item it : v.items) {
+                LinearLayout row = a.kit.v();
+                row.setPadding(0, Theme.dp(6), 0, Theme.dp(6));
+                row.addView(a.kit.text(it.glyph + "  " + it.title, 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
+                row.addView(a.kit.hint(it.brief), a.kit.lp(-1, -2));
+                body.addView(row, a.kit.lp(-1, -2));
+            }
+            String head = v.name + "  •  " + v.dateFa + "  •  " + v.headline;
+            TextView hd = a.kit.text(head, 13f, Theme.GOLD_SOFT, true);
+            hd.setPadding(0, Theme.dp(12), 0, Theme.dp(4));
+            hd.setOnClickListener(x -> body.setVisibility(body.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE));
+            box.addView(hd, a.kit.lp(-1, -2));
+            box.addView(body, a.kit.lp(-1, -2));
+        }
+        a.kit.addCard(content, box);
     }
 
     /** Company profile auto-loaded from Atiran (no manual entry needed). */

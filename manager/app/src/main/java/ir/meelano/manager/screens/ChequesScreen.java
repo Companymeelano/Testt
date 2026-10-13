@@ -309,9 +309,7 @@ public class ChequesScreen extends Screen {
                     if (!dueText.isEmpty()) rowDate += (rowDate.isEmpty() ? "" : "\n") + dueText;
                 }
                 String pill = rowLabel(myIn, row);
-                View v = a.kit.docRow("چک " + Money.fa(row.s("num")), row.s("customer"),
-                        rowDate, Money.rial(row.d("amount")), pill,
-                        v2 -> openDetail(row, myIn));
+                View v = chequeCard(row, myIn, rowDate, pill);
                 LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
                 p.setMargins(0, 0, 0, Theme.dp(10));
                 content.addView(v, p);
@@ -325,6 +323,83 @@ public class ChequesScreen extends Screen {
         }
 
         renderNotes(content, d.notes);
+    }
+
+    /**
+     * Cheque-stub card: accent stripe by urgency, perforated divider, amount on the
+     * stub side and a due-date countdown. Urgency: overdue = danger, due within 7 days = warning.
+     */
+    private View chequeCard(final Row row, final boolean inc, String rowDate, String pill) {
+        int dd = daysUntil(row.s("sardate"));
+        int accent = accent();
+        String due = "";
+        if (dd != Integer.MIN_VALUE) {
+            if (dd < 0) { accent = Theme.DANGER; due = "گذشته " + Money.fa(String.valueOf(-dd)) + " روز"; }
+            else if (dd == 0) { accent = Theme.WARNING; due = "امروز سررسید است"; }
+            else {
+                if (dd <= 7) accent = Theme.WARNING;
+                due = Money.fa(String.valueOf(dd)) + " روز مانده";
+            }
+        }
+        final int color = accent;
+        LinearLayout c = a.kit.h();
+        c.setBackground(Theme.cardAccent(color));
+        c.setPadding(Theme.dp(4), Theme.dp(10), Theme.dp(12), Theme.dp(10));
+        c.setGravity(android.view.Gravity.CENTER_VERTICAL);
+
+        // Left stripe (cheque edge).
+        View stripe = new View(a);
+        stripe.setBackground(Theme.pill(Theme.alpha(color, 230)));
+        c.addView(stripe, new LinearLayout.LayoutParams(Theme.dp(5), Theme.dp(64)));
+
+        LinearLayout copy = a.kit.v();
+        copy.setPadding(Theme.dp(10), 0, Theme.dp(6), 0);
+        android.widget.TextView t = a.kit.text("چک " + Money.fa(row.s("num")), 14f, Theme.TEXT, true);
+        t.setSingleLine(true);
+        t.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        copy.addView(t, a.kit.lp(-1, -2));
+        String who = row.s("customer");
+        if (who != null && !who.isEmpty()) {
+            android.widget.TextView w = a.kit.text(who, 11.5f, Theme.MUTED, false);
+            w.setSingleLine(true);
+            w.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            copy.addView(w, a.kit.lp(-1, -2));
+        }
+        if (rowDate != null && !rowDate.isEmpty()) copy.addView(a.kit.text(rowDate, 10.5f, Theme.MUTED, false), a.kit.lp(-1, -2));
+        if (!due.isEmpty()) copy.addView(a.kit.text(due, 11f, color, true), a.kit.lp(-1, -2));
+        c.addView(copy, a.kit.wlp(1f));
+
+        // Perforated divider.
+        View perf = new View(a) {
+            private final android.graphics.Paint pp = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+            {
+                pp.setStyle(android.graphics.Paint.Style.STROKE);
+                pp.setStrokeWidth(Theme.dp(1.2f));
+                pp.setPathEffect(new android.graphics.DashPathEffect(new float[]{Theme.dp(4), Theme.dp(4)}, 0));
+            }
+            @Override
+            protected void onDraw(android.graphics.Canvas g) {
+                pp.setColor(Theme.alpha(color, 160));
+                float x = getWidth() / 2f;
+                g.drawLine(x, 0, x, getHeight(), pp);
+            }
+        };
+        c.addView(perf, new LinearLayout.LayoutParams(Theme.dp(6), Theme.dp(60)));
+
+        LinearLayout side = a.kit.v();
+        side.setGravity(android.view.Gravity.END);
+        side.setPadding(Theme.dp(8), 0, 0, 0);
+        side.addView(a.kit.text(Money.rial(row.d("amount")), 13.5f, Theme.GOLD_SOFT, true), a.kit.lp(-2, -2));
+        if (pill != null && !pill.isEmpty()) {
+            android.widget.LinearLayout.LayoutParams pp = a.kit.lp(-2, -2);
+            pp.setMargins(0, Theme.dp(6), 0, 0);
+            side.addView(a.kit.pill(pill, color), pp);
+        }
+        c.addView(side, a.kit.lp(-2, -2));
+
+        Theme.pressable(c);
+        c.setOnClickListener(v2 -> openDetail(row, inc));
+        return c;
     }
 
     private void ensureCalMonth() {

@@ -108,7 +108,10 @@ public final class AdvancedReports {
         String linkCol = m.must("subbuyfact", "شماره فاکتور", "shfackh", "shfac");
         String shka = m.must("subbuyfact", "کد کالا", "SHKA", "shka");
         String qty = m.must("subbuyfact", "تعداد", "TEDVAH", "tedvah");
-        String sum = m.must("subbuyfact", "جمع ردیف", "LINESUM", "linesum");
+        // The purchase-line amount is not in the verified sample schema (subbuyfact has no LINESUM).
+        // Refuse to guess: the report stays unavailable until the real column is confirmed.
+        String sum = Sql.pick(m.columns("subbuyfact"), "LINESUM", "linesum");
+        if (sum == null) throw new Queries.Missing("ستون مبلغ خط خرید در «اقلام فاکتور خرید» تأیید نشده است");
         String invName = m.col("inventory", "naka", "NAKA");
         String invShka = m.col("inventory", "SHKA", "shka");
         List<Object> binds = new ArrayList<>();

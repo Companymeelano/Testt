@@ -161,6 +161,11 @@ jobs:
             --backup /var/opt/mssql/backup/AtiranSample.bak \
             --output "${{ runner.temp }}/buy-formula-counts.json"
           cp "${{ runner.temp }}/buy-formula-counts.json" buy-formula-counts.json
+          python3 tools/probe_money_structure.py \
+            --container atiran-sample \
+            --backup /var/opt/mssql/backup/AtiranSample.bak \
+            --output "${{ runner.temp }}/money-structure-counts.json"
+          cp "${{ runner.temp }}/money-structure-counts.json" money-structure-counts.json
 
       - name: Commit counts-only file to this branch
         if: always()
@@ -170,9 +175,10 @@ jobs:
           if [[ ! -f buy-formula-counts.json ]]; then echo "no counts file"; exit 0; fi
           mkdir -p dist
           cp buy-formula-counts.json dist/buy-formula-counts.json
+          [[ -f money-structure-counts.json ]] && cp money-structure-counts.json dist/money-structure-counts.json || true
           git config user.name "arena-ci"
           git config user.email "arena-ci@local"
-          git add -f dist/buy-formula-counts.json
+          git add -f dist/buy-formula-counts.json dist/money-structure-counts.json 2>/dev/null || git add -f dist/buy-formula-counts.json
           git commit -m "dist: purchase formula counts (counts only, no rows)"
           for i in 1 2 3 4 5; do
             git pull -q --rebase origin arena/eec375ea-testt && git push -q origin HEAD:arena/eec375ea-testt && break

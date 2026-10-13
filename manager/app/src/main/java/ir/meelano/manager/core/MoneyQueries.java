@@ -28,14 +28,17 @@ public final class MoneyQueries {
         d.date = m.must("dar", "تاریخ", "date", "DATE");
         d.done = m.col("dar", "donedate", "done_date", "DoneDate");
         d.desc = m.col("dar", "DarDesc", "darDesc", "description", "Explain");
-        d.cash = m.col("dar", "MabNaghdi", "mabNaghdi", "cash", "naghd");
-        d.pos = m.col("dar", "MabPos", "mabPos");
-        d.havaleh = m.col("dar", "MabHavaleh", "mabHavaleh");
-        d.cheque = m.col("dar", "SumMabcheck", "sumMabcheck", "MabCheck", "mabCheck");
-        d.chkCount = m.col("dar", "TedadChk", "tedadChk");
+        // Verified against the attached Atiran schema (tools/atiran-money-structure.md).
+        // POS and transfer amounts are not header columns of dar: they come from PosDetails
+        // and havaleh through (ghno, p, Rdf_), handled in posDetailSum / darParts.
+        d.cash = m.col("dar", "naghd", "cash");
+        d.pos = null;
+        d.havaleh = null;
+        d.cheque = m.col("dar", "mabcheck");
+        d.chkCount = m.col("dar", "ted_chk");
         d.shfac = m.col("dar", "shfacfo", "shfac");
         d.kind = m.col("dar", "darDescriptionTypeID", "DescriptionReceiveId");
-        d.user = m.col("dar", "user", "UserName", "username");
+        d.user = m.col("dar", "UserID", "user");
         d.isFinal = m.col("dar", "IsFinal", "isFinal");
         return d;
     }

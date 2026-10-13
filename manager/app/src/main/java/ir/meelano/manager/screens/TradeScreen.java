@@ -32,7 +32,7 @@ import java.util.Map;
 /** Sales (sailfact) and Purchases (buyfact) — one screen, two personalities. */
 public class TradeScreen extends Screen {
     private final boolean sales;
-    private final Filter filter = new Filter();
+    private final Filter filter = Filter.daily();
     private int tab;
 
     public TradeScreen(MainActivity a, boolean sales) {

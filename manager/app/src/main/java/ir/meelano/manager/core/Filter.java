@@ -16,6 +16,8 @@ public final class Filter {
     public static final int P_ALL = 7;
 
     public int preset = P_LAST30;
+    /** The preset this screen opens with; isDefault() compares against it. */
+    public int defaultPreset = P_LAST30;
     /** Atiran «YYYY/MM/DD» (inclusive). Empty = no bound. */
     public String from = "";
     public String to = "";
@@ -37,6 +39,15 @@ public final class Filter {
         applyPreset();
     }
 
+    /** Filter that opens on «امروز» (daily) — used by receipts, payments, invoices and returns. */
+    public static Filter daily() {
+        Filter f = new Filter();
+        f.defaultPreset = P_TODAY;
+        f.preset = P_TODAY;
+        f.applyPreset();
+        return f;
+    }
+
     public Filter copy() {
         Filter f = new Filter();
         f.copyFrom(this);
@@ -44,7 +55,7 @@ public final class Filter {
     }
 
     public void copyFrom(Filter o) {
-        preset = o.preset; from = o.from; to = o.to; search = o.search;
+        preset = o.preset; defaultPreset = o.defaultPreset; from = o.from; to = o.to; search = o.search;
         visitor = o.visitor; route = o.route; custGroup = o.custGroup;
         kalaGroup = o.kalaGroup; warehouse = o.warehouse; bank = o.bank; user = o.user;
         status = o.status; sort = o.sort; top = o.top; page = o.page;
@@ -70,7 +81,7 @@ public final class Filter {
     }
 
     public boolean isDefault() {
-        return preset == P_LAST30 && (search == null || search.trim().isEmpty())
+        return preset == defaultPreset && (search == null || search.trim().isEmpty())
                 && visitor < 0 && route < 0 && custGroup < 0 && kalaGroup < 0
                 && warehouse < 0 && bank < 0 && user < 0
                 && (status == null || status.isEmpty()) && (sort == null || sort.isEmpty());

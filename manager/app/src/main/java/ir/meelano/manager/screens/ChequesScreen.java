@@ -57,7 +57,7 @@ public class ChequesScreen extends Screen {
     public FilterSheet.Config filterConfig() {
         FilterSheet.Config c = new FilterSheet.Config();
         c.searchHint = "شماره، مشتری، شناسه صیادی…";
-        // The ordinary list's range is the cheque's receipt/issue date. Due and calendar
+        // The ordinary list's range is the cheque's DUE date. Due and calendar
         // modes have their own explicit due-date window/month and must not offer a range
         // control that those queries would silently ignore.
         c.range = !calMode && !"due".equals(bucket);
@@ -88,16 +88,17 @@ public class ChequesScreen extends Screen {
 
     /** Persian label for one cheque row (prefers the DB status label when present). */
     private String rowLabel(boolean inc, Row r) {
-        if (!r.s("statusLabel").isEmpty()) return r.s("statusLabel");
+        // Always the code mapping (Atiran procedure codes). The view's CheckStatus text is not
+        // trusted: it labelled cleared outgoing cheques (پاس) as بازگشتی.
         return inc ? AtiranSchema.chequeInStatusFa(r.s("st"), r.s("back"))
                 : AtiranSchema.chequeOutStatusFa(r.s("st"));
     }
 
     private String dateHint(boolean inc, String selectedBucket, boolean calendar) {
-        if (calendar) return "تقویم بر اساس سررسید چک است؛ تاریخ دریافت/صدور در جزئیات جدا آمده است.";
+        if (calendar) return "تقویم بر اساس تاریخ سررسید چک است؛ تاریخ دریافت/صدور در جزئیات آمده است.";
         if ("due".equals(selectedBucket)) return "این فهرست، چک‌های باز با سررسید در ۳۰ روز آینده را نشان می‌دهد.";
-        return "بازهٔ فهرست بر اساس تاریخ " + (inc ? "دریافت" : "صدور")
-                + " چک است؛ تاریخ سررسید جداگانه نمایش داده می‌شود.";
+        return "بازهٔ فهرست بر اساس تاریخ سررسید چک است؛ تاریخ "
+                + (inc ? "دریافت" : "صدور") + " در جزئیات آمده است.";
     }
 
     private static final class Data {
@@ -392,6 +393,7 @@ public class ChequesScreen extends Screen {
                     boolean isToday = key.equals(today);
                     LinearLayout cell = a.kit.v();
                     cell.setGravity(android.view.Gravity.CENTER);
+                    cell.setMinimumHeight(Theme.dp(60));
                     android.widget.TextView dn = a.kit.text(Money.fa(String.valueOf(dayNo)), 13f,
                             isToday ? Theme.GOLD : Theme.TEXT, rows != null || isToday);
                     dn.setGravity(android.view.Gravity.CENTER);
@@ -399,6 +401,8 @@ public class ChequesScreen extends Screen {
                     android.widget.TextView am = a.kit.text(rows == null ? "" : Money.compactRial(tot), 9f,
                             rows == null ? Theme.MUTED : Theme.INFO, false);
                     am.setGravity(android.view.Gravity.CENTER);
+                    am.setSingleLine(true);
+                    am.setEllipsize(android.text.TextUtils.TruncateAt.END);
                     cell.addView(am, a.kit.lp(-1, -2));
                     cell.setBackground(rows != null ? Theme.pill(Theme.INFO) : (isToday ? Theme.pill(Theme.GOLD) : null));
                     int pad = Theme.dp(4);
@@ -408,7 +412,9 @@ public class ChequesScreen extends Screen {
                         final double fTot = tot;
                         cell.setOnClickListener(v -> showDayDialog(key, rows, fTot, myIn));
                     }
-                    row.addView(cell, a.kit.wlp(1f));
+                    android.widget.LinearLayout.LayoutParams cp = a.kit.wlp(1f);
+                    cp.setMargins(Theme.dp(2), Theme.dp(2), Theme.dp(2), Theme.dp(2));
+                    row.addView(cell, cp);
                 }
             }
             if (!any && week > 0) break;

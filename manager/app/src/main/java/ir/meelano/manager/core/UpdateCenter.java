@@ -78,8 +78,7 @@ public final class UpdateCenter {
         autoDone = true;
         try {
             if (isDebug(a) || !LicenseStore.unlocked(a)) return;
-            long last = prefs(a).getLong("last_check", 0);
-            if (System.currentTimeMillis() - last < UpdateConfig.AUTO_INTERVAL_MS) return;
+            // Checked on every app open (cold start); the once-per-session guard above prevents repeats.
             if (!online(a)) return;
             final Context app = a.getApplicationContext();
             new Thread(() -> {

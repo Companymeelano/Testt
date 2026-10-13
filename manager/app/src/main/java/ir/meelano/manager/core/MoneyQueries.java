@@ -773,13 +773,15 @@ public final class MoneyQueries {
     /** Grouped statuses for bucket cards: st,back,hasBank,count,total. */
     public static Queries.Q chequeGroups(Meta m, boolean incoming, Filter f) throws Queries.Missing {
         Chq c = chq(m, incoming);
-        if (c.getdate == null)
-            throw new Queries.Missing("ستون تاریخ دریافت/صدور در «" + AtiranSchema.faTitle(c.table) + "» پیدا نشد");
+        // Lists and buckets are ordered/filtered by DUE date (سررسید); receipt/issue date is the fallback.
+        String listDate = c.sardate != null ? c.sardate : c.getdate;
+        if (listDate == null)
+            throw new Queries.Missing("ستون تاریخ سررسید/دریافت در «" + AtiranSchema.faTitle(c.table) + "» پیدا نشد");
         List<Object> binds = new ArrayList<>();
         List<String> conds = new ArrayList<>();
-        if (c.getdate != null) {
+        {
             // Match Jalali text, Gregorian datetime, and bare-digit Atiran date variants.
-            String dc = chequeDateRange("h", c.getdate, f.from, f.to, binds);
+            String dc = chequeDateRange("h", listDate, f.from, f.to, binds);
             if (!dc.isEmpty()) conds.add(dc);
         }
         String bankFilter = chequeBankFilter(c, f.bank, binds);
@@ -815,13 +817,15 @@ public final class MoneyQueries {
      */
     public static Queries.Q chequeList(Meta m, boolean incoming, Filter f, String bucket) throws Queries.Missing {
         Chq c = chq(m, incoming);
-        if (c.getdate == null)
-            throw new Queries.Missing("ستون تاریخ دریافت/صدور در «" + AtiranSchema.faTitle(c.table) + "» پیدا نشد");
+        // Lists and buckets are ordered/filtered by DUE date (سررسید); receipt/issue date is the fallback.
+        String listDate = c.sardate != null ? c.sardate : c.getdate;
+        if (listDate == null)
+            throw new Queries.Missing("ستون تاریخ سررسید/دریافت در «" + AtiranSchema.faTitle(c.table) + "» پیدا نشد");
         List<Object> binds = new ArrayList<>();
         List<String> conds = new ArrayList<>();
-        if (c.getdate != null) {
+        {
             // Match Jalali text, Gregorian datetime, and bare-digit Atiran date variants.
-            String dc = chequeDateRange("h", c.getdate, f.from, f.to, binds);
+            String dc = chequeDateRange("h", listDate, f.from, f.to, binds);
             if (!dc.isEmpty()) conds.add(dc);
         }
         String st = "LTRIM(RTRIM(TRY_CONVERT(nvarchar(40),h.[" + c.st + "])))";

@@ -368,6 +368,13 @@ public class ReportsScreen extends Screen {
     }
 
     private void renderReport(final LinearLayout content, final ReportCatalog.Spec spec) {
+        // Returns open on «امروز» (daily) instead of the generic 30-day window.
+        if (("returns_by_kind".equals(spec.id) || "returns_list".equals(spec.id))
+                && filter.preset == Filter.P_LAST30) {
+            filter.defaultPreset = Filter.P_TODAY;
+            filter.preset = Filter.P_TODAY;
+            filter.applyPreset();
+        }
         content.removeAllViews();
         content.addView(a.kit.btnGhost("‹ بازگشت به فهرست", Theme.GOLD, v -> onBack()), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));

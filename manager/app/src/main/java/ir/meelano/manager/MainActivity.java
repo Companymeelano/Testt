@@ -94,6 +94,7 @@ public class MainActivity extends Activity {
     private Runnable linkPending = null;
     private TextView licChip;
     private View backFab;
+    private TextView backLabel;
     private TextView companyName;
     private android.widget.FrameLayout logoBox;
     private android.widget.ImageView logoImg;
@@ -1032,6 +1033,15 @@ public class MainActivity extends Activity {
         if (s == null) return;
         paintBottom();
         if (backFab != null) backFab.setVisibility("home".equals(currentId) ? View.GONE : View.VISIBLE);
+        updateBackLabel();
+    }
+
+    /** The back capsule names the screen it will actually return to. */
+    private void updateBackLabel() {
+        if (backLabel == null) return;
+        String target = history.isEmpty() ? "home" : history.get(history.size() - 1);
+        Screen t = screens.get(target);
+        backLabel.setText(t == null ? "بازگشت" : "بازگشت به «" + t.title() + "»");
     }
 
     public void openFilter() {
@@ -1091,6 +1101,9 @@ public class MainActivity extends Activity {
         pill.addView(disc, new LinearLayout.LayoutParams(Theme.dp(36), Theme.dp(36)));
         TextView label = kit.text("بازگشت", 14f, ink, true);
         label.setSingleLine(true);
+        label.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        label.setMaxWidth(Theme.dp(190));
+        backLabel = label;
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
         lp.setMargins(Theme.dp(10), 0, 0, 0);
         pill.addView(label, lp);
@@ -1106,6 +1119,7 @@ public class MainActivity extends Activity {
         }
         backFab = pill;
         backFab.setVisibility("home".equals(currentId) ? View.GONE : View.VISIBLE);
+        updateBackLabel();
     }
 
     // ================= Persian voice search =================

@@ -31,7 +31,7 @@ import java.util.Map;
 /** Receipts (dar p=0) and Payments (dar p=1). */
 public class MoneyScreen extends Screen {
     private final int p;
-    private final Filter filter = new Filter();
+    private final Filter filter = Filter.daily();
     private int tab;
 
     public MoneyScreen(MainActivity a, int p) {

@@ -468,7 +468,39 @@ public class LicenseActivity extends Activity {
                 fName, fPhone, errName, errPhone, startBtn));
         c.addView(startBtn, kit.lp(-1, -2));
         Card3D.mount(box, c);
+        addManualEntry(box);
         buildDevFooter(box);
+    }
+
+    /**
+     * Manual activation: the customer pastes a code that arrived by any channel
+     * (WhatsApp, a phone call, a printed note) when the SMS never came. It goes through
+     * the same parser as the clipboard path, so every format is accepted.
+     */
+    private void addManualEntry(LinearLayout box) {
+        LinearLayout c = Card3D.card(this, Theme.TEAL);
+        c.addView(kit.text("ورود دستی کد فعال‌سازی", 15f, Theme.TEXT, true), kit.lp(-1, -2));
+        c.addView(kit.hint("اگر پیامک نرسید، کد را از فروشنده (واتس‌اپ، تماس یا متن) بگیرید و اینجا بچسبانید."),
+                kit.lp(-1, -2));
+        final EditText fCode = kit.editLux("کد فعال‌سازی (M1…)", "");
+        c.addView(fCode, kit.lp(-1, -2));
+        LinearLayout row = kit.h();
+        row.addView(kit.btnGhost("چسباندن از حافظه", Theme.MUTED, v -> {
+            String cl = clipText();
+            if (cl == null || cl.isEmpty()) kit.toast("متنی در حافظه نیست");
+            else fCode.setText(cl);
+        }), kit.wlp(1f));
+        row.addView(kit.space(8));
+        row.addView(kit.btnGold("✦ فعال‌سازی با کد", v -> {
+            String t = txt(fCode);
+            if (t.isEmpty()) {
+                kit.toast("کد را وارد کنید");
+                return;
+            }
+            smartReceive(t);
+        }), kit.wlp(1f));
+        c.addView(row, kit.lp(-1, -2));
+        Card3D.mount(box, c);
     }
 
     /** Field row with a leading vector icon from the single icon family (v34). */
@@ -697,6 +729,7 @@ public class LicenseActivity extends Activity {
         row.addView(recall[0], kit.wlp(1f));
         c.addView(row, kit.lp(-1, -2));
         Card3D.mount(box, c);
+        addManualEntry(box);
         buildDevFooter(box);
         startDots();
     }

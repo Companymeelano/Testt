@@ -73,6 +73,20 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
+      - name: Compile admin licence app (debug APK, artifact only)
+        working-directory: manager
+        run: |
+          set -o pipefail
+          gradle :admin:assembleDebug --no-daemon 2>&1 | tee ../admin-build.log | tail -40
+
+      - name: Upload admin debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: meelano-admin-debug
+          path: manager/admin/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Verify APK identity, version and signature
         run: |
           set -euo pipefail

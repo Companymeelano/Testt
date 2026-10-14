@@ -128,6 +128,8 @@ public class ReportsScreen extends Screen {
                 Money.fa(String.valueOf(ReportCatalog.ALL.length)) + " گزارش مدیریتی • جست‌وجوی سریع و دسته‌بندی‌شده",
                 accent()), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
+        content.addView(a.kit.btnGhost("📈  داشبورد تحلیلی فروش", Theme.VIOLET, v -> a.nav("analytics")), a.kit.lp(-1, -2));
+        content.addView(a.kit.gap(8));
         LinearLayout tr = a.kit.h();
         tr.addView(a.kit.btnGhost("🧾  فاکتورهای فروش", Theme.GOLD, v -> a.nav("sales")), a.kit.wlp(1f));
         tr.addView(a.kit.space(8));

@@ -54,6 +54,7 @@ import ir.meelano.manager.screens.ScoreScreen;
 import ir.meelano.manager.screens.SearchScreen;
 import ir.meelano.manager.screens.SettingsScreen;
 import ir.meelano.manager.screens.TradeScreen;
+import ir.meelano.manager.screens.ProductFileScreen;
 import ir.meelano.manager.screens.ShomarshScreen;
 import ir.meelano.manager.screens.TahvilScreen;
 import ir.meelano.manager.screens.TakmilScreen;
@@ -630,6 +631,7 @@ public class MainActivity extends Activity {
         reg(new ChequesScreen(this));
         reg(new CashScreen(this));
         reg(new ProductsScreen(this));
+        reg(new ProductFileScreen(this));
         reg(new CustomersScreen(this));
         reg(new VisitorsScreen(this));
         reg(new UsersScreen(this));

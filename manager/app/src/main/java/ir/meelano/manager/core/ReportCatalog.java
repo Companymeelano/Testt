@@ -156,9 +156,21 @@ public final class ReportCatalog {
                     new Col[]{c("invoice", "فاکتور", T_TEXT), c("party", "مشتری", T_TEXT), c("amount", "مبلغ", T_MONEY),
                             c("dueDate", "سررسید", T_DATE), c("days", "روز تأخیر", T_NUM), c("visitor", "ویزیتور", T_TEXT)},
                     C_NONE, "", ""),
-            s("aging", "سابقه مطالبات", "فروش", "بازه‌بندی مانده فاکتورهای تسویه‌نشده", false,
-                    new Col[]{c("bucket", "بازه", T_TEXT), c("amount", "مبلغ", T_MONEY), c("count", "تعداد", T_NUM)},
-                    C_BARS, "bucket", "amount"),
+            s("aging", "سن بدهی — توزیع مانده", VIS, "مانده بدهی فاکتورهای تسویه‌نشده به تفکیک سن بدهی (روز از سررسید)", false,
+                    new Col[]{c("bucket", "سن بدهی", T_TEXT), c("amount", "مانده", T_MONEY), c("count", "فاکتور", T_NUM)},
+                    C_DONUT, "bucket", "amount"),
+            s("debtors_aging", "بدهکاران به تفکیک سن بدهی", VIS, "هر مشتری بدهکار با مانده در هر بازه سنی و ویزیتور او", false,
+                    new Col[]{c("customer", "مشتری", T_TEXT), c("visitor", "ویزیتور", T_TEXT),
+                            c("b0", "جاری", T_MONEY), c("b1", "۱–۳۰", T_MONEY), c("b2", "۳۱–۶۰", T_MONEY),
+                            c("b3", "۶۱–۹۰", T_MONEY), c("b4", "۹۱–۱۸۰", T_MONEY), c("b5", "+۱۸۰", T_MONEY),
+                            c("total", "جمع مانده", T_MONEY), c("docs", "فاکتور", T_NUM)},
+                    C_BARS, "customer", "total"),
+            s("visitor_aging", "سن بدهی به تفکیک ویزیتور", VIS, "مانده بدهی هر ویزیتور در بازه‌های سنی", false,
+                    new Col[]{c("visitor", "ویزیتور", T_TEXT),
+                            c("b0", "جاری", T_MONEY), c("b1", "۱–۳۰", T_MONEY), c("b2", "۳۱–۶۰", T_MONEY),
+                            c("b3", "۶۱–۹۰", T_MONEY), c("b4", "۹۱–۱۸۰", T_MONEY), c("b5", "+۱۸۰", T_MONEY),
+                            c("total", "جمع مانده", T_MONEY), c("customers", "مشتری", T_NUM)},
+                    C_BARS, "visitor", "total"),
             // ---- خرید ----
             s("buy_daily", "خرید روزانه", "خرید", "جمع و تعداد فاکتور خرید هر روز", true,
                     new Col[]{c("day", "روز", T_DATE), c("total", "جمع خرید", T_MONEY), c("docs", "اسناد", T_NUM)},
@@ -319,9 +331,11 @@ public final class ReportCatalog {
         if ("sales_top_products".equals(id)) return Queries.factorTopProducts(m, true, ff, 50);
         if ("unsettled".equals(id)) { ff.top = Math.max(ff.top, 100); return Queries.overdueInvoices(m, ff.top); }
         if ("aging".equals(id)) {
-            if (m.function("dif_date_alan")) return Queries.agingBuckets(m);
+            if (m.function("dif_date_alan")) return MasterQueries.agingBuckets(m);
             return Queries.unsettledByMonth(m);
         }
+        if ("debtors_aging".equals(id)) return MasterQueries.agingCustomers(m, 300);
+        if ("visitor_aging".equals(id)) return MasterQueries.agingVisitors(m);
         if ("buy_daily".equals(id)) return Queries.factorDaily(m, false, ff.from, ff.to);
         if ("buy_monthly".equals(id)) return MasterQueries.monthly(m, false, 12);
         if ("buy_price_trend".equals(id)) return Queries.buyPriceTrend(m, ff, 50);

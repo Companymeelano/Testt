@@ -128,6 +128,12 @@ public class ReportsScreen extends Screen {
                 Money.fa(String.valueOf(ReportCatalog.ALL.length)) + " گزارش مدیریتی • جست‌وجوی سریع و دسته‌بندی‌شده",
                 accent()), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
+        LinearLayout tr = a.kit.h();
+        tr.addView(a.kit.btnGhost("🧾  فاکتورهای فروش", Theme.GOLD, v -> a.nav("sales")), a.kit.wlp(1f));
+        tr.addView(a.kit.space(8));
+        tr.addView(a.kit.btnGhost("🧺  فاکتورهای خرید", Theme.INFO, v -> a.nav("buy")), a.kit.wlp(1f));
+        content.addView(tr, a.kit.lp(-1, -2));
+        content.addView(a.kit.gap(10));
         content.addView(a.kit.searchBar("جست‌وجوی نام، کاربرد یا دستهٔ گزارش…", browseQuery, q -> {
             browseQuery = q == null ? "" : q.trim();
             selCat = null;

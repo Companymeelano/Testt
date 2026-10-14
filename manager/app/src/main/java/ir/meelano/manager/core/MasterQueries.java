@@ -877,6 +877,125 @@ public final class MasterQueries {
     // =====================================================================================
     // MISC REPORTS
     // =====================================================================================
+    // =====================================================================================
+    // DEBT AGING (سن بدهی) — rules match the Atiran-verified mobile app:
+    // remaining = all_fel|all − MabDaryaftFactor − tdf, only unsettled invoices (tasvieh='f'),
+    // age = −dif_date_alan(t_date) days; dif ≥ 0 means not yet due.
+    // =====================================================================================
+    public static final String[] AGING_LABELS = {"جاری", "۱ تا ۳۰ روز", "۳۱ تا ۶۰ روز", "۶۱ تا ۹۰ روز",
+            "۹۱ تا ۱۸۰ روز", "بیش از ۱۸۰ روز"};
+
+    /** Inner rows: code, customer, visitor, bk (0..5 bucket index), remain (positive only). */
+    private static String agingInner(Meta m) throws Queries.Missing {
+        String dif = m.qFunction("dif_date_alan");
+        if (dif == null) throw new Queries.Missing("تابع محاسبه سررسید (dif_date_alan) در دیتابیس نیست");
+        Set<String> sail = m.columns("sailfact");
+        m.must("sailfact", "تاریخ تسویه", "t_date");
+        m.must("sailfact", "وضعیت تسویه", "tasvieh");
+        String amount = Sql.pick(sail, "all_fel", "all");
+        if (amount == null) throw new Queries.Missing("«مبلغ فاکتور» در دیتابیس پیدا نشد");
+        String shmo = Sql.pick(sail, "shmo", "SHMO");
+        String visId = Sql.pick(sail, "vis_rdf", "VisitorID");
+        String remain = "TRY_CONVERT(decimal(19,2),s.[" + amount + "])";
+        if (sail.contains("MabDaryaftFactor") || sail.contains("mabdaryaftfactor"))
+            remain += "-ISNULL(TRY_CONVERT(decimal(19,2),s.[MabDaryaftFactor]),0)";
+        if (sail.contains("tdf") || sail.contains("TDF"))
+            remain += "-ISNULL(TRY_CONVERT(decimal(19,2),s.[tdf]),0)";
+        String age = "-" + dif + "(s.[t_date])";
+        String bk = "CASE WHEN " + dif + "(s.[t_date])>=0 THEN 0 WHEN " + age + "<=30 THEN 1 WHEN " + age
+                + "<=60 THEN 2 WHEN " + age + "<=90 THEN 3 WHEN " + age + "<=180 THEN 4 ELSE 5 END";
+        String code = shmo == null ? "CAST(NULL AS nvarchar(100))" : "TRY_CONVERT(nvarchar(100),s.[" + shmo + "])";
+        String visExpr = visId == null ? "N'بدون ویزیتور'" : Queries.visNameExpr(m, "s", visId, "v");
+        return "SELECT " + code + " AS code, " + Queries.custNameExpr(m, "s", shmo, "c") + " AS customer, "
+                + visExpr + " AS visitor, " + bk + " AS bk, (" + remain + ") AS remain"
+                + " FROM dbo.sailfact s" + Queries.custJoin(m, "s", shmo, "c") + Queries.visJoin(m, "s", visId, "v")
+                + " WHERE s.[tasvieh]='f' AND NULLIF(s.[t_date],'') IS NOT NULL"
+                + Sql.activeAnd(sail, "s") + Sql.softAnd(sail, "s");
+    }
+
+    private static String bucketSums() {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < AGING_LABELS.length; i++)
+            sb.append(", ISNULL(SUM(CASE WHEN x.bk=").append(i).append(" THEN x.remain ELSE 0 END),0) AS b").append(i);
+        return sb.toString();
+    }
+
+    /** Totals per aging bucket: bucket,amount,count (oldest bucket last). */
+    public static Queries.Q agingBuckets(Meta m) throws Queries.Missing {
+        StringBuilder lbl = new StringBuilder("CASE x.bk");
+        for (int i = 0; i < AGING_LABELS.length; i++) lbl.append(" WHEN ").append(i).append(" THEN N'").append(AGING_LABELS[i]).append("'");
+        lbl.append(" END");
+        return new Queries.Q("SELECT " + lbl + " AS bucket, ISNULL(SUM(x.remain),0) AS amount, COUNT_BIG(1) AS count"
+                + " FROM (" + agingInner(m) + ") x WHERE x.remain>0 GROUP BY x.bk ORDER BY x.bk");
+    }
+
+    /** Debtors by customer and visitor with the amount in each aging bucket: customer,visitor,b0..b5,total,docs. */
+    public static Queries.Q agingCustomers(Meta m, int top) throws Queries.Missing {
+        return new Queries.Q("SELECT TOP (" + Queries.clampTop(top) + ") x.customer AS customer, x.visitor AS visitor"
+                + bucketSums() + ", ISNULL(SUM(x.remain),0) AS total, COUNT_BIG(1) AS docs"
+                + " FROM (" + agingInner(m) + ") x WHERE x.remain>0"
+                + " GROUP BY x.code, x.customer, x.visitor ORDER BY total DESC");
+    }
+
+    /** Debt by visitor with the amount in each aging bucket: visitor,b0..b5,total,customers. */
+    public static Queries.Q agingVisitors(Meta m) throws Queries.Missing {
+        return new Queries.Q("SELECT x.visitor AS visitor" + bucketSums()
+                + ", ISNULL(SUM(x.remain),0) AS total, COUNT(DISTINCT x.code) AS customers"
+                + " FROM (" + agingInner(m) + ") x WHERE x.remain>0 GROUP BY x.visitor ORDER BY total DESC");
+    }
+
+    // =====================================================================================
+    // PRODUCT STOCK CARD (کاردکس) — ka_act ledger, same in/out rules as the Atiran-verified app
+    // =====================================================================================
+    /** Acts that take stock OUT of the warehouse (Atiran's stock-event list). */
+    public static final String STOCK_OUT_ACTS = "20,22,5,19,18,48,26,85,133";
+
+    /**
+     * Movements of one product, newest first: date,act,opLabel,qty,outFlag,price,warehouse,doc,descrip.
+     * qty is in counting units (tedvah×mohvah + tedjoz) when the inventory unit is known.
+     */
+    public static Queries.Q productKardex(Meta m, String shkaVal, int top) throws Queries.Missing {
+        if (!m.table("ka_act")) throw new Queries.Missing("«گردش کالا» در دیتابیس پیدا نشد");
+        Set<String> cols = m.columns("ka_act");
+        String shka = m.must("ka_act", "کد کالا", "shka", "SHKA");
+        String date = m.col("ka_act", "act_date", "done_date");
+        String op = m.col("ka_act", "act_id", "ActID", "actid");
+        String tedvah = m.col("ka_act", "tedvah", "TEDVAH");
+        if (tedvah == null) throw new Queries.Missing("«تعداد گردش» در دیتابیس پیدا نشد");
+        String tedjoz = m.col("ka_act", "tedjoz", "TEDJOZ");
+        String price = m.colFlex("ka_act", "price", "Price");
+        String desc = m.colFlex("ka_act", "act_dis", "description", "sharh", "tozihat");
+        String doc = m.colFlex("ka_act", "shfacfo", "shfackh", "ghno", "shfac", "sanad", "docnumber");
+        String anbar = m.col("ka_act", "RdfAnbar", "rdf_anbar");
+        String invKey = m.table("inventory") ? m.col("inventory", "SHKA", "shka") : null;
+        String mohvah = invKey == null ? null : m.col("inventory", "mohvah");
+        boolean pieces = tedjoz != null && mohvah != null;
+        String qty = pieces
+                ? "(CAST(ISNULL(h.[" + tedvah + "],0) AS decimal(19,3))*ISNULL(NULLIF(TRY_CONVERT(decimal(19,3),i.[" + mohvah
+                  + "]),0),1)+CAST(ISNULL(h.[" + tedjoz + "],0) AS decimal(19,3)))"
+                : "TRY_CONVERT(decimal(19,3),h.[" + tedvah + "])";
+        String outFlag = op == null ? "CAST(0 AS int)"
+                : "CASE WHEN TRY_CONVERT(int,h.[" + op + "]) IN (" + STOCK_OUT_ACTS + ") THEN 1 ELSE 0 END";
+        List<Object> binds = new ArrayList<>();
+        binds.add(shkaVal);
+        String sql = "SELECT TOP (" + Queries.clampTop(top) + ") "
+                + (date == null ? "CAST(NULL AS nvarchar(10))" : Sql.date10("h", date)) + " AS date"
+                + ", " + (op == null ? "CAST(NULL AS int)" : "TRY_CONVERT(int,h.[" + op + "])") + " AS act"
+                + ", " + (op == null ? "N'عملیات'" : Queries.actLabelExpr(m, "h", op, "an")) + " AS opLabel"
+                + ", " + qty + " AS qty"
+                + ", " + outFlag + " AS outFlag"
+                + ", " + (price == null ? "CAST(NULL AS decimal(19,2))" : "TRY_CONVERT(decimal(19,2),h.[" + price + "])") + " AS price"
+                + ", " + (anbar == null ? "CAST(NULL AS nvarchar(60))" : "TRY_CONVERT(nvarchar(60),h.[" + anbar + "])") + " AS warehouse"
+                + ", " + (doc == null ? "CAST(NULL AS nvarchar(80))" : "TRY_CONVERT(nvarchar(80),h.[" + doc + "])") + " AS doc"
+                + ", " + (desc == null ? "N''" : "COALESCE(" + Sql.txt("h", desc, 300) + ",N'')") + " AS descrip"
+                + " FROM dbo.ka_act h"
+                + (pieces ? " LEFT JOIN dbo.inventory i ON TRY_CONVERT(nvarchar(100),i.[" + invKey + "])=TRY_CONVERT(nvarchar(100),h.[" + shka + "])" : "")
+                + (op == null ? "" : Queries.actLabelJoin(m, "h", op, "an"))
+                + " WHERE TRY_CONVERT(nvarchar(100),h.[" + shka + "])=?" + Sql.activeAnd(cols, "h")
+                + (date == null ? "" : " ORDER BY h.[" + date + "] DESC");
+        return new Queries.Q(sql, binds);
+    }
+
     /** Monthly sales/purchases (latest months first): month,total,docs. */
     public static Queries.Q monthly(Meta m, boolean sales, int months) throws Queries.Missing {
         String table = sales ? "sailfact" : "buyfact";

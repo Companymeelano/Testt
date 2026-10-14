@@ -326,19 +326,6 @@ public final class Queries {
     }
 
     /** Aging buckets via dif_date_alan (only call when the function exists): k,amount,count. */
-    public static Q agingBuckets(Meta m) throws Missing {
-        String dateDiffFn = m.qFunction("dif_date_alan");
-        if (dateDiffFn == null) throw new Missing("تابع محاسبه سررسید در دیتابیس نیست");
-        m.must("sailfact", "تاریخ تسویه", "t_date");
-        m.must("sailfact", "وضعیت تسویه", "tasvieh");
-        String amountCol = m.must("sailfact", "مبلغ", "all");
-        return new Q("SELECT k AS k, ISNULL(SUM(amount),0) AS amount, COUNT_BIG(1) AS count FROM (SELECT"
-                + " CASE WHEN " + dateDiffFn + "([t_date])<0 THEN 0 WHEN " + dateDiffFn + "([t_date])<=30 THEN 1"
-                + " WHEN " + dateDiffFn + "([t_date])<=60 THEN 2 WHEN " + dateDiffFn + "([t_date])<=90 THEN 3 ELSE 4 END AS k"
-                + ", TRY_CONVERT(decimal(19,2),[all]) AS amount FROM dbo.sailfact"
-                + " WHERE [tasvieh]='f' AND NULLIF([t_date],'') IS NOT NULL) g GROUP BY k ORDER BY k");
-    }
-
     // =====================================================================================
     // SALES + PURCHASES
     // =====================================================================================

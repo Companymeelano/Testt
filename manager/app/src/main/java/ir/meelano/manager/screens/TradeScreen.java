@@ -426,6 +426,12 @@ public class TradeScreen extends Screen {
         return Money.pct(part * 100.0 / whole);
     }
 
+    /** Opens one invoice by its number (used by product movements and reports). */
+    public void openInvoice(final String no) {
+        if (no == null || no.trim().isEmpty()) return;
+        openDetailByNo(no.trim());
+    }
+
     // ---------------- invoice detail ----------------
     private void openDetailByNo(final String no) {
         a.kit.toast("در حال دریافت فاکتور…");

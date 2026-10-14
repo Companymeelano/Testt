@@ -141,7 +141,12 @@ public final class LicenseStore {
         }
         if (today < r.iatDay - 1) {
             s.reason = "clock";
-            s.fa = "ساعت گوشی درست نیست";
+            // Epoch day -> Julian day number, so Jalali can format both dates.
+            String phone = Jalali.format((int) (today + 2440588L));
+            String issued = Jalali.format((int) (r.iatDay + 2440588L));
+            s.fa = "ساعت گوشی عقب است: تاریخ گوشی " + phone
+                    + " و تاریخ صدور کد " + issued + ".\n"
+                    + "تاریخ و ساعت گوشی را روی «خودکار» بگذارید و دوباره تلاش کنید.";
             return s;
         }
         try {

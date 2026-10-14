@@ -1,5 +1,6 @@
 package ir.meelano.manager.data;
 
+import ir.meelano.manager.core.Diag;
 import android.content.Context;
 import android.content.SharedPreferences;
 
@@ -124,7 +125,7 @@ public final class Settings {
             String h = host();
             if (h.isEmpty()) return;
             placeHost(h, port(), db(), user(), pass());
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Settings:127", ignored); }
     }
 
     /** Smart-link mode: "auto" (default), "lan" or "wan". */

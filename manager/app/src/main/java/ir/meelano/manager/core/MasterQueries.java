@@ -1946,7 +1946,7 @@ public final class MasterQueries {
         try {
             fdt = m.col("sailfact", "date");
             fall = m.col("sailfact", "all", "All");
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MasterQueries:1949", ignored); }
         String todayJ = Jalali.todayStr();
         String todayG = Jalali.todayGregorian();
         if (fdt != null && m.table("sailfact")) {
@@ -2027,7 +2027,7 @@ public final class MasterQueries {
             String dt = null;
             try {
                 dt = m.col(t[0], "date", "DATE", "tarikh");
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("MasterQueries:2030", ignored); }
             if (dt != null && m.table(t[0])) {
                 sb.append("(SELECT COUNT_BIG(1) FROM dbo.[").append(t[0]).append("] d WHERE ")
                         .append(Sql.date10("d", dt)).append(" IN (").append(Sql.lit(todayJ))

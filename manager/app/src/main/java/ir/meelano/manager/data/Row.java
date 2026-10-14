@@ -1,5 +1,6 @@
 package ir.meelano.manager.data;
 
+import ir.meelano.manager.core.Diag;
 import java.util.LinkedHashMap;
 
 /** One database row: column name → value, with forgiving typed getters. */
@@ -43,7 +44,7 @@ public final class Row extends LinkedHashMap<String, Object> {
         try {
             Object o = get(key);
             if (o instanceof byte[]) return (byte[]) o;
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Row:46", ignored); }
         return null;
     }
 }

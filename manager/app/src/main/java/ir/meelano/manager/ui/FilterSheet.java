@@ -1,5 +1,6 @@
 package ir.meelano.manager.ui;
 
+import ir.meelano.manager.core.Diag;
 import android.app.AlertDialog;
 import android.view.Gravity;
 import android.view.View;
@@ -101,7 +102,7 @@ public final class FilterSheet {
                     search.setCompoundDrawablesRelative(ic, null, null, null);
                     search.setCompoundDrawablePadding(Theme.dp(8));
                 }
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("FilterSheet:104", ignored); }
             search.setPadding(Theme.dp(14), Theme.dp(10), Theme.dp(14), Theme.dp(10));
             search.setSingleLine(true);
             search.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
@@ -123,7 +124,7 @@ public final class FilterSheet {
                         search.setSelection(search.getText().length());
                         pendingSearch[0] = t == null ? "" : t;
                     });
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("FilterSheet:126", ignored); }
             });
             sRow.addView(mic, new LinearLayout.LayoutParams(Theme.dp(52), Theme.dp(50)));
             root.addView(sRow, kit.lp(-1, -2));
@@ -401,14 +402,14 @@ public final class FilterSheet {
             String[] disp = new String[count];
             for (int i = 0; i < count; i++) disp[i] = Money.fa(String.valueOf(min + i));
             p.setDisplayedValues(disp);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("FilterSheet:404", ignored); }
         try {
             for (int i = 0; i < p.getChildCount(); i++) {
                 android.view.View ch = p.getChildAt(i);
                 if (ch instanceof android.widget.EditText)
                     ((android.widget.EditText) ch).setTextColor(Theme.TEXT);
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("FilterSheet:411", ignored); }
         return p;
     }
 

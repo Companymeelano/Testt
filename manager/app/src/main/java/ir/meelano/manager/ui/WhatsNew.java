@@ -1,5 +1,6 @@
 package ir.meelano.manager.ui;
 
+import ir.meelano.manager.core.Diag;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
@@ -70,7 +71,7 @@ public final class WhatsNew {
         } catch (Exception e) {
             try {
                 done.run();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("WhatsNew:73", ignored); }
         }
     }
 
@@ -92,7 +93,7 @@ public final class WhatsNew {
             List<Changelog.Ver> vers = Changelog.since(cur - 1, cur);
             if (vers.isEmpty()) return;
             show(a, vers, cur, null);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("WhatsNew:95", ignored); }
     }
 
     private static void show(Activity a, List<Changelog.Ver> vers, int cur, Runnable onDone) {
@@ -100,7 +101,7 @@ public final class WhatsNew {
         Dialog d = new Dialog(a);
         try {
             d.requestWindowFeature(Window.FEATURE_NO_TITLE);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("WhatsNew:103", ignored); }
 
         LinearLayout root = new LinearLayout(a);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -128,7 +129,7 @@ public final class WhatsNew {
         badge.setBackground(Theme.accentAvatar(Theme.GOLD));
         try {
             badge.setElevation(Theme.dp(12));
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("WhatsNew:131", ignored); }
         LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(Theme.dp(84), Theme.dp(84));
         bp.gravity = Gravity.CENTER;
         hero.addView(badge, bp);
@@ -174,7 +175,7 @@ public final class WhatsNew {
                 LinearLayout card = kit.card(Changelog.kindColor(it.kind));
                 try {
                     card.setElevation(Theme.dp(6));
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("WhatsNew:177", ignored); }
                 LinearLayout row = kit.h();
                 row.setGravity(Gravity.CENTER_VERTICAL);
                 TextView g = kit.text(it.glyph, 21, Changelog.kindColor(it.kind), true);
@@ -218,7 +219,7 @@ public final class WhatsNew {
         foot.addView(kit.btnGold("✦ ورود به برنامه", v -> {
             try {
                 d.dismiss();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("WhatsNew:221", ignored); }
         }), kit.lp(-1, -2));
         TextView re = kit.text("همیشه در: تنظیمات » درباره » تازه‌های نسخه",
                 11f, Theme.MUTED, false);
@@ -232,7 +233,7 @@ public final class WhatsNew {
         try {
             if (d.getWindow() != null)
                 d.getWindow().setBackgroundDrawable(new ColorDrawable(0x00000000));
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("WhatsNew:235", ignored); }
         d.setCancelable(true);
         d.setOnDismissListener(dd -> {
             markSeen(a, cur);
@@ -240,7 +241,7 @@ public final class WhatsNew {
             if (onDone != null) {
                 try {
                     onDone.run();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("WhatsNew:243", ignored); }
             }
         });
         d.show();
@@ -248,7 +249,7 @@ public final class WhatsNew {
             if (d.getWindow() != null)
                 d.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.MATCH_PARENT);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("WhatsNew:251", ignored); }
         // Staged entrance: badge pops, cards rise one by one.
         try {
             badge.setScaleX(0.5f);
@@ -263,7 +264,7 @@ public final class WhatsNew {
                 c.animate().alpha(1f).translationY(0f).setDuration(320)
                         .setStartDelay(150 + i * 70).start();
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("WhatsNew:266", ignored); }
     }
 
     /** Full story of one item + exactly where to find it in the app. */
@@ -288,12 +289,12 @@ public final class WhatsNew {
             body.addView(kit.btnGold("فهمیدم", v -> {
                 try {
                     if (box[0] != null) box[0].dismiss();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("WhatsNew:291", ignored); }
             }), kit.lp(-1, -2));
             AlertDialog d = kit.dialog(it.title, kit.scrollWrap(body, 420), true);
             box[0] = d;
             d.show();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("WhatsNew:296", ignored); }
     }
 
     private static SharedPreferences prefs(Context c) {
@@ -303,7 +304,7 @@ public final class WhatsNew {
     private static void markSeen(Context c, int code) {
         try {
             prefs(c).edit().putInt("last_news_code", code).apply();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("WhatsNew:306", ignored); }
     }
 
     private static int appCode(Context c) {

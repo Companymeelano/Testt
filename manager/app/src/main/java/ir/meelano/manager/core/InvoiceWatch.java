@@ -64,7 +64,7 @@ public final class InvoiceWatch {
                 public void ok(List<Row> rows) {
                     try {
                         repo.close();
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("InvoiceWatch:67", ignored); }
                     finishCb(onDone);
                     if (rows == null) return;
                     try {
@@ -91,14 +91,14 @@ public final class InvoiceWatch {
                         while (seen.size() > MAX_SEEN) seen.remove(seen.iterator().next());
                         s2.setWhSeen(join(seen));
                         if (!fresh.isEmpty()) notifyNew(c, fresh);
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("InvoiceWatch:94", ignored); }
                 }
 
                 @Override
                 public void fail(String faError) {
                     try {
                         repo.close();
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("InvoiceWatch:101", ignored); }
                     finishCb(onDone);
                 }
             });
@@ -177,12 +177,12 @@ public final class InvoiceWatch {
                     .build();
             NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
             if (nm != null) nm.notify(Notify.NEWINV_NOTIF_ID, n);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("InvoiceWatch:180", ignored); }
     }
 
     private static void finishCb(Runnable r) {
         try {
             if (r != null) r.run();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("InvoiceWatch:186", ignored); }
     }
 }

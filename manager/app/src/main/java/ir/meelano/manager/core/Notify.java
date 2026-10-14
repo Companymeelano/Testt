@@ -17,6 +17,7 @@ import ir.meelano.manager.data.Meta;
 import ir.meelano.manager.data.Repo;
 import ir.meelano.manager.data.Row;
 import ir.meelano.manager.data.Settings;
+import ir.meelano.manager.ui.Theme;
 
 import java.util.Calendar;
 import java.util.List;
@@ -70,7 +71,7 @@ public final class Notify {
                 launched = true;
                 checkNow(a.getApplicationContext());
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Notify:73", ignored); }
     }
 
     public static void channel(Context c) {
@@ -80,7 +81,7 @@ public final class Notify {
             NotificationChannel ch = new NotificationChannel(CH, "هشدار سررسید", NotificationManager.IMPORTANCE_DEFAULT);
             ch.setDescription("سررسید چک‌ها و فاکتورهای معوق");
             nm.createNotificationChannel(ch);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Notify:83", ignored); }
     }
 
     /** Every day at 8:00 (inexact, battery-friendly). */
@@ -98,7 +99,7 @@ public final class Notify {
             if (cal.getTimeInMillis() <= System.currentTimeMillis()) cal.add(Calendar.DAY_OF_YEAR, 1);
             am.setInexactRepeating(AlarmManager.RTC_WAKEUP, cal.getTimeInMillis(),
                     AlarmManager.INTERVAL_DAY, pi);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Notify:101", ignored); }
     }
 
     public static void cancelDaily(Context c) {
@@ -108,7 +109,7 @@ public final class Notify {
             PendingIntent pi = PendingIntent.getBroadcast(c, ALARM_REQ, i,
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             if (am != null) am.cancel(pi);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Notify:111", ignored); }
     }
 
     /** Every Friday at 9:00 (inexact, battery-friendly). */
@@ -128,7 +129,7 @@ public final class Notify {
             if (cal.getTimeInMillis() <= System.currentTimeMillis()) cal.add(Calendar.DAY_OF_YEAR, 7);
             am.setInexactRepeating(AlarmManager.RTC_WAKEUP, cal.getTimeInMillis(),
                     AlarmManager.INTERVAL_DAY * 7, pi);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Notify:131", ignored); }
     }
 
     public static void cancelWeekly(Context c) {
@@ -139,7 +140,7 @@ public final class Notify {
             PendingIntent pi = PendingIntent.getBroadcast(c, BACKUP_REQ, i,
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             if (am != null) am.cancel(pi);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Notify:142", ignored); }
     }
 
     /** Every Thursday at 20:00 (inexact, battery-friendly): the week in numbers. */
@@ -159,7 +160,7 @@ public final class Notify {
             if (cal.getTimeInMillis() <= System.currentTimeMillis()) cal.add(Calendar.DAY_OF_YEAR, 7);
             am.setInexactRepeating(AlarmManager.RTC_WAKEUP, cal.getTimeInMillis(),
                     AlarmManager.INTERVAL_DAY * 7, pi);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Notify:162", ignored); }
     }
 
     public static void cancelWeeklyReport(Context c) {
@@ -170,7 +171,7 @@ public final class Notify {
             PendingIntent pi = PendingIntent.getBroadcast(c, WEEKLY_REQ, i,
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             if (am != null) am.cancel(pi);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Notify:173", ignored); }
     }
 
     /** Every night at 21:00 (inexact, battery-friendly): the day in numbers. */
@@ -189,7 +190,7 @@ public final class Notify {
             if (cal.getTimeInMillis() <= System.currentTimeMillis()) cal.add(Calendar.DAY_OF_YEAR, 1);
             am.setInexactRepeating(AlarmManager.RTC_WAKEUP, cal.getTimeInMillis(),
                     AlarmManager.INTERVAL_DAY, pi);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Notify:192", ignored); }
     }
 
     public static void cancelEod(Context c) {
@@ -200,7 +201,7 @@ public final class Notify {
             PendingIntent pi = PendingIntent.getBroadcast(c, EOD_REQ, i,
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             if (am != null) am.cancel(pi);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Notify:203", ignored); }
     }
 
     /** Every 30 minutes (inexact, battery-friendly): the live sales guard. */
@@ -215,7 +216,7 @@ public final class Notify {
             am.setInexactRepeating(AlarmManager.RTC_WAKEUP,
                     System.currentTimeMillis() + AlarmManager.INTERVAL_HALF_HOUR,
                     AlarmManager.INTERVAL_HALF_HOUR, pi);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Notify:218", ignored); }
     }
 
     public static void cancelGuard(Context c) {
@@ -226,7 +227,7 @@ public final class Notify {
             PendingIntent pi = PendingIntent.getBroadcast(c, GUARD_REQ, i,
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             if (am != null) am.cancel(pi);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Notify:229", ignored); }
     }
 
     /**
@@ -246,7 +247,7 @@ public final class Notify {
             am.setInexactRepeating(AlarmManager.RTC_WAKEUP,
                     System.currentTimeMillis() + AlarmManager.INTERVAL_FIFTEEN_MINUTES,
                     AlarmManager.INTERVAL_FIFTEEN_MINUTES, pi);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Notify:249", ignored); }
     }
 
     public static void cancelNewInv(Context c) {
@@ -257,7 +258,7 @@ public final class Notify {
             PendingIntent pi = PendingIntent.getBroadcast(c, NEWINV_REQ, i,
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             if (am != null) am.cancel(pi);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Notify:260", ignored); }
     }
 
     /** Tonight's numbers, saved for the home card + a nightly summary notification. */
@@ -279,20 +280,20 @@ public final class Notify {
                     Row r = Repo.one(conn, Queries.salesOn(m, true, today));
                     sales = r.d("total");
                     docs = r.l("docs");
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("Notify:282", ignored); }
                 try {
                     inAmt = Repo.one(conn, MoneyQueries.darOn(m, 0, today)).d("total");
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("Notify:285", ignored); }
                 try {
                     outAmt = Repo.one(conn, MoneyQueries.darOn(m, 1, today)).d("total");
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("Notify:288", ignored); }
                 return new long[]{(long) sales, docs, (long) inAmt, (long) outAmt};
             }, new Repo.Cb<long[]>() {
                 @Override
                 public void ok(long[] v) {
                     try {
                         repo.close();
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("Notify:295", ignored); }
                     finishCb(onDone);
                     if (v == null || v.length < 4) return;
                     String msg = "فروش " + Money.compactRial(v[0])
@@ -301,7 +302,7 @@ public final class Notify {
                             + " • پرداخت " + Money.compactRial(v[3]);
                     try {
                         new Settings(c).saveEod(msg, today);
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("Notify:304", ignored); }
                     showEod(c, msg);
                 }
 
@@ -309,7 +310,7 @@ public final class Notify {
                 public void fail(String faError) {
                     try {
                         repo.close();
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("Notify:312", ignored); }
                     finishCb(onDone);
                 }
             });
@@ -333,11 +334,11 @@ public final class Notify {
                     .setSmallIcon(R.mipmap.ic_launcher)
                     .setContentIntent(pi)
                     .setAutoCancel(true)
-                    .setColor(0xFF9B7BFF)
+                    .setColor(Theme.VIOLET)
                     .build();
             NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
             if (nm != null) nm.notify(EOD_NOTIF_ID, n);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Notify:340", ignored); }
     }
 
     /** Last-7-days numbers, then a Thursday-night summary notification. */
@@ -360,27 +361,27 @@ public final class Notify {
                     Row r = Repo.one(conn, Queries.factorSummary(m, true, f));
                     sales = r.d("total");
                     docs = r.l("docs");
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("Notify:363", ignored); }
                 try {
                     List<Row> ds = Repo.exec(conn, MoneyQueries.darDaily(m, 0, from, to));
                     for (Row r : ds) inAmt += r.d("total");
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("Notify:367", ignored); }
                 try {
                     bounced = Repo.one(conn, MoneyQueries.bouncedTotal(m)).l("count");
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("Notify:370", ignored); }
                 try {
                     due7 += Repo.exec(conn, MoneyQueries.chequeDue(m, true, 7)).size();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("Notify:373", ignored); }
                 try {
                     due7 += Repo.exec(conn, MoneyQueries.chequeDue(m, false, 7)).size();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("Notify:376", ignored); }
                 return new long[]{(long) sales, docs, (long) inAmt, bounced, due7};
             }, new Repo.Cb<long[]>() {
                 @Override
                 public void ok(long[] v) {
                     try {
                         repo.close();
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("Notify:383", ignored); }
                     finishCb(onDone);
                     if (v == null || v.length < 5) return;
                     showWeek(c, v);
@@ -390,11 +391,11 @@ public final class Notify {
                 public void fail(String faError) {
                     try {
                         repo.close();
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("Notify:393", ignored); }
                     finishCb(onDone);
                 }
             });
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Notify:397", ignored); }
     }
 
     private static void showWeek(Context c, long[] v) {
@@ -416,11 +417,11 @@ public final class Notify {
                     .setSmallIcon(R.mipmap.ic_launcher)
                     .setContentIntent(pi)
                     .setAutoCancel(true)
-                    .setColor(0xFFD9AE5A)
+                    .setColor(Theme.GOLD)
                     .build();
             NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
             if (nm != null) nm.notify(WEEKLY_NOTIF_ID, n);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Notify:423", ignored); }
     }
 
     /** Query Atiran in background; notify only when there is something to warn about. */
@@ -442,39 +443,39 @@ public final class Notify {
                     List<Row> in = Repo.exec(conn, MoneyQueries.chequeDue(m, true, 3));
                     inN = in.size();
                     for (Row r : in) inSum += r.d("amount");
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("Notify:445", ignored); }
                 try {
                     List<Row> out = Repo.exec(conn, MoneyQueries.chequeDue(m, false, 3));
                     outN = out.size();
                     for (Row r : out) outSum += r.d("amount");
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("Notify:450", ignored); }
                 try {
                     List<Row> od = Repo.exec(conn, Queries.overdueInvoices(m, 200));
                     odN = od.size();
                     for (Row r : od) odSum += r.d("amount");
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("Notify:455", ignored); }
                 double ySales = 0, yIn = 0;
                 try {
                     Row ys = Repo.one(conn, Queries.salesOn(m, true, Jalali.addDays(Jalali.todayStr(), -1)));
                     ySales = ys.d("total");
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("Notify:460", ignored); }
                 try {
                     Row yi = Repo.one(conn, MoneyQueries.darOn(m, 0, Jalali.addDays(Jalali.todayStr(), -1)));
                     yIn = yi.d("total");
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("Notify:464", ignored); }
                 long bN = 0;
                 double bSum = 0;
                 try {
                     Row bb = Repo.one(conn, MoneyQueries.bouncedTotal(m));
                     bN = bb.l("count");
                     bSum = bb.d("total");
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("Notify:471", ignored); }
                 long lowN = 0, zeroN = 0;
                 try {
                     Row ps = Repo.one(conn, MasterQueries.productsSummary(m));
                     lowN = ps.l("low");
                     zeroN = ps.l("out");
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("Notify:477", ignored); }
                 return new long[]{(long) inSum, (long) outSum, (long) odSum, inN, outN, odN,
                         (long) ySales, (long) yIn, bN, (long) bSum, lowN, zeroN};
             }, new Repo.Cb<long[]>() {
@@ -482,7 +483,7 @@ public final class Notify {
                 public void ok(long[] v) {
                     try {
                         repo.close();
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("Notify:485", ignored); }
                     finishCb(onDone);
                     if (v == null || v.length < 12) return;
                     Settings s2 = new Settings(c);
@@ -499,17 +500,17 @@ public final class Notify {
                 public void fail(String faError) {
                     try {
                         repo.close();
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("Notify:502", ignored); }
                     finishCb(onDone);
                 }
             });
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Notify:506", ignored); }
     }
 
     private static void finishCb(Runnable r) {
         try {
             if (r != null) r.run();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Notify:512", ignored); }
     }
 
     private static void show(Context c, long[] v, long bNew, boolean morning) {
@@ -528,7 +529,7 @@ public final class Notify {
             if (bNew > 0)
                 parts.add(Money.fa(String.valueOf(bNew)) + " چک برگشتی تازه");
             boolean stockOn = true;
-            try { stockOn = new Settings(c).stockOn(); } catch (Exception ignored) { }
+            try { stockOn = new Settings(c).stockOn(); } catch (Exception ignored) { Diag.ignored("Notify:531", ignored); }
             if (stockOn && v.length >= 12 && v[10] + v[11] > 0)
                 parts.add(Money.fa(String.valueOf(v[10] + v[11])) + " کالا کم‌موجود/ناموجود");
             StringBuilder b = new StringBuilder();
@@ -549,11 +550,11 @@ public final class Notify {
                     .setSmallIcon(R.mipmap.ic_launcher)
                     .setContentIntent(pi)
                     .setAutoCancel(true)
-                    .setColor(0xFFD9AE5A)
+                    .setColor(Theme.GOLD)
                     .build();
             NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
             if (nm != null) nm.notify(NOTIF_ID, n);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Notify:556", ignored); }
     }
 
     /** Weekly backup reminder (no database access needed). */
@@ -572,11 +573,11 @@ public final class Notify {
                     .setSmallIcon(R.mipmap.ic_launcher)
                     .setContentIntent(pi)
                     .setAutoCancel(true)
-                    .setColor(0xFF3ED6C5)
+                    .setColor(Theme.SUCCESS)
                     .build();
             NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
             if (nm != null) nm.notify(BACKUP_NOTIF_ID, n);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Notify:579", ignored); }
     }
 }
 
@@ -649,6 +650,6 @@ final class NotifyReceiver extends BroadcastReceiver {
     private void finishPr(PendingResult pr) {
         try {
             pr.finish();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Notify:652", ignored); }
     }
 }

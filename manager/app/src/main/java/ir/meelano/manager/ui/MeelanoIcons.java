@@ -1,5 +1,6 @@
 package ir.meelano.manager.ui;
 
+import ir.meelano.manager.core.Diag;
 import ir.meelano.manager.R;
 
 import android.content.Context;
@@ -234,7 +235,7 @@ public final class MeelanoIcons {
         }
         try {
             iconize(tv);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MeelanoIcons:237", ignored); }
     }
 
     /** Applies {@link #iconize} to one TextView (EditTexts are left alone so typing is never disturbed). */
@@ -246,7 +247,7 @@ public final class MeelanoIcons {
         if (seen == t) return;
         if (t instanceof Spanned && ((Spanned) t).getSpans(0, t.length(), IconSpan.class).length > 0) { tv.setTag(R.id.meelano_icon_scan, t); return; }
         if (hasGlyph(t)) {
-            try { tv.setText(iconize(tv.getContext(), t)); } catch (Exception ignored) { }
+            try { tv.setText(iconize(tv.getContext(), t)); } catch (Exception ignored) { Diag.ignored("MeelanoIcons:249", ignored); }
         }
         tv.setTag(R.id.meelano_icon_scan, tv.getText());
     }
@@ -268,7 +269,7 @@ public final class MeelanoIcons {
 
         IconSpan(Context ctx, int res) {
             Drawable d = null;
-            try { d = ctx.getResources().getDrawable(res, ctx.getTheme()).mutate(); } catch (Exception ignored) { }
+            try { d = ctx.getResources().getDrawable(res, ctx.getTheme()).mutate(); } catch (Exception ignored) { Diag.ignored("MeelanoIcons:271", ignored); }
             icon = d;
         }
 

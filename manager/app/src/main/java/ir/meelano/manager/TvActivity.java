@@ -1,5 +1,6 @@
 package ir.meelano.manager;
 
+import ir.meelano.manager.core.Diag;
 import android.app.Activity;
 import android.os.Bundle;
 import android.os.Handler;
@@ -74,7 +75,7 @@ public class TvActivity extends Activity {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
             getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN
                     | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("TvActivity:77", ignored); }
         settings = new Settings(this);
         kit = new Kit(this);
         repo = new Repo(this, settings);
@@ -142,10 +143,10 @@ public class TvActivity extends Activity {
         alive = false;
         try {
             handler.removeCallbacksAndMessages(null);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("TvActivity:145", ignored); }
         try {
             repo.close();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("TvActivity:148", ignored); }
         super.onDestroy();
     }
 
@@ -161,7 +162,7 @@ public class TvActivity extends Activity {
             String hm = String.format(java.util.Locale.US, "%02d:%02d",
                     c.get(java.util.Calendar.HOUR_OF_DAY), c.get(java.util.Calendar.MINUTE));
             clock.setText(Money.fa(hm) + " • " + kit.todayLine());
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("TvActivity:164", ignored); }
         handler.postDelayed(() -> tickClock(), 20000);
     }
 
@@ -171,42 +172,42 @@ public class TvActivity extends Activity {
             TvData d = new TvData();
             try {
                 d.salesDay = Repo.one(c, Queries.homeSalesDay(m));
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("TvActivity:174", ignored); }
             try {
                 d.inDay = Repo.one(c, MoneyQueries.darDay(m, 0));
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("TvActivity:177", ignored); }
             try {
                 String to = Jalali.todayStr();
                 d.daily = Repo.exec(c, Queries.factorDaily(m, true, Jalali.addDays(to, -13), to));
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("TvActivity:181", ignored); }
             try {
                 Filter f = new Filter();
                 f.preset = Filter.P_LAST30;
                 f.applyPreset();
                 d.top = Repo.exec(c, Queries.factorTopProducts(m, true, f, 8));
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("TvActivity:187", ignored); }
             try {
                 d.debtors = Repo.exec(c, Queries.topDebtors(m, 5));
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("TvActivity:190", ignored); }
             try {
                 d.dueIn = Repo.exec(c, MoneyQueries.chequeDue(m, true, 1));
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("TvActivity:193", ignored); }
             try {
                 d.dueOut = Repo.exec(c, MoneyQueries.chequeDue(m, false, 1));
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("TvActivity:196", ignored); }
             try {
                 d.bounced = Repo.one(c, MoneyQueries.bouncedTotal(m));
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("TvActivity:199", ignored); }
             try {
                 d.prodSum = Repo.one(c, MasterQueries.productsSummary(m));
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("TvActivity:202", ignored); }
             try {
                 String today = Jalali.todayStr();
                 d.whToday = Repo.exec(c, MasterQueries.whDeliveries(m, today));
                 Set<String> shared = HandoverDb.markedSet(c, today);
                 if (shared != null) d.handed.addAll(shared);
                 d.handed.addAll(WarehouseWriter.handedOn(TvActivity.this, today));
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("TvActivity:209", ignored); }
             return d;
         }, new Repo.Cb<TvData>() {
             @Override
@@ -409,7 +410,7 @@ public class TvActivity extends Activity {
             boolean ever = false;
             try {
                 ever = WarehouseWriter.handlog(this).length() > 0;
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("TvActivity:412", ignored); }
             if (!ever) {
                 c.addView(kit.gap(6));
                 TextView note = kit.text("تیک‌ها فقط تحویل‌های ثبت‌شده روی همین دستگاه را نشان می‌دهند",

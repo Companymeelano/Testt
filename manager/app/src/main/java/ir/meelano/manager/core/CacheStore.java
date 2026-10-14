@@ -25,7 +25,7 @@ public final class CacheStore {
         File d = new File(c.getCacheDir(), "mcache");
         try {
             if (!d.exists()) d.mkdirs();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("CacheStore:28", ignored); }
         return d;
     }
 
@@ -68,7 +68,7 @@ public final class CacheStore {
                 }
             }
             write(new File(dir(c), fn(prefix + "_index")), idx.toString());
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("CacheStore:71", ignored); }
     }
 
     /** Load a screen state saved with {@link #saveData} (null when nothing cached). */
@@ -169,9 +169,9 @@ public final class CacheStore {
             } finally {
                 try {
                     out.close();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("CacheStore:172", ignored); }
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("CacheStore:174", ignored); }
     }
 
     private static String read(File f) {
@@ -187,7 +187,7 @@ public final class CacheStore {
             } finally {
                 try {
                     in.close();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("CacheStore:190", ignored); }
             }
         } catch (Exception e) {
             return null;

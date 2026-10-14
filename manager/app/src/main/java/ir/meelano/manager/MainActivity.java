@@ -1,5 +1,6 @@
 package ir.meelano.manager;
 
+import ir.meelano.manager.core.Diag;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
@@ -186,7 +187,7 @@ public class MainActivity extends Activity {
             Intent i = new Intent(this, LicenseActivity.class);
             i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
             startActivity(i);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:189", ignored); }
         finish();
     }
 
@@ -195,7 +196,7 @@ public class MainActivity extends Activity {
             Intent i = new Intent(this, LoginActivity.class);
             i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
             startActivity(i);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:198", ignored); }
         finish();
     }
 
@@ -203,7 +204,7 @@ public class MainActivity extends Activity {
     public void logout() {
         try {
             AtiranAuth.clearSession(this);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:206", ignored); }
         toLogin();
     }
 
@@ -224,7 +225,7 @@ public class MainActivity extends Activity {
         try {
             String sr = AtiranAuth.sessionRole(this);
             if (RoleStore.WAREHOUSE.equals(sr)) splashSub = "نسخه انباردار • آتیران";
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:227", ignored); }
         TextView s = kit.text(splashSub, 12.5f, Theme.MUTED, false);
         s.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams sp = kit.lp(-1, -2);
@@ -300,7 +301,7 @@ public class MainActivity extends Activity {
             else
                 vis &= ~(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
             getWindow().getDecorView().setSystemUiVisibility(vis);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:303", ignored); }
     }
 
     /** Re-apply the luxury theme and rebuild the shell on the current screen. */
@@ -318,12 +319,12 @@ public class MainActivity extends Activity {
                         (android.net.ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
                 if (cm != null && linkCb != null) cm.unregisterNetworkCallback(linkCb);
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:321", ignored); }
         linkCbReg = false;
         try {
             if (linkPending != null) linkHandler.removeCallbacks(linkPending);
-        } catch (Exception ignored) { }
-        try { repo.close(); } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:325", ignored); }
+        try { repo.close(); } catch (Exception ignored) { Diag.ignored("MainActivity:326", ignored); }
         super.onDestroy();
     }
 
@@ -345,7 +346,7 @@ public class MainActivity extends Activity {
             };
             cm.registerDefaultNetworkCallback(linkCb);
             linkCbReg = true;
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:348", ignored); }
     }
 
     private void linkChanged() {
@@ -354,10 +355,10 @@ public class MainActivity extends Activity {
             linkPending = () -> {
                 try {
                     if (!isFinishing()) checkConn();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("MainActivity:357", ignored); }
             };
             linkHandler.postDelayed(linkPending, 1500);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:360", ignored); }
     }
 
     // ================= PIN gate =================
@@ -505,7 +506,7 @@ public class MainActivity extends Activity {
                     o.setOval(0, 0, v.getWidth(), v.getHeight());
                 }
             });
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:508", ignored); }
         int lpad = Theme.dp(2);
         logoImg.setPadding(lpad, lpad, lpad, lpad);
         logoImg.setVisibility(View.GONE);
@@ -525,14 +526,14 @@ public class MainActivity extends Activity {
         linkIcon = new android.widget.ImageView(this);
         try {
             linkIcon.setImageResource(R.drawable.link_probe);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:528", ignored); }
         linkIcon.setContentDescription("وضعیت اتصال — لمس برای جزئیات");
         linkIcon.setPadding(Theme.dp(1), Theme.dp(1), Theme.dp(1), Theme.dp(1));
         Theme.pressable(linkIcon);
         linkIcon.setOnClickListener(v -> {
             try {
                 LinkPanel.showStatus(this, settings, () -> checkConn());
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("MainActivity:535", ignored); }
         });
         status.addView(linkIcon, new LinearLayout.LayoutParams(Theme.dp(20), Theme.dp(20)));
         status.addView(kit.space(6));
@@ -581,7 +582,7 @@ public class MainActivity extends Activity {
             try {
                 zoom.setImageResource(R.drawable.mi_zoom);
                 zoom.setColorFilter(Theme.GOLD_SOFT);
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("MainActivity:584", ignored); }
             tools.addView(toolCell(zoom, "بزرگ‌نمایی", "بزرگ‌نمایی متن", () -> cycleZoom()), toolLp());
         }
 
@@ -592,7 +593,7 @@ public class MainActivity extends Activity {
         try {
             account.setImageResource(R.drawable.mi_person);
             account.setColorFilter(Theme.GOLD_SOFT);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:595", ignored); }
         compactUserAction = account;
         tools.addView(toolCell(account, "حساب", "حساب کاربری؛ خروج یا تغییر کاربر", () -> userMenu()), toolLp());
 
@@ -664,7 +665,7 @@ public class MainActivity extends Activity {
         try {
             android.content.Intent gi = getIntent();
             if (gi != null) want = gi.getStringExtra(EXTRA_SCREEN);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:667", ignored); }
         if (want != null && !want.isEmpty() && screens.containsKey(want)) nav(want);
         styleBars();
         checkConn();
@@ -674,13 +675,13 @@ public class MainActivity extends Activity {
                 ir.meelano.manager.core.LicenseStore.setTourPending(this, false);
                 ir.meelano.manager.ui.WhatsNew.showCurrent(this);
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:677", ignored); }
         Notify.boot(this);
         syncBackFab();
         // v24: What's New on upgrade (once), then the silent licensed update check.
         try {
             WhatsNew.maybeShow(this, () -> UpdateCenter.autoCheck(this));
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:683", ignored); }
         watchLink();
     }
 
@@ -691,7 +692,7 @@ public class MainActivity extends Activity {
         try {
             iv.setImageResource(res);
             iv.setColorFilter(Theme.GOLD_SOFT);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:694", ignored); }
         return iv;
     }
 
@@ -742,7 +743,7 @@ public class MainActivity extends Activity {
         try {
             String r = AtiranAuth.sessionRole(this);
             if (r != null && !r.isEmpty()) return r;
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:745", ignored); }
         return RoleStore.current(this);
     }
 
@@ -951,7 +952,7 @@ public class MainActivity extends Activity {
             content.setTranslationX((forward ? -1 : 1) * Theme.dp(48));
             content.setAlpha(0.35f);
             content.animate().translationX(0f).alpha(1f).setDuration(220).start();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:954", ignored); }
     }
 
     /** Paint the company header from cache, then refresh from Atiran in background. */
@@ -966,7 +967,7 @@ public class MainActivity extends Activity {
                 paintCompany();
                 if (after != null) after.run();
             });
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:969", ignored); }
     }
 
     private String companyTitle() {
@@ -994,7 +995,7 @@ public class MainActivity extends Activity {
                     logoGlyph.setVisibility(View.VISIBLE);
                 }
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:997", ignored); }
     }
 
     /**
@@ -1009,7 +1010,7 @@ public class MainActivity extends Activity {
             if (s == null) return;
             if (shown) s.onShown();
             else s.onHidden();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:1012", ignored); }
     }
 
     private void renderCurrent() {
@@ -1076,8 +1077,7 @@ public class MainActivity extends Activity {
         try {
             if (backFab != null && backFab.getParent() instanceof android.view.ViewGroup)
                 ((android.view.ViewGroup) backFab.getParent()).removeView(backFab);
-        } catch (Exception ignored) {
-        }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:1079", ignored); }
         backFab = null;
         int ink = Theme.onAccent(Theme.GOLD);
         LinearLayout pill = new LinearLayout(this);
@@ -1142,7 +1142,7 @@ public class MainActivity extends Activity {
         if (requestCode == UpdateCenter.REQ_UNKNOWN) {
             try {
                 UpdateCenter.onUnknownSourcesReturn(this);
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("MainActivity:1145", ignored); }
             return;
         }
         if (requestCode == VOICE_REQ && resultCode == Activity.RESULT_OK && data != null && voiceCb != null) {
@@ -1179,7 +1179,7 @@ public class MainActivity extends Activity {
                     while ((n = in.read(buf)) > 0) b.append(new String(buf, 0, n, "UTF-8"));
                     try {
                         in.close();
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("MainActivity:1182", ignored); }
                     docCb.accept(b.toString());
                 } else kit.toast("فایلی انتخاب نشد");
             } catch (Exception e) {
@@ -1215,7 +1215,7 @@ public class MainActivity extends Activity {
             try {
                 Screen s = screens.get(currentId);
                 if (s != null) s.onSmsPermission(granted);
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("MainActivity:1218", ignored); }
         } else if (requestCode == FisPrint.BT_REQ) {
             FisPrint.onPermissionResult(this, granted);
         }
@@ -1337,14 +1337,14 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             try {
                 licChip.setVisibility(View.GONE);
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("MainActivity:1340", ignored); }
         }
     }
 
     private void openLicense() {
         try {
             startActivity(new Intent(this, LicenseActivity.class));
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:1347", ignored); }
     }
 
     /** Open the license connection flow directly in edit mode, preserving the current session. */
@@ -1396,7 +1396,7 @@ public class MainActivity extends Activity {
                 compactUserAction.setContentDescription(hasSession
                         ? "حساب کاربری؛ خروج یا تغییر کاربر" : "ورود به حساب کاربری");
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:1399", ignored); }
     }
 
     /** Who am I + logout (+ PIN-management shortcut for the manager). */
@@ -1419,18 +1419,18 @@ public class MainActivity extends Activity {
                 body.addView(kit.btnGhost("تعیین رمز کاربران", Theme.GOLD, v -> {
                     try {
                         box[0].dismiss();
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("MainActivity:1422", ignored); }
                     nav("users");
                 }), kit.lp(-1, -2));
             body.addView(kit.btnGhost("↪ خروج از حساب / تغییر کاربر", Theme.DANGER, v -> {
                 try {
                     box[0].dismiss();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("MainActivity:1428", ignored); }
                 logout();
             }), kit.lp(-1, -2));
             box[0] = kit.dialog("حساب کاربری", body, true);
             box[0].show();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:1433", ignored); }
     }
 
     public void checkConn() {
@@ -1441,7 +1441,7 @@ public class MainActivity extends Activity {
                 String last = "";
                 try {
                     last = settings.linkLast();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("MainActivity:1444", ignored); }
                 setLinkIcon(last.isEmpty() ? SmartLink.LAN : last);
             }
 
@@ -1478,14 +1478,14 @@ public class MainActivity extends Activity {
                 linkIcon.setImageResource(R.drawable.link_off);
                 linkIcon.setContentDescription("قطع — لمس برای عیب‌یابی");
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:1481", ignored); }
     }
 
     public void testConnection(final Repo.Cb<String> cb) {
         boolean vpn = false;
         try {
             vpn = NetRoute.isVpnActive(this);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:1488", ignored); }
         SmartLink.diagnose(this, settings, vpn, r -> {
             try {
                 if (r.anyOk) {
@@ -1494,7 +1494,7 @@ public class MainActivity extends Activity {
                 } else {
                     cb.fail(r.verdict);
                 }
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("MainActivity:1497", ignored); }
         });
     }
 

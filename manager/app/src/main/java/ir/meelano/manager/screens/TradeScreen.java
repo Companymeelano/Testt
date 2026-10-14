@@ -1,5 +1,6 @@
 package ir.meelano.manager.screens;
 
+import ir.meelano.manager.core.Diag;
 import android.app.AlertDialog;
 import android.view.View;
 import android.widget.LinearLayout;
@@ -442,7 +443,7 @@ public class TradeScreen extends Screen {
             List<Row> dars = new ArrayList<>();
             try {
                 dars = Repo.exec(c, MoneyQueries.invoiceDars(m, sales ? 0 : 1, no));
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("TradeScreen:445", ignored); }
             return new Detail(head, lines, dars);
         }, new Repo.Cb<Detail>() {
             @Override

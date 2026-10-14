@@ -1,5 +1,6 @@
 package ir.meelano.manager.screens;
 
+import ir.meelano.manager.core.Diag;
 import android.app.AlertDialog;
 import android.view.View;
 import android.widget.LinearLayout;
@@ -216,7 +217,7 @@ public class TahvilScreen extends Screen {
         if (watchTick != null) {
             try {
                 watch.removeCallbacks(watchTick);
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("TahvilScreen:219", ignored); }
             watchTick = null;
         }
     }
@@ -504,7 +505,7 @@ if (!items.isEmpty()) {
         pdfBox.setTextColor(Theme.MUTED);
         pdfBox.setTextSize(12.5f * Theme.fontScale() * Theme.typeScale());
         pdfBox.setTypeface(Theme.face(false));
-        try { pdfBox.setLayoutDirection(View.LAYOUT_DIRECTION_RTL); } catch (Exception ignored) { }
+        try { pdfBox.setLayoutDirection(View.LAYOUT_DIRECTION_RTL); } catch (Exception ignored) { Diag.ignored("TahvilScreen:507", ignored); }
         body.addView(pdfBox, a.kit.lp(-1, -2));
         body.addView(a.kit.gap(6));
         body.addView(a.kit.btn("ثبت تحویل", v -> {
@@ -522,7 +523,7 @@ if (!items.isEmpty()) {
             }
             try {
                 box[0].dismiss();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("TahvilScreen:525", ignored); }
             String keeper = AtiranAuth.sessionName(a);
             if (keeper.isEmpty()) keeper = AtiranAuth.sessionUser(a);
             // Only the ticked items go on the receipt and into the handover record, so a
@@ -604,7 +605,7 @@ if (!items.isEmpty()) {
             out[0] = sign.bitmap();
             try {
                 box[0].dismiss();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("TahvilScreen:607", ignored); }
             done.run();
         }), a.kit.wlp(1f));
         b.addView(row, a.kit.lp(-1, -2));
@@ -621,7 +622,7 @@ if (!items.isEmpty()) {
             android.graphics.BitmapFactory.decodeStream(in, null, o);
             try {
                 in.close();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("TahvilScreen:624", ignored); }
             int s = 1;
             while (Math.max(o.outWidth, o.outHeight) / s > maxDim) s *= 2;
             android.graphics.BitmapFactory.Options o2 =
@@ -634,7 +635,7 @@ if (!items.isEmpty()) {
         } finally {
             try {
                 if (in != null) in.close();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("TahvilScreen:637", ignored); }
         }
     }
 
@@ -644,7 +645,7 @@ if (!items.isEmpty()) {
             java.io.FileOutputStream fos = new java.io.FileOutputStream(f);
             bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 90, fos);
             fos.close();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("TahvilScreen:647", ignored); }
     }
 
     /**

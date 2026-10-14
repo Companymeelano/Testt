@@ -1,5 +1,6 @@
 package ir.meelano.manager.screens;
 
+import ir.meelano.manager.core.Diag;
 import android.app.AlertDialog;
 import android.view.View;
 import android.widget.LinearLayout;
@@ -356,25 +357,25 @@ public class CustomersScreen extends Screen {
             df.page = 0;
             try {
                 dz.header = Repo.one(c, MasterQueries.customerHeader(m, code));
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("CustomersScreen:359", ignored); }
             try {
                 dz.ledger = Repo.exec(c, MasterQueries.customerTurnover(m, code, df));
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("CustomersScreen:362", ignored); }
             try {
                 dz.invoices = Repo.exec(c, MasterQueries.partyInvoices(m, true, code, df));
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("CustomersScreen:365", ignored); }
             try {
                 dz.darsIn = Repo.exec(c, MasterQueries.customerDars(m, code, 0, df));
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("CustomersScreen:368", ignored); }
             try {
                 dz.darsOut = Repo.exec(c, MasterQueries.customerDars(m, code, 1, df));
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("CustomersScreen:371", ignored); }
             try {
                 dz.chqIn = Repo.exec(c, MasterQueries.customerCheques(m, code, true));
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("CustomersScreen:374", ignored); }
             try {
                 dz.chqOut = Repo.exec(c, MasterQueries.customerCheques(m, code, false));
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("CustomersScreen:377", ignored); }
             return dz;
         }, new Repo.Cb<Dossier>() {
             @Override
@@ -559,7 +560,7 @@ public class CustomersScreen extends Screen {
                 android.view.WindowManager.LayoutParams lp = dlg.getWindow().getAttributes();
                 lp.width = (int) (a.getResources().getDisplayMetrics().widthPixels * 0.94);
                 dlg.getWindow().setAttributes(lp);
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("CustomersScreen:562", ignored); }
         }
         LinearLayout footer = a.kit.h();
         if (!dz.ledger.isEmpty()) {
@@ -599,7 +600,7 @@ public class CustomersScreen extends Screen {
         final android.widget.EditText te = a.kit.edit("متن پیامک…", msg);
         try {
             te.setMinLines(3);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("CustomersScreen:602", ignored); }
         nb.addView(te, a.kit.lp(-1, -2));
         nb.addView(a.kit.gap(8));
         nb.addView(a.kit.kv("گیرنده", Money.fa(cell), Theme.TEXT), a.kit.lp(-1, -2));
@@ -716,7 +717,7 @@ public class CustomersScreen extends Screen {
             List<Row> dars = new ArrayList<>();
             try {
                 dars = Repo.exec(c, MoneyQueries.invoiceDars(m, 0, no));
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("CustomersScreen:719", ignored); }
             return new InvDetail(head, lines, dars);
         }, new Repo.Cb<InvDetail>() {
             @Override
@@ -826,15 +827,15 @@ public class CustomersScreen extends Screen {
             List<Row> pos = new ArrayList<>();
             try {
                 pos = Repo.exec(c, MoneyQueries.darPos(m, p, ghno));
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("CustomersScreen:829", ignored); }
             List<Row> chqs = new ArrayList<>();
             try {
                 chqs = Repo.exec(c, MoneyQueries.darCheques(m, p, ghno));
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("CustomersScreen:833", ignored); }
             List<Row> invs = new ArrayList<>();
             try {
                 invs = Repo.exec(c, MoneyQueries.darSettled(m, p, ghno));
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("CustomersScreen:837", ignored); }
             return new DarDetail(head, pos, chqs, invs);
         }, new Repo.Cb<DarDetail>() {
             @Override

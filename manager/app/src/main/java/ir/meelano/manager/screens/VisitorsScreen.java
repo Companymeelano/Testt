@@ -1,5 +1,6 @@
 package ir.meelano.manager.screens;
 
+import ir.meelano.manager.core.Diag;
 import android.app.AlertDialog;
 import android.view.View;
 import android.widget.LinearLayout;
@@ -249,12 +250,12 @@ public class VisitorsScreen extends Screen {
             if (visId >= 0) {
                 try {
                     trend = Repo.exec(c, MasterQueries.visitorTrend(m, visId, f));
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("VisitorsScreen:252", ignored); }
                 try {
                     Filter cf = f.copy();
                     cf.top = 30;
                     custs = Repo.exec(c, MasterQueries.visitorCustomers(m, visId, cf));
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("VisitorsScreen:257", ignored); }
             }
             return new Detail(head, trend, custs);
         }, new Repo.Cb<Detail>() {

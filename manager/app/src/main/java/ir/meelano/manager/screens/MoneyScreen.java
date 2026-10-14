@@ -1,5 +1,6 @@
 package ir.meelano.manager.screens;
 
+import ir.meelano.manager.core.Diag;
 import android.app.AlertDialog;
 import android.view.View;
 import android.widget.LinearLayout;
@@ -326,15 +327,15 @@ public class MoneyScreen extends Screen {
             List<Row> pos = new ArrayList<>();
             try {
                 pos = Repo.exec(c, MoneyQueries.darPos(m, p, ghno));
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("MoneyScreen:329", ignored); }
             List<Row> chqs = new ArrayList<>();
             try {
                 chqs = Repo.exec(c, MoneyQueries.darCheques(m, p, ghno));
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("MoneyScreen:333", ignored); }
             List<Row> invs = new ArrayList<>();
             try {
                 invs = Repo.exec(c, MoneyQueries.darSettled(m, p, ghno));
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("MoneyScreen:337", ignored); }
             return new Detail(head, pos, chqs, invs);
         }, new Repo.Cb<Detail>() {
             @Override

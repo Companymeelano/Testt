@@ -1,5 +1,6 @@
 package ir.meelano.manager.screens;
 
+import ir.meelano.manager.core.Diag;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.FrameLayout;
@@ -182,7 +183,7 @@ public class HomeScreen extends Screen {
             }
             a.settings.saveHomeCache(s.toString());
             pokeWidget();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("HomeScreen:185", ignored); }
     }
 
     /** Ask the home-screen widget to re-read the fresh cache. */
@@ -199,7 +200,7 @@ public class HomeScreen extends Screen {
                 in.putExtra(android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_IDS, ids);
                 a.sendBroadcast(in);
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("HomeScreen:202", ignored); }
     }
 
     private Data loadCached(String[] tsOut) {
@@ -797,7 +798,7 @@ public class HomeScreen extends Screen {
         String when = "";
         try {
             when = dt == null || dt.isEmpty() ? "" : Jalali.dispFa(dt);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("HomeScreen:800", ignored); }
         c.addView(a.kit.sectionHead("🌙 جمع‌بندی پایان روز" + (when.isEmpty() ? "" : " • " + when),
                 null, null), a.kit.lp(-1, -2));
         c.addView(a.kit.text(txt, 13f, Theme.TEXT, false), a.kit.lp(-1, -2));

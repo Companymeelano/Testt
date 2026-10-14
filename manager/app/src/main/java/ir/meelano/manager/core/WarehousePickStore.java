@@ -42,7 +42,7 @@ public final class WarehousePickStore {
                 JSONObject o = arr.optJSONObject(i);
                 if (o != null) out.add(o);
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("WarehousePickStore:45", ignored); }
         return out;
     }
 }

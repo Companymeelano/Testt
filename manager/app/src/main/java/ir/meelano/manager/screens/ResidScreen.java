@@ -1,5 +1,6 @@
 package ir.meelano.manager.screens;
 
+import ir.meelano.manager.core.Diag;
 import android.app.AlertDialog;
 import android.view.View;
 import android.widget.EditText;
@@ -213,7 +214,7 @@ public class ResidScreen extends Screen {
         boolean direct = false;
         try {
             direct = a.settings.whDirect();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("ResidScreen:216", ignored); }
         card.addView(a.kit.btnGhost(direct ? "⬆ ثبت مستقیم در آتیران" : "⬆ ثبت مستقیم (خاموش است)",
                 direct ? Theme.SUCCESS : Theme.MUTED, v -> {
                     desc = eDesc.getText().toString();
@@ -268,7 +269,7 @@ public class ResidScreen extends Screen {
             double q = 0;
             try {
                 q = Double.parseDouble(Money.en(ln.optString(WarehouseWriter.L_QTY, "0")).trim());
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("ResidScreen:271", ignored); }
             if (q <= 0) return "تعداد قلم " + Money.fa(String.valueOf(i + 1)) + " معتبر نیست";
         }
         return null;
@@ -330,7 +331,7 @@ public class ResidScreen extends Screen {
         boolean direct = false;
         try {
             direct = a.settings.whDirect();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("ResidScreen:333", ignored); }
         if (!direct) {
             a.kit.toast("ثبت مستقیم خاموش است؛ پیش‌نویس ذخیره شد");
             saveCurrent();
@@ -403,7 +404,7 @@ public class ResidScreen extends Screen {
                 TextView tv = a.kit.text(sql == null ? "" : sql, 11f, Theme.TEXT, false);
                 try {
                     tv.setTextIsSelectable(true);
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("ResidScreen:406", ignored); }
                 a.kit.dialog("پیش‌نمایش SQL (اجرا نمی‌شود)", a.kit.scrollWrap(tv, 420), true).show();
             }
 
@@ -493,20 +494,20 @@ public class ResidScreen extends Screen {
             boolean direct = false;
             try {
                 direct = a.settings.whDirect();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("ResidScreen:496", ignored); }
             if (!direct) {
                 a.kit.toast("ثبت مستقیم از تنظیمات خاموش است");
                 return;
             }
             try {
                 box[0].dismiss();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("ResidScreen:503", ignored); }
             postDoc(d, false);
         }), a.kit.lp(-1, -2));
         body.addView(a.kit.btnGhost("✏ ویرایش پیش‌نویس", Theme.GOLD, v -> {
             try {
                 box[0].dismiss();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("ResidScreen:509", ignored); }
             loadDraft(d);
         }), a.kit.lp(-1, -2));
         body.addView(a.kit.btnGhost("📤 ارسال پیش‌نویس (فایل)", Theme.INFO, v -> shareDraft(d)),
@@ -515,7 +516,7 @@ public class ResidScreen extends Screen {
             WarehouseWriter.deleteDraft(a, d.optInt(WarehouseWriter.D_NO, 0));
             try {
                 box[0].dismiss();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("ResidScreen:518", ignored); }
             if (content != null) render(content);
         }), a.kit.lp(-1, -2));
         ScrollView sv = new ScrollView(a);
@@ -558,13 +559,13 @@ public class ResidScreen extends Screen {
         b.addView(a.kit.btn("✏ ویرایش تعداد", v -> {
             try {
                 box[0].dismiss();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("ResidScreen:561", ignored); }
             editQtyDialog(idx);
         }), a.kit.lp(-1, -2));
         b.addView(a.kit.btnGhost("🏷 لیبل قفسه", Theme.GOLD, v -> {
             try {
                 box[0].dismiss();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("ResidScreen:567", ignored); }
             printLabel(idx);
         }), a.kit.lp(-1, -2));
         b.addView(a.kit.btnGhost("🗑 حذف قلم", Theme.DANGER, v -> {
@@ -575,7 +576,7 @@ public class ResidScreen extends Screen {
             lines = keep;
             try {
                 box[0].dismiss();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("ResidScreen:578", ignored); }
             if (content != null) render(content);
         }), a.kit.lp(-1, -2));
         box[0] = a.kit.dialog("قلم سند", b, true);
@@ -595,7 +596,7 @@ public class ResidScreen extends Screen {
             double q = 0;
             try {
                 q = Double.parseDouble(Money.en(e.getText().toString()).trim());
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("ResidScreen:598", ignored); }
             if (q <= 0) {
                 a.kit.toast("تعداد معتبر وارد کنید");
                 return;
@@ -604,7 +605,7 @@ public class ResidScreen extends Screen {
                 lines.optJSONObject(idx).put(WarehouseWriter.L_QTY, String.valueOf(q));
                 try {
                     box[0].dismiss();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("ResidScreen:607", ignored); }
                 if (content != null) render(content);
             } catch (Exception ex) {
                 a.kit.toast("ذخیره ممکن نشد");
@@ -701,7 +702,7 @@ public class ResidScreen extends Screen {
                             partyNew = null;
                             try {
                                 box[0].dismiss();
-                            } catch (Exception ignored) { }
+                            } catch (Exception ignored) { Diag.ignored("ResidScreen:704", ignored); }
                             if (content != null) render(content);
                         }), a.kit.lp(-1, -2));
                     }
@@ -763,7 +764,7 @@ public class ResidScreen extends Screen {
                 partyName = nm;
                 try {
                     box[0].dismiss();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("ResidScreen:766", ignored); }
                 if (content != null) render(content);
             } catch (Exception ex) {
                 a.kit.toast("ثبت ممکن نشد");
@@ -817,7 +818,7 @@ public class ResidScreen extends Screen {
                         name[0] = row.s("name");
                         try {
                             box[0].dismiss();
-                        } catch (Exception ignored) { }
+                        } catch (Exception ignored) { Diag.ignored("ResidScreen:820", ignored); }
                         done.run();
                     }), a.kit.lp(-1, -2));
                 }
@@ -856,7 +857,7 @@ public class ResidScreen extends Screen {
                         anbarName = row.s("name");
                         try {
                             box[0].dismiss();
-                        } catch (Exception ignored) { }
+                        } catch (Exception ignored) { Diag.ignored("ResidScreen:859", ignored); }
                         if (content != null) render(content);
                     }), a.kit.lp(-1, -2));
                 }
@@ -914,7 +915,7 @@ public class ResidScreen extends Screen {
                         results.addView(a.kit.btnGhost(label, Theme.GOLD, v -> {
                             try {
                                 box[0].dismiss();
-                            } catch (Exception ignored) { }
+                            } catch (Exception ignored) { Diag.ignored("ResidScreen:917", ignored); }
                             qtyDialog(row.s("code"), row.s("name"), row.s("unit"));
                         }), a.kit.lp(-1, -2));
                     }
@@ -945,7 +946,7 @@ public class ResidScreen extends Screen {
             double q = 0;
             try {
                 q = Double.parseDouble(Money.en(e.getText().toString()).trim());
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("ResidScreen:948", ignored); }
             if (q <= 0) {
                 a.kit.toast("تعداد معتبر وارد کنید");
                 return;
@@ -959,7 +960,7 @@ public class ResidScreen extends Screen {
                 lines.put(ln);
                 try {
                     box[0].dismiss();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("ResidScreen:962", ignored); }
                 if (content != null) render(content);
             } catch (Exception ex) {
                 a.kit.toast("افزودن ممکن نشد");
@@ -1003,7 +1004,7 @@ public class ResidScreen extends Screen {
             double q = 0;
             try {
                 q = Double.parseDouble(Money.en(eQty.getText().toString()).trim());
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("ResidScreen:1006", ignored); }
             if (q <= 0) {
                 a.kit.toast("تعداد معتبر وارد کنید");
                 return;
@@ -1022,7 +1023,7 @@ public class ResidScreen extends Screen {
                 lines.put(ln);
                 try {
                     box[0].dismiss();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("ResidScreen:1025", ignored); }
                 if (content != null) render(content);
             } catch (Exception ex) {
                 a.kit.toast("افزودن ممکن نشد");
@@ -1052,7 +1053,7 @@ public class ResidScreen extends Screen {
                         unit[0] = row.s("name");
                         try {
                             box[0].dismiss();
-                        } catch (Exception ignored) { }
+                        } catch (Exception ignored) { Diag.ignored("ResidScreen:1055", ignored); }
                         done.run();
                     }), a.kit.lp(-1, -2));
                 }

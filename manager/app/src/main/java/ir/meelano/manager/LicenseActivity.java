@@ -1,5 +1,6 @@
 package ir.meelano.manager;
 
+import ir.meelano.manager.core.Diag;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.BroadcastReceiver;
@@ -122,7 +123,7 @@ public class LicenseActivity extends Activity {
                     float sc = logoBig ? 1.07f : 1.0f;
                     waitLogo.animate().scaleX(sc).scaleY(sc).setDuration(650).start();
                 }
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("LicenseActivity:125", ignored); }
             try {
                 tickCount++;
                 if (waitTimer != null && waitStartMs > 0) {
@@ -133,7 +134,7 @@ public class LicenseActivity extends Activity {
                 if (motion && waitCreative != null && tickCount % 7 == 0 && tickCount > 0) {
                     waitCreative.setText(WAIT_LINES[(tickCount / 7) % WAIT_LINES.length]);
                 }
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("LicenseActivity:136", ignored); }
             uiHandler.postDelayed(dotsTick, 700);
         }
     };
@@ -149,7 +150,7 @@ public class LicenseActivity extends Activity {
         try {
             getWindow().setStatusBarColor(Theme.BG);
             getWindow().setNavigationBarColor(Theme.BG);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:152", ignored); }
         kit = new Kit(this);
         settings = new Settings(this);
         editingConnection = getIntent() != null
@@ -171,7 +172,7 @@ public class LicenseActivity extends Activity {
         try {
             if (connectionIp != null) outState.putString("manager_connection_ip",
                     connectionIp.getText().toString());
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:174", ignored); }
         super.onSaveInstanceState(outState);
     }
 
@@ -190,7 +191,7 @@ public class LicenseActivity extends Activity {
             IntentFilter ff = new IntentFilter(SmsReceiver.ACTION_INTERNAL);
             if (Build.VERSION.SDK_INT >= 33) registerReceiver(smsPing, ff, Context.RECEIVER_NOT_EXPORTED);
             else registerReceiver(smsPing, ff);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:193", ignored); }
         // A reply SMS may have landed while we were away — apply it instantly.
         consumeSms();
         try {
@@ -198,17 +199,17 @@ public class LicenseActivity extends Activity {
                 uiHandler.removeCallbacks(dotsTick);
                 uiHandler.post(dotsTick);
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:201", ignored); }
     }
 
     @Override
     protected void onPause() {
         try {
             uiHandler.removeCallbacks(dotsTick);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:208", ignored); }
         try {
             unregisterReceiver(smsPing);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:211", ignored); }
         super.onPause();
     }
 
@@ -217,7 +218,7 @@ public class LicenseActivity extends Activity {
         stopDots();
         try {
             if (repo != null) repo.close();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:220", ignored); }
         super.onDestroy();
     }
 
@@ -242,7 +243,7 @@ public class LicenseActivity extends Activity {
                 updateRecvHint();
                 buildUi();
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:245", ignored); }
     }
 
     // ---------- UI ----------
@@ -250,7 +251,7 @@ public class LicenseActivity extends Activity {
     private void buildUi() {
         try {
             if (connectionIp != null) restoredConnectionIp = connectionIp.getText().toString();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:253", ignored); }
         connectionIp = null;
         LinearLayout box = kit.v();
         int pad = Theme.dp(16);
@@ -295,13 +296,13 @@ public class LicenseActivity extends Activity {
                 sv.setTranslationY(Theme.dp(26));
                 sv.animate().alpha(1f).translationY(0).setDuration(380).start();
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:298", ignored); }
     }
 
     private void stopDots() {
         try {
             uiHandler.removeCallbacks(dotsTick);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:304", ignored); }
         dotsView = null;
         waitLogo = null;
         waitTimer = null;
@@ -340,7 +341,7 @@ public class LicenseActivity extends Activity {
                 lb.setSingleLine(true);
                 cell.setContentDescription("مرحله " + idx + " از ۳: " + labels[idx - 1]
                         + (done ? "، انجام شد" : (on ? "، مرحله کنونی" : "، مانده")));
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("LicenseActivity:343", ignored); }
             cell.addView(lb, kit.lp(-2, -2));
             row.addView(cell, kit.lp(-2, -2));
             if (Ui.motionOk(this)) {
@@ -401,7 +402,7 @@ public class LicenseActivity extends Activity {
         try {
             fName.setInputType(android.text.InputType.TYPE_CLASS_TEXT
                     | android.text.InputType.TYPE_TEXT_VARIATION_PERSON_NAME);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:404", ignored); }
         fName.addTextChangedListener(new android.text.TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence x, int a, int b, int cc) { }
@@ -415,7 +416,7 @@ public class LicenseActivity extends Activity {
                         errName.setText("");
                         fName.setBackground(Theme.fieldBg());
                     }
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("LicenseActivity:418", ignored); }
             }
         });
         c.addView(iconField(fName, R.drawable.mi_person), kit.lp(-1, -2));
@@ -424,7 +425,7 @@ public class LicenseActivity extends Activity {
         try {
             fPhone.setInputType(android.text.InputType.TYPE_CLASS_PHONE);
             fPhone.setTextDirection(View.TEXT_DIRECTION_LOCALE);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:427", ignored); }
         final TextView tick = kit.text("✓", 18, Theme.SUCCESS, true);
         try {
             tick.setVisibility(SmsIo.cleanPhone(LicenseStore.contactPhone(this)).length() == 11
@@ -447,7 +448,7 @@ public class LicenseActivity extends Activity {
                         errPhone.setText("");
                         fPhone.setBackground(Theme.fieldBg());
                     }
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("LicenseActivity:450", ignored); }
             }
         });
         LinearLayout prow = iconField(fPhone, R.drawable.mi_call);
@@ -461,7 +462,7 @@ public class LicenseActivity extends Activity {
             startBtn.setBackground(Theme.startButton());
             startBtn.setTextSize(15f);
             startBtn.setMinHeight(Theme.dp(52));
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:464", ignored); }
         glowBtn = startBtn;
         startBtn.setOnClickListener(v -> requestStart(txt(fName), txt(fPhone),
                 fName, fPhone, errName, errPhone, startBtn));
@@ -485,7 +486,7 @@ public class LicenseActivity extends Activity {
         TextView e = kit.text("", 11.5f, Theme.DANGER, false);
         try {
             e.setMinHeight(Theme.dp(20));
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:488", ignored); }
         return e;
     }
 
@@ -508,7 +509,7 @@ public class LicenseActivity extends Activity {
             }
             copyBtn.setMinHeight(Theme.dp(48));
             copyBtn.setContentDescription("کپی کد دستگاه");
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:511", ignored); }
         copyBtn.setOnClickListener(v -> {
             if (copyText("کد دستگاه میلانو", device)) {
                 kit.toast("کد دستگاه کپی شد");
@@ -529,11 +530,11 @@ public class LicenseActivity extends Activity {
             dev.setTextDirection(View.TEXT_DIRECTION_LTR);
             dev.setAutoSizeTextTypeUniformWithConfiguration(14, codeSp, 1,
                     android.util.TypedValue.COMPLEX_UNIT_SP);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:532", ignored); }
         dev.setGravity(Gravity.CENTER);
         try {
             dev.setContentDescription("کد دستگاه " + device);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:536", ignored); }
         card.addView(dev, kit.lp(-1, -2));
         return card;
     }
@@ -548,7 +549,7 @@ public class LicenseActivity extends Activity {
             errPhone.setText(badPhone ? "شماره تماس معتبر وارد کنید (مثلاً 09123456789)" : "");
             fName.setBackground(badName ? Theme.fieldBgError() : Theme.fieldBg());
             fPhone.setBackground(badPhone ? Theme.fieldBgError() : Theme.fieldBg());
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:551", ignored); }
         if (badName || badPhone) {
             try {
                 if (badName) {
@@ -558,14 +559,14 @@ public class LicenseActivity extends Activity {
                     fPhone.requestFocus();
                     Ui.announce(errPhone, "شماره تماس معتبر وارد کنید");
                 }
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("LicenseActivity:561", ignored); }
             return;
         }
         sending = true;
         try {
             btn.setEnabled(false);
             btn.setText("در حال ارسال…");
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:568", ignored); }
         LicenseStore.setDistName(this, dist);
         LicenseStore.setContactPhone(this, phone);
         LicenseStore.setRequested(this, true);
@@ -650,7 +651,7 @@ public class LicenseActivity extends Activity {
                 ring.setIndeterminateTintList(android.content.res.ColorStateList
                         .valueOf(Theme.GOLD));
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:653", ignored); }
         android.widget.FrameLayout.LayoutParams rlp =
                 new android.widget.FrameLayout.LayoutParams(Theme.dp(124), Theme.dp(124));
         rlp.gravity = Gravity.CENTER;
@@ -719,7 +720,7 @@ public class LicenseActivity extends Activity {
         if (!Ui.motionOk(this)) {
             try {
                 after.run();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("LicenseActivity:722", ignored); }
             return;
         }
         try {
@@ -742,15 +743,15 @@ public class LicenseActivity extends Activity {
                 try {
                     android.view.ViewGroup pa = (android.view.ViewGroup) root.getParent();
                     if (pa != null) pa.removeView(root);
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("LicenseActivity:745", ignored); }
                 try {
                     after.run();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("LicenseActivity:748", ignored); }
             }, 2100);
         } catch (Exception e) {
             try {
                 after.run();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("LicenseActivity:753", ignored); }
         }
     }
 
@@ -763,7 +764,7 @@ public class LicenseActivity extends Activity {
                 v.vibrate(android.os.VibrationEffect.createOneShot(80,
                         android.os.VibrationEffect.DEFAULT_AMPLITUDE));
             else v.vibrate(80);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:766", ignored); }
     }
 
     private void recallFlow(final android.widget.Button btn) {
@@ -774,7 +775,7 @@ public class LicenseActivity extends Activity {
         try {
             btn.setEnabled(false);
             btn.setText("در حال فعال‌سازی…");
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:777", ignored); }
         uiHandler.postDelayed(() -> {
             try {
                 consumeSms();
@@ -789,11 +790,11 @@ public class LicenseActivity extends Activity {
                     return;
                 }
                 kit.toast("هنوز کلیدی نرسیده؛ کمی صبر کنید ✦");
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("LicenseActivity:792", ignored); }
             try {
                 btn.setEnabled(true);
                 ir.meelano.manager.ui.MeelanoIcons.set(btn, "✦ دریافت کلید");
-            } catch (Exception ignored2) { }
+            } catch (Exception ignored2) { Diag.ignored("LicenseActivity:796", ignored2); }
         }, 1200);
     }
 
@@ -807,16 +808,16 @@ public class LicenseActivity extends Activity {
         try {
             licBefore = LicenseStore.check(this).ok;
             connBefore = connConfigured();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:810", ignored); }
         try {
             consumeSms();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:813", ignored); }
         updateRecvHint();
         boolean moved = false;
         try {
             moved = LicenseStore.check(this).ok != licBefore
                     || connConfigured() != connBefore;
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:819", ignored); }
         if (moved) {
             buildUi();
             return;
@@ -824,7 +825,7 @@ public class LicenseActivity extends Activity {
         try {
             kit.toast(Net.online(this) ? "✓ بررسی شد"
                     : "اینترنت قطع است — وصل شوید و دوباره بزنید");
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:827", ignored); }
     }
 
     /** Circular gold refresh icon for the card headers. */
@@ -837,7 +838,7 @@ public class LicenseActivity extends Activity {
         try {
             v.setMinWidth(Theme.dp(44));
             v.setMinHeight(Theme.dp(44));
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:840", ignored); }
         Theme.pressable(v);
         v.setOnClickListener(vv -> refreshFlow());
         return v;
@@ -906,7 +907,7 @@ public class LicenseActivity extends Activity {
             fIp.setSingleLine(true);
             fIp.setInputType(android.text.InputType.TYPE_CLASS_TEXT
                     | android.text.InputType.TYPE_TEXT_VARIATION_URI);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:909", ignored); }
         c.addView(iconField(fIp, R.drawable.mi_my_location), kit.lp(-1, -2));
         c.addView(kit.text("پس از اتصال مستقیم، دیتابیس‌های دارای ساختار آتیران برای انتخاب نمایش داده می‌شوند.",
                 11.5f, Theme.MUTED, false), kit.lp(-1, -2));
@@ -931,7 +932,7 @@ public class LicenseActivity extends Activity {
                 wbtn[0].setCompoundDrawablePadding(Theme.dp(6));
             }
             wbtn[0].setMinHeight(Theme.dp(48));
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:934", ignored); }
         c.addView(wbtn[0], kit.lp(-1, -2));
         if (editingConnection) {
             c.addView(kit.btnGhost("انصراف • بازگشت به برنامه", Theme.MUTED, v -> finish()),
@@ -949,7 +950,7 @@ public class LicenseActivity extends Activity {
                     connStage.setVisibility(View.VISIBLE);
                     connStage.setText(stage);
                 }
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("LicenseActivity:952", ignored); }
         });
     }
 
@@ -957,7 +958,7 @@ public class LicenseActivity extends Activity {
         runOnUiThread(() -> {
             try {
                 if (connStage != null) connStage.setText(t);
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("LicenseActivity:960", ignored); }
         });
     }
 
@@ -966,7 +967,7 @@ public class LicenseActivity extends Activity {
             try {
                 if (connRadar != null) connRadar.setVisibility(View.GONE);
                 if (connStage != null) connStage.setVisibility(View.GONE);
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("LicenseActivity:969", ignored); }
         });
     }
 
@@ -988,7 +989,7 @@ public class LicenseActivity extends Activity {
         try {
             btn.setEnabled(false);
             btn.setText("در حال دریافت دیتابیس‌ها…");
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:991", ignored); }
         showRadar("در حال اتصال مستقیم به سرور…");
         new Thread(() -> {
             List<String> databases = LanDiscover.listDatabases(fIp, LanDiscover.PORT,
@@ -1057,7 +1058,7 @@ public class LicenseActivity extends Activity {
                             compatible.add(pairs.get(i));
                             tableCounts.add(n);
                         }
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("LicenseActivity:1060", ignored); }
                 }
             } finally {
                 pool.shutdownNow();
@@ -1084,7 +1085,7 @@ public class LicenseActivity extends Activity {
         try {
             btn.setEnabled(true);
             ir.meelano.manager.ui.MeelanoIcons.set(btn, "✦ اتصال و نمایش دیتابیس‌ها");
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:1087", ignored); }
     }
 
     /** Wi-Fi connect (v33): find the server, list its databases, user picks one. */
@@ -1096,7 +1097,7 @@ public class LicenseActivity extends Activity {
         try {
             btn.setEnabled(false);
             btn.setText("در حال جستجو…");
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:1099", ignored); }
         showRadar("در حال یافتن سرور در وای‌فای…");
         new Thread(() -> {
             List<String> hosts = LanDiscover.find("", LanDiscover.PORT);
@@ -1132,7 +1133,7 @@ public class LicenseActivity extends Activity {
                                 pairs.add(new String[]{hosts.get(i), d});
                             }
                         }
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("LicenseActivity:1135", ignored); }
                 }
                 if (pairs.isEmpty()) {
                     runOnUiThread(() -> {
@@ -1167,7 +1168,7 @@ public class LicenseActivity extends Activity {
                             wins.add(pairs.get(i));
                             winN.add(r[0]);
                         }
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("LicenseActivity:1170", ignored); }
                 }
                 final List<String[]> fw = wins;
                 final List<Integer> fn = winN;
@@ -1195,7 +1196,7 @@ public class LicenseActivity extends Activity {
         try {
             btn.setEnabled(true);
             btn.setText("اتصال با وای‌فای");
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:1198", ignored); }
     }
 
     /** Luxury single-choice database picker (v33). */
@@ -1236,7 +1237,7 @@ public class LicenseActivity extends Activity {
         b.addView(kit.btnGold("✦ اتصال", v -> {
             try {
                 box[0].dismiss();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("LicenseActivity:1239", ignored); }
             saveSite(pairs.get(sel[0])[0], pairs.get(sel[0])[1], counts.get(sel[0]));
         }), kit.lp(-1, -2));
         box[0] = kit.dialog("انتخاب دیتابیس", kit.scrollWrap(b, 420), true);
@@ -1253,13 +1254,13 @@ public class LicenseActivity extends Activity {
                     License.SQL_USER, License.SQL_PASS);
             settings.setLinkLast(lan.isEmpty() ? SmartLink.WAN : SmartLink.LAN);
             saveConnSummary(host, tables);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:1256", ignored); }
         editingConnection = false;
         connectionIp = null;
         restoredConnectionIp = null;
         try {
             if (getIntent() != null) getIntent().removeExtra(EXTRA_EDIT_CONNECTION);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:1262", ignored); }
         buzz();
         kit.toast("✓ وصل شد • " + Money.fa(String.valueOf(tables)) + " بخش پایه آماده");
         copySiteLine(host, LanDiscover.PORT, db);
@@ -1270,7 +1271,7 @@ public class LicenseActivity extends Activity {
         try {
             getSharedPreferences("meelano_license_ui", MODE_PRIVATE).edit()
                     .putString("conn_summary", (host == null ? "" : host) + "|" + tables).apply();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:1273", ignored); }
     }
 
     private String connSummaryHost() {
@@ -1303,7 +1304,7 @@ public class LicenseActivity extends Activity {
             copyText("مشخصات اتصال",
                     "مشخصات اتصال مشتری\n" + line + (dist.isEmpty() ? "" : "\nپخش: " + dist));
             kit.toast("مشخصات اتصال کپی شد؛ برای فروشنده بفرستید");
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:1306", ignored); }
     }
 
     // ================= done =================
@@ -1330,7 +1331,7 @@ public class LicenseActivity extends Activity {
             String masked = sh;
             try {
                 masked = SmartLink.maskHost(sh);
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("LicenseActivity:1333", ignored); }
             c.addView(kit.kv("سرور", "✓ " + masked, Theme.GOLD_SOFT), kit.lp(-1, -2));
         }
         if (!stn.isEmpty())
@@ -1342,7 +1343,7 @@ public class LicenseActivity extends Activity {
             editingConnection = true;
             try {
                 getIntent().putExtra(EXTRA_EDIT_CONNECTION, true);
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("LicenseActivity:1345", ignored); }
             buildUi();
         }), kit.lp(-1, -2));
         Card3D.mount(box, c);
@@ -1513,7 +1514,7 @@ public class LicenseActivity extends Activity {
                     if (r.ok) return r.pack;
                 }
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:1516", ignored); }
         return null;
     }
 
@@ -1525,7 +1526,7 @@ public class LicenseActivity extends Activity {
                 if (line.startsWith(License.DB_PREFIX + "|")) return line;
                 if (line.startsWith(License.NET_PREFIX + "|")) return line;
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:1528", ignored); }
         return null;
     }
 
@@ -1545,7 +1546,7 @@ public class LicenseActivity extends Activity {
                 kit.toast("برای دریافت خودکار کلید، دسترسی را تأیید کنید");
                 requestPermissions(new String[]{android.Manifest.permission.RECEIVE_SMS}, REQ_RECV);
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:1548", ignored); }
     }
 
     private void updateRecvHint() {
@@ -1558,7 +1559,7 @@ public class LicenseActivity extends Activity {
                 recvHint.setText("برای دریافت خودکار کلید، اجازه را تأیید کنید.");
                 recvHint.setTextColor(Theme.MUTED);
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:1561", ignored); }
     }
 
     private void doActivate(String in) {
@@ -1621,7 +1622,7 @@ public class LicenseActivity extends Activity {
                     LicenseStore.addPendingSms(this, null, s.card);
                 }
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:1624", ignored); }
     }
 
     // ---- automatic server connection ----
@@ -1666,7 +1667,7 @@ public class LicenseActivity extends Activity {
             public void ok(String v) {
                 try {
                     settings.placeHost(fh, String.valueOf(port), fd, fu, fp);
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("LicenseActivity:1669", ignored); }
                 kit.toast("✓ " + v);
                 buildUi();
             }
@@ -1693,7 +1694,7 @@ public class LicenseActivity extends Activity {
             android.graphics.drawable.GradientDrawable gd =
                     new android.graphics.drawable.GradientDrawable(
                             android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
-                            new int[]{0x00000000, 0xFF8A6420, 0x00000000});
+                            new int[]{0x00000000, Theme.shade(Theme.GOLD, -0.45f), 0x00000000});
             div.setBackground(gd);
         } catch (Exception ignored) {
             div.setBackgroundColor(Theme.GOLD);
@@ -1736,23 +1737,23 @@ public class LicenseActivity extends Activity {
                 name.setTypeface(Theme.face(true));
                 name.setLetterSpacing(0.06f);
                 name.setShadowLayer(3, 0, 2, 0x40000000);
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("LicenseActivity:1739", ignored); }
             c.addView(name, kit.lp(-1, -2));
             name.post(() -> {
                 try {
                     int h = name.getHeight();
                     if (h <= 0) h = Theme.dp(28);
                     int[] sigCols = Theme.isLight()
-                            ? new int[]{0xFF7A5410, 0xFFA86F14, 0xFF5C3F0C, 0xFFA86F14, 0xFF7A5410}
-                            : new int[]{0xFFF3E3B8, 0xFFE9C37C, 0xFFB08A3E, 0xFFE9C37C, 0xFFF3E3B8};
+                            ? new int[]{Theme.shade(Theme.GOLD, -0.5f), Theme.shade(Theme.GOLD, -0.3f), Theme.shade(Theme.GOLD, -0.6f), Theme.shade(Theme.GOLD, -0.3f), Theme.shade(Theme.GOLD, -0.5f)}
+                            : new int[]{Theme.shade(Theme.GOLD, 0.6f), Theme.GOLD, Theme.shade(Theme.GOLD, 0.2f), Theme.GOLD, Theme.shade(Theme.GOLD, 0.6f)};
                     name.getPaint().setShader(new android.graphics.LinearGradient(0, 0, 0, h,
                             sigCols,
                             new float[]{0f, 0.35f, 0.55f, 0.75f, 1f},
                             android.graphics.Shader.TileMode.CLAMP));
                     name.invalidate();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("LicenseActivity:1753", ignored); }
             });
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:1755", ignored); }
     }
 
     private void supportDialog() {
@@ -1773,7 +1774,7 @@ public class LicenseActivity extends Activity {
                     pb.setCompoundDrawablePadding(Theme.dp(6));
                 }
                 pb.setMinHeight(Theme.dp(48));
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("LicenseActivity:1776", ignored); }
             body.addView(pb, kit.lp(-1, -2));
         }
         final AlertDialog[] dlgH = new AlertDialog[1];
@@ -1793,7 +1794,7 @@ public class LicenseActivity extends Activity {
                 CharSequence t = cm.getPrimaryClip().getItemAt(0).getText();
                 if (t != null) return t.toString().trim();
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:1796", ignored); }
         return null;
     }
 
@@ -1845,7 +1846,7 @@ public class LicenseActivity extends Activity {
                 LicenseStore.setEnteredOnce(this);
                 LicenseStore.setTourPending(this, true);
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:1848", ignored); }
         try {
             LinearLayout box = kit.v();
             box.setPadding(Theme.dp(28), Theme.dp(28), Theme.dp(28), Theme.dp(28));
@@ -1863,12 +1864,12 @@ public class LicenseActivity extends Activity {
             try {
                 d.setCancelable(false);
                 d.setCanceledOnTouchOutside(false);
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("LicenseActivity:1866", ignored); }
             d.show();
             uiHandler.postDelayed(() -> {
                 try {
                     d.dismiss();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("LicenseActivity:1871", ignored); }
                 enterAppNow();
             }, 1300);
         } catch (Exception e) {
@@ -1882,7 +1883,7 @@ public class LicenseActivity extends Activity {
             i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
             startActivity(i);
             finish();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:1885", ignored); }
     }
 
     private static String txt(EditText e) {

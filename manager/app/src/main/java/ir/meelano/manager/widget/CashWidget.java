@@ -1,5 +1,6 @@
 package ir.meelano.manager.widget;
 
+import ir.meelano.manager.core.Diag;
 import android.app.PendingIntent;
 import android.appwidget.AppWidgetManager;
 import android.appwidget.AppWidgetProvider;
@@ -30,16 +31,16 @@ public class CashWidget extends AppWidgetProvider {
             String ts = unesc(sec(s, "ts"));
             v.setTextViewText(R.id.w_ts, ts.isEmpty() ? "—" : Money.fa(ts));
             v.setTextViewText(R.id.w_date, Jalali.shortLabel(Jalali.todayStr()));
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("CashWidget:33", ignored); }
         try {
             Intent i = new Intent(ctx, MainActivity.class);
             PendingIntent pi = PendingIntent.getActivity(ctx, 0, i,
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             v.setOnClickPendingIntent(R.id.w_root, pi);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("CashWidget:39", ignored); }
         try {
             mgr.updateAppWidget(appWidgetId, v);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("CashWidget:42", ignored); }
     }
 
     /** Raw section body of the |name=...| cache block. */

@@ -1,5 +1,6 @@
 package ir.meelano.manager.ui;
 
+import ir.meelano.manager.core.Diag;
 import android.content.Context;
 import android.provider.Settings;
 import android.util.DisplayMetrics;
@@ -15,8 +16,7 @@ public final class Ui {
         try {
             DisplayMetrics m = c.getResources().getDisplayMetrics();
             if (m != null && m.density > 0) return (int) (m.widthPixels / m.density);
-        } catch (Exception ignored) {
-        }
+        } catch (Exception ignored) { Diag.ignored("Ui:18", ignored); }
         return 360;
     }
 
@@ -35,7 +35,6 @@ public final class Ui {
     public static void announce(View v, String text) {
         try {
             if (v != null && text != null) v.announceForAccessibility(text);
-        } catch (Exception ignored) {
-        }
+        } catch (Exception ignored) { Diag.ignored("Ui:38", ignored); }
     }
 }

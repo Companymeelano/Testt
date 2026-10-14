@@ -1,5 +1,6 @@
 package ir.meelano.manager.screens;
 
+import ir.meelano.manager.core.Diag;
 import android.app.AlertDialog;
 import android.view.Gravity;
 import android.view.View;
@@ -185,7 +186,7 @@ public class SettingsScreen extends Screen {
                     a.kit.toast(idx == 0 ? "حالت خودکار فعال شد" : "حالت دستی فعال شد");
                     try {
                         a.checkConn();
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("SettingsScreen:188", ignored); }
                     render(content);
                 }), a.kit.lp(-1, -2));
         c.addView(a.kit.gap(6));
@@ -585,6 +586,8 @@ public class SettingsScreen extends Screen {
                     a.kit.lp(-1, -2));
             crash.addView(a.kit.btnGhost("کپی گزارش فنی برای پشتیبانی", Theme.INFO, v -> {
                 String report = ir.meelano.manager.core.CrashReporter.readReport(a);
+                String diag = ir.meelano.manager.core.Diag.readRecent(a);
+                if (!diag.isEmpty()) report = (report.isEmpty() ? "" : report + "\n\n") + "--- رویدادهای بازیابی‌شده ---\n" + diag;
                 try {
                     android.content.ClipboardManager cm = (android.content.ClipboardManager)
                             a.getSystemService(android.content.Context.CLIPBOARD_SERVICE);
@@ -712,7 +715,7 @@ public class SettingsScreen extends Screen {
             public void onDone(java.io.File zip, long bytes, String notes) {
                 try {
                     dlg.dismiss();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("SettingsScreen:715", ignored); }
                 a.settings.saveBackupInfo(Jalali.faDate(Jalali.todayStr()), Backup.sizeFa(bytes));
                 a.kit.toast("بکاپ ساخته شد (" + Backup.sizeFa(bytes) + ") • " + notes);
                 render(content);
@@ -729,7 +732,7 @@ public class SettingsScreen extends Screen {
             public void onFail(String faError) {
                 try {
                     dlg.dismiss();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("SettingsScreen:732", ignored); }
                 a.kit.toast(faError == null ? "بکاپ ممکن نشد" : faError);
             }
         });

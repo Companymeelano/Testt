@@ -1,5 +1,6 @@
 package ir.meelano.manager.screens;
 
+import ir.meelano.manager.core.Diag;
 import android.speech.tts.TextToSpeech;
 import android.widget.LinearLayout;
 
@@ -144,10 +145,10 @@ public class VoiceScreen extends Screen {
             int n = 0;
             try {
                 n += Repo.exec(c, MoneyQueries.chequeDue(m, true, 3)).size();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("VoiceScreen:147", ignored); }
             try {
                 n += Repo.exec(c, MoneyQueries.chequeDue(m, false, 3)).size();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("VoiceScreen:150", ignored); }
             return n;
         }, new Repo.Cb<Integer>() {
             @Override
@@ -214,12 +215,12 @@ public class VoiceScreen extends Screen {
                         int fa = tts.isLanguageAvailable(new Locale("fa"));
                         if (fa >= TextToSpeech.LANG_AVAILABLE) tts.setLanguage(new Locale("fa"));
                         else a.kit.toast("صدای فارسی روی این گوشی نیست؛ پاسخ نمایش داده شد");
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("VoiceScreen:217", ignored); }
                 });
             }
             try {
                 tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "meelano-voice");
-            } catch (Exception ignored) { }
-        } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("VoiceScreen:222", ignored); }
+        } catch (Exception ignored) { Diag.ignored("VoiceScreen:223", ignored); }
     }
 }

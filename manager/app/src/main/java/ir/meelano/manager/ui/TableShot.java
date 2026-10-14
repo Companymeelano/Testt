@@ -1,5 +1,6 @@
 package ir.meelano.manager.ui;
 
+import ir.meelano.manager.core.Diag;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -151,10 +152,10 @@ public final class TableShot {
         } finally {
             try {
                 if (fos != null) fos.close();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("TableShot:154", ignored); }
             try {
                 bmp.recycle();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("TableShot:157", ignored); }
         }
         return out;
     }

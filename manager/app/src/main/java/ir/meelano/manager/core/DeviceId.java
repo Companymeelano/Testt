@@ -14,13 +14,13 @@ public final class DeviceId {
         String androidId = "";
         try {
             androidId = Settings.Secure.getString(c.getContentResolver(), Settings.Secure.ANDROID_ID);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("DeviceId:17", ignored); }
         String fp = "";
         String board = "";
         try {
             fp = Build.FINGERPRINT;
             board = Build.BOARD;
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("DeviceId:23", ignored); }
         return (androidId == null ? "" : androidId) + "|" + fp + "|" + board + "|meelano7";
     }
 

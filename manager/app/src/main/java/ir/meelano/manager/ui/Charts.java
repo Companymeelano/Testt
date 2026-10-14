@@ -1,5 +1,6 @@
 package ir.meelano.manager.ui;
 
+import ir.meelano.manager.core.Diag;
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
@@ -130,7 +131,7 @@ public final class Charts {
         void holdParent() {
             try {
                 if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(true);
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("Charts:133", ignored); }
         }
 
         void animateIn() {
@@ -590,7 +591,14 @@ public final class Charts {
         protected void onDraw(Canvas g) {
             super.onDraw(g);
             int w = getWidth();
-            if (w <= 0 || data.isEmpty()) return;
+            if (w <= 0) return;
+            if (data.isEmpty()) {
+                paint.setColor(Theme.MUTED);
+                paint.setTextSize(Theme.dp(11));
+                paint.setTextAlign(Paint.Align.CENTER);
+                g.drawText("داده‌ای برای نمایش نیست", w / 2f, getHeight() / 2f, paint);
+                return;
+            }
             double mx = Math.max(0, max());
             double mn = Math.min(0, min());
             if (mx - mn <= 0) mx = mn + 1;

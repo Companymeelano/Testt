@@ -1,5 +1,6 @@
 package ir.meelano.manager.ui;
 
+import ir.meelano.manager.core.Diag;
 import android.content.Context;
 import android.graphics.Paint;
 import android.graphics.pdf.PdfDocument;
@@ -60,7 +61,7 @@ public final class LabelPrint {
         bold.setColor(0xFF101828);
         try {
             bold.setTypeface(Theme.face(true));
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LabelPrint:63", ignored); }
         PdfDocument.PageInfo info = new PdfDocument.PageInfo.Builder(W, H, 1).create();
         PdfDocument.Page page = doc.startPage(info);
         android.graphics.Canvas g = page.getCanvas();
@@ -85,7 +86,7 @@ public final class LabelPrint {
         } finally {
             try {
                 doc.close();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("LabelPrint:88", ignored); }
         }
         return out;
     }

@@ -181,7 +181,7 @@ public final class MoneyQueries {
             try (java.sql.ResultSet r = ps.executeQuery()) {
                 if (r.next() && r.getString(1) != null) day = r.getString(1).trim();
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MoneyQueries:184", ignored); }
         DarParts parts = darParts(m, d, "h", p);
         List<Object> binds = new ArrayList<>();
         binds.add(p);

@@ -107,28 +107,28 @@ public final class AtiranAuth {
             ps.setString(1, username == null ? "" : username.trim());
             rs = ps.executeQuery();
             if (!rs.next()) return null;
-            try { u.uid = rs.getInt("a_id"); } catch (Exception ignored) { }
-            try { u.userName = str(rs, "a_un"); } catch (Exception ignored) { }
+            try { u.uid = rs.getInt("a_id"); } catch (Exception ignored) { Diag.ignored("AtiranAuth:110", ignored); }
+            try { u.userName = str(rs, "a_un"); } catch (Exception ignored) { Diag.ignored("AtiranAuth:111", ignored); }
             String fn = col(rs, "a_fn"), ln = col(rs, "a_ln");
             u.displayName = (fn + " " + ln).trim();
             if (u.displayName.isEmpty()) u.displayName = u.userName;
-            try { u.roleId = rs.getInt("a_role"); } catch (Exception ignored) { }
+            try { u.roleId = rs.getInt("a_role"); } catch (Exception ignored) { Diag.ignored("AtiranAuth:115", ignored); }
             if (actCol != null) {
                 try {
                     Object o = rs.getObject("a_act");
                     u.active = flagOn(o);
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("AtiranAuth:120", ignored); }
             }
             if (lockCol != null) {
                 try {
                     Object o = rs.getObject("a_lock");
                     u.locked = flagOn(o);
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("AtiranAuth:126", ignored); }
             }
             u.phone = col(rs, "a_phone");
             u.pwColFound = (pwCol != null);
             if (pwCol != null) {
-                try { u.pw = rs.getBytes("a_pw"); } catch (Exception ignored) { }
+                try { u.pw = rs.getBytes("a_pw"); } catch (Exception ignored) { Diag.ignored("AtiranAuth:131", ignored); }
             }
         } finally {
             closeQuiet(rs);
@@ -167,8 +167,7 @@ public final class AtiranAuth {
                     String v = rs.getString(1);
                     if (v != null && !v.trim().isEmpty()) return v.trim();
                 }
-            } catch (Exception ignored) {
-            } finally {
+            } catch (Exception ignored) { Diag.ignored("AtiranAuth:170", ignored); } finally {
                 closeQuiet(rs);
                 closeQuiet(ps);
             }
@@ -259,7 +258,7 @@ public final class AtiranAuth {
                     }
                 }
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("AtiranAuth:262", ignored); }
         return false;
     }
 
@@ -397,7 +396,7 @@ public final class AtiranAuth {
     public static void setEnabled(Context c, boolean on) {
         try {
             prefs(c).edit().putBoolean("login_on", on).apply();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("AtiranAuth:400", ignored); }
     }
 
     /** Legacy marker from older builds; it no longer bypasses the app account gate. */
@@ -412,13 +411,13 @@ public final class AtiranAuth {
     public static void setNoTable(Context c) {
         try {
             prefs(c).edit().putBoolean("no_table", true).apply();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("AtiranAuth:415", ignored); }
     }
 
     public static void clearNoTable(Context c) {
         try {
             prefs(c).edit().putBoolean("no_table", false).apply();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("AtiranAuth:421", ignored); }
     }
 
     /** Require a valid local manager/warehouse account session in this standalone build. */
@@ -496,13 +495,13 @@ public final class AtiranAuth {
                             + days * 3600L * 1000L)
                     .putBoolean("s_boot", boot)
                     .apply();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("AtiranAuth:499", ignored); }
     }
 
     public static void clearSession(Context c) {
         try {
             prefs(c).edit().putLong("s_until", 0).putBoolean("s_boot", false).apply();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("AtiranAuth:505", ignored); }
     }
 
     public static int sessionUid(Context c) {
@@ -518,14 +517,14 @@ public final class AtiranAuth {
         try {
             String r = sessionRole(c);
             if (!r.isEmpty()) RoleStore.setCurrent(c, r);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("AtiranAuth:521", ignored); }
     }
 
     public static String startScreen(Context c) {
         try {
             String r = sessionRole(c);
             if (!r.isEmpty()) return RoleStore.homeFor(r);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("AtiranAuth:528", ignored); }
         return "home";
     }
 
@@ -556,7 +555,7 @@ public final class AtiranAuth {
             if (pin.length() < 4) e.putString("pin" + uid, "");
             else e.putString("pin" + uid, sha(pin));
             e.apply();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("AtiranAuth:559", ignored); }
     }
 
     // ---- manager role override per user ----
@@ -577,7 +576,7 @@ public final class AtiranAuth {
             if (RoleStore.isValid(roleOrNull)) e.putString("role_ov" + uid, roleOrNull);
             else e.remove("role_ov" + uid);
             e.apply();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("AtiranAuth:580", ignored); }
     }
 
     /** Effective app role = override if set, else the auto-mapped role. */
@@ -609,7 +608,7 @@ public final class AtiranAuth {
             if (val.isEmpty()) e.remove("link" + uid);
             else e.putString("link" + uid, val);
             e.apply();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("AtiranAuth:612", ignored); }
     }
 
     public static String faStaffLink(Context c, int uid) {
@@ -643,7 +642,7 @@ public final class AtiranAuth {
                     .putString("nm" + uid, displayName == null ? "" : displayName)
                     .putString("rl" + uid, role == null ? "" : role)
                     .apply();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("AtiranAuth:646", ignored); }
     }
 
     /** Cached uid for this username, or -999 when unknown. */
@@ -696,7 +695,7 @@ public final class AtiranAuth {
         try {
             if (pw == null || pw.length == 0) return;
             prefs(c).edit().putString("pwb" + uid, toHex(pw)).apply();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("AtiranAuth:699", ignored); }
     }
 
     public static byte[] cachedPw(Context c, int uid) {
@@ -746,7 +745,7 @@ public final class AtiranAuth {
         try {
             if (o instanceof ResultSet) ((ResultSet) o).close();
             else if (o instanceof java.sql.Statement) ((java.sql.Statement) o).close();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("AtiranAuth:749", ignored); }
     }
 
     private static String sha(String s) {

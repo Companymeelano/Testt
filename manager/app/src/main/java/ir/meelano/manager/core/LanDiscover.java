@@ -82,9 +82,9 @@ public final class LanDiscover {
                         int last = ip == null ? -1 : ip.lastIndexOf('.');
                         if (last > 0) out.add(ip.substring(0, last + 1));
                     }
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("LanDiscover:85", ignored); }
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LanDiscover:87", ignored); }
         return new ArrayList<>(out);
     }
 
@@ -121,13 +121,13 @@ public final class LanDiscover {
                         Future<Boolean> f = fs.get(i);
                         if (f.isDone() && !f.isCancelled() && Boolean.TRUE.equals(f.get()))
                             ordered.add(all.get(i));
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("LanDiscover:124", ignored); }
                     if (ordered.size() >= 8) break;
                 }
             } finally {
                 pool.shutdownNow();
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LanDiscover:130", ignored); }
         return ordered;
     }
 
@@ -151,19 +151,19 @@ public final class LanDiscover {
                 String nm = null;
                 try {
                     nm = rs.getString(1);
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("LanDiscover:154", ignored); }
                 if (nm != null && !nm.trim().isEmpty()) out.add(nm.trim());
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LanDiscover:157", ignored); }
         try {
             if (rs != null) rs.close();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LanDiscover:160", ignored); }
         try {
             if (ps != null) ps.close();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LanDiscover:163", ignored); }
         try {
             if (c != null) c.close();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LanDiscover:166", ignored); }
         return out;
     }
 

@@ -133,7 +133,7 @@ public final class WarehouseWriter {
                 JSONObject o = arr.optJSONObject(i);
                 if (o != null) out.add(o);
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("WarehouseWriter:136", ignored); }
         return out;
     }
 
@@ -153,7 +153,7 @@ public final class WarehouseWriter {
             JSONArray arr = new JSONArray();
             for (JSONObject o : keep) arr.put(o);
             prefs(c).edit().putString("drafts", arr.toString()).apply();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("WarehouseWriter:156", ignored); }
     }
 
     // ---- handover log (which invoices were handed over, per day) ----
@@ -206,7 +206,7 @@ public final class WarehouseWriter {
                     .putString("handlog", log.toString())
                     .putString("handover_outbox", outbox.toString())
                     .apply();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("WarehouseWriter:209", ignored); }
     }
 
     /** Durable local handover events which have not yet been confirmed on the shared table. */
@@ -238,7 +238,7 @@ public final class WarehouseWriter {
                 JSONObject e = queue.optJSONObject(i);
                 if (e != null) out.add(new JSONObject(e.toString()));
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("WarehouseWriter:241", ignored); }
         return out;
     }
 
@@ -262,7 +262,7 @@ public final class WarehouseWriter {
             }
             prefs(c).edit().putString("handover_outbox", keep.toString())
                     .putString("handlog", log.toString()).apply();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("WarehouseWriter:265", ignored); }
     }
 
     private static boolean hasHandover(JSONArray arr, String day, String no) {
@@ -285,7 +285,7 @@ public final class WarehouseWriter {
         try {
             String cur = prefs(c).getString("hand_" + day.replace("/", ""), ",");
             for (String p : cur.split(",")) if (!p.isEmpty()) out.add(p);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("WarehouseWriter:288", ignored); }
         return out;
     }
 
@@ -325,8 +325,7 @@ public final class WarehouseWriter {
                 col.hasDefault = rs.getString(4) != null;
                 cols.put(col.name.toLowerCase(Locale.US), col);
             }
-        } catch (Exception ignored) {
-        } finally {
+        } catch (Exception ignored) { Diag.ignored("WarehouseWriter:328", ignored); } finally {
             closeQuiet(rs);
             closeQuiet(ps);
             rs = null;
@@ -342,8 +341,7 @@ public final class WarehouseWriter {
                 Col col = cols.get(rs.getString(1).toLowerCase(Locale.US));
                 if (col != null) col.identity = true;
             }
-        } catch (Exception ignored) {
-        } finally {
+        } catch (Exception ignored) { Diag.ignored("WarehouseWriter:345", ignored); } finally {
             closeQuiet(rs);
             closeQuiet(ps);
             rs = null;
@@ -360,8 +358,7 @@ public final class WarehouseWriter {
                 Col col = cols.get(rs.getString(1).toLowerCase(Locale.US));
                 if (col != null) col.pk = true;
             }
-        } catch (Exception ignored) {
-        } finally {
+        } catch (Exception ignored) { Diag.ignored("WarehouseWriter:363", ignored); } finally {
             closeQuiet(rs);
             closeQuiet(ps);
             rs = null;
@@ -379,8 +376,7 @@ public final class WarehouseWriter {
                 Col col = cols.get(rs.getString(1).toLowerCase(Locale.US));
                 if (col != null) col.fkRef = rs.getString(2) + "." + rs.getString(3);
             }
-        } catch (Exception ignored) {
-        } finally {
+        } catch (Exception ignored) { Diag.ignored("WarehouseWriter:382", ignored); } finally {
             closeQuiet(rs);
             closeQuiet(ps);
         }
@@ -397,8 +393,7 @@ public final class WarehouseWriter {
                     + table.replace("]", "]]") + "]') AND is_disabled=0");
             rs = ps.executeQuery();
             while (rs.next()) out.add(rs.getString(1));
-        } catch (Exception ignored) {
-        } finally {
+        } catch (Exception ignored) { Diag.ignored("WarehouseWriter:400", ignored); } finally {
             closeQuiet(rs);
             closeQuiet(ps);
         }
@@ -434,7 +429,7 @@ public final class WarehouseWriter {
                 Object o = rs.getObject(1);
                 return o == null ? null : String.valueOf(o);
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("WarehouseWriter:437", ignored); }
         finally {
             closeQuiet(rs);
             closeQuiet(ps);
@@ -457,8 +452,7 @@ public final class WarehouseWriter {
                 Object o = rs.getObject(1);
                 return o == null ? null : String.valueOf(o);
             }
-        } catch (Exception ignored) {
-        } finally {
+        } catch (Exception ignored) { Diag.ignored("WarehouseWriter:460", ignored); } finally {
             closeQuiet(rs);
             closeQuiet(ps);
         }
@@ -723,7 +717,7 @@ public final class WarehouseWriter {
         warnings.add(0, "شماره سند: " + docNo);
         try {
             doc.put("_postedNo", docNo);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("WarehouseWriter:726", ignored); }
         return out;
     }
 
@@ -767,7 +761,7 @@ public final class WarehouseWriter {
         boolean auto = true;
         try {
             auto = c.getAutoCommit();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("WarehouseWriter:770", ignored); }
         try {
             c.setAutoCommit(false);
             for (Stmt st : stmts) {
@@ -790,12 +784,12 @@ public final class WarehouseWriter {
         } catch (Exception e) {
             try {
                 c.rollback();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("WarehouseWriter:793", ignored); }
             throw e;
         } finally {
             try {
                 c.setAutoCommit(auto);
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("WarehouseWriter:798", ignored); }
         }
     }
 
@@ -839,11 +833,11 @@ public final class WarehouseWriter {
             double qty = ln.optDouble(L_QTY, 0);
             try {
                 qty = Double.parseDouble(Money.en(ln.optString(L_QTY, "0")).trim());
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("WarehouseWriter:842", ignored); }
             double price = ln.optDouble(L_PRICE, 0);
             try {
                 price = Double.parseDouble(Money.en(ln.optString(L_PRICE, "0")).trim());
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("WarehouseWriter:846", ignored); }
             double sum = qty * price;
             total += sum;
             StringBuilder set = new StringBuilder();
@@ -892,8 +886,7 @@ public final class WarehouseWriter {
                 ps.setLong(2, docNo);
                 ps.executeUpdate();
                 posted++;
-            } catch (Exception ignored) {
-            } finally {
+            } catch (Exception ignored) { Diag.ignored("WarehouseWriter:895", ignored); } finally {
                 closeQuiet(ps);
             }
         }
@@ -922,6 +915,6 @@ public final class WarehouseWriter {
         try {
             if (o instanceof ResultSet) ((ResultSet) o).close();
             else if (o instanceof java.sql.Statement) ((java.sql.Statement) o).close();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("WarehouseWriter:925", ignored); }
     }
 }

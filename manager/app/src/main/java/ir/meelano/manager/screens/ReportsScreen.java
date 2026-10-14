@@ -1,5 +1,6 @@
 package ir.meelano.manager.screens;
 
+import ir.meelano.manager.core.Diag;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.ImageView;
@@ -346,7 +347,7 @@ public class ReportsScreen extends Screen {
         try {
             iv.setImageResource(sectionIcon(section));
             iv.setColorFilter(sectionAccent(section));
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("ReportsScreen:349", ignored); }
         int sz = Theme.dp(44);
         c.addView(iv, new LinearLayout.LayoutParams(sz, sz));
         c.addView(a.kit.gap(6));
@@ -498,7 +499,7 @@ java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
         String cut = "";
         try {
             cut = Jalali.addDays(Jalali.todayStr(), -30);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("ReportsScreen:501", ignored); }
         for (Row r : rows) {
             String ls = Jalali.disp(r.s("lastSale"));
             if (!ls.isEmpty() && ls.compareTo(cut) >= 0) out.add(r);
@@ -688,7 +689,7 @@ java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
         try {
             if ("day".equals(spec.chartX)) return Jalali.shortLabel(x);
             if ("month".equals(spec.chartX)) return Jalali.monthName(x + "/01") + " " + Money.fa(x.substring(0, 4));
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("ReportsScreen:691", ignored); }
         String t = Money.fa(x);
         return t.length() > 16 ? t.substring(0, 16) + "…" : t;
     }

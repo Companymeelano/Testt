@@ -1,5 +1,6 @@
 package ir.meelano.manager.screens;
 
+import ir.meelano.manager.core.Diag;
 import android.app.AlertDialog;
 import android.view.Gravity;
 import android.view.View;
@@ -551,7 +552,7 @@ public class CloseoutScreen extends Screen {
             out.put(key + "Cheque", row.d("cheque"));
             out.put(key + "Components", b.componentTotal);
             out.put(key + "Unexplained", b.unexplained);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("CloseoutScreen:554", ignored); }
     }
 
     private JSONObject snapshot(Data d) {
@@ -594,7 +595,7 @@ public class CloseoutScreen extends Screen {
                 o.put("openDeliveryAmount", del.d("openAmount"));
             }
             o.put("moneyUnit", Money.unitName());
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("CloseoutScreen:597", ignored); }
         return o;
     }
 

@@ -1,5 +1,6 @@
 package ir.meelano.manager.ui;
 
+import ir.meelano.manager.core.Diag;
 import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -576,7 +577,7 @@ public final class Kit {
                     hideKeyboard(e);
                     l.onGo(t == null ? "" : t);
                 });
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("Kit:579", ignored); }
         });
         r.addView(mic, new LinearLayout.LayoutParams(Theme.dp(52), Theme.dp(50)));
         r.addView(space(8));
@@ -600,7 +601,7 @@ public final class Kit {
         try {
             InputMethodManager imm = (InputMethodManager) a.getSystemService(Activity.INPUT_METHOD_SERVICE);
             if (imm != null) imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Kit:603", ignored); }
     }
 
     /** In-content filter bar: live summary of the section's filters, opens the sheet. */
@@ -642,17 +643,37 @@ public final class Kit {
         return r;
     }
 
+    /**
+     * Loading state: a skeleton that matches the real cards (title line, two text lines
+     * and a figure block) with a slow pulse, plus the status text. Replaces the spinner
+     * so the layout does not jump when content arrives.
+     */
     public View loading(String msg) {
         LinearLayout c = card();
-        c.setGravity(Gravity.CENTER);
-        ProgressBar p = new ProgressBar(a);
-        try { p.getIndeterminateDrawable().setTint(Theme.GOLD); } catch (Exception ignored) { }
-        c.addView(p, new LinearLayout.LayoutParams(Theme.dp(40), Theme.dp(40)));
         TextView t = text(msg, 12f, Theme.MUTED, false);
-        t.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams tp = lp(-1, -2);
-        tp.setMargins(0, Theme.dp(10), 0, 0);
-        c.addView(t, tp);
+        c.addView(t, lp(-1, -2));
+        int[] heights = {16, 12, 12, 44};
+        float[] widths = {0.55f, 0.85f, 0.4f, 1f};
+        for (int i = 0; i < heights.length; i++) {
+            View bar = new View(a);
+            bar.setBackground(Theme.pill(Theme.alpha(Theme.TEXT, i == 3 ? 22 : 34)));
+            LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, Theme.dp(heights[i]), widths[i]);
+            p.setMargins(0, Theme.dp(i == 0 ? 12 : 8), 0, 0);
+            if (widths[i] < 1f) {
+                LinearLayout line = h();
+                line.addView(bar, p);
+                line.addView(new View(a), new LinearLayout.LayoutParams(0, 1, 1f - widths[i]));
+                c.addView(line, lp(-1, -2));
+            } else {
+                c.addView(bar, p);
+            }
+            android.animation.ObjectAnimator pulse = android.animation.ObjectAnimator.ofFloat(bar, View.ALPHA, 0.35f, 1f);
+            pulse.setDuration(900);
+            pulse.setStartDelay(i * 140L);
+            pulse.setRepeatMode(ValueAnimator.REVERSE);
+            pulse.setRepeatCount(ValueAnimator.INFINITE);
+            pulse.start();
+        }
         return c;
     }
 
@@ -838,7 +859,7 @@ public final class Kit {
         try {
             q.setSingleLine(true);
             q.setTextDirection(View.TEXT_DIRECTION_RTL);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Kit:841", ignored); }
         root.addView(q, lp(-1, -2));
         final TextView count = text("", 11.5f, Theme.MUTED, false);
         root.addView(count, lp(-1, -2));
@@ -868,7 +889,7 @@ public final class Kit {
                     if (label.length() == 0) label.append("\u2014");
                     list.addView(btnGhost(label.toString(), Theme.GOLD, new View.OnClickListener() {
                         @Override public void onClick(View tapped) {
-                            try { box[0].dismiss(); } catch (Exception ignored) { }
+                            try { box[0].dismiss(); } catch (Exception ignored) { Diag.ignored("Kit:871", ignored); }
                             if (onPick != null) onPick.onPick(r);
                         }
                     }), lp(-1, -2));
@@ -912,7 +933,7 @@ public final class Kit {
                 .create();
         try {
             if (d.getWindow() != null) d.getWindow().setBackgroundDrawable(Theme.dialogBg());
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Kit:915", ignored); }
         return d;
     }
 
@@ -947,14 +968,14 @@ public final class Kit {
         View chart = maker.make();
         int hPx = (int) (a.getResources().getDisplayMetrics().heightPixels * 0.60);
         root.addView(chart, new LinearLayout.LayoutParams(-1, hPx));
-        try { dialog(title, root, true).show(); } catch (Exception ignored) { }
+        try { dialog(title, root, true).show(); } catch (Exception ignored) { Diag.ignored("Kit:950", ignored); }
     }
 
     public ImageView logo(int sizeDp) {
         ImageView v = new ImageView(a);
         try {
             v.setImageResource(a.getResources().getIdentifier("meelano_3d", "drawable", a.getPackageName()));
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Kit:957", ignored); }
         v.setAdjustViewBounds(true);
         v.setScaleType(ImageView.ScaleType.CENTER_CROP);
         // Gold ring framing: the artwork sits on a themed halo and is clipped to a circle,
@@ -973,7 +994,7 @@ public final class Kit {
                     o.setOval(0, 0, view.getWidth(), view.getHeight());
                 }
             });
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Kit:976", ignored); }
         // Honour the requested size: the argument used to be accepted and then ignored, so a
         // caller that relied on it got an unsized ImageView and the artwork rendered at its
         // raw pixel size instead.
@@ -1195,7 +1216,7 @@ public final class Kit {
         } catch (Exception ex) {
             try {
                 v.setImageResource(res);
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("Kit:1198", ignored); }
         }
         int s = Theme.dp(dp);
         v.setLayoutParams(new LinearLayout.LayoutParams(s, s));
@@ -1274,7 +1295,7 @@ public final class Kit {
                 View ch = p.getChildAt(i);
                 if (ch instanceof EditText) ((EditText) ch).setTextColor(Theme.TEXT);
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Kit:1277", ignored); }
         return p;
     }
 

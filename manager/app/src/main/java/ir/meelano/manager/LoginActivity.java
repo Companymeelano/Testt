@@ -1,5 +1,6 @@
 package ir.meelano.manager;
 
+import ir.meelano.manager.core.Diag;
 import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
@@ -47,7 +48,7 @@ public class LoginActivity extends Activity {
         try {
             getWindow().setStatusBarColor(Theme.BG);
             getWindow().setNavigationBarColor(Theme.BG);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LoginActivity:50", ignored); }
         kit = new Kit(this);
         settings = new Settings(this);
         if (!LicenseStore.unlocked(this) || !settings.connConfigured()) {
@@ -79,7 +80,7 @@ public class LoginActivity extends Activity {
         eUser = kit.edit("نام کاربری", "");
         try {
             eUser.setTextDirection(View.TEXT_DIRECTION_ANY_RTL);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LoginActivity:82", ignored); }
         card.addView(eUser, kit.lp(-1, -2));
         card.addView(kit.gap(10));
         ePass = kit.edit("رمز عبور", "", true);
@@ -129,14 +130,14 @@ public class LoginActivity extends Activity {
     private void paintRemember() {
         try {
             ir.meelano.manager.ui.MeelanoIcons.set(rememberV, (remember ? "☑ " : "○ ") + "مرا به خاطر بسپار");
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LoginActivity:132", ignored); }
     }
 
     private void showErr(String msg) {
         try {
             err.setText(msg == null ? "" : msg);
             err.setVisibility(msg == null || msg.isEmpty() ? View.GONE : View.VISIBLE);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LoginActivity:139", ignored); }
     }
 
     private void setBusy(boolean b) {
@@ -144,7 +145,7 @@ public class LoginActivity extends Activity {
         try {
             loginBtn.setEnabled(!b);
             loginBtn.setText(b ? "در حال بررسی…" : "ورود");
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LoginActivity:147", ignored); }
     }
 
     // ================= login flow =================
@@ -199,7 +200,7 @@ public class LoginActivity extends Activity {
                 } finally {
                     try {
                         c.close();
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("LoginActivity:202", ignored); }
                 }
                 if (u == null) {
                     uiFail("کاربری با این نام در آتیران یافت نشد");
@@ -271,7 +272,7 @@ public class LoginActivity extends Activity {
                     return;
                 }
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LoginActivity:274", ignored); }
         uiFail("ارتباط با سرور ممکن نشد؛ برای اولین ورود، اینترنت لازم است");
     }
 
@@ -299,7 +300,7 @@ public class LoginActivity extends Activity {
                     boolean ok = copyText("گزارش ورود میلانو", report);
                     kit.toast(ok ? "گزارش کپی شد" : "کپی نشد");
                 });
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("LoginActivity:302", ignored); }
         });
     }
 
@@ -362,7 +363,7 @@ public class LoginActivity extends Activity {
                 AtiranAuth.putCache(LoginActivity.this, uid, user, name, role);
                 AtiranAuth.saveSession(LoginActivity.this, uid, user, name, role, rem, boot);
                 RoleStore.setCurrent(LoginActivity.this, role);
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("LoginActivity:365", ignored); }
             kit.toast(hello);
             goMain();
         });
@@ -382,7 +383,7 @@ public class LoginActivity extends Activity {
             Intent i = new Intent(this, LicenseActivity.class);
             i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
             startActivity(i);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LoginActivity:385", ignored); }
         finish();
     }
 
@@ -391,7 +392,7 @@ public class LoginActivity extends Activity {
             Intent i = new Intent(this, MainActivity.class);
             i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
             startActivity(i);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LoginActivity:394", ignored); }
         finish();
     }
 

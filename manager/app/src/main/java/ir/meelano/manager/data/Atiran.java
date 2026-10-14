@@ -1,5 +1,6 @@
 package ir.meelano.manager.data;
 
+import ir.meelano.manager.core.Diag;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.sql.Connection;
@@ -73,7 +74,7 @@ public final class Atiran {
             st.setQueryTimeout(5);
             st.execute("SELECT 1");
         } catch (Exception e) {
-            try { c.close(); } catch (Exception ignored) { }
+            try { c.close(); } catch (Exception ignored) { Diag.ignored("Atiran:76", ignored); }
             throw e;
         }
         return c;

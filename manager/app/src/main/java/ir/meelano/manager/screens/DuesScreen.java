@@ -1,5 +1,6 @@
 package ir.meelano.manager.screens;
 
+import ir.meelano.manager.core.Diag;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.LinearLayout;
@@ -137,7 +138,7 @@ java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
         String mt = "";
         try {
             mt = Jalali.MONTHS[jm - 1] + " " + Money.fa(String.valueOf(jy));
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("DuesScreen:140", ignored); }
         TextView t = a.kit.text(mt, 15f, Theme.TEXT, true);
         t.setGravity(Gravity.CENTER);
         r.addView(t, a.kit.wlp(1f));

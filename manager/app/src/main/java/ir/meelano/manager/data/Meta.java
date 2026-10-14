@@ -1,5 +1,6 @@
 package ir.meelano.manager.data;
 
+import ir.meelano.manager.core.Diag;
 import ir.meelano.manager.core.AtiranSchema;
 import ir.meelano.manager.core.Queries;
 import ir.meelano.manager.core.Sql;
@@ -216,7 +217,7 @@ public final class Meta {
                     return v == null ? "" : v.trim();
                 }
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Meta:219", ignored); }
         return "";
     }
 

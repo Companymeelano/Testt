@@ -47,7 +47,7 @@ public final class HandoverDb {
                     + "[device] nvarchar(100) NULL, "
                     + "[ts] bigint NOT NULL, "
                     + "CONSTRAINT PK_" + TABLE + " PRIMARY KEY ([day],[no]))");
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("HandoverDb:50", ignored); }
     }
 
     /** True when the table is present and readable. */

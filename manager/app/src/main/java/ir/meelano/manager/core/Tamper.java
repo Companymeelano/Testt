@@ -29,7 +29,7 @@ public final class Tamper {
         try {
             String tags = Build.TAGS;
             if (tags != null && tags.contains("test-keys")) return true;
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Tamper:32", ignored); }
         String[] paths = {
                 "/system/bin/su", "/system/xbin/su", "/sbin/su", "/system/sd/xbin/su",
                 "/system/bin/failsafe/su", "/data/local/xbin/su", "/data/local/bin/su",
@@ -37,7 +37,7 @@ public final class Tamper {
         };
         try {
             for (String p : paths) if (new File(p).exists()) return true;
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Tamper:40", ignored); }
         return false;
     }
 

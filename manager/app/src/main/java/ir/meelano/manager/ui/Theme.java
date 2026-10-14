@@ -1,5 +1,6 @@
 package ir.meelano.manager.ui;
 
+import ir.meelano.manager.core.Diag;
 import android.content.Context;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -151,7 +152,7 @@ public final class Theme {
         try {
             zi = s.zoomIdx();
             if (s.bigFont()) zi = 3;
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Theme:154", ignored); }
         fontScale = zi == 0 ? 0.9f : zi == 2 ? 1.15f : zi == 3 ? 1.3f : 1f;
         accentKey = s.themeAccent();
         if (s.seasonalOn() && "gold".equals(accentKey)) accentKey = seasonAccentKey();
@@ -488,6 +489,6 @@ public final class Theme {
             android.graphics.drawable.Drawable mask =
                     bg == null ? new android.graphics.drawable.ColorDrawable(0xFFFFFFFF) : null;
             v.setBackground(new android.graphics.drawable.RippleDrawable(csl, bg, mask));
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Theme:491", ignored); }
     }
 }

@@ -331,13 +331,41 @@ public final class MoneyQueries {
                 + ", " + darKindExpr(m, "h", d) + " AS kind"
                 + ", " + (d.shfac == null ? "CAST(NULL AS nvarchar(80))" : Sql.txt("h", d.shfac, 80)) + " AS linkNo"
                 + ", " + (hasMulti ? "ISNULL(mc.cnt,0)" : "CAST(0 AS int)") + " AS multiCount"
+                + ", " + registrantExpr(m, d) + " AS username"
                 + " FROM dbo.dar h" + Queries.custJoin(m, "h", d.shmo, "cu")
                 + (hasMulti ? " LEFT JOIN (SELECT [" + multiGh + "] g, COUNT_BIG(1) cnt FROM dbo.[" + multi + "] GROUP BY [" + multiGh + "]) mc"
                 + " ON TRY_CONVERT(nvarchar(60),mc.g)=TRY_CONVERT(nvarchar(60),h.[" + d.ghno + "])" : "")
+                + (registrantApply(m, d) == null ? "" : registrantApply(m, d))
                 + where + Sql.activeAnd(cols, "h") + Sql.softAnd(cols, "h")
                 + " ORDER BY h.[" + d.date + "] DESC, h.[" + d.ghno + "] DESC"
                 + Queries.pageClause(binds, f.page, f.top);
         return new Queries.Q(sql, binds);
+    }
+
+    /**
+     * Registrant of a receipt. dar.UserID is the Atiran user id; the name lives in sys_users
+     * (fname + lname, else user_name). OUTER APPLY with TOP (1) gives exactly one row per
+     * receipt, so a duplicated user row can never duplicate a receipt. Returns null when the
+     * user table or column is missing, so the receipt still loads without a name.
+     */
+    static String registrantApply(Meta m, Dar d) {
+        if (d.user == null || !m.table("sys_users")) return null;
+        String id = m.col("sys_users", "user_id", "UserID", "userid");
+        if (id == null) return null;
+        String fname = m.col("sys_users", "user_fname");
+        String lname = m.col("sys_users", "user_lname");
+        String uname = m.col("sys_users", "user_name", "Username", "username");
+        String fn = fname == null ? "N''" : "COALESCE(" + Sql.txt("su", fname, 100) + ",N'')";
+        String ln = lname == null ? "N''" : "COALESCE(" + Sql.txt("su", lname, 100) + ",N'')";
+        String full = "NULLIF(LTRIM(RTRIM(" + fn + "+N' '+" + ln + ")),N'')";
+        String name = uname == null ? full : "COALESCE(" + full + "," + Sql.txt("su", uname, 120) + ")";
+        return " OUTER APPLY (SELECT TOP (1) " + name + " AS regName FROM " + m.qTable("sys_users") + " su"
+                + " WHERE TRY_CONVERT(nvarchar(60),su.[" + id + "])=TRY_CONVERT(nvarchar(60),h.[" + d.user + "])) ru";
+    }
+
+    /** SQL expression for the registrant name (empty string when unavailable). */
+    static String registrantExpr(Meta m, Dar d) {
+        return registrantApply(m, d) == null ? "N''" : "COALESCE(ru.regName,N'')";
     }
 
     /** Voucher header: all fields + customer + kind + done date. */
@@ -358,10 +386,11 @@ public final class MoneyQueries {
                 + ", " + parts.chkCount + " AS chkCount"
                 + ", " + (d.desc == null ? "N''" : "COALESCE(" + Sql.txt("h", d.desc, 500) + ",N'')") + " AS descrip"
                 + ", " + darKindExpr(m, "h", d) + " AS kind"
-                + ", " + (d.user == null ? "N''" : "COALESCE(" + Sql.txt("h", d.user, 120) + ",N'')") + " AS username"
+                + ", " + registrantExpr(m, d) + " AS username"
                 + ", " + (d.isFinal == null ? "N''" : "COALESCE(" + Sql.txt("h", d.isFinal, 10) + ",N'')") + " AS isFinal"
                 + ", " + (d.shfac == null ? "CAST(NULL AS nvarchar(80))" : Sql.txt("h", d.shfac, 80)) + " AS linkNo"
                 + " FROM dbo.dar h" + Queries.custJoin(m, "h", d.shmo, "cu")
+                + (registrantApply(m, d) == null ? "" : registrantApply(m, d))
                 + " WHERE h.[p]=? AND TRY_CONVERT(nvarchar(60),h.[" + d.ghno + "])=?";
         return new Queries.Q(sql, binds);
     }

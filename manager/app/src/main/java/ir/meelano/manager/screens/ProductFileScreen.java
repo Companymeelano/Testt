@@ -212,7 +212,7 @@ public class ProductFileScreen extends Screen {
         if (!r.s("warehouse").isEmpty()) body.addView(a.kit.kv("انبار", Money.fa(r.s("warehouse")), Theme.TEXT), a.kit.lp(-1, -2));
         if (!r.s("doc").isEmpty()) body.addView(a.kit.kv("شماره سند", Money.fa(r.s("doc")), Theme.TEXT), a.kit.lp(-1, -2));
         if (!r.s("descrip").isEmpty()) body.addView(a.kit.kv("شرح", r.s("descrip"), Theme.MUTED), a.kit.lp(-1, -2));
-        final String screenId = invoiceScreenFor(r.l("act"));
+        final String screenId = invoiceScreenFor((int) r.l("act"));
         final String doc = r.s("doc");
         final android.app.AlertDialog[] holder = new android.app.AlertDialog[1];
         if (screenId != null && !doc.isEmpty()) {

@@ -93,6 +93,38 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      - name: Build signed release APK (runs only when release secrets are set)
+        env:
+          MEELANO_KEYSTORE_B64: ${{ secrets.MEELANO_KEYSTORE_B64 }}
+          MEELANO_STORE_PASS: ${{ secrets.MEELANO_STORE_PASS }}
+          MEELANO_KEY_ALIAS: ${{ secrets.MEELANO_KEY_ALIAS }}
+          MEELANO_KEY_PASS: ${{ secrets.MEELANO_KEY_PASS }}
+        working-directory: manager
+        run: |
+          set -euo pipefail
+          if [ -z "${MEELANO_KEYSTORE_B64:-}" ]; then
+            echo "Release signing secrets are not set; skipping the release build."
+            exit 0
+          fi
+          echo "$MEELANO_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/meelano-release.jks"
+          export MEELANO_KEYSTORE="$RUNNER_TEMP/meelano-release.jks"
+          gradle :app:assembleRelease --no-daemon --stacktrace
+          APK=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          BT="$ANDROID_HOME/build-tools/35.0.0"
+          "$BT/aapt" dump badging "$APK" | grep -F "package: name='ir.meelano.manager' versionCode='58' versionName='36.26.0'"
+          "$BT/apksigner" verify --verbose --print-certs "$APK" | tee ../release-signing.txt
+          cp "$APK" ../meelano-manager-v36-release.apk
+          sha256sum ../meelano-manager-v36-release.apk
+
+      - name: Upload signed release APK artifact (not committed)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: meelano-manager-v36-release
+          path: meelano-manager-v36-release.apk
+          if-no-files-found: ignore
+          retention-days: 30
+
       - name: Commit verified APK to the session branch for direct delivery
         run: |
           set -euo pipefail

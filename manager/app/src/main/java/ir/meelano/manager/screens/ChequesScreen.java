@@ -516,8 +516,7 @@ public class ChequesScreen extends Screen {
             String eventDate = Jalali.disp(r.s("getdate"));
             String dates = "سررسید " + Jalali.dispFa(r.s("sardate"));
             if (!eventDate.isEmpty()) dates += "\n" + (inc ? "دریافت " : "صدور ") + Money.fa(eventDate);
-            View v = a.kit.docRow("چک " + Money.fa(r.s("num")), r.s("customer"),
-                    dates, Money.rial(r.d("amount")), rowLabel(inc, r), v2 -> openDetail(r, inc));
+            View v = chequeCard(r, inc, dates, rowLabel(inc, r));
             LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
             p.setMargins(0, 0, 0, Theme.dp(8));
             body.addView(v, p);

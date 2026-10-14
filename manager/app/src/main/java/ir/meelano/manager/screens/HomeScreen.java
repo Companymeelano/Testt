@@ -540,13 +540,17 @@ public class HomeScreen extends Screen {
             LinearLayout compare = a.kit.card(Theme.GOLD);
             compare.addView(a.kit.sectionHead("فروش " + compareLabel + " در مقایسه", "فروش ›", v -> a.nav("sales")),
                     a.kit.lp(-1, -2));
-            compare.addView(a.kit.kv(compareLabel, Money.compactRial(todaySales), Theme.GOLD), a.kit.lp(-1, -2));
-            compare.addView(a.kit.kv("دیروز", Money.compactRial(yesterday), Theme.TEXT), a.kit.lp(-1, -2));
-            compare.addView(a.kit.kv("میانگین ۷ روز تقویمی قبل", Money.compactRial(avg7), Theme.INFO), a.kit.lp(-1, -2));
-            compare.addView(a.kit.kv("میانگین ۳۰ روز تقویمی قبل", Money.compactRial(avg30), Theme.INFO), a.kit.lp(-1, -2));
             String delta = avg7 > 0 ? Money.pct((todaySales - avg7) * 100.0 / avg7) : "—";
             int deltaColor = avg7 <= 0 ? Theme.MUTED : (todaySales >= avg7 ? Theme.SUCCESS : Theme.WARNING);
-            compare.addView(a.kit.kv("تغییر نسبت به میانگین ۷روزه", delta, deltaColor), a.kit.lp(-1, -2));
+            List<Kit.Kpi> cmp = new ArrayList<>();
+            cmp.add(new Kit.Kpi(compareLabel, Money.compactRial(todaySales), "تغییر ۷ روزه " + delta, Theme.GOLD));
+            cmp.add(new Kit.Kpi("دیروز", Money.compactRial(yesterday), "", Theme.TEXT));
+            cmp.add(new Kit.Kpi("میانگین ۷ روز قبل", Money.compactRial(avg7), "", Theme.INFO));
+            cmp.add(new Kit.Kpi("میانگین ۳۰ روز قبل", Money.compactRial(avg30), "", Theme.VIOLET));
+            compare.addView(a.kit.kpiGrid(cmp, 2), a.kit.lp(-1, -2));
+            if (todaySales <= 0)
+                compare.addView(a.kit.hint("برای " + compareLabel + " هنوز فروشی ثبت نشده است. اعداد بالا از روزهای قبل محاسبه شده‌اند."),
+                        a.kit.lp(-1, -2));
             a.kit.addCard(content, compare);
         }
     }
@@ -909,9 +913,10 @@ public class HomeScreen extends Screen {
     private double salesOnDay(List<Row> rows, String day) {
         if (rows == null || day == null || day.isEmpty()) return 0;
         String target = Jalali.disp(day);
+        double total = 0;
         for (Row r : rows)
-            if (target.equals(Jalali.disp(r.s("day")))) return r.d("total");
-        return 0;
+            if (target.equals(Jalali.disp(r.s("day")))) total += r.d("total");
+        return total;
     }
 
     /** Average across calendar days before today, counting days without sales as zero. */
@@ -920,7 +925,7 @@ public class HomeScreen extends Screen {
         Map<String, Double> byDay = new HashMap<>();
         for (Row r : rows) {
             String d = Jalali.disp(r.s("day"));
-            if (!d.isEmpty()) byDay.put(d, r.d("total"));
+            if (!d.isEmpty()) byDay.merge(d, r.d("total"), Double::sum);
         }
         int first = Jalali.parse(Jalali.addDays(today, -days));
         if (first < 0) return 0;
@@ -937,7 +942,7 @@ public class HomeScreen extends Screen {
         Map<String, Double> map = new HashMap<>();
         if (rows != null) for (Row r : rows) {
             String k = Jalali.disp(r.s("day"));
-            if (!k.isEmpty()) map.put(k, r.d("total"));
+            if (!k.isEmpty()) map.merge(k, r.d("total"), Double::sum);
         }
         List<Charts.Point> out = new ArrayList<>();
         String to = Jalali.disp(endDay);

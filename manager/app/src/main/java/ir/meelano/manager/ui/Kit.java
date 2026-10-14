@@ -283,15 +283,16 @@ public final class Kit {
             v.setAlpha(0f);
             v.animate().alpha(1f).setDuration(350).start();
         }
-        if (k.sub != null && !k.sub.isEmpty()) {
-            TextView s = text(k.sub, 10f, k.accent, true);
-            s.setSingleLine(true);
-            s.setEllipsize(TextUtils.TruncateAt.END);
-            t.addView(s, lp(-1, -2));
-        }
+        // Every tile reserves the same lines (sub + action), so tiles in one row
+        // match in height and their values line up whether or not they have a note.
+        TextView s = text(k.sub == null || k.sub.isEmpty() ? " " : k.sub, 10f, k.accent, true);
+        s.setSingleLine(true);
+        s.setEllipsize(TextUtils.TruncateAt.END);
+        t.addView(s, lp(-1, -2));
+        TextView more = text(k.action != null ? "مشاهده جزئیات ›" : " ", 9.5f, Theme.MUTED, true);
+        more.setSingleLine(true);
+        t.addView(more, lp(-1, -2));
         if (k.action != null) {
-            TextView more = text("مشاهده جزئیات ›", 9.5f, Theme.MUTED, true);
-            t.addView(more, lp(-1, -2));
             Theme.pressable(t);
             t.setOnClickListener(vw -> k.action.run());
         }
@@ -319,6 +320,8 @@ public final class Kit {
                 root.addView(row, rp);
             }
             View tile = kpiTile(kpis.get(i));
+            // Equal width (weight 1). Height stays wrap: all tiles share the same
+            // single-line structure, so they come out equal without MATCH_PARENT pitfalls.
             LinearLayout.LayoutParams p = wlp(1f);
             if (i % span != span - 1) p.setMarginEnd(Theme.dp(10));
             row.addView(tile, p);

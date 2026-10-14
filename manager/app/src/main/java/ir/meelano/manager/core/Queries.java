@@ -240,7 +240,23 @@ public final class Queries {
         String amountCol = m.must(table, "مبلغ", "all");
         String numberCol = Sql.pick(cols, sales ? "shfacfo" : "shfackh");
         List<Object> binds = new ArrayList<>();
-        String dc = Sql.dateCond(Sql.date10("x", dateCol), from, to, binds);
+        // Some rows store Gregorian dates («2026-10-14…») beside Atiran Jalali («1405/07/22»).
+        // The Jalali range alone drops the Gregorian rows, so recent days looked empty.
+        // Match both spellings; Java folds them onto the same Jalali day.
+        String raw = Sql.date10("x", dateCol);
+        String dc;
+        boolean bothEnds = from != null && !from.trim().isEmpty() && to != null && !to.trim().isEmpty();
+        String gf = bothEnds ? Jalali.toGregorian(from.trim()) : "";
+        String gt = bothEnds ? Jalali.toGregorian(to.trim()) : "";
+        if (bothEnds && !gf.isEmpty() && !gt.isEmpty()) {
+            String f = from.trim(), t = to.trim();
+            if (f.compareTo(t) > 0) { String x = f; f = t; t = x; String y = gf; gf = gt; gt = y; }
+            String dk = Sql.dateKey(raw);
+            dc = "((" + dk + ">=? AND " + dk + "<=?) OR (" + raw + ">=? AND " + raw + "<=?))";
+            binds.add(f); binds.add(t); binds.add(gf); binds.add(gt);
+        } else {
+            dc = Sql.dateCond(raw, from, to, binds);
+        }
         String inner = "WHERE " + (dc.isEmpty() ? "1=1" : dc) + Sql.activeAnd(cols, "x") + Sql.softAnd(cols, "x");
         String src = Sql.dedupe(table, numberCol, "h", inner);
         String day = Sql.date10("h", dateCol);

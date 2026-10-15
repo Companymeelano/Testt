@@ -102,7 +102,7 @@ public final class Assistant {
         String q = norm(question);
         if (q.isEmpty()) return help();
         StringBuilder b = new StringBuilder();
-        if (has(q, "راهنما", "کمک", "چیکار", "چه کار", "چی بپرس", "چه سوالی", "چطور")) {
+        if (has(q, "راهنما", "کمک", "چیکار", "چه کار", "چی بپرس", "چه سوالی", "راهنمایی")) {
             return help();
         }
         if (has(q, "پیشنهاد", "چه کنم", "اقدام", "مدیر")) {

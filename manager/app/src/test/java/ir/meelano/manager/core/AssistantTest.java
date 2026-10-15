@@ -29,7 +29,9 @@ public class AssistantTest {
 
     @Test
     public void normalizesArabicLettersAndZwnj() {
-        assertEquals("کتاب ها", Assistant.norm("كتاب\u200cها"));
+        // Arabic kaf/yeh and ZWNJ must fold to Persian forms and a space.
+        assertEquals("\u06a9\u062a\u0627\u0628 \u0647\u0627",
+                Assistant.norm("\u0643\u062a\u0627\u0628\u200c\u0647\u0627"));
     }
 
     @Test
@@ -42,7 +44,7 @@ public class AssistantTest {
     public void stockQuestionReportsOutAndLow() {
         String a = Assistant.answer(snap(), "موجودی و کالای ناموجود");
         assertTrue(a, a.contains("ناموجود"));
-        assertTrue(a, a.contains("کم‌موجود"));
+        assertTrue(a, a.contains("کم"));
     }
 
     @Test

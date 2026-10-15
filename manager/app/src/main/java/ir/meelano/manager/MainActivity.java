@@ -160,6 +160,10 @@ public class MainActivity extends Activity {
         if (!isFinishing() && !LicenseStore.unlocked(this)) toLicense();
         if (!isFinishing() && LicenseStore.unlocked(this)
                 && !new Settings(this).connConfigured()) toLicense();
+        // Persian voice is a prerequisite: guide the install before the app is used.
+        if (!isFinishing() && LicenseStore.unlocked(this) && new Settings(this).connConfigured()) {
+            ir.meelano.manager.core.Speaker.onResume(this);
+        }
         if (!isFinishing() && AtiranAuth.gate(this)) toLogin();
         Usage.touch(this);
         if (repo != null && !isFinishing() && RoleStore.WAREHOUSE.equals(effRole()))

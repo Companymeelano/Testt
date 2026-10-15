@@ -210,11 +210,18 @@ public final class Theme {
 
     /** Standard glass card with a restrained top sheen and warm hairline edge. */
     public static GradientDrawable card() {
+        if (light) {
+            // Ivory-champagne card with a fine bronze hairline (matches the approved home mockup).
+            GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                    new int[]{0xFFFFFDF8, 0xFFF7EEDB});
+            d.setCornerRadius(dp(22));
+            d.setStroke(dp(1), alpha(GOLD, 70));
+            return d;
+        }
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{shade(SURFACE, light ? 0.012f : 0.07f), SURFACE,
-                        shade(SURFACE, light ? -0.012f : -0.045f)});
+                new int[]{shade(SURFACE, 0.07f), SURFACE, shade(SURFACE, -0.045f)});
         d.setCornerRadius(dp(20));
-        d.setStroke(dp(1), alpha(GOLD, light ? 44 : 48));
+        d.setStroke(dp(1), alpha(GOLD, 48));
         return d;
     }
 

@@ -104,11 +104,17 @@ public class MoreScreen extends Screen {
         super(a);
     }
 
+    /** Hub segments: 0 = assistant, 1 = reports (default), 2 = all sections. */
+    private static final int SEG_ASSISTANT = 0, SEG_REPORTS = 1, SEG_ALL = 2;
+    private static final String[] SEG_LABELS = {"✦ دستیار", "📊 گزارش‌ها", "▦ همه بخش‌ها"};
+    private int seg = SEG_REPORTS;
+
     @Override public String id() { return "more"; }
-    @Override public String title() { return "همه بخش‌ها"; }
-    @Override public String glyph() { return "▦"; }
+    @Override public String title() { return "اتاق فرمان"; }
+    @Override public String glyph() { return "▣"; }
     @Override public int accent() { return Theme.GOLD; }
 
+    /** The command room: assistant, reports and every section in one place. */
     @Override
     public void render(final LinearLayout content) {
         contentRef = content;
@@ -118,12 +124,39 @@ public class MoreScreen extends Screen {
             expandedGroup = RoleStore.WAREHOUSE.equals(role) ? "stock" : "operations";
         }
         content.removeAllViews();
-        content.addView(a.kit.hero("▦", "مرکز دسترسی",
-                "بخش‌ها به تفکیک کار • فقط گزینه‌های مجازِ نقش شما", Theme.GOLD), a.kit.lp(-1, -2));
+        content.addView(a.kit.hero("▣", "اتاق فرمان",
+                "دستیار، گزارش‌ها و همهٔ بخش‌ها در یک جا", Theme.GOLD), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
+
+        LinearLayout segRow = a.kit.h();
+        for (int i = 0; i < SEG_LABELS.length; i++) {
+            final int idx = i;
+            boolean on = seg == i;
+            segRow.addView(a.kit.chip(SEG_LABELS[i], on, Theme.GOLD, v -> {
+                seg = idx;
+                render(contentRef);
+            }), a.kit.wlp(1f));
+        }
+        content.addView(segRow, a.kit.lp(-1, -2));
+        content.addView(a.kit.gap(10));
+
+        LinearLayout inner = a.kit.v();
+        content.addView(inner, a.kit.lp(-1, -2));
+        if (seg == SEG_ASSISTANT) {
+            a.screen("assistant").render(inner);
+        } else if (seg == SEG_REPORTS) {
+            a.screen("reports").render(inner);
+        } else {
+            renderAll(inner);
+        }
+    }
+
+    /** «همه بخش‌ها»: searchable, role-filtered list of every section. */
+    private void renderAll(final LinearLayout content) {
+        content.removeAllViews();
         content.addView(a.kit.searchBar("جست‌وجوی بخش یا کار…", searchText, q -> {
             searchText = q == null ? "" : q.trim();
-            render(contentRef);
+            renderAll(content);
         }), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
 

@@ -210,6 +210,50 @@ public final class Assistant {
         return b.toString().trim();
     }
 
+    /** Plain-text facts for a generative model: the same numbers the rule engine uses. */
+    public static String contextBlock(Snap s) {
+        StringBuilder b = new StringBuilder();
+        b.append("تاریخ امروز (شمسی): ").append(s.day).append("\n");
+        b.append("فروش امروز: ").append(money(s.salesToday.d("total")))
+                .append(" (").append(s.salesToday.l("docs")).append(" فاکتور)\n");
+        b.append("فروش دیروز: ").append(money(s.salesYesterday.d("total"))).append("\n");
+        double avg = averageLastWeek(s);
+        if (avg > 0) b.append("میانگین فروش روزانه ۷ روز گذشته: ").append(money(avg)).append("\n");
+        b.append("خرید امروز: ").append(money(s.buyToday.d("total"))).append("\n");
+        b.append("دریافت امروز: ").append(money(s.inToday.d("total"))).append(" (نقد ")
+                .append(money(s.inToday.d("cash"))).append("، چک ")
+                .append(money(s.inToday.d("cheque"))).append("، پوز ")
+                .append(money(s.inToday.d("pos"))).append("، حواله ")
+                .append(money(s.inToday.d("havaleh"))).append(")\n");
+        b.append("پرداخت امروز: ").append(money(s.outToday.d("total"))).append("\n");
+        b.append("فاکتورهای معوق: ").append(s.overdue.size()).append(" مورد، جمع ")
+                .append(money(sumAmount(s.overdue))).append("\n");
+        for (Row r : s.overdue) {
+            b.append("  - ").append(r.s("party")).append(": ").append(money(r.d("amount")))
+                    .append("، ").append(r.l("days")).append(" روز تأخیر\n");
+        }
+        b.append("بدهکاران اولویت‌دار:\n");
+        for (Row r : s.debtors) {
+            b.append("  - ").append(r.s("party")).append(": ").append(money(r.d("amount"))).append("\n");
+        }
+        b.append("چک دریافتی تا ۳ روز آینده: ").append(s.dueIn.size()).append(" مورد، ")
+                .append(money(sumAmount(s.dueIn))).append("\n");
+        b.append("چک پرداختی تا ۳ روز آینده: ").append(s.dueOut.size()).append(" مورد، ")
+                .append(money(sumAmount(s.dueOut))).append("\n");
+        b.append("کالاها: کل ").append(s.prod.l("count")).append("، فعال ").append(s.prod.l("active"))
+                .append("، ناموجود ").append(s.prod.l("out")).append("، کم‌موجود ").append(s.prod.l("low"))
+                .append("، نیازمند سفارش ").append(s.prod.l("reorderN"))
+                .append("، ارزش موجودی ").append(money(s.prod.d("value"))).append("\n");
+        b.append("سندهای انبار منتظر همگام‌سازی: ").append(s.pendingSync).append("\n");
+        b.append("عملکرد ویزیتورها (۳۰ روز):\n");
+        for (Row r : s.visitors) {
+            if (r.s("name").isEmpty()) continue;
+            b.append("  - ").append(r.s("name")).append(": ").append(money(r.d("sales"))).append("\n");
+        }
+        if (!s.notes.isEmpty()) b.append("بخش‌های بدون داده: ").append(join(s.notes.keySet())).append("\n");
+        return b.toString();
+    }
+
     /** Human-readable help listing what can be asked. */
     public static String help() {
         return "می‌توانید بپرسید:\n"

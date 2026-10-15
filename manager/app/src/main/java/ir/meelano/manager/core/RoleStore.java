@@ -131,9 +131,9 @@ public final class RoleStore {
             return new String[]{"sales", "customers", "cheques", "dues", "more"};
         if (MOADIAN.equals(role))
             return new String[]{"sales", "customers", "reports", "more"};
-        // Manager's five steady destinations. Sales now lives inside «گزارشات» (all sales items
-        // are reports there); the product file takes its tab.
-        return new String[]{"home", "products", "customers", "reports", "more"};
+        // Manager's bar: home, product file, customers, a dedicated assistant tab, and the
+        // command room («اتاق فرمان») which holds reports and every section.
+        return new String[]{"home", "products", "customers", "assistant", "more"};
     }
 
     /** Short tab label (some screen titles are too long for a tab). */
@@ -142,6 +142,8 @@ public final class RoleStore {
         if ("resid".equals(screenId)) return "رسید";
         if ("shomarsh".equals(screenId)) return "شمارش";
         if ("score".equals(screenId)) return "امتیاز";
+        if ("assistant".equals(screenId)) return "دستیار";
+        if ("more".equals(screenId)) return "اتاق فرمان";
         return null; // fall back to the screen title
     }
 

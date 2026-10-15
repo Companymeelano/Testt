@@ -35,6 +35,7 @@ import ir.meelano.manager.data.Repo;
 import ir.meelano.manager.data.Row;
 import ir.meelano.manager.data.Settings;
 import ir.meelano.manager.screens.AnbarScreen;
+import ir.meelano.manager.screens.AssistantScreen;
 import ir.meelano.manager.screens.CashScreen;
 import ir.meelano.manager.screens.CloseoutScreen;
 import ir.meelano.manager.screens.ManagerAlertsScreen;
@@ -626,6 +627,7 @@ public class MainActivity extends Activity {
 
         // screens
         reg(new HomeScreen(this));
+        reg(new AssistantScreen(this));
         reg(new TradeScreen(this, true));
         reg(new TradeScreen(this, false));
         reg(new MoneyScreen(this, 0));

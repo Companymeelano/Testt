@@ -319,6 +319,11 @@ public final class Notify {
         }
     }
 
+    /** Sends the assistant's daily summary as a notification (manual «ارسال خلاصه»). */
+    public static void sendSummary(Context c, String msg) {
+        showEod(c, msg);
+    }
+
     private static void showEod(Context c, String msg) {
         try {
             channel(c);

@@ -82,6 +82,8 @@ public class HomeScreen extends Screen {
         content.removeAllViews();
         content.addView(greetingHero(), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
+        content.addView(AssistantScreen.entryCard(a), a.kit.lp(-1, -2));
+        content.addView(a.kit.gap(10));
         addExecutiveDock(content);
         content.addView(a.kit.gap(6));
         content.addView(a.kit.loading("در حال دریافت داشبورد مدیریتی…"), a.kit.lp(-1, -2));
@@ -151,6 +153,8 @@ public class HomeScreen extends Screen {
                 }
                 content.removeAllViews();
                 content.addView(greetingHero(), a.kit.lp(-1, -2));
+                content.addView(a.kit.gap(10));
+                content.addView(AssistantScreen.entryCard(a), a.kit.lp(-1, -2));
                 content.addView(a.kit.gap(10));
                 addExecutiveDock(content);
                 content.addView(a.kit.gap(8));
@@ -404,6 +408,8 @@ public class HomeScreen extends Screen {
     private void build(LinearLayout content, Data d) {
         content.removeAllViews();
         content.addView(greetingHero(), a.kit.lp(-1, -2));
+        content.addView(a.kit.gap(10));
+        content.addView(AssistantScreen.entryCard(a), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
         addExecutiveDock(content);
         content.addView(a.kit.gap(8));

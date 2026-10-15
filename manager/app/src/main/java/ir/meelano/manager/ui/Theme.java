@@ -46,7 +46,6 @@ public final class Theme {
     private static boolean light = false;
     /** Mirror of !light for call sites (charts, tables). */
     public static boolean DARK = true;
-    private static String accentKey = "platinum";
     private static float fontScale = 1f;
     private static float density = 3f;
     /**
@@ -59,37 +58,11 @@ public final class Theme {
     private static Typeface regular;
     private static Typeface bold;
 
-    /** Accent: key, Persian label, dark, darkSoft, light, lightSoft. */
-    private static final String[][] ACCENTS = {
-            {"platinum", "پلاتینی", "FFE3E6EC", "FFF7F8FA", "FF4B5563", "FF374151"},
-            {"gold", "طلایی", "FFE0B765", "FFF5DFA6", "FF8A6320", "FF7A5612"},
-            {"emerald", "زمردی", "FF3ED598", "FF9BF0C8", "FF087A53", "FF046C4E"},
-            {"sapphire", "یاقوت آبی", "FF4FA3FF", "FFB3D4FF", "FF1C60E0", "FF1E429F"},
-            {"ruby", "یاقوتی", "FFF2617A", "FFFFB3C0", "FFC51E46", "FF8F0F2E"},
-            {"violet", "بنفش سلطنتی", "FF9A7BFF", "FFCDBFFF", "FF7C3AED", "FF5B21B6"},
-            {"teal", "فیروزه‌ای", "FF3ED6C5", "FFA7F3EA", "FF08776E", "FF065F56"},
-    };
-
     /** Deep ink and warm ivory chosen to keep accent controls legible in both skins. */
     private static final int ACCENT_INK = 0xFF111827;
     private static final int ACCENT_PAPER = 0xFFFFFCF5;
 
-    public static String[][] accents() { return ACCENTS; }
-
-    public static String accentLabel(String key) {
-        for (String[] a : ACCENTS) if (a[0].equals(key)) return a[1];
-        return ACCENTS[0][1];
-    }
-
-    /** Raw accent color (dark variant) for swatch previews. */
-    public static int accentPreview(String key) {
-        for (String[] a : ACCENTS) if (a[0].equals(key)) return (int) Long.parseLong(a[2], 16);
-        return (int) Long.parseLong(ACCENTS[0][2], 16);
-    }
-
     public static boolean isLight() { return light; }
-
-    public static String accentKey() { return accentKey; }
 
     /** 1.0 normal, 1.3 large-text mode (applied in Kit.text). */
     public static float fontScale() { return fontScale; }
@@ -97,40 +70,8 @@ public final class Theme {
     /** Screen-aware type multiplier (1.00 on small phones, up to 1.18 on large ones). */
     public static float typeScale() { return typeScale; }
 
-    /** Seasonal accent key from the Jalali date (v14 «تم مناسبتی»). */
-    public static String seasonAccentKey() {
-        try {
-            String t = Jalali.todayStr();
-            int m = Integer.parseInt(t.substring(5, 7));
-            int d = Integer.parseInt(t.substring(8, 10));
-            if ((m == 9 && d == 30) || (m == 10 && d == 1)) return "ruby"; // شب یلدا 🍉 (۳۰ آذر)
-            if ((m == 12 && d >= 29) || (m == 1 && d <= 13)) return "gold"; // نوروز 🌸
-            if (m >= 1 && m <= 3) return "emerald";                           // بهار
-            if (m >= 4 && m <= 6) return "teal";                              // تابستان
-            if (m >= 7 && m <= 9) return "ruby";                              // پاییز
-            return "sapphire";                                               // زمستان
-        } catch (Exception e) {
-            return "gold";
-        }
-    }
-
-    /** Seasonal glyph shown next to the company name (empty when seasonal mode is off). */
-    public static String seasonGlyph(android.content.Context c) {
-        try {
-            if (!new Settings(c).seasonalOn()) return "";
-            String t = Jalali.todayStr();
-            int m = Integer.parseInt(t.substring(5, 7));
-            int d = Integer.parseInt(t.substring(8, 10));
-            if ((m == 12 && d >= 29) || (m == 1 && d <= 1)) return "🍉";
-            if (m == 1 && d <= 13) return "🌸";
-            if (m >= 1 && m <= 3) return "🌸";
-            if (m >= 4 && m <= 6) return "☀";
-            if (m >= 7 && m <= 9) return "🍂";
-            return "❄";
-        } catch (Exception e) {
-            return "";
-        }
-    }
+    /** Seasonal themes were removed: the app has exactly two curated themes now. */
+    public static String seasonGlyph(android.content.Context c) { return ""; }
 
     public static void init(Context c) {
         android.util.DisplayMetrics dm0 = c.getResources().getDisplayMetrics();
@@ -158,17 +99,8 @@ public final class Theme {
             if (s.bigFont()) zi = 3;
         } catch (Exception ignored) { Diag.ignored("Theme:154", ignored); }
         fontScale = zi == 0 ? 0.9f : zi == 2 ? 1.15f : zi == 3 ? 1.3f : 1f;
-        accentKey = s.themeAccent();
-        if (s.seasonalOn() && ("platinum".equals(accentKey) || "gold".equals(accentKey))) accentKey = seasonAccentKey();
-        int dark = 0xFFD9AE5A, darkSoft = 0xFFF1D493, lite = 0xFFA86F14, liteSoft = 0xFF7A5410;
-        for (String[] a : ACCENTS) {
-            if (a[0].equals(accentKey)) {
-                dark = (int) Long.parseLong(a[2], 16);
-                darkSoft = (int) Long.parseLong(a[3], 16);
-                lite = (int) Long.parseLong(a[4], 16);
-                liteSoft = (int) Long.parseLong(a[5], 16);
-            }
-        }
+        // Exactly two curated themes; the accent is part of each theme, not a user choice.
+        int dark = 0xFFE2C27A, darkSoft = 0xFFF5E4B8, lite = 0xFF8A6420, liteSoft = 0xFF6B4C12;
         if (light) {
             // «عاج سلطنتی»: warm pearl background, near-white cards, clear separation.
             BG = 0xFFF7F3EA;

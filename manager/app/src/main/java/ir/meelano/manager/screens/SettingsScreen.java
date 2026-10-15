@@ -266,46 +266,16 @@ public class SettingsScreen extends Screen {
 
     private void buildTheme(final LinearLayout content) {
         content.addView(sectionHead("🎨 ظاهر لاکچری",
-                "قالب، رنگ اصلی و واحد نمایش. تغییرات فوراً روی همهٔ بخش‌ها اعمال می‌شود.",
+                "دو قالب طراحی‌شدهٔ برنامه و واحد نمایش. تغییرات فوراً روی همهٔ بخش‌ها اعمال می‌شود.",
                 Theme.GOLD), a.kit.lp(-1, -2));
         LinearLayout th = a.kit.card(Theme.GOLD);
         th.addView(a.kit.text("قالب", 12f, Theme.MUTED, true), a.kit.lp(-1, -2));
         final boolean isLight = "light".equals(a.settings.themeMode());
-        th.addView(a.kit.chips(new String[]{"◐ تیره • طلای نیمه‌شب", "◑ روشن • عاج سلطنتی"}, isLight ? 1 : 0, idx -> {
+        th.addView(a.kit.chips(new String[]{"◐ تیره • ابسیدین طلایی", "◑ روشن • عاج سلطنتی"}, isLight ? 1 : 0, idx -> {
             a.settings.setThemeMode(idx == 1 ? "light" : "dark");
             a.refreshTheme();
         }), a.kit.lp(-1, -2));
         th.addView(a.kit.gap(8));
-        th.addView(a.kit.text("رنگ اصلی برنامه", 12f, Theme.MUTED, true), a.kit.lp(-1, -2));
-        LinearLayout sw = a.kit.h();
-        sw.setGravity(Gravity.CENTER);
-        final String cur = a.settings.themeAccent();
-        for (String[] acc : Theme.accents()) {
-            final String key = acc[0];
-            TextView dot = new TextView(a);
-            boolean on = key.equals(cur);
-            dot.setBackground(Theme.swatch(Theme.accentPreview(key), on));
-            int sz = Theme.dp(on ? 46 : 38);
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(sz, sz);
-            lp.setMargins(Theme.dp(5), Theme.dp(4), Theme.dp(5), Theme.dp(4));
-            dot.setLayoutParams(lp);
-            LinearLayout cell = a.kit.v();
-            cell.setGravity(Gravity.CENTER);
-            cell.addView(dot, lp);
-            TextView lb = a.kit.text(acc[1], 9.5f, on ? Theme.TEXT : Theme.MUTED, on);
-            lb.setGravity(Gravity.CENTER);
-            cell.addView(lb, a.kit.lp(-2, -2));
-            cell.setPadding(Theme.dp(2), 0, Theme.dp(2), 0);
-            Theme.pressable(cell);
-            cell.setOnClickListener(v -> {
-                a.settings.setThemeAccent(key);
-                a.refreshTheme();
-            });
-            sw.addView(cell, a.kit.wlp(1f));
-        }
-        th.addView(sw, a.kit.lp(-1, -2));
-        th.addView(a.kit.gap(6));
-
         th.addView(a.kit.text("نمایش", 12f, Theme.MUTED, true), a.kit.lp(-1, -2));
         th.addView(a.kit.btnGhost("🔍 بزرگ‌نمایی متن: " + MainActivity.zoomLabel(a.settings.zoomIdx()), Theme.GOLD, v -> {
             a.cycleZoom();
@@ -320,13 +290,7 @@ public class SettingsScreen extends Screen {
             a.refreshTheme();
         }), a.kit.lp(-1, -2));
         th.addView(a.kit.gap(6));
-        final boolean sn = a.settings.seasonalOn();
-        addRow(th, toggleRow("تم مناسبتی خودکار", "در مناسبت‌ها رنگ‌بندی برنامه تغییر می‌کند", sn, Theme.TEAL, v -> {
-            a.settings.setSeasonalOn(!sn);
-            a.kit.toast(!sn ? "تم مناسبتی روشن شد" : "تم مناسبتی خاموش شد");
-            a.refreshTheme();
-        }));
-        th.addView(a.kit.hint("قالب و رنگ انتخابی فوراً روی همه بخش‌ها، جدول‌ها، نمودارها و آیکن‌ها اعمال می‌شود."),
+        th.addView(a.kit.hint("قالب انتخابی فوراً روی همه بخش‌ها، جدول‌ها، نمودارها و آیکن‌ها اعمال می‌شود."),
                 a.kit.lp(-1, -2));
         a.kit.addCard(content, th);
     }

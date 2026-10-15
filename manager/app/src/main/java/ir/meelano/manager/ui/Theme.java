@@ -246,10 +246,18 @@ public final class Theme {
     /** Executive dashboard hero: layered midnight/champagne glass with a quiet metallic edge. */
     public static GradientDrawable executiveHero() {
         int accent = GOLD;
+        if (light) {
+            // Champagne-gold hero: a clearly golden sheen fading into ivory, with a brighter bronze rim.
+            GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                    new int[]{alpha(accent, 130), 0xFFFBF3E2, 0xFFF1E2C2});
+            d.setCornerRadius(dp(28));
+            d.setStroke(dp(1), alpha(accent, 200));
+            return d;
+        }
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{alpha(accent, light ? 56 : 82), alpha(SURFACE, 250), BG});
+                new int[]{alpha(accent, 82), alpha(SURFACE, 250), BG});
         d.setCornerRadius(dp(28));
-        d.setStroke(dp(1), alpha(accent, light ? 150 : 125));
+        d.setStroke(dp(1), alpha(accent, 125));
         return d;
     }
 

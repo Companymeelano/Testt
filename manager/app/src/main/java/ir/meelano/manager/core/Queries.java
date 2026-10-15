@@ -436,6 +436,11 @@ public final class Queries {
         if ("total_desc".equals(f.sort)) orderBy = totalExpr + " DESC";
         if ("remain_desc".equals(f.sort)) orderBy = "((" + totalExpr + ")-(" + paidExpr + ")) DESC";
         if ("total_desc".equals(f.sort) || "remain_desc".equals(f.sort)) orderBy += ", h.[" + dateCol + "] DESC";
+        // Registrant (who entered the invoice): best-effort, empty when the column is absent.
+        String userCol = sales ? Sql.pick(cols, "UserID", "user_id", "ShUser", "shuser", "CreateUser", "sabt_user") : null;
+        String regApply = MoneyQueries.registrantApplyFor(m, userCol);
+        String regSel = regApply == null ? "N''" : "COALESCE(ru.regName,N'')";
+        if (regApply != null) join = join + regApply;
         String sql = "SELECT " + Sql.txt("h", numberCol, 80) + " AS no"
                 + ", " + Sql.date10("h", dateCol) + " AS date"
                 + ", " + (partyCol == null ? "CAST(NULL AS nvarchar(100))" : Sql.txt("h", partyCol, 100)) + " AS code"
@@ -446,6 +451,7 @@ public final class Queries {
                 + ", " + (tasviehCol == null ? "N''" : Sql.txt("h", tasviehCol, 10)) + " AS tasvieh"
                 + ", " + (dueCol == null ? "CAST(NULL AS nvarchar(10))" : Sql.date10("h", dueCol)) + " AS dueDate"
                 + ", " + (descCol == null ? "CAST(NULL AS nvarchar(500))" : Sql.txt("h", descCol, 500)) + " AS descrip"
+                + ", " + regSel + " AS registrant"
                 + " FROM " + Sql.dedupe(table, numberCol, "h", "") + join
                 + where + extra
                 + " ORDER BY " + orderBy

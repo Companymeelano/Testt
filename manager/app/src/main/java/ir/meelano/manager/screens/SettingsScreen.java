@@ -64,6 +64,7 @@ public class SettingsScreen extends Screen {
 
     @Override
     public void render(final LinearLayout content) {
+        if (warehouseRole()) section = "alerts";
         content.removeAllViews();
         if (pendingSection != null) {
             section = pendingSection;
@@ -96,7 +97,7 @@ public class SettingsScreen extends Screen {
         LinearLayout row = a.kit.h();
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(Theme.dp(2), Theme.dp(2), Theme.dp(2), Theme.dp(2));
-        for (String[] s : SECTIONS) {
+        for (String[] s : visibleSections()) {
             final String key = s[0];
             final boolean on = key.equals(section);
             TextView pill = a.kit.text(s[2] + "  " + s[1], 12f, on ? Theme.onAccent() : Theme.TEXT, on);
@@ -115,6 +116,24 @@ public class SettingsScreen extends Screen {
         }
         sv.addView(row, new HorizontalScrollView.LayoutParams(-2, -2));
         return sv;
+    }
+
+    private static String roleNow(MainActivity a) {
+        String role = ir.meelano.manager.core.AtiranAuth.sessionRole(a);
+        if (role == null || role.isEmpty()) role = ir.meelano.manager.core.RoleStore.current(a);
+        return role == null ? "" : role;
+    }
+
+    private boolean warehouseRole() {
+        return ir.meelano.manager.core.RoleStore.WAREHOUSE.equals(roleNow(a));
+    }
+
+    /** The warehouse keeper only sees the alerts section; everything else stays with the manager. */
+    private String[][] visibleSections() {
+        if (!warehouseRole()) return SECTIONS;
+        java.util.List<String[]> out = new java.util.ArrayList<>();
+        for (String[] s : SECTIONS) if ("alerts".equals(s[0])) out.add(s);
+        return out.toArray(new String[0][]);
     }
 
     /** Section header inside the open section: a title and one line of guidance. */
@@ -382,6 +401,13 @@ public class SettingsScreen extends Screen {
             a.kit.toast(!whn ? "اعلان فاکتور جدید روشن شد؛ هر ۱۵ دقیقه بررسی می‌شود" : "اعلان فاکتور جدید خاموش شد");
             render(content);
         }));
+        if (warehouseRole()) {
+            addRow(nt, toggleRow("🔔 نمایش نمونهٔ اعلان بار", "یک اعلان نمونه با صدای آلارم نشان داده می‌شود", true,
+                    Theme.GOLD, v -> {
+                        ir.meelano.manager.core.InvoiceWatch.preview(a);
+                        a.kit.toast("نمونهٔ اعلان ارسال شد");
+                    }));
+        }
         a.kit.addCard(content, nt);
     }
 

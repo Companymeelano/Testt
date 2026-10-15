@@ -349,7 +349,12 @@ public final class MoneyQueries {
      * user table or column is missing, so the receipt still loads without a name.
      */
     static String registrantApply(Meta m, Dar d) {
-        if (d.user == null || !m.table("sys_users")) return null;
+        return registrantApplyFor(m, d.user);
+    }
+
+    /** Same join for any header table whose alias is «h» and whose user column is {@code userCol}. */
+    static String registrantApplyFor(Meta m, String userCol) {
+        if (userCol == null || !m.table("sys_users")) return null;
         String id = m.col("sys_users", "user_id", "UserID", "userid");
         if (id == null) return null;
         String fname = m.col("sys_users", "user_fname");
@@ -360,7 +365,7 @@ public final class MoneyQueries {
         String full = "NULLIF(LTRIM(RTRIM(" + fn + "+N' '+" + ln + ")),N'')";
         String name = uname == null ? full : "COALESCE(" + full + "," + Sql.txt("su", uname, 120) + ")";
         return " OUTER APPLY (SELECT TOP (1) " + name + " AS regName FROM " + m.qTable("sys_users") + " su"
-                + " WHERE TRY_CONVERT(nvarchar(60),su.[" + id + "])=TRY_CONVERT(nvarchar(60),h.[" + d.user + "])) ru";
+                + " WHERE TRY_CONVERT(nvarchar(60),su.[" + id + "])=TRY_CONVERT(nvarchar(60),h.[" + userCol + "])) ru";
     }
 
     /** SQL expression for the registrant name (empty string when unavailable). */

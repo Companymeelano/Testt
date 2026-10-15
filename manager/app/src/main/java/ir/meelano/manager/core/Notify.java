@@ -31,6 +31,8 @@ public final class Notify {
     private Notify() { }
 
     static final String CH = "meelano_due";
+    /** Warehouse «بار جدید» channel: its own id so the custom chime is applied (sound is fixed per channel). */
+    public static final String CH_WH = "meelano_wh_bell";
     private static final int ALARM_REQ = 7001;
     private static final int NOTIF_ID = 7002;
     static final String ACT_BACKUP = "ir.meelano.manager.BACKUP";
@@ -85,6 +87,32 @@ public final class Notify {
     }
 
     /** Every day at 8:00 (inexact, battery-friendly). */
+    /** Creates the warehouse channel with the custom alarm chime, vibration and gold light. */
+    public static void whChannel(Context c) {
+        try {
+            if (android.os.Build.VERSION.SDK_INT < 26) return;
+            NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm == null) return;
+            NotificationChannel ch = new NotificationChannel(CH_WH, "بار جدید انبار",
+                    NotificationManager.IMPORTANCE_HIGH);
+            ch.setDescription("اعلان بار جدید برای تحویل، با نام مشتری و ثبت‌کننده");
+            android.net.Uri sound = android.net.Uri.parse("android.resource://" + c.getPackageName() + "/raw/wh_alarm");
+            android.media.AudioAttributes attrs = new android.media.AudioAttributes.Builder()
+                    .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION_EVENT)
+                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build();
+            ch.setSound(sound, attrs);
+            ch.enableVibration(true);
+            ch.setVibrationPattern(new long[]{0, 280, 140, 280, 140, 560});
+            ch.enableLights(true);
+            ch.setLightColor(0xFFD9AE5A);
+            ch.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+            nm.createNotificationChannel(ch);
+        } catch (Exception e) {
+            Diag.ignored("Notify:whChannel", e);
+        }
+    }
+
     public static void scheduleDaily(Context c) {
         try {
             AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);

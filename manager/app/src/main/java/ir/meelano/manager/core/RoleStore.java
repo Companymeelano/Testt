@@ -46,7 +46,7 @@ public final class RoleStore {
     /** Warehouse side: his own build (phase 2) + stock views. */
     private static final String[] WAREHOUSE_OK = {
             "anbar", "tahvil", "resid", "shomarsh", "score", "sync_queue", "pick_wave",
-            "home", "products", "customers", "search", "voice", "more"};
+            "home", "products", "customers", "search", "voice", "more", "settings"};
     /** Moadian (tax) side: invoices + tax reports. */
     private static final String[] MOADIAN_OK = {
             "home", "sales", "customers", "reports", "search", "voice", "more"};

@@ -139,45 +139,106 @@ public final class InvoiceWatch {
         return sb.toString();
     }
 
+    /** Sample loads for the «نمایش نمونه» button in Settings (no database access). */
+    public static void preview(Context c) {
+        List<Row> rows = new ArrayList<>();
+        Row a = new Row();
+        a.put("no", "1047");
+        a.put("customer", "فروشگاه نمونه آذر");
+        a.put("total", 12500000d);
+        a.put("registrant", "علی رضایی");
+        rows.add(a);
+        Row b = new Row();
+        b.put("no", "1048");
+        b.put("customer", "داروخانه مهر");
+        b.put("total", 4800000d);
+        b.put("registrant", "مریم احمدی");
+        rows.add(b);
+        notifyNew(c.getApplicationContext(), rows);
+    }
+
+    /**
+     * The warehouse alert: who the load is for, its value, who registered it, and a closing
+     * line that depends on the time of day. Several loads become an inbox-style list.
+     */
     private static void notifyNew(Context c, List<Row> fresh) {
         try {
-            Notify.channel(c);
-            String title = fresh.size() == 1
-                    ? "🧾 فاکتور فروش جدید"
-                    : "🧾 " + Money.fa(String.valueOf(fresh.size())) + " فاکتور فروش جدید";
-            StringBuilder b = new StringBuilder();
-            int shown = Math.min(fresh.size(), 4);
-            for (int i = 0; i < shown; i++) {
-                Row r = fresh.get(i);
-                if (b.length() > 0) b.append(" • ");
-                b.append("فاکتور ").append(Money.fa(r.s("no")));
-                String cust = r.s("customer");
-                if (cust != null && !cust.isEmpty() && !"—".equals(cust))
-                    b.append(" («").append(cust).append("»)");
-                b.append(" — ").append(Money.compactRial(r.d("total")));
+            Notify.whChannel(c);
+            int n = fresh.size();
+            String now = Money.fa(new java.text.SimpleDateFormat("HH:mm", java.util.Locale.US)
+                    .format(new java.util.Date()));
+            int hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY);
+            double sum = 0;
+            List<String> lines = new ArrayList<>();
+            for (Row r : fresh) {
+                sum += r.d("total");
+                lines.add(loadLine(r));
             }
-            if (fresh.size() > shown)
-                b.append(" • و ").append(Money.fa(String.valueOf(fresh.size() - shown))).append(" مورد دیگر");
-            b.append("؛ برای تحویل لمس کنید.");
-            String body = b.toString();
+            String title = n == 1
+                    ? "🚚 بار جدید برای تحویل"
+                    : "🚚 " + Money.fa(String.valueOf(n)) + " بار جدید برای تحویل";
+            String summary = "جمع ارزش " + Money.compactRial(sum) + " • ثبت شد ساعت " + now;
+            String closing = hour < 12
+                    ? "بار امروز را پیش از ظهر آماده و با فاکتور کنترل کنید."
+                    : "پیش از خروج، بار را با فاکتور و امضای تحویل کنترل کنید.";
+
+            Notification.Style style;
+            if (n == 1) {
+                style = new Notification.BigTextStyle()
+                        .setBigContentTitle(title)
+                        .setSummaryText(summary)
+                        .bigText(lines.get(0) + "\n\n" + closing);
+            } else {
+                Notification.InboxStyle inbox = new Notification.InboxStyle()
+                        .setBigContentTitle(title)
+                        .setSummaryText(summary);
+                int shown = Math.min(lines.size(), 5);
+                for (int i = 0; i < shown; i++) inbox.addLine(lines.get(i));
+                if (lines.size() > shown) {
+                    inbox.addLine("… و " + Money.fa(String.valueOf(lines.size() - shown)) + " بار دیگر");
+                }
+                inbox.addLine(closing);
+                style = inbox;
+            }
 
             Intent open = new Intent(c, MainActivity.class);
             open.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
             open.putExtra(MainActivity.EXTRA_SCREEN, "tahvil");
             PendingIntent pi = PendingIntent.getActivity(c, Notify.NEWINV_NOTIF_ID, open,
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-            Notification n = new Notification.Builder(c, Notify.CH)
+
+            Notification.Builder b = new Notification.Builder(c, Notify.CH_WH)
                     .setContentTitle(title)
-                    .setContentText(body)
-                    .setStyle(new Notification.BigTextStyle().bigText(body))
+                    .setContentText(lines.get(0))
+                    .setSubText("انبار • میلانو")
+                    .setTicker(title)
+                    .setWhen(System.currentTimeMillis())
+                    .setShowWhen(true)
+                    .setCategory(Notification.CATEGORY_REMINDER)
                     .setSmallIcon(R.mipmap.ic_launcher)
+                    .setColor(0xFFD9AE5A)
                     .setContentIntent(pi)
                     .setAutoCancel(true)
-                    .setColor(0xFF3ED6C5)
-                    .build();
+                    .setStyle(style);
+            try {
+                android.graphics.Bitmap big = android.graphics.BitmapFactory.decodeResource(c.getResources(),
+                        R.mipmap.ic_launcher);
+                if (big != null) b.setLargeIcon(big);
+            } catch (Exception ignored) { Diag.ignored("InvoiceWatch:large", ignored); }
             NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
-            if (nm != null) nm.notify(Notify.NEWINV_NOTIF_ID, n);
+            if (nm != null) nm.notify(Notify.NEWINV_NOTIF_ID, b.build());
         } catch (Exception ignored) { Diag.ignored("InvoiceWatch:180", ignored); }
+    }
+
+    /** One load as a readable line: «🧾 ۱۰۴۷ • مشتری «…» • ۱۲٫۵ میلیون ریال • ثبت: …». */
+    private static String loadLine(Row r) {
+        StringBuilder b = new StringBuilder("🧾 ").append(Money.fa(r.s("no")));
+        String cust = r.s("customer");
+        if (cust != null && !cust.isEmpty() && !"—".equals(cust)) b.append(" • مشتری «").append(cust).append("»");
+        b.append(" • ").append(Money.compactRial(r.d("total")));
+        String reg = r.s("registrant");
+        if (reg != null && !reg.trim().isEmpty()) b.append(" • ثبت: ").append(reg.trim());
+        return b.toString();
     }
 
     private static void finishCb(Runnable r) {

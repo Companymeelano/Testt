@@ -1122,6 +1122,15 @@ public class MainActivity extends Activity {
     private java.util.function.Consumer<String> voiceCb;
 
     /** Start Persian speech recognition; the transcript is delivered to cb. */
+    /** Asks for the microphone (used by live assistant conversation). */
+    public void requestMic(java.util.function.Consumer<Boolean> cb) {
+        micCb = cb;
+        requestPermissions(new String[]{android.Manifest.permission.RECORD_AUDIO}, MIC_PERM);
+    }
+
+    private static final int MIC_PERM = 4471;
+    private java.util.function.Consumer<Boolean> micCb;
+
     public void startVoiceSearch(java.util.function.Consumer<String> cb) {
         voiceCb = cb;
         try {
@@ -1207,6 +1216,12 @@ public class MainActivity extends Activity {
         // Notification permission is best-effort; the app works fully without it.
         boolean granted = grantResults != null && grantResults.length > 0
                 && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED;
+        if (requestCode == MIC_PERM) {
+            java.util.function.Consumer<Boolean> cb = micCb;
+            micCb = null;
+            if (cb != null) cb.accept(granted);
+            return;
+        }
         if (requestCode == SCAN_PERM) {
             if (granted && scanCb != null) launchScanner();
             else {

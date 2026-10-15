@@ -31,6 +31,7 @@ public class SettingsScreen extends Screen {
     private static final String[][] SECTIONS = {
             {"connection", "اتصال", "🔌"},
             {"theme", "ظاهر", "🎨"},
+            {"ai", "هوش مصنوعی", "✦"},
             {"alerts", "هشدارها", "🔔"},
             {"shop", "فروشگاه", "🏪"},
             {"backup", "پشتیبان", "💾"},
@@ -42,6 +43,8 @@ public class SettingsScreen extends Screen {
 
     /** Currently open section (the screen instance is kept for the app's lifetime). */
     private String section = "connection";
+    /** Set by other screens to open a section directly (read once on the next render). */
+    public static String pendingSection = null;
 
     public SettingsScreen(MainActivity a) {
         super(a);
@@ -62,12 +65,17 @@ public class SettingsScreen extends Screen {
     @Override
     public void render(final LinearLayout content) {
         content.removeAllViews();
+        if (pendingSection != null) {
+            section = pendingSection;
+            pendingSection = null;
+        }
         content.addView(heroCard(), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
         content.addView(sectionNav(content), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
         switch (section) {
             case "theme": buildTheme(content); break;
+            case "ai": AiSettings.build(a, content, () -> render(content)); break;
             case "alerts": buildAlerts(content); break;
             case "shop": buildShop(content); break;
             case "backup": buildBackup(content); break;

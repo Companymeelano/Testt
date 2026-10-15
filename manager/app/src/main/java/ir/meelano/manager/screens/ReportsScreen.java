@@ -80,8 +80,8 @@ public class ReportsScreen extends Screen {
 
     private int sectionAccent(String section) {
         if ("ویژه مدیر".equals(section)) return Theme.GOLD;
-        if ("فروش".equals(section)) return Theme.GOLD;
-        if ("خرید".equals(section)) return Theme.INFO;
+        if ("فروش".equals(section)) return Theme.SALES_HUE;
+        if ("خرید".equals(section)) return Theme.BUY_HUE;
         if ("دریافت و پرداخت".equals(section)) return Theme.SUCCESS;
         if ("چک‌ها".equals(section)) return Theme.INFO;
         if ("کالا و انبار".equals(section)) return Theme.VIOLET;
@@ -132,9 +132,9 @@ public class ReportsScreen extends Screen {
         content.addView(a.kit.btnGhost("📈  داشبورد تحلیلی فروش", Theme.VIOLET, v -> a.nav("analytics")), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(8));
         LinearLayout tr = a.kit.h();
-        tr.addView(a.kit.btnGhost("🧾  فاکتورهای فروش", Theme.GOLD, v -> a.nav("sales")), a.kit.wlp(1f));
+        tr.addView(a.kit.btnGhost("🧾  فاکتورهای فروش", Theme.SALES_HUE, v -> a.nav("sales")), a.kit.wlp(1f));
         tr.addView(a.kit.space(8));
-        tr.addView(a.kit.btnGhost("🧺  فاکتورهای خرید", Theme.INFO, v -> a.nav("buy")), a.kit.wlp(1f));
+        tr.addView(a.kit.btnGhost("🧺  فاکتورهای خرید", Theme.BUY_HUE, v -> a.nav("buy")), a.kit.wlp(1f));
         content.addView(tr, a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
         content.addView(a.kit.searchBar("جست‌وجوی نام، کاربرد یا دستهٔ گزارش…", browseQuery, q -> {

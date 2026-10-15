@@ -39,6 +39,9 @@ public final class Theme {
     public static int VIOLET = 0xFF9A7BFF;
     public static int TEAL = 0xFF3ED6C5;
     public static int STEEL = 0xFF7C8DA6;
+    /** Fixed hues for sales and purchases: they must stand out from the gold/theme accent. */
+    public static final int SALES_HUE = 0xFFFF8A3D;
+    public static final int BUY_HUE = 0xFFFF5FA2;
 
     private static boolean light = false;
     /** Mirror of !light for call sites (charts, tables). */

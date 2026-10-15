@@ -1,15 +1,17 @@
 package ir.meelano.manager.screens;
 
-import android.app.AlertDialog;
 import android.content.Context;
-import android.content.SharedPreferences;
-import android.speech.tts.TextToSpeech;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.speech.RecognitionListener;
+import android.speech.RecognizerIntent;
+import android.speech.SpeechRecognizer;
 import android.text.Editable;
-import android.text.InputType;
 import android.text.TextWatcher;
-import android.view.Gravity;
 import android.view.View;
-import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
@@ -22,6 +24,7 @@ import ir.meelano.manager.core.Diag;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.Notify;
 import ir.meelano.manager.core.SecretBox;
+import ir.meelano.manager.core.Speaker;
 import ir.meelano.manager.core.WarehouseSync;
 import ir.meelano.manager.data.Repo;
 import ir.meelano.manager.ui.Card3D;
@@ -35,10 +38,9 @@ import java.util.Locale;
 
 /**
  * «دستیار میلانو»: a Persian manager chat over the live store data.
- * Uses a configured generative model (Gemini, OpenAI, Grok or a custom
- * OpenAI-compatible server) when the user has added a key and allowed it;
- * otherwise the built-in data engine answers. Voice in and out, daily summary,
- * and a minute refresh while the screen is open.
+ * Uses the configured generative model (set in Settings → هوش مصنوعی) when it is
+ * enabled; otherwise the built-in data engine answers. Supports typed questions,
+ * voice input, read-aloud replies, and a live voice conversation mode.
  */
 public final class AssistantScreen extends Screen {
 
@@ -47,18 +49,12 @@ public final class AssistantScreen extends Screen {
             "چک‌های نزدیک سررسید", "موجودی و کسری", "ویزیتورها", "پیشنهاد اقدام", "راهنما"
     };
     private static final String PREFS = "meelano_assistant";
-    private static final String AI_PREFS = "meelano_ai";
-    private static final String KEY_NAME = "ai_key";
 
     static final String SYSTEM_PROMPT =
             "تو دستیار ارشد مدیریت یک فروشگاه ایرانی هستی؛ مدیری بسیار باتجربه در فروش، خرید، کالا، انبار، "
             + "دریافت و پرداخت، چک، بدهکاری و ویزیتورها. فقط بر اساس «داده‌های فروشگاه» پاسخ بده، "
             + "هیچ عددی را حدس نزن و اگر داده‌ای نبود صریح بگو. پاسخ فارسی، کوتاه، دقیق و قابل اقدام باشد؛ "
             + "در پایان یک یا دو پیشنهاد عملی بده. مبالغ را با جداکننده هزارگان و واحد ریال بنویس.";
-
-    private static TextToSpeech tts;
-    private static boolean ttsReady = false;
-    private static String pendingSpeech = null;
 
     private final List<String[]> msgs = new ArrayList<>();
     private final List<Runnable> pending = new ArrayList<>();
@@ -68,14 +64,19 @@ public final class AssistantScreen extends Screen {
     private LinearLayout root;
     private String draft = "";
 
-    /** Keeps the snapshot fresh every minute while the assistant is open; stops when it is closed. */
-    private final android.os.Handler ticker = new android.os.Handler(android.os.Looper.getMainLooper());
+    // live conversation
+    private boolean liveOn = false;
+    private boolean listening = false;
+    private SpeechRecognizer recognizer;
+    private final Handler handler = new Handler(Looper.getMainLooper());
+
+    /** Keeps the snapshot fresh every minute while the assistant is open. */
     private final Runnable tick = new Runnable() {
         @Override
         public void run() {
             if (root == null || !root.isAttachedToWindow()) return;
             refresh(true, null);
-            ticker.postDelayed(this, Assistant.FRESH_MS);
+            handler.postDelayed(this, Assistant.FRESH_MS);
         }
     };
 
@@ -83,25 +84,10 @@ public final class AssistantScreen extends Screen {
         super(a);
     }
 
-    @Override
-    public String id() {
-        return "assistant";
-    }
-
-    @Override
-    public String title() {
-        return "دستیار میلانو";
-    }
-
-    @Override
-    public String glyph() {
-        return "✦";
-    }
-
-    @Override
-    public int accent() {
-        return Theme.GOLD;
-    }
+    @Override public String id() { return "assistant"; }
+    @Override public String title() { return "دستیار میلانو"; }
+    @Override public String glyph() { return "✦"; }
+    @Override public int accent() { return Theme.GOLD; }
 
     @Override
     public void render(LinearLayout content) {
@@ -109,17 +95,17 @@ public final class AssistantScreen extends Screen {
         if (msgs.isEmpty()) {
             msgs.add(new String[]{"bot", "سلام! من دستیار مدیریت فروشگاه شما هستم. "
                     + "اطلاعات فروش، خرید، کالا، انبار، دریافت، پرداخت، چک‌ها و بدهکاران را از پایگاه‌داده می‌خوانم. "
-                    + "هر سؤالی دارید بپرسید یا یکی از پرسش‌های آماده را بزنید."});
+                    + "هر سؤالی دارید بپرسید، یکی از پرسش‌های آماده را بزنید، یا «گفتگوی زنده» را روشن کنید."});
         }
         build();
         refresh(false, null);
-        ticker.removeCallbacks(tick);
-        ticker.postDelayed(tick, Assistant.FRESH_MS);
+        handler.removeCallbacks(tick);
+        handler.postDelayed(tick, Assistant.FRESH_MS);
     }
 
     // ================= data =================
 
-    /** Reloads the snapshot when it is stale (or forced), then runs after. */
+    /** Reloads the snapshot when it is stale (or forced), then runs the queued actions. */
     private void refresh(boolean force, Runnable after) {
         boolean fresh = snap != null && System.currentTimeMillis() - snap.loadedAt < Assistant.FRESH_MS;
         if (after != null) pending.add(after);
@@ -168,7 +154,10 @@ public final class AssistantScreen extends Screen {
 
     private void ask(String question) {
         final String q = question == null ? "" : question.trim();
-        if (q.isEmpty()) return;
+        if (q.isEmpty()) {
+            if (liveOn) listenOnce();
+            return;
+        }
         draft = "";
         msgs.add(new String[]{"user", q});
         redraw();
@@ -177,27 +166,33 @@ public final class AssistantScreen extends Screen {
             if (aiReady()) {
                 askAi(q, rule);
             } else {
-                msgs.add(new String[]{"bot", rule});
-                if (speakOn()) speak(rule);
+                addAnswer("bot", rule);
             }
         });
     }
 
-    // ================= generative AI =================
-
-    private SharedPreferences aiPrefs() {
-        return a.getSharedPreferences(AI_PREFS, Context.MODE_PRIVATE);
+    /** Adds an assistant reply; in live mode it is read aloud and then listening resumes. */
+    private void addAnswer(String role, String text) {
+        msgs.add(new String[]{role, text});
+        redraw();
+        if (liveOn) {
+            Speaker.speak(a, text, this::listenOnce);
+        } else if (speakOn()) {
+            Speaker.speak(a, text, null);
+        }
     }
 
+    // ================= generative AI =================
+
     private boolean aiReady() {
-        return aiPrefs().getBoolean("consent", false) && !SecretBox.get(a, KEY_NAME).isEmpty();
+        return AiSettings.ready(a);
     }
 
     private void askAi(final String q, final String rule) {
-        final String provider = aiPrefs().getString("provider", AiClient.GEMINI);
-        final String model = aiPrefs().getString("model", "");
-        final String custom = aiPrefs().getString("baseUrl", "");
-        final String key = SecretBox.get(a, KEY_NAME);
+        final String provider = AiSettings.prefs(a).getString("provider", AiClient.GEMINI);
+        final String model = AiSettings.prefs(a).getString("model", "");
+        final String custom = AiSettings.prefs(a).getString("baseUrl", "");
+        final String key = SecretBox.get(a, AiSettings.KEY_NAME);
         final String ctx = Assistant.contextBlock(snap);
         aiBusy = true;
         redraw();
@@ -214,132 +209,111 @@ public final class AssistantScreen extends Screen {
             a.runOnUiThread(() -> {
                 aiBusy = false;
                 if (fr != null) {
-                    msgs.add(new String[]{"ai", fr});
-                    if (speakOn()) speak(fr);
+                    addAnswer("ai", fr);
                 } else {
-                    String note = "\n\n⚠ هوش مصنوعی پاسخ نداد: " + fe + "\nپاسخ داده‌محور:";
-                    msgs.add(new String[]{"bot", note + "\n" + rule});
+                    addAnswer("bot", "⚠ هوش مصنوعی پاسخ نداد: " + fe + "\nپاسخ داده‌محور:\n" + rule);
                 }
-                redraw();
             });
         }).start();
     }
 
-    private void showAiSettings() {
-        final SharedPreferences p = aiPrefs();
-        final String[] prov = {p.getString("provider", AiClient.GEMINI)};
-        LinearLayout body = a.kit.v();
-        body.setPadding(Theme.dp(18), Theme.dp(6), Theme.dp(18), Theme.dp(12));
-        body.addView(a.kit.hint("مدل هوش مصنوعی را انتخاب کنید. کلید روی گوشی رمزگذاری می‌شود و هرگز در متن برنامه ذخیره نمی‌شود."),
-                a.kit.lp(-1, -2));
-        body.addView(a.kit.gap(8));
-        LinearLayout provRow = a.kit.h();
-        final AlertDialog[] box = new AlertDialog[1];
-        String[][] options = {
-                {AiClient.GEMINI, "Gemini"}, {AiClient.OPENAI, "OpenAI"},
-                {AiClient.GROK, "Grok"}, {AiClient.CUSTOM, "سفارشی"}
-        };
-        for (String[] o : options) {
-            boolean on = o[0].equals(prov[0]);
-            provRow.addView(on ? a.kit.btnGold(o[1], v -> { }) : a.kit.btnGhost(o[1], Theme.GOLD, v -> { }),
-                    weight());
+    // ================= live conversation =================
+
+    private void toggleLive() {
+        if (liveOn) {
+            stopLive("گفتگوی زنده متوقف شد");
+            return;
         }
-        body.addView(provRow, a.kit.lp(-1, -2));
-        // Provider buttons are rebuilt on change: reopen the dialog with the chosen provider.
-        for (int i = 0; i < options.length; i++) {
-            final String id = options[i][0];
-            View btn = provRow.getChildAt(i);
-            btn.setOnClickListener(v -> {
-                try {
-                    if (box[0] != null) box[0].dismiss();
-                } catch (Exception e) {
-                    Diag.ignored("AssistantScreen:dlg", e);
-                }
-                saveProvider(id);
-                showAiSettings();
+        if (a.checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            a.requestMic(granted -> {
+                if (granted) toggleLive();
+                else a.kit.toast("برای گفتگوی زنده دسترسی میکروفون لازم است");
             });
+            return;
         }
-        body.addView(a.kit.gap(8));
-        final EditText model = a.kit.edit("نام مدل، مثلاً gemini-2.5-flash", p.getString("model", ""));
-        body.addView(a.kit.hint("نام مدل"), a.kit.lp(-1, -2));
-        body.addView(model, a.kit.lp(-1, -2));
-        body.addView(a.kit.gap(6));
-        final EditText baseUrl = a.kit.edit("https://…/v1 (فقط برای سفارشی)", p.getString("baseUrl", ""));
-        if (AiClient.CUSTOM.equals(prov[0])) {
-            body.addView(a.kit.hint("آدرس سرویس"), a.kit.lp(-1, -2));
-            body.addView(baseUrl, a.kit.lp(-1, -2));
-            body.addView(a.kit.gap(6));
+        if (!SpeechRecognizer.isRecognitionAvailable(a)) {
+            a.kit.toast("تشخیص گفتار در این گوشی پشتیبانی نمی‌شود");
+            return;
         }
-        final EditText key = a.kit.edit("کلید API را اینجا وارد کنید", "", true);
-        key.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        body.addView(a.kit.hint(SecretBox.get(a, KEY_NAME).isEmpty()
-                ? "کلید: هنوز ثبت نشده" : "کلید: ثبت شده (برای تغییر، کلید جدید را وارد کنید)"), a.kit.lp(-1, -2));
-        body.addView(key, a.kit.lp(-1, -2));
-        body.addView(a.kit.gap(8));
-        final CheckBox consent = new CheckBox(a);
-        consent.setText("اجازه می‌دهم خلاصهٔ عددی فروشگاه (فروش، مانده، چک و معوق‌ها) برای پاسخ هوشمند به همین سرویس فرستاده شود.");
-        consent.setTextColor(Theme.TEXT);
-        consent.setTextSize(12.5f);
-        consent.setChecked(p.getBoolean("consent", false));
-        body.addView(consent, a.kit.lp(-1, -2));
-        body.addView(a.kit.gap(10));
-        body.addView(a.kit.btnGold("✦ ذخیره", v -> {
-            String k = key.getText().toString().trim();
-            if (!k.isEmpty() && !SecretBox.put(a, KEY_NAME, k)) {
-                a.kit.toast("ذخیرهٔ امن کلید ممکن نشد");
-                return;
-            }
-            p.edit().putString("provider", prov[0])
-                    .putString("model", model.getText().toString().trim())
-                    .putString("baseUrl", baseUrl.getText().toString().trim())
-                    .putBoolean("consent", consent.isChecked())
-                    .apply();
-            a.kit.toast("تنظیمات هوش مصنوعی ذخیره شد");
-            closeDialog(box[0]);
-            redraw();
-        }), a.kit.lp(-1, -2));
-        body.addView(a.kit.gap(6));
-        body.addView(a.kit.btnGhost("⟳ آزمایش اتصال", Theme.TEAL, v -> testConnection(prov[0],
-                model.getText().toString().trim(), baseUrl.getText().toString().trim(),
-                key.getText().toString().trim())), a.kit.lp(-1, -2));
-        body.addView(a.kit.gap(6));
-        body.addView(a.kit.btnGhost("🗑 حذف کلید", Theme.DANGER, v -> {
-            SecretBox.put(a, KEY_NAME, "");
-            p.edit().putBoolean("consent", false).apply();
-            a.kit.toast("کلید حذف شد و پاسخ هوشمند خاموش شد");
-            closeDialog(box[0]);
-            redraw();
-        }), a.kit.lp(-1, -2));
-        box[0] = a.kit.dialog("✦ تنظیم هوش مصنوعی", a.kit.scrollWrap(body, 480), true);
-        box[0].show();
+        liveOn = true;
+        if (!speakOn()) setSpeakOn(true);
+        a.kit.toast("گفتگوی زنده روشن شد؛ سؤالتان را بگویید");
+        listenOnce();
     }
 
-    private void saveProvider(String id) {
-        aiPrefs().edit().putString("provider", id).apply();
-    }
-
-    private void closeDialog(AlertDialog d) {
+    private void stopLive(String note) {
+        liveOn = false;
+        listening = false;
         try {
-            if (d != null) d.dismiss();
+            if (recognizer != null) {
+                recognizer.stopListening();
+                recognizer.cancel();
+                recognizer.destroy();
+            }
         } catch (Exception e) {
-            Diag.ignored("AssistantScreen:close", e);
+            Diag.ignored("AssistantScreen:stopLive", e);
         }
+        recognizer = null;
+        if (note != null) a.kit.toast(note);
+        redraw();
     }
 
-    private void testConnection(String provider, String model, String base, String key) {
-        String k = key.isEmpty() ? SecretBox.get(a, KEY_NAME) : key;
-        a.kit.toast("در حال آزمایش اتصال…");
-        new Thread(() -> {
-            String msg;
-            try {
-                String r = AiClient.complete(provider, base, model, k, "پاسخ کوتاه بده.", "فقط بنویس: آمادهٔ کمک هستم.");
-                msg = "اتصال برقرار است ✓ " + (r.length() > 60 ? r.substring(0, 60) + "…" : r);
-            } catch (Exception e) {
-                msg = "اتصال ناموفق: " + (e.getMessage() == null ? "خطا" : e.getMessage());
+    private void listenOnce() {
+        if (!liveOn) return;
+        if (root == null || !root.isAttachedToWindow()) {
+            stopLive(null);
+            return;
+        }
+        if (aiBusy) return; // answer still coming; listenOnce runs again after it is spoken
+        try {
+            if (recognizer == null) {
+                recognizer = SpeechRecognizer.createSpeechRecognizer(a);
+                recognizer.setRecognitionListener(new RecognitionListener() {
+                    @Override public void onReadyForSpeech(Bundle params) { }
+                    @Override public void onBeginningOfSpeech() { }
+                    @Override public void onRmsChanged(float rmsdB) { }
+                    @Override public void onBufferReceived(byte[] buffer) { }
+                    @Override public void onEndOfSpeech() { }
+                    @Override public void onPartialResults(Bundle partialResults) { }
+                    @Override public void onEvent(int eventType, Bundle params) { }
+
+                    @Override
+                    public void onResults(Bundle results) {
+                        listening = false;
+                        List<String> got = results == null ? null
+                                : results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+                        String text = got == null || got.isEmpty() ? "" : got.get(0).trim();
+                        if (text.isEmpty()) {
+                            listenOnce();
+                        } else {
+                            ask(text);
+                        }
+                    }
+
+                    @Override
+                    public void onError(int error) {
+                        listening = false;
+                        if (!liveOn) return;
+                        if (error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT
+                                || error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY) {
+                            handler.postDelayed(AssistantScreen.this::listenOnce, 500);
+                        } else {
+                            stopLive("گفتگوی زنده متوقف شد؛ دوباره روشن کنید");
+                        }
+                    }
+                });
             }
-            final String fm = msg;
-            a.runOnUiThread(() -> a.kit.toast(fm));
-        }).start();
+            Intent i = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+            i.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+            i.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fa-IR");
+            i.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false);
+            listening = true;
+            recognizer.startListening(i);
+            redraw();
+        } catch (Exception e) {
+            Diag.ignored("AssistantScreen:listen", e);
+            stopLive("شنیدن صدا ممکن نشد");
+        }
     }
 
     // ================= UI =================
@@ -363,6 +337,10 @@ public final class AssistantScreen extends Screen {
         root.addView(a.kit.gap(8));
         root.addView(aiRow(), a.kit.lp(-1, -2));
         root.addView(a.kit.gap(10));
+        if (liveOn) {
+            root.addView(liveBar(), a.kit.lp(-1, -2));
+            root.addView(a.kit.gap(10));
+        }
         if (loading && snap == null) {
             root.addView(a.kit.loading("در حال خواندن اطلاعات فروشگاه…"), a.kit.lp(-1, -2));
         }
@@ -378,7 +356,7 @@ public final class AssistantScreen extends Screen {
         root.addView(a.kit.gap(6));
         root.addView(a.kit.hint(aiReady()
                 ? "پاسخ‌ها با مدل هوش مصنوعی شما و از روی داده‌های زندهٔ فروشگاه ساخته می‌شوند."
-                : "پاسخ‌ها از موتور داخلی و داده‌های زندهٔ فروشگاه ساخته می‌شوند؛ هیچ داده‌ای بیرون نمی‌رود مگر اینکه هوش مصنوعی را فعال کنید."),
+                : "پاسخ‌ها از موتور داخلی و داده‌های زندهٔ فروشگاه ساخته می‌شوند؛ هیچ داده‌ای بیرون نمی‌رود."),
                 a.kit.lp(-1, -2));
     }
 
@@ -419,9 +397,22 @@ public final class AssistantScreen extends Screen {
     private View aiRow() {
         boolean ready = aiReady();
         String label = ready
-                ? "✦ هوش مصنوعی فعال • " + aiPrefs().getString("model", "")
-                : "✦ تنظیم هوش مصنوعی (Gemini / OpenAI / Grok)";
-        return a.kit.btnGold(label, v -> showAiSettings());
+                ? "✦ هوش مصنوعی فعال • " + AiSettings.prefs(a).getString("model", "")
+                : "✦ هوش مصنوعی خاموش — تنظیم در «تنظیمات»";
+        return a.kit.btnGhost(label, Theme.GOLD, v -> {
+            SettingsScreen.pendingSection = "ai";
+            a.nav("settings");
+        });
+    }
+
+    private View liveBar() {
+        LinearLayout bar = Card3D.card(a, Theme.TEAL);
+        LinearLayout row = a.kit.h();
+        String state = listening ? "🎙 در حال شنیدن… سؤالتان را بگویید" : "✦ در حال پاسخ یا خواندن…";
+        row.addView(a.kit.text(state, 12.5f, Theme.TEXT, true), a.kit.wlp(1f));
+        row.addView(a.kit.btnGhost("■ توقف", Theme.DANGER, v -> toggleLive()), a.kit.lp(-2, -2));
+        bar.addView(row, a.kit.lp(-1, -2));
+        return bar;
     }
 
     private LinearLayout.LayoutParams weight() {
@@ -444,7 +435,7 @@ public final class AssistantScreen extends Screen {
         card.addView(body, a.kit.lp(-1, -2));
         if (!user) {
             card.addView(a.kit.gap(6));
-            card.addView(a.kit.btnGhost("🔊 بخوان", Theme.GOLD, v -> speak(text)), a.kit.lp(-2, -2));
+            card.addView(a.kit.btnGhost("🔊 بخوان", Theme.GOLD, v -> Speaker.speak(a, text, null)), a.kit.lp(-2, -2));
         }
         return card;
     }
@@ -453,16 +444,9 @@ public final class AssistantScreen extends Screen {
         LinearLayout box = a.kit.v();
         final EditText input = a.kit.edit("مثلاً: فروش امروز چقدر است؟", draft);
         input.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence s, int st, int c, int af) { }
-
-            @Override
-            public void onTextChanged(CharSequence s, int st, int b, int c) { }
-
-            @Override
-            public void afterTextChanged(Editable s) {
-                draft = s.toString();
-            }
+            @Override public void beforeTextChanged(CharSequence s, int st, int c, int af) { }
+            @Override public void onTextChanged(CharSequence s, int st, int b, int c) { }
+            @Override public void afterTextChanged(Editable s) { draft = s.toString(); }
         });
         box.addView(input, a.kit.lp(-1, -2));
         box.addView(a.kit.gap(6));
@@ -472,6 +456,7 @@ public final class AssistantScreen extends Screen {
             draft = text;
             ask(text);
         })), weight());
+        row.addView(a.kit.btnGhost(liveOn ? "■ گفتگو" : "🎙 گفتگوی زنده", Theme.VIOLET, v -> toggleLive()), weight());
         box.addView(row, a.kit.lp(-1, -2));
         return box;
     }
@@ -487,7 +472,7 @@ public final class AssistantScreen extends Screen {
         });
     }
 
-    // ================= voice out =================
+    // ================= voice out preference =================
 
     private boolean speakOn() {
         return a.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("speak", false);
@@ -495,58 +480,5 @@ public final class AssistantScreen extends Screen {
 
     private void setSpeakOn(boolean on) {
         a.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("speak", on).apply();
-    }
-
-    private void speak(String text) {
-        try {
-            String clean = text.replace("•", " ").replace("✦", " ").replace("📊", " ")
-                    .replace("⚠", " ").replace("📨", " ");
-            if (tts == null) {
-                pendingSpeech = clean;
-                tts = new TextToSpeech(a.getApplicationContext(), status -> {
-                    if (status == TextToSpeech.SUCCESS) {
-                        int r = tts.setLanguage(new Locale("fa"));
-                        ttsReady = r >= TextToSpeech.LANG_AVAILABLE;
-                        if (ttsReady && pendingSpeech != null) {
-                            tts.speak(pendingSpeech, TextToSpeech.QUEUE_FLUSH, null, "meelano-assistant");
-                        }
-                    }
-                    pendingSpeech = null;
-                });
-                return;
-            }
-            if (!ttsReady) {
-                a.kit.toast("صدای فارسی روی این گوشی نصب نیست");
-                return;
-            }
-            tts.speak(clean, TextToSpeech.QUEUE_FLUSH, null, "meelano-assistant");
-        } catch (Exception e) {
-            Diag.ignored("AssistantScreen:speak", e);
-        }
-    }
-
-    // ================= home entry =================
-
-    /** Gradient entry card shown on the home screen. */
-    public static View entryCard(MainActivity a) {
-        LinearLayout card = new LinearLayout(a);
-        card.setOrientation(LinearLayout.HORIZONTAL);
-        card.setGravity(Gravity.CENTER_VERTICAL);
-        card.setBackground(Theme.executiveHero());
-        card.setPadding(Theme.dp(16), Theme.dp(14), Theme.dp(14), Theme.dp(14));
-        card.setElevation(Theme.cardElevation());
-        TextView icon = a.kit.text("✦", 28f, Theme.GOLD, true);
-        card.addView(icon, a.kit.lp(-2, -2));
-        LinearLayout col = a.kit.v();
-        col.setPadding(Theme.dp(12), 0, Theme.dp(8), 0);
-        col.addView(a.kit.text("دستیار هوشمند میلانو", 15f, Theme.TEXT, true), a.kit.lp(-1, -2));
-        col.addView(a.kit.text("پرسش به فارسی، خلاصهٔ روزانه، پیشنهاد اقدام و خواندن با صدا", 11.5f, Theme.MUTED, false),
-                a.kit.lp(-1, -2));
-        card.addView(col, new LinearLayout.LayoutParams(0, -2, 1f));
-        TextView go = a.kit.text("‹", 22f, Theme.GOLD, true);
-        card.addView(go, a.kit.lp(-2, -2));
-        card.setOnClickListener(v -> a.nav("assistant"));
-        Theme.pressable(card);
-        return card;
     }
 }

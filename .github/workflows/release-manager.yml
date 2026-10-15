@@ -150,6 +150,6 @@ jobs:
             exit 1
           fi
           gh release create "$TAG" dist/*.apk dist/version.json \
-            --title "MEELANO Manager v${NAME}" \
-            --notes "نسخه فروش میلانو ${NAME}. برای بروزرسانی، داخل برنامه: تنظیمات ‹ بروزرسانی برنامه." \
+            --title "مدیر پخش v${NAME}" \
+            --notes "نسخه فروش «مدیر پخش» (${NAME}). برای بروزرسانی، داخل برنامه: تنظیمات ‹ بروزرسانی برنامه." \
             --latest

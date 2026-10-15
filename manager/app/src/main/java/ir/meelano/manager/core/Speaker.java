@@ -1,7 +1,7 @@
 package ir.meelano.manager.core;
 
 import android.content.Intent;
-import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
@@ -13,6 +13,7 @@ import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.ui.Theme;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -21,57 +22,70 @@ import java.util.Map;
 /**
  * Shared Persian text-to-speech for the whole app.
  *
- * Android does not let an app install system packages silently: the user confirms each
- * install. This class does everything else automatically: it detects a missing Persian
- * voice, opens the Google Text-to-Speech install page, asks the system to download the
- * Persian voice data, and re-checks when the user comes back, then continues.
+ * Google's Text-to-Speech does not offer Persian on many phones, so the speaker probes every
+ * installed TTS engine and uses the first one that really speaks Persian. When none does, it
+ * guides the user to install eSpeak NG (which supports Persian). Android requires the user to
+ * confirm every install; the app opens the store page and re-checks when the user returns.
  */
 public final class Speaker {
     private Speaker() { }
 
-    static final String GOOGLE_TTS = "com.google.android.tts";
+    /** eSpeak NG: open-source engine with Persian (fa). Play and F-Droid. */
+    public static final String ESPEAK_PKG = "com.reecedunn.espeak";
+    public static final String ESPEAK_FDROID = "https://f-droid.org/en/packages/com.reecedunn.espeak/";
+    /** Engines we prefer when several are installed (they support Persian). */
+    private static final List<String> PREFERRED = Arrays.asList(ESPEAK_PKG, "com.redzoc.ramees.tts.espeak",
+            "com.googlecode.eyesfree.espeak");
+    private static final long PROBE_TIMEOUT_MS = 4000;
 
-    private static final int UNINIT = 0, READY = 1, NO_PERSIAN = 2, FAILED = 3;
+    private static final int UNINIT = 0, PROBING = 1, READY = 2, NO_PERSIAN = 3;
     private static TextToSpeech tts;
+    private static String engineName = "";
     private static int state = UNINIT;
     private static boolean setupShown = false;
     private static android.app.AlertDialog setupDialog;
     private static int seq = 0;
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static final Map<String, Runnable> WAITING = new HashMap<>();
-    private static final List<Runnable> AFTER_INIT = new ArrayList<>();
+    private static final List<Runnable> AFTER_PROBE = new ArrayList<>();
 
     /** True when a Persian voice can be used right now. */
     public static boolean persianReady() {
         return state == READY;
     }
 
+    /** Name of the engine that speaks Persian (empty when none). */
+    public static String engine() {
+        return engineName;
+    }
+
     /**
-     * Called on every resume. The first time the app opens without a Persian voice it shows
-     * the setup step (blocking until the user continues). When the user returns from the
-     * system install screens, it re-checks and closes the step by itself.
+     * Called on every resume. The first time the app opens without a Persian voice it shows the
+     * setup step. When the user returns from the store, it probes the engines again and closes
+     * the step by itself once Persian works.
      */
     public static void onResume(final MainActivity a) {
         if (state == UNINIT) {
-            ensure(a, () -> {
+            probe(a, () -> {
                 if (state == NO_PERSIAN) showSetup(a);
             });
             return;
         }
         if (state == NO_PERSIAN) {
-            recheck();
-            if (state == READY) {
-                closeSetup();
-                a.kit.toast("صدای فارسی آماده است");
-            } else if (setupDialog == null || !setupDialog.isShowing()) {
-                showSetup(a);
-            }
+            probe(a, () -> {
+                if (state == READY) {
+                    closeSetup();
+                    a.kit.toast("صدای فارسی آماده است (" + engineName + ")");
+                } else if (setupDialog == null || !setupDialog.isShowing()) {
+                    showSetup(a);
+                }
+            });
         }
     }
 
     /**
-     * Speaks the text (symbols removed). {@code onDone} runs on the main thread when the
-     * speech ends, or at once when nothing could be spoken.
+     * Speaks the text (symbols removed). {@code onDone} runs on the main thread when the speech
+     * ends, or at once when nothing could be spoken.
      */
     public static void speak(final MainActivity a, final String text, final Runnable onDone) {
         final String clean = clean(text);
@@ -79,9 +93,8 @@ public final class Speaker {
             post(onDone);
             return;
         }
-        ensure(a, () -> {
-            if (state == NO_PERSIAN) recheck();
-            if (state == READY) {
+        whenProbed(a, () -> {
+            if (state == READY && tts != null) {
                 String id = "m" + (++seq);
                 if (onDone != null) {
                     synchronized (WAITING) {
@@ -91,8 +104,8 @@ public final class Speaker {
                 tts.speak(clean, TextToSpeech.QUEUE_FLUSH, null, id);
             } else {
                 post(onDone);
-                if (state == NO_PERSIAN && !setupShown) showSetup(a);
-                else a.kit.toast("صدای فارسی روی گوشی نصب نیست؛ از «تنظیمات ← هوش مصنوعی» راه‌اندازی کنید");
+                if (!setupShown) showSetup(a);
+                else a.kit.toast("صدای فارسی روی گوشی نیست؛ موتور eSpeak NG را نصب کنید");
             }
         });
     }
@@ -102,37 +115,26 @@ public final class Speaker {
     private static void showSetup(final MainActivity a) {
         if (setupDialog != null && setupDialog.isShowing()) return;
         setupShown = true;
-        final boolean googleOk = googleTtsInstalled(a);
 
         LinearLayout body = a.kit.v();
         body.setPadding(Theme.dp(18), Theme.dp(6), Theme.dp(18), Theme.dp(12));
-        body.addView(a.kit.text("برای خواندن متن فارسی و گفتگوی زنده، بستهٔ صدای فارسی لازم است. "
-                + "برنامه مراحل را به ترتیب باز می‌کند؛ فقط کافی است هر بار «نصب» را تأیید کنید.",
+        body.addView(a.kit.text("موتور صدای این گوشی زبان فارسی ندارد. برای خواندن متن فارسی و گفتگوی زنده، "
+                + "موتور رایگان eSpeak NG را نصب کنید. بعد از نصب و برگشت به برنامه، خودکار بررسی می‌شود.",
                 13f, Theme.TEXT, false), a.kit.lp(-1, -2));
-        body.addView(a.kit.gap(10));
-        body.addView(a.kit.text((googleOk ? "✓ " : "۱. ") + "موتور صدای Google (Text-to-Speech)"
-                + (googleOk ? " — نصب است" : " — نصب نیست"), 12.5f,
-                googleOk ? Theme.SUCCESS : Theme.GOLD_SOFT, true), a.kit.lp(-1, -2));
-        body.addView(a.kit.gap(6));
-        body.addView(a.kit.text("۲. بستهٔ صدای فارسی", 12.5f, Theme.GOLD_SOFT, true), a.kit.lp(-1, -2));
         body.addView(a.kit.gap(12));
-
-        if (!googleOk) {
-            body.addView(a.kit.btnGold("۱. باز کردن صفحهٔ نصب موتور صدای Google", v -> openPlay(a)),
-                    a.kit.lp(-1, -2));
-            body.addView(a.kit.gap(6));
-        }
-        body.addView(a.kit.btnGold("۲. دانلود و نصب صدای فارسی", v -> openInstall(a)), a.kit.lp(-1, -2));
+        body.addView(a.kit.btnGold("۱. نصب eSpeak NG از فروشگاه", v -> openStore(a)), a.kit.lp(-1, -2));
         body.addView(a.kit.gap(6));
-        body.addView(a.kit.btnGhost("⟳ بررسی مجدد", Theme.TEAL, v -> {
-            recheck();
+        body.addView(a.kit.btnGhost("صفحهٔ F-Droid (جایگزین)", Theme.TEAL, v -> openUrl(a, ESPEAK_FDROID)),
+                a.kit.lp(-1, -2));
+        body.addView(a.kit.gap(6));
+        body.addView(a.kit.btnGhost("⟳ بررسی مجدد", Theme.TEAL, v -> probe(a, () -> {
             if (state == READY) {
                 closeSetup();
-                a.kit.toast("صدای فارسی آماده است");
+                a.kit.toast("صدای فارسی آماده است (" + engineName + ")");
             } else {
-                a.kit.toast("هنوز صدای فارسی نصب نشده است");
+                a.kit.toast("هنوز موتور فارسی پیدا نشد");
             }
-        }), a.kit.lp(-1, -2));
+        })), a.kit.lp(-1, -2));
         body.addView(a.kit.gap(6));
         body.addView(a.kit.btnGhost("فعلاً بدون صدا ادامه بده", Theme.MUTED, v -> closeSetup()), a.kit.lp(-1, -2));
 
@@ -150,88 +152,143 @@ public final class Speaker {
         setupDialog = null;
     }
 
-    /** Opens the Google Text-to-Speech page in Play (the user taps install). */
-    public static void openPlay(MainActivity a) {
+    /** Opens the eSpeak NG page in the store (the user taps install). */
+    public static void openStore(MainActivity a) {
         try {
-            a.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=" + GOOGLE_TTS)));
+            a.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=" + ESPEAK_PKG)));
         } catch (Exception e) {
-            try {
-                a.startActivity(new Intent(Intent.ACTION_VIEW,
-                        Uri.parse("https://play.google.com/store/apps/details?id=" + GOOGLE_TTS)));
-            } catch (Exception e2) {
-                a.kit.toast("فروشگاه برنامه پیدا نشد");
-            }
+            openUrl(a, "https://play.google.com/store/apps/details?id=" + ESPEAK_PKG);
         }
     }
 
-    /** Asks the system to download/install the Persian voice data (user confirms). */
-    public static void openInstall(MainActivity a) {
+    private static void openUrl(MainActivity a, String url) {
         try {
-            Intent i = new Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA);
-            if (i.resolveActivity(a.getPackageManager()) != null) {
-                a.startActivity(i);
-                return;
-            }
+            a.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
         } catch (Exception e) {
-            Diag.ignored("Speaker:install", e);
-        }
-        try {
-            a.startActivity(new Intent("com.android.settings.TTS_SETTINGS"));
-        } catch (Exception e) {
-            a.kit.toast("تنظیمات خروجی صدا روی این گوشی پیدا نشد");
+            a.kit.toast("مرورگر یا فروشگاه پیدا نشد");
         }
     }
 
-    static boolean googleTtsInstalled(MainActivity a) {
-        try {
-            a.getPackageManager().getPackageInfo(GOOGLE_TTS, 0);
-            return true;
-        } catch (PackageManager.NameNotFoundException e) {
-            return false;
-        }
-    }
+    // ================= engine probing =================
 
-    // ================= engine =================
-
-    private static void ensure(final MainActivity a, final Runnable ready) {
-        if (state != UNINIT) {
+    private static void whenProbed(final MainActivity a, final Runnable ready) {
+        if (state == READY || state == NO_PERSIAN) {
             ready.run();
             return;
         }
-        synchronized (AFTER_INIT) {
-            AFTER_INIT.add(ready);
-            if (tts != null) return;
+        synchronized (AFTER_PROBE) {
+            AFTER_PROBE.add(ready);
         }
-        tts = new TextToSpeech(a.getApplicationContext(), status -> {
-            int s = FAILED;
-            if (status == TextToSpeech.SUCCESS) {
-                tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
-                    @Override public void onStart(String id) { }
-                    @Override public void onDone(String id) { fire(id); }
-                    @Override public void onError(String id) { fire(id); }
-                    @Override public void onError(String id, int code) { fire(id); }
-                });
-                s = setPersian() ? READY : NO_PERSIAN;
-            }
-            state = s;
-            List<Runnable> run;
-            synchronized (AFTER_INIT) {
-                run = new ArrayList<>(AFTER_INIT);
-                AFTER_INIT.clear();
-            }
-            for (Runnable r : run) MAIN.post(r);
-        });
+        if (state == UNINIT) probe(a, null);
     }
 
-    /** Re-checks the installed voices without restarting the engine. */
-    private static void recheck() {
-        if (tts != null && setPersian()) state = READY;
+    /** Tries engines one by one until one speaks Persian. Calls {@code done} on the main thread. */
+    private static void probe(final MainActivity a, final Runnable done) {
+        if (done != null) {
+            synchronized (AFTER_PROBE) {
+                AFTER_PROBE.add(done);
+            }
+        }
+        if (state == PROBING) return;
+        state = PROBING;
+        if (tts != null) {
+            try {
+                tts.shutdown();
+            } catch (Exception e) {
+                Diag.ignored("Speaker:shutdown", e);
+            }
+            tts = null;
+        }
+        List<String> candidates = candidates(a);
+        tryEngine(a, candidates, 0);
     }
 
-    private static boolean setPersian() {
+    /** null = system default engine first, then preferred installed engines, then the rest. */
+    private static List<String> candidates(MainActivity a) {
+        List<String> out = new ArrayList<>();
+        out.add(null);
+        List<String> installed = new ArrayList<>();
         try {
-            int r = tts.setLanguage(new Locale("fa", "IR"));
-            if (r < TextToSpeech.LANG_AVAILABLE) r = tts.setLanguage(new Locale("fa"));
+            List<ResolveInfo> services = a.getPackageManager().queryIntentServices(
+                    new Intent(TextToSpeech.Engine.INTENT_ACTION_TTS_SERVICE), 0);
+            for (ResolveInfo ri : services) {
+                if (ri.serviceInfo != null && !installed.contains(ri.serviceInfo.packageName)) {
+                    installed.add(ri.serviceInfo.packageName);
+                }
+            }
+        } catch (Exception e) {
+            Diag.ignored("Speaker:services", e);
+        }
+        for (String p : PREFERRED) if (installed.contains(p)) out.add(p);
+        for (String p : installed) if (!out.contains(p)) out.add(p);
+        return out;
+    }
+
+    private static void tryEngine(final MainActivity a, final List<String> candidates, final int idx) {
+        if (idx >= candidates.size()) {
+            finishProbe(NO_PERSIAN, null, "");
+            return;
+        }
+        final String pkg = candidates.get(idx);
+        final boolean[] settled = {false};
+        final TextToSpeech[] holder = new TextToSpeech[1];
+        final Runnable next = () -> {
+            if (settled[0]) return;
+            settled[0] = true;
+            if (holder[0] != null) {
+                try {
+                    holder[0].shutdown();
+                } catch (Exception e) {
+                    Diag.ignored("Speaker:drop", e);
+                }
+            }
+            tryEngine(a, candidates, idx + 1);
+        };
+        MAIN.postDelayed(() -> {
+            if (!settled[0]) next.run();
+        }, PROBE_TIMEOUT_MS);
+        try {
+            TextToSpeech.OnInitListener listener = status -> {
+                if (settled[0]) return;
+                if (status == TextToSpeech.SUCCESS && holder[0] != null && setPersian(holder[0])) {
+                    settled[0] = true;
+                    holder[0].setOnUtteranceProgressListener(new UtteranceProgressListener() {
+                        @Override public void onStart(String id) { }
+                        @Override public void onDone(String id) { fire(id); }
+                        @Override public void onError(String id) { fire(id); }
+                        @Override public void onError(String id, int code) { fire(id); }
+                    });
+                    String name = pkg == null ? "موتور پیش‌فرض" : pkg;
+                    finishProbe(READY, holder[0], name);
+                } else {
+                    next.run();
+                }
+            };
+            holder[0] = pkg == null
+                    ? new TextToSpeech(a.getApplicationContext(), listener)
+                    : new TextToSpeech(a.getApplicationContext(), listener, pkg);
+        } catch (Exception e) {
+            Diag.ignored("Speaker:engine", e);
+            next.run();
+        }
+    }
+
+    private static void finishProbe(int result, TextToSpeech engine, String name) {
+        tts = engine;
+        engineName = name;
+        state = result;
+        List<Runnable> run;
+        synchronized (AFTER_PROBE) {
+            run = new ArrayList<>(AFTER_PROBE);
+            AFTER_PROBE.clear();
+        }
+        for (Runnable r : run) MAIN.post(r);
+    }
+
+    private static boolean setPersian(TextToSpeech t) {
+        try {
+            int r = t.setLanguage(new Locale("fa", "IR"));
+            if (r < TextToSpeech.LANG_AVAILABLE) r = t.setLanguage(new Locale("fa"));
             return r >= TextToSpeech.LANG_AVAILABLE;
         } catch (Exception e) {
             Diag.ignored("Speaker:lang", e);

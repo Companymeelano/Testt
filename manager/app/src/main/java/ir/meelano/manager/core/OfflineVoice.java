@@ -159,21 +159,19 @@ public final class OfflineVoice {
         synchronized (LOCK) {
             if (engine != null) return engine;
             File d = root(app);
-            OfflineTtsVitsModelConfig vits = OfflineTtsVitsModelConfig.builder()
-                    .setModel(find(d, ".onnx").getAbsolutePath())
-                    .setTokens(new File(d, "tokens.txt").getAbsolutePath())
-                    .setDataDir(new File(d, "espeak-ng-data").getAbsolutePath())
-                    .build();
-            OfflineTtsModelConfig model = OfflineTtsModelConfig.builder()
-                    .setVits(vits)
-                    .setNumThreads(3)
-                    .setProvider("cpu")
-                    .build();
-            OfflineTtsConfig cfg = OfflineTtsConfig.builder()
-                    .setModel(model)
-                    .setMaxNumSentences(1)
-                    .build();
-            engine = new OfflineTts(cfg);
+            // sherpa-onnx AAR config classes are Kotlin data classes: plain setters from Java.
+            OfflineTtsVitsModelConfig vits = new OfflineTtsVitsModelConfig();
+            vits.setModel(find(d, ".onnx").getAbsolutePath());
+            vits.setTokens(new File(d, "tokens.txt").getAbsolutePath());
+            vits.setDataDir(new File(d, "espeak-ng-data").getAbsolutePath());
+            OfflineTtsModelConfig model = new OfflineTtsModelConfig();
+            model.setVits(vits);
+            model.setNumThreads(3);
+            model.setProvider("cpu");
+            OfflineTtsConfig cfg = new OfflineTtsConfig();
+            cfg.setModel(model);
+            cfg.setMaxNumSentences(1);
+            engine = new OfflineTts(null, cfg);
             return engine;
         }
     }

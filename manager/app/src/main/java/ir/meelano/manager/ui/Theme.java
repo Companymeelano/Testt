@@ -46,7 +46,7 @@ public final class Theme {
     private static boolean light = false;
     /** Mirror of !light for call sites (charts, tables). */
     public static boolean DARK = true;
-    private static String accentKey = "gold";
+    private static String accentKey = "platinum";
     private static float fontScale = 1f;
     private static float density = 3f;
     /**
@@ -61,6 +61,7 @@ public final class Theme {
 
     /** Accent: key, Persian label, dark, darkSoft, light, lightSoft. */
     private static final String[][] ACCENTS = {
+            {"platinum", "پلاتینی", "FFE3E6EC", "FFF7F8FA", "FF4B5563", "FF374151"},
             {"gold", "طلایی", "FFE0B765", "FFF5DFA6", "FF8A6320", "FF7A5612"},
             {"emerald", "زمردی", "FF3ED598", "FF9BF0C8", "FF087A53", "FF046C4E"},
             {"sapphire", "یاقوت آبی", "FF4FA3FF", "FFB3D4FF", "FF1C60E0", "FF1E429F"},
@@ -158,7 +159,7 @@ public final class Theme {
         } catch (Exception ignored) { Diag.ignored("Theme:154", ignored); }
         fontScale = zi == 0 ? 0.9f : zi == 2 ? 1.15f : zi == 3 ? 1.3f : 1f;
         accentKey = s.themeAccent();
-        if (s.seasonalOn() && "gold".equals(accentKey)) accentKey = seasonAccentKey();
+        if (s.seasonalOn() && ("platinum".equals(accentKey) || "gold".equals(accentKey))) accentKey = seasonAccentKey();
         int dark = 0xFFD9AE5A, darkSoft = 0xFFF1D493, lite = 0xFFA86F14, liteSoft = 0xFF7A5410;
         for (String[] a : ACCENTS) {
             if (a[0].equals(accentKey)) {
@@ -185,14 +186,14 @@ public final class Theme {
             TEAL = 0xFF007268;
             STEEL = 0xFF546177;
         } else {
-            // «نیمه‌شب طلایی»: deeper ink background, luminous gold accents.
-            BG = 0xFF0A0F1C;
-            SURFACE = 0xFF121A2C;
-            SURFACE2 = 0xFF1B2640;
+            // «گرافیت پلاتینی»: neutral graphite-black surfaces, so every accent (platinum, gold…) reads as one family.
+            BG = 0xFF090A0D;
+            SURFACE = 0xFF14161C;
+            SURFACE2 = 0xFF1E2129;
             GOLD = dark;
             GOLD_SOFT = darkSoft;
-            TEXT = 0xFFF5F1E8;
-            MUTED = 0xFFA3ACBF;
+            TEXT = 0xFFF4F5F7;
+            MUTED = 0xFF9EA5B1;
             SUCCESS = 0xFF3DD68C;
             DANGER = 0xFFFF5C61;
             WARNING = 0xFFFFB020;

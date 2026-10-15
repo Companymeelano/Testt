@@ -194,14 +194,14 @@ public final class Settings {
 
     /** Accent key: gold / emerald / sapphire / ruby / violet / teal. */
     public String themeAccent() {
-        String k = p.getString("theme_accent", "gold");
-        for (String ok : new String[]{"gold", "emerald", "sapphire", "ruby", "violet", "teal"})
+        String k = p.getString("theme_accent", "platinum");
+        for (String ok : new String[]{"platinum", "gold", "emerald", "sapphire", "ruby", "violet", "teal"})
             if (ok.equals(k)) return k;
-        return "gold";
+        return "platinum";
     }
 
     public void setThemeAccent(String key) {
-        p.edit().putString("theme_accent", key == null ? "gold" : key).apply();
+        p.edit().putString("theme_accent", key == null ? "platinum" : key).apply();
     }
 
     // ---------------- smart notifications ----------------

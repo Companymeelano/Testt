@@ -632,9 +632,7 @@ public class SettingsScreen extends Screen {
                 }));
         ab.addView(a.kit.btnGhost("✦  تازه‌های نسخه", Theme.GOLD, v ->
                 ir.meelano.manager.ui.WhatsNew.showCurrent(a)), a.kit.lp(-1, -2));
-        ab.addView(a.kit.btnGhost("⬆  بررسی بروزرسانی", Theme.TEAL, v ->
-                ir.meelano.manager.core.UpdateCenter.manualCheck(a)), a.kit.lp(-1, -2));
-        ab.addView(a.kit.hint(ir.meelano.manager.core.UpdateCenter.lastCheckLine(a)), a.kit.lp(-1, -2));
+        addUpdateCard(ab);
         ab.addView(a.kit.kv("منبع داده", "SQL Server آتیران (اتصال مستقیم)", Theme.TEXT), a.kit.lp(-1, -2));
         ab.addView(a.kit.text("✦ پشتیبانی میلانو", 13f, Theme.GOLD_SOFT, true), a.kit.lp(-1, -2));
         ab.addView(a.kit.btnGhost("🌐  " + ir.meelano.manager.core.Brand.SITE_LABEL, Theme.GOLD, v ->
@@ -647,6 +645,30 @@ public class SettingsScreen extends Screen {
         ab.addView(a.kit.hint("همه بخش‌ها داده زنده نمایش می‌دهند؛ بدون اتصال، اطلاع‌رسانی می‌شود."), a.kit.lp(-1, -2));
         a.kit.addCard(content, ab);
         buildChangelog(content);
+    }
+
+    /** Themed update card: manual check, status, and a manual release-page fallback. */
+    private void addUpdateCard(LinearLayout ab) {
+        ab.addView(a.kit.gap(6), a.kit.lp(-1, -2));
+        ab.addView(a.kit.text("⟳ بروزرسانی برنامه", 14f, Theme.GOLD, true), a.kit.lp(-1, -2));
+        ab.addView(a.kit.hint(ir.meelano.manager.core.UpdateCenter.statusLine(a)), a.kit.lp(-1, -2));
+        ab.addView(a.kit.hint(ir.meelano.manager.core.UpdateCenter.lastCheckLine(a)), a.kit.lp(-1, -2));
+        ab.addView(a.kit.btnGold("⟳  بررسی و دریافت نسخه جدید", v ->
+                ir.meelano.manager.core.UpdateCenter.manualCheck(a)), a.kit.lp(-1, -2));
+        ab.addView(a.kit.btnGhost("📦  صفحه نسخه‌های منتشرشده", Theme.TEAL, v -> openReleasesPage()),
+                a.kit.lp(-1, -2));
+        ab.addView(a.kit.hint("دانلود امن، بررسی امضا و نصب روی همین گوشی انجام می‌شود؛ داده‌ها حفظ می‌شوند. "
+                + "اگر اینترنت قطع بود، از صفحه نسخه‌ها دستی هم می‌توانید دریافت کنید."), a.kit.lp(-1, -2));
+    }
+
+    private void openReleasesPage() {
+        try {
+            a.startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW,
+                    android.net.Uri.parse(ir.meelano.manager.core.UpdateCenter.releasesPage())));
+        } catch (Exception e) {
+            Diag.ignored("SettingsScreen:openReleases", e);
+            a.kit.toast("مرورگری برای باز کردن صفحه پیدا نشد");
+        }
     }
 
     /** Full version history from the bundled changelog; the newest versions open by default. */

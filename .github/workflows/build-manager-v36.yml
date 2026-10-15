@@ -87,6 +87,15 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Verify update descriptor tool (MAC round-trip, no publishing)
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/reldesc"
+          javac -d "$RUNNER_TEMP/reldesc" manager/licensing/src/main/java/ir/meelano/licensing/License.java tools/release/ReleaseDescriptor.java
+          SHA=$(printf 'meelano' | sha256sum | cut -d' ' -f1)
+          java -cp "$RUNNER_TEMP/reldesc" ReleaseDescriptor 58 36.26.0 meelano-manager-v36.26.0-release.apk 1000 "$SHA" https://github.com/Companymeelano/Testt/releases/download/manager-v36.26.0/meelano-manager-v36.26.0-release.apk "test" | tee descriptor-check.json
+          grep -F '"code": 58' descriptor-check.json
+
       - name: Verify APK identity, version and signature
         run: |
           set -euo pipefail

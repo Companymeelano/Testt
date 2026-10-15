@@ -85,6 +85,7 @@ public final class UpdateCenter {
                 Info info = fetch(app);
                 if (info == null) return;
                 markChecked(app);
+                rememberLatest(app, info);
                 purgeStale(app, info.code);
                 if (info.code <= currentCode(app)) return;
                 SharedPreferences p = prefs(app);
@@ -132,6 +133,7 @@ public final class UpdateCenter {
                         return;
                     }
                     markChecked(app);
+                    rememberLatest(app, info);
                     purgeStale(app, info.code);
                     if (info.code <= currentCode(app)) {
                         toast(a, "✦ شما آخرین نسخه را دارید");
@@ -173,6 +175,35 @@ public final class UpdateCenter {
         }
     }
 
+    /** Remember the newest verified release so Settings can show it immediately. */
+    private static void rememberLatest(Context c, Info info) {
+        try {
+            prefs(c).edit().putInt("latest_code", info.code).putString("latest_name", info.name).apply();
+        } catch (Exception e) {
+            Diag.ignored("UpdateCenter:rememberLatest", e);
+        }
+    }
+
+    /** Settings card status: current version, and whether a newer one is known. */
+    public static String statusLine(Context c) {
+        try {
+            String cur = currentName(c);
+            int latest = prefs(c).getInt("latest_code", 0);
+            if (latest > currentCode(c)) {
+                return "نسخه فعلی " + cur + " • نسخه جدید «" + prefs(c).getString("latest_name", "")
+                        + "» آماده دریافت است";
+            }
+            return "نسخه فعلی " + cur + " • شما آخرین نسخه را دارید";
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    /** Public URL of the release list (manual download fallback). */
+    public static String releasesPage() {
+        return "https://github.com/" + UpdateConfig.OWNER + "/" + UpdateConfig.REPO + "/releases/latest";
+    }
+
     // ================= descriptor =================
 
     /** Download + fully verify version.json. Null = nothing to do. Never throws. */
@@ -207,8 +238,8 @@ public final class UpdateCenter {
                 return null;
             }
             if (!host.equals("github.com") && !host.endsWith(".github.com")
-                    && !host.equals("objects.githubusercontent")
-                    && !host.equals("release-assets.githubusercontent")) return null;
+                    && !host.equals("githubusercontent.com")
+                    && !host.endsWith(".githubusercontent.com")) return null;
             if (i.size < 0 || i.size > UpdateConfig.MAX_APK_BYTES) return null;
             if (!License.updateVerify(i.code, i.sha256, m.optString("mac", ""))) return null;
             return i;

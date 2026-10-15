@@ -1,0 +1,155 @@
+name: Manager release (signed APK + version.json)
+
+# Publishes the sale build that installed phones check for updates:
+#   * a tag  manager-v<versionName>  (e.g. manager-v36.26.0) publishes a release
+#   * workflow_dispatch with publish=PUBLISH publishes; any other value is a dry run
+#     that only builds and uploads the artifacts (nothing is published).
+# The release is marked "latest", so the app's UpdateConfig.META_URL resolves to it.
+
+on:
+  push:
+    tags: ["manager-v*"]
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Type PUBLISH to publish a GitHub release. Anything else = dry run."
+        required: false
+        default: "dry-run"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Decide mode
+        id: mode
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT: ${{ github.event.inputs.publish }}
+        run: |
+          if [ "$EVENT" = "push" ] || [ "$INPUT" = "PUBLISH" ]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Require release signing secrets (no unsigned release)
+        env:
+          MEELANO_KEYSTORE_B64: ${{ secrets.MEELANO_KEYSTORE_B64 }}
+          MEELANO_STORE_PASS: ${{ secrets.MEELANO_STORE_PASS }}
+          MEELANO_KEY_ALIAS: ${{ secrets.MEELANO_KEY_ALIAS }}
+          MEELANO_KEY_PASS: ${{ secrets.MEELANO_KEY_PASS }}
+        run: |
+          set -euo pipefail
+          for v in MEELANO_KEYSTORE_B64 MEELANO_STORE_PASS MEELANO_KEY_ALIAS MEELANO_KEY_PASS; do
+            if [ -z "${!v:-}" ]; then
+              echo "Missing secret $v — the release signing keystore must be set in GitHub Secrets."
+              exit 1
+            fi
+          done
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: "17"
+          distribution: temurin
+
+      - name: Install Android SDK 35
+        run: |
+          SDKMAN="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMAN" --licenses > /dev/null || true
+          "$SDKMAN" "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+
+      - name: Set up Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.11.1
+
+      - name: Read version from the app build file
+        id: ver
+        run: |
+          set -euo pipefail
+          code=$(grep -oP "versionCode \K[0-9]+" manager/app/build.gradle | head -1)
+          name=$(grep -oP "versionName '\K[^']+" manager/app/build.gradle | head -1)
+          test -n "$code" && test -n "$name"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "tag=manager-v$name" >> "$GITHUB_OUTPUT"
+
+      - name: Build signed release APK
+        env:
+          MEELANO_KEYSTORE_B64: ${{ secrets.MEELANO_KEYSTORE_B64 }}
+          MEELANO_STORE_PASS: ${{ secrets.MEELANO_STORE_PASS }}
+          MEELANO_KEY_ALIAS: ${{ secrets.MEELANO_KEY_ALIAS }}
+          MEELANO_KEY_PASS: ${{ secrets.MEELANO_KEY_PASS }}
+        working-directory: manager
+        run: |
+          set -euo pipefail
+          echo "$MEELANO_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/meelano-release.jks"
+          export MEELANO_KEYSTORE="$RUNNER_TEMP/meelano-release.jks"
+          gradle :app:assembleRelease --no-daemon --stacktrace
+
+      - name: Verify package, version and signature
+        env:
+          CODE: ${{ steps.ver.outputs.code }}
+          NAME: ${{ steps.ver.outputs.name }}
+        run: |
+          set -euo pipefail
+          APK=$(ls manager/app/build/outputs/apk/release/*.apk | head -1)
+          BT="$ANDROID_HOME/build-tools/35.0.0"
+          "$BT/aapt" dump badging "$APK" | grep -F "package: name='ir.meelano.manager' versionCode='$CODE' versionName='$NAME'"
+          "$BT/apksigner" verify --verbose --print-certs "$APK" | tee release-signing.txt
+          mkdir -p dist
+          cp "$APK" "dist/meelano-manager-v${NAME}-release.apk"
+          sha256sum "dist/meelano-manager-v${NAME}-release.apk"
+
+      - name: Build version.json (signed descriptor)
+        env:
+          CODE: ${{ steps.ver.outputs.code }}
+          NAME: ${{ steps.ver.outputs.name }}
+          TAG: ${{ steps.ver.outputs.tag }}
+        run: |
+          set -euo pipefail
+          APKNAME="meelano-manager-v${NAME}-release.apk"
+          SHA=$(sha256sum "dist/$APKNAME" | cut -d' ' -f1)
+          SIZE=$(stat -c %s "dist/$APKNAME")
+          URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${APKNAME}"
+          # Release message: the annotated tag text, first 300 characters (empty if none).
+          MSG=$(git tag -l --format='%(contents:subject)' "$TAG" | head -c 300 || true)
+          mkdir -p "$RUNNER_TEMP/rel"
+          javac -d "$RUNNER_TEMP/rel" manager/licensing/src/main/java/ir/meelano/licensing/License.java tools/release/ReleaseDescriptor.java
+          java -cp "$RUNNER_TEMP/rel" ReleaseDescriptor "$CODE" "$NAME" "$APKNAME" "$SIZE" "$SHA" "$URL" "$MSG" > dist/version.json
+          cat dist/version.json
+
+      - name: Upload artifacts (dry run or publish)
+        uses: actions/upload-artifact@v4
+        with:
+          name: meelano-manager-release-${{ steps.ver.outputs.name }}
+          path: |
+            dist/*.apk
+            dist/version.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish GitHub release (latest)
+        if: steps.mode.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.ver.outputs.tag }}
+          NAME: ${{ steps.ver.outputs.name }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "Release $TAG already exists; refusing to overwrite a published build."
+            exit 1
+          fi
+          gh release create "$TAG" dist/*.apk dist/version.json \
+            --title "MEELANO Manager v${NAME}" \
+            --notes "نسخه فروش میلانو ${NAME}. برای بروزرسانی، داخل برنامه: تنظیمات ‹ بروزرسانی برنامه." \
+            --latest

@@ -134,7 +134,7 @@ public final class Speaker {
     public static boolean cloudOn(MainActivity a) {
         android.content.SharedPreferences p = a.getSharedPreferences("meelano_ai", android.content.Context.MODE_PRIVATE);
         String provider = p.getString("provider", "gemini");
-        return p.getBoolean("tts_cloud", false) && p.getBoolean("consent", false)
+        return p.getBoolean("tts_cloud", true) && p.getBoolean("consent", false)
                 && !"grok".equals(provider)
                 && !ir.meelano.manager.core.SecretBox.get(a, "ai_key").isEmpty();
     }

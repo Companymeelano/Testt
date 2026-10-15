@@ -75,6 +75,18 @@ public final class WhatsNew {
         }
     }
 
+    /** True when the «تازه‌های نسخه» popup will open at this launch (so other startup popups must wait). */
+    public static boolean pending(Activity a) {
+        try {
+            int cur = appCode(a);
+            if (cur <= 0 || isAutoOff(a)) return false;
+            int last = prefs(a).getInt("last_news_code", 0);
+            return !Changelog.since(last, cur).isEmpty();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     /** True when the user ticked «دیگر این پیغام را نشان نده». */
     public static boolean isAutoOff(Context c) {
         return prefs(c).getBoolean("auto_off", false);

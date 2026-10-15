@@ -686,7 +686,9 @@ public class MainActivity extends Activity {
         syncBackFab();
         // v24: What's New on upgrade (once), then the silent licensed update check.
         try {
-            WhatsNew.maybeShow(this, () -> UpdateCenter.autoCheck(this));
+            // One startup popup at a time: when «تازه‌های نسخه» opens, the update prompt waits for the next launch.
+            boolean news = WhatsNew.pending(this);
+            WhatsNew.maybeShow(this, news ? null : () -> UpdateCenter.autoCheck(this));
         } catch (Exception ignored) { Diag.ignored("MainActivity:683", ignored); }
         watchLink();
     }
@@ -1085,38 +1087,30 @@ public class MainActivity extends Activity {
                 ((android.view.ViewGroup) backFab.getParent()).removeView(backFab);
         } catch (Exception ignored) { Diag.ignored("MainActivity:1079", ignored); }
         backFab = null;
-        int ink = Theme.onAccent(Theme.GOLD);
-        LinearLayout pill = new LinearLayout(this);
-        pill.setOrientation(LinearLayout.HORIZONTAL);
-        pill.setGravity(Gravity.CENTER_VERTICAL);
-        pill.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        pill.setBackground(Theme.backPill());
-        pill.setPadding(Theme.dp(6), Theme.dp(6), Theme.dp(18), Theme.dp(6));
-        pill.setElevation(Theme.dp(12));
-        pill.setContentDescription("بازگشت به صفحه قبلی");
-        TextView disc = kit.text("\u2192", 18, ink, true);
-        disc.setGravity(Gravity.CENTER);
-        disc.setBackground(Theme.avatar(Theme.alpha(ink, 40)));
-        pill.addView(disc, new LinearLayout.LayoutParams(Theme.dp(36), Theme.dp(36)));
-        TextView label = kit.text("بازگشت", 14f, ink, true);
-        label.setSingleLine(true);
-        label.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        label.setMaxWidth(Theme.dp(190));
-        backLabel = label;
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
-        lp.setMargins(Theme.dp(10), 0, 0, 0);
-        pill.addView(label, lp);
-        Theme.pressable(pill);
-        pill.setOnClickListener(v -> goBack());
+        // Floating gold disc: one arrow, no label, a soft gold glow underneath.
+        final int ink = Theme.onAccent(Theme.GOLD);
+        android.graphics.drawable.GradientDrawable disc = new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                new int[]{Theme.GOLD_SOFT, Theme.GOLD});
+        disc.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        disc.setStroke(Theme.dp(1), Theme.alpha(ink, 60));
+        TextView arrow = kit.text("\u2192", 22f, ink, true);
+        arrow.setGravity(Gravity.CENTER);
+        arrow.setBackground(disc);
+        arrow.setElevation(Theme.dp(14));
+        arrow.setContentDescription("بازگشت به صفحه قبلی");
+        Theme.pressable(arrow);
+        arrow.setOnClickListener(v -> goBack());
+        backLabel = null;
         android.widget.FrameLayout.LayoutParams p = new android.widget.FrameLayout.LayoutParams(
-                -2, -2, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
-        p.setMargins(0, 0, 0, Theme.dp(86));
+                Theme.dp(56), Theme.dp(56), Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+        p.setMargins(0, 0, 0, Theme.dp(92));
         try {
-            addContentView(pill, p);
+            addContentView(arrow, p);
         } catch (Exception ignored) {
             return;
         }
-        backFab = pill;
+        backFab = arrow;
         backFab.setVisibility("home".equals(currentId) ? View.GONE : View.VISIBLE);
         updateBackLabel();
     }

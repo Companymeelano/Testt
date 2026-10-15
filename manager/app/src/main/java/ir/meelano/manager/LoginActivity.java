@@ -57,16 +57,31 @@ public class LoginActivity extends Activity {
         }
 
         ScrollView sv = new ScrollView(this);
-        sv.setBackgroundColor(Theme.BG);
+        // Backdrop: a warm gold light falling from the top onto the graphite/ivory base.
+        android.graphics.drawable.GradientDrawable backdrop = new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{Theme.alpha(Theme.GOLD, Theme.DARK ? 46 : 60), Theme.BG});
+        sv.setBackground(backdrop);
         LinearLayout root = kit.v();
         root.setGravity(Gravity.CENTER);
-        root.setPadding(Theme.dp(26), Theme.dp(30), Theme.dp(26), Theme.dp(30));
+        root.setPadding(Theme.dp(26), Theme.dp(44), Theme.dp(26), Theme.dp(30));
         sv.addView(root);
 
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(Theme.dp(92), Theme.dp(92));
+        // Logo inside a soft gold halo.
+        android.widget.FrameLayout halo = new android.widget.FrameLayout(this);
+        android.graphics.drawable.GradientDrawable glow = new android.graphics.drawable.GradientDrawable();
+        glow.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        glow.setColors(new int[]{Theme.alpha(Theme.GOLD, 90), Theme.alpha(Theme.GOLD, 0)});
+        glow.setGradientType(android.graphics.drawable.GradientDrawable.RADIAL_GRADIENT);
+        glow.setGradientRadius(Theme.dp(96));
+        halo.setBackground(glow);
+        android.widget.FrameLayout.LayoutParams hp = new android.widget.FrameLayout.LayoutParams(
+                Theme.dp(92), Theme.dp(92), Gravity.CENTER);
+        halo.addView(kit.logo(92), hp);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(Theme.dp(190), Theme.dp(170));
         lp.gravity = Gravity.CENTER;
-        root.addView(kit.logo(92), lp);
-        TextView t = kit.text("ورود به میلانو", 23, Theme.TEXT, true);
+        root.addView(halo, lp);
+        TextView t = kit.text("ورود به میلانو", 26, Theme.TEXT, true);
         t.setGravity(Gravity.CENTER);
         root.addView(t, kit.lp(-1, -2));
         TextView s = kit.text("پس از انتخاب دیتابیس، با حساب مدیریت یا انبارداری وارد شوید",
@@ -77,6 +92,9 @@ public class LoginActivity extends Activity {
         root.addView(s, sp);
 
         LinearLayout card = kit.card(Theme.GOLD);
+        // Glass panel: the same hero gradient the rest of the app uses, with generous inner space.
+        card.setBackground(Theme.hero(Theme.GOLD));
+        card.setPadding(Theme.dp(22), Theme.dp(22), Theme.dp(22), Theme.dp(18));
         eUser = kit.edit("نام کاربری", "");
         try {
             eUser.setTextDirection(View.TEXT_DIRECTION_ANY_RTL);
@@ -103,7 +121,7 @@ public class LoginActivity extends Activity {
         root.addView(err, kit.lp(-1, -2));
         root.addView(kit.gap(12));
 
-        loginBtn = kit.btn("ورود", v -> doLogin());
+        loginBtn = kit.btnGold("ورود  ✦", v -> doLogin());
         root.addView(loginBtn, kit.lp(-1, -2));
         root.addView(kit.gap(10));
         root.addView(kit.hint("با حساب محلی مدیریت یا انبارداری وارد شوید؛ محیط متناسب با نقش شما باز می‌شود."),

@@ -131,7 +131,7 @@ final class AiSettings {
         cloudTts.setText("استفاده از صدای طبیعی سرویس انتخابی");
         cloudTts.setTextColor(Theme.TEXT);
         cloudTts.setTextSize(12.5f);
-        cloudTts.setChecked(p.getBoolean("tts_cloud", false));
+        cloudTts.setChecked(p.getBoolean("tts_cloud", true));
         card.addView(cloudTts, a.kit.lp(-1, -2));
         card.addView(a.kit.hint("مدل صدا (مدل TTS سرویس شما)"), a.kit.lp(-1, -2));
         final EditText ttsModel = a.kit.edit("مثلاً gpt-4o-mini-tts یا مدل TTS جمینای", p.getString("tts_model", ""));

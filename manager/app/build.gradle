@@ -49,10 +49,6 @@ android {
     // No viewBinding / compose: the whole UI is hand-built Views (zero UI dependencies).
 }
 
-repositories {
-    flatDir { dirs 'libs' }
-}
-
 dependencies {
     // Direct SQL Server access (Atiran) + QR codes for the shop card. The ONLY external dependencies.
     implementation 'net.sourceforge.jtds:jtds:1.3.1'

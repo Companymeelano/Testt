@@ -11,6 +11,7 @@ import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.core.AtiranAuth;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.RoleStore;
+import ir.meelano.manager.ui.Card3D;
 import ir.meelano.manager.ui.MeelanoIcons;
 import ir.meelano.manager.ui.Theme;
 
@@ -143,12 +144,93 @@ public class MoreScreen extends Screen {
         LinearLayout inner = a.kit.v();
         content.addView(inner, a.kit.lp(-1, -2));
         if (seg == SEG_ASSISTANT) {
-            a.screen("assistant").render(inner);
+            renderAssistantHub(inner);
         } else if (seg == SEG_REPORTS) {
-            a.screen("reports").render(inner);
+            renderReportsHub(inner);
         } else {
             renderAll(inner);
         }
+    }
+
+    private static final String[][] REPORT_GROUPS = {
+            {"فروش", "🧾"}, {"خرید", "🧺"}, {"دریافت و پرداخت", "💰"}, {"چک‌ها", "📝"},
+            {"کالا و انبار", "📦"}, {"مشتریان", "👥"}, {"ویزیتورها", "🚚"}, {"سود و زیان", "📈"},
+            {"برگشتی و ابطالی", "↩"}, {"هوشمند", "✦"}
+    };
+
+    private static final String[] QUICK_QUESTIONS = {
+            "خلاصه امروز", "فروش امروز", "بدهکاران", "معوق‌ها", "چک‌های نزدیک سررسید", "پیشنهاد اقدام"
+    };
+
+    /** Segment 0: a launcher for the assistant (the chat itself is its own screen). */
+    private void renderAssistantHub(LinearLayout c) {
+        LinearLayout card = Card3D.card(a, Theme.GOLD);
+        card.addView(a.kit.text("✦ دستیار هوشمند", 15f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        card.addView(a.kit.hint(AiSettings.ready(a)
+                ? "هوش مصنوعی فعال است؛ پاسخ‌ها از مدل شما و داده‌های زندهٔ فروشگاه ساخته می‌شوند."
+                : "پاسخ‌ها از داده‌های زندهٔ فروشگاه ساخته می‌شوند. هوش مصنوعی را در تنظیمات فعال کنید."),
+                a.kit.lp(-1, -2));
+        card.addView(a.kit.gap(10));
+        card.addView(a.kit.btnGold("💬 گفتگو با دستیار", v -> a.nav("assistant")), a.kit.lp(-1, -2));
+        card.addView(a.kit.gap(6));
+        card.addView(a.kit.btnGhost("🎙 گفتگوی زنده", Theme.VIOLET, v -> a.nav("assistant")), a.kit.lp(-1, -2));
+        c.addView(card, a.kit.lp(-1, -2));
+        c.addView(a.kit.gap(10));
+        c.addView(a.kit.text("پرسش‌های آماده", 13f, Theme.GOLD_SOFT, true), a.kit.lp(-1, -2));
+        c.addView(a.kit.gap(6));
+        for (int i = 0; i < QUICK_QUESTIONS.length; i += 2) {
+            LinearLayout row = a.kit.h();
+            row.addView(quickTile(QUICK_QUESTIONS[i]), a.kit.wlp(1f));
+            row.addView(a.kit.space(8));
+            if (i + 1 < QUICK_QUESTIONS.length) row.addView(quickTile(QUICK_QUESTIONS[i + 1]), a.kit.wlp(1f));
+            else row.addView(a.kit.space(0), a.kit.wlp(1f));
+            c.addView(row, a.kit.lp(-1, -2));
+            c.addView(a.kit.gap(8));
+        }
+    }
+
+    private View quickTile(final String question) {
+        return a.kit.btnGhost(question, Theme.GOLD, v -> {
+            AssistantScreen.pendingQuestion = question;
+            a.nav("assistant");
+        });
+    }
+
+    /** Segment 1: each report group opens directly in «گزارشات». */
+    private void renderReportsHub(LinearLayout c) {
+        c.addView(a.kit.hint("یک بخش را انتخاب کنید تا گزارش‌های همان بخش باز شود."), a.kit.lp(-1, -2));
+        c.addView(a.kit.gap(8));
+        for (int i = 0; i < REPORT_GROUPS.length; i += 2) {
+            LinearLayout row = a.kit.h();
+            row.addView(groupTile(REPORT_GROUPS[i]), a.kit.wlp(1f));
+            row.addView(a.kit.space(8));
+            if (i + 1 < REPORT_GROUPS.length) row.addView(groupTile(REPORT_GROUPS[i + 1]), a.kit.wlp(1f));
+            else row.addView(a.kit.space(0), a.kit.wlp(1f));
+            c.addView(row, a.kit.lp(-1, -2));
+            c.addView(a.kit.gap(8));
+        }
+        c.addView(a.kit.btnGold("▤ همهٔ گزارش‌ها", v -> a.nav("reports")), a.kit.lp(-1, -2));
+    }
+
+    private View groupTile(final String[] group) {
+        return a.kit.btnGhost(group[1] + "  " + group[0], groupColor(group[0]), v -> {
+            ReportsScreen.pendingCategory = group[0];
+            a.nav("reports");
+        });
+    }
+
+    /** Fixed colours for report groups: sales and purchases stand out from the theme gold. */
+    private static int groupColor(String group) {
+        if ("فروش".equals(group)) return Theme.SALES_HUE;
+        if ("خرید".equals(group)) return Theme.BUY_HUE;
+        if ("دریافت و پرداخت".equals(group)) return Theme.SUCCESS;
+        if ("چک‌ها".equals(group)) return Theme.INFO;
+        if ("کالا و انبار".equals(group)) return Theme.VIOLET;
+        if ("مشتریان".equals(group)) return Theme.TEAL;
+        if ("ویزیتورها".equals(group)) return Theme.WARNING;
+        if ("سود و زیان".equals(group)) return Theme.GOLD_SOFT;
+        if ("برگشتی و ابطالی".equals(group)) return Theme.DANGER;
+        return Theme.STEEL;
     }
 
     /** «همه بخش‌ها»: searchable, role-filtered list of every section. */

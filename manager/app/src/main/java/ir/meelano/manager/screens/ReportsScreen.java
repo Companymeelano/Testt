@@ -29,6 +29,8 @@ import java.util.List;
 public class ReportsScreen extends Screen {
     private final Filter filter = new Filter();
     private ReportCatalog.Spec sel;
+    /** Set by the command room to open one report group directly. */
+    public static String pendingCategory = null;
     private String selCat;
     /** Browse search is separate from the report's date/status filter. */
     private String browseQuery = "";
@@ -119,6 +121,11 @@ public class ReportsScreen extends Screen {
     @Override
     public void render(final LinearLayout content) {
         contentRef = content;
+        if (pendingCategory != null) {
+            selCat = pendingCategory;
+            sel = null;
+            pendingCategory = null;
+        }
         if (sel == null) renderList(content);
         else renderReport(content, sel);
     }

@@ -1,5 +1,7 @@
 package ir.meelano.manager.core;
 
+import android.util.Base64;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -8,7 +10,11 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Optional generative-AI backend for the assistant. Two wire formats cover the
@@ -79,6 +85,122 @@ public final class AiClient {
         if (choices == null || choices.length() == 0) throw new IllegalStateException("پاسخی از سرویس نرسید");
         JSONObject msg = choices.getJSONObject(0).optJSONObject("message");
         return finish(msg == null ? "" : msg.optString("content", ""));
+    }
+
+    /** Synthesized speech: bytes plus file extension (wav or mp3). */
+    public static final class Audio {
+        public final byte[] data;
+        public final String ext;
+
+        Audio(byte[] data, String ext) {
+            this.data = data;
+            this.ext = ext;
+        }
+    }
+
+    /**
+     * Natural voice from the same provider. Gemini returns PCM (wrapped as WAV); OpenAI-compatible
+     * servers return MP3. Grok has no speech API here, so it throws.
+     */
+    public static Audio speech(String provider, String baseUrl, String model, String voice, String key,
+                               String text) throws Exception {
+        if (key == null || key.trim().isEmpty()) throw new IllegalStateException("کلید هوش مصنوعی ثبت نشده است");
+        if (model == null || model.trim().isEmpty()) throw new IllegalStateException("نام مدل صدا را وارد کنید");
+        if (GROK.equals(provider)) throw new IllegalStateException("این سرویس صدای طبیعی ندارد");
+        String base = baseUrl(provider, baseUrl);
+        String v = voice == null ? "" : voice.trim();
+        if (GEMINI.equals(provider)) {
+            JSONObject body = new JSONObject();
+            body.put("contents", new JSONArray().put(new JSONObject().put("parts",
+                    new JSONArray().put(new JSONObject().put("text", text)))));
+            JSONObject voiceCfg = new JSONObject().put("prebuiltVoiceConfig",
+                    new JSONObject().put("voiceName", v.isEmpty() ? "Kore" : v));
+            body.put("generationConfig", new JSONObject()
+                    .put("responseModalities", new JSONArray().put("AUDIO"))
+                    .put("speechConfig", new JSONObject().put("voiceConfig", voiceCfg)));
+            JSONObject res = post(base + "/models/" + model.trim() + ":generateContent", body,
+                    "x-goog-api-key", key.trim());
+            JSONArray cands = res.optJSONArray("candidates");
+            if (cands == null || cands.length() == 0) throw new IllegalStateException("صدایی از سرویس نرسید");
+            JSONObject content = cands.getJSONObject(0).optJSONObject("content");
+            JSONArray parts = content == null ? null : content.optJSONArray("parts");
+            if (parts != null) {
+                for (int i = 0; i < parts.length(); i++) {
+                    JSONObject inl = parts.getJSONObject(i).optJSONObject("inlineData");
+                    if (inl == null) continue;
+                    byte[] pcm = Base64.decode(inl.getString("data"), Base64.DEFAULT);
+                    return new Audio(wav(pcm, rateOf(inl.optString("mimeType", ""))), "wav");
+                }
+            }
+            throw new IllegalStateException("صدایی از سرویس نرسید");
+        }
+        JSONObject body = new JSONObject();
+        body.put("model", model.trim());
+        body.put("voice", v.isEmpty() ? "alloy" : v);
+        body.put("input", text);
+        body.put("response_format", "mp3");
+        return new Audio(postBinary(base + "/audio/speech", body, "Authorization", "Bearer " + key.trim()), "mp3");
+    }
+
+    private static final Pattern RATE = Pattern.compile("rate=(\\d+)");
+
+    private static int rateOf(String mime) {
+        Matcher m = RATE.matcher(mime == null ? "" : mime);
+        return m.find() ? Integer.parseInt(m.group(1)) : 24000;
+    }
+
+    /** 16-bit mono PCM to a WAV file. */
+    static byte[] wav(byte[] pcm, int rate) {
+        ByteBuffer b = ByteBuffer.allocate(44 + pcm.length).order(ByteOrder.LITTLE_ENDIAN);
+        b.put("RIFF".getBytes(StandardCharsets.US_ASCII));
+        b.putInt(36 + pcm.length);
+        b.put("WAVE".getBytes(StandardCharsets.US_ASCII));
+        b.put("fmt ".getBytes(StandardCharsets.US_ASCII));
+        b.putInt(16);
+        b.putShort((short) 1);
+        b.putShort((short) 1);
+        b.putInt(rate);
+        b.putInt(rate * 2);
+        b.putShort((short) 2);
+        b.putShort((short) 16);
+        b.put("data".getBytes(StandardCharsets.US_ASCII));
+        b.putInt(pcm.length);
+        b.put(pcm);
+        return b.array();
+    }
+
+    private static byte[] postBinary(String url, JSONObject body, String authHeader, String authValue) throws Exception {
+        HttpURLConnection con = (HttpURLConnection) new URL(url).openConnection();
+        try {
+            con.setRequestMethod("POST");
+            con.setConnectTimeout(TIMEOUT_MS);
+            con.setReadTimeout(TIMEOUT_MS);
+            con.setDoOutput(true);
+            con.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+            con.setRequestProperty(authHeader, authValue);
+            try (OutputStream os = con.getOutputStream()) {
+                os.write(body.toString().getBytes(StandardCharsets.UTF_8));
+            }
+            int code = con.getResponseCode();
+            if (code >= 400) {
+                read(con.getErrorStream());
+                if (code == 401 || code == 403) throw new IllegalStateException("کلید یا دسترسی سرویس معتبر نیست (" + code + ")");
+                throw new IllegalStateException("خطای سرویس صدا (" + code + ")");
+            }
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            try (InputStream is = con.getInputStream()) {
+                byte[] buf = new byte[8192];
+                int n;
+                while ((n = is.read(buf)) >= 0) {
+                    out.write(buf, 0, n);
+                    if (out.size() > 20_000_000) throw new IllegalStateException("فایل صوتی بیش از حد بزرگ است");
+                }
+            }
+            if (out.size() == 0) throw new IllegalStateException("صدایی از سرویس نرسید");
+            return out.toByteArray();
+        } finally {
+            con.disconnect();
+        }
     }
 
     private static String finish(String text) {

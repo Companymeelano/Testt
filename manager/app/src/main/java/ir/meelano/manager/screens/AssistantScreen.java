@@ -56,6 +56,9 @@ public final class AssistantScreen extends Screen {
             + "هیچ عددی را حدس نزن و اگر داده‌ای نبود صریح بگو. پاسخ فارسی، کوتاه، دقیق و قابل اقدام باشد؛ "
             + "در پایان یک یا دو پیشنهاد عملی بده. مبالغ را با جداکننده هزارگان و واحد ریال بنویس.";
 
+    /** Set by the command room («اتاق فرمان») before opening the assistant with a question. */
+    public static String pendingQuestion = null;
+
     private final List<String[]> msgs = new ArrayList<>();
     private final List<Runnable> pending = new ArrayList<>();
     private Assistant.Snap snap;
@@ -101,6 +104,11 @@ public final class AssistantScreen extends Screen {
         refresh(false, null);
         handler.removeCallbacks(tick);
         handler.postDelayed(tick, Assistant.FRESH_MS);
+        if (pendingQuestion != null) {
+            String q = pendingQuestion;
+            pendingQuestion = null;
+            ask(q);
+        }
     }
 
     // ================= data =================

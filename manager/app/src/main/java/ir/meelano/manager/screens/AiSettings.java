@@ -10,6 +10,7 @@ import android.widget.LinearLayout;
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.core.AiClient;
 import ir.meelano.manager.core.SecretBox;
+import ir.meelano.manager.core.Speaker;
 import ir.meelano.manager.ui.Theme;
 
 /**
@@ -84,11 +85,34 @@ final class AiSettings {
         card.addView(a.kit.gap(8));
 
         final CheckBox consent = new CheckBox(a);
-        consent.setText("اجازه می‌دهم خلاصهٔ عددی فروشگاه (فروش، مانده، چک و معوق‌ها) برای پاسخ هوشمند به همین سرویس فرستاده شود.");
+        consent.setText("اجازه می‌دهم خلاصهٔ عددی فروشگاه (فروش، مانده، چک و معوق‌ها) و متن پاسخ‌ها برای هوش مصنوعی و صدای طبیعی به همین سرویس فرستاده شود.");
         consent.setTextColor(Theme.TEXT);
         consent.setTextSize(12.5f);
         consent.setChecked(p.getBoolean("consent", false));
         card.addView(consent, a.kit.lp(-1, -2));
+        card.addView(a.kit.gap(10));
+
+        card.addView(a.kit.text("🔊 صدای طبیعی", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        card.addView(a.kit.hint("صدای گوشی برای فارسی کیفیت کمی دارد. با این گزینه، پاسخ‌ها با صدای طبیعی همین سرویس خوانده می‌شوند "
+                + "(نیاز به اینترنت و همان کلید). اگر خطا بدهد، صدای گوشی استفاده می‌شود. Grok صدای طبیعی ندارد."),
+                a.kit.lp(-1, -2));
+        final CheckBox cloudTts = new CheckBox(a);
+        cloudTts.setText("استفاده از صدای طبیعی سرویس انتخابی");
+        cloudTts.setTextColor(Theme.TEXT);
+        cloudTts.setTextSize(12.5f);
+        cloudTts.setChecked(p.getBoolean("tts_cloud", false));
+        card.addView(cloudTts, a.kit.lp(-1, -2));
+        card.addView(a.kit.hint("مدل صدا (مدل TTS سرویس شما)"), a.kit.lp(-1, -2));
+        final EditText ttsModel = a.kit.edit("مثلاً gpt-4o-mini-tts یا مدل TTS جمینای", p.getString("tts_model", ""));
+        card.addView(ttsModel, a.kit.lp(-1, -2));
+        card.addView(a.kit.hint("نام صدا (اختیاری)"), a.kit.lp(-1, -2));
+        final EditText ttsVoice = a.kit.edit("مثلاً alloy (OpenAI) یا Kore (Gemini)", p.getString("tts_voice", ""));
+        card.addView(ttsVoice, a.kit.lp(-1, -2));
+        card.addView(a.kit.gap(6));
+        card.addView(a.kit.btnGhost("🔈 ذخیره و شنیدن نمونه", Theme.VIOLET, v -> {
+            saveTts(p, cloudTts, ttsModel, ttsVoice);
+            Speaker.speak(a, "سلام، این نمونهٔ صدای دستیار میلانو است. فروش امروز آماده است.", null);
+        }), a.kit.lp(-1, -2));
         card.addView(a.kit.gap(10));
 
         card.addView(a.kit.btnGold("✦ ذخیره", v -> {
@@ -101,6 +125,7 @@ final class AiSettings {
                     .putString("baseUrl", baseUrl.getText().toString().trim())
                     .putBoolean("consent", consent.isChecked())
                     .apply();
+            saveTts(p, cloudTts, ttsModel, ttsVoice);
             a.kit.toast("تنظیمات هوش مصنوعی ذخیره شد");
             rerender.run();
         }), a.kit.lp(-1, -2));
@@ -117,6 +142,13 @@ final class AiSettings {
         }), a.kit.lp(-1, -2));
 
         content.addView(card, a.kit.lp(-1, -2));
+    }
+
+    private static void saveTts(SharedPreferences p, CheckBox on, EditText model, EditText voice) {
+        p.edit().putBoolean("tts_cloud", on.isChecked())
+                .putString("tts_model", model.getText().toString().trim())
+                .putString("tts_voice", voice.getText().toString().trim())
+                .apply();
     }
 
     private static void testConnection(final MainActivity a, final String provider, final String model,

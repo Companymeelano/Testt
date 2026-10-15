@@ -1,6 +1,8 @@
 package ir.meelano.manager.core;
 
 import android.content.Intent;
+import android.media.AudioAttributes;
+import android.media.MediaPlayer;
 import android.content.pm.ResolveInfo;
 import android.net.Uri;
 import android.os.Handler;
@@ -12,6 +14,8 @@ import android.widget.LinearLayout;
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.ui.Theme;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -93,6 +97,15 @@ public final class Speaker {
             post(onDone);
             return;
         }
+        if (cloudOn(a)) {
+            speakCloud(a, clean, onDone);
+            return;
+        }
+        speakLocal(a, clean, onDone);
+    }
+
+    private static void speakLocal(final MainActivity a, final String clean, final Runnable onDone) {
+        stopPlayer();
         whenProbed(a, () -> {
             if (state == READY && tts != null) {
                 String id = "m" + (++seq);
@@ -105,9 +118,89 @@ public final class Speaker {
             } else {
                 post(onDone);
                 if (!setupShown) showSetup(a);
-                else a.kit.toast("صدای فارسی روی گوشی نیست؛ موتور eSpeak NG را نصب کنید");
+                else a.kit.toast("صدای فارسی روی گوشی نیست؛ صدای طبیعی را در تنظیمات هوش مصنوعی فعال کنید");
             }
         });
+    }
+
+    // ================= natural (cloud) voice =================
+
+    /** Cloud voice is used when the user enabled it and the AI key + consent are in place. */
+    public static boolean cloudOn(MainActivity a) {
+        android.content.SharedPreferences p = a.getSharedPreferences("meelano_ai", android.content.Context.MODE_PRIVATE);
+        String provider = p.getString("provider", "gemini");
+        return p.getBoolean("tts_cloud", false) && p.getBoolean("consent", false)
+                && !"grok".equals(provider)
+                && !ir.meelano.manager.core.SecretBox.get(a, "ai_key").isEmpty();
+    }
+
+    private static MediaPlayer player;
+    private static Runnable playerDone;
+
+    private static void speakCloud(final MainActivity a, final String clean, final Runnable onDone) {
+        final android.content.SharedPreferences p = a.getSharedPreferences("meelano_ai", android.content.Context.MODE_PRIVATE);
+        final String provider = p.getString("provider", AiClient.GEMINI);
+        final String base = p.getString("baseUrl", "");
+        final String model = p.getString("tts_model", "");
+        final String voice = p.getString("tts_voice", "");
+        final String key = SecretBox.get(a, "ai_key");
+        stopPlayer();
+        new Thread(() -> {
+            try {
+                AiClient.Audio au = AiClient.speech(provider, base, model, voice, key, clean);
+                File f = new File(a.getCacheDir(), "assistant_reply." + au.ext);
+                try (FileOutputStream fo = new FileOutputStream(f)) {
+                    fo.write(au.data);
+                }
+                a.runOnUiThread(() -> play(f, onDone));
+            } catch (Exception e) {
+                Diag.ignored("Speaker:cloud", e);
+                a.runOnUiThread(() -> {
+                    a.kit.toast("صدای طبیعی در دسترس نبود؛ صدای گوشی استفاده شد");
+                    speakLocal(a, clean, onDone);
+                });
+            }
+        }).start();
+    }
+
+    private static void play(File f, Runnable onDone) {
+        stopPlayer();
+        try {
+            MediaPlayer mp = new MediaPlayer();
+            player = mp;
+            playerDone = onDone;
+            mp.setAudioAttributes(new AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ASSISTANT)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build());
+            mp.setDataSource(f.getAbsolutePath());
+            mp.setOnCompletionListener(m -> stopPlayer());
+            mp.setOnErrorListener((m, w, e) -> {
+                stopPlayer();
+                return true;
+            });
+            mp.prepare();
+            mp.start();
+        } catch (Exception e) {
+            Diag.ignored("Speaker:play", e);
+            stopPlayer();
+        }
+    }
+
+    /** Stops the natural voice and releases the player; the pending callback still runs. */
+    public static void stopPlayer() {
+        Runnable done = playerDone;
+        playerDone = null;
+        try {
+            if (player != null) {
+                player.stop();
+                player.release();
+            }
+        } catch (Exception e) {
+            Diag.ignored("Speaker:stop", e);
+        }
+        player = null;
+        post(done);
     }
 
     // ================= setup step =================

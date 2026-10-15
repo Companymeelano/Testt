@@ -690,24 +690,63 @@ public final class AtiranAuth {
 
     // ---- cached verifier bytes: the real-password check, offline ----
 
-    /** Cache the stored bytes after any successful fetch (same exposure as the baked-in SQL login). */
+    private static final String PW_ALIAS = "meelano_pw_v1";
+    private static final String PW_PREFIX = "g1:";
+
+    /** Keystore-backed AES-GCM key; the key never leaves the Android Keystore. */
+    private static javax.crypto.SecretKey pwKey(boolean create) throws Exception {
+        java.security.KeyStore ks = java.security.KeyStore.getInstance("AndroidKeyStore");
+        ks.load(null);
+        if (ks.containsAlias(PW_ALIAS)) {
+            return (javax.crypto.SecretKey) ks.getKey(PW_ALIAS, null);
+        }
+        if (!create) return null;
+        javax.crypto.KeyGenerator gen = javax.crypto.KeyGenerator.getInstance(
+                android.security.keystore.KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore");
+        gen.init(new android.security.keystore.KeyGenParameterSpec.Builder(PW_ALIAS,
+                android.security.keystore.KeyProperties.PURPOSE_ENCRYPT
+                        | android.security.keystore.KeyProperties.PURPOSE_DECRYPT)
+                .setBlockModes(android.security.keystore.KeyProperties.BLOCK_MODE_GCM)
+                .setEncryptionPaddings(android.security.keystore.KeyProperties.ENCRYPTION_PADDING_NONE)
+                .setKeySize(256)
+                .build());
+        return gen.generateKey();
+    }
+
+    /**
+     * Cache the stored verifier bytes after a successful fetch, encrypted with a
+     * Keystore key (not plain prefs). If the Keystore is unavailable the cache is
+     * skipped: online login still works, only the offline fallback is unavailable.
+     */
     public static void putPwCache(Context c, int uid, byte[] pw) {
         try {
             if (pw == null || pw.length == 0) return;
-            prefs(c).edit().putString("pwb" + uid, toHex(pw)).apply();
-        } catch (Exception ignored) { Diag.ignored("AtiranAuth:699", ignored); }
+            javax.crypto.Cipher ci = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding");
+            ci.init(javax.crypto.Cipher.ENCRYPT_MODE, pwKey(true));
+            byte[] iv = ci.getIV();
+            byte[] ct = ci.doFinal(pw);
+            String v = PW_PREFIX + android.util.Base64.encodeToString(iv, android.util.Base64.NO_WRAP)
+                    + ":" + android.util.Base64.encodeToString(ct, android.util.Base64.NO_WRAP);
+            // Drop any legacy plaintext copy written by older builds.
+            prefs(c).edit().remove("pwb" + uid).putString("pwk" + uid, v).apply();
+        } catch (Exception ignored) { Diag.ignored("AtiranAuth:putPwCache", ignored); }
     }
 
     public static byte[] cachedPw(Context c, int uid) {
         try {
-            String h = prefs(c).getString("pwb" + uid, "");
-            if (h.isEmpty() || (h.length() % 2) != 0) return null;
-            byte[] b = new byte[h.length() / 2];
-            for (int i = 0; i < b.length; i++) {
-                b[i] = (byte) Integer.parseInt(h.substring(i * 2, i * 2 + 2), 16);
-            }
-            return b;
+            prefs(c).edit().remove("pwb" + uid).apply(); // legacy plaintext, if any
+            String v = prefs(c).getString("pwk" + uid, "");
+            if (!v.startsWith(PW_PREFIX)) return null;
+            String[] parts = v.substring(PW_PREFIX.length()).split(":", 2);
+            if (parts.length != 2) return null;
+            byte[] iv = android.util.Base64.decode(parts[0], android.util.Base64.NO_WRAP);
+            byte[] ct = android.util.Base64.decode(parts[1], android.util.Base64.NO_WRAP);
+            javax.crypto.Cipher ci = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding");
+            ci.init(javax.crypto.Cipher.DECRYPT_MODE, pwKey(false),
+                    new javax.crypto.spec.GCMParameterSpec(128, iv));
+            return ci.doFinal(ct);
         } catch (Exception e) {
+            Diag.ignored("AtiranAuth:cachedPw", e);
             return null;
         }
     }

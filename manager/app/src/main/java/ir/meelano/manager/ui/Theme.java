@@ -103,13 +103,13 @@ public final class Theme {
         int dark = 0xFFE2C27A, darkSoft = 0xFFF5E4B8, lite = 0xFF8A6420, liteSoft = 0xFF6B4C12;
         if (light) {
             // «عاج سلطنتی»: warm pearl background, near-white cards, clear separation.
-            BG = 0xFFF7F3EA;
-            SURFACE = 0xFFFFFDF8;
-            SURFACE2 = 0xFFF3EBDA;
+            BG = 0xFFF5EFE2;
+            SURFACE = 0xFFFFFBF3;
+            SURFACE2 = 0xFFEFE4CC;
             GOLD = lite;
             GOLD_SOFT = liteSoft;
-            TEXT = 0xFF141B2D;
-            MUTED = 0xFF5A6378;
+            TEXT = 0xFF1C1915;
+            MUTED = 0xFF6B6255;
             SUCCESS = 0xFF1B7A4B;
             DANGER = 0xFFB3261E;
             WARNING = 0xFF9A5B00;

@@ -9,6 +9,7 @@ import android.widget.LinearLayout;
 
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.core.AiClient;
+import ir.meelano.manager.core.OfflineVoice;
 import ir.meelano.manager.core.SecretBox;
 import ir.meelano.manager.core.Speaker;
 import ir.meelano.manager.ui.Theme;
@@ -90,6 +91,36 @@ final class AiSettings {
         consent.setTextSize(12.5f);
         consent.setChecked(p.getBoolean("consent", false));
         card.addView(consent, a.kit.lp(-1, -2));
+        card.addView(a.kit.gap(10));
+
+        // ---- built-in Persian voice (offline, one-time model download) ----
+        card.addView(a.kit.text("🗣 صدای فارسی داخل برنامه", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        final boolean vInstalled = OfflineVoice.installed(a);
+        card.addView(a.kit.hint(vInstalled
+                ? "مدل صدای فارسی روی گوشی است. گفتار بدون اینترنت و بدون نصب برنامهٔ دیگر پخش می‌شود."
+                : "یک بار مدل صدای فارسی (حدود ۶۰ مگابایت) از GitHub دانلود می‌شود. بعد از آن بدون اینترنت کار می‌کند."),
+                a.kit.lp(-1, -2));
+        final android.widget.TextView vStatus = a.kit.text(vInstalled ? "✓ آماده است" : "دانلود نشده",
+                12f, vInstalled ? Theme.SUCCESS : Theme.MUTED, true);
+        card.addView(vStatus, a.kit.lp(-1, -2));
+        if (!vInstalled) {
+            card.addView(a.kit.btnGhost("⬇ دانلود صدای فارسی", Theme.VIOLET, v -> {
+                if (OfflineVoice.downloading()) { a.kit.toast("دانلود در حال انجام است"); return; }
+                vStatus.setText("در حال دانلود…");
+                OfflineVoice.download(a, pct -> vStatus.setText("در حال دانلود " + pct + "٪"), err -> {
+                    if (err == null) {
+                        a.kit.toast("صدای فارسی آماده شد");
+                        if (rerender != null) rerender.run();
+                    } else {
+                        vStatus.setText("خطا در دانلود: " + err);
+                    }
+                });
+            }), a.kit.lp(-1, -2));
+        } else {
+            card.addView(a.kit.btnGhost("🔈 شنیدن نمونهٔ صدای فارسی", Theme.SUCCESS, v ->
+                    OfflineVoice.speak(a, "سلام، من دستیار هوشمند میلانو هستم. امروز چه کاری برایتان انجام دهم؟", null)),
+                    a.kit.lp(-1, -2));
+        }
         card.addView(a.kit.gap(10));
 
         card.addView(a.kit.text("🔊 صدای طبیعی", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));

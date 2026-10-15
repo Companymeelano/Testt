@@ -69,6 +69,7 @@ public final class Speaker {
      * the step by itself once Persian works.
      */
     public static void onResume(final MainActivity a) {
+        if (OfflineVoice.installed(a)) return; // built-in Persian voice is ready: no setup step
         if (state == UNINIT) {
             probe(a, () -> {
                 if (state == NO_PERSIAN) showSetup(a);
@@ -106,6 +107,10 @@ public final class Speaker {
 
     private static void speakLocal(final MainActivity a, final String clean, final Runnable onDone) {
         stopPlayer();
+        if (OfflineVoice.installed(a)) {
+            OfflineVoice.speak(a, clean, onDone);
+            return;
+        }
         whenProbed(a, () -> {
             if (state == READY && tts != null) {
                 String id = "m" + (++seq);
@@ -189,6 +194,7 @@ public final class Speaker {
 
     /** Stops the natural voice and releases the player; the pending callback still runs. */
     public static void stopPlayer() {
+        OfflineVoice.stop();
         Runnable done = playerDone;
         playerDone = null;
         try {

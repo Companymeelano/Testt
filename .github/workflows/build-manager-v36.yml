@@ -41,6 +41,12 @@ jobs:
         with:
           gradle-version: 8.11.1
 
+      - name: Fetch offline Persian voice engine (sherpa-onnx AAR, pinned sha256)
+        run: |
+          mkdir -p manager/app/libs
+          curl -fsSL -o manager/app/libs/sherpa-onnx-1.13.8.aar https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-1.13.8.aar
+          echo "633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96  manager/app/libs/sherpa-onnx-1.13.8.aar" | sha256sum -c -
+
       - name: Run manager unit tests and build v36.26.0
         working-directory: manager
         run: |

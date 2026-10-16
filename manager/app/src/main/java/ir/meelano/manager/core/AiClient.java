@@ -28,7 +28,23 @@ public final class AiClient {
     public static final String GEMINI = "gemini";
     public static final String OPENAI = "openai";
     public static final String GROK = "grok";
+    public static final String GROQ = "groq";
+    public static final String DEEPSEEK = "deepseek";
+    public static final String OPENROUTER = "openrouter";
+    public static final String GAPGPT = "gapgpt";
     public static final String CUSTOM = "custom";
+
+    /** Recommended default model per preset (the user may change it in settings). */
+    public static String defaultModel(String provider) {
+        if (GEMINI.equals(provider)) return "gemini-2.5-flash";
+        if (OPENAI.equals(provider)) return "gpt-4o-mini";
+        if (GROK.equals(provider)) return "grok-3-mini";
+        if (GROQ.equals(provider)) return "llama-3.3-70b-versatile";
+        if (DEEPSEEK.equals(provider)) return "deepseek-chat";
+        if (OPENROUTER.equals(provider)) return "openai/gpt-4o-mini";
+        if (GAPGPT.equals(provider)) return "gpt-4o-mini";
+        return "";
+    }
 
     public static final int TIMEOUT_MS = 45_000;
     private static final int MAX_REPLY = 60_000;
@@ -38,6 +54,10 @@ public final class AiClient {
         if (GEMINI.equals(provider)) return "https://generativelanguage.googleapis.com/v1beta";
         if (OPENAI.equals(provider)) return "https://api.openai.com/v1";
         if (GROK.equals(provider)) return "https://api.x.ai/v1";
+        if (GROQ.equals(provider)) return "https://api.groq.com/openai/v1";
+        if (DEEPSEEK.equals(provider)) return "https://api.deepseek.com/v1";
+        if (OPENROUTER.equals(provider)) return "https://openrouter.ai/api/v1";
+        if (GAPGPT.equals(provider)) return "https://api.gapgpt.app/v1";
         return custom == null ? "" : custom.trim();
     }
 

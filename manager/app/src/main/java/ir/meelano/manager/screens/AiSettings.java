@@ -51,23 +51,33 @@ final class AiSettings {
         card.addView(a.kit.gap(8));
 
         card.addView(a.kit.hint("سرویس"), a.kit.lp(-1, -2));
-        LinearLayout provRow = a.kit.h();
         String[][] options = {
                 {AiClient.GEMINI, "Gemini"}, {AiClient.OPENAI, "OpenAI"},
+                {AiClient.GROQ, "Groq"}, {AiClient.DEEPSEEK, "DeepSeek"},
+                {AiClient.OPENROUTER, "OpenRouter"}, {AiClient.GAPGPT, "GapGPT"},
                 {AiClient.GROK, "Grok"}, {AiClient.CUSTOM, "سفارشی"}
         };
-        for (final String[] o : options) {
-            boolean on = o[0].equals(provider);
-            provRow.addView(a.kit.chip(o[1], on, Theme.GOLD, v -> {
-                p.edit().putString("provider", o[0]).apply();
-                rerender.run();
-            }), a.kit.wlp(1f));
+        for (int row = 0; row < options.length; row += 4) {
+            LinearLayout provRow = a.kit.h();
+            for (int i = row; i < Math.min(row + 4, options.length); i++) {
+                final String[] o = options[i];
+                boolean on = o[0].equals(provider);
+                provRow.addView(a.kit.chip(o[1], on, Theme.GOLD, v -> {
+                    p.edit().putString("provider", o[0]).apply();
+                    if (p.getString("model", "").trim().isEmpty() && !AiClient.defaultModel(o[0]).isEmpty()) {
+                        p.edit().putString("model", AiClient.defaultModel(o[0])).apply();
+                    }
+                    rerender.run();
+                }), a.kit.wlp(1f));
+            }
+            card.addView(provRow, a.kit.lp(-1, -2));
+            card.addView(a.kit.gap(4));
         }
-        card.addView(provRow, a.kit.lp(-1, -2));
         card.addView(a.kit.gap(8));
 
         card.addView(a.kit.hint("نام مدل (از داشبورد همان سرویس کپی کنید)"), a.kit.lp(-1, -2));
-        final EditText model = a.kit.edit("مثلاً نام مدل Gemini / GPT / Grok", p.getString("model", ""));
+        final EditText model = a.kit.edit("مثلاً " + AiClient.defaultModel(provider),
+                p.getString("model", ""));
         card.addView(model, a.kit.lp(-1, -2));
         card.addView(a.kit.gap(6));
 

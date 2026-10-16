@@ -100,12 +100,12 @@ public final class Theme {
         } catch (Exception ignored) { Diag.ignored("Theme:154", ignored); }
         fontScale = zi == 0 ? 0.9f : zi == 2 ? 1.15f : zi == 3 ? 1.3f : 1f;
         // Exactly two curated themes; the accent is part of each theme, not a user choice.
-        int dark = 0xFFE2C27A, darkSoft = 0xFFF5E4B8, lite = 0xFF8A6420, liteSoft = 0xFF6B4C12;
+        int dark = 0xFFD9DEE7, darkSoft = 0xFFF4F6FA, lite = 0xFF9A6E1F, liteSoft = 0xFF5E4310;
         if (light) {
             // «عاج سلطنتی»: warm pearl background, near-white cards, clear separation.
-            BG = 0xFFF5EFE2;
-            SURFACE = 0xFFFFFBF3;
-            SURFACE2 = 0xFFEFE4CC;
+            BG = 0xFFF6F0E3;
+            SURFACE = 0xFFFFFDF8;
+            SURFACE2 = 0xFFF1E7D2;
             GOLD = lite;
             GOLD_SOFT = liteSoft;
             TEXT = 0xFF1C1915;
@@ -119,13 +119,13 @@ public final class Theme {
             STEEL = 0xFF546177;
         } else {
             // «گرافیت پلاتینی»: neutral graphite-black surfaces, so every accent (platinum, gold…) reads as one family.
-            BG = 0xFF090A0D;
-            SURFACE = 0xFF14161C;
-            SURFACE2 = 0xFF1E2129;
+            BG = 0xFF050609;
+            SURFACE = 0xFF0F1116;
+            SURFACE2 = 0xFF181B23;
             GOLD = dark;
             GOLD_SOFT = darkSoft;
-            TEXT = 0xFFF4F5F7;
-            MUTED = 0xFF9EA5B1;
+            TEXT = 0xFFF6F7F9;
+            MUTED = 0xFF9CA3AF;
             SUCCESS = 0xFF3DD68C;
             DANGER = 0xFFFF5C61;
             WARNING = 0xFFFFB020;
@@ -229,9 +229,9 @@ public final class Theme {
             return d;
         }
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{shade(SURFACE, 0.07f), SURFACE, shade(SURFACE, -0.045f)});
-        d.setCornerRadius(dp(20));
-        d.setStroke(dp(1), alpha(GOLD, 48));
+                new int[]{shade(SURFACE, 0.10f), SURFACE, shade(SURFACE, -0.06f)});
+        d.setCornerRadius(dp(22));
+        d.setStroke(dp(1), alpha(GOLD, 64));
         return d;
     }
 
@@ -315,12 +315,12 @@ public final class Theme {
     public static GradientDrawable goldButton() {
         boolean darkInk = darkAccentInk(GOLD);
         float direction = darkInk ? 1f : -1f;
-        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
-                new int[]{shade(GOLD, direction * 0.04f),
-                        shade(GOLD, direction * 0.12f),
-                        shade(GOLD, direction * 0.07f)});
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{shade(GOLD, direction * 0.14f),
+                        shade(GOLD, direction * 0.02f),
+                        shade(GOLD, direction * -0.08f)});
         d.setCornerRadius(dp(18));
-        d.setStroke(dp(1), alpha(ACCENT_PAPER, 82));
+        d.setStroke(dp(1), alpha(ACCENT_PAPER, 110));
         return d;
     }
 
@@ -332,10 +332,10 @@ public final class Theme {
         boolean darkInk = darkAccentInk(GOLD);
         int gold = shade(GOLD, darkInk ? 0.04f : -0.08f);
         int rose = shade(ROSE, darkInk ? 0.22f : -0.18f);
-        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{gold, rose});
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{shade(gold, 0.10f), gold, rose});
         d.setCornerRadius(dp(18));
-        d.setStroke(dp(1), alpha(ACCENT_PAPER, 82));
+        d.setStroke(dp(1), alpha(ACCENT_PAPER, 110));
         return d;
     }
 
@@ -417,7 +417,10 @@ public final class Theme {
     }
 
     public static GradientDrawable dialogBg() {
-        GradientDrawable d = base(SURFACE, 26, dp(1), alpha(GOLD, 80));
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{shade(SURFACE, light ? 0.02f : 0.08f), SURFACE});
+        d.setCornerRadius(dp(26));
+        d.setStroke(dp(1), alpha(GOLD, 90));
         return d;
     }
 

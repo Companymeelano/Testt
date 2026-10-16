@@ -317,7 +317,9 @@ public class HomeScreen extends Screen {
         hero.addView(a.kit.gap(13));
 
         View divider = new View(a);
-        divider.setBackgroundColor(Theme.alpha(Theme.GOLD, Theme.isLight() ? 78 : 62));
+        divider.setBackground(new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{0x00000000, Theme.alpha(Theme.GOLD, Theme.isLight() ? 120 : 110), 0x00000000}));
         hero.addView(divider, a.kit.lp(-1, Theme.dp(1)));
         hero.addView(a.kit.gap(9));
         LinearLayout footer = a.kit.h();

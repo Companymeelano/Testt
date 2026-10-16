@@ -80,7 +80,28 @@ public class LoginActivity extends Activity {
         root.addView(halo, lp);
         TextView t = kit.text("ورود به میلانو", 26, Theme.TEXT, true);
         t.setGravity(Gravity.CENTER);
+        try {
+            t.setLetterSpacing(0.04f);
+            t.post(() -> {
+                int h = t.getHeight();
+                if (h <= 0) return;
+                int[] cols = Theme.isLight()
+                        ? new int[]{Theme.shade(Theme.GOLD, -0.4f), Theme.GOLD, Theme.shade(Theme.GOLD, -0.5f)}
+                        : new int[]{0xFFFFFFFF, Theme.GOLD, 0xFFA9B0BC};
+                t.getPaint().setShader(new android.graphics.LinearGradient(0, 0, 0, h, cols,
+                        null, android.graphics.Shader.TileMode.CLAMP));
+                t.invalidate();
+            });
+        } catch (Exception ignored) { Diag.ignored("LoginActivity:metal", ignored); }
         root.addView(t, kit.lp(-1, -2));
+        View hair = new View(this);
+        hair.setBackground(new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{0x00000000, Theme.alpha(Theme.GOLD, 150), 0x00000000}));
+        LinearLayout.LayoutParams hlp = new LinearLayout.LayoutParams(Theme.dp(120), Theme.dp(1));
+        hlp.gravity = Gravity.CENTER_HORIZONTAL;
+        hlp.setMargins(0, Theme.dp(8), 0, 0);
+        root.addView(hair, hlp);
         TextView s = kit.text("پس از انتخاب دیتابیس، با حساب مدیریت یا انبارداری وارد شوید",
                 12.5f, Theme.MUTED, false);
         s.setGravity(Gravity.CENTER);
@@ -119,6 +140,12 @@ public class LoginActivity extends Activity {
         root.addView(kit.gap(12));
 
         loginBtn = kit.btnGold("ورود  ✦", v -> doLogin());
+        try {
+            loginBtn.setBackground(Theme.startButton());
+            loginBtn.setTextSize(16f);
+            loginBtn.setMinHeight(Theme.dp(56));
+            loginBtn.setLetterSpacing(0.05f);
+        } catch (Exception ignored) { Diag.ignored("LoginActivity:btn", ignored); }
         root.addView(loginBtn, kit.lp(-1, -2));
         root.addView(kit.gap(10));
         root.addView(kit.hint("با حساب محلی مدیریت یا انبارداری وارد شوید؛ محیط متناسب با نقش شما باز می‌شود."),

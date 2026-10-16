@@ -136,6 +136,16 @@ public final class Theme {
         }
     }
 
+    /**
+     * Shared page backdrop for the licence and login screens. Dark: a cool platinum light
+     * falling onto graphite black. Light: a warm gold glow over the ivory pearl base.
+     */
+    public static GradientDrawable backdrop() {
+        int glow = light ? alpha(GOLD, 60) : alpha(0xFFD5DAE2, 34);
+        return new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{glow, BG});
+    }
+
     /** Choose the foreground with the stronger contrast against an accent surface. */
     public static int onAccent(int background) {
         return darkAccentInk(background) ? ACCENT_INK : ACCENT_PAPER;

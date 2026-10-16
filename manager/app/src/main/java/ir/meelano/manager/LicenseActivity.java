@@ -286,6 +286,7 @@ public class LicenseActivity extends Activity {
             sv.addView(box);
         }
         android.widget.FrameLayout wrap = new android.widget.FrameLayout(this);
+        wrap.setBackground(Theme.backdrop());
         wrap.addView(new ParticlesView(this),
                 new android.widget.FrameLayout.LayoutParams(-1, -1));
         wrap.addView(sv, new android.widget.FrameLayout.LayoutParams(-1, -1));

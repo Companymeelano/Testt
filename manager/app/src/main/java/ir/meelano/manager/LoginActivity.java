@@ -58,10 +58,7 @@ public class LoginActivity extends Activity {
 
         ScrollView sv = new ScrollView(this);
         // Backdrop: a warm gold light falling from the top onto the graphite/ivory base.
-        android.graphics.drawable.GradientDrawable backdrop = new android.graphics.drawable.GradientDrawable(
-                android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{Theme.alpha(Theme.GOLD, Theme.DARK ? 46 : 60), Theme.BG});
-        sv.setBackground(backdrop);
+        sv.setBackground(Theme.backdrop());
         LinearLayout root = kit.v();
         root.setGravity(Gravity.CENTER);
         root.setPadding(Theme.dp(26), Theme.dp(44), Theme.dp(26), Theme.dp(30));

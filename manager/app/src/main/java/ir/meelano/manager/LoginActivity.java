@@ -23,7 +23,7 @@ import ir.meelano.manager.ui.Kit;
 import ir.meelano.manager.ui.Theme;
 
 /**
- * Manager-app account gate. Shown only after a valid license and an explicitly
+ * Manager-app account gate (metallic title and premium start button since v36.26). Shown only after a valid license and an explicitly
  * selected server/database. The fixed local accounts are the only route into
  * the manager and warehouse editions; those reserved names and roles are never
  * authenticated through Atiran's user table. A missing Atiran login table never

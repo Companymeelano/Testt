@@ -18,7 +18,7 @@ import ir.meelano.manager.ui.Theme;
  * «هوش مصنوعی» block of the Settings screen: provider, model, key, consent and test.
  * Preferences live in {@code meelano_ai}; the key is stored encrypted by {@link SecretBox}.
  */
-final class AiSettings {
+public final class AiSettings {
     private AiSettings() { }
 
     static final String PREFS = "meelano_ai";

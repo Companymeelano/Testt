@@ -136,7 +136,7 @@ public final class Speaker {
         String provider = p.getString("provider", "gemini");
         return p.getBoolean("tts_cloud", true) && p.getBoolean("consent", false)
                 && !"grok".equals(provider)
-                && !ir.meelano.manager.core.SecretBox.get(a, "ai_key").isEmpty();
+                && !ir.meelano.manager.screens.AiSettings.keyFor(a, provider).isEmpty();
     }
 
     private static MediaPlayer player;
@@ -148,7 +148,7 @@ public final class Speaker {
         final String base = p.getString("baseUrl", "");
         final String model = p.getString("tts_model", "");
         final String voice = p.getString("tts_voice", "");
-        final String key = SecretBox.get(a, "ai_key");
+        final String key = ir.meelano.manager.screens.AiSettings.keyFor(a, provider);
         stopPlayer();
         new Thread(() -> {
             try {

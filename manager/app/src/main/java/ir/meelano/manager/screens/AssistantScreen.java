@@ -202,7 +202,7 @@ public final class AssistantScreen extends Screen {
         final String provider = AiSettings.prefs(a).getString("provider", AiClient.GEMINI);
         final String model = AiSettings.prefs(a).getString("model", "");
         final String custom = AiSettings.prefs(a).getString("baseUrl", "");
-        final String key = SecretBox.get(a, AiSettings.KEY_NAME);
+        final String key = AiSettings.keyFor(a, provider);
         final String ctx = Assistant.contextBlock(snap);
         aiBusy = true;
         redraw();

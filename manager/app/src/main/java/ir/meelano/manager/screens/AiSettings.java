@@ -22,7 +22,47 @@ final class AiSettings {
     private AiSettings() { }
 
     static final String PREFS = "meelano_ai";
+    /** Legacy single-key slot (migrated once into the per-provider slot). */
     static final String KEY_NAME = "ai_key";
+
+    /** Each service keeps its own encrypted key, so switching provider never sends the wrong key. */
+    public static String keyName(String provider) {
+        return "ai_key_" + provider;
+    }
+
+    /** Moves the legacy key to the provider that was active when it was saved (runs once). */
+    private static void migrate(android.content.Context c) {
+        SharedPreferences p = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        if (p.getBoolean("keys_migrated", false)) return;
+        String legacy = SecretBox.get(c, KEY_NAME);
+        if (!legacy.isEmpty()) {
+            SecretBox.put(c, keyName(p.getString("provider", AiClient.GEMINI)), legacy);
+            SecretBox.put(c, KEY_NAME, "");
+        }
+        p.edit().putBoolean("keys_migrated", true).apply();
+    }
+
+    /** The stored key for one provider («» when none). */
+    public static String keyFor(android.content.Context c, String provider) {
+        migrate(c);
+        return SecretBox.get(c, keyName(provider));
+    }
+
+    /** Names of every service that has a key saved, in the order shown in the chooser. */
+    static String configuredList(android.content.Context c) {
+        String[][] names = {
+                {AiClient.GEMINI, "Gemini"}, {AiClient.OPENAI, "OpenAI"}, {AiClient.GROQ, "Groq"},
+                {AiClient.DEEPSEEK, "DeepSeek"}, {AiClient.OPENROUTER, "OpenRouter"},
+                {AiClient.GAPGPT, "GapGPT"}, {AiClient.GROK, "Grok"}, {AiClient.CUSTOM, "سفارشی"}};
+        StringBuilder b = new StringBuilder();
+        for (String[] n : names) {
+            if (!keyFor(c, n[0]).isEmpty()) {
+                if (b.length() > 0) b.append("، ");
+                b.append(n[1]);
+            }
+        }
+        return b.length() == 0 ? "هیچ کلیدی ثبت نشده" : "کلید ثبت‌شده: " + b;
+    }
 
     static SharedPreferences prefs(MainActivity a) {
         return a.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
@@ -30,13 +70,14 @@ final class AiSettings {
 
     /** True when the user has both a key and the consent switch on. */
     static boolean ready(MainActivity a) {
-        return prefs(a).getBoolean("consent", false) && !SecretBox.get(a, KEY_NAME).isEmpty();
+        String provider = prefs(a).getString("provider", AiClient.GEMINI);
+        return prefs(a).getBoolean("consent", false) && !keyFor(a, provider).isEmpty();
     }
 
     static void build(final MainActivity a, final LinearLayout content, final Runnable rerender) {
         final SharedPreferences p = prefs(a);
         final String provider = p.getString("provider", AiClient.GEMINI);
-        final boolean hasKey = !SecretBox.get(a, KEY_NAME).isEmpty();
+        final boolean hasKey = !keyFor(a, provider).isEmpty();
 
         LinearLayout card = a.kit.card(Theme.GOLD);
         card.addView(a.kit.text("✦ هوش مصنوعی", 15f, Theme.TEXT, true), a.kit.lp(-1, -2));
@@ -88,8 +129,8 @@ final class AiSettings {
             card.addView(a.kit.gap(6));
         }
 
-        card.addView(a.kit.hint(hasKey ? "کلید: ثبت شده (برای تغییر، کلید جدید را وارد کنید)"
-                : "کلید: هنوز ثبت نشده"), a.kit.lp(-1, -2));
+        card.addView(a.kit.hint((hasKey ? "کلید این سرویس: ثبت شده (برای تغییر، کلید جدید را وارد کنید)"
+                : "کلید این سرویس: هنوز ثبت نشده") + "\n" + configuredList(a)), a.kit.lp(-1, -2));
         final EditText key = a.kit.edit("کلید API را اینجا وارد کنید", "", true);
         key.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         card.addView(key, a.kit.lp(-1, -2));
@@ -158,7 +199,7 @@ final class AiSettings {
 
         card.addView(a.kit.btnGold("✦ ذخیره", v -> {
             String k = key.getText().toString().trim();
-            if (!k.isEmpty() && !SecretBox.put(a, KEY_NAME, k)) {
+            if (!k.isEmpty() && !SecretBox.put(a, keyName(provider), k)) {
                 a.kit.toast("ذخیرهٔ امن کلید ممکن نشد");
                 return;
             }
@@ -176,9 +217,9 @@ final class AiSettings {
                 key.getText().toString().trim())), a.kit.lp(-1, -2));
         card.addView(a.kit.gap(6));
         card.addView(a.kit.btnGhost("🗑 حذف کلید و خاموش کردن", Theme.DANGER, v -> {
-            SecretBox.put(a, KEY_NAME, "");
+            SecretBox.put(a, keyName(provider), "");
             p.edit().putBoolean("consent", false).apply();
-            a.kit.toast("کلید حذف شد و هوش مصنوعی خاموش شد");
+            a.kit.toast("کلید این سرویس حذف شد و هوش مصنوعی خاموش شد");
             rerender.run();
         }), a.kit.lp(-1, -2));
 
@@ -194,7 +235,7 @@ final class AiSettings {
 
     private static void testConnection(final MainActivity a, final String provider, final String model,
                                        final String base, final String typedKey) {
-        final String k = typedKey.isEmpty() ? SecretBox.get(a, KEY_NAME) : typedKey;
+        final String k = typedKey.isEmpty() ? keyFor(a, provider) : typedKey;
         a.kit.toast("در حال آزمایش اتصال…");
         new Thread(() -> {
             String msg;

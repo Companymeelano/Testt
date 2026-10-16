@@ -77,7 +77,8 @@ public final class AssistantScreen extends Screen {
     private final Runnable tick = new Runnable() {
         @Override
         public void run() {
-            if (root == null || !root.isAttachedToWindow()) return;
+            // The content container is shared by every screen: only refresh while the assistant is on display.
+            if (root == null || !root.isAttachedToWindow() || !"assistant".equals(a.currentScreenId())) return;
             refresh(true, null);
             handler.postDelayed(this, Assistant.FRESH_MS);
         }
@@ -327,7 +328,7 @@ public final class AssistantScreen extends Screen {
     // ================= UI =================
 
     private void redraw() {
-        if (root == null) return;
+        if (root == null || !"assistant".equals(a.currentScreenId())) return;
         try {
             build();
         } catch (Exception e) {

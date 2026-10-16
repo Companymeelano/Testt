@@ -179,9 +179,10 @@ public final class OfflineVoice {
     /** Speaks the text. {@code onDone} runs on the main thread when speech ends (or fails). */
     public static void speak(Context c, final String text, final Runnable onDone) {
         final Context app = c.getApplicationContext();
-        final int my;
-        synchronized (LOCK) { my = ++seq; }
+        // stop() bumps the sequence; read it afterwards so this utterance is the current one.
         stop();
+        final int my;
+        synchronized (LOCK) { my = seq; }
         new Thread(() -> {
             float[] samples = null;
             int rate = 22050;
@@ -191,7 +192,10 @@ public final class OfflineVoice {
                 synchronized (t) { audio = t.generate(text, 0, 1.0f); }
                 samples = audio.getSamples();
                 rate = audio.getSampleRate();
-            } catch (Throwable ignored) { samples = null; }
+            } catch (Throwable e) {
+                samples = null;
+                ir.meelano.manager.core.Diag.ignored("OfflineVoice:speak", e);
+            }
             final float[] s = samples;
             final int sr = rate;
             MAIN.post(() -> {

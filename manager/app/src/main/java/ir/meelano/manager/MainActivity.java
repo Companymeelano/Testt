@@ -676,19 +676,24 @@ public class MainActivity extends Activity {
         styleBars();
         checkConn();
         refreshCompany();
+        // Only ONE startup popup per launch: the post-login tour, else «تازه‌های نسخه», else the update prompt.
+        boolean tourShown = false;
         try {
             if (ir.meelano.manager.core.LicenseStore.tourPending(this)) {
                 ir.meelano.manager.core.LicenseStore.setTourPending(this, false);
                 ir.meelano.manager.ui.WhatsNew.showCurrent(this);
+                tourShown = true;
             }
         } catch (Exception ignored) { Diag.ignored("MainActivity:677", ignored); }
         Notify.boot(this);
         syncBackFab();
         // v24: What's New on upgrade (once), then the silent licensed update check.
         try {
-            // One startup popup at a time: when «تازه‌های نسخه» opens, the update prompt waits for the next launch.
-            boolean news = WhatsNew.pending(this);
-            WhatsNew.maybeShow(this, news ? null : () -> UpdateCenter.autoCheck(this));
+            if (!tourShown) {
+                // When «تازه‌های نسخه» opens, the update prompt waits for the next launch.
+                boolean news = WhatsNew.pending(this);
+                WhatsNew.maybeShow(this, news ? null : () -> UpdateCenter.autoCheck(this));
+            }
         } catch (Exception ignored) { Diag.ignored("MainActivity:683", ignored); }
         watchLink();
     }
@@ -1028,6 +1033,9 @@ public class MainActivity extends Activity {
         scroll.scrollTo(0, 0);
         s.render(content);
     }
+
+    /** Id of the screen that is on display right now. */
+    public String currentScreenId() { return currentId; }
 
     /** Repaint bottom bar + back FAB (screens call this after internal state changes). */
     public void refreshChrome() {

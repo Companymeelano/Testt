@@ -467,8 +467,8 @@ public class LicenseActivity extends Activity {
         startBtn.setOnClickListener(v -> requestStart(txt(fName), txt(fPhone),
                 fName, fPhone, errName, errPhone, startBtn));
         c.addView(startBtn, kit.lp(-1, -2));
+        addManualEntry(c);
         Card3D.mount(box, c);
-        addManualEntry(box);
         buildDevFooter(box);
     }
 
@@ -477,13 +477,13 @@ public class LicenseActivity extends Activity {
      * (WhatsApp, a phone call, a printed note) when the SMS never came. It goes through
      * the same parser as the clipboard path, so every format is accepted.
      */
-    private void addManualEntry(LinearLayout box) {
-        LinearLayout c = Card3D.card(this, Theme.TEAL);
-        c.addView(kit.text("ورود دستی کد فعال‌سازی", 15f, Theme.TEXT, true), kit.lp(-1, -2));
-        c.addView(kit.hint("اگر پیامک نرسید، کد را از فروشنده (واتس‌اپ، تماس یا متن) بگیرید و اینجا بچسبانید."),
+    private void addManualEntry(LinearLayout c) {
+        final LinearLayout body = kit.v();
+        body.setVisibility(View.GONE);
+        body.addView(kit.hint("اگر پیامک نرسید، کد را از فروشنده (واتس‌اپ، تماس یا متن) بگیرید و اینجا بچسبانید."),
                 kit.lp(-1, -2));
         final EditText fCode = kit.editLux("کد فعال‌سازی (M1…)", "");
-        c.addView(fCode, kit.lp(-1, -2));
+        body.addView(fCode, kit.lp(-1, -2));
         LinearLayout row = kit.h();
         row.addView(kit.btnGhost("چسباندن از حافظه", Theme.MUTED, v -> {
             String cl = clipText();
@@ -499,8 +499,16 @@ public class LicenseActivity extends Activity {
             }
             smartReceive(t);
         }), kit.wlp(1f));
-        c.addView(row, kit.lp(-1, -2));
-        Card3D.mount(box, c);
+        body.addView(row, kit.lp(-1, -2));
+        final android.widget.Button toggle = kit.btnGhost("ورود با کد فعال‌سازی", Theme.TEAL, null);
+        toggle.setOnClickListener(v -> {
+            boolean open = body.getVisibility() != View.VISIBLE;
+            body.setVisibility(open ? View.VISIBLE : View.GONE);
+            toggle.setText(open ? "بستن ورود کد" : "ورود با کد فعال‌سازی");
+        });
+        c.addView(kit.gap(6));
+        c.addView(toggle, kit.lp(-1, -2));
+        c.addView(body, kit.lp(-1, -2));
     }
 
     /** Field row with a leading vector icon from the single icon family (v34). */
@@ -524,7 +532,7 @@ public class LicenseActivity extends Activity {
 
     /** Device code card: LTR-isolated code, one line, honest copy feedback (v34). */
     private LinearLayout deviceCodeView() {
-        LinearLayout card = Card3D.card(this, Theme.TEAL);
+        LinearLayout card = kit.v();
         LinearLayout top = kit.h();
         top.setGravity(Gravity.CENTER_VERTICAL);
         top.addView(kit.icon(R.drawable.mi_credit_card, Theme.GOLD_SOFT, 20), kit.lp(-2, -2));
@@ -728,8 +736,8 @@ public class LicenseActivity extends Activity {
         recall[0] = kit.btnGold("✦ دریافت کلید", v -> recallFlow(recall[0]));
         row.addView(recall[0], kit.wlp(1f));
         c.addView(row, kit.lp(-1, -2));
+        addManualEntry(c);
         Card3D.mount(box, c);
-        addManualEntry(box);
         buildDevFooter(box);
         startDots();
     }
@@ -904,14 +912,10 @@ public class LicenseActivity extends Activity {
     private void buildConnPage(LinearLayout box, LicenseStore.Status s) {
         box.addView(stepBar(2), kit.lp(-1, -2));
         box.addView(kit.gap(10));
-        box.addView(Card3D.hero(this, kit, R.drawable.mi_database, Theme.GOLD,
+        box.addView(heroHeader(
                 editingConnection ? "تغییر سرور اختصاصی" : "اتصال اختصاصی فروشگاه",
                 editingConnection ? "آدرس فعلی را جایگزین کنید و دیتابیس را دوباره انتخاب کنید."
-                        : "IP سرور را وارد کنید؛ سپس دیتابیس سازگار را با یک لمس انتخاب کنید.",
-                editingConnection ? "ویرایش اتصال" : "گام ۲ • اتصال", Theme.GOLD_SOFT),
-                kit.lp(-1, -2));
-        box.addView(kit.gap(8));
-        Card3D.mount(box, licenseTicket(s));
+                        : "IP سرور را وارد کنید؛ دیتابیس سازگار را انتخاب کنید"), kit.lp(-1, -2));
         LinearLayout c = Card3D.card(this, Theme.GOLD);
         LinearLayout chead = kit.h();
         chead.setGravity(Gravity.CENTER_VERTICAL);
@@ -952,8 +956,6 @@ public class LicenseActivity extends Activity {
         final android.widget.Button[] btn = new android.widget.Button[1];
         btn[0] = kit.btnGold("✦ اتصال و نمایش دیتابیس‌ها",
                 v -> connectManual(txt(fIp), btn[0]));
-        c.addView(btn[0], kit.lp(-1, -2));
-        c.addView(kit.gap(6));
         final android.widget.Button[] wbtn = new android.widget.Button[1];
         wbtn[0] = kit.btnGhost("اتصال با وای‌فای", Theme.TEAL, v -> wifiConnect(wbtn[0]));
         try {
@@ -966,7 +968,11 @@ public class LicenseActivity extends Activity {
             }
             wbtn[0].setMinHeight(Theme.dp(48));
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:934", ignored); }
-        c.addView(wbtn[0], kit.lp(-1, -2));
+        LinearLayout brow = kit.h();
+        brow.addView(btn[0], kit.wlp(1.4f));
+        brow.addView(kit.space(8));
+        brow.addView(wbtn[0], kit.wlp(1f));
+        c.addView(brow, kit.lp(-1, -2));
         if (editingConnection) {
             c.addView(kit.btnGhost("انصراف • بازگشت به برنامه", Theme.MUTED, v -> finish()),
                     kit.lp(-1, -2));
@@ -1738,19 +1744,7 @@ public class LicenseActivity extends Activity {
         tag.setGravity(Gravity.CENTER);
         box.addView(tag, kit.lp(-1, -2));
         box.addView(kit.gap(4));
-        if (Ui.widthDp(this) < 360) {
-            box.addView(kit.btnGhost(Brand.SITE_LABEL, Theme.GOLD,
-                    v -> Brand.openSite(this)), kit.lp(-1, -2));
-            box.addView(kit.gap(6));
-            box.addView(kit.btnGhost("پشتیبانی", Theme.TEAL, v -> supportDialog()), kit.lp(-1, -2));
-        } else {
-            LinearLayout row = kit.h();
-            row.addView(kit.btnGhost(Brand.SITE_LABEL, Theme.GOLD,
-                    v -> Brand.openSite(this)), kit.wlp(1f));
-            row.addView(kit.space(8));
-            row.addView(kit.btnGhost("پشتیبانی", Theme.TEAL, v -> supportDialog()), kit.wlp(1f));
-            box.addView(row, kit.lp(-1, -2));
-        }
+        box.addView(kit.btnGhost("پشتیبانی", Theme.TEAL, v -> supportDialog()), kit.lp(-1, -2));
         TextView ver = kit.text(appVer(), 11f, Theme.MUTED, false);
         ver.setGravity(Gravity.CENTER);
         box.addView(ver, kit.lp(-1, -2));

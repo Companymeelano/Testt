@@ -216,18 +216,50 @@ public final class InvoiceWatch {
                     .setShowWhen(true)
                     .setCategory(Notification.CATEGORY_REMINDER)
                     .setSmallIcon(R.mipmap.ic_launcher)
-                    .setColor(0xFFD9AE5A)
+                    .setColor(0xFFE8C77A)
+                    .setGroup("meelano_warehouse")
                     .setContentIntent(pi)
                     .setAutoCancel(true)
                     .setStyle(style);
+            if (android.os.Build.VERSION.SDK_INT >= 24) b.setColorized(true);
             try {
-                android.graphics.Bitmap big = android.graphics.BitmapFactory.decodeResource(c.getResources(),
-                        R.mipmap.ic_launcher);
-                if (big != null) b.setLargeIcon(big);
+                b.addAction(new Notification.Action.Builder(
+                        android.graphics.drawable.Icon.createWithResource(c, R.mipmap.ic_launcher),
+                        "مشاهده بار", pi).build());
+            } catch (Exception ignored) { Diag.ignored("InvoiceWatch:action", ignored); }
+            try {
+                b.setLargeIcon(loadBadge(c, n));
             } catch (Exception ignored) { Diag.ignored("InvoiceWatch:large", ignored); }
             NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
             if (nm != null) nm.notify(Notify.NEWINV_NOTIF_ID, b.build());
         } catch (Exception ignored) { Diag.ignored("InvoiceWatch:180", ignored); }
+    }
+
+    /** Black-and-gold badge with the number of loads, used as the notification's large icon. */
+    private static android.graphics.Bitmap loadBadge(Context c, int count) {
+        int size = 256;
+        android.graphics.Bitmap bmp = android.graphics.Bitmap.createBitmap(size, size,
+                android.graphics.Bitmap.Config.ARGB_8888);
+        android.graphics.Canvas cv = new android.graphics.Canvas(bmp);
+        android.graphics.Paint p = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        float cx = size / 2f, cy = size / 2f, r = size / 2f - 8;
+        p.setShader(new android.graphics.RadialGradient(cx - 30, cy - 40, r * 1.6f,
+                new int[]{0xFF2A2A2E, 0xFF0B0B0D}, null, android.graphics.Shader.TileMode.CLAMP));
+        cv.drawCircle(cx, cy, r, p);
+        p.setShader(null);
+        p.setStyle(android.graphics.Paint.Style.STROKE);
+        p.setStrokeWidth(10);
+        p.setColor(0xFFE8C77A);
+        cv.drawCircle(cx, cy, r - 12, p);
+        p.setStyle(android.graphics.Paint.Style.FILL);
+        p.setColor(0xFFF2F2F4);
+        p.setTextAlign(android.graphics.Paint.Align.CENTER);
+        p.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.BOLD));
+        p.setTextSize(count > 9 ? 84 : 104);
+        String txt = String.valueOf(Math.min(count, 99));
+        android.graphics.Paint.FontMetrics fm = p.getFontMetrics();
+        cv.drawText(txt, cx, cy - (fm.ascent + fm.descent) / 2f, p);
+        return bmp;
     }
 
     /** One load as a readable line: «🧾 ۱۰۴۷ • مشتری «…» • ۱۲٫۵ میلیون ریال • ثبت: …». */

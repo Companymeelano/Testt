@@ -45,8 +45,7 @@ import java.util.Locale;
 public final class AssistantScreen extends Screen {
 
     private static final String[] QUICK = {
-            "خلاصه امروز", "فروش امروز", "دریافت و پرداخت", "بدهکاران", "معوق‌ها",
-            "چک‌های نزدیک سررسید", "موجودی و کسری", "ویزیتورها", "پیشنهاد اقدام", "راهنما"
+            "خلاصه امروز", "فروش امروز", "بدهکاران", "پیشنهاد اقدام"
     };
     private static final String PREFS = "meelano_assistant";
 
@@ -341,10 +340,8 @@ public final class AssistantScreen extends Screen {
         root.addView(hero(), a.kit.lp(-1, -2));
         root.addView(a.kit.gap(10));
         root.addView(quickChips(), a.kit.lp(-1, -2));
-        root.addView(a.kit.gap(10));
-        root.addView(actionRow(), a.kit.lp(-1, -2));
         root.addView(a.kit.gap(8));
-        root.addView(aiRow(), a.kit.lp(-1, -2));
+        root.addView(speakChip(), a.kit.lp(-1, -2));
         root.addView(a.kit.gap(10));
         if (liveOn) {
             root.addView(liveBar(), a.kit.lp(-1, -2));
@@ -391,16 +388,14 @@ public final class AssistantScreen extends Screen {
         return sv;
     }
 
-    private View actionRow() {
-        LinearLayout row = a.kit.h();
-        row.addView(a.kit.btnGhost("⟳ بروزرسانی", Theme.TEAL, v -> refresh(true, null)), weight());
-        row.addView(a.kit.btnGhost("📨 ارسال خلاصه", Theme.GOLD, v -> sendSummary()), weight());
+    /** One quiet control: whether answers are read aloud. Data refreshes on its own. */
+    private View speakChip() {
         boolean on = speakOn();
-        row.addView(a.kit.btnGhost(on ? "🔊 صدا: روشن" : "🔈 صدا: خاموش", Theme.VIOLET, v -> {
+        return a.kit.btnGhost(on ? "🔊  پاسخ‌ها را بخوان" : "🔈  پاسخ‌ها را بخوان (خاموش)",
+                on ? Theme.GOLD : Theme.MUTED, v -> {
             setSpeakOn(!on);
             redraw();
-        }), weight());
-        return row;
+        });
     }
 
     private View aiRow() {

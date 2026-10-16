@@ -32,7 +32,7 @@ public final class Notify {
 
     static final String CH = "meelano_due";
     /** Warehouse «بار جدید» channel: its own id so the custom chime is applied (sound is fixed per channel). */
-    public static final String CH_WH = "meelano_wh_bell";
+    public static final String CH_WH = "meelano_wh_signature";
     private static final int ALARM_REQ = 7001;
     private static final int NOTIF_ID = 7002;
     static final String ACT_BACKUP = "ir.meelano.manager.BACKUP";
@@ -96,16 +96,16 @@ public final class Notify {
             NotificationChannel ch = new NotificationChannel(CH_WH, "بار جدید انبار",
                     NotificationManager.IMPORTANCE_HIGH);
             ch.setDescription("اعلان بار جدید برای تحویل، با نام مشتری و ثبت‌کننده");
-            android.net.Uri sound = android.net.Uri.parse("android.resource://" + c.getPackageName() + "/raw/wh_alarm");
+            android.net.Uri sound = android.net.Uri.parse("android.resource://" + c.getPackageName() + "/raw/meelano_signature");
             android.media.AudioAttributes attrs = new android.media.AudioAttributes.Builder()
                     .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION_EVENT)
                     .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
                     .build();
             ch.setSound(sound, attrs);
             ch.enableVibration(true);
-            ch.setVibrationPattern(new long[]{0, 280, 140, 280, 140, 560});
+            ch.setVibrationPattern(new long[]{0, 90, 70, 90, 70, 260});
             ch.enableLights(true);
-            ch.setLightColor(0xFFD9AE5A);
+            ch.setLightColor(0xFFE8C77A);
             ch.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
             nm.createNotificationChannel(ch);
         } catch (Exception e) {

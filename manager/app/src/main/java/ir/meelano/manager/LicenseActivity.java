@@ -1020,14 +1020,29 @@ public class LicenseActivity extends Activity {
     private void buildConnPage(LinearLayout box, LicenseStore.Status s) {
         box.addView(stepBar(2), kit.lp(-1, -2));
         box.addView(kit.gap(10));
-        box.addView(heroHeader(
+        box.addView(Card3D.hero(this, kit, R.drawable.mi_database, Theme.GOLD,
                 editingConnection ? "تغییر سرور اختصاصی" : "اتصال اختصاصی فروشگاه",
                 editingConnection ? "آدرس فعلی را جایگزین کنید و دیتابیس را دوباره انتخاب کنید."
-                        : "IP سرور را وارد کنید؛ دیتابیس سازگار را انتخاب کنید"), kit.lp(-1, -2));
+                        : "IP سرور را وارد کنید؛ سپس دیتابیس سازگار را با یک لمس انتخاب کنید.",
+                editingConnection ? "ویرایش اتصال" : "گام ۲ • اتصال", Theme.GOLD_SOFT),
+                kit.lp(-1, -2));
+        box.addView(kit.gap(8));
+        LinearLayout lc = Card3D.card(this, Theme.SUCCESS);
+        lc.addView(Card3D.stepRow(this, kit, "✓", Theme.SUCCESS, "لایسنس"), kit.lp(-1, -2));
+        lc.addView(kit.kv("وضعیت", "✓ فعال", Theme.SUCCESS), kit.lp(-1, -2));
+        lc.addView(kit.kv("طرح", "«" + License.planFa(s.plan) + "»", Theme.GOLD_SOFT),
+                kit.lp(-1, -2));
+        if (s.plan == License.P_PERM) {
+            lc.addView(kit.kv("اعتبار", "دائمی ♾", Theme.SUCCESS), kit.lp(-1, -2));
+        } else {
+            lc.addView(kit.kv("اعتبار", Money.fa(String.valueOf(s.daysLeft)) + " روز",
+                    leftColor(s.daysLeft)), kit.lp(-1, -2));
+        }
+        Card3D.mount(box, lc);
         LinearLayout c = Card3D.card(this, Theme.GOLD);
         LinearLayout chead = kit.h();
         chead.setGravity(Gravity.CENTER_VERTICAL);
-        chead.addView(sectionHead(R.drawable.mi_database, Theme.GOLD, "اتصال به سرور"), kit.wlp(1f));
+        chead.addView(Card3D.stepRow(this, kit, "✦", Theme.GOLD, "اتصال به سرور"), kit.wlp(1f));
         chead.addView(refreshIconView(), kit.lp(-2, -2));
         c.addView(chead, kit.lp(-1, -2));
         c.addView(kit.text("لایسنس فعال است؛ IP سرور را وارد کنید تا دیتابیس‌های سازگار نمایش داده شوند.",
@@ -1052,7 +1067,7 @@ public class LicenseActivity extends Activity {
             fIp.setSingleLine(true);
             fIp.setInputType(android.text.InputType.TYPE_CLASS_TEXT
                     | android.text.InputType.TYPE_TEXT_VARIATION_URI);
-        } catch (Exception ignored) { Diag.ignored("LicenseActivity:909", ignored); }
+        } catch (Exception ignored) { }
         c.addView(iconField(fIp, R.drawable.mi_my_location), kit.lp(-1, -2));
         c.addView(kit.text("پس از اتصال مستقیم، دیتابیس‌های دارای ساختار آتیران برای انتخاب نمایش داده می‌شوند.",
                 11.5f, Theme.MUTED, false), kit.lp(-1, -2));
@@ -1062,8 +1077,10 @@ public class LicenseActivity extends Activity {
         }
         c.addView(kit.gap(4));
         final android.widget.Button[] btn = new android.widget.Button[1];
-        btn[0] = goldAction("اتصال و نمایش دیتابیس‌ها", R.drawable.mi_database,
+        btn[0] = kit.btnGold("✦ اتصال و نمایش دیتابیس‌ها",
                 v -> connectManual(txt(fIp), btn[0]));
+        c.addView(btn[0], kit.lp(-1, -2));
+        c.addView(kit.gap(6));
         final android.widget.Button[] wbtn = new android.widget.Button[1];
         wbtn[0] = kit.btnGhost("اتصال با وای‌فای", Theme.TEAL, v -> wifiConnect(wbtn[0]));
         try {
@@ -1075,12 +1092,8 @@ public class LicenseActivity extends Activity {
                 wbtn[0].setCompoundDrawablePadding(Theme.dp(6));
             }
             wbtn[0].setMinHeight(Theme.dp(48));
-        } catch (Exception ignored) { Diag.ignored("LicenseActivity:934", ignored); }
-        LinearLayout brow = kit.h();
-        brow.addView(btn[0], kit.wlp(1.4f));
-        brow.addView(kit.space(8));
-        brow.addView(wbtn[0], kit.wlp(1f));
-        c.addView(brow, kit.lp(-1, -2));
+        } catch (Exception ignored) { }
+        c.addView(wbtn[0], kit.lp(-1, -2));
         if (editingConnection) {
             c.addView(kit.btnGhost("انصراف • بازگشت به برنامه", Theme.MUTED, v -> finish()),
                     kit.lp(-1, -2));

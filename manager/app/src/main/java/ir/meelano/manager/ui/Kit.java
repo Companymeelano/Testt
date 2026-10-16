@@ -1139,6 +1139,23 @@ public final class Kit {
 
     /** Inventory row: name + code/extra + stock + price. */
     public View invRow(String name, String code, String extra, String qty, String price, View.OnClickListener onClick) {
+        return invRowTone(name, code, extra, qty, price, null, 0, onClick);
+    }
+
+    /** Neon status chip (موجود / کم‌موجود / ناموجود) in the given tone. */
+    public TextView stockChip(String label, int tone) {
+        TextView t = text(label, 10f, tone, true);
+        t.setSingleLine(true);
+        t.setPadding(Theme.dp(8), Theme.dp(2), Theme.dp(8), Theme.dp(2));
+        t.setBackground(Theme.pill(tone));
+        try {
+            t.setShadowLayer(Theme.dp(4), 0, 0, Theme.alpha(tone, 150));
+        } catch (Exception ignored) { Diag.ignored("Kit:chipGlow", ignored); }
+        return t;
+    }
+
+    public View invRowTone(String name, String code, String extra, String qty, String price,
+                           String status, int tone, View.OnClickListener onClick) {
         LinearLayout c = v();
         c.setBackground(Theme.card());
         c.setPadding(Theme.dp(12), Theme.dp(11), Theme.dp(12), Theme.dp(11));
@@ -1159,6 +1176,10 @@ public final class Kit {
         head.addView(copy, wlp(1f));
         LinearLayout side = v();
         side.setGravity(Gravity.END);
+        if (status != null && !status.isEmpty() && tone != 0) {
+            side.addView(stockChip(status, tone), lp(-2, -2));
+            side.addView(space(0), lp(-2, Theme.dp(4)));
+        }
         if (qty != null && !qty.isEmpty()) side.addView(text(qty, 12.5f, Theme.TEXT, true), lp(-2, -2));
         if (price != null && !price.isEmpty()) side.addView(text(price, 11f, Theme.GOLD_SOFT, false), lp(-2, -2));
         head.addView(side, lp(-2, -2));

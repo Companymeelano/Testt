@@ -444,6 +444,29 @@ public final class Theme {
     public static void pressable(View v) {
         v.setClickable(true);
         v.setFocusable(true);
+        // Micro-interaction: a soft press-in, a spring back, and a light haptic tick on release.
+        // Returns false so clicks and scrolling behave exactly as before.
+        try {
+            v.setOnTouchListener((view, ev) -> {
+                boolean motion = Ui.motionOk(view.getContext());
+                switch (ev.getActionMasked()) {
+                    case android.view.MotionEvent.ACTION_DOWN:
+                        if (motion) view.animate().scaleX(0.975f).scaleY(0.975f).setDuration(110).start();
+                        break;
+                    case android.view.MotionEvent.ACTION_UP:
+                        if (motion) view.animate().scaleX(1f).scaleY(1f).setDuration(260)
+                                .setInterpolator(new android.view.animation.OvershootInterpolator(1.3f)).start();
+                        view.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP);
+                        break;
+                    case android.view.MotionEvent.ACTION_CANCEL:
+                        if (motion) view.animate().scaleX(1f).scaleY(1f).setDuration(160).start();
+                        break;
+                    default:
+                        break;
+                }
+                return false;
+            });
+        } catch (Exception ignored) { Diag.ignored("Theme:press", ignored); }
         try {
             // Never nest ripples: repaint passes (e.g. the bottom bar) call this repeatedly.
             if (v.getBackground() instanceof android.graphics.drawable.RippleDrawable) return;

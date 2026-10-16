@@ -231,8 +231,12 @@ public class ProductsScreen extends Screen {
                 stock = "انبار " + Money.qty(r.d("anbarQty"));
             String extra = r.s("groupName");
             if (!r.s("unit").isEmpty()) extra += (extra.isEmpty() ? "" : " • ") + r.s("unit");
-            View v = a.kit.invRow(r.s("naka"), "کد " + Money.fa(r.s("code").isEmpty() ? shka : r.s("code")),
-                    extra, stock, Money.rial(r.d("sale")), v2 -> openProduct(shka));
+            // Stock tone uses the same threshold the screen states above (5 units).
+            double qtyNow = filter.warehouse >= 0 && r.has("anbarQty") ? r.d("anbarQty") : r.d("vah");
+            String status = qtyNow <= 0 ? "ناموجود" : (qtyNow <= 5 ? "کم‌موجود" : "موجود");
+            int tone = qtyNow <= 0 ? Theme.DANGER : (qtyNow <= 5 ? Theme.WARNING : Theme.SUCCESS);
+            View v = a.kit.invRowTone(r.s("naka"), "کد " + Money.fa(r.s("code").isEmpty() ? shka : r.s("code")),
+                    extra, stock, Money.rial(r.d("sale")), status, tone, v2 -> openProduct(shka));
             LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
             p.setMargins(0, 0, 0, Theme.dp(10));
             content.addView(v, p);

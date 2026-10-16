@@ -19,6 +19,7 @@ import android.widget.TextView;
 
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.core.AiClient;
+import ir.meelano.manager.core.AiRouter;
 import ir.meelano.manager.core.Assistant;
 import ir.meelano.manager.core.Diag;
 import ir.meelano.manager.core.Money;
@@ -199,10 +200,6 @@ public final class AssistantScreen extends Screen {
     }
 
     private void askAi(final String q, final String rule) {
-        final String provider = AiSettings.prefs(a).getString("provider", AiClient.GEMINI);
-        final String model = AiSettings.prefs(a).getString("model", "");
-        final String custom = AiSettings.prefs(a).getString("baseUrl", "");
-        final String key = AiSettings.keyFor(a, provider);
         final String ctx = Assistant.contextBlock(snap);
         aiBusy = true;
         redraw();
@@ -210,8 +207,9 @@ public final class AssistantScreen extends Screen {
             String reply = null;
             String err = null;
             try {
-                reply = AiClient.complete(provider, custom, model, key, SYSTEM_PROMPT,
+                AiRouter.Result r = AiRouter.complete(a, SYSTEM_PROMPT,
                         "داده‌های فروشگاه (امروز):\n" + ctx + "\nسؤال مدیر: " + q);
+                reply = r.text;
             } catch (Exception e) {
                 err = e.getMessage() == null ? "خطای ناشناخته" : e.getMessage();
             }

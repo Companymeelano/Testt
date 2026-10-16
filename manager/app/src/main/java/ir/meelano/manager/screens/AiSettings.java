@@ -9,6 +9,7 @@ import android.widget.LinearLayout;
 
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.core.AiClient;
+import ir.meelano.manager.core.AiRouter;
 import ir.meelano.manager.core.OfflineVoice;
 import ir.meelano.manager.core.SecretBox;
 import ir.meelano.manager.core.Speaker;
@@ -50,12 +51,8 @@ public final class AiSettings {
 
     /** Names of every service that has a key saved, in the order shown in the chooser. */
     static String configuredList(android.content.Context c) {
-        String[][] names = {
-                {AiClient.GEMINI, "Gemini"}, {AiClient.OPENAI, "OpenAI"}, {AiClient.GROQ, "Groq"},
-                {AiClient.DEEPSEEK, "DeepSeek"}, {AiClient.OPENROUTER, "OpenRouter"},
-                {AiClient.GAPGPT, "GapGPT"}, {AiClient.GROK, "Grok"}, {AiClient.CUSTOM, "سفارشی"}};
         StringBuilder b = new StringBuilder();
-        for (String[] n : names) {
+        for (String[] n : AiClient.NAMES) {
             if (!keyFor(c, n[0]).isEmpty()) {
                 if (b.length() > 0) b.append("، ");
                 b.append(n[1]);
@@ -70,8 +67,7 @@ public final class AiSettings {
 
     /** True when the user has both a key and the consent switch on. */
     static boolean ready(MainActivity a) {
-        String provider = prefs(a).getString("provider", AiClient.GEMINI);
-        return prefs(a).getBoolean("consent", false) && !keyFor(a, provider).isEmpty();
+        return prefs(a).getBoolean("consent", false) && AiRouter.anyKey(a);
     }
 
     static void build(final MainActivity a, final LinearLayout content, final Runnable rerender) {
@@ -92,12 +88,7 @@ public final class AiSettings {
         card.addView(a.kit.gap(8));
 
         card.addView(a.kit.hint("سرویس"), a.kit.lp(-1, -2));
-        String[][] options = {
-                {AiClient.GEMINI, "Gemini"}, {AiClient.OPENAI, "OpenAI"},
-                {AiClient.GROQ, "Groq"}, {AiClient.DEEPSEEK, "DeepSeek"},
-                {AiClient.OPENROUTER, "OpenRouter"}, {AiClient.GAPGPT, "GapGPT"},
-                {AiClient.GROK, "Grok"}, {AiClient.CUSTOM, "سفارشی"}
-        };
+        String[][] options = AiClient.NAMES;
         for (int row = 0; row < options.length; row += 4) {
             LinearLayout provRow = a.kit.h();
             for (int i = row; i < Math.min(row + 4, options.length); i++) {

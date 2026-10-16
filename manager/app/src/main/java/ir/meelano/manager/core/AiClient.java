@@ -32,13 +32,39 @@ public final class AiClient {
     public static final String DEEPSEEK = "deepseek";
     public static final String OPENROUTER = "openrouter";
     public static final String GAPGPT = "gapgpt";
+    public static final String CEREBRAS = "cerebras";
+    public static final String HUGGINGFACE = "huggingface";
     public static final String CUSTOM = "custom";
+
+    /** Display names in the order the chooser shows them. */
+    public static final String[][] NAMES = {
+            {GEMINI, "Gemini"}, {OPENAI, "OpenAI"}, {GROQ, "Groq"}, {CEREBRAS, "Cerebras"},
+            {HUGGINGFACE, "Hugging Face"}, {DEEPSEEK, "DeepSeek"}, {OPENROUTER, "OpenRouter"},
+            {GAPGPT, "GapGPT"}, {GROK, "Grok"}, {CUSTOM, "سفارشی"}
+    };
+
+    public static String nameOf(String provider) {
+        for (String[] n : NAMES) if (n[0].equals(provider)) return n[1];
+        return provider == null ? "" : provider;
+    }
+
+    /** An HTTP failure from the provider, carrying the status code so routing can react. */
+    public static final class ApiError extends IllegalStateException {
+        public final int code;
+
+        ApiError(int code, String message) {
+            super(message);
+            this.code = code;
+        }
+    }
 
     /** Recommended default model per preset (the user may change it in settings). */
     public static String defaultModel(String provider) {
         if (GEMINI.equals(provider)) return "gemini-2.5-flash";
         if (OPENAI.equals(provider)) return "gpt-4o-mini";
         if (GROK.equals(provider)) return "grok-3-mini";
+        if (CEREBRAS.equals(provider)) return "llama-3.3-70b";
+        if (HUGGINGFACE.equals(provider)) return "meta-llama/Llama-3.3-70B-Instruct";
         if (GROQ.equals(provider)) return "llama-3.3-70b-versatile";
         if (DEEPSEEK.equals(provider)) return "deepseek-chat";
         if (OPENROUTER.equals(provider)) return "openai/gpt-4o-mini";
@@ -58,6 +84,8 @@ public final class AiClient {
         if (DEEPSEEK.equals(provider)) return "https://api.deepseek.com/v1";
         if (OPENROUTER.equals(provider)) return "https://openrouter.ai/api/v1";
         if (GAPGPT.equals(provider)) return "https://api.gapgpt.app/v1";
+        if (CEREBRAS.equals(provider)) return "https://api.cerebras.ai/v1";
+        if (HUGGINGFACE.equals(provider)) return "https://router.huggingface.co/v1";
         return custom == null ? "" : custom.trim();
     }
 
@@ -204,8 +232,8 @@ public final class AiClient {
             int code = con.getResponseCode();
             if (code >= 400) {
                 read(con.getErrorStream());
-                if (code == 401 || code == 403) throw new IllegalStateException("کلید یا دسترسی سرویس معتبر نیست (" + code + ")");
-                throw new IllegalStateException("خطای سرویس صدا (" + code + ")");
+                if (code == 401 || code == 403) throw new ApiError(code, "کلید یا دسترسی سرویس معتبر نیست (" + code + ")");
+                throw new ApiError(code, "خطای سرویس صدا (" + code + ")");
             }
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             try (InputStream is = con.getInputStream()) {
@@ -244,9 +272,9 @@ public final class AiClient {
             }
             int code = con.getResponseCode();
             String text = read(code >= 400 ? con.getErrorStream() : con.getInputStream());
-            if (code == 401 || code == 403) throw new IllegalStateException("کلید یا دسترسی سرویس معتبر نیست (" + code + ")");
-            if (code == 429) throw new IllegalStateException("سقف درخواست سرویس پر شده؛ کمی بعد دوباره تلاش کنید");
-            if (code >= 400) throw new IllegalStateException("خطای سرویس هوش مصنوعی (" + code + ")");
+            if (code == 401 || code == 403) throw new ApiError(code, "کلید یا دسترسی سرویس معتبر نیست (" + code + ")");
+            if (code == 429) throw new ApiError(code, "سقف درخواست سرویس پر شده؛ کمی بعد دوباره تلاش کنید");
+            if (code >= 400) throw new ApiError(code, "خطای سرویس هوش مصنوعی (" + code + ")");
             return new JSONObject(text);
         } finally {
             con.disconnect();

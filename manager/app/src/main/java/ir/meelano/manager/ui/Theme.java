@@ -304,10 +304,11 @@ public final class Theme {
 
     /** KPI tile background. */
     public static GradientDrawable kpi(int accent) {
-        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{alpha(accent, light ? 26 : 34), alpha(SURFACE, 255)});
-        d.setCornerRadius(dp(18));
-        d.setStroke(dp(1), alpha(accent, light ? 60 : 70));
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                light ? new int[]{alpha(accent, 34), alpha(SURFACE, 255)}
+                        : new int[]{alpha(accent, 44), alpha(SURFACE, 255), shade(SURFACE, -0.06f)});
+        d.setCornerRadius(dp(20));
+        d.setStroke(dp(1), alpha(accent, light ? 70 : 84));
         return d;
     }
 
@@ -408,7 +409,7 @@ public final class Theme {
 
     public static GradientDrawable bottomBar() {
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                light ? new int[]{0xFFFFFDF6, 0xFFF2E4C6} : new int[]{0xFF101828, 0xFF0C1220});
+                light ? new int[]{0xFFFFFDF6, 0xFFF2E4C6} : new int[]{0xFF14171F, 0xFF050609});
         // Rounded top edge with a gold hairline: the bar reads as a floating luxury dock.
         float r = dp(22);
         d.setCornerRadii(new float[]{r, r, r, r, 0, 0, 0, 0});

@@ -965,6 +965,7 @@ public class MainActivity extends Activity {
             content.setTranslationX((forward ? -1 : 1) * Theme.dp(48));
             content.setAlpha(0.35f);
             content.animate().translationX(0f).alpha(1f).setDuration(220).start();
+            ir.meelano.manager.ui.Ui.reveal(content);
         } catch (Exception ignored) { Diag.ignored("MainActivity:954", ignored); }
     }
 

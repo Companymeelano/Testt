@@ -286,7 +286,7 @@ public class HomeScreen extends Screen {
         LinearLayout hero = a.kit.v();
         hero.setBackground(Theme.executiveHero());
         hero.setPadding(Theme.dp(18), Theme.dp(17), Theme.dp(18), Theme.dp(14));
-        hero.setElevation(Theme.cardElevation() + Theme.dp(1));
+        Theme.lift(hero, Theme.cardElevation() + Theme.dp(1));
 
         LinearLayout top = a.kit.h();
         FrameLayout crest = new FrameLayout(a);

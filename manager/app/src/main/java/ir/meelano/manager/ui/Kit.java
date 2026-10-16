@@ -124,7 +124,7 @@ public final class Kit {
         LinearLayout c = v();
         c.setBackground(Theme.card());
         c.setPadding(Theme.dp(14), Theme.dp(13), Theme.dp(14), Theme.dp(13));
-        c.setElevation(Theme.cardElevation());
+        Theme.lift(c, Theme.cardElevation());
         return c;
     }
 
@@ -132,7 +132,7 @@ public final class Kit {
         LinearLayout c = v();
         c.setBackground(Theme.cardAccent(accent));
         c.setPadding(Theme.dp(14), Theme.dp(13), Theme.dp(14), Theme.dp(13));
-        c.setElevation(Theme.cardElevation());
+        Theme.lift(c, Theme.cardElevation());
         return c;
     }
 
@@ -438,7 +438,7 @@ public final class Kit {
         LinearLayout c = h();
         c.setBackground(Theme.card());
         c.setPadding(Theme.dp(13), Theme.dp(12), Theme.dp(13), Theme.dp(12));
-        c.setElevation(Theme.cardElevation());
+        Theme.lift(c, Theme.cardElevation());
         TextView g = text(glyph, 22, accent, true);
         g.setGravity(Gravity.CENTER);
         g.setBackground(Theme.avatar(Theme.alpha(accent, 52)));
@@ -833,6 +833,15 @@ public final class Kit {
     // ---------------- misc ----------------
     public void toast(String msg) {
         Toast.makeText(a, msg, Toast.LENGTH_SHORT).show();
+        try { Ui.haptic(a.getWindow().getDecorView(), !isFailureText(msg)); } catch (Exception ignored) { Diag.ignored("Kit:toastHaptic", ignored); }
+    }
+
+    /** Rough check so error toasts get the reject pattern instead of the success one. */
+    private static boolean isFailureText(String msg) {
+        if (msg == null) return false;
+        String m = msg.toLowerCase(java.util.Locale.ROOT);
+        return m.contains("ممکن نشد") || m.contains("خطا") || m.contains("ناموفق")
+                || m.contains("نشد") || m.contains("error") || m.contains("fail");
     }
 
     /** Selection callback for {@link #searchPicker}. */

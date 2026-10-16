@@ -75,6 +75,10 @@ public class SignView extends View {
                 path.lineTo(x, y);
                 invalidate();
                 return true;
+            case MotionEvent.ACTION_UP:
+                // A soft tick when a stroke ends, so the pen feels physical.
+                Ui.haptic(this, true);
+                return super.onTouchEvent(e);
             default:
                 return super.onTouchEvent(e);
         }

@@ -100,16 +100,16 @@ public final class Theme {
         } catch (Exception ignored) { Diag.ignored("Theme:154", ignored); }
         fontScale = zi == 0 ? 0.9f : zi == 2 ? 1.15f : zi == 3 ? 1.3f : 1f;
         // Exactly two curated themes; the accent is part of each theme, not a user choice.
-        int dark = 0xFFD9DEE7, darkSoft = 0xFFF4F6FA, lite = 0xFF9A6E1F, liteSoft = 0xFF5E4310;
+        int dark = 0xFFD4AF37, darkSoft = 0xFFF0D98C, lite = 0xFF9C7A1A, liteSoft = 0xFF5C4510;
         if (light) {
             // «عاج سلطنتی»: warm pearl background, near-white cards, clear separation.
-            BG = 0xFFF6F0E3;
+            BG = 0xFFF5F1E6;
             SURFACE = 0xFFFFFDF8;
-            SURFACE2 = 0xFFF1E7D2;
+            SURFACE2 = 0xFFEEE7D4;
             GOLD = lite;
             GOLD_SOFT = liteSoft;
-            TEXT = 0xFF1C1915;
-            MUTED = 0xFF6B6255;
+            TEXT = 0xFF0F172A;
+            MUTED = 0xFF5B6478;
             SUCCESS = 0xFF1B7A4B;
             DANGER = 0xFFB3261E;
             WARNING = 0xFF9A5B00;
@@ -118,18 +118,18 @@ public final class Theme {
             TEAL = 0xFF007268;
             STEEL = 0xFF546177;
         } else {
-            // «گرافیت پلاتینی»: neutral graphite-black surfaces, so every accent (platinum, gold…) reads as one family.
-            BG = 0xFF050609;
-            SURFACE = 0xFF0F1116;
-            SURFACE2 = 0xFF181B23;
+            // «نیوی و طلا»: deep navy surfaces with a polished gold accent.
+            BG = 0xFF0F172A;
+            SURFACE = 0xFF162139;
+            SURFACE2 = 0xFF1E2B47;
             GOLD = dark;
             GOLD_SOFT = darkSoft;
-            TEXT = 0xFFF6F7F9;
-            MUTED = 0xFF9CA3AF;
-            SUCCESS = 0xFF3DD68C;
-            DANGER = 0xFFFF5C61;
-            WARNING = 0xFFFFB020;
-            INFO = 0xFF5AA9FF;
+            TEXT = 0xFFF8F4E8;
+            MUTED = 0xFF9EAAC4;
+            SUCCESS = 0xFF34D399;
+            DANGER = 0xFFF87171;
+            WARNING = 0xFFFBBF24;
+            INFO = 0xFF60A5FA;
             VIOLET = 0xFF9A7BFF;
             TEAL = 0xFF3ED6C5;
             STEEL = 0xFF7C8DA6;
@@ -141,7 +141,7 @@ public final class Theme {
      * falling onto graphite black. Light: a warm gold glow over the ivory pearl base.
      */
     public static GradientDrawable backdrop() {
-        int glow = light ? alpha(GOLD, 60) : alpha(0xFFD5DAE2, 34);
+        int glow = light ? alpha(GOLD, 52) : alpha(GOLD, 40);
         return new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
                 new int[]{glow, BG});
     }
@@ -196,12 +196,12 @@ public final class Theme {
 
     // ---------------- system bars ----------------
     public static int statusBar() {
-        return light ? 0xFFF6F0E1 : 0xFF0C1220;
+        return light ? 0xFFF5F1E6 : 0xFF0F172A;
     }
 
     /** Navigation-bar color: champagne in light mode so the dark system keys stay visible. */
     public static int navBar() {
-        return light ? 0xFFEFE0C2 : 0xFF0C1220;
+        return light ? 0xFFEBE2CC : 0xFF0F172A;
     }
 
     // ---------------- drawable factories ----------------
@@ -213,26 +213,47 @@ public final class Theme {
         return d;
     }
 
-    /** One controlled lift for every card. Deliberately small: depth comes from spacing too. */
+    /** Elevation for cards: deeper in dark mode, where the gold glow carries the depth. */
     public static float cardElevation() {
-        return dp(light ? 2 : 3);
+        return dp(light ? 4 : 10);
     }
 
-    /** Standard glass card with a restrained top sheen and warm hairline edge. */
-    public static GradientDrawable card() {
-        if (light) {
-            // Ivory-champagne card with a fine bronze hairline (matches the approved home mockup).
-            GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                    new int[]{0xFFFFFDF8, 0xFFF7EEDB});
-            d.setCornerRadius(dp(22));
-            d.setStroke(dp(1), alpha(GOLD, 70));
-            return d;
+    /**
+     * Applies elevation and, on Android 9+, a tinted shadow: a soft black ambient shadow plus a
+     * faint gold spot-glow on dark, so raised cards read as lit objects rather than grey boxes.
+     */
+    public static void lift(android.view.View v, float elevationPx) {
+        v.setElevation(elevationPx);
+        if (android.os.Build.VERSION.SDK_INT >= 28) {
+            try {
+                v.setOutlineAmbientShadowColor(light ? 0x2A3A2A10 : 0xCC000000);
+                v.setOutlineSpotShadowColor(light ? 0x406B5210 : alpha(GOLD, 120));
+            } catch (Exception ignored) { Diag.ignored("Theme:lift", ignored); }
         }
-        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{shade(SURFACE, 0.10f), SURFACE, shade(SURFACE, -0.06f)});
-        d.setCornerRadius(dp(22));
-        d.setStroke(dp(1), alpha(GOLD, 64));
-        return d;
+    }
+
+    /**
+     * Glass surface: a translucent body with a bright top sheen fading out and a fine gold
+     * edge. Used by every card, so the whole app shares one material.
+     */
+    public static android.graphics.drawable.Drawable glass(int top, int bottom, float radiusDp, int edgeAlpha) {
+        GradientDrawable body = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{top, bottom});
+        body.setCornerRadius(dp(radiusDp));
+        body.setStroke(dp(1), alpha(GOLD, edgeAlpha));
+        GradientDrawable sheen = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{alpha(0xFFFFFFFF, light ? 150 : 22), 0x00FFFFFF});
+        sheen.setCornerRadius(dp(radiusDp));
+        return new android.graphics.drawable.LayerDrawable(
+                new android.graphics.drawable.Drawable[]{body, sheen});
+    }
+
+    /** Standard glass card: translucent navy (or ivory) body with a top sheen and gold edge. */
+    public static android.graphics.drawable.Drawable card() {
+        if (light) {
+            return glass(0xFFFFFDF8, 0xFFF4ECDA, 22, 70);
+        }
+        return glass(alpha(SURFACE, 242), alpha(SURFACE, 214), 22, 64);
     }
 
     /** Card with an accent glow edge. */
@@ -254,21 +275,14 @@ public final class Theme {
     }
 
     /** Executive dashboard hero: layered midnight/champagne glass with a quiet metallic edge. */
-    public static GradientDrawable executiveHero() {
+    public static android.graphics.drawable.Drawable executiveHero() {
         int accent = GOLD;
         if (light) {
             // Champagne-gold hero: a clearly golden sheen fading into ivory, with a brighter bronze rim.
-            GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                    new int[]{alpha(accent, 130), 0xFFFBF3E2, 0xFFF1E2C2});
-            d.setCornerRadius(dp(28));
-            d.setStroke(dp(1), alpha(accent, 200));
-            return d;
+            return glass(alpha(accent, 120), 0xFFF1E2C2, 28, 200);
         }
-        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{alpha(accent, 82), alpha(SURFACE, 250), BG});
-        d.setCornerRadius(dp(28));
-        d.setStroke(dp(1), alpha(accent, 125));
-        return d;
+        // Navy hero with a gold light falling from the top-left corner.
+        return glass(alpha(accent, 70), alpha(SURFACE, 250), 28, 130);
     }
 
     /** Selected destination on the premium bottom navigation rail. */
@@ -409,7 +423,7 @@ public final class Theme {
 
     public static GradientDrawable bottomBar() {
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                light ? new int[]{0xFFFFFDF6, 0xFFF2E4C6} : new int[]{0xFF14171F, 0xFF050609});
+                light ? new int[]{0xFFFFFDF6, 0xFFEFE6CF} : new int[]{0xFF1B2A47, 0xFF0B1222});
         // Rounded top edge with a gold hairline: the bar reads as a floating luxury dock.
         float r = dp(22);
         d.setCornerRadii(new float[]{r, r, r, r, 0, 0, 0, 0});

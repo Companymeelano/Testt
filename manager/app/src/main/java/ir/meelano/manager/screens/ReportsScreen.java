@@ -248,7 +248,7 @@ public class ReportsScreen extends Screen {
         c.setGravity(Gravity.CENTER_VERTICAL);
         c.setBackground(Theme.card());
         c.setPadding(Theme.dp(12), Theme.dp(11), Theme.dp(12), Theme.dp(11));
-        c.setElevation(Theme.cardElevation());
+        Theme.lift(c, Theme.cardElevation());
 
         ImageView icon = new ImageView(a);
         icon.setImageResource(reportIcon(spec));

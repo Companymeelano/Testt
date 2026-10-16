@@ -326,12 +326,13 @@ public class LicenseActivity extends Activity {
             boolean done = idx < active;
             boolean on = idx == active;
             int stepColor = done ? Theme.SUCCESS : (on ? Theme.TEAL : Theme.SURFACE2);
-            TextView dot = kit.text(done ? "✓" : String.valueOf(idx), 14,
-                    done || on ? Theme.onAccent(stepColor) : Theme.MUTED, true);
-            dot.setGravity(Gravity.CENTER);
-            dot.setBackground(done || on ? Theme.accentAvatar(stepColor)
-                    : Theme.avatar(stepColor));
-            int d = Theme.dp(34);
+            int stepIcon = done ? R.drawable.mi_check
+                    : (idx == 1 ? R.drawable.mi_key : (idx == 2 ? R.drawable.mi_database : R.drawable.mi_login));
+            android.widget.FrameLayout dot = new android.widget.FrameLayout(this);
+            dot.setBackground(done || on ? Theme.accentAvatar(stepColor) : Theme.avatar(stepColor));
+            dot.addView(kit.icon(stepIcon, done || on ? Theme.onAccent(stepColor) : Theme.MUTED, 18),
+                    new android.widget.FrameLayout.LayoutParams(Theme.dp(18), Theme.dp(18), Gravity.CENTER));
+            int d = Theme.dp(38);
             LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(d, d);
             dlp.gravity = Gravity.CENTER;
             cell.addView(dot, dlp);
@@ -373,10 +374,19 @@ public class LicenseActivity extends Activity {
         LinearLayout h = kit.v();
         h.setGravity(Gravity.CENTER_HORIZONTAL);
         h.setPadding(0, Theme.dp(6), 0, Theme.dp(10));
-        android.widget.ImageView logo = kit.logo(88);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(Theme.dp(88), Theme.dp(88));
+        android.widget.FrameLayout ring = new android.widget.FrameLayout(this);
+        try {
+            android.graphics.drawable.GradientDrawable rg = new android.graphics.drawable.GradientDrawable();
+            rg.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+            rg.setStroke(Theme.dp(2), Theme.alpha(Theme.GOLD, 200));
+            rg.setColor(Theme.alpha(Theme.GOLD, Theme.isLight() ? 22 : 16));
+            ring.setBackground(rg);
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:ring", ignored); }
+        ring.addView(kit.logo(88), new android.widget.FrameLayout.LayoutParams(Theme.dp(88), Theme.dp(88),
+                Gravity.CENTER));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(Theme.dp(104), Theme.dp(104));
         lp.gravity = Gravity.CENTER_HORIZONTAL;
-        h.addView(logo, lp);
+        h.addView(ring, lp);
         TextView t = kit.text(title, 19f, Theme.GOLD_SOFT, true);
         t.setGravity(Gravity.CENTER);
         h.addView(t, kit.lp(-1, -2));
@@ -391,7 +401,7 @@ public class LicenseActivity extends Activity {
         box.addView(stepBar(1), kit.lp(-1, -2));
         box.addView(kit.gap(10));
         LinearLayout c = Card3D.card(this, Theme.GOLD);
-        c.addView(Card3D.stepRow(this, kit, "✦", Theme.GOLD, "خوش آمدید"), kit.lp(-1, -2));
+        c.addView(sectionHead(R.drawable.mi_star_shine, Theme.GOLD, "خوش آمدید"), kit.lp(-1, -2));
         c.addView(kit.text("نام و شماره‌تان را بنویسید؛ بقیه‌اش با ما.",
                 13f, Theme.TEXT, false), kit.lp(-1, -2));
         c.addView(kit.gap(6));
@@ -458,7 +468,7 @@ public class LicenseActivity extends Activity {
         c.addView(prow, kit.lp(-1, -2));
         c.addView(errPhone, kit.lp(-1, -2));
         c.addView(kit.gap(4));
-        final android.widget.Button startBtn = kit.btnGold("✦ شروع", null);
+        final android.widget.Button startBtn = goldAction("شروع", R.drawable.mi_arrow_forward, null);
         try {
             startBtn.setBackground(Theme.startButton());
             startBtn.setTextSize(15f);
@@ -501,7 +511,7 @@ public class LicenseActivity extends Activity {
             smartReceive(t);
         }), kit.wlp(1f));
         body.addView(row, kit.lp(-1, -2));
-        final android.widget.Button toggle = kit.btnGhost("ورود با کد فعال‌سازی", Theme.TEAL, null);
+        final android.widget.Button toggle = ghostAction("ورود با کد فعال‌سازی", Theme.TEAL, R.drawable.mi_key, null);
         toggle.setOnClickListener(v -> {
             boolean open = body.getVisibility() != View.VISIBLE;
             body.setVisibility(open ? View.VISIBLE : View.GONE);
@@ -510,6 +520,98 @@ public class LicenseActivity extends Activity {
         c.addView(kit.gap(6));
         c.addView(toggle, kit.lp(-1, -2));
         c.addView(body, kit.lp(-1, -2));
+    }
+
+    /** A round medallion: graded tint, hairline rim, and a centred icon in the given colour. */
+    private android.widget.FrameLayout iconChip(int iconRes, int color, int sizeDp) {
+        android.widget.FrameLayout f = new android.widget.FrameLayout(this);
+        try {
+            android.graphics.drawable.GradientDrawable g = new android.graphics.drawable.GradientDrawable(
+                    android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                    new int[]{Theme.alpha(color, Theme.isLight() ? 80 : 84), Theme.alpha(color, Theme.isLight() ? 24 : 26)});
+            g.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+            g.setStroke(Theme.dp(1), Theme.alpha(color, 170));
+            f.setBackground(g);
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:chip", ignored); }
+        int inner = Math.round(sizeDp * 0.5f);
+        f.addView(kit.icon(iconRes, color, inner), new android.widget.FrameLayout.LayoutParams(
+                Theme.dp(inner), Theme.dp(inner), Gravity.CENTER));
+        return f;
+    }
+
+    /** Section title with a medallion icon on the leading edge. */
+    private LinearLayout sectionHead(int iconRes, int color, String title) {
+        LinearLayout h = kit.h();
+        h.setGravity(Gravity.CENTER_VERTICAL);
+        h.setPadding(0, 0, 0, Theme.dp(8));
+        h.addView(iconChip(iconRes, color, 40), new LinearLayout.LayoutParams(Theme.dp(40), Theme.dp(40)));
+        h.addView(kit.space(10));
+        h.addView(kit.text(title, 16f, Theme.TEXT, true), kit.wlp(1f));
+        return h;
+    }
+
+    /** One label/value row with a medallion, used in the summary card. */
+    private LinearLayout statRow(int iconRes, int color, String label, String value, int valueColor) {
+        LinearLayout r = kit.h();
+        r.setGravity(Gravity.CENTER_VERTICAL);
+        r.setPadding(0, Theme.dp(8), 0, Theme.dp(8));
+        r.addView(iconChip(iconRes, color, 38), new LinearLayout.LayoutParams(Theme.dp(38), Theme.dp(38)));
+        r.addView(kit.space(12));
+        LinearLayout col = kit.v();
+        col.addView(kit.text(label, 11.5f, Theme.MUTED, false), kit.lp(-1, -2));
+        col.addView(kit.text(value, 15f, valueColor, true), kit.lp(-1, -2));
+        r.addView(col, kit.wlp(1f));
+        return r;
+    }
+
+    /** Gold hairline that fades at both ends. */
+    private View hairline() {
+        View v = new View(this);
+        try {
+            v.setBackground(new android.graphics.drawable.GradientDrawable(
+                    android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+                    new int[]{0x00000000, Theme.alpha(Theme.GOLD, 120), 0x00000000}));
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:hairline", ignored); }
+        return v;
+    }
+
+    /** Primary action: metallic gold-to-rose capsule with a leading icon. */
+    private android.widget.Button goldAction(String text, int iconRes, View.OnClickListener l) {
+        android.widget.Button b = kit.btnGold(text, l);
+        try {
+            b.setBackground(Theme.startButton());
+            b.setTextSize(15.5f);
+            b.setMinHeight(Theme.dp(56));
+            b.setLetterSpacing(0.04f);
+            if (iconRes != 0) {
+                android.graphics.drawable.Drawable d = getDrawable(iconRes);
+                if (d != null) {
+                    d = d.mutate();
+                    d.setTint(Theme.onAccent(Theme.GOLD));
+                    b.setCompoundDrawablesRelativeWithIntrinsicBounds(d, null, null, null);
+                    b.setCompoundDrawablePadding(Theme.dp(8));
+                }
+            }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:goldAction", ignored); }
+        return b;
+    }
+
+    /** Secondary action: ghost capsule with a tinted leading icon. */
+    private android.widget.Button ghostAction(String text, int color, int iconRes, View.OnClickListener l) {
+        android.widget.Button b = kit.btnGhost(text, color, l);
+        try {
+            b.setMinHeight(Theme.dp(50));
+            if (iconRes != 0) {
+                android.graphics.drawable.Drawable d = getDrawable(iconRes);
+                if (d != null) {
+                    d = d.mutate();
+                    d.setTint(color);
+                    b.setCompoundDrawablesRelativeWithIntrinsicBounds(d, null, null, null);
+                    b.setCompoundDrawablePadding(Theme.dp(6));
+                }
+            }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:ghostAction", ignored); }
+        return b;
     }
 
     /** Field row with a leading vector icon from the single icon family (v34). */
@@ -534,9 +636,14 @@ public class LicenseActivity extends Activity {
     /** Device code card: LTR-isolated code, one line, honest copy feedback (v34). */
     private LinearLayout deviceCodeView() {
         LinearLayout card = kit.v();
+        try {
+            card.setBackground(Theme.kpi(Theme.GOLD));
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:plaque", ignored); }
+        card.setPadding(Theme.dp(14), Theme.dp(12), Theme.dp(14), Theme.dp(12));
         LinearLayout top = kit.h();
         top.setGravity(Gravity.CENTER_VERTICAL);
-        top.addView(kit.icon(R.drawable.mi_credit_card, Theme.GOLD_SOFT, 20), kit.lp(-2, -2));
+        top.addView(iconChip(R.drawable.mi_credit_card, Theme.GOLD, 34),
+                new LinearLayout.LayoutParams(Theme.dp(34), Theme.dp(34)));
         top.addView(kit.space(6));
         top.addView(kit.text("کد دستگاه", 12.5f, Theme.GOLD_SOFT, true), kit.wlp(1f));
         final android.widget.Button copyBtn = kit.btnGhost("کپی", Theme.TEAL, null);
@@ -920,7 +1027,7 @@ public class LicenseActivity extends Activity {
         LinearLayout c = Card3D.card(this, Theme.GOLD);
         LinearLayout chead = kit.h();
         chead.setGravity(Gravity.CENTER_VERTICAL);
-        chead.addView(Card3D.stepRow(this, kit, "✦", Theme.GOLD, "اتصال به سرور"), kit.wlp(1f));
+        chead.addView(sectionHead(R.drawable.mi_database, Theme.GOLD, "اتصال به سرور"), kit.wlp(1f));
         chead.addView(refreshIconView(), kit.lp(-2, -2));
         c.addView(chead, kit.lp(-1, -2));
         c.addView(kit.text("لایسنس فعال است؛ IP سرور را وارد کنید تا دیتابیس‌های سازگار نمایش داده شوند.",
@@ -955,7 +1062,7 @@ public class LicenseActivity extends Activity {
         }
         c.addView(kit.gap(4));
         final android.widget.Button[] btn = new android.widget.Button[1];
-        btn[0] = kit.btnGold("✦ اتصال و نمایش دیتابیس‌ها",
+        btn[0] = goldAction("اتصال و نمایش دیتابیس‌ها", R.drawable.mi_database,
                 v -> connectManual(txt(fIp), btn[0]));
         final android.widget.Button[] wbtn = new android.widget.Button[1];
         wbtn[0] = kit.btnGhost("اتصال با وای‌فای", Theme.TEAL, v -> wifiConnect(wbtn[0]));
@@ -1352,19 +1459,33 @@ public class LicenseActivity extends Activity {
     private void buildDonePage(LinearLayout box, LicenseStore.Status s) {
         box.addView(stepBar(3), kit.lp(-1, -2));
         box.addView(kit.gap(10));
+        LinearLayout hero = kit.v();
+        hero.setGravity(Gravity.CENTER_HORIZONTAL);
+        hero.addView(iconChip(R.drawable.mi_verified_user, Theme.SUCCESS, 88),
+                new LinearLayout.LayoutParams(Theme.dp(88), Theme.dp(88)));
+        TextView t = kit.text("همه‌چیز آماده است", 21f, Theme.TEXT, true);
+        t.setGravity(Gravity.CENTER);
+        hero.addView(t, kit.lp(-1, -2));
+        TextView sub = kit.text("لایسنس شما فعال است؛ با یک لمس وارد میلانو شوید.", 12.5f, Theme.MUTED, false);
+        sub.setGravity(Gravity.CENTER);
+        hero.addView(sub, kit.lp(-1, -2));
+        box.addView(hero, kit.lp(-1, -2));
+        box.addView(kit.gap(12));
+
         LinearLayout c = Card3D.card(this, Theme.SUCCESS);
-        c.addView(Card3D.stepRow(this, kit, "✓", Theme.SUCCESS, "همه‌چیز آماده است"),
-                kit.lp(-1, -2));
-        c.addView(kit.kv("لایسنس", "✓ فعال • «" + License.planFa(s.plan) + "»", Theme.SUCCESS),
-                kit.lp(-1, -2));
+        c.addView(statRow(R.drawable.mi_verified_user, Theme.SUCCESS, "لایسنس",
+                "فعال • «" + License.planFa(s.plan) + "»", Theme.SUCCESS), kit.lp(-1, -2));
+        c.addView(hairline(), kit.lp(-1, Theme.dp(1)));
         if (s.plan == License.P_PERM) {
-            c.addView(kit.kv("اعتبار", "دائمی ♾", Theme.SUCCESS), kit.lp(-1, -2));
-        } else {
-            c.addView(kit.kv("زمان باقی‌مانده",
-                    Money.fa(String.valueOf(s.daysLeft)) + " روز", leftColor(s.daysLeft)),
+            c.addView(statRow(R.drawable.mi_diamond, Theme.SUCCESS, "اعتبار", "دائمی", Theme.SUCCESS),
                     kit.lp(-1, -2));
+        } else {
+            c.addView(statRow(R.drawable.mi_timer, Theme.GOLD, "زمان باقی‌مانده",
+                    Money.fa(String.valueOf(s.daysLeft)) + " روز", leftColor(s.daysLeft)), kit.lp(-1, -2));
         }
-        c.addView(kit.kv("اتصال به سرور", "✓ تنظیم شده", Theme.SUCCESS), kit.lp(-1, -2));
+        c.addView(hairline(), kit.lp(-1, Theme.dp(1)));
+        c.addView(statRow(R.drawable.mi_database, Theme.TEAL, "اتصال به سرور", "تنظیم شده", Theme.SUCCESS),
+                kit.lp(-1, -2));
         String sh = connSummaryHost();
         String stn = connSummaryTables();
         if (!sh.isEmpty()) {
@@ -1372,14 +1493,19 @@ public class LicenseActivity extends Activity {
             try {
                 masked = SmartLink.maskHost(sh);
             } catch (Exception ignored) { Diag.ignored("LicenseActivity:1333", ignored); }
-            c.addView(kit.kv("سرور", "✓ " + masked, Theme.GOLD_SOFT), kit.lp(-1, -2));
+            c.addView(hairline(), kit.lp(-1, Theme.dp(1)));
+            c.addView(statRow(R.drawable.mi_my_location, Theme.GOLD, "سرور", masked, Theme.GOLD_SOFT),
+                    kit.lp(-1, -2));
         }
-        if (!stn.isEmpty())
-            c.addView(kit.kv("جدول‌های آتیران", Money.fa(stn), Theme.TEXT), kit.lp(-1, -2));
-        c.addView(kit.gap(4));
-        c.addView(kit.btnGold("ورود به برنامه ⇤", v -> enterApp()), kit.lp(-1, -2));
-        c.addView(kit.gap(6));
-        c.addView(kit.btnGhost("تغییر IP / انتخاب دیتابیس دیگر", Theme.GOLD, v -> {
+        if (!stn.isEmpty()) {
+            c.addView(hairline(), kit.lp(-1, Theme.dp(1)));
+            c.addView(statRow(R.drawable.mi_inventory_2, Theme.VIOLET, "جدول‌های آتیران",
+                    Money.fa(stn), Theme.TEXT), kit.lp(-1, -2));
+        }
+        c.addView(kit.gap(12));
+        c.addView(goldAction("ورود به برنامه", R.drawable.mi_login, v -> enterApp()), kit.lp(-1, -2));
+        c.addView(kit.gap(8));
+        c.addView(ghostAction("تغییر سرور یا دیتابیس", Theme.GOLD, R.drawable.mi_swap_horiz, v -> {
             editingConnection = true;
             try {
                 getIntent().putExtra(EXTRA_EDIT_CONNECTION, true);

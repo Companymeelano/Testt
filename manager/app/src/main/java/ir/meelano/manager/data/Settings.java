@@ -182,9 +182,12 @@ public final class Settings {
     // ---------------- luxury theme ----------------
     /** "dark" (Midnight Gold) or "light" (Ivory Royal). */
     public String themeMode() {
-        // v37: light is the default theme. The dark palette stays available and is
-        // switched to from the header toggle or Settings.
-        String m = p.getString("theme_mode", "light");
+        // Dark («Midnight Gold») is the default. One-time migration: installs that were
+        // still on the old light default switch to dark once; a later manual choice is kept.
+        if (!p.getBoolean("theme_dark_default_v38", false)) {
+            p.edit().putString("theme_mode", "dark").putBoolean("theme_dark_default_v38", true).apply();
+        }
+        String m = p.getString("theme_mode", "dark");
         return "light".equals(m) ? "light" : "dark";
     }
 

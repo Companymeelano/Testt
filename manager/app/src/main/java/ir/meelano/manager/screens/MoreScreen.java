@@ -174,6 +174,8 @@ public class MoreScreen extends Screen {
     private View groupTile(final String[] group) {
         int accent = groupColor(group[0]);
         LinearLayout tile = a.kit.card(accent);
+        // A row: badge on the start side, the label beside it. (The card is vertical by default.)
+        tile.setOrientation(LinearLayout.HORIZONTAL);
         tile.setGravity(Gravity.CENTER_VERTICAL);
         tile.setMinimumHeight(Theme.dp(60));
         tile.setPadding(Theme.dp(10), Theme.dp(10), Theme.dp(10), Theme.dp(10));

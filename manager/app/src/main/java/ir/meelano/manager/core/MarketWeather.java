@@ -22,9 +22,10 @@ public final class MarketWeather {
 
     public static final String RATES_URL =
             "https://raw.githubusercontent.com/iran-market/iran-market.github.io/main/data/popular.json";
-    /** Fallback when the device position is unavailable: Tehran. */
-    public static final double TEHRAN_LAT = 35.6892;
-    public static final double TEHRAN_LON = 51.3890;
+    /** Fallback when the device position is unavailable: Ahvaz (اهواز). */
+    public static final double AHVAZ_LAT = 31.3183;
+    public static final double AHVAZ_LON = 48.6706;
+    public static final String AHVAZ_NAME = "اهواز";
 
     /** Open-Meteo forecast for the given coordinates (current conditions, local timezone). */
     public static String weatherUrl(double lat, double lon) {

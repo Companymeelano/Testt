@@ -471,7 +471,7 @@ public class HomeScreen extends Screen {
     /** A compact luxury launchpad to the five high-frequency management destinations. */
     /** Compact rates + Tehran weather. Saved values show at once; the refresh runs in the background. */
     /** Place name shown with the weather: the device's city, or Tehran when no position is available. */
-    private String weatherPlace = "تهران";
+    private String weatherPlace = MarketWeather.AHVAZ_NAME;
     /** True when the weather shown comes from the device position (not the Tehran fallback). */
     private boolean weatherFromDevice = false;
 
@@ -492,10 +492,10 @@ public class HomeScreen extends Screen {
             android.location.Location loc = null;
             try { loc = ir.meelano.manager.core.DeviceLocation.resolve(a, 6000); } catch (Exception ignored) { }
             final boolean fromDevice = loc != null;
-            final double lat = fromDevice ? loc.getLatitude() : MarketWeather.TEHRAN_LAT;
-            final double lon = fromDevice ? loc.getLongitude() : MarketWeather.TEHRAN_LON;
+            final double lat = fromDevice ? loc.getLatitude() : MarketWeather.AHVAZ_LAT;
+            final double lon = fromDevice ? loc.getLongitude() : MarketWeather.AHVAZ_LON;
             String place = fromDevice ? ir.meelano.manager.core.DeviceLocation.placeName(a, lat, lon) : null;
-            if (place == null) place = fromDevice ? "موقعیت شما" : "تهران";
+            if (place == null) place = fromDevice ? "موقعیت شما" : MarketWeather.AHVAZ_NAME + " (پیش‌فرض)";
 
             String rRaw = null;
             String wRaw = null;
@@ -571,15 +571,20 @@ public class HomeScreen extends Screen {
 
         if (!weatherFromDevice && w != null) {
             // Without the device position the card says so and offers the permission again.
-            card.addView(a.kit.hint("موقعیت شما در دسترس نیست؛ هواشناسی تهران نمایش داده می‌شود."), a.kit.lp(-1, -2));
-            card.addView(a.kit.btnGhost("📍 فعال‌سازی موقعیت برای هواشناسی شهر من", Theme.GOLD,
-                    v -> a.requestLocationAccess()), a.kit.lp(-1, -2));
+            android.widget.Button loc = a.kit.btnGhost("📍 موقعیت من", Theme.GOLD, v -> a.requestLocationAccess());
+            loc.setSingleLine(true);
+            loc.setTextSize(11f);
+            loc.setPadding(Theme.dp(10), Theme.dp(4), Theme.dp(10), Theme.dp(4));
+            loc.setMinHeight(Theme.dp(30));
+            LinearLayout.LayoutParams lp = a.kit.lp(-2, -2);
+            lp.setMargins(0, Theme.dp(6), 0, 0);
+            card.addView(loc, lp);
         }
 
         String stamp = rates != null && !rates.isEmpty() ? rates.get(0).asOf : "";
         card.addView(a.kit.gap(6));
-        card.addView(a.kit.hint("آخرین به‌روزرسانی قیمت: " + Money.fa(stamp == null || stamp.isEmpty() ? "—" : stamp)
-                + " • قیمت‌ها به تومان (منبع: TGJU)"), a.kit.lp(-1, -2));
+        card.addView(a.kit.hint("به‌روزرسانی: " + Money.fa(stamp == null || stamp.isEmpty() ? "—" : stamp)
+                + " • تومان • TGJU"), a.kit.lp(-1, -2));
     }
 
     private View rateTile(MarketWeather.Rate r) {
@@ -587,13 +592,18 @@ public class HomeScreen extends Screen {
         t.setBackground(Theme.kpi(Theme.GOLD));
         t.setPadding(Theme.dp(8), Theme.dp(8), Theme.dp(8), Theme.dp(8));
         TextView label = a.kit.text(r.label, 10f, Theme.MUTED, false);
+        label.setMinLines(2);
         label.setMaxLines(2);
         label.setEllipsize(TextUtils.TruncateAt.END);
         t.addView(label, a.kit.lp(-1, -2));
+        // Prices are always in toman (the source's unit), whatever unit the rest of the app uses.
         TextView price = a.kit.text(Money.fa(Money.num(r.toman)), 13f, Theme.TEXT, true);
         price.setMaxLines(1);
         price.setAutoSizeTextTypeUniformWithConfiguration(10, 13, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
         t.addView(price, a.kit.lp(-1, -2));
+        TextView unit = a.kit.text("تومان", 9.5f, Theme.GOLD_SOFT, true);
+        unit.setMaxLines(1);
+        t.addView(unit, a.kit.lp(-1, -2));
         int color = r.changePct > 0 ? Theme.SUCCESS : (r.changePct < 0 ? Theme.DANGER : Theme.MUTED);
         String arrow = r.changePct > 0 ? "▲ " : (r.changePct < 0 ? "▼ " : "");
         TextView ch = a.kit.text(arrow + Money.fa(String.format(Locale.US, "%.1f", Math.abs(r.changePct))) + "٪",

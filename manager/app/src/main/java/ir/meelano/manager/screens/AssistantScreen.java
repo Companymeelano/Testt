@@ -454,6 +454,12 @@ public final class AssistantScreen extends Screen {
         return bar;
     }
 
+    private LinearLayout.LayoutParams weightBy(float w) {
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, -2, w);
+        p.setMargins(Theme.dp(3), 0, Theme.dp(3), 0);
+        return p;
+    }
+
     private LinearLayout.LayoutParams weight() {
         LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, -2, 1f);
         p.setMargins(Theme.dp(3), 0, Theme.dp(3), 0);
@@ -489,14 +495,23 @@ public final class AssistantScreen extends Screen {
         });
         box.addView(input, a.kit.lp(-1, -2));
         box.addView(a.kit.gap(6));
+        // Row 1: send (wide) and voice. Row 2: live conversation, full width, so its label never wraps.
         LinearLayout row = a.kit.h();
-        row.addView(a.kit.btnGold("➤ ارسال", v -> ask(input.getText().toString())), weight());
-        row.addView(a.kit.btnGhost("🎤 صوتی", Theme.GOLD, v -> a.startVoiceSearch(text -> {
+        android.widget.Button send = a.kit.btnGold("➤ ارسال", v -> ask(input.getText().toString()));
+        send.setSingleLine(true);
+        row.addView(send, weightBy(1.6f));
+        android.widget.Button voice = a.kit.btnGhost("🎤 صوتی", Theme.GOLD, v -> a.startVoiceSearch(text -> {
             draft = text;
             ask(text);
-        })), weight());
-        row.addView(a.kit.btnGhost(liveOn ? "■ گفتگو" : "🎙 گفتگوی زنده", Theme.VIOLET, v -> toggleLive()), weight());
+        }));
+        voice.setSingleLine(true);
+        row.addView(voice, weightBy(1f));
         box.addView(row, a.kit.lp(-1, -2));
+        box.addView(a.kit.gap(8));
+        android.widget.Button live = a.kit.btnGhost(liveOn ? "■ پایان گفتگوی زنده" : "🎙 گفتگوی زنده", Theme.VIOLET,
+                v -> toggleLive());
+        live.setSingleLine(true);
+        box.addView(live, a.kit.lp(-1, -2));
         return box;
     }
 

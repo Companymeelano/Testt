@@ -1005,8 +1005,10 @@ public class MainActivity extends Activity {
                     logoImg.setVisibility(View.VISIBLE);
                     logoGlyph.setVisibility(View.GONE);
                 } else {
-                    logoImg.setVisibility(View.GONE);
-                    logoGlyph.setVisibility(View.VISIBLE);
+                    // No company logo cached: show the app's own M mark instead of a generic glyph.
+                    logoImg.setImageResource(R.drawable.meelano_3d);
+                    logoImg.setVisibility(View.VISIBLE);
+                    logoGlyph.setVisibility(View.GONE);
                 }
             }
         } catch (Exception ignored) { Diag.ignored("MainActivity:997", ignored); }

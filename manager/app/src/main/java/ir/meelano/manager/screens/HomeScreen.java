@@ -326,11 +326,6 @@ public class HomeScreen extends Screen {
                     Theme.alpha(0xFFFFFFFF, light ? 110 : 26), 0x00FFFFFF, Shader.TileMode.CLAMP));
             g.drawRect(box, p);
             p.setShader(null);
-            p.setStyle(Paint.Style.STROKE);
-            p.setStrokeWidth(Theme.dp(1));
-            p.setColor(Theme.alpha(Theme.GOLD, light ? 90 : 70));
-            box.set(w * 0.62f, -h * 0.9f, w * 1.35f, h * 0.9f);
-            g.drawArc(box, 120, 120, false, p);
             g.restore();
             // Rim: a light top edge makes the card read as a raised, glossy panel.
             p.setStyle(Paint.Style.STROKE);
@@ -338,6 +333,20 @@ public class HomeScreen extends Screen {
             p.setColor(Theme.alpha(0xFFFFFFFF, light ? 150 : 34));
             box.set(Theme.dp(0.5f), Theme.dp(0.5f), w - Theme.dp(0.5f), h - Theme.dp(0.5f));
             g.drawRoundRect(box, radius, radius, p);
+        }
+    }
+
+    /** «شنبه، ۲۵ مهر ۱۴۰۵» in Persian digits; falls back to the short line when the date is unusual. */
+    private String dateLine() {
+        String t = Jalali.todayStr();
+        String[] p = t.split("/");
+        if (p.length != 3) return a.kit.todayLine();
+        try {
+            int day = Integer.parseInt(p[2].trim());
+            return Jalali.weekday(t) + "، " + Money.fa(String.valueOf(day)) + " " + Jalali.monthName(t)
+                    + " " + Money.fa(p[0].trim());
+        } catch (NumberFormatException e) {
+            return a.kit.todayLine();
         }
     }
 
@@ -379,8 +388,17 @@ public class HomeScreen extends Screen {
             });
             crest.addView(li, new FrameLayout.LayoutParams(Theme.dp(50), Theme.dp(50), Gravity.CENTER));
         } else {
-            ImageView mark = a.kit.icon(R.drawable.mi_admin_panel_settings, Theme.selectedNavInk(), 28);
-            crest.addView(mark, new FrameLayout.LayoutParams(Theme.dp(28), Theme.dp(28), Gravity.CENTER));
+            ImageView mark = new ImageView(a);
+            mark.setImageResource(R.drawable.meelano_3d);
+            mark.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            mark.setClipToOutline(true);
+            mark.setOutlineProvider(new android.view.ViewOutlineProvider() {
+                @Override
+                public void getOutline(View v, android.graphics.Outline o) {
+                    o.setOval(0, 0, v.getWidth(), v.getHeight());
+                }
+            });
+            crest.addView(mark, new FrameLayout.LayoutParams(Theme.dp(50), Theme.dp(50), Gravity.CENTER));
         }
         top.addView(crest, new LinearLayout.LayoutParams(Theme.dp(58), Theme.dp(58)));
         top.addView(a.kit.space(12));
@@ -401,27 +419,6 @@ public class HomeScreen extends Screen {
         copy.addView(description, a.kit.lp(-1, -2));
         top.addView(copy, a.kit.wlp(1f));
 
-        // Jalali date tile: day in large type, month and weekday beneath it.
-        String today = Jalali.todayStr();
-        String[] parts = today.split("/");
-        String dayText = parts.length == 3 ? Money.fa(parts[2]) : Money.fa(today);
-        LinearLayout tile = a.kit.v();
-        tile.setGravity(Gravity.CENTER);
-        tile.setPadding(Theme.dp(8), Theme.dp(6), Theme.dp(8), Theme.dp(6));
-        tile.setBackground(Theme.ghostButton(Theme.GOLD));
-        TextView dayView = a.kit.text(dayText, 20f, Theme.TEXT, true);
-        dayView.setGravity(Gravity.CENTER);
-        dayView.setSingleLine(true);
-        tile.addView(dayView, a.kit.lp(-1, -2));
-        TextView month = a.kit.text(Jalali.monthName(today), 10f, Theme.GOLD_SOFT, true);
-        month.setGravity(Gravity.CENTER);
-        month.setSingleLine(true);
-        tile.addView(month, a.kit.lp(-1, -2));
-        TextView weekday = a.kit.text(Jalali.weekday(today), 9.5f, Theme.MUTED, false);
-        weekday.setGravity(Gravity.CENTER);
-        weekday.setSingleLine(true);
-        tile.addView(weekday, a.kit.lp(-1, -2));
-        top.addView(tile, new LinearLayout.LayoutParams(Theme.dp(64), -2));
         hero.addView(top, a.kit.lp(-1, -2));
         hero.addView(a.kit.gap(13));
 
@@ -435,13 +432,17 @@ public class HomeScreen extends Screen {
         hero.addView(marketCard(), a.kit.lp(-1, -2));
         hero.addView(a.kit.gap(10));
         LinearLayout footer = a.kit.h();
-        footer.addView(a.kit.icon(R.drawable.mi_calendar_month, Theme.GOLD_SOFT, 16),
-                new LinearLayout.LayoutParams(Theme.dp(16), Theme.dp(16)));
+        footer.setGravity(Gravity.CENTER_VERTICAL);
+        footer.addView(a.kit.icon(R.drawable.mi_calendar_month, Theme.GOLD_SOFT, 18),
+                new LinearLayout.LayoutParams(Theme.dp(18), Theme.dp(18)));
         footer.addView(a.kit.space(6));
-        TextView date = a.kit.text(a.kit.todayLine(), 11.5f, Theme.TEXT, true);
+        TextView date = a.kit.text(dateLine(), 12f, Theme.TEXT, true);
         date.setSingleLine(true);
-        footer.addView(date, a.kit.wlp(1f));
-        TextView edition = a.kit.text(RoleStore.editionFa(role), 10.5f, Theme.GOLD_SOFT, true);
+        date.setPadding(Theme.dp(10), Theme.dp(5), Theme.dp(10), Theme.dp(5));
+        date.setBackground(Theme.ghostButton(Theme.GOLD));
+        footer.addView(date, a.kit.lp(-2, -2));
+        footer.addView(a.kit.space(1), a.kit.wlp(1f));
+        TextView edition = a.kit.text(RoleStore.editionFa(role), 12f, Theme.GOLD_SOFT, true);
         edition.setSingleLine(true);
         edition.setPadding(Theme.dp(10), Theme.dp(5), Theme.dp(10), Theme.dp(5));
         edition.setBackground(Theme.ghostButton(Theme.GOLD));

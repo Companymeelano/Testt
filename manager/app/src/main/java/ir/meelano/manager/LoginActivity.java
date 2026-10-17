@@ -1,5 +1,6 @@
 package ir.meelano.manager;
 
+import ir.meelano.manager.core.Diag;
 import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
@@ -22,7 +23,7 @@ import ir.meelano.manager.ui.Kit;
 import ir.meelano.manager.ui.Theme;
 
 /**
- * Manager-app account gate. Shown only after a valid license and an explicitly
+ * Manager-app account gate (metallic title and premium start button since v36.26). Shown only after a valid license and an explicitly
  * selected server/database. The fixed local accounts are the only route into
  * the manager and warehouse editions; those reserved names and roles are never
  * authenticated through Atiran's user table. A missing Atiran login table never
@@ -47,7 +48,7 @@ public class LoginActivity extends Activity {
         try {
             getWindow().setStatusBarColor(Theme.BG);
             getWindow().setNavigationBarColor(Theme.BG);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LoginActivity:50", ignored); }
         kit = new Kit(this);
         settings = new Settings(this);
         if (!LicenseStore.unlocked(this) || !settings.connConfigured()) {
@@ -56,30 +57,66 @@ public class LoginActivity extends Activity {
         }
 
         ScrollView sv = new ScrollView(this);
-        sv.setBackgroundColor(Theme.BG);
+        // Backdrop: a warm gold light falling from the top onto the graphite/ivory base.
+        sv.setBackground(Theme.backdrop());
         LinearLayout root = kit.v();
         root.setGravity(Gravity.CENTER);
-        root.setPadding(Theme.dp(26), Theme.dp(30), Theme.dp(26), Theme.dp(30));
+        root.setPadding(Theme.dp(26), Theme.dp(44), Theme.dp(26), Theme.dp(30));
         sv.addView(root);
 
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(Theme.dp(92), Theme.dp(92));
+        // Logo inside a soft gold halo.
+        android.widget.FrameLayout halo = new android.widget.FrameLayout(this);
+        android.graphics.drawable.GradientDrawable glow = new android.graphics.drawable.GradientDrawable();
+        glow.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        glow.setColors(new int[]{Theme.alpha(Theme.GOLD, 90), Theme.alpha(Theme.GOLD, 0)});
+        glow.setGradientType(android.graphics.drawable.GradientDrawable.RADIAL_GRADIENT);
+        glow.setGradientRadius(Theme.dp(96));
+        halo.setBackground(glow);
+        android.widget.FrameLayout.LayoutParams hp = new android.widget.FrameLayout.LayoutParams(
+                Theme.dp(92), Theme.dp(92), Gravity.CENTER);
+        halo.addView(kit.logo(92), hp);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(Theme.dp(190), Theme.dp(170));
         lp.gravity = Gravity.CENTER;
-        root.addView(kit.logo(92), lp);
-        TextView t = kit.text("ورود به میلانو", 23, Theme.TEXT, true);
+        root.addView(halo, lp);
+        TextView t = kit.text("ورود به میلانو", 26, Theme.TEXT, true);
         t.setGravity(Gravity.CENTER);
+        try {
+            t.setLetterSpacing(0.04f);
+            t.post(() -> {
+                int h = t.getHeight();
+                if (h <= 0) return;
+                int[] cols = Theme.isLight()
+                        ? new int[]{Theme.shade(Theme.GOLD, -0.4f), Theme.GOLD, Theme.shade(Theme.GOLD, -0.5f)}
+                        : new int[]{0xFFFFFFFF, Theme.GOLD, 0xFFA9B0BC};
+                t.getPaint().setShader(new android.graphics.LinearGradient(0, 0, 0, h, cols,
+                        null, android.graphics.Shader.TileMode.CLAMP));
+                t.invalidate();
+            });
+        } catch (Exception ignored) { Diag.ignored("LoginActivity:metal", ignored); }
         root.addView(t, kit.lp(-1, -2));
+        View hair = new View(this);
+        hair.setBackground(new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{0x00000000, Theme.alpha(Theme.GOLD, 150), 0x00000000}));
+        LinearLayout.LayoutParams hlp = new LinearLayout.LayoutParams(Theme.dp(120), Theme.dp(1));
+        hlp.gravity = Gravity.CENTER_HORIZONTAL;
+        hlp.setMargins(0, Theme.dp(8), 0, 0);
+        root.addView(hair, hlp);
         TextView s = kit.text("پس از انتخاب دیتابیس، با حساب مدیریت یا انبارداری وارد شوید",
-                12.5f, Theme.MUTED, false);
+                13.5f, Theme.TEXT, false);
         s.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams sp = kit.lp(-1, -2);
         sp.setMargins(0, Theme.dp(6), 0, Theme.dp(16));
         root.addView(s, sp);
 
         LinearLayout card = kit.card(Theme.GOLD);
+        // Glass panel: the same hero gradient the rest of the app uses, with generous inner space.
+        card.setBackground(Theme.hero(Theme.GOLD));
+        card.setPadding(Theme.dp(22), Theme.dp(22), Theme.dp(22), Theme.dp(18));
         eUser = kit.edit("نام کاربری", "");
         try {
             eUser.setTextDirection(View.TEXT_DIRECTION_ANY_RTL);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LoginActivity:82", ignored); }
         card.addView(eUser, kit.lp(-1, -2));
         card.addView(kit.gap(10));
         ePass = kit.edit("رمز عبور", "", true);
@@ -102,7 +139,13 @@ public class LoginActivity extends Activity {
         root.addView(err, kit.lp(-1, -2));
         root.addView(kit.gap(12));
 
-        loginBtn = kit.btn("ورود", v -> doLogin());
+        loginBtn = kit.btnGold("ورود  ✦", v -> doLogin());
+        try {
+            loginBtn.setBackground(Theme.startButton());
+            loginBtn.setTextSize(16f);
+            loginBtn.setMinHeight(Theme.dp(56));
+            loginBtn.setLetterSpacing(0.05f);
+        } catch (Exception ignored) { Diag.ignored("LoginActivity:btn", ignored); }
         root.addView(loginBtn, kit.lp(-1, -2));
         root.addView(kit.gap(10));
         root.addView(kit.hint("با حساب محلی مدیریت یا انبارداری وارد شوید؛ محیط متناسب با نقش شما باز می‌شود."),
@@ -129,14 +172,14 @@ public class LoginActivity extends Activity {
     private void paintRemember() {
         try {
             ir.meelano.manager.ui.MeelanoIcons.set(rememberV, (remember ? "☑ " : "○ ") + "مرا به خاطر بسپار");
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LoginActivity:132", ignored); }
     }
 
     private void showErr(String msg) {
         try {
             err.setText(msg == null ? "" : msg);
             err.setVisibility(msg == null || msg.isEmpty() ? View.GONE : View.VISIBLE);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LoginActivity:139", ignored); }
     }
 
     private void setBusy(boolean b) {
@@ -144,7 +187,7 @@ public class LoginActivity extends Activity {
         try {
             loginBtn.setEnabled(!b);
             loginBtn.setText(b ? "در حال بررسی…" : "ورود");
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LoginActivity:147", ignored); }
     }
 
     // ================= login flow =================
@@ -199,7 +242,7 @@ public class LoginActivity extends Activity {
                 } finally {
                     try {
                         c.close();
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("LoginActivity:202", ignored); }
                 }
                 if (u == null) {
                     uiFail("کاربری با این نام در آتیران یافت نشد");
@@ -271,7 +314,7 @@ public class LoginActivity extends Activity {
                     return;
                 }
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LoginActivity:274", ignored); }
         uiFail("ارتباط با سرور ممکن نشد؛ برای اولین ورود، اینترنت لازم است");
     }
 
@@ -299,7 +342,7 @@ public class LoginActivity extends Activity {
                     boolean ok = copyText("گزارش ورود میلانو", report);
                     kit.toast(ok ? "گزارش کپی شد" : "کپی نشد");
                 });
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("LoginActivity:302", ignored); }
         });
     }
 
@@ -362,7 +405,7 @@ public class LoginActivity extends Activity {
                 AtiranAuth.putCache(LoginActivity.this, uid, user, name, role);
                 AtiranAuth.saveSession(LoginActivity.this, uid, user, name, role, rem, boot);
                 RoleStore.setCurrent(LoginActivity.this, role);
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("LoginActivity:365", ignored); }
             kit.toast(hello);
             goMain();
         });
@@ -382,7 +425,7 @@ public class LoginActivity extends Activity {
             Intent i = new Intent(this, LicenseActivity.class);
             i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
             startActivity(i);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LoginActivity:385", ignored); }
         finish();
     }
 
@@ -391,7 +434,7 @@ public class LoginActivity extends Activity {
             Intent i = new Intent(this, MainActivity.class);
             i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
             startActivity(i);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LoginActivity:394", ignored); }
         finish();
     }
 

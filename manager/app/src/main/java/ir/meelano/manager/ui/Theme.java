@@ -1,5 +1,6 @@
 package ir.meelano.manager.ui;
 
+import ir.meelano.manager.core.Diag;
 import android.content.Context;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -36,13 +37,14 @@ public final class Theme {
     public static int WARNING = 0xFFF5A524;
     public static int INFO = 0xFF4FA3FF;
     public static int VIOLET = 0xFF9A7BFF;
-    public static int TEAL = 0xFF3ED6C5;
     public static int STEEL = 0xFF7C8DA6;
+    /** Fixed hues for sales and purchases: they must stand out from the gold/theme accent. */
+    public static final int SALES_HUE = 0xFFFF8A3D;
+    public static final int BUY_HUE = 0xFFFF5FA2;
 
     private static boolean light = false;
     /** Mirror of !light for call sites (charts, tables). */
     public static boolean DARK = true;
-    private static String accentKey = "gold";
     private static float fontScale = 1f;
     private static float density = 3f;
     /**
@@ -55,36 +57,11 @@ public final class Theme {
     private static Typeface regular;
     private static Typeface bold;
 
-    /** Accent: key, Persian label, dark, darkSoft, light, lightSoft. */
-    private static final String[][] ACCENTS = {
-            {"gold", "طلایی", "FFD9AE5A", "FFF1D493", "FF925D0B", "FF76500B"},
-            {"emerald", "زمردی", "FF3ED598", "FF9BF0C8", "FF087A53", "FF046C4E"},
-            {"sapphire", "یاقوت آبی", "FF4FA3FF", "FFB3D4FF", "FF1C60E0", "FF1E429F"},
-            {"ruby", "یاقوتی", "FFF2617A", "FFFFB3C0", "FFC51E46", "FF8F0F2E"},
-            {"violet", "بنفش سلطنتی", "FF9A7BFF", "FFCDBFFF", "FF7C3AED", "FF5B21B6"},
-            {"teal", "فیروزه‌ای", "FF3ED6C5", "FFA7F3EA", "FF08776E", "FF065F56"},
-    };
-
     /** Deep ink and warm ivory chosen to keep accent controls legible in both skins. */
     private static final int ACCENT_INK = 0xFF111827;
     private static final int ACCENT_PAPER = 0xFFFFFCF5;
 
-    public static String[][] accents() { return ACCENTS; }
-
-    public static String accentLabel(String key) {
-        for (String[] a : ACCENTS) if (a[0].equals(key)) return a[1];
-        return ACCENTS[0][1];
-    }
-
-    /** Raw accent color (dark variant) for swatch previews. */
-    public static int accentPreview(String key) {
-        for (String[] a : ACCENTS) if (a[0].equals(key)) return (int) Long.parseLong(a[2], 16);
-        return (int) Long.parseLong(ACCENTS[0][2], 16);
-    }
-
     public static boolean isLight() { return light; }
-
-    public static String accentKey() { return accentKey; }
 
     /** 1.0 normal, 1.3 large-text mode (applied in Kit.text). */
     public static float fontScale() { return fontScale; }
@@ -92,40 +69,8 @@ public final class Theme {
     /** Screen-aware type multiplier (1.00 on small phones, up to 1.18 on large ones). */
     public static float typeScale() { return typeScale; }
 
-    /** Seasonal accent key from the Jalali date (v14 «تم مناسبتی»). */
-    public static String seasonAccentKey() {
-        try {
-            String t = Jalali.todayStr();
-            int m = Integer.parseInt(t.substring(5, 7));
-            int d = Integer.parseInt(t.substring(8, 10));
-            if ((m == 9 && d == 30) || (m == 10 && d == 1)) return "ruby"; // شب یلدا 🍉 (۳۰ آذر)
-            if ((m == 12 && d >= 29) || (m == 1 && d <= 13)) return "gold"; // نوروز 🌸
-            if (m >= 1 && m <= 3) return "emerald";                           // بهار
-            if (m >= 4 && m <= 6) return "teal";                              // تابستان
-            if (m >= 7 && m <= 9) return "ruby";                              // پاییز
-            return "sapphire";                                               // زمستان
-        } catch (Exception e) {
-            return "gold";
-        }
-    }
-
-    /** Seasonal glyph shown next to the company name (empty when seasonal mode is off). */
-    public static String seasonGlyph(android.content.Context c) {
-        try {
-            if (!new Settings(c).seasonalOn()) return "";
-            String t = Jalali.todayStr();
-            int m = Integer.parseInt(t.substring(5, 7));
-            int d = Integer.parseInt(t.substring(8, 10));
-            if ((m == 12 && d >= 29) || (m == 1 && d <= 1)) return "🍉";
-            if (m == 1 && d <= 13) return "🌸";
-            if (m >= 1 && m <= 3) return "🌸";
-            if (m >= 4 && m <= 6) return "☀";
-            if (m >= 7 && m <= 9) return "🍂";
-            return "❄";
-        } catch (Exception e) {
-            return "";
-        }
-    }
+    /** Seasonal themes were removed: the app has exactly two curated themes now. */
+    public static String seasonGlyph(android.content.Context c) { return ""; }
 
     public static void init(Context c) {
         android.util.DisplayMetrics dm0 = c.getResources().getDisplayMetrics();
@@ -151,50 +96,51 @@ public final class Theme {
         try {
             zi = s.zoomIdx();
             if (s.bigFont()) zi = 3;
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Theme:154", ignored); }
         fontScale = zi == 0 ? 0.9f : zi == 2 ? 1.15f : zi == 3 ? 1.3f : 1f;
-        accentKey = s.themeAccent();
-        if (s.seasonalOn() && "gold".equals(accentKey)) accentKey = seasonAccentKey();
-        int dark = 0xFFD9AE5A, darkSoft = 0xFFF1D493, lite = 0xFFA86F14, liteSoft = 0xFF7A5410;
-        for (String[] a : ACCENTS) {
-            if (a[0].equals(accentKey)) {
-                dark = (int) Long.parseLong(a[2], 16);
-                darkSoft = (int) Long.parseLong(a[3], 16);
-                lite = (int) Long.parseLong(a[4], 16);
-                liteSoft = (int) Long.parseLong(a[5], 16);
-            }
-        }
+        // Exactly two curated themes; the accent is part of each theme, not a user choice.
+        int dark = 0xFFD4AF37, darkSoft = 0xFFF0D98C, lite = 0xFF9C7A1A, liteSoft = 0xFF5C4510;
         if (light) {
-            BG = 0xFFF6F0E1;
-            SURFACE = 0xFFFFFDF6;
-            SURFACE2 = 0xFFF1E4C8;
+            // «عاج سلطنتی»: warm pearl background, near-white cards, clear separation.
+            BG = 0xFFF5F1E6;
+            SURFACE = 0xFFFFFDF8;
+            SURFACE2 = 0xFFEEE7D4;
             GOLD = lite;
             GOLD_SOFT = liteSoft;
-            TEXT = 0xFF1B2333;
-            MUTED = 0xFF5C6678;
-            SUCCESS = 0xFF12753F;
-            DANGER = 0xFFB42332;
-            WARNING = 0xFF985600;
-            INFO = 0xFF1D5FA8;
+            TEXT = 0xFF0F172A;
+            MUTED = 0xFF5B6478;
+            SUCCESS = 0xFF1B7A4B;
+            DANGER = 0xFFB3261E;
+            WARNING = 0xFF9A5B00;
+            INFO = 0xFF1F5FAD;
             VIOLET = 0xFF6343D6;
-            TEAL = 0xFF007268;
             STEEL = 0xFF546177;
         } else {
-            BG = 0xFF0C1220;
-            SURFACE = 0xFF151D31;
-            SURFACE2 = 0xFF1D2742;
+            // «نیوی و طلا»: deep navy surfaces with a polished gold accent.
+            BG = 0xFF0F172A;
+            SURFACE = 0xFF162139;
+            SURFACE2 = 0xFF1E2B47;
             GOLD = dark;
             GOLD_SOFT = darkSoft;
-            TEXT = 0xFFF4EFE4;
-            MUTED = 0xFF9AA3B5;
-            SUCCESS = 0xFF35C26E;
-            DANGER = 0xFFE5484D;
-            WARNING = 0xFFF5A524;
-            INFO = 0xFF4FA3FF;
+            TEXT = 0xFFF8F4E8;
+            MUTED = 0xFF9EAAC4;
+            SUCCESS = 0xFF34D399;
+            DANGER = 0xFFF87171;
+            WARNING = 0xFFFBBF24;
+            INFO = 0xFF60A5FA;
             VIOLET = 0xFF9A7BFF;
-            TEAL = 0xFF3ED6C5;
             STEEL = 0xFF7C8DA6;
         }
+    }
+
+    /**
+     * Shared page backdrop for the licence and login screens. Dark: a cool platinum light
+     * falling onto graphite black. Light: a warm gold glow over the ivory pearl base.
+     */
+    public static GradientDrawable backdrop() {
+        int glow = light ? alpha(GOLD, 52) : alpha(GOLD, 40);
+        return new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{glow, BG});
     }
 
     /** Choose the foreground with the stronger contrast against an accent surface. */
@@ -247,12 +193,12 @@ public final class Theme {
 
     // ---------------- system bars ----------------
     public static int statusBar() {
-        return light ? 0xFFF6F0E1 : 0xFF0C1220;
+        return light ? 0xFFF5F1E6 : 0xFF0F172A;
     }
 
     /** Navigation-bar color: champagne in light mode so the dark system keys stay visible. */
     public static int navBar() {
-        return light ? 0xFFEFE0C2 : 0xFF0C1220;
+        return light ? 0xFFEBE2CC : 0xFF0F172A;
     }
 
     // ---------------- drawable factories ----------------
@@ -264,19 +210,47 @@ public final class Theme {
         return d;
     }
 
-    /** One controlled lift for every card. Deliberately small: depth comes from spacing too. */
+    /** Elevation for cards: deeper in dark mode, where the gold glow carries the depth. */
     public static float cardElevation() {
-        return dp(light ? 2 : 3);
+        return dp(light ? 4 : 10);
     }
 
-    /** Standard glass card with a restrained top sheen and warm hairline edge. */
-    public static GradientDrawable card() {
-        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{shade(SURFACE, light ? 0.012f : 0.07f), SURFACE,
-                        shade(SURFACE, light ? -0.012f : -0.045f)});
-        d.setCornerRadius(dp(20));
-        d.setStroke(dp(1), alpha(GOLD, light ? 44 : 48));
-        return d;
+    /**
+     * Applies elevation and, on Android 9+, a tinted shadow: a soft black ambient shadow plus a
+     * faint gold spot-glow on dark, so raised cards read as lit objects rather than grey boxes.
+     */
+    public static void lift(android.view.View v, float elevationPx) {
+        v.setElevation(elevationPx);
+        if (android.os.Build.VERSION.SDK_INT >= 28) {
+            try {
+                v.setOutlineAmbientShadowColor(light ? 0x2A3A2A10 : 0xCC000000);
+                v.setOutlineSpotShadowColor(light ? 0x406B5210 : alpha(GOLD, 120));
+            } catch (Exception ignored) { Diag.ignored("Theme:lift", ignored); }
+        }
+    }
+
+    /**
+     * Glass surface: a translucent body with a bright top sheen fading out and a fine gold
+     * edge. Used by every card, so the whole app shares one material.
+     */
+    public static android.graphics.drawable.Drawable glass(int top, int bottom, float radiusDp, int edgeAlpha) {
+        GradientDrawable body = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{top, bottom});
+        body.setCornerRadius(dp(radiusDp));
+        body.setStroke(dp(1), alpha(GOLD, edgeAlpha));
+        GradientDrawable sheen = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{alpha(0xFFFFFFFF, light ? 150 : 22), 0x00FFFFFF});
+        sheen.setCornerRadius(dp(radiusDp));
+        return new android.graphics.drawable.LayerDrawable(
+                new android.graphics.drawable.Drawable[]{body, sheen});
+    }
+
+    /** Standard glass card: translucent navy (or ivory) body with a top sheen and gold edge. */
+    public static android.graphics.drawable.Drawable card() {
+        if (light) {
+            return glass(0xFFFFFDF8, 0xFFF4ECDA, 22, 70);
+        }
+        return glass(alpha(SURFACE, 242), alpha(SURFACE, 214), 22, 64);
     }
 
     /** Card with an accent glow edge. */
@@ -298,13 +272,14 @@ public final class Theme {
     }
 
     /** Executive dashboard hero: layered midnight/champagne glass with a quiet metallic edge. */
-    public static GradientDrawable executiveHero() {
+    public static android.graphics.drawable.Drawable executiveHero() {
         int accent = GOLD;
-        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{alpha(accent, light ? 56 : 82), alpha(SURFACE, 250), BG});
-        d.setCornerRadius(dp(28));
-        d.setStroke(dp(1), alpha(accent, light ? 150 : 125));
-        return d;
+        if (light) {
+            // Champagne-gold hero: a clearly golden sheen fading into ivory, with a brighter bronze rim.
+            return glass(alpha(accent, 120), 0xFFF1E2C2, 28, 200);
+        }
+        // Navy hero with a gold light falling from the top-left corner.
+        return glass(alpha(accent, 70), alpha(SURFACE, 250), 28, 130);
     }
 
     /** Selected destination on the premium bottom navigation rail. */
@@ -320,12 +295,13 @@ public final class Theme {
     public static GradientDrawable bottomNavIconSelected() {
         // Ivory Royal uses a neutral champagne capsule with the accent itself as
         // the foreground; Midnight Gold uses a luminous accent capsule and ink.
+        // Three-stop gold: champagne highlight → accent → deep shade, with a bright rim.
         int[] colors = light
-                ? new int[]{shade(SURFACE2, 0.025f), SURFACE2}
-                : new int[]{shade(GOLD, 0.04f), shade(GOLD, 0.12f)};
-        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, colors);
-        d.setCornerRadius(dp(14));
-        d.setStroke(dp(1), alpha(GOLD, light ? 96 : 72));
+                ? new int[]{shade(SURFACE2, 0.05f), SURFACE2, shade(SURFACE2, -0.03f)}
+                : new int[]{shade(GOLD, 0.22f), GOLD, shade(GOLD, -0.2f)};
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR, colors);
+        d.setCornerRadius(dp(16));
+        d.setStroke(dp(1), alpha(0xFFFFFFFF, light ? 110 : 120));
         return d;
     }
 
@@ -339,10 +315,11 @@ public final class Theme {
 
     /** KPI tile background. */
     public static GradientDrawable kpi(int accent) {
-        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{alpha(accent, light ? 26 : 34), alpha(SURFACE, 255)});
-        d.setCornerRadius(dp(18));
-        d.setStroke(dp(1), alpha(accent, light ? 60 : 70));
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                light ? new int[]{alpha(accent, 34), alpha(SURFACE, 255)}
+                        : new int[]{alpha(accent, 44), alpha(SURFACE, 255), shade(SURFACE, -0.06f)});
+        d.setCornerRadius(dp(20));
+        d.setStroke(dp(1), alpha(accent, light ? 70 : 84));
         return d;
     }
 
@@ -350,12 +327,12 @@ public final class Theme {
     public static GradientDrawable goldButton() {
         boolean darkInk = darkAccentInk(GOLD);
         float direction = darkInk ? 1f : -1f;
-        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
-                new int[]{shade(GOLD, direction * 0.04f),
-                        shade(GOLD, direction * 0.12f),
-                        shade(GOLD, direction * 0.07f)});
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{shade(GOLD, direction * 0.14f),
+                        shade(GOLD, direction * 0.02f),
+                        shade(GOLD, direction * -0.08f)});
         d.setCornerRadius(dp(18));
-        d.setStroke(dp(1), alpha(ACCENT_PAPER, 82));
+        d.setStroke(dp(1), alpha(ACCENT_PAPER, 110));
         return d;
     }
 
@@ -367,17 +344,17 @@ public final class Theme {
         boolean darkInk = darkAccentInk(GOLD);
         int gold = shade(GOLD, darkInk ? 0.04f : -0.08f);
         int rose = shade(ROSE, darkInk ? 0.22f : -0.18f);
-        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{gold, rose});
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{shade(gold, 0.10f), gold, rose});
         d.setCornerRadius(dp(18));
-        d.setStroke(dp(1), alpha(ACCENT_PAPER, 82));
+        d.setStroke(dp(1), alpha(ACCENT_PAPER, 110));
         return d;
     }
 
     /** Luxury field background with a real focus ring (v34). */
     public static android.graphics.drawable.StateListDrawable fieldBg() {
         GradientDrawable normal = base(SURFACE2, 16, dp(1), alpha(GOLD, light ? 70 : 46));
-        GradientDrawable focused = base(SURFACE2, 16, dp(2), TEAL);
+        GradientDrawable focused = base(SURFACE2, 16, dp(2), GOLD);
         android.graphics.drawable.StateListDrawable s = new android.graphics.drawable.StateListDrawable();
         s.addState(new int[]{android.R.attr.state_focused}, focused);
         s.addState(new int[]{}, normal);
@@ -387,6 +364,15 @@ public final class Theme {
     /** Field background in the error state (v34). */
     public static GradientDrawable fieldBgError() {
         return base(SURFACE2, 16, dp(2), DANGER);
+    }
+
+    /** The one back button used on every screen: accent-gradient capsule with a light rim. */
+    public static GradientDrawable backPill() {
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{shade(GOLD, 0.08f), GOLD, shade(GOLD, -0.22f)});
+        d.setCornerRadius(dp(30));
+        d.setStroke(dp(1), alpha(0xFFFFFFFF, light ? 150 : 90));
+        return d;
     }
 
     public static GradientDrawable ghostButton(int accent) {
@@ -434,13 +420,19 @@ public final class Theme {
 
     public static GradientDrawable bottomBar() {
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                light ? new int[]{0xFFFFFDF6, 0xFFF2E4C6} : new int[]{0xFF101828, 0xFF0C1220});
-        d.setStroke(dp(1), alpha(GOLD, 44));
+                light ? new int[]{0xFFFFFDF6, 0xFFEFE6CF} : new int[]{0xFF1B2A47, 0xFF0B1222});
+        // Rounded top edge with a gold hairline: the bar reads as a floating luxury dock.
+        float r = dp(22);
+        d.setCornerRadii(new float[]{r, r, r, r, 0, 0, 0, 0});
+        d.setStroke(dp(1), alpha(GOLD, 70));
         return d;
     }
 
     public static GradientDrawable dialogBg() {
-        GradientDrawable d = base(SURFACE, 26, dp(1), alpha(GOLD, 80));
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{shade(SURFACE, light ? 0.02f : 0.08f), SURFACE});
+        d.setCornerRadius(dp(26));
+        d.setStroke(dp(1), alpha(GOLD, 90));
         return d;
     }
 
@@ -463,6 +455,29 @@ public final class Theme {
     public static void pressable(View v) {
         v.setClickable(true);
         v.setFocusable(true);
+        // Micro-interaction: a soft press-in, a spring back, and a light haptic tick on release.
+        // Returns false so clicks and scrolling behave exactly as before.
+        try {
+            v.setOnTouchListener((view, ev) -> {
+                boolean motion = Ui.motionOk(view.getContext());
+                switch (ev.getActionMasked()) {
+                    case android.view.MotionEvent.ACTION_DOWN:
+                        if (motion) view.animate().scaleX(0.975f).scaleY(0.975f).setDuration(110).start();
+                        break;
+                    case android.view.MotionEvent.ACTION_UP:
+                        if (motion) view.animate().scaleX(1f).scaleY(1f).setDuration(260)
+                                .setInterpolator(new android.view.animation.OvershootInterpolator(1.3f)).start();
+                        view.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP);
+                        break;
+                    case android.view.MotionEvent.ACTION_CANCEL:
+                        if (motion) view.animate().scaleX(1f).scaleY(1f).setDuration(160).start();
+                        break;
+                    default:
+                        break;
+                }
+                return false;
+            });
+        } catch (Exception ignored) { Diag.ignored("Theme:press", ignored); }
         try {
             // Never nest ripples: repaint passes (e.g. the bottom bar) call this repeatedly.
             if (v.getBackground() instanceof android.graphics.drawable.RippleDrawable) return;
@@ -473,6 +488,6 @@ public final class Theme {
             android.graphics.drawable.Drawable mask =
                     bg == null ? new android.graphics.drawable.ColorDrawable(0xFFFFFFFF) : null;
             v.setBackground(new android.graphics.drawable.RippleDrawable(csl, bg, mask));
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Theme:491", ignored); }
     }
 }

@@ -1,5 +1,6 @@
 package ir.meelano.manager.ui;
 
+import ir.meelano.manager.core.Diag;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ClipData;
@@ -39,10 +40,10 @@ public final class LinkPanel {
             ImageView iv = new ImageView(a);
             try {
                 iv.setImageResource(icon);
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("LinkPanel:42", ignored); }
             try {
                 iv.setElevation(Theme.dp(6));
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("LinkPanel:45", ignored); }
             LinearLayout.LayoutParams ip =
                     new LinearLayout.LayoutParams(Theme.dp(76), Theme.dp(76));
             ip.gravity = Gravity.CENTER;
@@ -77,26 +78,26 @@ public final class LinkPanel {
                     if (box[0] != null) box[0].dismiss();
                     showStatus(a, s, onModeChanged);
                     if (onModeChanged != null) onModeChanged.run();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("LinkPanel:80", ignored); }
             }), kit.lp(-1, -2));
             body.addView(kit.gap(8));
             body.addView(kit.btnGold("عیب‌یابی هوشمند", v -> {
                 try {
                     if (box[0] != null) box[0].dismiss();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("LinkPanel:86", ignored); }
                 showDiagnose(a, s);
             }), kit.lp(-1, -2));
             body.addView(kit.gap(8));
             body.addView(kit.btnGhost("بستن", Theme.MUTED, v -> {
                 try {
                     if (box[0] != null) box[0].dismiss();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("LinkPanel:93", ignored); }
             }), kit.lp(-1, -2));
             signature(kit, body);
             AlertDialog d = kit.dialog("اتصال هوشمند", kit.scrollWrap(body, 460), true);
             box[0] = d;
             d.show();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LinkPanel:99", ignored); }
     }
 
     /** Troubleshoot saved profiles. */
@@ -114,11 +115,11 @@ public final class LinkPanel {
             SmartLink.diagnose(a, s, vpn, r -> {
                 try {
                     d.dismiss();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("LinkPanel:117", ignored); }
                 if (finished(a)) return;
                 renderReport(a, r, () -> showDiagnose(a, s));
             });
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LinkPanel:121", ignored); }
     }
 
     /** Troubleshoot explicit (unsaved) values from the activation screen. */
@@ -137,11 +138,11 @@ public final class LinkPanel {
             SmartLink.diagnoseExplicit(a, lan, wan, port, db, user, pass, vpn, r -> {
                 try {
                     d.dismiss();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("LinkPanel:140", ignored); }
                 if (finished(a)) return;
                 renderReport(a, r, () -> showDiagnoseExplicit(a, lan, wan, port, db, user, pass));
             });
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LinkPanel:144", ignored); }
     }
 
     /**
@@ -176,7 +177,7 @@ public final class LinkPanel {
                         if (fixes.size() >= 3) break;
                     }
                 }
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("LinkPanel:179", ignored); }
             for (String f : fixes) {
                 LinearLayout row = kit.h();
                 row.addView(kit.text("◈", 13, Theme.GOLD, true), kit.lp(-2, -2));
@@ -197,7 +198,7 @@ public final class LinkPanel {
                     try {
                         NetRoute.openVpnSettings(a);
                         kit.toast("بعد از خاموش کردن برگردید و «تلاش مجدد» بزنید");
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("LinkPanel:200", ignored); }
                 }), kit.lp(-1, -2));
                 body.addView(vpn, kit.lp(-1, -2));
             }
@@ -207,14 +208,14 @@ public final class LinkPanel {
             row.addView(kit.btnGold("تلاش مجدد", v -> {
                 try {
                     if (box[0] != null) box[0].dismiss();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("LinkPanel:210", ignored); }
                 if (retry != null) retry.run();
             }), kit.wlp(1f));
             row.addView(kit.space(8));
-            row.addView(kit.btnGhost("عیب‌یابی کامل", Theme.TEAL, v -> {
+            row.addView(kit.btnGhost("عیب‌یابی کامل", Theme.GOLD, v -> {
                 try {
                     if (box[0] != null) box[0].dismiss();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("LinkPanel:217", ignored); }
                 if (full != null) full.run();
             }), kit.wlp(1f));
             body.addView(row, kit.lp(-1, -2));
@@ -222,13 +223,13 @@ public final class LinkPanel {
             body.addView(kit.btnGhost("بستن", Theme.MUTED, v -> {
                 try {
                     if (box[0] != null) box[0].dismiss();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("LinkPanel:225", ignored); }
             }), kit.lp(-1, -2));
             signature(kit, body);
             AlertDialog d = kit.dialog("✦ اتصال نشد", kit.scrollWrap(body, 420), true);
             box[0] = d;
             d.show();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LinkPanel:231", ignored); }
     }
 
     private static void renderReport(Activity a, SmartLink.Report r, Runnable retry) {
@@ -250,7 +251,7 @@ public final class LinkPanel {
                 try {
                     iv.setImageResource(SmartLink.WAN.equals(p.kind)
                             ? R.drawable.link_wan : R.drawable.link_lan);
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("LinkPanel:253", ignored); }
                 head.addView(iv, new LinearLayout.LayoutParams(Theme.dp(40), Theme.dp(40)));
                 head.addView(kit.space(8));
                 LinearLayout copy = kit.v();
@@ -287,23 +288,23 @@ public final class LinkPanel {
             row.addView(kit.btnGold("تلاش مجدد", v -> {
                 try {
                     if (box[0] != null) box[0].dismiss();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("LinkPanel:290", ignored); }
                 if (retry != null) retry.run();
             }), kit.wlp(1f));
             row.addView(kit.space(8));
-            row.addView(kit.btnGhost("کپی گزارش", Theme.TEAL, v -> copyReport(a, r)), kit.wlp(1f));
+            row.addView(kit.btnGhost("کپی گزارش", Theme.GOLD, v -> copyReport(a, r)), kit.wlp(1f));
             body.addView(row, kit.lp(-1, -2));
             body.addView(kit.gap(8));
             body.addView(kit.btnGhost("بستن", Theme.MUTED, v -> {
                 try {
                     if (box[0] != null) box[0].dismiss();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("LinkPanel:300", ignored); }
             }), kit.lp(-1, -2));
             signature(kit, body);
             AlertDialog d = kit.dialog("عیب‌یابی هوشمند", kit.scrollWrap(body, 460), true);
             box[0] = d;
             d.show();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LinkPanel:306", ignored); }
     }
 
     private static void copyReport(Activity a, SmartLink.Report r) {
@@ -325,7 +326,7 @@ public final class LinkPanel {
             over.setGravity(Gravity.CENTER);
             try {
                 over.setTypeface(Theme.face(true));
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("LinkPanel:328", ignored); }
             body.addView(over, kit.lp(-1, -2));
             final TextView name = kit.text("Milad Yaghoobi", 21, Theme.GOLD_SOFT, true);
             name.setGravity(Gravity.CENTER);
@@ -333,7 +334,7 @@ public final class LinkPanel {
                 name.setTypeface(Theme.face(true));
                 name.setLetterSpacing(0.06f);
                 name.setShadowLayer(5, 0, 3, 0x80000000);
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("LinkPanel:336", ignored); }
             body.addView(name, kit.lp(-1, -2));
             name.post(() -> {
                 try {
@@ -343,12 +344,12 @@ public final class LinkPanel {
                             new int[]{0xFFFFF6DE, 0xFFE9C37C, 0xFF8A6420, 0xFFF1D493, 0xFFFFF6DE},
                             new float[]{0f, 0.35f, 0.55f, 0.75f, 1f}, Shader.TileMode.CLAMP));
                     name.invalidate();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("LinkPanel:346", ignored); }
             });
             TextView under = kit.text("معماری اتصال هوشمند", 11f, Theme.MUTED, false);
             under.setGravity(Gravity.CENTER);
             body.addView(under, kit.lp(-1, -2));
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LinkPanel:351", ignored); }
     }
 
     private static boolean finished(Activity a) {

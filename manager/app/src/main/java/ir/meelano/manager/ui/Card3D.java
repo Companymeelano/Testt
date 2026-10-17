@@ -1,5 +1,6 @@
 package ir.meelano.manager.ui;
 
+import ir.meelano.manager.core.Diag;
 import android.content.Context;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
@@ -25,7 +26,7 @@ public final class Card3D {
         c.setBackground(slab(accent));
         try {
             c.setElevation(Theme.dp(4));
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Card3D:28", ignored); }
         c.setPadding(Theme.dp(14), Theme.dp(13), Theme.dp(14), Theme.dp(13));
         return c;
     }
@@ -54,7 +55,7 @@ public final class Card3D {
         badge.setBackground(bg);
         try {
             badge.setElevation(Theme.dp(3));
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Card3D:57", ignored); }
         int s = Theme.dp(30);
         row.addView(badge, new LinearLayout.LayoutParams(s, s));
         row.addView(kit.space(10));

@@ -29,3 +29,6 @@ node_modules/
 
 # --- دادهٔ ورودی کاربر و بسته‌های خروجی (حجیم، داخل گیت لازم نیست) ---
 /*.zip
+
+# Fetched by CI (pinned sha256); never committed.
+manager/app/libs/*.aar

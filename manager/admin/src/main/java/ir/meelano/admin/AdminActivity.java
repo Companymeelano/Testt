@@ -272,6 +272,10 @@ public class AdminActivity extends Activity {
         try {
             inboxN = db.inboxCount();
         } catch (Exception ignored) { }
+        Button bManual = AdminKit.btn(this, "⚡  صدور دستی (کد دستگاه را خودتان وارد کنید)", false);
+        bManual.setOnClickListener(v -> show(() -> showMint(new MintCtx())));
+        box.addView(bManual);
+
         Button bInbox = AdminKit.btn(this,
                 inboxN > 0 ? ("📥  صندوق درخواست‌ها (" + AdminKit.fa(inboxN) + " تازه)") : "📥  صندوق درخواست‌ها",
                 inboxN > 0);
@@ -605,8 +609,8 @@ public class AdminActivity extends Activity {
 
         Button issue = AdminKit.btn(this, "صدور کد", true);
         issue.setOnClickListener(v -> {
-            ctx.dev = AdminKit.txt(fDev).toUpperCase()
-                    .replaceAll("[^A-Z0-9]", "");
+            // Crockford normalization: a typed O becomes 0, I/L become 1, separators drop.
+            ctx.dev = License.normalize(AdminKit.txt(fDev));
             ctx.name = AdminKit.txt(fName);
             ctx.family = AdminKit.txt(fFamily);
             ctx.shop = AdminKit.txt(fShop);
@@ -614,8 +618,8 @@ public class AdminActivity extends Activity {
             ctx.city = AdminKit.txt(fCity);
             ctx.note = AdminKit.txt(fNote);
             if (fCustom != null) ctx.customDate = AdminKit.txt(fCustom);
-            if (ctx.dev.length() != 8) {
-                AdminKit.toast(this, "کد دستگاه باید ۸ حرف باشد");
+            if (!ctx.dev.matches("[0-9ABCDEFGHJKMNPQRSTVWXYZ]{8}")) {
+                AdminKit.toast(this, "کد دستگاه باید ۸ حرف/عدد باشد (همان کدی که در برنامه مشتری نشان داده می‌شود)");
                 return;
             }
             int days = TRIAL_DAYS;
@@ -783,7 +787,9 @@ public class AdminActivity extends Activity {
                 + AdminKit.prettifyPack(l.pack) + "\n"
                 + "طرح: «" + License.planFa(planOf(l)) + "»\n"
                 + "انقضا: " + expText(l) + "\n"
-                + "راهنما: برنامه را باز نگه دارید؛ کد خودکار فعال می‌شود.";
+                + "راهنما: برنامه را باز نگه دارید؛ کد خودکار فعال می‌شود.\n"
+                + "اگر فعال نشد: در برنامه، بخش «فعال‌سازی»، کادر «کد فعال‌سازی» را باز کنید، "
+                + "کد را بچسبانید و دکمه «فعال‌سازی با کد» را بزنید.";
     }
 
     // ---------- customers ----------

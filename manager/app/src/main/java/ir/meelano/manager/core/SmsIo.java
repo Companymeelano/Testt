@@ -66,7 +66,7 @@ public final class SmsIo {
         try {
             a.requestPermissions(new String[]{android.Manifest.permission.SEND_SMS,
                     android.Manifest.permission.RECEIVE_SMS}, REQ_SEND);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("SmsIo:69", ignored); }
     }
 
     /** True when the user ticked «don't ask again» — only Settings can fix it. */
@@ -87,7 +87,7 @@ public final class SmsIo {
                     android.net.Uri.parse("package:" + a.getPackageName()));
             i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
             a.startActivity(i);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("SmsIo:90", ignored); }
     }
 
     /** One-line diagnostics for the license screen («ارسال ✓ • دریافت خودکار ✓»). */
@@ -134,7 +134,7 @@ public final class SmsIo {
                 // otherwise many ROMs throw even with the permission granted.
                 int sub = SmsManager.getDefaultSmsSubscriptionId();
                 if (sub > 0) sms = SmsManager.getSmsManagerForSubscriptionId(sub);
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("SmsIo:137", ignored); }
             final ArrayList<String> parts = sms.divideMessage(text);
             if (parts == null || parts.isEmpty()) {
                 safe.fail("متن پیامک خالی است");
@@ -152,7 +152,7 @@ public final class SmsIo {
                     if (left.decrementAndGet() <= 0 && done.compareAndSet(false, true)) {
                         try {
                             app.unregisterReceiver(box[0]);
-                        } catch (Exception ignored) { }
+                        } catch (Exception ignored) { Diag.ignored("SmsIo:155", ignored); }
                         if (failed[0]) safe.fail("ارسال پیامک ناموفق بود؛ آنتن و اعتبار سیم‌کارت را بررسی کنید");
                         else safe.ok();
                     }
@@ -166,7 +166,7 @@ public final class SmsIo {
                 if (done.compareAndSet(false, true)) {
                     try {
                         app.unregisterReceiver(box[0]);
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("SmsIo:169", ignored); }
                     safe.fail("پاسخی از شبکه دریافت نشد؛ دوباره تلاش کنید");
                 }
             }, 45000);

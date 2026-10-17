@@ -42,7 +42,7 @@ public class CashScreen extends Screen {
     public String glyph() { return "💧"; }
 
     @Override
-    public int accent() { return Theme.TEAL; }
+    public int accent() { return Theme.GOLD; }
 
     @Override
     public String subtitle() {

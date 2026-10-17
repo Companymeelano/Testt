@@ -30,7 +30,7 @@ public final class Usage {
                     .putLong("last_day", License.today())
                     .putLong("sess_start", 0)
                     .apply();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Usage:33", ignored); }
     }
 
     /** Called from onResume: (re)starts the foreground timer. */
@@ -40,7 +40,7 @@ public final class Usage {
             if (p.getLong("sess_start", 0) <= 0) {
                 p.edit().putLong("sess_start", System.currentTimeMillis()).apply();
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Usage:43", ignored); }
     }
 
     /** Called from onPause: banks the foreground time of this session. */
@@ -56,7 +56,7 @@ public final class Usage {
                     .putLong("last_day", License.today())
                     .putLong("sess_start", 0)
                     .apply();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Usage:59", ignored); }
     }
 
     public static long totalMin(Context c) {

@@ -1,5 +1,6 @@
 package ir.meelano.manager.screens;
 
+import ir.meelano.manager.core.Diag;
 import android.app.AlertDialog;
 import android.view.View;
 import android.widget.LinearLayout;
@@ -255,7 +256,7 @@ public class UsersScreen extends Screen {
             AtiranAuth.setPin(a, uid, pin);
             try {
                 box[0].dismiss();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("UsersScreen:258", ignored); }
             paint.run();
             a.kit.toast("رمز ورود ذخیره شد");
         }), a.kit.lp(-1, -2));
@@ -263,7 +264,7 @@ public class UsersScreen extends Screen {
             AtiranAuth.setPin(a, uid, null);
             try {
                 box[0].dismiss();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("UsersScreen:266", ignored); }
             paint.run();
             a.kit.toast("رمز حذف شد");
         }), a.kit.lp(-1, -2));
@@ -301,7 +302,7 @@ public class UsersScreen extends Screen {
         AtiranAuth.setOverrideRole(a, uid, role);
         try {
             box[0].dismiss();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("UsersScreen:304", ignored); }
         paint.run();
         a.kit.toast("نقش ذخیره شد؛ در ورود بعدی اعمال می‌شود");
     }
@@ -321,7 +322,7 @@ public class UsersScreen extends Screen {
             AtiranAuth.setStaffLink(a, uid, eV.getText().toString(), eA.getText().toString());
             try {
                 box[0].dismiss();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("UsersScreen:324", ignored); }
             paint.run();
             a.kit.toast("اتصال پرسنلی ذخیره شد");
         }), a.kit.lp(-1, -2));

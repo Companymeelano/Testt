@@ -57,7 +57,7 @@ public class ChequesScreen extends Screen {
     public FilterSheet.Config filterConfig() {
         FilterSheet.Config c = new FilterSheet.Config();
         c.searchHint = "شماره، مشتری، شناسه صیادی…";
-        // The ordinary list's range is the cheque's receipt/issue date. Due and calendar
+        // The ordinary list's range is the cheque's DUE date. Due and calendar
         // modes have their own explicit due-date window/month and must not offer a range
         // control that those queries would silently ignore.
         c.range = !calMode && !"due".equals(bucket);
@@ -88,16 +88,17 @@ public class ChequesScreen extends Screen {
 
     /** Persian label for one cheque row (prefers the DB status label when present). */
     private String rowLabel(boolean inc, Row r) {
-        if (!r.s("statusLabel").isEmpty()) return r.s("statusLabel");
+        // Always the code mapping (Atiran procedure codes). The view's CheckStatus text is not
+        // trusted: it labelled cleared outgoing cheques (پاس) as بازگشتی.
         return inc ? AtiranSchema.chequeInStatusFa(r.s("st"), r.s("back"))
                 : AtiranSchema.chequeOutStatusFa(r.s("st"));
     }
 
     private String dateHint(boolean inc, String selectedBucket, boolean calendar) {
-        if (calendar) return "تقویم بر اساس سررسید چک است؛ تاریخ دریافت/صدور در جزئیات جدا آمده است.";
+        if (calendar) return "تقویم بر اساس تاریخ سررسید چک است؛ تاریخ دریافت/صدور در جزئیات آمده است.";
         if ("due".equals(selectedBucket)) return "این فهرست، چک‌های باز با سررسید در ۳۰ روز آینده را نشان می‌دهد.";
-        return "بازهٔ فهرست بر اساس تاریخ " + (inc ? "دریافت" : "صدور")
-                + " چک است؛ تاریخ سررسید جداگانه نمایش داده می‌شود.";
+        return "بازهٔ فهرست بر اساس تاریخ سررسید چک است؛ تاریخ "
+                + (inc ? "دریافت" : "صدور") + " در جزئیات آمده است.";
     }
 
     private static final class Data {
@@ -308,9 +309,7 @@ public class ChequesScreen extends Screen {
                     if (!dueText.isEmpty()) rowDate += (rowDate.isEmpty() ? "" : "\n") + dueText;
                 }
                 String pill = rowLabel(myIn, row);
-                View v = a.kit.docRow("چک " + Money.fa(row.s("num")), row.s("customer"),
-                        rowDate, Money.rial(row.d("amount")), pill,
-                        v2 -> openDetail(row, myIn));
+                View v = chequeCard(row, myIn, rowDate, pill);
                 LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
                 p.setMargins(0, 0, 0, Theme.dp(10));
                 content.addView(v, p);
@@ -324,6 +323,83 @@ public class ChequesScreen extends Screen {
         }
 
         renderNotes(content, d.notes);
+    }
+
+    /**
+     * Cheque-stub card: accent stripe by urgency, perforated divider, amount on the
+     * stub side and a due-date countdown. Urgency: overdue = danger, due within 7 days = warning.
+     */
+    private View chequeCard(final Row row, final boolean inc, String rowDate, String pill) {
+        int dd = daysUntil(row.s("sardate"));
+        int accent = accent();
+        String due = "";
+        if (dd != Integer.MIN_VALUE) {
+            if (dd < 0) { accent = Theme.DANGER; due = "گذشته " + Money.fa(String.valueOf(-dd)) + " روز"; }
+            else if (dd == 0) { accent = Theme.WARNING; due = "امروز سررسید است"; }
+            else {
+                if (dd <= 7) accent = Theme.WARNING;
+                due = Money.fa(String.valueOf(dd)) + " روز مانده";
+            }
+        }
+        final int color = accent;
+        LinearLayout c = a.kit.h();
+        c.setBackground(Theme.cardAccent(color));
+        c.setPadding(Theme.dp(4), Theme.dp(10), Theme.dp(12), Theme.dp(10));
+        c.setGravity(android.view.Gravity.CENTER_VERTICAL);
+
+        // Left stripe (cheque edge).
+        View stripe = new View(a);
+        stripe.setBackground(Theme.pill(Theme.alpha(color, 230)));
+        c.addView(stripe, new LinearLayout.LayoutParams(Theme.dp(5), Theme.dp(64)));
+
+        LinearLayout copy = a.kit.v();
+        copy.setPadding(Theme.dp(10), 0, Theme.dp(6), 0);
+        android.widget.TextView t = a.kit.text("چک " + Money.fa(row.s("num")), 14f, Theme.TEXT, true);
+        t.setSingleLine(true);
+        t.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        copy.addView(t, a.kit.lp(-1, -2));
+        String who = row.s("customer");
+        if (who != null && !who.isEmpty()) {
+            android.widget.TextView w = a.kit.text(who, 11.5f, Theme.MUTED, false);
+            w.setSingleLine(true);
+            w.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            copy.addView(w, a.kit.lp(-1, -2));
+        }
+        if (rowDate != null && !rowDate.isEmpty()) copy.addView(a.kit.text(rowDate, 10.5f, Theme.MUTED, false), a.kit.lp(-1, -2));
+        if (!due.isEmpty()) copy.addView(a.kit.text(due, 11f, color, true), a.kit.lp(-1, -2));
+        c.addView(copy, a.kit.wlp(1f));
+
+        // Perforated divider.
+        View perf = new View(a) {
+            private final android.graphics.Paint pp = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+            {
+                pp.setStyle(android.graphics.Paint.Style.STROKE);
+                pp.setStrokeWidth(Theme.dp(1.2f));
+                pp.setPathEffect(new android.graphics.DashPathEffect(new float[]{Theme.dp(4), Theme.dp(4)}, 0));
+            }
+            @Override
+            protected void onDraw(android.graphics.Canvas g) {
+                pp.setColor(Theme.alpha(color, 160));
+                float x = getWidth() / 2f;
+                g.drawLine(x, 0, x, getHeight(), pp);
+            }
+        };
+        c.addView(perf, new LinearLayout.LayoutParams(Theme.dp(6), Theme.dp(60)));
+
+        LinearLayout side = a.kit.v();
+        side.setGravity(android.view.Gravity.END);
+        side.setPadding(Theme.dp(8), 0, 0, 0);
+        side.addView(a.kit.text(Money.rial(row.d("amount")), 13.5f, Theme.GOLD_SOFT, true), a.kit.lp(-2, -2));
+        if (pill != null && !pill.isEmpty()) {
+            android.widget.LinearLayout.LayoutParams pp = a.kit.lp(-2, -2);
+            pp.setMargins(0, Theme.dp(6), 0, 0);
+            side.addView(a.kit.pill(pill, color), pp);
+        }
+        c.addView(side, a.kit.lp(-2, -2));
+
+        Theme.pressable(c);
+        c.setOnClickListener(v2 -> openDetail(row, inc));
+        return c;
     }
 
     private void ensureCalMonth() {
@@ -392,6 +468,7 @@ public class ChequesScreen extends Screen {
                     boolean isToday = key.equals(today);
                     LinearLayout cell = a.kit.v();
                     cell.setGravity(android.view.Gravity.CENTER);
+                    cell.setMinimumHeight(Theme.dp(60));
                     android.widget.TextView dn = a.kit.text(Money.fa(String.valueOf(dayNo)), 13f,
                             isToday ? Theme.GOLD : Theme.TEXT, rows != null || isToday);
                     dn.setGravity(android.view.Gravity.CENTER);
@@ -399,6 +476,8 @@ public class ChequesScreen extends Screen {
                     android.widget.TextView am = a.kit.text(rows == null ? "" : Money.compactRial(tot), 9f,
                             rows == null ? Theme.MUTED : Theme.INFO, false);
                     am.setGravity(android.view.Gravity.CENTER);
+                    am.setSingleLine(true);
+                    am.setEllipsize(android.text.TextUtils.TruncateAt.END);
                     cell.addView(am, a.kit.lp(-1, -2));
                     cell.setBackground(rows != null ? Theme.pill(Theme.INFO) : (isToday ? Theme.pill(Theme.GOLD) : null));
                     int pad = Theme.dp(4);
@@ -408,7 +487,9 @@ public class ChequesScreen extends Screen {
                         final double fTot = tot;
                         cell.setOnClickListener(v -> showDayDialog(key, rows, fTot, myIn));
                     }
-                    row.addView(cell, a.kit.wlp(1f));
+                    android.widget.LinearLayout.LayoutParams cp = a.kit.wlp(1f);
+                    cp.setMargins(Theme.dp(2), Theme.dp(2), Theme.dp(2), Theme.dp(2));
+                    row.addView(cell, cp);
                 }
             }
             if (!any && week > 0) break;
@@ -435,8 +516,7 @@ public class ChequesScreen extends Screen {
             String eventDate = Jalali.disp(r.s("getdate"));
             String dates = "سررسید " + Jalali.dispFa(r.s("sardate"));
             if (!eventDate.isEmpty()) dates += "\n" + (inc ? "دریافت " : "صدور ") + Money.fa(eventDate);
-            View v = a.kit.docRow("چک " + Money.fa(r.s("num")), r.s("customer"),
-                    dates, Money.rial(r.d("amount")), rowLabel(inc, r), v2 -> openDetail(r, inc));
+            View v = chequeCard(r, inc, dates, rowLabel(inc, r));
             LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
             p.setMargins(0, 0, 0, Theme.dp(8));
             body.addView(v, p);
@@ -480,6 +560,17 @@ public class ChequesScreen extends Screen {
         if (dlg.getWindow() != null)
             dlg.getWindow().setBackgroundDrawable(Theme.dialogBg());
         LinearLayout footer = a.kit.h();
+        if (!r.s("code").isEmpty() && !"0".equals(r.s("code"))) {
+            final String custCode = r.s("code");
+            footer.addView(a.kit.btn("حساب مشتری", v -> {
+                dlg.dismiss();
+                // Same order as Home: load the dossier into the Customers screen, then open it.
+                Screen cs = a.screen("customers");
+                if (cs instanceof CustomersScreen) ((CustomersScreen) cs).openDossier(custCode);
+                a.nav("customers");
+            }), a.kit.wlp(1f));
+            footer.addView(a.kit.space(8));
+        }
         if (!r.s("ghno").isEmpty() && !"0".equals(r.s("ghno"))) {
             final String ghno = r.s("ghno");
             footer.addView(a.kit.btn("مشاهده در قبوض", v -> {

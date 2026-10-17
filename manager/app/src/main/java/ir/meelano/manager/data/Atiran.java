@@ -1,5 +1,6 @@
 package ir.meelano.manager.data;
 
+import ir.meelano.manager.core.Diag;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.sql.Connection;
@@ -73,7 +74,7 @@ public final class Atiran {
             st.setQueryTimeout(5);
             st.execute("SELECT 1");
         } catch (Exception e) {
-            try { c.close(); } catch (Exception ignored) { }
+            try { c.close(); } catch (Exception ignored) { Diag.ignored("Atiran:76", ignored); }
             throw e;
         }
         return c;
@@ -99,6 +100,16 @@ public final class Atiran {
             String o = m.replaceAll("(?i).*invalid column name\\s*'?", "").replace("'", "").trim();
             if (o.length() > 40) o = o.substring(0, 40);
             return "ستون «" + o + "» در دیتابیس پیدا نشد";
+        }
+        if (l.contains("socket closed") || l.contains("i/o error") || l.contains("connection reset")) {
+            return "ارتباط با سرور قطع شد؛ اتصال شبکه را بررسی و دوباره تلاش کنید";
+        }
+        if (l.contains("incorrect syntax")) {
+            return "ساختار این گزارش با دیتابیس سازگار نیست؛ به پشتیبانی اطلاع دهید";
+        }
+        if (l.contains("aggregate function") || l.contains("group by") || l.contains("subquery")) {
+            // SQL Server rejects this report's calculation shape. Keep the raw text out of the UI.
+            return "این محاسبه روی این دیتابیس اجرا نشد؛ دوباره تلاش کنید یا به پشتیبانی اطلاع دهید";
         }
         if (m.length() > 220) m = m.substring(0, 220) + "…";
         return m.isEmpty() ? "خطای اتصال به دیتابیس" : m;

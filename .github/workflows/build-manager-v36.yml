@@ -2,10 +2,13 @@ name: MEELANO Manager v36.26.0 debug APK
 
 on:
   push:
-    branches: ["arena/c192ed08-testt"]
+    branches: ["arena/eec375ea-testt"]
     paths:
       - "manager/**"
       - "tools/audit_manager_schema.py"
+      - "tools/probe_buy_formula.py"
+      - "tools/probe_money_structure.py"
+      - "tools/probe_atiran_backup.py"
       - ".github/workflows/build-manager-v36.yml"
   workflow_dispatch:
 
@@ -37,6 +40,12 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.11.1
+
+      - name: Fetch offline Persian voice engine (sherpa-onnx AAR, pinned sha256)
+        run: |
+          mkdir -p manager/app/libs
+          curl -fsSL -o manager/app/libs/sherpa-onnx-1.13.8.aar https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-1.13.8.aar
+          echo "633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96  manager/app/libs/sherpa-onnx-1.13.8.aar" | sha256sum -c -
 
       - name: Run manager unit tests and build v36.26.0
         working-directory: manager
@@ -70,6 +79,29 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
+      - name: Compile admin licence app (debug APK, artifact only)
+        working-directory: manager
+        run: |
+          set -o pipefail
+          gradle :admin:assembleDebug --no-daemon 2>&1 | tee ../admin-build.log | tail -40
+
+      - name: Upload admin debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: meelano-admin-debug
+          path: manager/admin/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Verify update descriptor tool (MAC round-trip, no publishing)
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/reldesc"
+          javac -d "$RUNNER_TEMP/reldesc" manager/licensing/src/main/java/ir/meelano/licensing/License.java tools/release/ReleaseDescriptor.java
+          SHA=$(printf 'meelano' | sha256sum | cut -d' ' -f1)
+          java -cp "$RUNNER_TEMP/reldesc" ReleaseDescriptor 58 36.26.0 meelano-manager-v36.26.0-release.apk 1000 "$SHA" https://github.com/Companymeelano/Testt/releases/download/manager-v36.26.0/meelano-manager-v36.26.0-release.apk "test" | tee descriptor-check.json
+          grep -F '"code": 58' descriptor-check.json
+
       - name: Verify APK identity, version and signature
         run: |
           set -euo pipefail
@@ -90,6 +122,38 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      - name: Build signed release APK (runs only when release secrets are set)
+        env:
+          MEELANO_KEYSTORE_B64: ${{ secrets.MEELANO_KEYSTORE_B64 }}
+          MEELANO_STORE_PASS: ${{ secrets.MEELANO_STORE_PASS }}
+          MEELANO_KEY_ALIAS: ${{ secrets.MEELANO_KEY_ALIAS }}
+          MEELANO_KEY_PASS: ${{ secrets.MEELANO_KEY_PASS }}
+        working-directory: manager
+        run: |
+          set -euo pipefail
+          if [ -z "${MEELANO_KEYSTORE_B64:-}" ]; then
+            echo "Release signing secrets are not set; skipping the release build."
+            exit 0
+          fi
+          echo "$MEELANO_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/meelano-release.jks"
+          export MEELANO_KEYSTORE="$RUNNER_TEMP/meelano-release.jks"
+          gradle :app:assembleRelease --no-daemon --stacktrace
+          APK=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          BT="$ANDROID_HOME/build-tools/35.0.0"
+          "$BT/aapt" dump badging "$APK" | grep -F "package: name='ir.meelano.manager' versionCode='58' versionName='36.26.0'"
+          "$BT/apksigner" verify --verbose --print-certs "$APK" | tee ../release-signing.txt
+          cp "$APK" ../meelano-manager-v36-release.apk
+          sha256sum ../meelano-manager-v36-release.apk
+
+      - name: Upload signed release APK artifact (not committed)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: meelano-manager-v36-release
+          path: meelano-manager-v36-release.apk
+          if-no-files-found: ignore
+          retention-days: 30
+
       - name: Commit verified APK to the session branch for direct delivery
         run: |
           set -euo pipefail
@@ -104,4 +168,101 @@ jobs:
           git config user.email "arena-ci@local"
           git add -f dist/meelano-manager-v36-debug-9.apk dist/manager-v36-build-info.txt
           git commit -m "dist: MEELANO Manager v36.26.0 debug APK"
-          git push origin HEAD:arena/c192ed08-testt
+          git push origin HEAD:arena/eec375ea-testt
+
+  buy-formula-counts:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[buy-check]')
+    name: Restore sample and count formula matches (no business rows printed)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start isolated SQL Server 2022
+        shell: bash
+        run: |
+          set -euo pipefail
+          password="Atiran$(openssl rand -hex 24)!9a"
+          echo "::add-mask::$password"
+          echo "ATIRAN_SQL_PASSWORD=$password" >> "$GITHUB_ENV"
+          docker run -d --name atiran-sample \
+            -e ACCEPT_EULA=Y \
+            -e MSSQL_PID=Developer \
+            -e MSSQL_SA_PASSWORD="$password" \
+            mcr.microsoft.com/mssql/server:2022-latest
+
+      - name: Extract backup and copy it into the disposable database container
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          archive = Path("Atiran2-1405-7-14-15-21-49.zip")
+          target = Path("${{ runner.temp }}/AtiranSample.bak")
+          with ZipFile(archive) as zf:
+              matches = [name for name in zf.namelist() if name.lower().endswith(".bak")]
+              if len(matches) != 1:
+                  raise SystemExit(f"Expected one .bak in archive, found {len(matches)}")
+              with zf.open(matches[0]) as source, target.open("wb") as dest:
+                  while block := source.read(1024 * 1024):
+                      dest.write(block)
+          print("Extracted sample backup; this step reads no rows.")
+          PY
+          docker exec atiran-sample mkdir -p /var/opt/mssql/backup
+          docker cp "${{ runner.temp }}/AtiranSample.bak" atiran-sample:/var/opt/mssql/backup/AtiranSample.bak
+
+      - name: Count formula matches (aggregates only)
+        id: check
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/probe_buy_formula.py \
+            --container atiran-sample \
+            --backup /var/opt/mssql/backup/AtiranSample.bak \
+            --output "${{ runner.temp }}/buy-formula-counts.json"
+          cp "${{ runner.temp }}/buy-formula-counts.json" buy-formula-counts.json
+          python3 tools/probe_money_structure.py \
+            --container atiran-sample \
+            --backup /var/opt/mssql/backup/AtiranSample.bak \
+            --output "${{ runner.temp }}/money-structure-counts.json"
+          cp "${{ runner.temp }}/money-structure-counts.json" money-structure-counts.json
+
+      - name: Commit counts-only file to this branch
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -f buy-formula-counts.json ]]; then echo "no counts file"; exit 0; fi
+          mkdir -p dist
+          cp buy-formula-counts.json dist/buy-formula-counts.json
+          [[ -f money-structure-counts.json ]] && cp money-structure-counts.json dist/money-structure-counts.json || true
+          git config user.name "arena-ci"
+          git config user.email "arena-ci@local"
+          git add -f dist/buy-formula-counts.json dist/money-structure-counts.json 2>/dev/null || git add -f dist/buy-formula-counts.json
+          git commit -m "dist: purchase formula counts (counts only, no rows)"
+          for i in 1 2 3 4 5; do
+            git pull -q --rebase origin arena/eec375ea-testt && git push -q origin HEAD:arena/eec375ea-testt && break
+            sleep 5
+          done
+
+      - name: Publish counts to run summary
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f buy-formula-counts.json ]]; then
+            { echo "## Purchase-line formula check (counts only)"; echo '```json'; cat buy-formula-counts.json; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "## Purchase-line formula check failed before producing counts" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Attach counts-only report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: atiran-buy-formula-counts
+          path: buy-formula-counts.json
+          if-no-files-found: ignore
+          retention-days: 14

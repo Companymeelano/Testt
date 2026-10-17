@@ -94,7 +94,7 @@ public final class ReportCatalog {
                             c("bouncedAmt", "مبلغ برگشتی", T_MONEY), c("totalAmt", "جمع چک‌ها", T_MONEY),
                             c("rate", "نرخ برگشتی ٪", T_NUM), c("grade", "رتبه", T_TEXT)},
                     C_BARS, "customer", "bouncedAmt"),
-            s("visitor_yield", "بازده ویزیتور", "هوشمند", "مشتریان منتسب، فعال بازه و ریزش ۹۰روزه هر ویزیتور + فاکتور به‌ازای مشتری", true,
+            s("visitor_yield", "بازده ویزیتور", "تحلیل ویزیتور و مسیر", "مشتریان منتسب، فعال بازه و ریزش ۹۰روزه هر ویزیتور + فاکتور به‌ازای مشتری", true,
                     new Col[]{c("name", "ویزیتور", T_TEXT), c("assigned", "منتسب", T_NUM), c("active", "فعال بازه", T_NUM),
                             c("churned", "ریزش", T_NUM), c("invoices", "فاکتور", T_NUM), c("sales", "فروش", T_MONEY),
                             c("perCust", "فاکتور/مشتری", T_NUM)},
@@ -135,22 +135,42 @@ public final class ReportCatalog {
             s("yoy_sales", "مقایسه فروش با پارسال", "فروش", "فروش ماهانه امسال در برابر پارسال + درصد رشد", false,
                     new Col[]{c("mlab", "ماه", T_TEXT), c("thisY", "فروش امسال", T_MONEY), c("lastY", "فروش پارسال", T_MONEY), c("growth", "رشد ٪", T_NUM)},
                     C_BARS, "mlab", "thisY"),
-            s("sales_by_visitor", "فروش ویزیتورها", "فروش", "سهم هر ویزیتور از فروش بازه", true,
+            s("sales_price_spread", "پراکندگی قیمت فروش", "فروش", "اختلاف کمترین و بیشترین بهای واحد فروش هر کالا (نشت تخفیف)", true,
+                    new Col[]{c("label", "کالا", T_TEXT), c("docs", "اسناد", T_NUM), c("qty", "مقدار", T_NUM),
+                            c("minUnit", "کمترین بها", T_MONEY), c("maxUnit", "بیشترین بها", T_MONEY),
+                            c("avgUnit", "میانگین بها", T_MONEY), c("spread", "اختلاف ٪", T_NUM)},
+                    C_NONE, "", ""),
+            s("sales_by_visitor", "فروش ویزیتورها", "تحلیل ویزیتور و مسیر", "سهم هر ویزیتور از فروش بازه", true,
                     new Col[]{c("label", "ویزیتور", T_TEXT), c("total", "جمع فروش", T_MONEY), c("docs", "اسناد", T_NUM)},
                     C_BARS, "label", "total"),
-            s("sales_by_route", "فروش مسیرها", "فروش", "سهم هر مسیر از فروش بازه", true,
+            s("sales_by_route", "فروش مسیرها", "تحلیل ویزیتور و مسیر", "سهم هر مسیر از فروش بازه", true,
                     new Col[]{c("label", "مسیر", T_TEXT), c("total", "جمع فروش", T_MONEY), c("docs", "اسناد", T_NUM)},
                     C_BARS, "label", "total"),
             s("sales_by_group", "فروش گروه‌های مشتری", "فروش", "سهم هر گروه مشتری از فروش", true,
                     new Col[]{c("label", "گروه", T_TEXT), c("total", "جمع فروش", T_MONEY), c("docs", "اسناد", T_NUM)},
                     C_DONUT, "label", "total"),
+            s("sales_by_kala_group", "فروش گروه‌های کالا", "فروش", "سهم هر گروه کالا از فروش بازه", true,
+                    new Col[]{c("label", "گروه کالا", T_TEXT), c("qty", "مقدار", T_NUM), c("total", "جمع فروش", T_MONEY), c("docs", "اسناد", T_NUM)},
+                    C_DONUT, "label", "total"),
             s("unsettled", "فاکتورهای معوق", "فروش", "فاکتورهای تسویه‌نشده با سررسید گذشته", false,
                     new Col[]{c("invoice", "فاکتور", T_TEXT), c("party", "مشتری", T_TEXT), c("amount", "مبلغ", T_MONEY),
                             c("dueDate", "سررسید", T_DATE), c("days", "روز تأخیر", T_NUM), c("visitor", "ویزیتور", T_TEXT)},
                     C_NONE, "", ""),
-            s("aging", "سابقه مطالبات", "فروش", "بازه‌بندی مانده فاکتورهای تسویه‌نشده", false,
-                    new Col[]{c("bucket", "بازه", T_TEXT), c("amount", "مبلغ", T_MONEY), c("count", "تعداد", T_NUM)},
-                    C_BARS, "bucket", "amount"),
+            s("aging", "سن بدهی — توزیع مانده", "تحلیل ویزیتور و مسیر", "مانده بدهی فاکتورهای تسویه‌نشده به تفکیک سن بدهی (روز از سررسید)", false,
+                    new Col[]{c("bucket", "سن بدهی", T_TEXT), c("amount", "مانده", T_MONEY), c("count", "فاکتور", T_NUM)},
+                    C_DONUT, "bucket", "amount"),
+            s("debtors_aging", "بدهکاران به تفکیک سن بدهی", "تحلیل ویزیتور و مسیر", "هر مشتری بدهکار با مانده در هر بازه سنی و ویزیتور او", false,
+                    new Col[]{c("customer", "مشتری", T_TEXT), c("visitor", "ویزیتور", T_TEXT),
+                            c("b0", "جاری", T_MONEY), c("b1", "۱–۳۰", T_MONEY), c("b2", "۳۱–۶۰", T_MONEY),
+                            c("b3", "۶۱–۹۰", T_MONEY), c("b4", "۹۱–۱۸۰", T_MONEY), c("b5", "+۱۸۰", T_MONEY),
+                            c("total", "جمع مانده", T_MONEY), c("docs", "فاکتور", T_NUM)},
+                    C_BARS, "customer", "total"),
+            s("visitor_aging", "سن بدهی به تفکیک ویزیتور", "تحلیل ویزیتور و مسیر", "مانده بدهی هر ویزیتور در بازه‌های سنی", false,
+                    new Col[]{c("visitor", "ویزیتور", T_TEXT),
+                            c("b0", "جاری", T_MONEY), c("b1", "۱–۳۰", T_MONEY), c("b2", "۳۱–۶۰", T_MONEY),
+                            c("b3", "۶۱–۹۰", T_MONEY), c("b4", "۹۱–۱۸۰", T_MONEY), c("b5", "+۱۸۰", T_MONEY),
+                            c("total", "جمع مانده", T_MONEY), c("customers", "مشتری", T_NUM)},
+                    C_BARS, "visitor", "total"),
             // ---- خرید ----
             s("buy_daily", "خرید روزانه", "خرید", "جمع و تعداد فاکتور خرید هر روز", true,
                     new Col[]{c("day", "روز", T_DATE), c("total", "جمع خرید", T_MONEY), c("docs", "اسناد", T_NUM)},
@@ -161,6 +181,16 @@ public final class ReportCatalog {
             s("buy_monthly", "خرید ماهانه", "خرید", "جمع و تعداد فاکتور خرید هر ماه", false,
                     new Col[]{c("month", "ماه", T_TEXT), c("total", "جمع خرید", T_MONEY), c("docs", "اسناد", T_NUM)},
                     C_BARS, "month", "total"),
+            s("buy_price_trend", "روند قیمت خرید", "خرید", "تغییر بهای واحد آخرین خرید نسبت به خرید قبلی هر کالا (درصد)", true,
+                    new Col[]{c("label", "کالا", T_TEXT), c("prevUnit", "خرید قبلی (واحد)", T_MONEY),
+                            c("lastUnit", "خرید اخیر (واحد)", T_MONEY), c("change", "تغییر ٪", T_NUM),
+                            c("docs", "تعداد خرید", T_NUM)},
+                    C_NONE, "", ""),
+            s("supplier_price_gap", "شکاف قیمت تأمین‌کنندگان", "خرید", "بهای واحد هر تأمین‌کننده نسبت به میانگین همان کالا از سایر تأمین‌کنندگان", true,
+                    new Col[]{c("label", "تأمین‌کننده", T_TEXT), c("product", "کالا", T_TEXT),
+                            c("supUnit", "بهای این تأمین‌کننده", T_MONEY), c("marketUnit", "میانگین بازار", T_MONEY),
+                            c("gap", "شکاف ٪", T_NUM), c("qty", "مقدار", T_NUM), c("sups", "تعداد تأمین‌کننده", T_NUM)},
+                    C_NONE, "", ""),
             s("buy_by_party", "خرید از طرف‌حساب‌ها", "خرید", "برترین فروشندگان/تأمین‌کنندگان", true,
                     new Col[]{c("label", "طرف‌حساب", T_TEXT), c("total", "جمع خرید", T_MONEY), c("docs", "اسناد", T_NUM)},
                     C_BARS, "label", "total"),
@@ -198,7 +228,7 @@ public final class ReportCatalog {
                     new Col[]{c("label", "گروه", T_TEXT), c("value", "ارزش", T_MONEY), c("count", "اقلام", T_NUM)},
                     C_DONUT, "label", "value"),
             // ---- مشتریان ----
-            s("debtors", "بدهکاران", "مشتریان", "مشتریان دارای مانده بدهی، مرتب‌شده", false,
+            s("debtors", "بدهکاران", "تحلیل ویزیتور و مسیر", "مشتریان دارای مانده بدهی، مرتب‌شده", false,
                     new Col[]{c("name", "مشتری", T_TEXT), c("cell", "همراه", T_TEXT), c("balance", "مانده", T_MONEY),
                             c("salesTotal", "جمع فروش", T_MONEY), c("lastSale", "آخرین خرید", T_DATE)},
                     C_NONE, "", ""),
@@ -209,11 +239,19 @@ public final class ReportCatalog {
             s("new_customers", "مشتریان جدید", "مشتریان", "مشتریان ثبت‌شده در بازه", true,
                     new Col[]{c("code", "کد", T_TEXT), c("name", "مشتری", T_TEXT), c("date", "تاریخ ثبت", T_DATE), c("visitor", "ویزیتور", T_TEXT)},
                     C_NONE, "", ""),
-            s("inactive_customers", "مشتریان بدون خرید", "مشتریان", "مشتریان بدون هیچ فاکتور فروش", false,
+            s("inactive_customers", "مشتریان بدون خرید", "تحلیل ویزیتور و مسیر", "مشتریان بدون هیچ فاکتور فروش", false,
                     new Col[]{c("code", "کد", T_TEXT), c("party", "مشتری", T_TEXT)},
                     C_NONE, "", ""),
             // ---- ویزیتور ----
-            s("visitor_perf", "عملکرد ویزیتورها", "ویزیتورها", "فروش، وصول، مشتریان و اهداف هر ویزیتور", true,
+            s("visitor_profit", "سود ویزیتورها", "تحلیل ویزیتور و مسیر", "فروش، بهای تمام‌شده (بر پایه قیمت خرید) و حاشیه سود هر ویزیتور", true,
+                    new Col[]{c("label", "ویزیتور", T_TEXT), c("docs", "فاکتور", T_NUM), c("sales", "فروش", T_MONEY),
+                            c("cogs", "بهای تمام‌شده", T_MONEY), c("profit", "سود", T_MONEY), c("margin", "حاشیه ٪", T_NUM)},
+                    C_NONE, "", ""),
+            s("visitor_collection", "وصول ویزیتورها", "تحلیل ویزیتور و مسیر", "مبلغ فاکتور، دریافتی، مانده و نرخ وصول هر ویزیتور", true,
+                    new Col[]{c("label", "ویزیتور", T_TEXT), c("docs", "فاکتور", T_NUM), c("total", "فروش", T_MONEY),
+                            c("collected", "دریافتی", T_MONEY), c("remain", "مانده", T_MONEY), c("rate", "نرخ وصول ٪", T_NUM)},
+                    C_NONE, "", ""),
+            s("visitor_perf", "عملکرد ویزیتورها", "تحلیل ویزیتور و مسیر", "فروش، وصول، مشتریان و اهداف هر ویزیتور", true,
                     new Col[]{c("name", "ویزیتور", T_TEXT), c("sales", "فروش", T_MONEY), c("collected", "وصول فاکتور", T_MONEY),
                             c("invoices", "فاکتور", T_NUM), c("customers", "مشتری فعال", T_NUM), c("goals", "هدف", T_MONEY)},
                     C_BARS, "name", "sales"),
@@ -266,6 +304,19 @@ public final class ReportCatalog {
             s("cows", "صندوق‌ها", "بانک و صندوق", "فهرست صندوق‌ها و مانده", false,
                     new Col[]{c("name", "صندوق", T_TEXT), c("balance", "مانده", T_MONEY)},
                     C_NONE, "", ""),
+            // ---- سرفصل‌ها (بازیابی؛ حسابداری غیرفعال است) ----
+            s("sf_balances", "مانده سرفصل‌ها", "سرفصل‌ها",
+                    "جمع بدهکار، بستانکار و مانده هر سرفصل در بازه — جست‌وجو با نام سرفصل", true,
+                    SarfaslReports.SARFASL_COLS, C_NONE, "", ""),
+            s("sf_zir", "مانده زیرسرفصل‌ها", "سرفصل‌ها",
+                    "جمع بدهکار، بستانکار و مانده هر زیرسرفصل در بازه — جست‌وجو با نام", true,
+                    SarfaslReports.BALANCE_COLS, C_NONE, "", ""),
+            s("sf_entries", "ریز ثبت‌های سرفصل", "سرفصل‌ها",
+                    "ثبت‌های سرفصل و زیرسرفصل با تاریخ، شرح، مبالغ و کاربر — جدیدترین اول", true,
+                    new Col[]{c("date", "تاریخ", T_DATE), c("sarfasl", "سرفصل", T_TEXT), c("zir", "زیرسرفصل", T_TEXT),
+                            c("descr", "شرح", T_TEXT), c("debit", "بدهکار", T_MONEY), c("credit", "بستانکار", T_MONEY),
+                            c("user", "کاربر", T_TEXT)},
+                    C_NONE, "", ""),
     };
 
     public static Spec byId(String id) {
@@ -284,18 +335,24 @@ public final class ReportCatalog {
         if ("sales_daily".equals(id)) return Queries.factorDaily(m, true, ff.from, ff.to);
         if ("sales_monthly".equals(id)) return MasterQueries.monthly(m, true, 12);
         if ("yoy_sales".equals(id)) return MasterQueries.monthly(m, true, 24);
+        if ("sales_price_spread".equals(id)) return AdvancedReports.salePriceSpread(m, ff, 50);
         if ("sales_by_visitor".equals(id)) return Queries.salesByVisitor(m, ff, 50);
         if ("sales_by_customer".equals(id)) return Queries.factorByCustomer(m, true, ff, 50);
         if ("sales_by_route".equals(id)) return Queries.factorByRoute(m, true, ff, 50);
         if ("sales_by_group".equals(id)) return Queries.factorByCustGroup(m, true, ff, 50);
+        if ("sales_by_kala_group".equals(id)) return Queries.factorByProductGroup(m, true, ff, 50);
         if ("sales_top_products".equals(id)) return Queries.factorTopProducts(m, true, ff, 50);
         if ("unsettled".equals(id)) { ff.top = Math.max(ff.top, 100); return Queries.overdueInvoices(m, ff.top); }
         if ("aging".equals(id)) {
-            if (m.function("dif_date_alan")) return Queries.agingBuckets(m);
+            if (m.function("dif_date_alan")) return MasterQueries.agingBuckets(m);
             return Queries.unsettledByMonth(m);
         }
+        if ("debtors_aging".equals(id)) return MasterQueries.agingCustomers(m, 300);
+        if ("visitor_aging".equals(id)) return MasterQueries.agingVisitors(m);
         if ("buy_daily".equals(id)) return Queries.factorDaily(m, false, ff.from, ff.to);
         if ("buy_monthly".equals(id)) return MasterQueries.monthly(m, false, 12);
+        if ("buy_price_trend".equals(id)) return Queries.buyPriceTrend(m, ff, 50);
+        if ("supplier_price_gap".equals(id)) return AdvancedReports.supplierPriceGap(m, ff, 50);
         if ("buy_by_party".equals(id)) return Queries.factorByCustomer(m, false, ff, 50);
         if ("buy_top_products".equals(id)) return Queries.factorTopProducts(m, false, ff, 50);
         if ("in_daily".equals(id)) return MoneyQueries.darDaily(m, 0, ff.from, ff.to);
@@ -311,6 +368,8 @@ public final class ReportCatalog {
         if ("creditors".equals(id)) { ff.status = "credit"; ff.sort = "balance_asc"; ff.top = 200; return MasterQueries.customersList(m, ff); }
         if ("new_customers".equals(id)) return MasterQueries.newCustomers(m, ff);
         if ("inactive_customers".equals(id)) return Queries.inactiveCustomers(m, 200);
+        if ("visitor_profit".equals(id)) return AdvancedReports.visitorProfit(m, ff, 50);
+        if ("visitor_collection".equals(id)) return AdvancedReports.visitorCollection(m, ff, 50);
         if ("visitor_perf".equals(id)) return MasterQueries.visitorsPerf(m, ff);
         if ("users".equals(id)) return MasterQueries.usersList(m);
         if ("changes".equals(id)) return MasterQueries.tableChanges(m, ff);
@@ -332,6 +391,9 @@ public final class ReportCatalog {
         if ("stock_forecast".equals(id)) return MasterQueries.stockForecast(m, ff);
         if ("invoice_profit".equals(id)) return MasterQueries.invoiceProfit(m, ff);
         if ("order_suggest".equals(id)) return MasterQueries.orderSuggest(m, ff);
+        if ("sf_balances".equals(id)) return SarfaslReports.sarfaslBalances(m, ff);
+        if ("sf_zir".equals(id)) return SarfaslReports.zirBalances(m, ff);
+        if ("sf_entries".equals(id)) return SarfaslReports.entries(m, ff);
         throw new Queries.Missing("گزارش ناشناخته است");
     }
 }

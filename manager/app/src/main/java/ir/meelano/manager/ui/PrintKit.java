@@ -1,5 +1,6 @@
 package ir.meelano.manager.ui;
 
+import ir.meelano.manager.core.Diag;
 import android.app.Activity;
 import android.os.CancellationSignal;
 import android.os.ParcelFileDescriptor;
@@ -57,14 +58,14 @@ public final class PrintKit {
                     } finally {
                         try {
                             if (in != null) in.close();
-                        } catch (Exception ignored) { }
+                        } catch (Exception ignored) { Diag.ignored("PrintKit:60", ignored); }
                         try {
                             if (out != null) out.close();
-                        } catch (Exception ignored) { }
+                        } catch (Exception ignored) { Diag.ignored("PrintKit:63", ignored); }
                     }
                 }
             };
             pm.print(jobName == null || jobName.isEmpty() ? "گزارش میلانو" : jobName, adapter, null);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("PrintKit:68", ignored); }
     }
 }

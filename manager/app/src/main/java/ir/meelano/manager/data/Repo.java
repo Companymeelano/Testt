@@ -1,5 +1,6 @@
 package ir.meelano.manager.data;
 
+import ir.meelano.manager.core.Diag;
 import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
@@ -140,6 +141,6 @@ public final class Repo {
     }
 
     public void close() {
-        try { pool.shutdownNow(); } catch (Exception ignored) { }
+        try { pool.shutdownNow(); } catch (Exception ignored) { Diag.ignored("Repo:143", ignored); }
     }
 }

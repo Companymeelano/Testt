@@ -1,5 +1,6 @@
 package ir.meelano.manager.data;
 
+import ir.meelano.manager.core.Diag;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
@@ -37,7 +38,7 @@ public final class Company {
             try {
                 String m = new Settings(c).shopName();
                 if (!m.isEmpty()) return m;
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("Company:40", ignored); }
             return "فروشگاه میلانو";
         }
 
@@ -48,7 +49,7 @@ public final class Company {
             try {
                 String m = new Settings(c).shopPhone();
                 if (!m.isEmpty()) return m;
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("Company:51", ignored); }
             return "";
         }
 
@@ -71,7 +72,7 @@ public final class Company {
             if (addr != null && !addr.trim().isEmpty()) return addr.trim();
             try {
                 return new Settings(c).shopAddr();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("Company:74", ignored); }
             return "";
         }
     }
@@ -104,7 +105,7 @@ public final class Company {
             i.meli = p.getString("meli", "");
             i.egh = p.getString("egh", "");
             i.pos = p.getString("pos", "");
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Company:107", ignored); }
         mem = i;
         return i;
     }
@@ -120,7 +121,7 @@ public final class Company {
             o.inJustDecodeBounds = true;
             BitmapFactory.decodeFile(f.getAbsolutePath(), o);
             int s = 1;
-            while ((o.outWidth / s > 256 || o.outHeight / s > 256) && s < 8) s *= 2;
+            while ((o.outWidth / s > 512 || o.outHeight / s > 512) && s < 8) s *= 2;
             o.inJustDecodeBounds = false;
             o.inSampleSize = s;
             logoMem = BitmapFactory.decodeFile(f.getAbsolutePath(), o);
@@ -157,14 +158,14 @@ public final class Company {
                 long len = 0;
                 try {
                     len = Repo.one(conn, MasterQueries.companyLogoLen(m)).l("len");
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("Company:160", ignored); }
                 long saved = prefs(app).getLong("logo_len", -1);
                 File f = logoFile(app);
                 if (len > 100 && (len != saved || !f.exists())) {
                     byte[] blob = null;
                     try {
                         blob = Repo.one(conn, MasterQueries.companyLogo(m)).bytes("logo");
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("Company:167", ignored); }
                     if (blob != null && blob.length > 100) {
                         try (FileOutputStream out = new FileOutputStream(f)) {
                             out.write(blob);
@@ -193,6 +194,6 @@ public final class Company {
     private static void runDone(Runnable done) {
         try {
             if (done != null) done.run();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Company:196", ignored); }
     }
 }

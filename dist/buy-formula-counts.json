@@ -1,0 +1,37 @@
+{
+  "purchase_candidates": {
+    "TEDVAH*JOZPRICE": [
+      "70",
+      "28",
+      "0"
+    ],
+    "TEDJOZ*JOZPRICE": [
+      "70",
+      "1",
+      "0"
+    ],
+    "tamam_joz": [
+      "70",
+      "1",
+      "0"
+    ],
+    "tamam_joz_tax": [
+      "70",
+      "1",
+      "0"
+    ]
+  },
+  "sales_control": {
+    "LINESUM (control)": [
+      "1282",
+      "490",
+      "0"
+    ]
+  },
+  "columns": [
+    "invoices",
+    "matched",
+    "unusable"
+  ],
+  "note": "counts only, no business data"
+}

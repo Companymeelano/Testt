@@ -1,5 +1,6 @@
 package ir.meelano.manager;
 
+import ir.meelano.manager.core.Diag;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
@@ -34,6 +35,7 @@ import ir.meelano.manager.data.Repo;
 import ir.meelano.manager.data.Row;
 import ir.meelano.manager.data.Settings;
 import ir.meelano.manager.screens.AnbarScreen;
+import ir.meelano.manager.screens.AssistantScreen;
 import ir.meelano.manager.screens.CashScreen;
 import ir.meelano.manager.screens.CloseoutScreen;
 import ir.meelano.manager.screens.ManagerAlertsScreen;
@@ -54,6 +56,8 @@ import ir.meelano.manager.screens.ScoreScreen;
 import ir.meelano.manager.screens.SearchScreen;
 import ir.meelano.manager.screens.SettingsScreen;
 import ir.meelano.manager.screens.TradeScreen;
+import ir.meelano.manager.screens.AnalyticsScreen;
+import ir.meelano.manager.screens.ProductFileScreen;
 import ir.meelano.manager.screens.ShomarshScreen;
 import ir.meelano.manager.screens.TahvilScreen;
 import ir.meelano.manager.screens.TakmilScreen;
@@ -84,6 +88,10 @@ public class MainActivity extends Activity {
     public Settings settings;
 
     private LinearLayout content;
+    /** Column that holds the current page; each render swaps in a fresh page. */
+    private LinearLayout contentWrap;
+    /** Incremented on every render. Async work captures it and stops once it changes. */
+    private int renderGen = 0;
     private ScrollView scroll;
     private LinearLayout bottomBar;
     private android.widget.ImageView linkIcon;
@@ -93,7 +101,8 @@ public class MainActivity extends Activity {
             new android.os.Handler(android.os.Looper.getMainLooper());
     private Runnable linkPending = null;
     private TextView licChip;
-    private TextView backFab;
+    private View backFab;
+    private TextView backLabel;
     private TextView companyName;
     private android.widget.FrameLayout logoBox;
     private android.widget.ImageView logoImg;
@@ -155,6 +164,10 @@ public class MainActivity extends Activity {
         if (!isFinishing() && !LicenseStore.unlocked(this)) toLicense();
         if (!isFinishing() && LicenseStore.unlocked(this)
                 && !new Settings(this).connConfigured()) toLicense();
+        // Persian voice is a prerequisite: guide the install before the app is used.
+        if (!isFinishing() && LicenseStore.unlocked(this) && new Settings(this).connConfigured()) {
+            ir.meelano.manager.core.Speaker.onResume(this);
+        }
         if (!isFinishing() && AtiranAuth.gate(this)) toLogin();
         Usage.touch(this);
         if (repo != null && !isFinishing() && RoleStore.WAREHOUSE.equals(effRole()))
@@ -183,7 +196,7 @@ public class MainActivity extends Activity {
             Intent i = new Intent(this, LicenseActivity.class);
             i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
             startActivity(i);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:189", ignored); }
         finish();
     }
 
@@ -192,7 +205,7 @@ public class MainActivity extends Activity {
             Intent i = new Intent(this, LoginActivity.class);
             i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
             startActivity(i);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:198", ignored); }
         finish();
     }
 
@@ -200,7 +213,7 @@ public class MainActivity extends Activity {
     public void logout() {
         try {
             AtiranAuth.clearSession(this);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:206", ignored); }
         toLogin();
     }
 
@@ -221,7 +234,7 @@ public class MainActivity extends Activity {
         try {
             String sr = AtiranAuth.sessionRole(this);
             if (RoleStore.WAREHOUSE.equals(sr)) splashSub = "نسخه انباردار • آتیران";
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:227", ignored); }
         TextView s = kit.text(splashSub, 12.5f, Theme.MUTED, false);
         s.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams sp = kit.lp(-1, -2);
@@ -297,7 +310,7 @@ public class MainActivity extends Activity {
             else
                 vis &= ~(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
             getWindow().getDecorView().setSystemUiVisibility(vis);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:303", ignored); }
     }
 
     /** Re-apply the luxury theme and rebuild the shell on the current screen. */
@@ -315,12 +328,12 @@ public class MainActivity extends Activity {
                         (android.net.ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
                 if (cm != null && linkCb != null) cm.unregisterNetworkCallback(linkCb);
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:321", ignored); }
         linkCbReg = false;
         try {
             if (linkPending != null) linkHandler.removeCallbacks(linkPending);
-        } catch (Exception ignored) { }
-        try { repo.close(); } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:325", ignored); }
+        try { repo.close(); } catch (Exception ignored) { Diag.ignored("MainActivity:326", ignored); }
         super.onDestroy();
     }
 
@@ -342,7 +355,7 @@ public class MainActivity extends Activity {
             };
             cm.registerDefaultNetworkCallback(linkCb);
             linkCbReg = true;
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:348", ignored); }
     }
 
     private void linkChanged() {
@@ -351,10 +364,10 @@ public class MainActivity extends Activity {
             linkPending = () -> {
                 try {
                     if (!isFinishing()) checkConn();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("MainActivity:357", ignored); }
             };
             linkHandler.postDelayed(linkPending, 1500);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:360", ignored); }
     }
 
     // ================= PIN gate =================
@@ -474,56 +487,19 @@ public class MainActivity extends Activity {
         root.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         root.setBackgroundColor(Theme.BG);
 
-        // header: connection dot + company logo (from Atiran) + company name + tools
-        // On narrow phones, drop the long license/name chips first. On the tiniest
-        // widths also hide secondary search/theme/zoom tools, keeping refresh, settings
-        // and the account/logout shortcut reachable without overflowing the header.
+        // header (two rows): row 1 = logo, company name (up to two lines, never squeezed
+        // to a stub) and the status line (link, licence, user); row 2 = a full-width
+        // toolbar with equal-width, labelled buttons. Nothing competes for the same width.
         android.util.DisplayMetrics dm = getResources().getDisplayMetrics();
         int widthDp = dm.widthPixels * 160 / dm.densityDpi;
-        final boolean compact = widthDp < 520;
         final boolean tiny = widthDp < 360;
-        LinearLayout header = kit.h();
-        header.setGravity(Gravity.CENTER_VERTICAL);
-        header.setPadding(Theme.dp(14), Theme.dp(10), Theme.dp(14), Theme.dp(8));
-        linkIcon = new android.widget.ImageView(this);
-        try {
-            linkIcon.setImageResource(R.drawable.link_probe);
-        } catch (Exception ignored) { }
-        linkIcon.setContentDescription("وضعیت اتصال — لمس برای جزئیات");
-        linkIcon.setPadding(Theme.dp(2), Theme.dp(2), Theme.dp(2), Theme.dp(2));
-        Theme.pressable(linkIcon);
-        linkIcon.setOnClickListener(v -> {
-            try {
-                LinkPanel.showStatus(this, settings, () -> checkConn());
-            } catch (Exception ignored) { }
-        });
-        header.addView(linkIcon, new LinearLayout.LayoutParams(Theme.dp(30), Theme.dp(30)));
-        header.addView(kit.space(8));
-        // License chip: subtle remaining-time pill, taps through to activation/support.
-        licChip = kit.text("", 10.5f, Theme.GOLD_SOFT, true);
-        licChip.setBackground(Theme.ghostButton(Theme.GOLD));
-        licChip.setPadding(Theme.dp(9), Theme.dp(4), Theme.dp(9), Theme.dp(4));
-        licChip.setSingleLine(true);
-        licChip.setMaxWidth(Theme.dp(96));
-        Theme.pressable(licChip);
-        licChip.setOnClickListener(v -> openLicense());
-        if (!compact) {
-            header.addView(licChip, kit.lp(-2, -2));
-            header.addView(kit.space(8));
-        }
-        // Atiran user chip: who is logged in, taps through to logout.
-        userChip = kit.text("", 10.5f, Theme.GOLD_SOFT, true);
-        userChip.setBackground(Theme.ghostButton(Theme.GOLD));
-        userChip.setPadding(Theme.dp(9), Theme.dp(4), Theme.dp(9), Theme.dp(4));
-        userChip.setSingleLine(true);
-        userChip.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        Theme.pressable(userChip);
-        userChip.setOnClickListener(v -> userMenu());
-        if (!compact) {
-            header.addView(userChip, kit.lp(-2, -2));
-            header.addView(kit.space(8));
-        }
-        refreshUserChip();
+        final boolean compact = widthDp < 520;
+        LinearLayout header = kit.v();
+        header.setPadding(Theme.dp(12), Theme.dp(10), Theme.dp(12), Theme.dp(8));
+
+        // ---- row 1: brand ----
+        LinearLayout brand = kit.h();
+        brand.setGravity(Gravity.CENTER_VERTICAL);
         logoBox = new android.widget.FrameLayout(this);
         logoBox.setBackground(Theme.accentAvatar(Theme.GOLD));
         logoGlyph = kit.text("♛", 20, Theme.onAccent(), true);
@@ -539,103 +515,108 @@ public class MainActivity extends Activity {
                     o.setOval(0, 0, v.getWidth(), v.getHeight());
                 }
             });
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:508", ignored); }
         int lpad = Theme.dp(2);
         logoImg.setPadding(lpad, lpad, lpad, lpad);
         logoImg.setVisibility(View.GONE);
         logoBox.addView(logoImg, new android.widget.FrameLayout.LayoutParams(-1, -1));
-        header.addView(logoBox, new LinearLayout.LayoutParams(Theme.dp(46), Theme.dp(46)));
-        header.addView(kit.space(8));
+        brand.addView(logoBox, new LinearLayout.LayoutParams(Theme.dp(64), Theme.dp(64)));
+        brand.addView(kit.space(10));
+
+        LinearLayout titleCol = kit.v();
         companyName = kit.text(companyTitle(), 16, Theme.TEXT, true);
-        companyName.setSingleLine(true);
+        companyName.setMaxLines(2);
         companyName.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        header.addView(companyName, kit.wlp(1f));
+        titleCol.addView(companyName, kit.lp(-1, -2));
+
+        // status line: link state, licence chip, Atiran user chip (small, always visible)
+        LinearLayout status = kit.h();
+        status.setGravity(Gravity.CENTER_VERTICAL);
+        linkIcon = new android.widget.ImageView(this);
+        try {
+            linkIcon.setImageResource(R.drawable.link_probe);
+        } catch (Exception ignored) { Diag.ignored("MainActivity:528", ignored); }
+        linkIcon.setContentDescription("وضعیت اتصال — لمس برای جزئیات");
+        linkIcon.setPadding(Theme.dp(1), Theme.dp(1), Theme.dp(1), Theme.dp(1));
+        Theme.pressable(linkIcon);
+        linkIcon.setOnClickListener(v -> {
+            try {
+                LinkPanel.showStatus(this, settings, () -> checkConn());
+            } catch (Exception ignored) { Diag.ignored("MainActivity:535", ignored); }
+        });
+        status.addView(linkIcon, new LinearLayout.LayoutParams(Theme.dp(20), Theme.dp(20)));
+        status.addView(kit.space(6));
+        licChip = kit.text("", 10.5f, Theme.GOLD_SOFT, true);
+        licChip.setBackground(Theme.ghostButton(Theme.GOLD));
+        licChip.setPadding(Theme.dp(8), Theme.dp(3), Theme.dp(8), Theme.dp(3));
+        licChip.setSingleLine(true);
+        licChip.setMaxWidth(Theme.dp(120));
+        licChip.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        Theme.pressable(licChip);
+        licChip.setOnClickListener(v -> openLicense());
+        status.addView(licChip, kit.lp(-2, -2));
+        status.addView(kit.space(6));
+        userChip = kit.text("", 10.5f, Theme.GOLD_SOFT, true);
+        userChip.setBackground(Theme.ghostButton(Theme.GOLD));
+        userChip.setPadding(Theme.dp(8), Theme.dp(3), Theme.dp(8), Theme.dp(3));
+        userChip.setSingleLine(true);
+        userChip.setMaxWidth(Theme.dp(120));
+        userChip.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        Theme.pressable(userChip);
+        userChip.setOnClickListener(v -> userMenu());
+        status.addView(userChip, kit.lp(-2, -2));
+        titleCol.addView(status, kit.lp(-2, -2));
+        brand.addView(titleCol, kit.wlp(1f));
+        header.addView(brand, kit.lp(-1, -2));
+        refreshUserChip();
+        header.addView(kit.space(8));
+
+        // ---- row 2: toolbar (equal-width cells with Persian labels) ----
         LinearLayout tools = kit.h();
         tools.setGravity(Gravity.CENTER_VERTICAL);
         tools.setBackground(Theme.ghostButton(Theme.GOLD));
-        tools.setPadding(Theme.dp(2), Theme.dp(2), Theme.dp(2), Theme.dp(2));
-        TextView gsearch = kit.text("⌕", 18, Theme.GOLD_SOFT, true);
-        gsearch.setPadding(Theme.dp(11), Theme.dp(6), Theme.dp(11), Theme.dp(6));
-        Theme.pressable(gsearch);
-        gsearch.setOnClickListener(v -> nav("search"));
-        MeelanoIcons.iconize(gsearch);
-        if (!tiny) {
-            tools.addView(gsearch, kit.lp(-2, -2));
-            tools.addView(vdiv(), kit.lp(Theme.dp(1), Theme.dp(22)));
-        }
-        TextView themeBtn = kit.text("◐", 18, Theme.GOLD, true);
-        themeBtn.setPadding(Theme.dp(11), Theme.dp(6), Theme.dp(11), Theme.dp(6));
-        themeBtn.setContentDescription("تغییر تم روشن / تیره");
-        Theme.pressable(themeBtn);
-        themeBtn.setOnClickListener(v -> {
+        tools.setPadding(Theme.dp(3), Theme.dp(3), Theme.dp(3), Theme.dp(3));
+
+        if (!tiny) tools.addView(toolCell(toolIcon(R.drawable.mi_search), "جستجو", "جستجو", () -> nav("search")), toolLp());
+
+        if (!tiny) tools.addView(toolCell(toolIcon(R.drawable.mi_contrast), "تم", "تغییر تم روشن / تیره", () -> {
             boolean toLight = !"light".equals(settings.themeMode());
             settings.setThemeMode(toLight ? "light" : "dark");
             kit.toast(toLight ? "تم روشن فعال شد" : "تم تیره فعال شد");
             refreshTheme();
-        });
-        MeelanoIcons.iconize(themeBtn);
-        if (!tiny) {
-            tools.addView(themeBtn, kit.lp(-2, -2));
-            tools.addView(vdiv(), kit.lp(Theme.dp(1), Theme.dp(22)));
-        }
-        TextView refresh = kit.text("⟳", 18, Theme.GOLD_SOFT, true);
-        refresh.setPadding(Theme.dp(11), Theme.dp(6), Theme.dp(11), Theme.dp(6));
-        Theme.pressable(refresh);
-        refresh.setOnClickListener(v -> renderCurrent());
-        MeelanoIcons.iconize(refresh);
-        tools.addView(refresh, kit.lp(-2, -2));
-        tools.addView(vdiv(), kit.lp(Theme.dp(1), Theme.dp(22)));
-        TextView sett = kit.text("⚙", 18, Theme.GOLD_SOFT, true);
-        sett.setPadding(Theme.dp(11), Theme.dp(6), Theme.dp(11), Theme.dp(6));
-        sett.setContentDescription("تنظیمات");
-        Theme.pressable(sett);
-        sett.setOnClickListener(v -> nav("settings"));
-        MeelanoIcons.iconize(sett);
-        tools.addView(sett, kit.lp(-2, -2));
-        android.widget.ImageView zoom = new android.widget.ImageView(this);
-        try {
-            zoom.setImageResource(R.drawable.mi_zoom);
-            zoom.setColorFilter(Theme.GOLD_SOFT);
-        } catch (Exception ignored) { }
-        zoom.setPadding(Theme.dp(11), Theme.dp(8), Theme.dp(11), Theme.dp(8));
-        zoom.setContentDescription("بزرگ‌نمایی متن");
-        Theme.pressable(zoom);
-        zoom.setOnClickListener(v -> cycleZoom());
-        if (compact) {
-            tools.addView(vdiv(), kit.lp(Theme.dp(1), Theme.dp(22)));
-            compactUserAction = new android.widget.ImageView(this);
+        }), toolLp());
+
+        if (!compact) {
+            android.widget.ImageView zoom = new android.widget.ImageView(this);
             try {
-                compactUserAction.setImageResource(R.drawable.mi_person);
-                compactUserAction.setColorFilter(Theme.GOLD_SOFT);
-            } catch (Exception ignored) { }
-            compactUserAction.setBackground(Theme.ghostButton(Theme.GOLD));
-            compactUserAction.setPadding(Theme.dp(9), Theme.dp(7), Theme.dp(9), Theme.dp(7));
-            compactUserAction.setContentDescription("حساب کاربری؛ خروج یا تغییر کاربر");
-            Theme.pressable(compactUserAction);
-            compactUserAction.setOnClickListener(v -> userMenu());
-            tools.addView(compactUserAction,
-                    new LinearLayout.LayoutParams(Theme.dp(40), Theme.dp(36)));
-        } else {
-            compactUserAction = null;
-            if (!tiny) {
-                tools.addView(vdiv(), kit.lp(Theme.dp(1), Theme.dp(22)));
-                tools.addView(zoom, new LinearLayout.LayoutParams(Theme.dp(42), Theme.dp(36)));
-            }
+                zoom.setImageResource(R.drawable.mi_zoom);
+                zoom.setColorFilter(Theme.GOLD_SOFT);
+            } catch (Exception ignored) { Diag.ignored("MainActivity:584", ignored); }
+            tools.addView(toolCell(zoom, "بزرگ‌نمایی", "بزرگ‌نمایی متن", () -> cycleZoom()), toolLp());
         }
-        header.addView(tools, kit.lp(-2, -2));
+
+        tools.addView(toolCell(toolIcon(R.drawable.mi_refresh), "تازه‌سازی", "تازه‌سازی", () -> renderCurrent()), toolLp());
+        tools.addView(toolCell(toolIcon(R.drawable.mi_settings), "تنظیمات", "تنظیمات", () -> nav("settings")), toolLp());
+
+        android.widget.ImageView account = new android.widget.ImageView(this);
+        try {
+            account.setImageResource(R.drawable.mi_person);
+            account.setColorFilter(Theme.GOLD_SOFT);
+        } catch (Exception ignored) { Diag.ignored("MainActivity:595", ignored); }
+        compactUserAction = account;
+        tools.addView(toolCell(account, "حساب", "حساب کاربری؛ خروج یا تغییر کاربر", () -> userMenu()), toolLp());
+
+        header.addView(tools, kit.lp(-1, -2));
         refreshUserChip();
         root.addView(header, kit.lp(-1, -2));
         refreshLicChip();
 
         // content (centered max-width column on tablets / wide screens)
         scroll = new ScrollView(this);
-        LinearLayout centerWrap = kit.h();
-        centerWrap.setGravity(Gravity.CENTER_HORIZONTAL);
-        content = kit.v();
-        content.setPadding(Theme.dp(12), Theme.dp(4), Theme.dp(12), Theme.dp(16));
-        scroll.addView(centerWrap, new ScrollView.LayoutParams(-1, -2));
-        int sw = getResources().getDisplayMetrics().widthPixels;
-        centerWrap.addView(content, new LinearLayout.LayoutParams(sw > Theme.dp(720) ? Theme.dp(640) : -1, -2));
+        contentWrap = kit.h();
+        contentWrap.setGravity(Gravity.CENTER_HORIZONTAL);
+        scroll.addView(contentWrap, new ScrollView.LayoutParams(-1, -2));
+        content = newPage();
         root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1f));
 
         // bottom bar
@@ -650,6 +631,7 @@ public class MainActivity extends Activity {
 
         // screens
         reg(new HomeScreen(this));
+        reg(new AssistantScreen(this));
         reg(new TradeScreen(this, true));
         reg(new TradeScreen(this, false));
         reg(new MoneyScreen(this, 0));
@@ -657,12 +639,14 @@ public class MainActivity extends Activity {
         reg(new ChequesScreen(this));
         reg(new CashScreen(this));
         reg(new ProductsScreen(this));
+        reg(new ProductFileScreen(this));
         reg(new CustomersScreen(this));
         reg(new VisitorsScreen(this));
         reg(new UsersScreen(this));
         reg(new ProfitScreen(this));
         reg(new DuesScreen(this));
         reg(new ReportsScreen(this));
+        reg(new AnalyticsScreen(this));
         reg(new SettingsScreen(this));
         reg(new MoreScreen(this));
         reg(new SearchScreen(this));
@@ -687,24 +671,66 @@ public class MainActivity extends Activity {
         try {
             android.content.Intent gi = getIntent();
             if (gi != null) want = gi.getStringExtra(EXTRA_SCREEN);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:667", ignored); }
         if (want != null && !want.isEmpty() && screens.containsKey(want)) nav(want);
         styleBars();
         checkConn();
         refreshCompany();
+        // Only ONE startup popup per launch: the post-login tour, else «تازه‌های نسخه», else the update prompt.
+        boolean tourShown = false;
         try {
             if (ir.meelano.manager.core.LicenseStore.tourPending(this)) {
                 ir.meelano.manager.core.LicenseStore.setTourPending(this, false);
                 ir.meelano.manager.ui.WhatsNew.showCurrent(this);
+                tourShown = true;
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:677", ignored); }
         Notify.boot(this);
         syncBackFab();
         // v24: What's New on upgrade (once), then the silent licensed update check.
         try {
-            WhatsNew.maybeShow(this, () -> UpdateCenter.autoCheck(this));
-        } catch (Exception ignored) { }
+            if (!tourShown) {
+                // When «تازه‌های نسخه» opens, the update prompt waits for the next launch.
+                boolean news = WhatsNew.pending(this);
+                WhatsNew.maybeShow(this, news ? null : () -> UpdateCenter.autoCheck(this));
+            }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:683", ignored); }
         watchLink();
+    }
+
+    /** One toolbar cell: icon above a small Persian label, equal width via {@link #toolLp()}. */
+    /** Gold vector icon for the header toolbar (replaces text glyphs, which rendered unevenly). */
+    private android.widget.ImageView toolIcon(int res) {
+        android.widget.ImageView iv = new android.widget.ImageView(this);
+        try {
+            iv.setImageResource(res);
+            iv.setColorFilter(Theme.GOLD_SOFT);
+        } catch (Exception ignored) { Diag.ignored("MainActivity:694", ignored); }
+        return iv;
+    }
+
+    private LinearLayout toolCell(View icon, String label, String desc, Runnable onTap) {
+        LinearLayout cell = new LinearLayout(this);
+        cell.setOrientation(LinearLayout.VERTICAL);
+        cell.setGravity(Gravity.CENTER);
+        cell.setContentDescription(desc);
+        cell.setMinimumHeight(Theme.dp(54));
+        Theme.pressable(cell);
+        cell.setOnClickListener(v -> onTap.run());
+        icon.setClickable(false);
+        cell.addView(icon, new LinearLayout.LayoutParams(Theme.dp(26), Theme.dp(24)));
+        TextView t = new TextView(this);
+        t.setText(label);
+        t.setTextSize(10);
+        t.setTextColor(Theme.MUTED);
+        t.setGravity(Gravity.CENTER);
+        t.setSingleLine(true);
+        cell.addView(t, new LinearLayout.LayoutParams(-2, -2));
+        return cell;
+    }
+
+    private LinearLayout.LayoutParams toolLp() {
+        return new LinearLayout.LayoutParams(0, Theme.dp(54), 1f);
     }
 
     /** Hairline divider between header tool buttons. */
@@ -730,7 +756,7 @@ public class MainActivity extends Activity {
         try {
             String r = AtiranAuth.sessionRole(this);
             if (r != null && !r.isEmpty()) return r;
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:745", ignored); }
         return RoleStore.current(this);
     }
 
@@ -939,7 +965,8 @@ public class MainActivity extends Activity {
             content.setTranslationX((forward ? -1 : 1) * Theme.dp(48));
             content.setAlpha(0.35f);
             content.animate().translationX(0f).alpha(1f).setDuration(220).start();
-        } catch (Exception ignored) { }
+            ir.meelano.manager.ui.Ui.reveal(content);
+        } catch (Exception ignored) { Diag.ignored("MainActivity:954", ignored); }
     }
 
     /** Paint the company header from cache, then refresh from Atiran in background. */
@@ -954,7 +981,7 @@ public class MainActivity extends Activity {
                 paintCompany();
                 if (after != null) after.run();
             });
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:969", ignored); }
     }
 
     private String companyTitle() {
@@ -978,11 +1005,13 @@ public class MainActivity extends Activity {
                     logoImg.setVisibility(View.VISIBLE);
                     logoGlyph.setVisibility(View.GONE);
                 } else {
-                    logoImg.setVisibility(View.GONE);
-                    logoGlyph.setVisibility(View.VISIBLE);
+                    // No company logo cached: show the app's own M mark instead of a generic glyph.
+                    logoImg.setImageResource(R.drawable.meelano_3d);
+                    logoImg.setVisibility(View.VISIBLE);
+                    logoGlyph.setVisibility(View.GONE);
                 }
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:997", ignored); }
     }
 
     /**
@@ -997,16 +1026,39 @@ public class MainActivity extends Activity {
             if (s == null) return;
             if (shown) s.onShown();
             else s.onHidden();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:1012", ignored); }
     }
 
     private void renderCurrent() {
         Screen s = screens.get(currentId);
         if (s == null) return;
+        renderGen++;
+        // A new page for every render: a slow query that returns after the user has moved to
+        // another section fills the old, detached page and can no longer repaint the screen on display.
+        content = newPage();
         refreshChrome();
         scroll.scrollTo(0, 0);
         s.render(content);
     }
+
+    /** Builds an empty, centred page column and puts it on screen in place of the previous one. */
+    private LinearLayout newPage() {
+        LinearLayout page = kit.v();
+        // Bottom room so the back capsule never covers the last row.
+        page.setPadding(Theme.dp(12), Theme.dp(4), Theme.dp(12), Theme.dp(128));
+        int sw = getResources().getDisplayMetrics().widthPixels;
+        if (contentWrap != null) {
+            contentWrap.removeAllViews();
+            contentWrap.addView(page, new LinearLayout.LayoutParams(sw > Theme.dp(720) ? Theme.dp(640) : -1, -2));
+        }
+        return page;
+    }
+
+    /** Current render generation; changes whenever a different page or a re-render replaces what is on screen. */
+    public int renderGen() { return renderGen; }
+
+    /** Id of the screen that is on display right now. */
+    public String currentScreenId() { return currentId; }
 
     /** Repaint bottom bar + back FAB (screens call this after internal state changes). */
     public void refreshChrome() {
@@ -1014,6 +1066,15 @@ public class MainActivity extends Activity {
         if (s == null) return;
         paintBottom();
         if (backFab != null) backFab.setVisibility("home".equals(currentId) ? View.GONE : View.VISIBLE);
+        updateBackLabel();
+    }
+
+    /** The back capsule names the screen it will actually return to. */
+    private void updateBackLabel() {
+        if (backLabel == null) return;
+        String target = history.isEmpty() ? "home" : history.get(history.size() - 1);
+        Screen t = screens.get(target);
+        backLabel.setText(t == null ? "بازگشت" : "بازگشت به «" + t.title() + "»");
     }
 
     public void openFilter() {
@@ -1046,30 +1107,44 @@ public class MainActivity extends Activity {
     }
 
     /** Golden circular back button, floating above the bottom bar on every section but Home. */
+    /**
+     * The single back control for every screen: one gold capsule with a round arrow
+     * and the word «بازگشت», docked bottom-centre just above the tab bar. It stays in
+     * the same place on every page so the user always knows where to find it.
+     */
     private void syncBackFab() {
         try {
             if (backFab != null && backFab.getParent() instanceof android.view.ViewGroup)
                 ((android.view.ViewGroup) backFab.getParent()).removeView(backFab);
-        } catch (Exception ignored) {
-        }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:1079", ignored); }
         backFab = null;
-        TextView f = kit.text("\u2192", 26, Theme.onAccent(), true);
-        f.setGravity(Gravity.CENTER);
-        f.setBackground(Theme.accentAvatar(Theme.GOLD));
-        f.setElevation(Theme.dp(6));
-        f.setContentDescription("برگشت");
-        Theme.pressable(f);
-        f.setOnClickListener(v -> goBack());
+        // Floating gold disc: one arrow, no label, a soft gold glow underneath.
+        final int ink = Theme.onAccent(Theme.GOLD);
+        android.graphics.drawable.GradientDrawable disc = new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                new int[]{Theme.GOLD_SOFT, Theme.GOLD});
+        disc.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        disc.setStroke(Theme.dp(1), Theme.alpha(ink, 60));
+        TextView arrow = kit.text("\u2192", 22f, ink, true);
+        arrow.setGravity(Gravity.CENTER);
+        arrow.setBackground(disc);
+        arrow.setElevation(Theme.dp(14));
+        arrow.setContentDescription("بازگشت به صفحه قبلی");
+        Theme.pressable(arrow);
+        arrow.setOnClickListener(v -> goBack());
+        backLabel = null;
+        // Compact disc in the bottom corner, above the tab bar, so list rows stay readable.
         android.widget.FrameLayout.LayoutParams p = new android.widget.FrameLayout.LayoutParams(
-                Theme.dp(58), Theme.dp(58), Gravity.BOTTOM | Gravity.LEFT);
-        p.setMargins(Theme.dp(16), 0, 0, Theme.dp(100));
+                Theme.dp(46), Theme.dp(46), Gravity.BOTTOM | Gravity.END);
+        p.setMargins(Theme.dp(14), 0, Theme.dp(14), Theme.dp(96));
         try {
-            addContentView(f, p);
+            addContentView(arrow, p);
         } catch (Exception ignored) {
             return;
         }
-        backFab = f;
+        backFab = arrow;
         backFab.setVisibility("home".equals(currentId) ? View.GONE : View.VISIBLE);
+        updateBackLabel();
     }
 
     // ================= Persian voice search =================
@@ -1077,6 +1152,22 @@ public class MainActivity extends Activity {
     private java.util.function.Consumer<String> voiceCb;
 
     /** Start Persian speech recognition; the transcript is delivered to cb. */
+    /** Asks for the microphone (used by live assistant conversation). */
+    public void requestMic(java.util.function.Consumer<Boolean> cb) {
+        micCb = cb;
+        requestPermissions(new String[]{android.Manifest.permission.RECORD_AUDIO}, MIC_PERM);
+    }
+
+    private static final int MIC_PERM = 4471;
+    private static final int LOC_PERM = 4472;
+
+    /** Asks for approximate and precise location, used only by the weather card. */
+    public void requestLocationAccess() {
+        requestPermissions(new String[]{android.Manifest.permission.ACCESS_COARSE_LOCATION,
+                android.Manifest.permission.ACCESS_FINE_LOCATION}, LOC_PERM);
+    }
+    private java.util.function.Consumer<Boolean> micCb;
+
     public void startVoiceSearch(java.util.function.Consumer<String> cb) {
         voiceCb = cb;
         try {
@@ -1099,7 +1190,7 @@ public class MainActivity extends Activity {
         if (requestCode == UpdateCenter.REQ_UNKNOWN) {
             try {
                 UpdateCenter.onUnknownSourcesReturn(this);
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("MainActivity:1145", ignored); }
             return;
         }
         if (requestCode == VOICE_REQ && resultCode == Activity.RESULT_OK && data != null && voiceCb != null) {
@@ -1136,7 +1227,7 @@ public class MainActivity extends Activity {
                     while ((n = in.read(buf)) > 0) b.append(new String(buf, 0, n, "UTF-8"));
                     try {
                         in.close();
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("MainActivity:1182", ignored); }
                     docCb.accept(b.toString());
                 } else kit.toast("فایلی انتخاب نشد");
             } catch (Exception e) {
@@ -1162,6 +1253,17 @@ public class MainActivity extends Activity {
         // Notification permission is best-effort; the app works fully without it.
         boolean granted = grantResults != null && grantResults.length > 0
                 && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED;
+        if (requestCode == LOC_PERM) {
+            // Location is optional: redraw the home card so weather follows the new permission at once.
+            if ("home".equals(currentId)) renderCurrent();
+            return;
+        }
+        if (requestCode == MIC_PERM) {
+            java.util.function.Consumer<Boolean> cb = micCb;
+            micCb = null;
+            if (cb != null) cb.accept(granted);
+            return;
+        }
         if (requestCode == SCAN_PERM) {
             if (granted && scanCb != null) launchScanner();
             else {
@@ -1172,7 +1274,7 @@ public class MainActivity extends Activity {
             try {
                 Screen s = screens.get(currentId);
                 if (s != null) s.onSmsPermission(granted);
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("MainActivity:1218", ignored); }
         } else if (requestCode == FisPrint.BT_REQ) {
             FisPrint.onPermissionResult(this, granted);
         }
@@ -1294,14 +1396,14 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             try {
                 licChip.setVisibility(View.GONE);
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("MainActivity:1340", ignored); }
         }
     }
 
     private void openLicense() {
         try {
             startActivity(new Intent(this, LicenseActivity.class));
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:1347", ignored); }
     }
 
     /** Open the license connection flow directly in edit mode, preserving the current session. */
@@ -1353,7 +1455,7 @@ public class MainActivity extends Activity {
                 compactUserAction.setContentDescription(hasSession
                         ? "حساب کاربری؛ خروج یا تغییر کاربر" : "ورود به حساب کاربری");
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:1399", ignored); }
     }
 
     /** Who am I + logout (+ PIN-management shortcut for the manager). */
@@ -1376,18 +1478,18 @@ public class MainActivity extends Activity {
                 body.addView(kit.btnGhost("تعیین رمز کاربران", Theme.GOLD, v -> {
                     try {
                         box[0].dismiss();
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("MainActivity:1422", ignored); }
                     nav("users");
                 }), kit.lp(-1, -2));
             body.addView(kit.btnGhost("↪ خروج از حساب / تغییر کاربر", Theme.DANGER, v -> {
                 try {
                     box[0].dismiss();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("MainActivity:1428", ignored); }
                 logout();
             }), kit.lp(-1, -2));
             box[0] = kit.dialog("حساب کاربری", body, true);
             box[0].show();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:1433", ignored); }
     }
 
     public void checkConn() {
@@ -1398,7 +1500,7 @@ public class MainActivity extends Activity {
                 String last = "";
                 try {
                     last = settings.linkLast();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("MainActivity:1444", ignored); }
                 setLinkIcon(last.isEmpty() ? SmartLink.LAN : last);
             }
 
@@ -1435,14 +1537,14 @@ public class MainActivity extends Activity {
                 linkIcon.setImageResource(R.drawable.link_off);
                 linkIcon.setContentDescription("قطع — لمس برای عیب‌یابی");
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:1481", ignored); }
     }
 
     public void testConnection(final Repo.Cb<String> cb) {
         boolean vpn = false;
         try {
             vpn = NetRoute.isVpnActive(this);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:1488", ignored); }
         SmartLink.diagnose(this, settings, vpn, r -> {
             try {
                 if (r.anyOk) {
@@ -1451,7 +1553,7 @@ public class MainActivity extends Activity {
                 } else {
                     cb.fail(r.verdict);
                 }
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("MainActivity:1497", ignored); }
         });
     }
 
@@ -1576,6 +1678,13 @@ public class MainActivity extends Activity {
     /** Two-row export bar: PDF + Excel + Word / image + print (share sheet covers social apps + Bluetooth). */
     public android.view.View exportBar(final String title, final String subtitle,
                                        final ReportCatalog.Col[] cols, final List<Row> rows) {
+        return exportBar(title, subtitle, cols, rows, true);
+    }
+
+    /** Same bar; pass withPrint=false where the screen already has its own print action. */
+    public android.view.View exportBar(final String title, final String subtitle,
+                                       final ReportCatalog.Col[] cols, final List<Row> rows,
+                                       boolean withPrint) {
         LinearLayout box = kit.v();
         LinearLayout r1 = kit.h();
         r1.addView(kit.btnGhost("▤ PDF", Theme.DANGER, v -> sharePdf(title, subtitle, cols, rows)), kit.wlp(1f));
@@ -1587,8 +1696,10 @@ public class MainActivity extends Activity {
         box.addView(kit.gap(8));
         LinearLayout r2 = kit.h();
         r2.addView(kit.btnGhost("▧ عکس", Theme.VIOLET, v -> sharePng(title, subtitle, cols, rows)), kit.wlp(1f));
-        r2.addView(kit.space(8));
-        r2.addView(kit.btnGhost("🖨 چاپ", Theme.GOLD, v -> printPdf(title, subtitle, cols, rows)), kit.wlp(1f));
+        if (withPrint) {
+            r2.addView(kit.space(8));
+            r2.addView(kit.btnGhost("🖨 چاپ", Theme.GOLD, v -> printPdf(title, subtitle, cols, rows)), kit.wlp(1f));
+        }
         box.addView(r2, kit.lp(-1, -2));
         return box;
     }

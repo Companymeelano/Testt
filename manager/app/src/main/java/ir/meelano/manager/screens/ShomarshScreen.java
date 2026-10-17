@@ -1,5 +1,6 @@
 package ir.meelano.manager.screens;
 
+import ir.meelano.manager.core.Diag;
 import android.app.AlertDialog;
 import android.view.View;
 import android.widget.EditText;
@@ -83,7 +84,7 @@ public class ShomarshScreen extends Screen {
             lines = state.lines;
             restoredAt = state.updatedAt;
             restoredLocalDraft = lines.length() > 0;
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("ShomarshScreen:86", ignored); }
     }
 
     private void persistLocalDraft() {
@@ -101,14 +102,14 @@ public class ShomarshScreen extends Screen {
             if (!json.isEmpty()) p.edit().putString(WarehouseCountDraft.KEY, json).apply();
             restoredLocalDraft = false;
             restoredAt = 0;
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("ShomarshScreen:104", ignored); }
     }
 
     private void clearLocalDraft() {
         try {
             a.getSharedPreferences(WarehouseCountDraft.PREFS,
                     android.content.Context.MODE_PRIVATE).edit().remove(WarehouseCountDraft.KEY).apply();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("ShomarshScreen:111", ignored); }
         restoredLocalDraft = false;
         restoredAt = 0;
     }
@@ -179,7 +180,7 @@ public class ShomarshScreen extends Screen {
                     String time = new java.text.SimpleDateFormat("HH:mm", java.util.Locale.US)
                             .format(new java.util.Date(restoredAt));
                     recovered += " آخرین ذخیره: " + Money.fa(time) + ".";
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("ShomarshScreen:182", ignored); }
             }
             session.addView(a.kit.hint(recovered), a.kit.lp(-1, -2));
         } else {
@@ -407,7 +408,7 @@ public class ShomarshScreen extends Screen {
                         persistLocalDraft();
                         try {
                             box[0].dismiss();
-                        } catch (Exception ignored) { }
+                        } catch (Exception ignored) { Diag.ignored("ShomarshScreen:410", ignored); }
                         if (content != null) render(content);
                     }), a.kit.lp(-1, -2));
                 }
@@ -450,7 +451,7 @@ public class ShomarshScreen extends Screen {
                         results.addView(a.kit.btnGhost(label, Theme.GOLD, v -> {
                             try {
                                 box[0].dismiss();
-                            } catch (Exception ignored) { }
+                            } catch (Exception ignored) { Diag.ignored("ShomarshScreen:453", ignored); }
                             countedDialog(row.s("code"), row.s("name"),
                                     row.s("unit"), row.d("stock"));
                         }), a.kit.lp(-1, -2));
@@ -537,7 +538,7 @@ public class ShomarshScreen extends Screen {
                 persistLocalDraft();
                 try {
                     box[0].dismiss();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("ShomarshScreen:540", ignored); }
                 if (content != null) render(content);
                 double diff = c - stock;
                 if (!blindMode() && Math.abs(diff) > 0.001)

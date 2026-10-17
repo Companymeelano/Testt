@@ -27,15 +27,18 @@ public final class MoneyQueries {
         d.shmo = m.col("dar", "shmo", "SHMO");
         d.date = m.must("dar", "تاریخ", "date", "DATE");
         d.done = m.col("dar", "donedate", "done_date", "DoneDate");
-        d.desc = m.col("dar", "DarDesc", "darDesc", "description", "Explain");
-        d.cash = m.col("dar", "MabNaghdi", "mabNaghdi", "cash", "naghd");
-        d.pos = m.col("dar", "MabPos", "mabPos");
-        d.havaleh = m.col("dar", "MabHavaleh", "mabHavaleh");
-        d.cheque = m.col("dar", "SumMabcheck", "sumMabcheck", "MabCheck", "mabCheck");
-        d.chkCount = m.col("dar", "TedadChk", "tedadChk");
+        d.desc = null; // dar has no description column in the schema
+        // Verified against the attached Atiran schema (tools/atiran-money-structure.md).
+        // POS and transfer amounts are not header columns of dar: they come from PosDetails
+        // and havaleh through (ghno, p, Rdf_), handled in posDetailSum / darParts.
+        d.cash = m.col("dar", "naghd", "cash");
+        d.pos = null;
+        d.havaleh = null;
+        d.cheque = m.col("dar", "mabcheck");
+        d.chkCount = m.col("dar", "ted_chk");
         d.shfac = m.col("dar", "shfacfo", "shfac");
         d.kind = m.col("dar", "darDescriptionTypeID", "DescriptionReceiveId");
-        d.user = m.col("dar", "user", "UserName", "username");
+        d.user = m.col("dar", "UserID", "user");
         d.isFinal = m.col("dar", "IsFinal", "isFinal");
         return d;
     }
@@ -77,9 +80,12 @@ public final class MoneyQueries {
         boolean detailSide = p == 0 || p == 1;
         x.pos = detailSide ? posDetailSum(m, a, p, false, Sql.num(a, d.pos)) : Sql.num(a, d.pos);
         x.havaleh = detailSide ? posDetailSum(m, a, p, true, Sql.num(a, d.havaleh)) : Sql.num(a, d.havaleh);
-        x.cheque = chequeDetailSum(m, a, p, Sql.num(a, d.cheque));
-        x.chkCount = chequeDetailCount(m, a, p, d.chkCount == null
-                ? "CAST(0 AS bigint)" : "COALESCE(TRY_CONVERT(bigint," + a + ".[" + d.chkCount + "]),0)");
+        // Header is authoritative: naghd + mabcheck + POS reproduces dar.mab for every document
+        // on the attached backup (1186/1186). Detail sums matched only 30 of 54 documents, so
+        // they are not used for totals.
+        x.cheque = Sql.num(a, d.cheque);
+        x.chkCount = d.chkCount == null
+                ? "CAST(0 AS bigint)" : "COALESCE(TRY_CONVERT(bigint," + a + ".[" + d.chkCount + "]),0)";
         return x;
     }
 
@@ -175,20 +181,35 @@ public final class MoneyQueries {
             try (java.sql.ResultSet r = ps.executeQuery()) {
                 if (r.next() && r.getString(1) != null) day = r.getString(1).trim();
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MoneyQueries:184", ignored); }
         DarParts parts = darParts(m, d, "h", p);
         List<Object> binds = new ArrayList<>();
         binds.add(p);
         binds.add(day);
-        String sql = "SELECT " + Sql.lit(day) + " AS d, ISNULL(SUM(" + darTotal("h", d, m) + "),0) AS total"
-                + ", ISNULL(SUM(" + parts.cash + "),0) AS cash"
-                + ", ISNULL(SUM(" + parts.pos + "),0) AS pos"
-                + ", ISNULL(SUM(" + parts.havaleh + "),0) AS havaleh"
-                + ", ISNULL(SUM(" + parts.cheque + "),0) AS cheque"
-                + ", COUNT_BIG(1) AS count FROM dbo.dar h WHERE h.[p]=?"
-                + " AND " + Sql.dateKey(Sql.date10("h", d.date)) + "=?"
-                + Sql.activeAnd(cols, "h") + Sql.softAnd(cols, "h");
+        String rows = darRows(d, m, parts, cols,
+                "h.[p]=? AND " + Sql.dateKey(Sql.date10("h", d.date)) + "=?");
+        String sql = "SELECT " + Sql.lit(day) + " AS d, ISNULL(SUM(x.tot),0) AS total"
+                + ", ISNULL(SUM(x.cash),0) AS cash"
+                + ", ISNULL(SUM(x.pos),0) AS pos"
+                + ", ISNULL(SUM(x.havaleh),0) AS havaleh"
+                + ", ISNULL(SUM(x.cheque),0) AS cheque"
+                + ", COUNT_BIG(1) AS count FROM (" + rows + ") x";
         return new Queries.Q(sql, binds);
+    }
+
+    /**
+     * One row per voucher. The correlated detail lookups (PosDetails, getchk/putchk)
+     * are scalar subqueries; SQL Server rejects them inside SUM(). They therefore live
+     * in this derived table and every aggregate runs in the outer query.
+     */
+    private static String darRows(Dar d, Meta m, DarParts parts, Set<String> cols, String where) {
+        return "SELECT " + darTotal("h", d, m) + " AS tot"
+                + ", " + parts.cash + " AS cash"
+                + ", " + parts.pos + " AS pos"
+                + ", " + parts.havaleh + " AS havaleh"
+                + ", " + parts.cheque + " AS cheque"
+                + " FROM dbo.dar h WHERE " + where
+                + Sql.activeAnd(cols, "h") + Sql.softAnd(cols, "h");
     }
 
     /** Day block for an explicit Atiran «YYYY/MM/DD» (morning report): d,total,count. */
@@ -264,14 +285,14 @@ public final class MoneyQueries {
         if (!dc.isEmpty()) conds.add(dc);
         DarParts parts = darParts(m, d, "h", p);
         int breakdownAvailable = darBreakdownAvailable(m, d, p) ? 1 : 0;
-        return new Queries.Q("SELECT ISNULL(SUM(" + darTotal("h", d, m) + "),0) AS total"
-                + ", ISNULL(SUM(" + parts.cash + "),0) AS cash"
-                + ", ISNULL(SUM(" + parts.pos + "),0) AS pos"
-                + ", ISNULL(SUM(" + parts.havaleh + "),0) AS havaleh"
-                + ", ISNULL(SUM(" + parts.cheque + "),0) AS cheque"
+        String rows = darRows(d, m, parts, cols, Sql.join(conds, " AND "));
+        return new Queries.Q("SELECT ISNULL(SUM(x.tot),0) AS total"
+                + ", ISNULL(SUM(x.cash),0) AS cash"
+                + ", ISNULL(SUM(x.pos),0) AS pos"
+                + ", ISNULL(SUM(x.havaleh),0) AS havaleh"
+                + ", ISNULL(SUM(x.cheque),0) AS cheque"
                 + ", CAST(" + breakdownAvailable + " AS int) AS breakdownAvailable"
-                + ", COUNT_BIG(1) AS count FROM dbo.dar h WHERE " + Sql.join(conds, " AND ")
-                + Sql.activeAnd(cols, "h") + Sql.softAnd(cols, "h"), binds);
+                + ", COUNT_BIG(1) AS count FROM (" + rows + ") x", binds);
     }
 
     /** Voucher list: ghno,date,code,customer,total,cash,pos,havaleh,cheque,chkCount,desc,kind,linkNo,multiCount. */
@@ -310,13 +331,46 @@ public final class MoneyQueries {
                 + ", " + darKindExpr(m, "h", d) + " AS kind"
                 + ", " + (d.shfac == null ? "CAST(NULL AS nvarchar(80))" : Sql.txt("h", d.shfac, 80)) + " AS linkNo"
                 + ", " + (hasMulti ? "ISNULL(mc.cnt,0)" : "CAST(0 AS int)") + " AS multiCount"
+                + ", " + registrantExpr(m, d) + " AS username"
                 + " FROM dbo.dar h" + Queries.custJoin(m, "h", d.shmo, "cu")
                 + (hasMulti ? " LEFT JOIN (SELECT [" + multiGh + "] g, COUNT_BIG(1) cnt FROM dbo.[" + multi + "] GROUP BY [" + multiGh + "]) mc"
                 + " ON TRY_CONVERT(nvarchar(60),mc.g)=TRY_CONVERT(nvarchar(60),h.[" + d.ghno + "])" : "")
+                + (registrantApply(m, d) == null ? "" : registrantApply(m, d))
                 + where + Sql.activeAnd(cols, "h") + Sql.softAnd(cols, "h")
                 + " ORDER BY h.[" + d.date + "] DESC, h.[" + d.ghno + "] DESC"
                 + Queries.pageClause(binds, f.page, f.top);
         return new Queries.Q(sql, binds);
+    }
+
+    /**
+     * Registrant of a receipt. dar.UserID is the Atiran user id; the name lives in sys_users
+     * (fname + lname, else user_name). OUTER APPLY with TOP (1) gives exactly one row per
+     * receipt, so a duplicated user row can never duplicate a receipt. Returns null when the
+     * user table or column is missing, so the receipt still loads without a name.
+     */
+    static String registrantApply(Meta m, Dar d) {
+        return registrantApplyFor(m, d.user);
+    }
+
+    /** Same join for any header table whose alias is «h» and whose user column is {@code userCol}. */
+    static String registrantApplyFor(Meta m, String userCol) {
+        if (userCol == null || !m.table("sys_users")) return null;
+        String id = m.col("sys_users", "user_id", "UserID", "userid");
+        if (id == null) return null;
+        String fname = m.col("sys_users", "user_fname");
+        String lname = m.col("sys_users", "user_lname");
+        String uname = m.col("sys_users", "user_name", "Username", "username");
+        String fn = fname == null ? "N''" : "COALESCE(" + Sql.txt("su", fname, 100) + ",N'')";
+        String ln = lname == null ? "N''" : "COALESCE(" + Sql.txt("su", lname, 100) + ",N'')";
+        String full = "NULLIF(LTRIM(RTRIM(" + fn + "+N' '+" + ln + ")),N'')";
+        String name = uname == null ? full : "COALESCE(" + full + "," + Sql.txt("su", uname, 120) + ")";
+        return " OUTER APPLY (SELECT TOP (1) " + name + " AS regName FROM " + m.qTable("sys_users") + " su"
+                + " WHERE TRY_CONVERT(nvarchar(60),su.[" + id + "])=TRY_CONVERT(nvarchar(60),h.[" + userCol + "])) ru";
+    }
+
+    /** SQL expression for the registrant name (empty string when unavailable). */
+    static String registrantExpr(Meta m, Dar d) {
+        return registrantApply(m, d) == null ? "N''" : "COALESCE(ru.regName,N'')";
     }
 
     /** Voucher header: all fields + customer + kind + done date. */
@@ -337,10 +391,11 @@ public final class MoneyQueries {
                 + ", " + parts.chkCount + " AS chkCount"
                 + ", " + (d.desc == null ? "N''" : "COALESCE(" + Sql.txt("h", d.desc, 500) + ",N'')") + " AS descrip"
                 + ", " + darKindExpr(m, "h", d) + " AS kind"
-                + ", " + (d.user == null ? "N''" : "COALESCE(" + Sql.txt("h", d.user, 120) + ",N'')") + " AS username"
+                + ", " + registrantExpr(m, d) + " AS username"
                 + ", " + (d.isFinal == null ? "N''" : "COALESCE(" + Sql.txt("h", d.isFinal, 10) + ",N'')") + " AS isFinal"
                 + ", " + (d.shfac == null ? "CAST(NULL AS nvarchar(80))" : Sql.txt("h", d.shfac, 80)) + " AS linkNo"
                 + " FROM dbo.dar h" + Queries.custJoin(m, "h", d.shmo, "cu")
+                + (registrantApply(m, d) == null ? "" : registrantApply(m, d))
                 + " WHERE h.[p]=? AND TRY_CONVERT(nvarchar(60),h.[" + d.ghno + "])=?";
         return new Queries.Q(sql, binds);
     }
@@ -394,7 +449,9 @@ public final class MoneyQueries {
                 + ", " + (c.getdate == null ? "CAST(NULL AS nvarchar(10))" : chequeDateDisplay("c", c.getdate)) + " AS getdate"
                 + ", " + (c.st == null ? "N''" : "COALESCE(" + Sql.txt("c", c.st, 40) + ",N'')") + " AS st"
                 + ", " + (c.back == null ? "N''" : "COALESCE(" + Sql.txt("c", c.back, 10) + ",N'')") + " AS back"
-                + " FROM " + c.from + " c WHERE TRY_CONVERT(nvarchar(60),c.[" + c.ghno + "])=?" + order, binds);
+                + " FROM " + c.from + " c WHERE TRY_CONVERT(nvarchar(60),c.[" + c.ghno + "])=?"
+                + (c.pCol == null ? "" : " AND TRY_CONVERT(int,c.[" + c.pCol + "])=" + (p == 0 ? 0 : 1))
+                + order, binds);
     }
 
     /** Invoices settled by a voucher: no,date,customer,total,paidSettled. */
@@ -479,7 +536,8 @@ public final class MoneyQueries {
         if (!m.table("PosDetails")) throw new Queries.Missing("«جزئیات کارت/حواله» در دیتابیس پیدا نشد");
         String amount = m.must("PosDetails", "مبلغ", "MabPos", "mabPos", "mablagh");
         String bankRef = m.must("PosDetails", "بانک", "PosBankRdf", "BankRdf", "bankrdf");
-        String date = m.col("PosDetails", "date", "Date", "done_date", "DoneDate");
+        // PosDetails has no date column: the date comes from the parent dar voucher (ghno,p).
+        String date = m.col("dar", "date");
         String gh = m.col("PosDetails", "ghno", "GHNO");
         String pp = m.col("PosDetails", "p");
         String hav = m.col("PosDetails", "IsHavaleh", "isHavaleh");
@@ -496,14 +554,26 @@ public final class MoneyQueries {
         if (p >= 0 && pp != null) { conds.add("d.[" + pp + "]=?"); binds.add(p); }
         String latest = posLatestVersionCondition(m, "d", gh, pp, hav);
         if (!latest.isEmpty()) conds.add(latest);
-        if (date != null) {
-            String dc = Sql.dateCond(Sql.date10("d", date), f.from, f.to, binds);
+        String darApply = "";
+        String darGh = m.col("dar", "ghno");
+        String darP = m.col("dar", "p");
+        String darRdf = m.col("dar", "Rdf_");
+        if (date != null && darGh != null && darP != null && gh != null && pp != null) {
+            // One dar row per voucher (latest Rdf_ revision), matched on ghno and p.
+            darApply = " OUTER APPLY (SELECT TOP (1) dh.[" + date + "] AS vdate FROM dbo.dar dh"
+                    + " WHERE TRY_CONVERT(nvarchar(60),dh.[" + darGh + "])=TRY_CONVERT(nvarchar(60),d.[" + gh + "])"
+                    + " AND TRY_CONVERT(int,dh.[" + darP + "])=TRY_CONVERT(int,d.[" + pp + "])"
+                    + " ORDER BY " + (darRdf == null ? "(SELECT NULL)" : "TRY_CONVERT(bigint,dh.[" + darRdf + "]) DESC") + ") dv";
+        }
+        if (!darApply.isEmpty()) {
+            // Without the dar relation the date filter is skipped rather than applied to a non-existent column.
+            String dc = Sql.dateCond(Sql.date10("dv", "vdate"), f.from, f.to, binds);
             if (!dc.isEmpty()) conds.add(dc);
         }
         String where = conds.isEmpty() ? "" : " WHERE " + Sql.join(conds, " AND ");
         return new Queries.Q("SELECT " + label + " AS bank, " + kind + " AS kind"
                 + ", ISNULL(SUM(" + Sql.num("d", amount) + "),0) AS total"
-                + ", COUNT_BIG(1) AS count FROM dbo.PosDetails d" + join + where
+                + ", COUNT_BIG(1) AS count FROM dbo.PosDetails d" + join + darApply + where
                 + " GROUP BY " + label + ", " + kind + " ORDER BY 3 DESC", binds);
     }
 
@@ -570,6 +640,7 @@ public final class MoneyQueries {
         String table, from, amount, num, bank, branch, acc, sardate, getdate, st, back, ourBank, ghno;
         String shmo, sayad, desc, kharjTo, kharjDate, naghdDate, typeId, typeName;
         String custName, custCode, statusLabel;
+        String pCol; // getchk.p: voucher type (0 receipt, 1 payment); must match dar.p
         boolean isView;
     }
 
@@ -608,7 +679,10 @@ public final class MoneyQueries {
             c.shmo = m.col(use, "shmo");
             c.sayad = m.col(use, "ShenaseSayad");
             c.desc = m.col(use, "getchkdis", "Description", "DisGetCheck");
-            c.ghno = m.col(use, "ghno");
+            // Verified on the attached backup: getchk.GhnoPardakht + p reference dar(ghno, p).
+            // getchk.ghno alone links only 37 of 159 rows, so it is not the voucher key.
+            c.ghno = m.col(use, "GhnoPardakht", "ghno");
+            c.pCol = m.col(use, "p");
             c.kharjTo = m.col(use, "kharj_shmo");
             c.kharjDate = m.col(use, "kharj_date", "kharj_done_date");
             c.naghdDate = m.col(use, "naghddate", "naghddonedate");
@@ -733,13 +807,15 @@ public final class MoneyQueries {
     /** Grouped statuses for bucket cards: st,back,hasBank,count,total. */
     public static Queries.Q chequeGroups(Meta m, boolean incoming, Filter f) throws Queries.Missing {
         Chq c = chq(m, incoming);
-        if (c.getdate == null)
-            throw new Queries.Missing("ستون تاریخ دریافت/صدور در «" + AtiranSchema.faTitle(c.table) + "» پیدا نشد");
+        // Lists and buckets are ordered/filtered by DUE date (سررسید); receipt/issue date is the fallback.
+        String listDate = c.sardate != null ? c.sardate : c.getdate;
+        if (listDate == null)
+            throw new Queries.Missing("ستون تاریخ سررسید/دریافت در «" + AtiranSchema.faTitle(c.table) + "» پیدا نشد");
         List<Object> binds = new ArrayList<>();
         List<String> conds = new ArrayList<>();
-        if (c.getdate != null) {
+        {
             // Match Jalali text, Gregorian datetime, and bare-digit Atiran date variants.
-            String dc = chequeDateRange("h", c.getdate, f.from, f.to, binds);
+            String dc = chequeDateRange("h", listDate, f.from, f.to, binds);
             if (!dc.isEmpty()) conds.add(dc);
         }
         String bankFilter = chequeBankFilter(c, f.bank, binds);
@@ -775,13 +851,15 @@ public final class MoneyQueries {
      */
     public static Queries.Q chequeList(Meta m, boolean incoming, Filter f, String bucket) throws Queries.Missing {
         Chq c = chq(m, incoming);
-        if (c.getdate == null)
-            throw new Queries.Missing("ستون تاریخ دریافت/صدور در «" + AtiranSchema.faTitle(c.table) + "» پیدا نشد");
+        // Lists and buckets are ordered/filtered by DUE date (سررسید); receipt/issue date is the fallback.
+        String listDate = c.sardate != null ? c.sardate : c.getdate;
+        if (listDate == null)
+            throw new Queries.Missing("ستون تاریخ سررسید/دریافت در «" + AtiranSchema.faTitle(c.table) + "» پیدا نشد");
         List<Object> binds = new ArrayList<>();
         List<String> conds = new ArrayList<>();
-        if (c.getdate != null) {
+        {
             // Match Jalali text, Gregorian datetime, and bare-digit Atiran date variants.
-            String dc = chequeDateRange("h", c.getdate, f.from, f.to, binds);
+            String dc = chequeDateRange("h", listDate, f.from, f.to, binds);
             if (!dc.isEmpty()) conds.add(dc);
         }
         String st = "LTRIM(RTRIM(TRY_CONVERT(nvarchar(40),h.[" + c.st + "])))";

@@ -147,7 +147,7 @@ public final class SmartLink {
     public static List<Cand> allSaved(Settings s) {
         try {
             s.migrateLegacyHost();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("SmartLink:150", ignored); }
         List<Cand> out = new ArrayList<>();
         if (!s.lan().isEmpty()) out.add(new Cand(LAN, s.lan()));
         if (!s.wan().isEmpty() && !sameHost(s.wan(), s.lan())) out.add(new Cand(WAN, s.wan()));
@@ -186,7 +186,7 @@ public final class SmartLink {
                         s.effUser(), s.effPass(), 1500, 5, false);
                 try {
                     s.setLinkLast(k.kind);
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("SmartLink:189", ignored); }
                 return conn;
             } catch (Exception e) {
                 fails.add(kindShort(k.kind) + ": " + Atiran.diagnose(e));
@@ -274,7 +274,7 @@ public final class SmartLink {
             MAIN.post(() -> {
                 try {
                     cb.done(r);
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("SmartLink:277", ignored); }
             });
         }).start();
     }
@@ -295,7 +295,7 @@ public final class SmartLink {
             MAIN.post(() -> {
                 try {
                     cb.done(r);
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("SmartLink:298", ignored); }
             });
         }).start();
     }
@@ -419,7 +419,7 @@ public final class SmartLink {
         } finally {
             try {
                 conn.close();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("SmartLink:422", ignored); }
         }
         return p;
     }

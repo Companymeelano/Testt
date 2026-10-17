@@ -1,5 +1,6 @@
 package ir.meelano.manager.screens;
 
+import ir.meelano.manager.core.Diag;
 import android.app.AlertDialog;
 import android.view.View;
 import android.widget.EditText;
@@ -163,7 +164,7 @@ public class TakmilScreen extends Screen {
             boolean direct = false;
             try {
                 direct = a.settings.whDirect();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("TakmilScreen:166", ignored); }
             if (!direct) {
                 a.kit.toast("ثبت مستقیم از تنظیمات خاموش است");
                 return;
@@ -171,7 +172,7 @@ public class TakmilScreen extends Screen {
             if (!readPrices(ls, priceEdits, true)) return;
             try {
                 box[0].dismiss();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("TakmilScreen:174", ignored); }
             postCompleted(d);
         }), a.kit.lp(-1, -2));
         ScrollView sv = new ScrollView(a);
@@ -194,7 +195,7 @@ public class TakmilScreen extends Screen {
                 try {
                     p = Double.parseDouble(
                             Money.en(edits.get(i).getText().toString()).trim());
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("TakmilScreen:197", ignored); }
                 if (strict && p <= 0) {
                     a.kit.toast("فی قلم " + Money.fa(String.valueOf(i + 1)) + " وارد نشده");
                     return false;
@@ -237,7 +238,7 @@ public class TakmilScreen extends Screen {
                         if (w.startsWith("TOTAL:")) {
                             try {
                                 total = Double.parseDouble(w.substring(6));
-                            } catch (Exception ignored) { }
+                            } catch (Exception ignored) { Diag.ignored("TakmilScreen:240", ignored); }
                         }
                         if (w.startsWith("DOCNO:")) docNo = w.substring(6);
                     }
@@ -272,7 +273,7 @@ public class TakmilScreen extends Screen {
                     try {
                         q = Double.parseDouble(Money.en(ln.optString(WarehouseWriter.L_QTY, "0")));
                         p = ln.optDouble(WarehouseWriter.L_PRICE, 0);
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("TakmilScreen:275", ignored); }
                     Row r = new Row();
                     r.put("name", ln.optBoolean(WarehouseWriter.L_NEW, false)
                             ? ln.optString(WarehouseWriter.L_NNAME, "")

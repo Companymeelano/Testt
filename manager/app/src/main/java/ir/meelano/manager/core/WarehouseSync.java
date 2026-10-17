@@ -75,7 +75,7 @@ public final class WarehouseSync {
                             d.put("approvalSync", "done");
                             WarehouseWriter.saveDraft(a, d);
                             countDone++;
-                        } catch (Exception ignored) { }
+                        } catch (Exception ignored) { Diag.ignored("WarehouseSync:78", ignored); }
                     }
                 }
                 if (listener != null) listener.done(handDone, countDone, pendingCount(a),
@@ -106,7 +106,7 @@ public final class WarehouseSync {
                     WarehouseWriter.saveDraft(a, d);
                 }
                 out.add(d);
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("WarehouseSync:109", ignored); }
         }
         return out;
     }

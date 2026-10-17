@@ -1,5 +1,6 @@
 package ir.meelano.manager.ui;
 
+import ir.meelano.manager.core.Diag;
 import android.app.AlertDialog;
 import android.view.Gravity;
 import android.view.View;
@@ -101,7 +102,7 @@ public final class FilterSheet {
                     search.setCompoundDrawablesRelative(ic, null, null, null);
                     search.setCompoundDrawablePadding(Theme.dp(8));
                 }
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("FilterSheet:104", ignored); }
             search.setPadding(Theme.dp(14), Theme.dp(10), Theme.dp(14), Theme.dp(10));
             search.setSingleLine(true);
             search.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
@@ -123,7 +124,7 @@ public final class FilterSheet {
                         search.setSelection(search.getText().length());
                         pendingSearch[0] = t == null ? "" : t;
                     });
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("FilterSheet:126", ignored); }
             });
             sRow.addView(mic, new LinearLayout.LayoutParams(Theme.dp(52), Theme.dp(50)));
             root.addView(sRow, kit.lp(-1, -2));
@@ -162,10 +163,7 @@ public final class FilterSheet {
                 }
             };
             // chips (manual, to control re-render)
-            android.widget.HorizontalScrollView sv = new android.widget.HorizontalScrollView(kit.a);
-            sv.setHorizontalScrollBarEnabled(false);
-            final LinearLayout[] rowHolder = {kit.h()};
-            sv.addView(rowHolder[0], new android.widget.HorizontalScrollView.LayoutParams(-2, -2));
+            final FlowRow[] rowHolder = {new FlowRow(kit.a)};
             final Runnable paintChips = new Runnable() {
                 @Override
                 public void run() {
@@ -192,7 +190,7 @@ public final class FilterSheet {
                 }
             };
             paintChips.run();
-            root.addView(sv, kit.lp(-1, -2));
+            root.addView(rowHolder[0], kit.lp(-1, -2));
             root.addView(customBox, kit.lp(-1, -2));
             renderCustom.run();
             root.addView(kit.gap(6));
@@ -210,10 +208,7 @@ public final class FilterSheet {
         if (cfg.status != null && cfg.status.length > 0) {
             root.addView(kit.text(cfg.statusTitle, 12.5f, Theme.GOLD_SOFT, true), kit.lp(-1, -2));
             root.addView(kit.gap(6));
-            android.widget.HorizontalScrollView s2 = new android.widget.HorizontalScrollView(kit.a);
-            s2.setHorizontalScrollBarEnabled(false);
-            final LinearLayout rr = kit.h();
-            s2.addView(rr, new android.widget.HorizontalScrollView.LayoutParams(-2, -2));
+            final FlowRow rr = new FlowRow(kit.a);
             final Runnable paint = new Runnable() {
                 @Override
                 public void run() {
@@ -234,7 +229,7 @@ public final class FilterSheet {
                 }
             };
             paint.run();
-            root.addView(s2, kit.lp(-1, -2));
+            root.addView(rr, kit.lp(-1, -2));
             root.addView(kit.gap(8));
         }
 
@@ -242,10 +237,7 @@ public final class FilterSheet {
         if (cfg.sort != null && cfg.sort.length > 0) {
             root.addView(kit.text(cfg.sortTitle, 12.5f, Theme.GOLD_SOFT, true), kit.lp(-1, -2));
             root.addView(kit.gap(6));
-            android.widget.HorizontalScrollView s3 = new android.widget.HorizontalScrollView(kit.a);
-            s3.setHorizontalScrollBarEnabled(false);
-            final LinearLayout rs = kit.h();
-            s3.addView(rs, new android.widget.HorizontalScrollView.LayoutParams(-2, -2));
+            final FlowRow rs = new FlowRow(kit.a);
             final Runnable paint = new Runnable() {
                 @Override
                 public void run() {
@@ -266,7 +258,7 @@ public final class FilterSheet {
                 }
             };
             paint.run();
-            root.addView(s3, kit.lp(-1, -2));
+            root.addView(rs, kit.lp(-1, -2));
             root.addView(kit.gap(8));
         }
 
@@ -314,10 +306,7 @@ public final class FilterSheet {
             @Override
             public void ok(List<Row> rows) {
                 box.removeAllViews();
-                android.widget.HorizontalScrollView sv = new android.widget.HorizontalScrollView(kit.a);
-                sv.setHorizontalScrollBarEnabled(false);
-                final LinearLayout r = kit.h();
-                sv.addView(r, new android.widget.HorizontalScrollView.LayoutParams(-2, -2));
+                final FlowRow r = new FlowRow(kit.a);
                 final Runnable paint = new Runnable() {
                     @Override
                     public void run() {
@@ -347,7 +336,7 @@ public final class FilterSheet {
                     }
                 };
                 paint.run();
-                box.addView(sv, kit.lp(-1, -2));
+                box.addView(r, kit.lp(-1, -2));
             }
 
             @Override
@@ -413,14 +402,14 @@ public final class FilterSheet {
             String[] disp = new String[count];
             for (int i = 0; i < count; i++) disp[i] = Money.fa(String.valueOf(min + i));
             p.setDisplayedValues(disp);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("FilterSheet:404", ignored); }
         try {
             for (int i = 0; i < p.getChildCount(); i++) {
                 android.view.View ch = p.getChildAt(i);
                 if (ch instanceof android.widget.EditText)
                     ((android.widget.EditText) ch).setTextColor(Theme.TEXT);
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("FilterSheet:411", ignored); }
         return p;
     }
 

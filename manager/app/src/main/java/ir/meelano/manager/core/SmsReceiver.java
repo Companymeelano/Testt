@@ -75,7 +75,7 @@ public class SmsReceiver extends BroadcastReceiver {
             LicenseStore.addPendingSms(app, pack, card);
             ping(app, ctx);
             // v31: activation applies silently — no notification, no noise.
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("SmsReceiver:78", ignored); }
     }
 
     /** Reassemble the (possibly multipart) SMS body. */
@@ -115,7 +115,7 @@ public class SmsReceiver extends BroadcastReceiver {
                     if (r.ok) return r.pack;
                 }
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("SmsReceiver:118", ignored); }
         return null;
     }
 
@@ -124,7 +124,7 @@ public class SmsReceiver extends BroadcastReceiver {
             Intent ping = new Intent(ACTION_INTERNAL);
             ping.setPackage(ctx.getPackageName());
             ctx.sendBroadcast(ping);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("SmsReceiver:127", ignored); }
     }
 
     private static String findLine(String body, String prefix) {
@@ -133,7 +133,7 @@ public class SmsReceiver extends BroadcastReceiver {
                 String line = raw.trim();
                 if (line.startsWith(prefix + "|")) return line;
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("SmsReceiver:136", ignored); }
         return null;
     }
 
@@ -145,7 +145,7 @@ public class SmsReceiver extends BroadcastReceiver {
                 if (line.startsWith(License.DB_PREFIX + "|")) return line;
                 if (line.startsWith(License.NET_PREFIX + "|")) return line;
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("SmsReceiver:148", ignored); }
         return null;
     }
 
@@ -160,7 +160,7 @@ public class SmsReceiver extends BroadcastReceiver {
                 try {
                     nm.createNotificationChannel(new NotificationChannel("milano_sms",
                             "پیامک میلانو", NotificationManager.IMPORTANCE_HIGH));
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("SmsReceiver:163", ignored); }
             }
             Intent i = new Intent(app, LicenseActivity.class);
             i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
@@ -176,7 +176,7 @@ public class SmsReceiver extends BroadcastReceiver {
                     .setAutoCancel(true)
                     .setContentIntent(pi);
             nm.notify(7702, nb.build());
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("SmsReceiver:179", ignored); }
     }
 
 

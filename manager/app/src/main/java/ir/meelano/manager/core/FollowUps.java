@@ -68,7 +68,7 @@ public final class FollowUps {
                 if (date.isEmpty()) continue;
                 out.add(new Note(date, unesc(p[1]), unesc(p[2])));
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("FollowUps:71", ignored); }
         return out;
     }
 
@@ -83,7 +83,7 @@ public final class FollowUps {
                 b.append(n.date).append('|').append(esc(n.name)).append('|').append(esc(n.text));
             }
             prefs(c).edit().putString(key(code), b.toString()).apply();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("FollowUps:86", ignored); }
     }
 
     public static void remove(Context c, String code, int idx) {
@@ -101,7 +101,7 @@ public final class FollowUps {
                 b.append(n.date).append('|').append(esc(n.name)).append('|').append(esc(n.text));
             }
             prefs(c).edit().putString(key(code), b.toString()).apply();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("FollowUps:104", ignored); }
     }
 
     /** Notes due today or overdue, oldest first. */
@@ -124,7 +124,7 @@ public final class FollowUps {
                     return a.note.date.compareTo(b.note.date);
                 }
             });
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("FollowUps:127", ignored); }
         return out;
     }
 }

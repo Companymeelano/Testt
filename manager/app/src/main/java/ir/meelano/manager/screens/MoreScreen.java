@@ -11,6 +11,7 @@ import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.core.AtiranAuth;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.RoleStore;
+import ir.meelano.manager.ui.Card3D;
 import ir.meelano.manager.ui.MeelanoIcons;
 import ir.meelano.manager.ui.Theme;
 
@@ -103,11 +104,17 @@ public class MoreScreen extends Screen {
         super(a);
     }
 
+    /** Hub segments: 0 = reports (default), 1 = all sections. The assistant has its own home icon. */
+    private static final int SEG_REPORTS = 0, SEG_ALL = 1;
+    private static final String[] SEG_LABELS = {"📊 گزارش‌ها", "▦ همه بخش‌ها"};
+    private int seg = SEG_REPORTS;
+
     @Override public String id() { return "more"; }
-    @Override public String title() { return "همه بخش‌ها"; }
-    @Override public String glyph() { return "▦"; }
+    @Override public String title() { return "اتاق فرمان"; }
+    @Override public String glyph() { return "▣"; }
     @Override public int accent() { return Theme.GOLD; }
 
+    /** The command room: reports and every section in one place. */
     @Override
     public void render(final LinearLayout content) {
         contentRef = content;
@@ -117,12 +124,96 @@ public class MoreScreen extends Screen {
             expandedGroup = RoleStore.WAREHOUSE.equals(role) ? "stock" : "operations";
         }
         content.removeAllViews();
-        content.addView(a.kit.hero("▦", "مرکز دسترسی",
-                "بخش‌ها به تفکیک کار • فقط گزینه‌های مجازِ نقش شما", Theme.GOLD), a.kit.lp(-1, -2));
+        content.addView(a.kit.hero("▣", "اتاق فرمان",
+                "گزارش‌ها و همهٔ بخش‌ها در یک جا", Theme.GOLD), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
+
+        LinearLayout segRow = a.kit.h();
+        for (int i = 0; i < SEG_LABELS.length; i++) {
+            final int idx = i;
+            boolean on = seg == i;
+            segRow.addView(a.kit.chip(SEG_LABELS[i], on, Theme.GOLD, v -> {
+                seg = idx;
+                render(contentRef);
+            }), a.kit.wlp(1f));
+        }
+        content.addView(segRow, a.kit.lp(-1, -2));
+        content.addView(a.kit.gap(10));
+
+        LinearLayout inner = a.kit.v();
+        content.addView(inner, a.kit.lp(-1, -2));
+        if (seg == SEG_REPORTS) {
+            renderReportsHub(inner);
+        } else {
+            renderAll(inner);
+        }
+    }
+
+    private static final String[][] REPORT_GROUPS = {
+            {"فروش", "🧾"}, {"خرید", "🧺"}, {"دریافت و پرداخت", "💰"}, {"چک‌ها", "📝"},
+            {"کالا و انبار", "📦"}, {"مشتریان", "👥"}, {"ویزیتورها", "🚚"}, {"سود و زیان", "📈"},
+            {"برگشتی و ابطالی", "↩"}, {"هوشمند", "✦"}, {"سرفصل‌ها", "🗂"}
+    };
+
+    private void renderReportsHub(LinearLayout c) {
+        c.addView(a.kit.hint("یک بخش را انتخاب کنید تا گزارش‌های همان بخش باز شود."), a.kit.lp(-1, -2));
+        c.addView(a.kit.gap(8));
+        for (int i = 0; i < REPORT_GROUPS.length; i += 2) {
+            LinearLayout row = a.kit.h();
+            row.addView(groupTile(REPORT_GROUPS[i]), a.kit.wlp(1f));
+            row.addView(a.kit.space(8));
+            if (i + 1 < REPORT_GROUPS.length) row.addView(groupTile(REPORT_GROUPS[i + 1]), a.kit.wlp(1f));
+            else row.addView(a.kit.space(0), a.kit.wlp(1f));
+            c.addView(row, a.kit.lp(-1, -2));
+            c.addView(a.kit.gap(8));
+        }
+        c.addView(a.kit.btnGold("▤ همهٔ گزارش‌ها", v -> a.nav("reports")), a.kit.lp(-1, -2));
+    }
+
+    /** Two-line card tile: long section names wrap instead of being cut off. */
+    private View groupTile(final String[] group) {
+        int accent = groupColor(group[0]);
+        LinearLayout tile = a.kit.card(accent);
+        // A row: badge on the start side, the label beside it. (The card is vertical by default.)
+        tile.setOrientation(LinearLayout.HORIZONTAL);
+        tile.setGravity(Gravity.CENTER_VERTICAL);
+        tile.setMinimumHeight(Theme.dp(60));
+        tile.setPadding(Theme.dp(10), Theme.dp(10), Theme.dp(10), Theme.dp(10));
+        tile.addView(iconBadge(group[1], accent, 36), new LinearLayout.LayoutParams(Theme.dp(36), Theme.dp(36)));
+        tile.addView(a.kit.space(8));
+        TextView label = a.kit.text(group[0], 12.5f, Theme.TEXT, true);
+        label.setMaxLines(2);
+        label.setEllipsize(TextUtils.TruncateAt.END);
+        tile.addView(label, a.kit.wlp(1f));
+        tile.setContentDescription(group[0] + "؛ باز کردن گزارش‌ها");
+        Theme.pressable(tile);
+        tile.setOnClickListener(v -> {
+            ReportsScreen.pendingCategory = group[0];
+            a.nav("reports");
+        });
+        return tile;
+    }
+
+    /** Fixed colours for report groups: sales and purchases stand out from the theme gold. */
+    private static int groupColor(String group) {
+        if ("فروش".equals(group)) return Theme.SALES_HUE;
+        if ("خرید".equals(group)) return Theme.BUY_HUE;
+        if ("دریافت و پرداخت".equals(group)) return Theme.SUCCESS;
+        if ("چک‌ها".equals(group)) return Theme.INFO;
+        if ("کالا و انبار".equals(group)) return Theme.VIOLET;
+        if ("مشتریان".equals(group)) return Theme.GOLD;
+        if ("ویزیتورها".equals(group)) return Theme.WARNING;
+        if ("سود و زیان".equals(group)) return Theme.GOLD_SOFT;
+        if ("برگشتی و ابطالی".equals(group)) return Theme.DANGER;
+        return Theme.STEEL;
+    }
+
+    /** «همه بخش‌ها»: searchable, role-filtered list of every section. */
+    private void renderAll(final LinearLayout content) {
+        content.removeAllViews();
         content.addView(a.kit.searchBar("جست‌وجوی بخش یا کار…", searchText, q -> {
             searchText = q == null ? "" : q.trim();
-            render(contentRef);
+            renderAll(content);
         }), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
 
@@ -223,7 +314,7 @@ public class MoreScreen extends Screen {
         if ("tv".equals(entry.id)) {
             title = "تلویزیون فروشگاه";
             glyph = "📺";
-            accent = Theme.TEAL;
+            accent = Theme.GOLD;
         } else {
             Screen destination = a.screen(entry.id);
             if (destination == null) return a.kit.space(1);
@@ -308,7 +399,7 @@ public class MoreScreen extends Screen {
     private int groupAccent(String accent) {
         if ("success".equals(accent)) return Theme.SUCCESS;
         if ("info".equals(accent)) return Theme.INFO;
-        if ("teal".equals(accent)) return Theme.TEAL;
+        if ("teal".equals(accent)) return Theme.GOLD;
         if ("steel".equals(accent)) return Theme.STEEL;
         return Theme.GOLD;
     }

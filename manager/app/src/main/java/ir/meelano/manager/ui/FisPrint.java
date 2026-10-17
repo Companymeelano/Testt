@@ -1,5 +1,6 @@
 package ir.meelano.manager.ui;
 
+import ir.meelano.manager.core.Diag;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
@@ -123,7 +124,7 @@ public final class FisPrint {
             try {
                 try {
                     BluetoothAdapter.getDefaultAdapter().cancelDiscovery();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("FisPrint:126", ignored); }
                 sock = dev.createRfcommSocketToServiceRecord(SPP);
                 sock.connect();
                 OutputStream out = sock.getOutputStream();
@@ -131,15 +132,15 @@ public final class FisPrint {
                 out.flush();
                 try {
                     Thread.sleep(400);
-                } catch (InterruptedException ignored) { }
+                } catch (InterruptedException ignored) { Diag.ignored("FisPrint:134", ignored); }
                 try {
                     sock.close();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("FisPrint:137", ignored); }
                 a.runOnUiThread(() -> a.kit.toast("فیش چاپ شد ✓"));
             } catch (Exception e) {
                 try {
                     if (sock != null) sock.close();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("FisPrint:142", ignored); }
                 a.runOnUiThread(() -> a.kit.toast("اتصال به چاپگر ممکن نشد"));
             }
         }).start();

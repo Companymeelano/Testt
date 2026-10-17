@@ -1,0 +1,115 @@
+{
+  "note": "counts only, no business data",
+  "dar_rows": [
+    [
+      "1186"
+    ]
+  ],
+  "dar_p_values": [
+    [
+      "0",
+      "1007"
+    ],
+    [
+      "1",
+      "179"
+    ]
+  ],
+  "posdetails_isHavaleh_values": [
+    [
+      "0",
+      "809"
+    ],
+    [
+      "1",
+      "406"
+    ]
+  ],
+  "mab_reconstruction": [
+    [
+      "1186",
+      "155",
+      "1186",
+      "461",
+      "461",
+      "876",
+      "155"
+    ]
+  ],
+  "p_vs_voucher_tables": [
+    [
+      "ghabz_e_daryaft",
+      "1",
+      "155",
+      "1"
+    ],
+    [
+      "ghabz_e_daryaft",
+      "0",
+      "978",
+      "967"
+    ],
+    [
+      "ghabz_e_pardakht",
+      "0",
+      "157",
+      "1"
+    ],
+    [
+      "ghabz_e_pardakht",
+      "1",
+      "175",
+      "153"
+    ]
+  ],
+  "cheques_link": [
+    [
+      "getchk_fullkey",
+      "18",
+      "7",
+      "7"
+    ]
+  ],
+  "putchk_link": [
+    [
+      "putchk_ghno_rdf",
+      "19",
+      "9"
+    ]
+  ],
+  "cheque_variants": [
+    [
+      "docs_with_mabcheck",
+      "125"
+    ],
+    [
+      "getchk_rows",
+      "159"
+    ],
+    [
+      "getchk_rows_linked_by_ghno_p",
+      "37"
+    ],
+    [
+      "getchk_rows_linked_by_GhnoPardakht_p",
+      "140"
+    ]
+  ],
+  "cheque_amount_variants": [
+    [
+      "getchk_by_ghno_p",
+      "22",
+      "6"
+    ],
+    [
+      "getchk_by_GhnoPardakht_p",
+      "54",
+      "30"
+    ],
+    [
+      "putchk_by_ghno_p1",
+      "10",
+      "8"
+    ]
+  ]
+}

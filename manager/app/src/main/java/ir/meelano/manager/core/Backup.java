@@ -92,7 +92,7 @@ public final class Backup {
                             main.post(() -> {
                                 try {
                                     pg.onTable(fa, di, TABLES.length);
-                                } catch (Exception ignored) { }
+                                } catch (Exception ignored) { Diag.ignored("Backup:95", ignored); }
                             });
                             String t = TABLES[i][0];
                             if (!m.table(t)) {
@@ -230,14 +230,13 @@ public final class Backup {
                 out = new FileOutputStream(new File(docs, zip.getName()));
                 copy(in, out);
             }
-        } catch (Exception ignored) {
-        } finally {
+        } catch (Exception ignored) { Diag.ignored("Backup:233", ignored); } finally {
             try {
                 if (in != null) in.close();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("Backup:237", ignored); }
             try {
                 if (out != null) out.close();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("Backup:240", ignored); }
         }
     }
 
@@ -283,10 +282,10 @@ public final class Backup {
             } finally {
                 try {
                     if (in != null) in.close();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("Backup:286", ignored); }
                 try {
                     if (out != null) out.close();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("Backup:289", ignored); }
             }
             return dst;
         } catch (Exception e) {

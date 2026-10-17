@@ -19,6 +19,8 @@ android {
         targetSdk 34
         versionCode 58
         versionName '36.26.0'
+        // Built-in Persian voice (sherpa-onnx) ships for phones; the emulator-only x86 ABIs are dropped to keep the APK small.
+        ndk { abiFilters 'arm64-v8a', 'armeabi-v7a' }
     }
 
     signingConfigs {
@@ -53,6 +55,10 @@ dependencies {
     implementation 'com.google.zxing:core:3.5.3'
     // Offline license vault (shared codec with the seller admin app).
     implementation project(':licensing')
+
+    // Offline Persian voice engine: pinned AAR fetched by CI into libs/ (see .github workflows), plus tar.bz2 unpacking for the model.
+    implementation(name: 'sherpa-onnx-1.13.8', ext: 'aar')
+    implementation 'org.apache.commons:commons-compress:1.27.1'
 
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.json:json:20240303'

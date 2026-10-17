@@ -1,5 +1,6 @@
 package ir.meelano.manager.data;
 
+import ir.meelano.manager.core.Diag;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
@@ -35,13 +36,13 @@ public final class NetRoute {
             try {
                 a.startActivity(new Intent("android.settings.VPN_SETTINGS"));
                 return;
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("NetRoute:38", ignored); }
             try {
                 a.startActivity(new Intent(android.provider.Settings.ACTION_WIRELESS_SETTINGS));
                 return;
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("NetRoute:42", ignored); }
             a.startActivity(new Intent(android.provider.Settings.ACTION_SETTINGS));
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("NetRoute:44", ignored); }
     }
 
     /** True when any active network is a VPN transport. */
@@ -53,7 +54,7 @@ public final class NetRoute {
                 NetworkCapabilities nc = cm.getNetworkCapabilities(n);
                 if (nc != null && nc.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) return true;
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("NetRoute:56", ignored); }
         return false;
     }
 
@@ -99,7 +100,7 @@ public final class NetRoute {
                 ConnectivityManager cm = cm(ctx);
                 if (cm != null) cm.bindProcessToNetwork(null);
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("NetRoute:102", ignored); }
     }
 
     /** True when the raw exception smells like a network/routing failure (pre-diagnosis). */

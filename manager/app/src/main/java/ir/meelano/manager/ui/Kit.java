@@ -1,5 +1,6 @@
 package ir.meelano.manager.ui;
 
+import ir.meelano.manager.core.Diag;
 import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -123,7 +124,7 @@ public final class Kit {
         LinearLayout c = v();
         c.setBackground(Theme.card());
         c.setPadding(Theme.dp(14), Theme.dp(13), Theme.dp(14), Theme.dp(13));
-        c.setElevation(Theme.cardElevation());
+        Theme.lift(c, Theme.cardElevation());
         return c;
     }
 
@@ -131,7 +132,7 @@ public final class Kit {
         LinearLayout c = v();
         c.setBackground(Theme.cardAccent(accent));
         c.setPadding(Theme.dp(14), Theme.dp(13), Theme.dp(14), Theme.dp(13));
-        c.setElevation(Theme.cardElevation());
+        Theme.lift(c, Theme.cardElevation());
         return c;
     }
 
@@ -219,7 +220,7 @@ public final class Kit {
         if (s.contains("دریافت") || s.contains("وصول")) return Theme.SUCCESS;
         if (s.contains("پرداخت") || s.contains("نقدینگی")) return Theme.INFO;
         if (s.contains("خرید")) return Theme.VIOLET;
-        if (s.contains("انبار") || s.contains("موجودی") || s.contains("کالا")) return Theme.TEAL;
+        if (s.contains("انبار") || s.contains("موجودی") || s.contains("کالا")) return Theme.VIOLET;
         if (s.contains("ویزیتور") || s.contains("گزارش") || s.contains("تحلیل") || s.contains("روند")) return Theme.INFO;
         if (s.contains("مشتری") || s.contains("بدهکار")) return Theme.WARNING;
         return Theme.GOLD;
@@ -268,7 +269,12 @@ public final class Kit {
         t.addView(l, lp(-1, -2));
         TextView v = text(k.value, 16.5f, Theme.TEXT, true);
         v.setSingleLine(true);
-        v.setEllipsize(TextUtils.TruncateAt.END);
+        // Large amounts shrink to fit the tile instead of ending in "…".
+        if (android.os.Build.VERSION.SDK_INT >= 26) {
+            v.setAutoSizeTextTypeUniformWithConfiguration(10, 17, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
+        } else {
+            v.setEllipsize(TextUtils.TruncateAt.END);
+        }
         t.addView(v, lp(-1, -2));
         if (!Double.isNaN(k.countTo)) {
             ValueAnimator va = ValueAnimator.ofFloat(0f, 1f);
@@ -283,15 +289,16 @@ public final class Kit {
             v.setAlpha(0f);
             v.animate().alpha(1f).setDuration(350).start();
         }
-        if (k.sub != null && !k.sub.isEmpty()) {
-            TextView s = text(k.sub, 10f, k.accent, true);
-            s.setSingleLine(true);
-            s.setEllipsize(TextUtils.TruncateAt.END);
-            t.addView(s, lp(-1, -2));
-        }
+        // Every tile reserves the same lines (sub + action), so tiles in one row
+        // match in height and their values line up whether or not they have a note.
+        TextView s = text(k.sub == null || k.sub.isEmpty() ? " " : k.sub, 10f, k.accent, true);
+        s.setSingleLine(true);
+        s.setEllipsize(TextUtils.TruncateAt.END);
+        t.addView(s, lp(-1, -2));
+        TextView more = text(k.action != null ? "مشاهده جزئیات ›" : " ", 9.5f, Theme.MUTED, true);
+        more.setSingleLine(true);
+        t.addView(more, lp(-1, -2));
         if (k.action != null) {
-            TextView more = text("مشاهده جزئیات ›", 9.5f, Theme.MUTED, true);
-            t.addView(more, lp(-1, -2));
             Theme.pressable(t);
             t.setOnClickListener(vw -> k.action.run());
         }
@@ -319,6 +326,8 @@ public final class Kit {
                 root.addView(row, rp);
             }
             View tile = kpiTile(kpis.get(i));
+            // Equal width (weight 1). Height stays wrap: all tiles share the same
+            // single-line structure, so they come out equal without MATCH_PARENT pitfalls.
             LinearLayout.LayoutParams p = wlp(1f);
             if (i % span != span - 1) p.setMarginEnd(Theme.dp(10));
             row.addView(tile, p);
@@ -332,17 +341,17 @@ public final class Kit {
     }
 
     public View kv(String k, String v, int vColor) {
-        LinearLayout r = h();
-        r.setPadding(0, Theme.dp(6), 0, Theme.dp(6));
-        TextView key = text(k, 11.5f, Theme.MUTED, false);
-        key.setSingleLine(true);
-        key.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        // v35: label and value each own a share of the row, so a long product name,
-        // address or note wraps instead of squeezing the label out of the row.
-        r.addView(key, wlp(0.42f));
-        TextView val = text(v == null || v.isEmpty() ? "—" : v, 12.5f, vColor, true);
-        val.setGravity(Gravity.END);
-        r.addView(val, wlp(0.58f));
+        // Label stacked above value, both full width and right-aligned (RTL start).
+        // Side-by-side rows collided when the label and value were both long.
+        LinearLayout r = v();
+        r.setPadding(0, Theme.dp(7), 0, Theme.dp(7));
+        TextView key = text(k, 11f, Theme.MUTED, false);
+        key.setGravity(Gravity.START);
+        r.addView(key, lp(-1, -2));
+        TextView val = text(v == null || v.isEmpty() ? "—" : v, 13f, vColor, true);
+        val.setGravity(Gravity.START);
+        val.setPadding(0, Theme.dp(2), 0, 0);
+        r.addView(val, lp(-1, -2));
         return r;
     }
 
@@ -362,13 +371,25 @@ public final class Kit {
     }
 
     public View personRow(String name, String subLine, String value, String pillText, int accent, View.OnClickListener onClick) {
+        return personRow(name, subLine, value, pillText, accent, onClick, null);
+    }
+
+    /** Same row; a real customer picture can replace the initials when a view is supplied. */
+    public View personRow(String name, String subLine, String value, String pillText, int accent,
+                          View.OnClickListener onClick, View avatar) {
         LinearLayout c = v();
         c.setBackground(Theme.cardAccent(accent));
         c.setPadding(Theme.dp(12), Theme.dp(11), Theme.dp(12), Theme.dp(11));
         LinearLayout head = h();
-        TextView av = text(initials(name), 16, Theme.onAccent(accent), true);
-        av.setGravity(Gravity.CENTER);
-        av.setBackground(Theme.accentAvatar(accent));
+        View av;
+        if (avatar != null) {
+            av = avatar;
+        } else {
+            TextView initialsView = text(initials(name), 16, Theme.onAccent(accent), true);
+            initialsView.setGravity(Gravity.CENTER);
+            initialsView.setBackground(Theme.accentAvatar(accent));
+            av = initialsView;
+        }
         head.addView(av, new LinearLayout.LayoutParams(Theme.dp(48), Theme.dp(48)));
         head.addView(space(9));
         LinearLayout copy = v();
@@ -434,7 +455,7 @@ public final class Kit {
         LinearLayout c = h();
         c.setBackground(Theme.card());
         c.setPadding(Theme.dp(13), Theme.dp(12), Theme.dp(13), Theme.dp(12));
-        c.setElevation(Theme.cardElevation());
+        Theme.lift(c, Theme.cardElevation());
         TextView g = text(glyph, 22, accent, true);
         g.setGravity(Gravity.CENTER);
         g.setBackground(Theme.avatar(Theme.alpha(accent, 52)));
@@ -573,7 +594,7 @@ public final class Kit {
                     hideKeyboard(e);
                     l.onGo(t == null ? "" : t);
                 });
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("Kit:579", ignored); }
         });
         r.addView(mic, new LinearLayout.LayoutParams(Theme.dp(52), Theme.dp(50)));
         r.addView(space(8));
@@ -597,7 +618,7 @@ public final class Kit {
         try {
             InputMethodManager imm = (InputMethodManager) a.getSystemService(Activity.INPUT_METHOD_SERVICE);
             if (imm != null) imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Kit:603", ignored); }
     }
 
     /** In-content filter bar: live summary of the section's filters, opens the sheet. */
@@ -639,28 +660,52 @@ public final class Kit {
         return r;
     }
 
+    /**
+     * Loading state: a skeleton that matches the real cards (title line, two text lines
+     * and a figure block) with a slow pulse, plus the status text. Replaces the spinner
+     * so the layout does not jump when content arrives.
+     */
     public View loading(String msg) {
         LinearLayout c = card();
-        c.setGravity(Gravity.CENTER);
-        ProgressBar p = new ProgressBar(a);
-        try { p.getIndeterminateDrawable().setTint(Theme.GOLD); } catch (Exception ignored) { }
-        c.addView(p, new LinearLayout.LayoutParams(Theme.dp(40), Theme.dp(40)));
         TextView t = text(msg, 12f, Theme.MUTED, false);
-        t.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams tp = lp(-1, -2);
-        tp.setMargins(0, Theme.dp(10), 0, 0);
-        c.addView(t, tp);
+        c.addView(t, lp(-1, -2));
+        int[] heights = {16, 12, 12, 44};
+        float[] widths = {0.55f, 0.85f, 0.4f, 1f};
+        for (int i = 0; i < heights.length; i++) {
+            View bar = new View(a);
+            bar.setBackground(Theme.pill(Theme.alpha(Theme.GOLD, i == 3 ? 30 : 46)));
+            LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, Theme.dp(heights[i]), widths[i]);
+            p.setMargins(0, Theme.dp(i == 0 ? 12 : 8), 0, 0);
+            if (widths[i] < 1f) {
+                LinearLayout line = h();
+                line.addView(bar, p);
+                line.addView(new View(a), new LinearLayout.LayoutParams(0, 1, 1f - widths[i]));
+                c.addView(line, lp(-1, -2));
+            } else {
+                c.addView(bar, p);
+            }
+            android.animation.ObjectAnimator pulse = android.animation.ObjectAnimator.ofFloat(bar, View.ALPHA, 0.35f, 1f);
+            pulse.setDuration(900);
+            pulse.setStartDelay(i * 140L);
+            pulse.setRepeatMode(ValueAnimator.REVERSE);
+            pulse.setRepeatCount(ValueAnimator.INFINITE);
+            pulse.start();
+        }
         return c;
     }
 
+    /** Empty state: a small gold illustration, a title and a one-line guidance text. */
     public View empty(String title, String body) {
         LinearLayout c = card();
-        TextView g = text("◇", 40, Theme.MUTED, true);
-        g.setGravity(Gravity.CENTER);
-        c.addView(g, lp(-1, -2));
+        c.setGravity(Gravity.CENTER_HORIZONTAL);
+        c.setPadding(Theme.dp(16), Theme.dp(18), Theme.dp(16), Theme.dp(18));
+        c.addView(new ir.meelano.manager.ui.EmptyArt(a, ir.meelano.manager.ui.EmptyArt.EMPTY),
+                new LinearLayout.LayoutParams(Theme.dp(96), Theme.dp(96)));
         TextView t = text(title, 14f, Theme.TEXT, true);
         t.setGravity(Gravity.CENTER);
-        c.addView(t, lp(-1, -2));
+        LinearLayout.LayoutParams tp = lp(-1, -2);
+        tp.setMargins(0, Theme.dp(8), 0, 0);
+        c.addView(t, tp);
         if (body != null && !body.isEmpty()) {
             TextView b = text(body, 11.5f, Theme.MUTED, false);
             b.setGravity(Gravity.CENTER);
@@ -669,17 +714,46 @@ public final class Kit {
         return c;
     }
 
-    public View error(String msg, final Runnable retry) {
-        LinearLayout c = card(Theme.DANGER);
-        TextView g = text("⚠", 34, Theme.DANGER, true);
+    /** Calm card for reports whose data source is not confirmed in this database (not a crash). */
+    public View unavailable(String msg) {
+        LinearLayout c = card(Theme.GOLD);
+        TextView g = text("◈", 30, Theme.GOLD, true);
         g.setGravity(Gravity.CENTER);
         c.addView(g, lp(-1, -2));
-        TextView t = text("خطا در دریافت اطلاعات", 14f, Theme.TEXT, true);
+        TextView t = text("این گزارش فعلاً در دسترس نیست", 14f, Theme.TEXT, true);
         t.setGravity(Gravity.CENTER);
         c.addView(t, lp(-1, -2));
+        TextView b = text(msg == null || msg.isEmpty() ? "ساختار دیتابیس برای این گزارش تأیید نشده است." : msg, 11.5f, Theme.MUTED, false);
+        b.setGravity(Gravity.CENTER);
+        c.addView(b, lp(-1, -2));
+        TextView n = text("پس از تأیید ساختار دیتابیس فعال می‌شود؛ اعداد نادرست نمایش داده نمی‌شوند.", 11f, Theme.MUTED, false);
+        n.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams np = lp(-1, -2);
+        np.setMargins(0, Theme.dp(8), 0, 0);
+        c.addView(n, np);
+        return c;
+    }
+
+    /** Error state: alert illustration, the reason, a hint on what to check, and a retry button. */
+    public View error(String msg, final Runnable retry) {
+        LinearLayout c = card(Theme.DANGER);
+        c.setGravity(Gravity.CENTER_HORIZONTAL);
+        c.setPadding(Theme.dp(16), Theme.dp(18), Theme.dp(16), Theme.dp(18));
+        c.addView(new ir.meelano.manager.ui.EmptyArt(a, ir.meelano.manager.ui.EmptyArt.ERROR),
+                new LinearLayout.LayoutParams(Theme.dp(96), Theme.dp(96)));
+        TextView t = text("خطا در دریافت اطلاعات", 14f, Theme.TEXT, true);
+        t.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams tp = lp(-1, -2);
+        tp.setMargins(0, Theme.dp(8), 0, 0);
+        c.addView(t, tp);
         TextView b = text(msg == null || msg.isEmpty() ? "خطای نامشخص" : msg, 11.5f, Theme.MUTED, false);
         b.setGravity(Gravity.CENTER);
         c.addView(b, lp(-1, -2));
+        TextView hint = text("اتصال شبکه و تنظیمات سرور را بررسی کنید، سپس دوباره تلاش کنید.", 11f, Theme.GOLD_SOFT, false);
+        hint.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams hp = lp(-1, -2);
+        hp.setMargins(0, Theme.dp(6), 0, 0);
+        c.addView(hint, hp);
         if (retry != null) {
             Button r = btnGold("⟳ تلاش مجدد", v -> retry.run());
             LinearLayout.LayoutParams p = lp(-1, -2);
@@ -727,56 +801,75 @@ public final class Kit {
         return "—".equals(t) ? t : Money.fa(Jalali.faDate(t));
     }
 
-    /** Deluxe scrollable table: row numbers, gold zebra, red negatives, rounded card. */
+    /**
+     * Deluxe table that fits the card width. Columns share the width by weight (their
+     * former dp widths become relative weights), so nothing is clipped at either edge and
+     * no horizontal scroll is needed. Text columns wrap to two lines instead of truncating.
+     */
     public View dataTable(ReportCatalog.Col[] cols, List<Row> rows, final RowClick click) {
-        HorizontalScrollView sv = new HorizontalScrollView(a);
+        LinearLayout sv = v();
+        sv.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         sv.setBackground(Theme.card());
         sv.setPadding(Theme.dp(4), Theme.dp(4), Theme.dp(4), Theme.dp(4));
         LinearLayout t = v();
+        t.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         t.setPadding(Theme.dp(2), Theme.dp(2), Theme.dp(2), Theme.dp(2));
         LinearLayout head = h();
+        head.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         head.setBackground(Theme.tableHeader());
-        head.setPadding(Theme.dp(6), Theme.dp(9), Theme.dp(6), Theme.dp(9));
+        head.setPadding(Theme.dp(4), Theme.dp(9), Theme.dp(4), Theme.dp(9));
         TextView rn0 = text("#", 11.5f, Theme.GOLD_SOFT, true);
         rn0.setGravity(Gravity.CENTER);
-        head.addView(rn0, new LinearLayout.LayoutParams(Theme.dp(44), -2));
+        head.addView(rn0, new LinearLayout.LayoutParams(0, -2, 0.6f));
         for (ReportCatalog.Col c : cols) {
-            TextView h = text(c.title, 11.5f, Theme.GOLD_SOFT, true);
+            TextView h = text(c.title, 11f, Theme.GOLD_SOFT, true);
             h.setGravity(Gravity.CENTER);
-            head.addView(h, new LinearLayout.LayoutParams(Theme.dp(colWidth(c)), -2));
+            h.setMaxLines(2);
+            head.addView(h, new LinearLayout.LayoutParams(0, -2, colWeight(c)));
         }
-        t.addView(head, lp(-2, -2));
+        t.addView(head, lp(-1, -2));
         for (int i = 0; i < rows.size(); i++) {
             final Row r = rows.get(i);
             LinearLayout row = h();
-            row.setPadding(Theme.dp(6), Theme.dp(10), Theme.dp(6), Theme.dp(10));
+            row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+            row.setPadding(Theme.dp(4), Theme.dp(10), Theme.dp(4), Theme.dp(10));
             if (i % 2 == 1) row.setBackgroundColor(Theme.alpha(Theme.GOLD, Theme.DARK ? 16 : 30));
             TextView rn = text(Money.fa(String.valueOf(i + 1)), 11f, Theme.MUTED, true);
             rn.setGravity(Gravity.CENTER);
-            row.addView(rn, new LinearLayout.LayoutParams(Theme.dp(44), -2));
+            row.addView(rn, new LinearLayout.LayoutParams(0, -2, 0.6f));
             for (ReportCatalog.Col c : cols) {
                 double dv = (c.type == ReportCatalog.T_MONEY || c.type == ReportCatalog.T_NUM) ? r.d(c.key) : 0;
                 int col = dv < -0.0001 ? Theme.DANGER
                         : (c.type == ReportCatalog.T_MONEY ? Theme.TEXT : (c.type == ReportCatalog.T_TEXT ? Theme.TEXT : Theme.MUTED));
-                TextView cell = text(fmtCol(c, r), 12f, col, c.type == ReportCatalog.T_MONEY);
+                TextView cell = text(fmtCol(c, r), 11.5f, col, c.type == ReportCatalog.T_MONEY);
                 cell.setGravity(Gravity.CENTER);
-                cell.setSingleLine(true);
-                cell.setEllipsize(TextUtils.TruncateAt.END);
-                row.addView(cell, new LinearLayout.LayoutParams(Theme.dp(colWidth(c)), -2));
+                if (c.type == ReportCatalog.T_TEXT) {
+                    cell.setMaxLines(2);
+                    cell.setEllipsize(TextUtils.TruncateAt.END);
+                } else {
+                    cell.setSingleLine(true);
+                }
+                row.addView(cell, new LinearLayout.LayoutParams(0, -2, colWeight(c)));
             }
             if (click != null) {
                 Theme.pressable(row);
                 row.setOnClickListener(v -> click.onRow(r));
             }
-            t.addView(row, lp(-2, -2));
+            t.addView(row, lp(-1, -2));
             if (i < rows.size() - 1) t.addView(divider(), lp(-1, Theme.dp(1)));
         }
-        sv.addView(t, new HorizontalScrollView.LayoutParams(-2, -2));
+        sv.addView(t, lp(-1, -2));
         return sv;
     }
 
+    /** Relative width of a column: wider types get more room, so amounts never clip. */
+    private float colWeight(ReportCatalog.Col c) {
+        return colWidth(c) / 80f;
+    }
+
     private int colWidth(ReportCatalog.Col c) {
-        if (c.type == ReportCatalog.T_MONEY) return 150;
+        // Wide enough for «۱۰۲٬۷۵۰٬۰۰۰ تومان» at the largest type scale without clipping.
+        if (c.type == ReportCatalog.T_MONEY) return 196;
         if (c.type == ReportCatalog.T_DATE) return 110;
         if (c.type == ReportCatalog.T_NUM) return 80;
         return 140;
@@ -785,6 +878,15 @@ public final class Kit {
     // ---------------- misc ----------------
     public void toast(String msg) {
         Toast.makeText(a, msg, Toast.LENGTH_SHORT).show();
+        try { Ui.haptic(a.getWindow().getDecorView(), !isFailureText(msg)); } catch (Exception ignored) { Diag.ignored("Kit:toastHaptic", ignored); }
+    }
+
+    /** Rough check so error toasts get the reject pattern instead of the success one. */
+    private static boolean isFailureText(String msg) {
+        if (msg == null) return false;
+        String m = msg.toLowerCase(java.util.Locale.ROOT);
+        return m.contains("ممکن نشد") || m.contains("خطا") || m.contains("ناموفق")
+                || m.contains("نشد") || m.contains("error") || m.contains("fail");
     }
 
     /** Selection callback for {@link #searchPicker}. */
@@ -811,7 +913,7 @@ public final class Kit {
         try {
             q.setSingleLine(true);
             q.setTextDirection(View.TEXT_DIRECTION_RTL);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Kit:841", ignored); }
         root.addView(q, lp(-1, -2));
         final TextView count = text("", 11.5f, Theme.MUTED, false);
         root.addView(count, lp(-1, -2));
@@ -841,7 +943,7 @@ public final class Kit {
                     if (label.length() == 0) label.append("\u2014");
                     list.addView(btnGhost(label.toString(), Theme.GOLD, new View.OnClickListener() {
                         @Override public void onClick(View tapped) {
-                            try { box[0].dismiss(); } catch (Exception ignored) { }
+                            try { box[0].dismiss(); } catch (Exception ignored) { Diag.ignored("Kit:871", ignored); }
                             if (onPick != null) onPick.onPick(r);
                         }
                     }), lp(-1, -2));
@@ -885,7 +987,7 @@ public final class Kit {
                 .create();
         try {
             if (d.getWindow() != null) d.getWindow().setBackgroundDrawable(Theme.dialogBg());
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Kit:915", ignored); }
         return d;
     }
 
@@ -920,16 +1022,33 @@ public final class Kit {
         View chart = maker.make();
         int hPx = (int) (a.getResources().getDisplayMetrics().heightPixels * 0.60);
         root.addView(chart, new LinearLayout.LayoutParams(-1, hPx));
-        try { dialog(title, root, true).show(); } catch (Exception ignored) { }
+        try { dialog(title, root, true).show(); } catch (Exception ignored) { Diag.ignored("Kit:950", ignored); }
     }
 
     public ImageView logo(int sizeDp) {
         ImageView v = new ImageView(a);
         try {
             v.setImageResource(a.getResources().getIdentifier("meelano_3d", "drawable", a.getPackageName()));
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Kit:957", ignored); }
         v.setAdjustViewBounds(true);
-        v.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        v.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        // Gold ring framing: the artwork sits on a themed halo and is clipped to a circle,
+        // so the crest reads as a premium badge on both light and dark palettes.
+        try {
+            android.graphics.drawable.GradientDrawable ring = new android.graphics.drawable.GradientDrawable();
+            ring.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+            ring.setColor(Theme.alpha(Theme.GOLD, 30));
+            ring.setStroke(Theme.dp(2), Theme.alpha(Theme.GOLD, 220));
+            v.setBackground(ring);
+            v.setPadding(Theme.dp(3), Theme.dp(3), Theme.dp(3), Theme.dp(3));
+            v.setClipToOutline(true);
+            v.setOutlineProvider(new android.view.ViewOutlineProvider() {
+                @Override
+                public void getOutline(android.view.View view, android.graphics.Outline o) {
+                    o.setOval(0, 0, view.getWidth(), view.getHeight());
+                }
+            });
+        } catch (Exception ignored) { Diag.ignored("Kit:976", ignored); }
         // Honour the requested size: the argument used to be accepted and then ignored, so a
         // caller that relied on it got an unsized ImageView and the artwork rendered at its
         // raw pixel size instead.
@@ -996,11 +1115,42 @@ public final class Kit {
     }
 
     /** Generic document row with a free pill. */
+    /**
+     * Icon badges for the payment parts of one receipt (نقد، کارت، حواله، چک). Only parts
+     * with a real amount appear, so a cheque-only receipt shows just the cheque badge.
+     */
+    public View docKinds(Row r) {
+        FlowRow w = new FlowRow(a);
+        addKind(w, "نقد", R.drawable.mi_payments, Theme.SUCCESS, r.d("cash"));
+        addKind(w, "کارت", R.drawable.mi_credit_card, Theme.INFO, r.d("pos"));
+        addKind(w, "حواله", R.drawable.mi_swap_horiz, Theme.VIOLET, r.d("havaleh"));
+        addKind(w, "چک", R.drawable.mi_cheque, Theme.GOLD, r.d("cheque"));
+        return w;
+    }
+
+    private void addKind(FlowRow w, String label, int icon, int color, double amount) {
+        if (amount < 0.5) return;
+        LinearLayout chip = h();
+        chip.setGravity(Gravity.CENTER_VERTICAL);
+        chip.setBackground(Theme.pill(Theme.alpha(color, Theme.isLight() ? 34 : 44)));
+        chip.setPadding(Theme.dp(8), Theme.dp(3), Theme.dp(10), Theme.dp(3));
+        chip.addView(icon(icon, color, 14), new LinearLayout.LayoutParams(Theme.dp(14), Theme.dp(14)));
+        chip.addView(space(5));
+        chip.addView(text(label, 10.5f, color, true), lp(-2, -2));
+        w.addView(chip, lp(-2, -2));
+    }
+
     public View docRow(String title, String mid, String date, String total, String pillText, View.OnClickListener onClick) {
         return docRow(title, mid, date, total, pillText, Theme.INFO, onClick);
     }
 
     public View docRow(String title, String mid, String date, String total, String pillText, int accent, View.OnClickListener onClick) {
+        return docRow(title, mid, date, total, pillText, accent, null, onClick);
+    }
+
+    /** Document card with an optional footer (e.g. {@link #docKinds}) under its header line. */
+    public View docRow(String title, String mid, String date, String total, String pillText, int accent,
+                       View foot, View.OnClickListener onClick) {
         LinearLayout c = v();
         c.setBackground(Theme.cardAccent(accent));
         c.setPadding(Theme.dp(12), Theme.dp(11), Theme.dp(12), Theme.dp(11));
@@ -1029,6 +1179,11 @@ public final class Kit {
         }
         head.addView(side, lp(-2, -2));
         c.addView(head, lp(-1, -2));
+        if (foot != null) {
+            LinearLayout.LayoutParams fp = lp(-1, -2);
+            fp.setMargins(0, Theme.dp(8), 0, 0);
+            c.addView(foot, fp);
+        }
         if (onClick != null) {
             Theme.pressable(c);
             c.setOnClickListener(onClick);
@@ -1038,6 +1193,23 @@ public final class Kit {
 
     /** Inventory row: name + code/extra + stock + price. */
     public View invRow(String name, String code, String extra, String qty, String price, View.OnClickListener onClick) {
+        return invRowTone(name, code, extra, qty, price, null, 0, onClick);
+    }
+
+    /** Neon status chip (موجود / کم‌موجود / ناموجود) in the given tone. */
+    public TextView stockChip(String label, int tone) {
+        TextView t = text(label, 10f, tone, true);
+        t.setSingleLine(true);
+        t.setPadding(Theme.dp(8), Theme.dp(2), Theme.dp(8), Theme.dp(2));
+        t.setBackground(Theme.pill(tone));
+        try {
+            t.setShadowLayer(Theme.dp(4), 0, 0, Theme.alpha(tone, 150));
+        } catch (Exception ignored) { Diag.ignored("Kit:chipGlow", ignored); }
+        return t;
+    }
+
+    public View invRowTone(String name, String code, String extra, String qty, String price,
+                           String status, int tone, View.OnClickListener onClick) {
         LinearLayout c = v();
         c.setBackground(Theme.card());
         c.setPadding(Theme.dp(12), Theme.dp(11), Theme.dp(12), Theme.dp(11));
@@ -1058,6 +1230,10 @@ public final class Kit {
         head.addView(copy, wlp(1f));
         LinearLayout side = v();
         side.setGravity(Gravity.END);
+        if (status != null && !status.isEmpty() && tone != 0) {
+            side.addView(stockChip(status, tone), lp(-2, -2));
+            side.addView(space(0), lp(-2, Theme.dp(4)));
+        }
         if (qty != null && !qty.isEmpty()) side.addView(text(qty, 12.5f, Theme.TEXT, true), lp(-2, -2));
         if (price != null && !price.isEmpty()) side.addView(text(price, 11f, Theme.GOLD_SOFT, false), lp(-2, -2));
         head.addView(side, lp(-2, -2));
@@ -1115,7 +1291,7 @@ public final class Kit {
         } catch (Exception ex) {
             try {
                 v.setImageResource(res);
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("Kit:1198", ignored); }
         }
         int s = Theme.dp(dp);
         v.setLayoutParams(new LinearLayout.LayoutParams(s, s));
@@ -1194,7 +1370,7 @@ public final class Kit {
                 View ch = p.getChildAt(i);
                 if (ch instanceof EditText) ((EditText) ch).setTextColor(Theme.TEXT);
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Kit:1277", ignored); }
         return p;
     }
 

@@ -101,6 +101,9 @@ public final class Atiran {
             if (o.length() > 40) o = o.substring(0, 40);
             return "ستون «" + o + "» در دیتابیس پیدا نشد";
         }
+        if (l.contains("incorrect syntax")) {
+            return "ساختار این گزارش با دیتابیس سازگار نیست؛ به پشتیبانی اطلاع دهید";
+        }
         if (l.contains("aggregate function") || l.contains("group by") || l.contains("subquery")) {
             // SQL Server rejects this report's calculation shape. Keep the raw text out of the UI.
             return "این محاسبه روی این دیتابیس اجرا نشد؛ دوباره تلاش کنید یا به پشتیبانی اطلاع دهید";

@@ -69,7 +69,7 @@ public class TradeScreen extends Screen {
         c.custGroups = true;
         c.statusTitle = "وضعیت تسویه";
         c.status = new FilterSheet.Opt[]{
-                new FilterSheet.Opt("", "همه"),
+                // «همه» is added by FilterSheet itself; listing it here showed it twice.
                 new FilterSheet.Opt("settled", "تسویه‌شده"),
                 new FilterSheet.Opt("unsettled", "تسویه‌نشده"),
         };

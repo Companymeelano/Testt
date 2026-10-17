@@ -60,7 +60,7 @@ public class ProductsScreen extends Screen {
         c.kalaGroups = true;
         c.statusTitle = "وضعیت موجودی";
         c.status = new FilterSheet.Opt[]{
-                new FilterSheet.Opt("", "همه"),
+                // «همه» is added by FilterSheet itself; listing it here showed it twice.
                 new FilterSheet.Opt("low", "کم‌موجودی"),
                 new FilterSheet.Opt("out", "ناموجود"),
                 new FilterSheet.Opt("ok", "موجودی سالم"),

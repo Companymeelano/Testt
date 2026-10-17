@@ -682,14 +682,18 @@ public final class Kit {
         return c;
     }
 
+    /** Empty state: a small gold illustration, a title and a one-line guidance text. */
     public View empty(String title, String body) {
         LinearLayout c = card();
-        TextView g = text("◇", 40, Theme.MUTED, true);
-        g.setGravity(Gravity.CENTER);
-        c.addView(g, lp(-1, -2));
+        c.setGravity(Gravity.CENTER_HORIZONTAL);
+        c.setPadding(Theme.dp(16), Theme.dp(18), Theme.dp(16), Theme.dp(18));
+        c.addView(new ir.meelano.manager.ui.EmptyArt(a, ir.meelano.manager.ui.EmptyArt.EMPTY),
+                new LinearLayout.LayoutParams(Theme.dp(96), Theme.dp(96)));
         TextView t = text(title, 14f, Theme.TEXT, true);
         t.setGravity(Gravity.CENTER);
-        c.addView(t, lp(-1, -2));
+        LinearLayout.LayoutParams tp = lp(-1, -2);
+        tp.setMargins(0, Theme.dp(8), 0, 0);
+        c.addView(t, tp);
         if (body != null && !body.isEmpty()) {
             TextView b = text(body, 11.5f, Theme.MUTED, false);
             b.setGravity(Gravity.CENTER);
@@ -718,17 +722,26 @@ public final class Kit {
         return c;
     }
 
+    /** Error state: alert illustration, the reason, a hint on what to check, and a retry button. */
     public View error(String msg, final Runnable retry) {
         LinearLayout c = card(Theme.DANGER);
-        TextView g = text("⚠", 34, Theme.DANGER, true);
-        g.setGravity(Gravity.CENTER);
-        c.addView(g, lp(-1, -2));
+        c.setGravity(Gravity.CENTER_HORIZONTAL);
+        c.setPadding(Theme.dp(16), Theme.dp(18), Theme.dp(16), Theme.dp(18));
+        c.addView(new ir.meelano.manager.ui.EmptyArt(a, ir.meelano.manager.ui.EmptyArt.ERROR),
+                new LinearLayout.LayoutParams(Theme.dp(96), Theme.dp(96)));
         TextView t = text("خطا در دریافت اطلاعات", 14f, Theme.TEXT, true);
         t.setGravity(Gravity.CENTER);
-        c.addView(t, lp(-1, -2));
+        LinearLayout.LayoutParams tp = lp(-1, -2);
+        tp.setMargins(0, Theme.dp(8), 0, 0);
+        c.addView(t, tp);
         TextView b = text(msg == null || msg.isEmpty() ? "خطای نامشخص" : msg, 11.5f, Theme.MUTED, false);
         b.setGravity(Gravity.CENTER);
         c.addView(b, lp(-1, -2));
+        TextView hint = text("اتصال شبکه و تنظیمات سرور را بررسی کنید، سپس دوباره تلاش کنید.", 11f, Theme.GOLD_SOFT, false);
+        hint.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams hp = lp(-1, -2);
+        hp.setMargins(0, Theme.dp(6), 0, 0);
+        c.addView(hint, hp);
         if (retry != null) {
             Button r = btnGold("⟳ تلاش مجدد", v -> retry.run());
             LinearLayout.LayoutParams p = lp(-1, -2);

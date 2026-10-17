@@ -4,6 +4,13 @@ import android.text.TextUtils;
 import java.util.Locale;
 import ir.meelano.manager.core.MarketWeather;
 import ir.meelano.manager.core.Diag;
+import android.content.Context;
+import android.graphics.Canvas;
+import android.graphics.LinearGradient;
+import android.graphics.Paint;
+import android.graphics.RadialGradient;
+import android.graphics.RectF;
+import android.graphics.Shader;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.FrameLayout;
@@ -24,6 +31,7 @@ import ir.meelano.manager.core.MoneyQueries;
 import ir.meelano.manager.R;
 import ir.meelano.manager.core.Queries;
 import ir.meelano.manager.data.Meta;
+import ir.meelano.manager.data.Company;
 import ir.meelano.manager.data.Repo;
 import ir.meelano.manager.data.Row;
 import ir.meelano.manager.ui.Charts;
@@ -287,6 +295,54 @@ public class HomeScreen extends Screen {
         return day.equals(Jalali.todayStr()) ? "امروز" : "روز " + Jalali.shortLabel(day);
     }
 
+    /** Depth layer behind the hero: two gold light sources, a glossy top sheen, a thin ring and a rim highlight. */
+    private static final class HeroDecor extends View {
+        private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final RectF box = new RectF();
+        private final float radius;
+
+        HeroDecor(Context c, float radiusPx) {
+            super(c);
+            this.radius = radiusPx;
+        }
+
+        @Override
+        protected void onDraw(Canvas g) {
+            super.onDraw(g);
+            float w = getWidth(), h = getHeight();
+            if (w <= 0 || h <= 0) return;
+            boolean light = Theme.isLight();
+            box.set(0, 0, w, h);
+            g.save();
+            android.graphics.Path clip = new android.graphics.Path();
+            clip.addRoundRect(box, radius, radius, android.graphics.Path.Direction.CW);
+            g.clipPath(clip);
+            p.setStyle(Paint.Style.FILL);
+            p.setShader(new RadialGradient(w * 0.92f, h * 0.02f, w * 0.60f,
+                    Theme.alpha(Theme.GOLD, light ? 70 : 110), Theme.alpha(Theme.GOLD, 0), Shader.TileMode.CLAMP));
+            g.drawRect(box, p);
+            p.setShader(new RadialGradient(w * 0.06f, h * 1.02f, w * 0.45f,
+                    Theme.alpha(Theme.GOLD_SOFT, light ? 40 : 46), Theme.alpha(Theme.GOLD_SOFT, 0), Shader.TileMode.CLAMP));
+            g.drawRect(box, p);
+            p.setShader(new LinearGradient(0, 0, 0, h * 0.5f,
+                    Theme.alpha(0xFFFFFFFF, light ? 110 : 26), 0x00FFFFFF, Shader.TileMode.CLAMP));
+            g.drawRect(box, p);
+            p.setShader(null);
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(Theme.dp(1));
+            p.setColor(Theme.alpha(Theme.GOLD, light ? 90 : 70));
+            box.set(w * 0.62f, -h * 0.9f, w * 1.35f, h * 0.9f);
+            g.drawArc(box, 120, 120, false, p);
+            g.restore();
+            // Rim: a light top edge makes the card read as a raised, glossy panel.
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(Theme.dp(1));
+            p.setColor(Theme.alpha(0xFFFFFFFF, light ? 150 : 34));
+            box.set(Theme.dp(0.5f), Theme.dp(0.5f), w - Theme.dp(0.5f), h - Theme.dp(0.5f));
+            g.drawRoundRect(box, radius, radius, p);
+        }
+    }
+
     private View greetingHero() {
         int hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
         String greeting = hour < 5 ? "شب بخیر" : (hour < 12 ? "صبح بخیر"
@@ -295,18 +351,39 @@ public class HomeScreen extends Screen {
         if (role == null || role.isEmpty()) role = RoleStore.current(a);
         String roleName = RoleStore.faName(role);
 
-        LinearLayout hero = a.kit.v();
+        final LinearLayout hero = a.kit.v();
         hero.setBackground(Theme.executiveHero());
         hero.setPadding(Theme.dp(18), Theme.dp(17), Theme.dp(18), Theme.dp(14));
-        Theme.lift(hero, Theme.cardElevation() + Theme.dp(1));
+        Theme.lift(hero, Theme.cardElevation() + Theme.dp(2));
+
+        FrameLayout wrap = new FrameLayout(a);
+        wrap.addView(new HeroDecor(a, Theme.dp(28)), new FrameLayout.LayoutParams(-1, -1));
+        wrap.addView(hero, new FrameLayout.LayoutParams(-1, -2));
 
         LinearLayout top = a.kit.h();
+        top.setGravity(Gravity.CENTER_VERTICAL);
+
+        // Crest: the company logo from the local cache (synced from the database), or a fine default mark.
         FrameLayout crest = new FrameLayout(a);
         crest.setBackground(Theme.bottomNavIconSelected());
         crest.setElevation(Theme.dp(3));
-        ImageView mark = a.kit.icon(R.drawable.mi_admin_panel_settings, Theme.selectedNavInk(), 30);
-        FrameLayout.LayoutParams mp = new FrameLayout.LayoutParams(Theme.dp(30), Theme.dp(30), Gravity.CENTER);
-        crest.addView(mark, mp);
+        android.graphics.Bitmap logo = ir.meelano.manager.data.Company.logo(a);
+        if (logo != null) {
+            ImageView li = new ImageView(a);
+            li.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            li.setImageBitmap(logo);
+            li.setClipToOutline(true);
+            li.setOutlineProvider(new android.view.ViewOutlineProvider() {
+                @Override
+                public void getOutline(View v, android.graphics.Outline o) {
+                    o.setOval(0, 0, v.getWidth(), v.getHeight());
+                }
+            });
+            crest.addView(li, new FrameLayout.LayoutParams(Theme.dp(50), Theme.dp(50), Gravity.CENTER));
+        } else {
+            ImageView mark = a.kit.icon(R.drawable.mi_admin_panel_settings, Theme.selectedNavInk(), 28);
+            crest.addView(mark, new FrameLayout.LayoutParams(Theme.dp(28), Theme.dp(28), Gravity.CENTER));
+        }
         top.addView(crest, new LinearLayout.LayoutParams(Theme.dp(58), Theme.dp(58)));
         top.addView(a.kit.space(12));
 
@@ -325,6 +402,28 @@ public class HomeScreen extends Screen {
         description.setEllipsize(android.text.TextUtils.TruncateAt.END);
         copy.addView(description, a.kit.lp(-1, -2));
         top.addView(copy, a.kit.wlp(1f));
+
+        // Jalali date tile: day in large type, month and weekday beneath it.
+        String today = Jalali.todayStr();
+        String[] parts = today.split("/");
+        String dayText = parts.length == 3 ? Money.fa(parts[2]) : Money.fa(today);
+        LinearLayout tile = a.kit.v();
+        tile.setGravity(Gravity.CENTER);
+        tile.setPadding(Theme.dp(8), Theme.dp(6), Theme.dp(8), Theme.dp(6));
+        tile.setBackground(Theme.ghostButton(Theme.GOLD));
+        TextView dayView = a.kit.text(dayText, 20f, Theme.TEXT, true);
+        dayView.setGravity(Gravity.CENTER);
+        dayView.setSingleLine(true);
+        tile.addView(dayView, a.kit.lp(-1, -2));
+        TextView month = a.kit.text(Jalali.monthName(today), 10f, Theme.GOLD_SOFT, true);
+        month.setGravity(Gravity.CENTER);
+        month.setSingleLine(true);
+        tile.addView(month, a.kit.lp(-1, -2));
+        TextView weekday = a.kit.text(Jalali.weekday(today), 9.5f, Theme.MUTED, false);
+        weekday.setGravity(Gravity.CENTER);
+        weekday.setSingleLine(true);
+        tile.addView(weekday, a.kit.lp(-1, -2));
+        top.addView(tile, new LinearLayout.LayoutParams(Theme.dp(64), -2));
         hero.addView(top, a.kit.lp(-1, -2));
         hero.addView(a.kit.gap(13));
 
@@ -347,7 +446,25 @@ public class HomeScreen extends Screen {
         edition.setBackground(Theme.ghostButton(Theme.GOLD));
         footer.addView(edition, a.kit.lp(-2, -2));
         hero.addView(footer, a.kit.lp(-1, -2));
-        return hero;
+
+        // Gentle float, only when the phone allows motion; it stops as soon as the card leaves the screen.
+        if (ir.meelano.manager.ui.Ui.motionOk(a)) {
+            final android.animation.ObjectAnimator float1 = android.animation.ObjectAnimator.ofFloat(
+                    hero, View.TRANSLATION_Y, 0f, -Theme.dp(3));
+            float1.setDuration(3600);
+            float1.setRepeatCount(android.animation.ObjectAnimator.INFINITE);
+            float1.setRepeatMode(android.animation.ObjectAnimator.REVERSE);
+            float1.setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator());
+            float1.start();
+            wrap.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
+                @Override
+                public void onViewAttachedToWindow(View v) { }
+
+                @Override
+                public void onViewDetachedFromWindow(View v) { float1.cancel(); }
+            });
+        }
+        return wrap;
     }
 
     /** A compact luxury launchpad to the five high-frequency management destinations. */

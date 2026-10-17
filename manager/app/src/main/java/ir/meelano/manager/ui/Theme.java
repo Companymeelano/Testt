@@ -37,7 +37,6 @@ public final class Theme {
     public static int WARNING = 0xFFF5A524;
     public static int INFO = 0xFF4FA3FF;
     public static int VIOLET = 0xFF9A7BFF;
-    public static int TEAL = 0xFF3ED6C5;
     public static int STEEL = 0xFF7C8DA6;
     /** Fixed hues for sales and purchases: they must stand out from the gold/theme accent. */
     public static final int SALES_HUE = 0xFFFF8A3D;
@@ -115,7 +114,6 @@ public final class Theme {
             WARNING = 0xFF9A5B00;
             INFO = 0xFF1F5FAD;
             VIOLET = 0xFF6343D6;
-            TEAL = 0xFF007268;
             STEEL = 0xFF546177;
         } else {
             // «نیوی و طلا»: deep navy surfaces with a polished gold accent.
@@ -131,7 +129,6 @@ public final class Theme {
             WARNING = 0xFFFBBF24;
             INFO = 0xFF60A5FA;
             VIOLET = 0xFF9A7BFF;
-            TEAL = 0xFF3ED6C5;
             STEEL = 0xFF7C8DA6;
         }
     }

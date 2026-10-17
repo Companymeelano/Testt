@@ -596,10 +596,15 @@ java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
             int cap = spec.chart == ReportCatalog.C_DONUT ? 8 : 31;
             for (int i = 0; i < Math.min(cap, rows.size()); i++) {
                 Row r = rows.get(i);
-                String x = chartLabel(spec, r.s(spec.chartX));
-                if (spec.chart == ReportCatalog.C_DONUT)
-                    pts.add(new Charts.Point(x, r.d(spec.chartY), Charts.palette(i)));
-                else pts.add(new Charts.Point(x, r.d(spec.chartY)));
+                boolean acc = "سرفصل‌ها".equals(spec.section);
+                String x = acc ? Charts.trim(chartLabel(spec, r.s(spec.chartX)), 8) : chartLabel(spec, r.s(spec.chartX));
+                double yv = r.d(spec.chartY);
+                if (acc) {
+                    // Gold family for the chart of accounts; negative balances stay in the danger colour.
+                    pts.add(new Charts.Point(x, yv, yv < 0 ? Theme.DANGER : Charts.goldTone(i)));
+                } else if (spec.chart == ReportCatalog.C_DONUT)
+                    pts.add(new Charts.Point(x, yv, Charts.palette(i)));
+                else pts.add(new Charts.Point(x, yv));
             }
             c.addView(a.kit.chartHead("نمودار", () -> {
                 if (spec.chart == ReportCatalog.C_LINE) {

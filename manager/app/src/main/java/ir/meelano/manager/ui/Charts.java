@@ -60,6 +60,24 @@ public final class Charts {
             0xFFD92D20, 0xFF0E9384, 0xFFD6508B, 0xFF669F2A, 0xFF667085
     };
 
+    /** Gold tones for accounting/chart-of-accounts charts: deep gold, light gold, bronze, champagne. */
+    public static int goldTone(int i) {
+        int[] t = {Theme.GOLD, Theme.GOLD_SOFT, mix(Theme.GOLD, 0xFF000000, 0.28f), mix(Theme.GOLD, 0xFFFFFFFF, 0.30f)};
+        return t[Math.abs(i) % t.length];
+    }
+
+    static int mix(int a, int b, float t) {
+        int r = (int) (((a >> 16) & 255) * (1 - t) + ((b >> 16) & 255) * t);
+        int g = (int) (((a >> 8) & 255) * (1 - t) + ((b >> 8) & 255) * t);
+        int bl = (int) ((a & 255) * (1 - t) + (b & 255) * t);
+        return 0xFF000000 | (r << 16) | (g << 8) | bl;
+    }
+
+    /** Short label for tight axes: at most n characters, ellipsis when cut. */
+    public static String trim(String s, int n) {
+        return ellipsize(s == null ? "" : s.trim(), n);
+    }
+
     public static int palette(int i) {
         int[] p = Theme.DARK ? PALETTE : PALETTE_LIGHT;
         return p[Math.abs(i) % p.length];
@@ -405,7 +423,9 @@ public final class Charts {
                 drawBar3D(g, r, col, Theme.dp(6));
                 if (i % step == 0) {
                     text.setColor(Theme.MUTED);
-                    g.drawText(Money.fa(ellipsize(p.label, 9)), cx, plot.bottom + Theme.dp(16), text);
+                    // Label length follows the bar slot, so neighbouring labels never overlap or leave the plot.
+                    int maxChars = (int) Math.max(4, Math.min(12, slot / Theme.dp(6)));
+                    g.drawText(Money.fa(ellipsize(p.label, maxChars)), cx, plot.bottom + Theme.dp(16), text);
                 }
             }
             // tooltip bubble over the selected bar

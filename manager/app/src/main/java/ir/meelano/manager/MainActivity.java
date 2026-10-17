@@ -1111,9 +1111,10 @@ public class MainActivity extends Activity {
         Theme.pressable(arrow);
         arrow.setOnClickListener(v -> goBack());
         backLabel = null;
+        // Compact disc in the bottom corner, above the tab bar, so list rows stay readable.
         android.widget.FrameLayout.LayoutParams p = new android.widget.FrameLayout.LayoutParams(
-                Theme.dp(56), Theme.dp(56), Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
-        p.setMargins(0, 0, 0, Theme.dp(92));
+                Theme.dp(46), Theme.dp(46), Gravity.BOTTOM | Gravity.END);
+        p.setMargins(Theme.dp(14), 0, Theme.dp(14), Theme.dp(96));
         try {
             addContentView(arrow, p);
         } catch (Exception ignored) {

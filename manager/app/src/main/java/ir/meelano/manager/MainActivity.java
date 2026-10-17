@@ -1644,6 +1644,13 @@ public class MainActivity extends Activity {
     /** Two-row export bar: PDF + Excel + Word / image + print (share sheet covers social apps + Bluetooth). */
     public android.view.View exportBar(final String title, final String subtitle,
                                        final ReportCatalog.Col[] cols, final List<Row> rows) {
+        return exportBar(title, subtitle, cols, rows, true);
+    }
+
+    /** Same bar; pass withPrint=false where the screen already has its own print action. */
+    public android.view.View exportBar(final String title, final String subtitle,
+                                       final ReportCatalog.Col[] cols, final List<Row> rows,
+                                       boolean withPrint) {
         LinearLayout box = kit.v();
         LinearLayout r1 = kit.h();
         r1.addView(kit.btnGhost("▤ PDF", Theme.DANGER, v -> sharePdf(title, subtitle, cols, rows)), kit.wlp(1f));
@@ -1655,8 +1662,10 @@ public class MainActivity extends Activity {
         box.addView(kit.gap(8));
         LinearLayout r2 = kit.h();
         r2.addView(kit.btnGhost("▧ عکس", Theme.VIOLET, v -> sharePng(title, subtitle, cols, rows)), kit.wlp(1f));
-        r2.addView(kit.space(8));
-        r2.addView(kit.btnGhost("🖨 چاپ", Theme.GOLD, v -> printPdf(title, subtitle, cols, rows)), kit.wlp(1f));
+        if (withPrint) {
+            r2.addView(kit.space(8));
+            r2.addView(kit.btnGhost("🖨 چاپ", Theme.GOLD, v -> printPdf(title, subtitle, cols, rows)), kit.wlp(1f));
+        }
         box.addView(r2, kit.lp(-1, -2));
         return box;
     }

@@ -405,7 +405,7 @@ public final class Charts {
                 drawBar3D(g, r, col, Theme.dp(6));
                 if (i % step == 0) {
                     text.setColor(Theme.MUTED);
-                    g.drawText(Money.fa(ellipsize(p.label, 7)), cx, plot.bottom + Theme.dp(16), text);
+                    g.drawText(Money.fa(ellipsize(p.label, 9)), cx, plot.bottom + Theme.dp(16), text);
                 }
             }
             // tooltip bubble over the selected bar

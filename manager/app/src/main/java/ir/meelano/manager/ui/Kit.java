@@ -269,7 +269,12 @@ public final class Kit {
         t.addView(l, lp(-1, -2));
         TextView v = text(k.value, 16.5f, Theme.TEXT, true);
         v.setSingleLine(true);
-        v.setEllipsize(TextUtils.TruncateAt.END);
+        // Large amounts shrink to fit the tile instead of ending in "…".
+        if (android.os.Build.VERSION.SDK_INT >= 26) {
+            v.setAutoSizeTextTypeUniformWithConfiguration(10, 17, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
+        } else {
+            v.setEllipsize(TextUtils.TruncateAt.END);
+        }
         t.addView(v, lp(-1, -2));
         if (!Double.isNaN(k.countTo)) {
             ValueAnimator va = ValueAnimator.ofFloat(0f, 1f);
@@ -771,9 +776,13 @@ public final class Kit {
         return "—".equals(t) ? t : Money.fa(Jalali.faDate(t));
     }
 
-    /** Deluxe scrollable table: row numbers, gold zebra, red negatives, rounded card. */
+    /**
+     * Deluxe table that fits the card width. Columns share the width by weight (their
+     * former dp widths become relative weights), so nothing is clipped at either edge and
+     * no horizontal scroll is needed. Text columns wrap to two lines instead of truncating.
+     */
     public View dataTable(ReportCatalog.Col[] cols, List<Row> rows, final RowClick click) {
-        HorizontalScrollView sv = new HorizontalScrollView(a);
+        LinearLayout sv = v();
         sv.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         sv.setBackground(Theme.card());
         sv.setPadding(Theme.dp(4), Theme.dp(4), Theme.dp(4), Theme.dp(4));
@@ -783,44 +792,54 @@ public final class Kit {
         LinearLayout head = h();
         head.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         head.setBackground(Theme.tableHeader());
-        head.setPadding(Theme.dp(6), Theme.dp(9), Theme.dp(6), Theme.dp(9));
+        head.setPadding(Theme.dp(4), Theme.dp(9), Theme.dp(4), Theme.dp(9));
         TextView rn0 = text("#", 11.5f, Theme.GOLD_SOFT, true);
         rn0.setGravity(Gravity.CENTER);
-        head.addView(rn0, new LinearLayout.LayoutParams(Theme.dp(44), -2));
+        head.addView(rn0, new LinearLayout.LayoutParams(0, -2, 0.6f));
         for (ReportCatalog.Col c : cols) {
-            TextView h = text(c.title, 11.5f, Theme.GOLD_SOFT, true);
+            TextView h = text(c.title, 11f, Theme.GOLD_SOFT, true);
             h.setGravity(Gravity.CENTER);
-            head.addView(h, new LinearLayout.LayoutParams(Theme.dp(colWidth(c)), -2));
+            h.setMaxLines(2);
+            head.addView(h, new LinearLayout.LayoutParams(0, -2, colWeight(c)));
         }
-        t.addView(head, lp(-2, -2));
+        t.addView(head, lp(-1, -2));
         for (int i = 0; i < rows.size(); i++) {
             final Row r = rows.get(i);
             LinearLayout row = h();
             row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-            row.setPadding(Theme.dp(6), Theme.dp(10), Theme.dp(6), Theme.dp(10));
+            row.setPadding(Theme.dp(4), Theme.dp(10), Theme.dp(4), Theme.dp(10));
             if (i % 2 == 1) row.setBackgroundColor(Theme.alpha(Theme.GOLD, Theme.DARK ? 16 : 30));
             TextView rn = text(Money.fa(String.valueOf(i + 1)), 11f, Theme.MUTED, true);
             rn.setGravity(Gravity.CENTER);
-            row.addView(rn, new LinearLayout.LayoutParams(Theme.dp(44), -2));
+            row.addView(rn, new LinearLayout.LayoutParams(0, -2, 0.6f));
             for (ReportCatalog.Col c : cols) {
                 double dv = (c.type == ReportCatalog.T_MONEY || c.type == ReportCatalog.T_NUM) ? r.d(c.key) : 0;
                 int col = dv < -0.0001 ? Theme.DANGER
                         : (c.type == ReportCatalog.T_MONEY ? Theme.TEXT : (c.type == ReportCatalog.T_TEXT ? Theme.TEXT : Theme.MUTED));
-                TextView cell = text(fmtCol(c, r), 12f, col, c.type == ReportCatalog.T_MONEY);
+                TextView cell = text(fmtCol(c, r), 11.5f, col, c.type == ReportCatalog.T_MONEY);
                 cell.setGravity(Gravity.CENTER);
-                cell.setSingleLine(true);
-                cell.setEllipsize(TextUtils.TruncateAt.END);
-                row.addView(cell, new LinearLayout.LayoutParams(Theme.dp(colWidth(c)), -2));
+                if (c.type == ReportCatalog.T_TEXT) {
+                    cell.setMaxLines(2);
+                    cell.setEllipsize(TextUtils.TruncateAt.END);
+                } else {
+                    cell.setSingleLine(true);
+                }
+                row.addView(cell, new LinearLayout.LayoutParams(0, -2, colWeight(c)));
             }
             if (click != null) {
                 Theme.pressable(row);
                 row.setOnClickListener(v -> click.onRow(r));
             }
-            t.addView(row, lp(-2, -2));
+            t.addView(row, lp(-1, -2));
             if (i < rows.size() - 1) t.addView(divider(), lp(-1, Theme.dp(1)));
         }
-        sv.addView(t, new HorizontalScrollView.LayoutParams(-2, -2));
+        sv.addView(t, lp(-1, -2));
         return sv;
+    }
+
+    /** Relative width of a column: wider types get more room, so amounts never clip. */
+    private float colWeight(ReportCatalog.Col c) {
+        return colWidth(c) / 80f;
     }
 
     private int colWidth(ReportCatalog.Col c) {

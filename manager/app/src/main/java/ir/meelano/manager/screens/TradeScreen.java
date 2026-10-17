@@ -543,7 +543,7 @@ public class TradeScreen extends Screen {
         };
         if (!fLines.isEmpty()) {
             body.addView(a.kit.gap(8));
-            body.addView(a.exportBar("فاکتور " + fNo, fParty + " • " + fDate, expCols, fLines), a.kit.lp(-1, -2));
+            body.addView(a.exportBar("فاکتور " + fNo, fParty + " • " + fDate, expCols, fLines, false), a.kit.lp(-1, -2));
         }
         LinearLayout footer = a.kit.h();
         footer.addView(a.kit.btnGhost("🖨 چاپ", Theme.GOLD, v -> FisPrint.print(a, head, fLines, sales)), a.kit.wlp(1f));

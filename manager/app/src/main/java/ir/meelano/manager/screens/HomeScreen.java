@@ -82,7 +82,6 @@ public class HomeScreen extends Screen {
         content.removeAllViews();
         content.addView(greetingHero(), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
-        addExecutiveDock(content);
         content.addView(a.kit.gap(6));
         content.addView(a.kit.loading("در حال دریافت داشبورد مدیریتی…"), a.kit.lp(-1, -2));
 
@@ -152,8 +151,7 @@ public class HomeScreen extends Screen {
                 content.removeAllViews();
                 content.addView(greetingHero(), a.kit.lp(-1, -2));
                 content.addView(a.kit.gap(10));
-                addExecutiveDock(content);
-                content.addView(a.kit.gap(8));
+                        content.addView(a.kit.gap(8));
                 content.addView(a.kit.error(faError, () -> render(content)), a.kit.lp(-1, -2));
             }
         });
@@ -339,7 +337,8 @@ public class HomeScreen extends Screen {
     }
 
     /** A compact luxury launchpad to the five high-frequency management destinations. */
-    private void addExecutiveDock(LinearLayout content) {
+    /** Quick-access strip. Lives in the Command Room (اتاق فرمان) so the home screen stays calm. */
+    void addExecutiveDock(LinearLayout content) {
         String[][] suggested = {
                 {"sales", "فاکتورها", "فروش و پیگیری"},
                 {"cash", "خزانه", "نقدینگی و گردش"},
@@ -407,7 +406,6 @@ public class HomeScreen extends Screen {
         content.removeAllViews();
         content.addView(greetingHero(), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
-        addExecutiveDock(content);
         content.addView(a.kit.gap(8));
 
         // Render each dashboard section into its own container so the lower-priority

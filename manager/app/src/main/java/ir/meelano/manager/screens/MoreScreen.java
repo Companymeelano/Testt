@@ -128,6 +128,9 @@ public class MoreScreen extends Screen {
         content.addView(a.kit.hero("▣", "اتاق فرمان",
                 "دستیار، گزارش‌ها و همهٔ بخش‌ها در یک جا", Theme.GOLD), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
+        // Quick access moved here from the home screen.
+        new HomeScreen(a).addExecutiveDock(content);
+        content.addView(a.kit.gap(10));
 
         LinearLayout segRow = a.kit.h();
         for (int i = 0; i < SEG_LABELS.length; i++) {

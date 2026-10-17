@@ -1,0 +1,46 @@
+{
+  "demo": {
+    "store": "فروشگاه نمونه",
+    "hook_question": "فروش امروزت؟",
+    "assistant_idle": "سوال خود را بپرس",
+    "input_hint": "از دستیار بپرس…",
+    "assistant_label": "دستیار",
+    "live_chat": "گفتگوی زنده",
+    "sales_total_m": 400,
+    "sales_invoices": 54,
+    "buy_m": 120,
+    "receive_m": 280,
+    "pay_m": 90,
+    "dash_footer": "به‌روزرسانی لحظه‌ای",
+    "stock": [
+      {"name": "بادام اصلی", "qty": "موجودی: ۱۲ کیلو", "status": "کم‌موجود", "tone": "gold"},
+      {"name": "کاجو", "qty": "موجودی: صفر", "status": "ناموجود", "tone": "red"},
+      {"name": "پسته اکبری", "qty": "موجودی: ۸۵ کیلو", "status": "موجود", "tone": "teal"}
+    ],
+    "stock_action": "پیشنهاد سفارش",
+    "sections": ["فاکتور", "صندوق", "چک‌ها", "انبار", "خرید", "گزارش‌ها"],
+    "cta_button": "امروز امتحان کن"
+  },
+  "scenes_full": [
+    {"id": "hook", "screen": "chat_type", "dur": 4.0, "voice": "v1.wav",
+     "text": "فروش امروزت؟ فقط بپرس.", "key": "فقط بپرس"},
+    {"id": "assistant", "screen": "chat_answer", "dur": 8.0, "voice": "v2t.wav",
+     "text": "دستیار هوشمند فارسی، جواب فوری. فروش امروز ۴۰۰ میلیون تومان، در ۵۴ فاکتور.", "key": "جواب فوری"},
+    {"id": "dashboard", "screen": "dash", "dur": 5.0, "voice": "v3.wav",
+     "text": "همه‌ی اعداد مهم، یک نگاه، لحظه‌ای.", "key": "یک نگاه"},
+    {"id": "stock", "screen": "stock", "dur": 5.0, "voice": "v4.wav",
+     "text": "کالا تمام شد؟ قبل از مشتری بدان.", "key": "قبل از مشتری"},
+    {"id": "sections", "screen": "grid", "dur": 6.0, "voice": "v5t.wav",
+     "text": "فاکتور، صندوق، چک، انبار. همه در یک اپ.", "key": "همه در یک اپ"},
+    {"id": "cta", "screen": "end", "dur": 5.5, "voice": "v6.wav",
+     "text": "مدیریت فروشگاهت، در جیب تو. امروز امتحان کن.", "key": "در جیب تو"}
+  ],
+  "scenes_short": [
+    {"id": "hook", "screen": "chat_type", "dur": 4.0, "voice": "v1.wav",
+     "text": "فروش امروزت؟ فقط بپرس.", "key": "فقط بپرس"},
+    {"id": "dashboard", "screen": "dash", "dur": 5.0, "voice": "v3.wav",
+     "text": "همه‌ی اعداد مهم، یک نگاه، لحظه‌ای.", "key": "یک نگاه"},
+    {"id": "cta", "screen": "end", "dur": 5.5, "voice": "v6.wav",
+     "text": "مدیریت فروشگاهت، در جیب تو. امروز امتحان کن.", "key": "در جیب تو"}
+  ]
+}

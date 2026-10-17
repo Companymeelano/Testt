@@ -103,7 +103,7 @@ public class LoginActivity extends Activity {
         hlp.setMargins(0, Theme.dp(8), 0, 0);
         root.addView(hair, hlp);
         TextView s = kit.text("پس از انتخاب دیتابیس، با حساب مدیریت یا انبارداری وارد شوید",
-                12.5f, Theme.MUTED, false);
+                13.5f, Theme.TEXT, false);
         s.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams sp = kit.lp(-1, -2);
         sp.setMargins(0, Theme.dp(6), 0, Theme.dp(16));

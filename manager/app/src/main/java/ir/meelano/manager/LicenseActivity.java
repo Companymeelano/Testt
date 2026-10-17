@@ -462,9 +462,8 @@ public class LicenseActivity extends Activity {
                 } catch (Exception ignored) { Diag.ignored("LicenseActivity:450", ignored); }
             }
         });
+        // Same width as the name row: the validity tick used to narrow this field, so it is no longer placed here.
         LinearLayout prow = iconField(fPhone, R.drawable.mi_call);
-        prow.addView(kit.space(6));
-        prow.addView(tick, kit.lp(-2, -2));
         c.addView(prow, kit.lp(-1, -2));
         c.addView(errPhone, kit.lp(-1, -2));
         c.addView(kit.gap(4));
@@ -1023,7 +1022,7 @@ public class LicenseActivity extends Activity {
         box.addView(Card3D.hero(this, kit, R.drawable.mi_database, Theme.GOLD,
                 editingConnection ? "تغییر سرور اختصاصی" : "اتصال اختصاصی فروشگاه",
                 editingConnection ? "آدرس فعلی را جایگزین کنید و دیتابیس را دوباره انتخاب کنید."
-                        : "IP سرور را وارد کنید؛ سپس دیتابیس سازگار را با یک لمس انتخاب کنید.",
+                        : "آدرس سرور را وارد کنید، سپس دیتابیس سازگار را انتخاب کنید.",
                 editingConnection ? "ویرایش اتصال" : "گام ۲ • اتصال", Theme.GOLD_SOFT),
                 kit.lp(-1, -2));
         box.addView(kit.gap(8));

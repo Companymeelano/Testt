@@ -94,13 +94,17 @@ public final class AiSettings {
             for (int i = row; i < Math.min(row + 4, options.length); i++) {
                 final String[] o = options[i];
                 boolean on = o[0].equals(provider);
-                provRow.addView(a.kit.chip(o[1], on, Theme.GOLD, v -> {
+                // Four per row: tighter padding and size so names like "OpenRouter" are not cut.
+                android.widget.TextView pc = a.kit.chip(o[1], on, Theme.GOLD, v -> {
                     p.edit().putString("provider", o[0]).apply();
                     if (p.getString("model", "").trim().isEmpty() && !AiClient.defaultModel(o[0]).isEmpty()) {
                         p.edit().putString("model", AiClient.defaultModel(o[0])).apply();
                     }
                     rerender.run();
-                }), a.kit.wlp(1f));
+                });
+                pc.setTextSize(10.5f);
+                pc.setPadding(Theme.dp(4), Theme.dp(8), Theme.dp(4), Theme.dp(8));
+                provRow.addView(pc, a.kit.wlp(1f));
             }
             card.addView(provRow, a.kit.lp(-1, -2));
             card.addView(a.kit.gap(4));

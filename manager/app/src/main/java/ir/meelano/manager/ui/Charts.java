@@ -559,7 +559,7 @@ public final class Charts {
                 g.drawCircle(lx - Theme.dp(5), row - Theme.dp(3.5f), Theme.dp(4), paint);
                 paint.setColor(Theme.TEXT);
                 paint.setTextAlign(Paint.Align.RIGHT);
-                String leg = ellipsize(p.label, 12) + "  " + Money.pct(sum > 0 ? Math.max(0, p.value) * 100.0 / sum : 0);
+                String leg = ellipsize(p.label, 16) + "  " + Money.pct(sum > 0 ? Math.max(0, p.value) * 100.0 / sum : 0);
                 g.drawText(Money.fa(leg), lx - Theme.dp(13), row, paint);
             }
         }

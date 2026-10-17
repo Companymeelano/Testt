@@ -99,8 +99,6 @@ public class HomeScreen extends Screen {
         content.removeAllViews();
         content.addView(greetingHero(), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
-        content.addView(marketCard(), a.kit.lp(-1, -2));
-        content.addView(a.kit.gap(10));
         content.addView(a.kit.gap(6));
         content.addView(a.kit.loading("در حال دریافت داشبورد مدیریتی…"), a.kit.lp(-1, -2));
 
@@ -433,6 +431,9 @@ public class HomeScreen extends Screen {
                 new int[]{0x00000000, Theme.alpha(Theme.GOLD, Theme.isLight() ? 120 : 110), 0x00000000}));
         hero.addView(divider, a.kit.lp(-1, Theme.dp(1)));
         hero.addView(a.kit.gap(9));
+        // Rates (dollar, gold, coin) and Tehran weather live inside the welcome card.
+        hero.addView(marketCard(), a.kit.lp(-1, -2));
+        hero.addView(a.kit.gap(10));
         LinearLayout footer = a.kit.h();
         footer.addView(a.kit.icon(R.drawable.mi_calendar_month, Theme.GOLD_SOFT, 16),
                 new LinearLayout.LayoutParams(Theme.dp(16), Theme.dp(16)));
@@ -900,14 +901,21 @@ public class HomeScreen extends Screen {
         // ---- debtors ----
         if (d.debtors != null && !d.debtors.isEmpty()) {
             content.addView(a.kit.sectionHead("بدهکاران اولویت‌دار", "مشتریان ›", v -> gotoDebtors()), a.kit.lp(-1, -2));
+            final java.util.Map<String, android.widget.ImageView> slots = new java.util.HashMap<>();
+            final List<String> codes = new ArrayList<>();
             for (Row r : d.debtors) {
                 final String code = r.s("code");
-                View row = a.kit.personRow(r.s("party"), "کد " + Money.fa(code), Money.rial(r.d("amount")),
-                        "مانده بدهی", Theme.DANGER, v -> gotoCustomer(code));
+                final String party = r.s("party");
+                codes.add(code);
+                View av = ir.meelano.manager.data.CustomerPhotos.avatar(a, code, a.kit.initials(party), Theme.DANGER, 48, slots);
+                View row = a.kit.personRow(party, "کد " + Money.fa(code), Money.rial(r.d("amount")),
+                        "مانده بدهی", Theme.DANGER, v -> gotoCustomer(code), av);
                 LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
                 p.setMargins(0, 0, 0, Theme.dp(10));
                 content.addView(row, p);
             }
+            ir.meelano.manager.data.CustomerPhotos.refresh(a.repo, a, codes,
+                    () -> ir.meelano.manager.data.CustomerPhotos.fill(slots, a));
         }
     }
 

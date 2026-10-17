@@ -371,13 +371,25 @@ public final class Kit {
     }
 
     public View personRow(String name, String subLine, String value, String pillText, int accent, View.OnClickListener onClick) {
+        return personRow(name, subLine, value, pillText, accent, onClick, null);
+    }
+
+    /** Same row; a real customer picture can replace the initials when a view is supplied. */
+    public View personRow(String name, String subLine, String value, String pillText, int accent,
+                          View.OnClickListener onClick, View avatar) {
         LinearLayout c = v();
         c.setBackground(Theme.cardAccent(accent));
         c.setPadding(Theme.dp(12), Theme.dp(11), Theme.dp(12), Theme.dp(11));
         LinearLayout head = h();
-        TextView av = text(initials(name), 16, Theme.onAccent(accent), true);
-        av.setGravity(Gravity.CENTER);
-        av.setBackground(Theme.accentAvatar(accent));
+        View av;
+        if (avatar != null) {
+            av = avatar;
+        } else {
+            TextView initialsView = text(initials(name), 16, Theme.onAccent(accent), true);
+            initialsView.setGravity(Gravity.CENTER);
+            initialsView.setBackground(Theme.accentAvatar(accent));
+            av = initialsView;
+        }
         head.addView(av, new LinearLayout.LayoutParams(Theme.dp(48), Theme.dp(48)));
         head.addView(space(9));
         LinearLayout copy = v();

@@ -124,6 +124,10 @@ public class ReportsScreen extends Screen {
     @Override
     public void render(final LinearLayout content) {
         contentRef = content;
+        if (!restored) {
+            restored = true;
+            restoreState();
+        }
         if (pendingCategory != null) {
             selCat = pendingCategory;
             sel = null;
@@ -131,6 +135,43 @@ public class ReportsScreen extends Screen {
         }
         if (sel == null) renderList(content);
         else renderReport(content, sel);
+        saveState();
+    }
+
+    private static final String STATE_PREFS = "reports_state";
+    private boolean restored = false;
+
+    /** Restores the last section, report, period and search so returning to Reports picks up where the user left off. */
+    private void restoreState() {
+        try {
+            android.content.SharedPreferences p = a.getSharedPreferences(STATE_PREFS, android.content.Context.MODE_PRIVATE);
+            String rep = p.getString("rep", "");
+            String cat = p.getString("cat", "");
+            if (!rep.isEmpty()) sel = ReportCatalog.byId(rep);
+            if (sel == null && !cat.isEmpty()) selCat = cat;
+            int preset = p.getInt("preset", -1);
+            if (preset >= 0) filter.preset = preset;
+            filter.from = p.getString("from", filter.from);
+            filter.to = p.getString("to", filter.to);
+            filter.search = p.getString("search", filter.search);
+        } catch (Exception ignored) {
+            Diag.ignored("ReportsScreen:restore", ignored);
+        }
+    }
+
+    private void saveState() {
+        try {
+            a.getSharedPreferences(STATE_PREFS, android.content.Context.MODE_PRIVATE).edit()
+                    .putString("rep", sel == null ? "" : sel.id)
+                    .putString("cat", selCat == null ? "" : selCat)
+                    .putInt("preset", filter.preset)
+                    .putString("from", filter.from == null ? "" : filter.from)
+                    .putString("to", filter.to == null ? "" : filter.to)
+                    .putString("search", filter.search == null ? "" : filter.search)
+                    .apply();
+        } catch (Exception ignored) {
+            Diag.ignored("ReportsScreen:save", ignored);
+        }
     }
 
     private void renderList(final LinearLayout content) {
@@ -405,6 +446,9 @@ public class ReportsScreen extends Screen {
         content.addView(a.kit.gap(12));
         content.addView(a.kit.loading("در حال تهیه گزارش…"), a.kit.lp(-1, -2));
         final Filter f = filter.copy();
+        // Offline copy is keyed by the range and search, so a cached report never shows another period.
+        final String cacheKey = "cx_rep_" + spec.id + "_"
+                + Integer.toHexString((f.from + "|" + f.to + "|" + f.search + "|" + f.status).hashCode());
 
         a.repo.run(c -> {
             Meta m = new Meta(c);
@@ -421,14 +465,14 @@ public class ReportsScreen extends Screen {
             public void ok(List<Row> rows) {
 java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
                 sm.put("rows", rows);
-                CacheStore.saveData(a, "cx_rep_" + spec.id, cacheNow(), sm);
+                CacheStore.saveData(a, cacheKey, cacheNow(), sm);
                 buildReport(content, spec, rows);
             }
 
             @Override
             public void fail(String faError) {
                 String[] lab = {""};
-                java.util.Map<String, Object> cm = CacheStore.loadData(a, "cx_rep_" + spec.id, lab);
+                java.util.Map<String, Object> cm = CacheStore.loadData(a, cacheKey, lab);
                 if (cm != null) {
                     buildReport(content, spec, CacheStore.rows(cm, "rows"));
                     offlineBanner(content, lab[0], faError);

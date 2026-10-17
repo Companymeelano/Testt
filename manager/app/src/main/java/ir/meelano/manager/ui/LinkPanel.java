@@ -212,7 +212,7 @@ public final class LinkPanel {
                 if (retry != null) retry.run();
             }), kit.wlp(1f));
             row.addView(kit.space(8));
-            row.addView(kit.btnGhost("عیب‌یابی کامل", Theme.TEAL, v -> {
+            row.addView(kit.btnGhost("عیب‌یابی کامل", Theme.GOLD, v -> {
                 try {
                     if (box[0] != null) box[0].dismiss();
                 } catch (Exception ignored) { Diag.ignored("LinkPanel:217", ignored); }
@@ -292,7 +292,7 @@ public final class LinkPanel {
                 if (retry != null) retry.run();
             }), kit.wlp(1f));
             row.addView(kit.space(8));
-            row.addView(kit.btnGhost("کپی گزارش", Theme.TEAL, v -> copyReport(a, r)), kit.wlp(1f));
+            row.addView(kit.btnGhost("کپی گزارش", Theme.GOLD, v -> copyReport(a, r)), kit.wlp(1f));
             body.addView(row, kit.lp(-1, -2));
             body.addView(kit.gap(8));
             body.addView(kit.btnGhost("بستن", Theme.MUTED, v -> {

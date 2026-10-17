@@ -88,6 +88,10 @@ public class MainActivity extends Activity {
     public Settings settings;
 
     private LinearLayout content;
+    /** Column that holds the current page; each render swaps in a fresh page. */
+    private LinearLayout contentWrap;
+    /** Incremented on every render. Async work captures it and stops once it changes. */
+    private int renderGen = 0;
     private ScrollView scroll;
     private LinearLayout bottomBar;
     private android.widget.ImageView linkIcon;
@@ -609,14 +613,10 @@ public class MainActivity extends Activity {
 
         // content (centered max-width column on tablets / wide screens)
         scroll = new ScrollView(this);
-        LinearLayout centerWrap = kit.h();
-        centerWrap.setGravity(Gravity.CENTER_HORIZONTAL);
-        content = kit.v();
-        // Bottom room so the back capsule never covers the last row.
-        content.setPadding(Theme.dp(12), Theme.dp(4), Theme.dp(12), Theme.dp(128));
-        scroll.addView(centerWrap, new ScrollView.LayoutParams(-1, -2));
-        int sw = getResources().getDisplayMetrics().widthPixels;
-        centerWrap.addView(content, new LinearLayout.LayoutParams(sw > Theme.dp(720) ? Theme.dp(640) : -1, -2));
+        contentWrap = kit.h();
+        contentWrap.setGravity(Gravity.CENTER_HORIZONTAL);
+        scroll.addView(contentWrap, new ScrollView.LayoutParams(-1, -2));
+        content = newPage();
         root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1f));
 
         // bottom bar
@@ -1030,10 +1030,30 @@ public class MainActivity extends Activity {
     private void renderCurrent() {
         Screen s = screens.get(currentId);
         if (s == null) return;
+        renderGen++;
+        // A new page for every render: a slow query that returns after the user has moved to
+        // another section fills the old, detached page and can no longer repaint the screen on display.
+        content = newPage();
         refreshChrome();
         scroll.scrollTo(0, 0);
         s.render(content);
     }
+
+    /** Builds an empty, centred page column and puts it on screen in place of the previous one. */
+    private LinearLayout newPage() {
+        LinearLayout page = kit.v();
+        // Bottom room so the back capsule never covers the last row.
+        page.setPadding(Theme.dp(12), Theme.dp(4), Theme.dp(12), Theme.dp(128));
+        int sw = getResources().getDisplayMetrics().widthPixels;
+        if (contentWrap != null) {
+            contentWrap.removeAllViews();
+            contentWrap.addView(page, new LinearLayout.LayoutParams(sw > Theme.dp(720) ? Theme.dp(640) : -1, -2));
+        }
+        return page;
+    }
+
+    /** Current render generation; changes whenever a different page or a re-render replaces what is on screen. */
+    public int renderGen() { return renderGen; }
 
     /** Id of the screen that is on display right now. */
     public String currentScreenId() { return currentId; }

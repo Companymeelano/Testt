@@ -207,7 +207,7 @@ public final class AiSettings {
             rerender.run();
         }), a.kit.lp(-1, -2));
         card.addView(a.kit.gap(6));
-        card.addView(a.kit.btnGhost("⟳ آزمایش اتصال", Theme.TEAL, v -> testConnection(a, provider,
+        card.addView(a.kit.btnGhost("⟳ آزمایش اتصال", Theme.GOLD, v -> testConnection(a, provider,
                 model.getText().toString().trim(), baseUrl.getText().toString().trim(),
                 key.getText().toString().trim())), a.kit.lp(-1, -2));
         card.addView(a.kit.gap(6));

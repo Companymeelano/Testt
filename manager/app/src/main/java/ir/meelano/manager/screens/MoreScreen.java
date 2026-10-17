@@ -199,7 +199,7 @@ public class MoreScreen extends Screen {
         if ("دریافت و پرداخت".equals(group)) return Theme.SUCCESS;
         if ("چک‌ها".equals(group)) return Theme.INFO;
         if ("کالا و انبار".equals(group)) return Theme.VIOLET;
-        if ("مشتریان".equals(group)) return Theme.TEAL;
+        if ("مشتریان".equals(group)) return Theme.GOLD;
         if ("ویزیتورها".equals(group)) return Theme.WARNING;
         if ("سود و زیان".equals(group)) return Theme.GOLD_SOFT;
         if ("برگشتی و ابطالی".equals(group)) return Theme.DANGER;
@@ -312,7 +312,7 @@ public class MoreScreen extends Screen {
         if ("tv".equals(entry.id)) {
             title = "تلویزیون فروشگاه";
             glyph = "📺";
-            accent = Theme.TEAL;
+            accent = Theme.GOLD;
         } else {
             Screen destination = a.screen(entry.id);
             if (destination == null) return a.kit.space(1);
@@ -397,7 +397,7 @@ public class MoreScreen extends Screen {
     private int groupAccent(String accent) {
         if ("success".equals(accent)) return Theme.SUCCESS;
         if ("info".equals(accent)) return Theme.INFO;
-        if ("teal".equals(accent)) return Theme.TEAL;
+        if ("teal".equals(accent)) return Theme.GOLD;
         if ("steel".equals(accent)) return Theme.STEEL;
         return Theme.GOLD;
     }

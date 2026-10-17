@@ -292,7 +292,7 @@ public final class WhatsNew {
             body.addView(kit.gap(6));
             body.addView(kit.text(it.detail, 13.5f, Theme.TEXT, false), kit.lp(-1, -2));
             body.addView(kit.gap(10));
-            LinearLayout where = kit.card(Theme.TEAL);
+            LinearLayout where = kit.card(Theme.GOLD);
             where.addView(kit.text("📍 کجای برنامه؟", 13f, Theme.TEXT, true), kit.lp(-1, -2));
             where.addView(kit.text(it.where, 13f, Theme.GOLD_SOFT, true), kit.lp(-1, -2));
             body.addView(where, kit.lp(-1, -2));

@@ -1,5 +1,6 @@
 package ir.meelano.manager.screens;
 
+import ir.meelano.manager.data.CustomerPhotos;
 import ir.meelano.manager.core.Diag;
 import android.app.AlertDialog;
 import android.view.View;
@@ -35,6 +36,8 @@ import java.util.Map;
 /** Customers: buckets, balances, and the full dossier (ledger + invoices + vouchers + cheques). */
 public class CustomersScreen extends Screen {
     private final Filter filter = new Filter();
+    /** Avatar slots waiting for their picture (SHMO code → image view). Rebuilt on every render. */
+    private final java.util.Map<String, android.widget.ImageView> avatarSlots = new java.util.HashMap<>();
     /** Queued debtor-SMS, flushed once SEND_SMS is granted. */
     private String pendSmsPhone = "";
     private String pendSmsText = "";
@@ -153,9 +156,7 @@ public class CustomersScreen extends Screen {
 
         LinearLayout top = a.kit.h();
         top.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        android.widget.TextView av = a.kit.text(a.kit.initials(name), 15f, Theme.onAccent(col), true);
-        av.setGravity(android.view.Gravity.CENTER);
-        av.setBackground(Theme.accentAvatar(col));
+        android.view.View av = CustomerPhotos.avatar(a, code, a.kit.initials(name), col, 50, avatarSlots);
         top.addView(av, new LinearLayout.LayoutParams(Theme.dp(50), Theme.dp(50)));
         top.addView(a.kit.space(12));
         LinearLayout copy = a.kit.v();
@@ -169,7 +170,7 @@ public class CustomersScreen extends Screen {
         String route = r.s("route");
         if (!route.isEmpty()) {
             meta.addView(a.kit.space(6));
-            meta.addView(tag(route, Theme.TEAL));
+            meta.addView(tag(route, Theme.GOLD));
         }
         LinearLayout.LayoutParams mp = a.kit.lp(-1, -2);
         mp.setMargins(0, Theme.dp(5), 0, 0);
@@ -302,14 +303,19 @@ public class CustomersScreen extends Screen {
                         12f, Theme.MUTED, false), a.kit.lp(-1, -2));
                 content.addView(a.kit.gap(8));
             }
+            avatarSlots.clear();
+            List<String> codes = new java.util.ArrayList<>();
             for (Row r : d.list) {
                 final String code = r.s("code");
+                codes.add(code);
                 double bal = r.d("balance");
                 View v = customerCard(r, code, bal);
                 LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
                 p.setMargins(0, 0, 0, Theme.dp(10));
                 content.addView(v, p);
             }
+            // One batched query for the pictures of this page; rows fill in when they arrive.
+            CustomerPhotos.refresh(a.repo, a, codes, () -> CustomerPhotos.fill(avatarSlots, a));
             if (!searching) {
                 final boolean hasMore = d.list.size() >= Math.max(1, filter.top);
                 content.addView(a.kit.pager(filter.page, hasMore,
@@ -394,6 +400,15 @@ public class CustomersScreen extends Screen {
         final AlertDialog[] dlgH = new AlertDialog[1];
         Row h = dz.header;
         LinearLayout body = a.kit.v();
+        final java.util.Map<String, android.widget.ImageView> dossierSlots = new java.util.HashMap<>();
+        LinearLayout avRow = a.kit.h();
+        avRow.setGravity(android.view.Gravity.CENTER_HORIZONTAL);
+        avRow.addView(CustomerPhotos.avatar(a, dz.code, a.kit.initials(h.s("name")), Theme.GOLD, 72, dossierSlots),
+                new LinearLayout.LayoutParams(Theme.dp(72), Theme.dp(72)));
+        body.addView(avRow, a.kit.lp(-1, -2));
+        body.addView(a.kit.gap(6));
+        CustomerPhotos.refresh(a.repo, a, java.util.Collections.singletonList(dz.code),
+                () -> CustomerPhotos.fill(dossierSlots, a));
         body.addView(a.kit.kv("مشتری", h.s("name").isEmpty() ? "—" : h.s("name"), Theme.TEXT), a.kit.lp(-1, -2));
         body.addView(a.kit.kv("کد", Money.fa(dz.code), Theme.TEXT), a.kit.lp(-1, -2));
         if (!h.s("cell").isEmpty()) body.addView(a.kit.kv("موبایل", Money.fa(h.s("cell")), Theme.TEXT), a.kit.lp(-1, -2));
@@ -544,7 +559,7 @@ public class CustomersScreen extends Screen {
             final String dCell = cell0;
             final String dName = h.s("name");
             final double dBal = bal;
-            body.addView(a.kit.btnGhost("✉ یادآوری بدهی با پیامک", Theme.TEAL, v ->
+            body.addView(a.kit.btnGhost("✉ یادآوری بدهی با پیامک", Theme.GOLD, v ->
                     debtDialog(dCell, dName, dBal)), a.kit.lp(-1, -2));
             body.addView(a.kit.gap(6));
         }

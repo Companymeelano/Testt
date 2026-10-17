@@ -93,11 +93,11 @@ public class ReportsScreen extends Screen {
         if ("سود و زیان".equals(section)) return Theme.GOLD;
         if ("بانک و صندوق".equals(section)) return Theme.INFO;
         if ("کاربران و نظارت".equals(section)) return Theme.STEEL;
-        if ("هوشمند".equals(section)) return Theme.TEAL;
+        if ("هوشمند".equals(section)) return Theme.VIOLET;
         if ("هزینه‌ها".equals(section)) return Theme.ROSE;
         if ("برگشتی و ابطالی".equals(section)) return Theme.DANGER;
         if ("تحلیل ویزیتور و مسیر".equals(section)) return Theme.WARNING;
-        if ("سرفصل‌ها".equals(section)) return Theme.TEAL;
+        if ("سرفصل‌ها".equals(section)) return Theme.GOLD_SOFT;
         return Theme.MUTED;
     }
 

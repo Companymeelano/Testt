@@ -192,6 +192,26 @@ public final class MasterQueries {
     // CUSTOMERS — CUSTOMERS / cust_act.
     // =====================================================================================
     /** Summary: total,debtorsN,debtorsSum,creditorsN,creditorsSum,settledN,blockedN. */
+    /**
+     * Customer pictures for a batch of SHMO codes (table cus_image: shmo, image, RDF).
+     * Columns returned: code (SHMO as text), img (image bytes). Read-only, bounded by the id list.
+     */
+    public static Queries.Q customerPhotos(Meta m, java.util.List<Long> ids) throws Queries.Missing {
+        if (!m.table("cus_image")) throw new Queries.Missing("جدول تصویر مشتریان در دیتابیس پیدا نشد");
+        String img = m.col("cus_image", "image", "Image", "pic");
+        String key = m.col("cus_image", "shmo", "SHMO");
+        if (img == null || key == null) throw new Queries.Missing("ستون تصویر مشتری در دیتابیس پیدا نشد");
+        StringBuilder in = new StringBuilder();
+        java.util.List<Object> binds = new java.util.ArrayList<>();
+        for (Long id : ids) {
+            if (in.length() > 0) in.append(',');
+            in.append('?');
+            binds.add(id);
+        }
+        return new Queries.Q("SELECT TRY_CONVERT(nvarchar(100),[" + key + "]) AS code, [" + img + "] AS img"
+                + " FROM dbo.cus_image WHERE [" + key + "] IN (" + in + ")", binds);
+    }
+
     public static Queries.Q customersSummary(Meta m) throws Queries.Missing {
         String bal = m.must("CUSTOMERS", "مانده", "man", "Balance", "Mandeh");
         String blocked = m.col("CUSTOMERS", "black_list");

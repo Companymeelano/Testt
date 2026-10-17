@@ -223,10 +223,10 @@ public final class Speaker {
         body.addView(a.kit.gap(12));
         body.addView(a.kit.btnGold("۱. نصب eSpeak NG از فروشگاه", v -> openStore(a)), a.kit.lp(-1, -2));
         body.addView(a.kit.gap(6));
-        body.addView(a.kit.btnGhost("صفحهٔ F-Droid (جایگزین)", Theme.TEAL, v -> openUrl(a, ESPEAK_FDROID)),
+        body.addView(a.kit.btnGhost("صفحهٔ F-Droid (جایگزین)", Theme.GOLD, v -> openUrl(a, ESPEAK_FDROID)),
                 a.kit.lp(-1, -2));
         body.addView(a.kit.gap(6));
-        body.addView(a.kit.btnGhost("⟳ بررسی مجدد", Theme.TEAL, v -> probe(a, () -> {
+        body.addView(a.kit.btnGhost("⟳ بررسی مجدد", Theme.GOLD, v -> probe(a, () -> {
             if (state == READY) {
                 closeSetup();
                 a.kit.toast("صدای فارسی آماده است (" + engineName + ")");

@@ -60,7 +60,7 @@ public class SettingsScreen extends Screen {
     public String glyph() { return "⚙"; }
 
     @Override
-    public int accent() { return Theme.TEAL; }
+    public int accent() { return Theme.GOLD; }
 
     @Override
     public void render(final LinearLayout content) {
@@ -234,7 +234,7 @@ public class SettingsScreen extends Screen {
         }), a.kit.lp(-1, -2));
         c.addView(a.kit.btnGhost(cfg ? "✦ تغییر IP / دیتابیس" : "✦ تنظیم IP / دیتابیس",
                 Theme.GOLD, v -> a.openConnectionSetup()), a.kit.lp(-1, -2));
-        c.addView(a.kit.btnGhost("🛠 عیب‌یابی هوشمند اتصال", Theme.TEAL, v -> {
+        c.addView(a.kit.btnGhost("🛠 عیب‌یابی هوشمند اتصال", Theme.GOLD, v -> {
             try {
                 ir.meelano.manager.ui.LinkPanel.showDiagnose(a, a.settings);
             } catch (Exception e) {
@@ -320,7 +320,7 @@ public class SettingsScreen extends Screen {
             render(content);
         }));
         final boolean bkp = a.settings.backupOn();
-        addRow(nt, toggleRow("یادآوری پشتیبان‌گیری هفتگی", "جمعه‌ها ساعت ۹", bkp, Theme.TEAL, v -> {
+        addRow(nt, toggleRow("یادآوری پشتیبان‌گیری هفتگی", "جمعه‌ها ساعت ۹", bkp, Theme.GOLD, v -> {
             a.settings.setBackupOn(!bkp);
             if (!bkp) ir.meelano.manager.core.Notify.scheduleWeekly(a);
             else ir.meelano.manager.core.Notify.cancelWeekly(a);
@@ -392,8 +392,8 @@ public class SettingsScreen extends Screen {
     private void buildBackup(final LinearLayout content) {
         content.addView(sectionHead("💾 پشتیبان‌گیری هوشمند",
                 "بکاپ کامل جداول آتیران در یک فایل ZIP داخل Downloads ذخیره می‌شود.",
-                Theme.TEAL), a.kit.lp(-1, -2));
-        LinearLayout bk = a.kit.card(Theme.TEAL);
+                Theme.GOLD), a.kit.lp(-1, -2));
+        LinearLayout bk = a.kit.card(Theme.GOLD);
         String bl = a.settings.backupLast();
         if (!bl.isEmpty())
             bk.addView(a.kit.kv("آخرین بکاپ", bl + (a.settings.backupSize().isEmpty() ? "" : " • " + a.settings.backupSize()), Theme.TEXT),
@@ -403,9 +403,9 @@ public class SettingsScreen extends Screen {
                 a.kit.lp(-1, -2));
         a.kit.addCard(content, bk);
 
-        LinearLayout auto = a.kit.card(Theme.TEAL);
+        LinearLayout auto = a.kit.card(Theme.GOLD);
         final boolean abo = a.settings.abOn();
-        addRow(auto, toggleRow("بکاپ خودکار شبانه", "هر شب سر ساعت، بی‌نیاز از اقدام دستی", abo, Theme.TEAL, v -> {
+        addRow(auto, toggleRow("بکاپ خودکار شبانه", "هر شب سر ساعت، بی‌نیاز از اقدام دستی", abo, Theme.GOLD, v -> {
             a.settings.setAbOn(!abo);
             if (!abo) ir.meelano.manager.core.AutoBackup.schedule(a);
             else ir.meelano.manager.core.AutoBackup.cancel(a);
@@ -637,7 +637,7 @@ public class SettingsScreen extends Screen {
                 ir.meelano.manager.core.Brand.openSite(a)), a.kit.lp(-1, -2));
         for (String ph : ir.meelano.manager.core.Brand.PHONES) {
             final String fph = ph;
-            ab.addView(a.kit.btnGhost("📞  " + Money.fa(ph), Theme.TEAL, v ->
+            ab.addView(a.kit.btnGhost("📞  " + Money.fa(ph), Theme.GOLD, v ->
                     ir.meelano.manager.core.Brand.dial(a, fph)), a.kit.lp(-1, -2));
         }
         ab.addView(a.kit.hint("همه بخش‌ها داده زنده نمایش می‌دهند؛ بدون اتصال، اطلاع‌رسانی می‌شود."), a.kit.lp(-1, -2));
@@ -653,7 +653,7 @@ public class SettingsScreen extends Screen {
         ab.addView(a.kit.hint(ir.meelano.manager.core.UpdateCenter.lastCheckLine(a)), a.kit.lp(-1, -2));
         ab.addView(a.kit.btnGold("⟳  بررسی و دریافت نسخه جدید", v ->
                 ir.meelano.manager.core.UpdateCenter.manualCheck(a)), a.kit.lp(-1, -2));
-        ab.addView(a.kit.btnGhost("📦  صفحه نسخه‌های منتشرشده", Theme.TEAL, v -> openReleasesPage()),
+        ab.addView(a.kit.btnGhost("📦  صفحه نسخه‌های منتشرشده", Theme.GOLD, v -> openReleasesPage()),
                 a.kit.lp(-1, -2));
         ab.addView(a.kit.hint("دانلود امن، بررسی امضا و نصب روی همین گوشی انجام می‌شود؛ داده‌ها حفظ می‌شوند. "
                 + "اگر اینترنت قطع بود، از صفحه نسخه‌ها دستی هم می‌توانید دریافت کنید."), a.kit.lp(-1, -2));
@@ -715,7 +715,7 @@ public class SettingsScreen extends Screen {
             nt.addView(a.kit.kv("کد اقتصادی", Money.fa(co.egh.trim()), Theme.MUTED), a.kit.lp(-1, -2));
         if (co.pos != null && !co.pos.trim().isEmpty())
             nt.addView(a.kit.kv("کد پستی", Money.fa(co.pos.trim()), Theme.MUTED), a.kit.lp(-1, -2));
-        nt.addView(a.kit.btnGhost("⟳ به‌روزرسانی از آتیران", Theme.TEAL, v -> {
+        nt.addView(a.kit.btnGhost("⟳ به‌روزرسانی از آتیران", Theme.GOLD, v -> {
             a.kit.toast("در حال به‌روزرسانی مشخصات…");
             a.refreshCompany(() -> render(content));
         }), a.kit.lp(-1, -2));

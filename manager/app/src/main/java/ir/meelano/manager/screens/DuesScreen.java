@@ -143,7 +143,7 @@ java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
         t.setGravity(Gravity.CENTER);
         r.addView(t, a.kit.wlp(1f));
         r.addView(a.kit.space(8));
-        r.addView(a.kit.btnGhost("امروز", Theme.TEAL, v -> {
+        r.addView(a.kit.btnGhost("امروز", Theme.GOLD, v -> {
             jy = 0;
             if (contentRef != null) render(contentRef);
         }), a.kit.lp(-2, -2));

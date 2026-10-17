@@ -37,7 +37,7 @@ public class VoiceScreen extends Screen {
     public String glyph() { return "🎙"; }
 
     @Override
-    public int accent() { return Theme.TEAL; }
+    public int accent() { return Theme.GOLD; }
 
     @Override
     public void render(final LinearLayout content) {
@@ -56,7 +56,7 @@ public class VoiceScreen extends Screen {
                 c.addView(a.kit.text("«" + lastQ + "»", 12.5f, Theme.MUTED, false), a.kit.lp(-1, -2));
             c.addView(a.kit.text(lastA, 15f, Theme.TEXT, true), a.kit.lp(-1, -2));
             c.addView(a.kit.gap(6));
-            c.addView(a.kit.btnGhost("🔊 پخش دوباره", Theme.TEAL, v -> speak(lastA)), a.kit.lp(-1, -2));
+            c.addView(a.kit.btnGhost("🔊 پخش دوباره", Theme.GOLD, v -> speak(lastA)), a.kit.lp(-1, -2));
             a.kit.addCard(content, c);
         }
     }

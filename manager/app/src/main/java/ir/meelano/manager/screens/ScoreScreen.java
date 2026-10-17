@@ -35,14 +35,14 @@ public class ScoreScreen extends Screen {
     public String glyph() { return "🏅"; }
 
     @Override
-    public int accent() { return Theme.TEAL; }
+    public int accent() { return Theme.GOLD; }
 
     private List<Row> rows = new ArrayList<>();
 
     @Override
     public void render(LinearLayout content) {
         content.removeAllViews();
-        LinearLayout hero = a.kit.card(Theme.TEAL);
+        LinearLayout hero = a.kit.card(Theme.GOLD);
         hero.addView(a.kit.text("🏅 امتیاز تأمین‌کننده", 17f, Theme.TEXT, true),
                 a.kit.lp(-1, -2));
         hero.addView(a.kit.text("حجم خرید و پیش‌فاکتورهای باز هر تأمین‌کننده",
@@ -72,7 +72,7 @@ public class ScoreScreen extends Screen {
                 }
                 List<Kit.Kpi> kpis = new ArrayList<>();
                 kpis.add(new Kit.Kpi("تأمین‌کننده", Money.fa(String.valueOf(rows.size())), "",
-                        Theme.TEAL));
+                        Theme.GOLD));
                 kpis.add(new Kit.Kpi("جمع خریدها", Money.compactMoney(total), "",
                         Theme.GOLD));
                 box.addView(a.kit.kpiGrid(kpis, 2), a.kit.lp(-1, -2));
@@ -90,7 +90,7 @@ public class ScoreScreen extends Screen {
                         sub += " • " + Money.fa(String.valueOf(r.l("pishN"))) + " پیش‌فاکتور باز";
                     View v = a.kit.personRow(medal + r.s("name"), sub,
                             "مانده " + Money.fa(Money.compact(r.d("bal"))),
-                            "#" + Money.fa(String.valueOf(i + 1)), Theme.TEAL, null);
+                            "#" + Money.fa(String.valueOf(i + 1)), Theme.GOLD, null);
                     LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
                     p.setMargins(0, 0, 0, Theme.dp(10));
                     box.addView(v, p);

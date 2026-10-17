@@ -220,7 +220,7 @@ public final class Kit {
         if (s.contains("دریافت") || s.contains("وصول")) return Theme.SUCCESS;
         if (s.contains("پرداخت") || s.contains("نقدینگی")) return Theme.INFO;
         if (s.contains("خرید")) return Theme.VIOLET;
-        if (s.contains("انبار") || s.contains("موجودی") || s.contains("کالا")) return Theme.TEAL;
+        if (s.contains("انبار") || s.contains("موجودی") || s.contains("کالا")) return Theme.VIOLET;
         if (s.contains("ویزیتور") || s.contains("گزارش") || s.contains("تحلیل") || s.contains("روند")) return Theme.INFO;
         if (s.contains("مشتری") || s.contains("بدهکار")) return Theme.WARNING;
         return Theme.GOLD;

@@ -80,6 +80,12 @@ public class HomeScreen extends Screen {
         Map<String, String> notes = new LinkedHashMap<>();
     }
 
+    /** Runs one dashboard query only while this render is still on screen; once the user has moved on, the rest are skipped. */
+    private <T> T live(final int token, Map<String, String> notes, String key, Soft<T> t) {
+        if (a.renderGen() != token) return null;
+        return soft(notes, key, t);
+    }
+
     @Override
     public void render(final LinearLayout content) {
         content.removeAllViews();
@@ -90,55 +96,58 @@ public class HomeScreen extends Screen {
         content.addView(a.kit.gap(6));
         content.addView(a.kit.loading("در حال دریافت داشبورد مدیریتی…"), a.kit.lp(-1, -2));
 
+        final int token = a.renderGen();
         a.repo.run(c -> {
             Meta m = new Meta(c);
             Data d = new Data();
-            d.salesDay = soft(d.notes, "فروش روز", () -> Repo.one(c, Queries.homeSalesDay(m)));
-            d.buyDay = soft(d.notes, "خرید روز", () -> Repo.one(c, Queries.homeBuyDay(m)));
-            d.inDay = soft(d.notes, "دریافت روز", () -> Repo.one(c, MoneyQueries.darDay(m, 0)));
-            d.outDay = soft(d.notes, "پرداخت روز", () -> Repo.one(c, MoneyQueries.darDay(m, 1)));
-            d.custSum = soft(d.notes, "خلاصه مشتریان", () -> Repo.one(c, MasterQueries.customersSummary(m)));
-            d.debtors = soft(d.notes, "بدهکاران", () -> Repo.exec(c, Queries.topDebtors(m, 5)));
-            d.overdue = soft(d.notes, "معوق‌ها", () -> Repo.exec(c, Queries.overdueInvoices(m, 5)));
+            d.salesDay = live(token, d.notes, "فروش روز", () -> Repo.one(c, Queries.homeSalesDay(m)));
+            d.buyDay = live(token, d.notes, "خرید روز", () -> Repo.one(c, Queries.homeBuyDay(m)));
+            d.inDay = live(token, d.notes, "دریافت روز", () -> Repo.one(c, MoneyQueries.darDay(m, 0)));
+            d.outDay = live(token, d.notes, "پرداخت روز", () -> Repo.one(c, MoneyQueries.darDay(m, 1)));
+            d.custSum = live(token, d.notes, "خلاصه مشتریان", () -> Repo.one(c, MasterQueries.customersSummary(m)));
+            d.debtors = live(token, d.notes, "بدهکاران", () -> Repo.exec(c, Queries.topDebtors(m, 5)));
+            d.overdue = live(token, d.notes, "معوق‌ها", () -> Repo.exec(c, Queries.overdueInvoices(m, 5)));
             final String to = Jalali.todayStr();
             d.snapshotDay = to;
             // 31 calendar days let the executive overview compare today against
             // yesterday plus rolling 7- and 30-day baselines; the chart itself stays 14 days.
             final String from = Jalali.addDays(to, -30);
             final String inFrom = Jalali.addDays(to, -13);
-            d.salesDaily = soft(d.notes, "روند فروش", () -> Repo.exec(c, Queries.factorDaily(m, true, from, to)));
-            d.inDaily = soft(d.notes, "روند دریافت", () -> Repo.exec(c, MoneyQueries.darDaily(m, 0, inFrom, to)));
+            d.salesDaily = live(token, d.notes, "روند فروش", () -> Repo.exec(c, Queries.factorDaily(m, true, from, to)));
+            d.inDaily = live(token, d.notes, "روند دریافت", () -> Repo.exec(c, MoneyQueries.darDaily(m, 0, inFrom, to)));
             Filter todayFilter = new Filter();
             todayFilter.from = to;
             todayFilter.to = to;
             todayFilter.top = 5;
-            d.topItems = soft(d.notes, "پرفروش‌ترین کالاهای امروز",
+            d.topItems = live(token, d.notes, "پرفروش‌ترین کالاهای امروز",
                     () -> Repo.exec(c, Queries.factorTopProducts(m, true, todayFilter, 5)));
             Filter vf = new Filter();
             vf.preset = Filter.P_LAST30;
             vf.applyPreset();
-            d.visitors = soft(d.notes, "ویزیتورها", () -> Repo.exec(c, MasterQueries.visitorsPerf(m, vf)));
-            d.dueIn = soft(d.notes, "سررسید دریافتی", () -> Repo.exec(c, MoneyQueries.chequeDue(m, true, 3)));
-            d.dueOut = soft(d.notes, "سررسید پرداختی", () -> Repo.exec(c, MoneyQueries.chequeDue(m, false, 3)));
+            d.visitors = live(token, d.notes, "ویزیتورها", () -> Repo.exec(c, MasterQueries.visitorsPerf(m, vf)));
+            d.dueIn = live(token, d.notes, "سررسید دریافتی", () -> Repo.exec(c, MoneyQueries.chequeDue(m, true, 3)));
+            d.dueOut = live(token, d.notes, "سررسید پرداختی", () -> Repo.exec(c, MoneyQueries.chequeDue(m, false, 3)));
             String stFrom = Jalali.addDays(to, -29);
-            d.saleState = soft(d.notes, "وضعیت فروش", () -> Repo.exec(c, Queries.factorStatusSummary(m, true, stFrom, to)));
-            d.buyState = soft(d.notes, "وضعیت خرید", () -> Repo.exec(c, Queries.factorStatusSummary(m, false, stFrom, to)));
+            d.saleState = live(token, d.notes, "وضعیت فروش", () -> Repo.exec(c, Queries.factorStatusSummary(m, true, stFrom, to)));
+            d.buyState = live(token, d.notes, "وضعیت خرید", () -> Repo.exec(c, Queries.factorStatusSummary(m, false, stFrom, to)));
             Filter rf = new Filter();
             rf.from = stFrom;
             rf.to = to;
-            d.returns = soft(d.notes, "برگشتی", () -> Repo.exec(c, MasterQueries.returnsByKind(m, rf)));
+            d.returns = live(token, d.notes, "برگشتی", () -> Repo.exec(c, MasterQueries.returnsByKind(m, rf)));
             if (d.salesDay == null && d.inDay == null && d.custSum == null && d.buyDay == null && d.outDay == null)
                 throw new Exception(firstNote(d.notes));
             return d;
         }, new Repo.Cb<Data>() {
             @Override
             public void ok(Data d) {
+                if (a.renderGen() != token) return;
                 saveCache(d);
                 build(content, d);
             }
 
             @Override
             public void fail(String faError) {
+                if (a.renderGen() != token) return;
                 String[] ts = {""};
                 Data cached = loadCached(ts);
                 if (cached != null) {

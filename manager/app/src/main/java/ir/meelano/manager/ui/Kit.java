@@ -824,7 +824,8 @@ public final class Kit {
     }
 
     private int colWidth(ReportCatalog.Col c) {
-        if (c.type == ReportCatalog.T_MONEY) return 150;
+        // Wide enough for «۱۰۲٬۷۵۰٬۰۰۰ تومان» at the largest type scale without clipping.
+        if (c.type == ReportCatalog.T_MONEY) return 196;
         if (c.type == ReportCatalog.T_DATE) return 110;
         if (c.type == ReportCatalog.T_NUM) return 80;
         return 140;

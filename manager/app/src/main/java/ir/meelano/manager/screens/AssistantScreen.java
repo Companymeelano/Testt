@@ -65,6 +65,11 @@ public final class AssistantScreen extends Screen {
     private final List<Runnable> pending = new ArrayList<>();
     private Assistant.Snap snap;
     private boolean loading = false;
+    /** Increments on every data request; a watchdog uses it to drop stale timers. */
+    private long reqId = 0;
+    /** Human-readable reason of the last failed read, or null when the last read worked. */
+    private String lastError = null;
+    private static final long LOAD_TIMEOUT_MS = 20000;
     private boolean aiBusy = false;
     private LinearLayout root;
     private String draft = "";
@@ -126,11 +131,21 @@ public final class AssistantScreen extends Screen {
             return;
         }
         loading = true;
+        final long my = ++reqId;
         redraw();
+        handler.postDelayed(() -> {
+            if (!loading || my != reqId) return;
+            // The database did not answer in time: stop spinning and offer a retry.
+            loading = false;
+            lastError = "پاسخ پایگاه‌داده دیر رسید";
+            if (snap == null) pending.clear();
+            redraw();
+        }, LOAD_TIMEOUT_MS);
         a.repo.run(c -> Assistant.load(c), new Repo.Cb<Assistant.Snap>() {
             @Override
             public void ok(Assistant.Snap v) {
                 loading = false;
+                lastError = null;
                 try {
                     v.pendingSync = WarehouseSync.pendingCount(a);
                 } catch (Exception e) {
@@ -143,8 +158,13 @@ public final class AssistantScreen extends Screen {
             @Override
             public void fail(String faError) {
                 loading = false;
-                if (snap == null) snap = new Assistant.Snap();
-                snap.notes.put("اتصال به پایگاه‌داده", faError == null ? "خطا" : faError);
+                lastError = faError == null || faError.isEmpty() ? "خطای ناشناخته" : faError;
+                if (snap == null) {
+                    // No data at all yet: answering now would invent zeros, so ask the user to retry.
+                    pending.clear();
+                    redraw();
+                    return;
+                }
                 flushPending();
             }
         });
@@ -349,6 +369,12 @@ public final class AssistantScreen extends Screen {
         }
         if (loading && snap == null) {
             root.addView(a.kit.loading("در حال خواندن اطلاعات فروشگاه…"), a.kit.lp(-1, -2));
+        } else if (!loading && (snap == null || snap.loadedAt <= 0) && lastError != null) {
+            root.addView(a.kit.error("پایگاه‌داده پاسخ نداد (" + lastError + ")", () -> {
+                lastError = null;
+                refresh(true, null);
+            }), a.kit.lp(-1, -2));
+            root.addView(a.kit.gap(10));
         }
         for (String[] m : msgs) {
             root.addView(bubble(m[0], m[1]), a.kit.lp(-1, -2));
@@ -368,31 +394,40 @@ public final class AssistantScreen extends Screen {
 
     private View hero() {
         String status;
-        if (snap == null || loading) {
+        boolean hasData = snap != null && snap.loadedAt > 0;
+        if (loading) {
             status = "در حال اتصال به پایگاه‌داده…";
+        } else if (!hasData) {
+            status = lastError != null ? "اتصال برقرار نشد؛ پایین صفحه را بزنید" : "در حال اتصال به پایگاه‌داده…";
         } else {
             String time = new SimpleDateFormat("HH:mm", Locale.US).format(new Date(snap.loadedAt));
-            status = "داده‌های زنده • آخرین خواندن ساعت " + Money.fa(time) + " • نوسازی هر دقیقه";
+            status = "داده‌های زنده • آخرین خواندن ساعت " + Money.fa(time)
+                    + (lastError != null ? " • اتصال موقتاً قطع است" : " • نوسازی هر دقیقه");
         }
         return a.kit.hero("✦", "دستیار هوشمند میلانو", status, Theme.GOLD);
     }
 
+    /** Quick questions as a 2×2 grid: every label is fully visible, no horizontal cut-off. */
     private View quickChips() {
-        HorizontalScrollView sv = new HorizontalScrollView(a);
-        sv.setHorizontalScrollBarEnabled(false);
-        LinearLayout row = a.kit.h();
-        for (String q : QUICK) {
-            row.addView(a.kit.btnGhost(q, Theme.GOLD, v -> ask(q)), a.kit.lp(-2, -2));
+        LinearLayout grid = a.kit.v();
+        for (int i = 0; i < QUICK.length; i += 2) {
+            LinearLayout row = a.kit.h();
+            for (int j = i; j < Math.min(i + 2, QUICK.length); j++) {
+                final String q = QUICK[j];
+                if (j > i) row.addView(a.kit.space(8));
+                row.addView(a.kit.btnGhost(q, Theme.GOLD, v -> ask(q)), a.kit.wlp(1f));
+            }
+            grid.addView(row, a.kit.lp(-1, -2));
+            if (i + 2 < QUICK.length) grid.addView(a.kit.gap(8));
         }
-        sv.addView(row);
-        return sv;
+        return grid;
     }
 
     /** One quiet control: whether answers are read aloud. Data refreshes on its own. */
     private View speakChip() {
         boolean on = speakOn();
-        return a.kit.btnGhost(on ? "🔊  پاسخ‌ها را بخوان" : "🔈  پاسخ‌ها را بخوان (خاموش)",
-                on ? Theme.GOLD : Theme.MUTED, v -> {
+        return a.kit.btnGhost(on ? "🔊  پاسخ‌ها با صدا" : "🔈  پاسخ‌ها بی‌صدا",
+                on ? Theme.GOLD : Theme.GOLD_SOFT, v -> {
             setSpeakOn(!on);
             redraw();
         });
@@ -410,7 +445,7 @@ public final class AssistantScreen extends Screen {
     }
 
     private View liveBar() {
-        LinearLayout bar = Card3D.card(a, Theme.TEAL);
+        LinearLayout bar = Card3D.card(a, Theme.GOLD);
         LinearLayout row = a.kit.h();
         String state = listening ? "🎙 در حال شنیدن… سؤالتان را بگویید" : "✦ در حال پاسخ یا خواندن…";
         row.addView(a.kit.text(state, 12.5f, Theme.TEXT, true), a.kit.wlp(1f));
@@ -428,7 +463,7 @@ public final class AssistantScreen extends Screen {
     private View bubble(String role, String text) {
         boolean user = "user".equals(role);
         boolean ai = "ai".equals(role);
-        int accent = user ? Theme.TEAL : (ai ? Theme.VIOLET : Theme.GOLD);
+        int accent = user ? Theme.STEEL : (ai ? Theme.VIOLET : Theme.GOLD);
         LinearLayout card = Card3D.card(a, accent);
         String who = user ? "🙋 شما" : (ai ? "✦ هوش مصنوعی" : "🤖 دستیار");
         card.addView(a.kit.text(who, 11.5f, accent == Theme.GOLD ? Theme.GOLD_SOFT : accent, true), a.kit.lp(-1, -2));
@@ -456,7 +491,7 @@ public final class AssistantScreen extends Screen {
         box.addView(a.kit.gap(6));
         LinearLayout row = a.kit.h();
         row.addView(a.kit.btnGold("➤ ارسال", v -> ask(input.getText().toString())), weight());
-        row.addView(a.kit.btnGhost("🎤 صوتی", Theme.TEAL, v -> a.startVoiceSearch(text -> {
+        row.addView(a.kit.btnGhost("🎤 صوتی", Theme.GOLD, v -> a.startVoiceSearch(text -> {
             draft = text;
             ask(text);
         })), weight());

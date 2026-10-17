@@ -661,7 +661,7 @@ public final class Kit {
         float[] widths = {0.55f, 0.85f, 0.4f, 1f};
         for (int i = 0; i < heights.length; i++) {
             View bar = new View(a);
-            bar.setBackground(Theme.pill(Theme.alpha(Theme.TEXT, i == 3 ? 22 : 34)));
+            bar.setBackground(Theme.pill(Theme.alpha(Theme.GOLD, i == 3 ? 30 : 46)));
             LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, Theme.dp(heights[i]), widths[i]);
             p.setMargins(0, Theme.dp(i == 0 ? 12 : 8), 0, 0);
             if (widths[i] < 1f) {

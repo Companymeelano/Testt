@@ -357,7 +357,7 @@ public final class Theme {
     /** Luxury field background with a real focus ring (v34). */
     public static android.graphics.drawable.StateListDrawable fieldBg() {
         GradientDrawable normal = base(SURFACE2, 16, dp(1), alpha(GOLD, light ? 70 : 46));
-        GradientDrawable focused = base(SURFACE2, 16, dp(2), TEAL);
+        GradientDrawable focused = base(SURFACE2, 16, dp(2), GOLD);
         android.graphics.drawable.StateListDrawable s = new android.graphics.drawable.StateListDrawable();
         s.addState(new int[]{android.R.attr.state_focused}, focused);
         s.addState(new int[]{}, normal);

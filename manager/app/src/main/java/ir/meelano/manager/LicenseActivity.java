@@ -325,7 +325,7 @@ public class LicenseActivity extends Activity {
             cell.setGravity(Gravity.CENTER);
             boolean done = idx < active;
             boolean on = idx == active;
-            int stepColor = done ? Theme.SUCCESS : (on ? Theme.TEAL : Theme.SURFACE2);
+            int stepColor = done ? Theme.SUCCESS : (on ? Theme.GOLD : Theme.SURFACE2);
             int stepIcon = done ? R.drawable.mi_check
                     : (idx == 1 ? R.drawable.mi_key : (idx == 2 ? R.drawable.mi_database : R.drawable.mi_login));
             android.widget.FrameLayout dot = new android.widget.FrameLayout(this);
@@ -510,7 +510,7 @@ public class LicenseActivity extends Activity {
             smartReceive(t);
         }), kit.wlp(1f));
         body.addView(row, kit.lp(-1, -2));
-        final android.widget.Button toggle = ghostAction("ورود با کد فعال‌سازی", Theme.TEAL, R.drawable.mi_key, null);
+        final android.widget.Button toggle = ghostAction("ورود با کد فعال‌سازی", Theme.GOLD, R.drawable.mi_key, null);
         toggle.setOnClickListener(v -> {
             boolean open = body.getVisibility() != View.VISIBLE;
             body.setVisibility(open ? View.VISIBLE : View.GONE);
@@ -645,12 +645,12 @@ public class LicenseActivity extends Activity {
                 new LinearLayout.LayoutParams(Theme.dp(34), Theme.dp(34)));
         top.addView(kit.space(6));
         top.addView(kit.text("کد دستگاه", 12.5f, Theme.GOLD_SOFT, true), kit.wlp(1f));
-        final android.widget.Button copyBtn = kit.btnGhost("کپی", Theme.TEAL, null);
+        final android.widget.Button copyBtn = kit.btnGhost("کپی", Theme.GOLD, null);
         try {
             android.graphics.drawable.Drawable ic = getDrawable(R.drawable.mi_content_copy);
             if (ic != null) {
                 ic = ic.mutate();
-                ic.setTint(Theme.TEAL);
+                ic.setTint(Theme.GOLD);
                 copyBtn.setCompoundDrawablesRelativeWithIntrinsicBounds(ic, null, null, null);
                 copyBtn.setCompoundDrawablePadding(Theme.dp(6));
             }
@@ -784,7 +784,7 @@ public class LicenseActivity extends Activity {
     private void buildWaitPage(LinearLayout box) {
         box.addView(stepBar(1), kit.lp(-1, -2));
         box.addView(kit.gap(10));
-        LinearLayout c = Card3D.card(this, Theme.TEAL);
+        LinearLayout c = Card3D.card(this, Theme.GOLD);
         android.widget.FrameLayout logowrap = new android.widget.FrameLayout(this);
         waitLogo = kit.logo(96);
         android.widget.FrameLayout.LayoutParams llp =
@@ -829,7 +829,7 @@ public class LicenseActivity extends Activity {
         c.addView(recvHint, kit.lp(-1, -2));
         updateRecvHint();
         if (!recvGranted()) {
-            c.addView(kit.btnGhost("فعال‌سازی دریافت خودکار", Theme.TEAL,
+            c.addView(kit.btnGhost("فعال‌سازی دریافت خودکار", Theme.GOLD,
                     v -> ensureRecvPerm()), kit.lp(-1, -2));
         }
         c.addView(kit.gap(6));
@@ -1052,7 +1052,7 @@ public class LicenseActivity extends Activity {
         rlp.gravity = Gravity.CENTER;
         connRadar.setVisibility(View.GONE);
         c.addView(connRadar, rlp);
-        connStage = kit.text("", 12.5f, Theme.TEAL, true);
+        connStage = kit.text("", 12.5f, Theme.GOLD, true);
         connStage.setGravity(Gravity.CENTER);
         connStage.setVisibility(View.GONE);
         c.addView(connStage, kit.lp(-1, -2));
@@ -1081,12 +1081,12 @@ public class LicenseActivity extends Activity {
         c.addView(btn[0], kit.lp(-1, -2));
         c.addView(kit.gap(6));
         final android.widget.Button[] wbtn = new android.widget.Button[1];
-        wbtn[0] = kit.btnGhost("اتصال با وای‌فای", Theme.TEAL, v -> wifiConnect(wbtn[0]));
+        wbtn[0] = kit.btnGhost("اتصال با وای‌فای", Theme.GOLD, v -> wifiConnect(wbtn[0]));
         try {
             android.graphics.drawable.Drawable icd = getDrawable(R.drawable.mi_wifi);
             if (icd != null) {
                 icd = icd.mutate();
-                icd.setTint(Theme.TEAL);
+                icd.setTint(Theme.GOLD);
                 wbtn[0].setCompoundDrawablesRelativeWithIntrinsicBounds(icd, null, null, null);
                 wbtn[0].setCompoundDrawablePadding(Theme.dp(6));
             }
@@ -1496,7 +1496,7 @@ public class LicenseActivity extends Activity {
                     Money.fa(String.valueOf(s.daysLeft)) + " روز", leftColor(s.daysLeft)), kit.lp(-1, -2));
         }
         c.addView(hairline(), kit.lp(-1, Theme.dp(1)));
-        c.addView(statRow(R.drawable.mi_database, Theme.TEAL, "اتصال به سرور", "تنظیم شده", Theme.SUCCESS),
+        c.addView(statRow(R.drawable.mi_database, Theme.GOLD, "اتصال به سرور", "تنظیم شده", Theme.SUCCESS),
                 kit.lp(-1, -2));
         String sh = connSummaryHost();
         String stn = connSummaryTables();
@@ -1732,7 +1732,7 @@ public class LicenseActivity extends Activity {
         try {
             if (recvGranted()) {
                 ir.meelano.manager.ui.MeelanoIcons.set(recvHint, "✦ دریافت خودکار فعال است — فقط منتظر بمانید.");
-                recvHint.setTextColor(Theme.TEAL);
+                recvHint.setTextColor(Theme.GOLD);
             } else {
                 recvHint.setText("برای دریافت خودکار کلید، اجازه را تأیید کنید.");
                 recvHint.setTextColor(Theme.MUTED);
@@ -1883,7 +1883,7 @@ public class LicenseActivity extends Activity {
         tag.setGravity(Gravity.CENTER);
         box.addView(tag, kit.lp(-1, -2));
         box.addView(kit.gap(4));
-        box.addView(kit.btnGhost("پشتیبانی", Theme.TEAL, v -> supportDialog()), kit.lp(-1, -2));
+        box.addView(kit.btnGhost("پشتیبانی", Theme.GOLD, v -> supportDialog()), kit.lp(-1, -2));
         TextView ver = kit.text(appVer(), 11f, Theme.MUTED, false);
         ver.setGravity(Gravity.CENTER);
         box.addView(ver, kit.lp(-1, -2));
@@ -1929,13 +1929,13 @@ public class LicenseActivity extends Activity {
                 v -> Brand.openSite(this)), kit.lp(-1, -2));
         for (String ph : Brand.PHONES) {
             final String fph = ph;
-            final android.widget.Button pb = kit.btnGhost(Money.fa(ph), Theme.TEAL,
+            final android.widget.Button pb = kit.btnGhost(Money.fa(ph), Theme.GOLD,
                     v -> Brand.dial(this, fph));
             try {
                 android.graphics.drawable.Drawable icd = getDrawable(R.drawable.mi_call);
                 if (icd != null) {
                     icd = icd.mutate();
-                    icd.setTint(Theme.TEAL);
+                    icd.setTint(Theme.GOLD);
                     pb.setCompoundDrawablesRelativeWithIntrinsicBounds(icd, null, null, null);
                     pb.setCompoundDrawablePadding(Theme.dp(6));
                 }

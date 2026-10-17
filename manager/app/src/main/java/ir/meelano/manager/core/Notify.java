@@ -552,34 +552,32 @@ public final class Notify {
             long inN = v[3], outN = v[4], odN = v[5];
             java.util.List<String> parts = new java.util.ArrayList<>();
             if (morning)
-                parts.add("☀ فروش دیروز " + Money.compactRial(v[6]) + " • دریافت دیروز " + Money.compactRial(v[7]));
+                parts.add("فروش دیروز: " + Money.compactRial(v[6]) + " • دریافت دیروز: " + Money.compactRial(v[7]));
             if (inN > 0)
-                parts.add(Money.fa(String.valueOf(inN)) + " فقره چک دریافتی (" + Money.compactRial(v[0]) + ")");
+                parts.add("چک دریافتی: " + Money.fa(String.valueOf(inN)) + " فقره • " + Money.compactRial(v[0]));
             if (outN > 0)
-                parts.add(Money.fa(String.valueOf(outN)) + " فقره چک پرداختی (" + Money.compactRial(v[1]) + ")");
+                parts.add("چک پرداختی: " + Money.fa(String.valueOf(outN)) + " فقره • " + Money.compactRial(v[1]));
             if (odN > 0)
-                parts.add(Money.fa(String.valueOf(odN)) + " فاکتور معوق (" + Money.compactRial(v[2]) + ")");
+                parts.add("فاکتور معوق: " + Money.fa(String.valueOf(odN)) + " فاکتور • " + Money.compactRial(v[2]));
             if (bNew > 0)
-                parts.add(Money.fa(String.valueOf(bNew)) + " چک برگشتی تازه");
+                parts.add("چک برگشتی تازه: " + Money.fa(String.valueOf(bNew)) + " فقره");
             boolean stockOn = true;
             try { stockOn = new Settings(c).stockOn(); } catch (Exception ignored) { Diag.ignored("Notify:531", ignored); }
             if (stockOn && v.length >= 12 && v[10] + v[11] > 0)
-                parts.add(Money.fa(String.valueOf(v[10] + v[11])) + " کالا کم‌موجود/ناموجود");
-            StringBuilder b = new StringBuilder();
-            for (String p : parts) {
-                if (b.length() > 0) b.append(" • ");
-                b.append(p);
-            }
-            b.append("؛ برای جزئیات لمس کنید.");
+                parts.add("کالای کم‌موجود یا ناموجود: " + Money.fa(String.valueOf(v[10] + v[11])) + " قلم");
             boolean onlyMorning = morning && parts.size() == 1;
+            Notification.InboxStyle inbox = new Notification.InboxStyle();
+            for (String p : parts) inbox.addLine(p);
+            inbox.setBigContentTitle(onlyMorning ? "☀ گزارش صبحگاهی میلانو" : "⚠ هشدار سررسید میلانو");
+            inbox.setSummaryText(Money.fa(String.valueOf(parts.size())) + " مورد نیازمند توجه • برای جزئیات لمس کنید");
             Intent open = new Intent(c, MainActivity.class);
             open.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
             PendingIntent pi = PendingIntent.getActivity(c, NOTIF_ID, open,
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             Notification n = new Notification.Builder(c, CH)
                     .setContentTitle(onlyMorning ? "☀ گزارش صبحگاهی میلانو" : "⚠ هشدار سررسید میلانو")
-                    .setContentText(b.toString())
-                    .setStyle(new Notification.BigTextStyle().bigText(b.toString()))
+                    .setContentText(parts.isEmpty() ? "" : parts.get(0))
+                    .setStyle(inbox)
                     .setSmallIcon(R.mipmap.ic_launcher)
                     .setContentIntent(pi)
                     .setAutoCancel(true)

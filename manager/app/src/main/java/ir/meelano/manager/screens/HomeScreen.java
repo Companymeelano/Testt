@@ -1,5 +1,8 @@
 package ir.meelano.manager.screens;
 
+import android.text.TextUtils;
+import java.util.Locale;
+import ir.meelano.manager.core.MarketWeather;
 import ir.meelano.manager.core.Diag;
 import android.view.Gravity;
 import android.view.View;
@@ -81,6 +84,8 @@ public class HomeScreen extends Screen {
     public void render(final LinearLayout content) {
         content.removeAllViews();
         content.addView(greetingHero(), a.kit.lp(-1, -2));
+        content.addView(a.kit.gap(10));
+        content.addView(marketCard(), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
         content.addView(a.kit.gap(6));
         content.addView(a.kit.loading("در حال دریافت داشبورد مدیریتی…"), a.kit.lp(-1, -2));
@@ -337,69 +342,97 @@ public class HomeScreen extends Screen {
     }
 
     /** A compact luxury launchpad to the five high-frequency management destinations. */
-    /** Quick-access strip. Lives in the Command Room (اتاق فرمان) so the home screen stays calm. */
-    void addExecutiveDock(LinearLayout content) {
-        String[][] suggested = {
-                {"sales", "فاکتورها", "فروش و پیگیری"},
-                {"cash", "خزانه", "نقدینگی و گردش"},
-                {"closeout", "بستن روز", "تطبیق مدیریتی"},
-                {"anbar", "انبار", "موجودی و عملیات"},
-                {"reports", "گزارش‌ها", "تحلیل تصمیم‌ها"},
-        };
-        List<String[]> available = new ArrayList<>();
-        for (String[] item : suggested)
-            if (a.screen(item[0]) != null && RoleStore.allowed(a, item[0])) available.add(item);
-        if (available.isEmpty()) return;
+    /** Compact rates + Tehran weather. Saved values show at once; the refresh runs in the background. */
+    private View marketCard() {
+        final LinearLayout card = a.kit.card(Theme.GOLD);
+        renderMarket(card, MarketWeather.cached(a, MarketWeather.ratesKey()),
+                MarketWeather.cached(a, MarketWeather.weatherKey()), false, false);
+        new Thread(() -> {
+            String rRaw = null;
+            String wRaw = null;
+            try { rRaw = MarketWeather.get(MarketWeather.RATES_URL); } catch (Exception ignored) { }
+            try { wRaw = MarketWeather.get(MarketWeather.WEATHER_URL); } catch (Exception ignored) { }
+            final boolean rLive = rRaw != null;
+            final boolean wLive = wRaw != null;
+            if (rLive) MarketWeather.save(a, MarketWeather.ratesKey(), rRaw);
+            if (wLive) MarketWeather.save(a, MarketWeather.weatherKey(), wRaw);
+            final String fr = rLive ? rRaw : MarketWeather.cached(a, MarketWeather.ratesKey());
+            final String fw = wLive ? wRaw : MarketWeather.cached(a, MarketWeather.weatherKey());
+            a.runOnUiThread(() -> renderMarket(card, fr, fw, rLive, wLive));
+        }, "market-refresh").start();
+        return card;
+    }
 
-        content.addView(a.kit.sectionHead("دسترسی فوری", "همه بخش‌ها ›", v -> a.nav("more")),
-                a.kit.lp(-1, -2));
-        HorizontalScrollView strip = new HorizontalScrollView(a);
-        strip.setHorizontalScrollBarEnabled(false);
-        strip.setClipToPadding(false);
-        strip.setPadding(Theme.dp(1), Theme.dp(1), Theme.dp(1), Theme.dp(4));
-        LinearLayout row = a.kit.h();
-        for (String[] item : available) {
-            Screen destination = a.screen(item[0]);
-            int accent = destination.accent();
-            LinearLayout tile = a.kit.h();
-            tile.setGravity(Gravity.CENTER_VERTICAL);
-            tile.setPadding(Theme.dp(10), Theme.dp(9), Theme.dp(10), Theme.dp(9));
-            tile.setMinimumHeight(Theme.dp(68));
-            tile.setBackground(Theme.cardAccent(accent));
+    private void renderMarket(LinearLayout card, String rJson, String wJson, boolean rLive, boolean wLive) {
+        card.removeAllViews();
+        List<MarketWeather.Rate> rates = null;
+        MarketWeather.Weather w = null;
+        try { if (rJson != null) rates = MarketWeather.parseRates(rJson); } catch (Exception ignored) { }
+        try { if (wJson != null) w = MarketWeather.parseWeather(wJson); } catch (Exception ignored) { }
 
-            FrameLayout iconBadge = new FrameLayout(a);
-            iconBadge.setBackground(Theme.avatar(Theme.alpha(accent, Theme.isLight() ? 34 : 48)));
-            int iconRes = MeelanoIcons.iconFor(destination.glyph());
-            if (iconRes != 0) {
-                ImageView image = a.kit.icon(iconRes, accent, 19);
-                iconBadge.addView(image, new FrameLayout.LayoutParams(Theme.dp(22), Theme.dp(22), Gravity.CENTER));
-            } else {
-                TextView fallback = a.kit.text(destination.glyph(), 19f, accent, true);
-                fallback.setGravity(Gravity.CENTER);
-                iconBadge.addView(fallback, new FrameLayout.LayoutParams(-1, -1));
+        LinearLayout head = a.kit.h();
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        head.addView(a.kit.text("بازار و هوای امروز", 12.5f, Theme.GOLD_SOFT, true), a.kit.wlp(1f));
+        boolean live = rLive || wLive;
+        head.addView(a.kit.pill(live ? "به‌روز" : "ذخیره‌شده", live ? Theme.SUCCESS : Theme.MUTED), a.kit.lp(-2, -2));
+        card.addView(head, a.kit.lp(-1, -2));
+        card.addView(a.kit.gap(8));
+
+        if (rates == null || rates.isEmpty()) {
+            card.addView(a.kit.hint("قیمت‌ها در دسترس نیست؛ اتصال اینترنت را بررسی کنید."), a.kit.lp(-1, -2));
+        } else {
+            LinearLayout row = a.kit.h();
+            for (int i = 0; i < rates.size(); i++) {
+                if (i > 0) row.addView(a.kit.space(6));
+                row.addView(rateTile(rates.get(i)), a.kit.wlp(1f));
             }
-            tile.addView(iconBadge, new LinearLayout.LayoutParams(Theme.dp(40), Theme.dp(40)));
-            tile.addView(a.kit.space(8));
-
-            LinearLayout labels = a.kit.v();
-            TextView title = a.kit.text(item[1], 12.5f, Theme.TEXT, true);
-            title.setSingleLine(true);
-            title.setEllipsize(android.text.TextUtils.TruncateAt.END);
-            labels.addView(title, a.kit.lp(-1, -2));
-            TextView sub = a.kit.text(item[2], 10.5f, Theme.MUTED, false);
-            sub.setSingleLine(true);
-            sub.setEllipsize(android.text.TextUtils.TruncateAt.END);
-            labels.addView(sub, a.kit.lp(-1, -2));
-            tile.addView(labels, a.kit.wlp(1f));
-            tile.setContentDescription(item[1] + "؛ " + item[2] + "؛ باز کردن");
-            Theme.pressable(tile);
-            tile.setOnClickListener(v -> a.nav(item[0]));
-            LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(Theme.dp(142), Theme.dp(68));
-            tp.setMarginEnd(Theme.dp(8));
-            row.addView(tile, tp);
+            card.addView(row, a.kit.lp(-1, -2));
         }
-        strip.addView(row, new HorizontalScrollView.LayoutParams(-2, -2));
-        content.addView(strip, a.kit.lp(-1, -2));
+
+        if (w != null) {
+            card.addView(a.kit.gap(8));
+            LinearLayout wr = a.kit.h();
+            wr.setGravity(Gravity.CENTER_VERTICAL);
+            wr.addView(a.kit.text(MarketWeather.glyph(w.code), 18f, Theme.GOLD, false), a.kit.lp(-2, -2));
+            wr.addView(a.kit.space(8));
+            LinearLayout wc = a.kit.v();
+            TextView line = a.kit.text("تهران • " + Money.fa(String.valueOf(Math.round(w.temp))) + "°  "
+                    + MarketWeather.describe(w.code), 12f, Theme.TEXT, true);
+            line.setMaxLines(1);
+            line.setEllipsize(TextUtils.TruncateAt.END);
+            wc.addView(line, a.kit.lp(-1, -2));
+            wc.addView(a.kit.text("رطوبت " + Money.fa(String.valueOf(w.humidity)) + "٪", 10.5f, Theme.MUTED, false),
+                    a.kit.lp(-1, -2));
+            wr.addView(wc, a.kit.wlp(1f));
+            card.addView(wr, a.kit.lp(-1, -2));
+        }
+
+        String stamp = rates != null && !rates.isEmpty() ? rates.get(0).asOf : "";
+        card.addView(a.kit.gap(6));
+        card.addView(a.kit.hint("آخرین به‌روزرسانی قیمت: " + Money.fa(stamp == null || stamp.isEmpty() ? "—" : stamp)
+                + " • قیمت‌ها به تومان (منبع: TGJU)"), a.kit.lp(-1, -2));
+    }
+
+    private View rateTile(MarketWeather.Rate r) {
+        LinearLayout t = a.kit.v();
+        t.setBackground(Theme.kpi(Theme.GOLD));
+        t.setPadding(Theme.dp(8), Theme.dp(8), Theme.dp(8), Theme.dp(8));
+        TextView label = a.kit.text(r.label, 10f, Theme.MUTED, false);
+        label.setMaxLines(2);
+        label.setEllipsize(TextUtils.TruncateAt.END);
+        t.addView(label, a.kit.lp(-1, -2));
+        TextView price = a.kit.text(Money.fa(Money.num(r.toman)), 13f, Theme.TEXT, true);
+        price.setMaxLines(1);
+        price.setAutoSizeTextTypeUniformWithConfiguration(10, 13, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
+        t.addView(price, a.kit.lp(-1, -2));
+        int color = r.changePct > 0 ? Theme.SUCCESS : (r.changePct < 0 ? Theme.DANGER : Theme.MUTED);
+        String arrow = r.changePct > 0 ? "▲ " : (r.changePct < 0 ? "▼ " : "");
+        TextView ch = a.kit.text(arrow + Money.fa(String.format(Locale.US, "%.1f", Math.abs(r.changePct))) + "٪",
+                10f, color, true);
+        ch.setMaxLines(1);
+        t.addView(ch, a.kit.lp(-1, -2));
+        t.setContentDescription(r.label + "، " + Money.fa(Money.num(r.toman)) + " تومان");
+        return t;
     }
 
     private void build(LinearLayout content, Data d) {

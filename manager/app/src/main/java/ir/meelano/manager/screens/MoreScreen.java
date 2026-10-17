@@ -58,7 +58,6 @@ public class MoreScreen extends Screen {
             new Group("operations", "مدیریت روزانه و فروش", "فاکتورها، مشتریان و پیگیری روزانه", "♛", "gold",
                     new Entry[]{
                             e("home", "شاخص‌ها و هشدارهای امروز"),
-                            e("assistant", "دستیار هوشمند: پرسش فارسی، خلاصهٔ روزانه و پیشنهاد اقدام"),
                             e("closeout", "تطبیق روزانهٔ فروش، دریافت، پرداخت، چک، برگشتی و تحویل باز"),
                             e("manager_alerts", "آستانه‌های هشدار قابل تنظیم با دسترسی مستقیم به اقدام"),
                             e("sales", "فاکتورهای فروش و پیگیری‌ها"),
@@ -105,9 +104,9 @@ public class MoreScreen extends Screen {
         super(a);
     }
 
-    /** Hub segments: 0 = assistant, 1 = reports (default), 2 = all sections. */
-    private static final int SEG_ASSISTANT = 0, SEG_REPORTS = 1, SEG_ALL = 2;
-    private static final String[] SEG_LABELS = {"✦ دستیار", "📊 گزارش‌ها", "▦ همه بخش‌ها"};
+    /** Hub segments: 0 = reports (default), 1 = all sections. The assistant has its own home icon. */
+    private static final int SEG_REPORTS = 0, SEG_ALL = 1;
+    private static final String[] SEG_LABELS = {"📊 گزارش‌ها", "▦ همه بخش‌ها"};
     private int seg = SEG_REPORTS;
 
     @Override public String id() { return "more"; }
@@ -115,7 +114,7 @@ public class MoreScreen extends Screen {
     @Override public String glyph() { return "▣"; }
     @Override public int accent() { return Theme.GOLD; }
 
-    /** The command room: assistant, reports and every section in one place. */
+    /** The command room: reports and every section in one place. */
     @Override
     public void render(final LinearLayout content) {
         contentRef = content;
@@ -126,10 +125,7 @@ public class MoreScreen extends Screen {
         }
         content.removeAllViews();
         content.addView(a.kit.hero("▣", "اتاق فرمان",
-                "دستیار، گزارش‌ها و همهٔ بخش‌ها در یک جا", Theme.GOLD), a.kit.lp(-1, -2));
-        content.addView(a.kit.gap(10));
-        // Quick access moved here from the home screen.
-        new HomeScreen(a).addExecutiveDock(content);
+                "گزارش‌ها و همهٔ بخش‌ها در یک جا", Theme.GOLD), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
 
         LinearLayout segRow = a.kit.h();
@@ -146,9 +142,7 @@ public class MoreScreen extends Screen {
 
         LinearLayout inner = a.kit.v();
         content.addView(inner, a.kit.lp(-1, -2));
-        if (seg == SEG_ASSISTANT) {
-            renderAssistantHub(inner);
-        } else if (seg == SEG_REPORTS) {
+        if (seg == SEG_REPORTS) {
             renderReportsHub(inner);
         } else {
             renderAll(inner);
@@ -158,48 +152,9 @@ public class MoreScreen extends Screen {
     private static final String[][] REPORT_GROUPS = {
             {"فروش", "🧾"}, {"خرید", "🧺"}, {"دریافت و پرداخت", "💰"}, {"چک‌ها", "📝"},
             {"کالا و انبار", "📦"}, {"مشتریان", "👥"}, {"ویزیتورها", "🚚"}, {"سود و زیان", "📈"},
-            {"برگشتی و ابطالی", "↩"}, {"هوشمند", "✦"}
+            {"برگشتی و ابطالی", "↩"}, {"هوشمند", "✦"}, {"سرفصل‌ها", "🗂"}
     };
 
-    private static final String[] QUICK_QUESTIONS = {
-            "خلاصه امروز", "فروش امروز", "بدهکاران", "معوق‌ها", "چک‌های نزدیک سررسید", "پیشنهاد اقدام"
-    };
-
-    /** Segment 0: a launcher for the assistant (the chat itself is its own screen). */
-    private void renderAssistantHub(LinearLayout c) {
-        LinearLayout card = Card3D.card(a, Theme.GOLD);
-        card.addView(a.kit.text("✦ دستیار هوشمند", 15f, Theme.TEXT, true), a.kit.lp(-1, -2));
-        card.addView(a.kit.hint(AiSettings.ready(a)
-                ? "هوش مصنوعی فعال است؛ پاسخ‌ها از مدل شما و داده‌های زندهٔ فروشگاه ساخته می‌شوند."
-                : "پاسخ‌ها از داده‌های زندهٔ فروشگاه ساخته می‌شوند. هوش مصنوعی را در تنظیمات فعال کنید."),
-                a.kit.lp(-1, -2));
-        card.addView(a.kit.gap(10));
-        card.addView(a.kit.btnGold("💬 گفتگو با دستیار", v -> a.nav("assistant")), a.kit.lp(-1, -2));
-        card.addView(a.kit.gap(6));
-        card.addView(a.kit.btnGhost("🎙 گفتگوی زنده", Theme.VIOLET, v -> a.nav("assistant")), a.kit.lp(-1, -2));
-        c.addView(card, a.kit.lp(-1, -2));
-        c.addView(a.kit.gap(10));
-        c.addView(a.kit.text("پرسش‌های آماده", 13f, Theme.GOLD_SOFT, true), a.kit.lp(-1, -2));
-        c.addView(a.kit.gap(6));
-        for (int i = 0; i < QUICK_QUESTIONS.length; i += 2) {
-            LinearLayout row = a.kit.h();
-            row.addView(quickTile(QUICK_QUESTIONS[i]), a.kit.wlp(1f));
-            row.addView(a.kit.space(8));
-            if (i + 1 < QUICK_QUESTIONS.length) row.addView(quickTile(QUICK_QUESTIONS[i + 1]), a.kit.wlp(1f));
-            else row.addView(a.kit.space(0), a.kit.wlp(1f));
-            c.addView(row, a.kit.lp(-1, -2));
-            c.addView(a.kit.gap(8));
-        }
-    }
-
-    private View quickTile(final String question) {
-        return a.kit.btnGhost(question, Theme.GOLD, v -> {
-            AssistantScreen.pendingQuestion = question;
-            a.nav("assistant");
-        });
-    }
-
-    /** Segment 1: each report group opens directly in «گزارشات». */
     private void renderReportsHub(LinearLayout c) {
         c.addView(a.kit.hint("یک بخش را انتخاب کنید تا گزارش‌های همان بخش باز شود."), a.kit.lp(-1, -2));
         c.addView(a.kit.gap(8));
@@ -215,11 +170,26 @@ public class MoreScreen extends Screen {
         c.addView(a.kit.btnGold("▤ همهٔ گزارش‌ها", v -> a.nav("reports")), a.kit.lp(-1, -2));
     }
 
+    /** Two-line card tile: long section names wrap instead of being cut off. */
     private View groupTile(final String[] group) {
-        return a.kit.btnGhost(group[1] + "  " + group[0], groupColor(group[0]), v -> {
+        int accent = groupColor(group[0]);
+        LinearLayout tile = a.kit.card(accent);
+        tile.setGravity(Gravity.CENTER_VERTICAL);
+        tile.setMinimumHeight(Theme.dp(60));
+        tile.setPadding(Theme.dp(10), Theme.dp(10), Theme.dp(10), Theme.dp(10));
+        tile.addView(iconBadge(group[1], accent, 36), new LinearLayout.LayoutParams(Theme.dp(36), Theme.dp(36)));
+        tile.addView(a.kit.space(8));
+        TextView label = a.kit.text(group[0], 12.5f, Theme.TEXT, true);
+        label.setMaxLines(2);
+        label.setEllipsize(TextUtils.TruncateAt.END);
+        tile.addView(label, a.kit.wlp(1f));
+        tile.setContentDescription(group[0] + "؛ باز کردن گزارش‌ها");
+        Theme.pressable(tile);
+        tile.setOnClickListener(v -> {
             ReportsScreen.pendingCategory = group[0];
             a.nav("reports");
         });
+        return tile;
     }
 
     /** Fixed colours for report groups: sales and purchases stand out from the theme gold. */

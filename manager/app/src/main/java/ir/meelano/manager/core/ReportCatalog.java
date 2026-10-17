@@ -304,44 +304,18 @@ public final class ReportCatalog {
             s("cows", "صندوق‌ها", "بانک و صندوق", "فهرست صندوق‌ها و مانده", false,
                     new Col[]{c("name", "صندوق", T_TEXT), c("balance", "مانده", T_MONEY)},
                     C_NONE, "", ""),
-            // ---- حسابداری (سرفصل‌ها، کل‌ها، اسناد) ----
-            s("acc_chart", "سرفصل‌ها و تراز معین‌ها", "حسابداری",
-                    "مانده بدهکار و بستانکار هر معین (سرفصل) به تفکیک کل در بازه — جست‌وجو با نام یا کد", true,
-                    AccountingReports.BALANCE_COLS, C_NONE, "", ""),
-            s("acc_assets", "دارایی‌ها", "حسابداری",
-                    "مانده کل‌های دارایی (کد ۱) — مانده بدهکار", true,
-                    new Col[]{c("code", "کد کل", T_TEXT), c("label", "کل", T_TEXT), c("debit", "بدهکار", T_MONEY),
-                            c("credit", "بستانکار", T_MONEY), c("balance", "مانده", T_MONEY), c("docs", "ردیف", T_NUM)},
-                    C_NONE, "", ""),
-            s("acc_liab", "بدهی‌ها", "حسابداری",
-                    "مانده کل‌های بدهی (کد ۲) — مانده بستانکار", true,
-                    new Col[]{c("code", "کد کل", T_TEXT), c("label", "کل", T_TEXT), c("debit", "بدهکار", T_MONEY),
-                            c("credit", "بستانکار", T_MONEY), c("balance", "مانده", T_MONEY), c("docs", "ردیف", T_NUM)},
-                    C_NONE, "", ""),
-            s("acc_equity", "حقوق صاحبان سهام", "حسابداری",
-                    "مانده کل‌های سرمایه (کد ۳) — مانده بستانکار", true,
-                    new Col[]{c("code", "کد کل", T_TEXT), c("label", "کل", T_TEXT), c("debit", "بدهکار", T_MONEY),
-                            c("credit", "بستانکار", T_MONEY), c("balance", "مانده", T_MONEY), c("docs", "ردیف", T_NUM)},
-                    C_NONE, "", ""),
-            s("acc_income", "درآمدها", "حسابداری",
-                    "مانده کل‌های درآمد (کد ۴) — مانده بستانکار", true,
-                    new Col[]{c("code", "کد کل", T_TEXT), c("label", "کل", T_TEXT), c("debit", "بدهکار", T_MONEY),
-                            c("credit", "بستانکار", T_MONEY), c("balance", "مانده", T_MONEY), c("docs", "ردیف", T_NUM)},
-                    C_NONE, "", ""),
-            s("acc_expense", "هزینه‌ها به تفکیک کل", "حسابداری",
-                    "مانده کل‌های هزینه (کد ۵) — مانده بدهکار؛ هر کل را باز کنید تا به معین‌ها برسید", true,
-                    new Col[]{c("code", "کد کل", T_TEXT), c("label", "کل", T_TEXT), c("debit", "بدهکار", T_MONEY),
-                            c("credit", "بستانکار", T_MONEY), c("balance", "مانده", T_MONEY), c("docs", "ردیف", T_NUM)},
-                    C_NONE, "", ""),
-            s("acc_journal", "اسناد حسابداری", "حسابداری",
-                    "فهرست اسناد با شماره، تاریخ، شرح و جمع بدهکار/بستانکار — روی هر سند بزنید تا ردیف‌هایش را ببینید", true,
-                    new Col[]{c("no", "شماره سند", T_TEXT), c("date", "تاریخ", T_DATE), c("descr", "شرح", T_TEXT),
-                            c("lines", "ردیف", T_NUM), c("debit", "بدهکار", T_MONEY), c("credit", "بستانکار", T_MONEY)},
-                    C_NONE, "", ""),
-            s("acc_sarfasl", "گردش سرفصل‌ها و زیرسرفصل‌ها", "حسابداری",
-                    "جمع بدهکار، بستانکار و مانده هر سرفصل و زیرسرفصل در بازه", true,
-                    new Col[]{c("sarfasl", "سرفصل", T_TEXT), c("zir", "زیرسرفصل", T_TEXT), c("debit", "بدهکار", T_MONEY),
-                            c("credit", "بستانکار", T_MONEY), c("balance", "مانده", T_MONEY), c("docs", "ردیف", T_NUM)},
+            // ---- سرفصل‌ها (بازیابی؛ حسابداری غیرفعال است) ----
+            s("sf_balances", "مانده سرفصل‌ها", "سرفصل‌ها",
+                    "جمع بدهکار، بستانکار و مانده هر سرفصل در بازه — جست‌وجو با نام سرفصل", true,
+                    SarfaslReports.SARFASL_COLS, C_NONE, "", ""),
+            s("sf_zir", "مانده زیرسرفصل‌ها", "سرفصل‌ها",
+                    "جمع بدهکار، بستانکار و مانده هر زیرسرفصل در بازه — جست‌وجو با نام", true,
+                    SarfaslReports.BALANCE_COLS, C_NONE, "", ""),
+            s("sf_entries", "ریز ثبت‌های سرفصل", "سرفصل‌ها",
+                    "ثبت‌های سرفصل و زیرسرفصل با تاریخ، شرح، مبالغ و کاربر — جدیدترین اول", true,
+                    new Col[]{c("date", "تاریخ", T_DATE), c("sarfasl", "سرفصل", T_TEXT), c("zir", "زیرسرفصل", T_TEXT),
+                            c("descr", "شرح", T_TEXT), c("debit", "بدهکار", T_MONEY), c("credit", "بستانکار", T_MONEY),
+                            c("user", "کاربر", T_TEXT)},
                     C_NONE, "", ""),
     };
 
@@ -417,14 +391,9 @@ public final class ReportCatalog {
         if ("stock_forecast".equals(id)) return MasterQueries.stockForecast(m, ff);
         if ("invoice_profit".equals(id)) return MasterQueries.invoiceProfit(m, ff);
         if ("order_suggest".equals(id)) return MasterQueries.orderSuggest(m, ff);
-        if ("acc_chart".equals(id)) return AccountingReports.chart(m, ff);
-        if ("acc_assets".equals(id)) return AccountingReports.byClass(m, ff, "1");
-        if ("acc_liab".equals(id)) return AccountingReports.byClass(m, ff, "2");
-        if ("acc_equity".equals(id)) return AccountingReports.byClass(m, ff, "3");
-        if ("acc_income".equals(id)) return AccountingReports.byClass(m, ff, "4");
-        if ("acc_expense".equals(id)) return AccountingReports.byClass(m, ff, "5");
-        if ("acc_journal".equals(id)) return AccountingReports.journal(m, ff);
-        if ("acc_sarfasl".equals(id)) return AccountingReports.sarfaslLedger(m, ff);
+        if ("sf_balances".equals(id)) return SarfaslReports.sarfaslBalances(m, ff);
+        if ("sf_zir".equals(id)) return SarfaslReports.zirBalances(m, ff);
+        if ("sf_entries".equals(id)) return SarfaslReports.entries(m, ff);
         throw new Queries.Missing("گزارش ناشناخته است");
     }
 }

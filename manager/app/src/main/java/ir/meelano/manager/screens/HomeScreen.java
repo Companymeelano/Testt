@@ -563,7 +563,8 @@ public class HomeScreen extends Screen {
         String day = dayOf(row);
         String label = day.isEmpty() ? title : title + " " + day;
         if (row == null) {
-            return new Kit.Kpi(label, "—", "داده در دسترس نیست", accent);
+            // No row for this day yet: a neutral dash, never an error-looking placeholder.
+            return new Kit.Kpi(label, "—", "هنوز ثبت نشده", accent);
         }
         return new Kit.Kpi(label, Money.compactRial(row.d("total")),
                 Money.fa(String.valueOf(row.l(countKey))) + " " + countLabel, accent,
@@ -665,7 +666,7 @@ public class HomeScreen extends Screen {
         c.addView(a.kit.sectionHead("پرفروش‌ترین کالاهای " + period, "گزارش کامل ›", v -> a.nav("reports")),
                 a.kit.lp(-1, -2));
         if (d.topItems == null || d.topItems.isEmpty()) {
-            c.addView(a.kit.text("دادهٔ کالای پرفروش برای " + period + " در دسترس نیست.", 11.5f, Theme.MUTED, false),
+            c.addView(a.kit.text("هنوز کالایی برای " + period + " ثبت نشده است.", 11.5f, Theme.MUTED, false),
                     a.kit.lp(-1, -2));
         } else {
             int show = Math.min(5, d.topItems.size());

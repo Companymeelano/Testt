@@ -470,25 +470,60 @@ public class HomeScreen extends Screen {
 
     /** A compact luxury launchpad to the five high-frequency management destinations. */
     /** Compact rates + Tehran weather. Saved values show at once; the refresh runs in the background. */
+    /** Place name shown with the weather: the device's city, or Tehran when no position is available. */
+    private String weatherPlace = "تهران";
+    /** True when the weather shown comes from the device position (not the Tehran fallback). */
+    private boolean weatherFromDevice = false;
+
+    private static final String PLACE_KEY = "weather_place";
+    private static final String DEVICE_KEY = "weather_device";
+
     private View marketCard() {
         final LinearLayout card = a.kit.card(Theme.GOLD);
+        final int gen = a.renderGen();
+        // Show the last saved values and place straight away; the live refresh replaces them below.
+        String savedPlace = MarketWeather.cached(a, PLACE_KEY);
+        if (savedPlace != null && !savedPlace.isEmpty()) weatherPlace = savedPlace;
+        weatherFromDevice = "1".equals(MarketWeather.cached(a, DEVICE_KEY));
         renderMarket(card, MarketWeather.cached(a, MarketWeather.ratesKey()),
                 MarketWeather.cached(a, MarketWeather.weatherKey()), false, false);
         new Thread(() -> {
+            // Position: last known or one quick fix (worker thread). Denied or unavailable means Tehran.
+            android.location.Location loc = null;
+            try { loc = ir.meelano.manager.core.DeviceLocation.resolve(a, 6000); } catch (Exception ignored) { }
+            final boolean fromDevice = loc != null;
+            final double lat = fromDevice ? loc.getLatitude() : MarketWeather.TEHRAN_LAT;
+            final double lon = fromDevice ? loc.getLongitude() : MarketWeather.TEHRAN_LON;
+            String place = fromDevice ? ir.meelano.manager.core.DeviceLocation.placeName(a, lat, lon) : null;
+            if (place == null) place = fromDevice ? "موقعیت شما" : "تهران";
+
             String rRaw = null;
             String wRaw = null;
             try { rRaw = MarketWeather.get(MarketWeather.RATES_URL); } catch (Exception ignored) { }
-            try { wRaw = MarketWeather.get(MarketWeather.WEATHER_URL); } catch (Exception ignored) { }
+            try { wRaw = MarketWeather.get(MarketWeather.weatherUrl(lat, lon)); } catch (Exception ignored) { }
             final boolean rLive = rRaw != null;
             final boolean wLive = wRaw != null;
             if (rLive) MarketWeather.save(a, MarketWeather.ratesKey(), rRaw);
-            if (wLive) MarketWeather.save(a, MarketWeather.weatherKey(), wRaw);
+            if (wLive) {
+                // Weather is stored with its place, so a saved value is never shown under another city's name.
+                MarketWeather.save(a, MarketWeather.weatherKey(), wRaw);
+                MarketWeather.save(a, PLACE_KEY, place);
+                MarketWeather.save(a, DEVICE_KEY, fromDevice ? "1" : "0");
+            }
             final String fr = rLive ? rRaw : MarketWeather.cached(a, MarketWeather.ratesKey());
             final String fw = wLive ? wRaw : MarketWeather.cached(a, MarketWeather.weatherKey());
-            a.runOnUiThread(() -> renderMarket(card, fr, fw, rLive, wLive));
+            final String fp = wLive ? place : (MarketWeather.cached(a, PLACE_KEY) == null ? place : MarketWeather.cached(a, PLACE_KEY));
+            final boolean fd = wLive ? fromDevice : "1".equals(MarketWeather.cached(a, DEVICE_KEY));
+            a.runOnUiThread(() -> {
+                if (a.renderGen() != gen) return;
+                weatherPlace = fp;
+                weatherFromDevice = fd;
+                renderMarket(card, fr, fw, rLive, wLive);
+            });
         }, "market-refresh").start();
         return card;
     }
+
 
     private void renderMarket(LinearLayout card, String rJson, String wJson, boolean rLive, boolean wLive) {
         card.removeAllViews();
@@ -523,7 +558,7 @@ public class HomeScreen extends Screen {
             wr.addView(a.kit.text(MarketWeather.glyph(w.code), 18f, Theme.GOLD, false), a.kit.lp(-2, -2));
             wr.addView(a.kit.space(8));
             LinearLayout wc = a.kit.v();
-            TextView line = a.kit.text("تهران • " + Money.fa(String.valueOf(Math.round(w.temp))) + "°  "
+            TextView line = a.kit.text(weatherPlace + " • " + Money.fa(String.valueOf(Math.round(w.temp))) + "°  "
                     + MarketWeather.describe(w.code), 12f, Theme.TEXT, true);
             line.setMaxLines(1);
             line.setEllipsize(TextUtils.TruncateAt.END);
@@ -532,6 +567,13 @@ public class HomeScreen extends Screen {
                     a.kit.lp(-1, -2));
             wr.addView(wc, a.kit.wlp(1f));
             card.addView(wr, a.kit.lp(-1, -2));
+        }
+
+        if (!weatherFromDevice && w != null) {
+            // Without the device position the card says so and offers the permission again.
+            card.addView(a.kit.hint("موقعیت شما در دسترس نیست؛ هواشناسی تهران نمایش داده می‌شود."), a.kit.lp(-1, -2));
+            card.addView(a.kit.btnGhost("📍 فعال‌سازی موقعیت برای هواشناسی شهر من", Theme.GOLD,
+                    v -> a.requestLocationAccess()), a.kit.lp(-1, -2));
         }
 
         String stamp = rates != null && !rates.isEmpty() ? rates.get(0).asOf : "";

@@ -22,9 +22,16 @@ public final class MarketWeather {
 
     public static final String RATES_URL =
             "https://raw.githubusercontent.com/iran-market/iran-market.github.io/main/data/popular.json";
-    public static final String WEATHER_URL =
-            "https://api.open-meteo.com/v1/forecast?latitude=35.6892&longitude=51.3890"
-                    + "&current=temperature_2m,relative_humidity_2m,weather_code&timezone=Asia%2FTehran";
+    /** Fallback when the device position is unavailable: Tehran. */
+    public static final double TEHRAN_LAT = 35.6892;
+    public static final double TEHRAN_LON = 51.3890;
+
+    /** Open-Meteo forecast for the given coordinates (current conditions, local timezone). */
+    public static String weatherUrl(double lat, double lon) {
+        return String.format(java.util.Locale.US,
+                "https://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f"
+                        + "&current=temperature_2m,relative_humidity_2m,weather_code&timezone=auto", lat, lon);
+    }
 
     private static final String PREFS = "market_cache_v1";
     private static final String KEY_RATES = "rates";

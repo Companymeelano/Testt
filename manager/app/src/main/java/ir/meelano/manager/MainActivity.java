@@ -1157,6 +1157,13 @@ public class MainActivity extends Activity {
     }
 
     private static final int MIC_PERM = 4471;
+    private static final int LOC_PERM = 4472;
+
+    /** Asks for approximate and precise location, used only by the weather card. */
+    public void requestLocationAccess() {
+        requestPermissions(new String[]{android.Manifest.permission.ACCESS_COARSE_LOCATION,
+                android.Manifest.permission.ACCESS_FINE_LOCATION}, LOC_PERM);
+    }
     private java.util.function.Consumer<Boolean> micCb;
 
     public void startVoiceSearch(java.util.function.Consumer<String> cb) {
@@ -1244,6 +1251,11 @@ public class MainActivity extends Activity {
         // Notification permission is best-effort; the app works fully without it.
         boolean granted = grantResults != null && grantResults.length > 0
                 && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED;
+        if (requestCode == LOC_PERM) {
+            // Location is optional: redraw the home card so weather follows the new permission at once.
+            if ("home".equals(currentId)) renderCurrent();
+            return;
+        }
         if (requestCode == MIC_PERM) {
             java.util.function.Consumer<Boolean> cb = micCb;
             micCb = null;

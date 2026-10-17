@@ -61,7 +61,8 @@ public class ReportsScreen extends Screen {
         boolean search = "fleeing_customers".equals(sel.id) || "lost_basket".equals(sel.id)
                 || "cheque_reliability".equals(sel.id) || "stock_forecast".equals(sel.id)
                 || "dying_stock".equals(sel.id) || "fresh_debtors".equals(sel.id)
-                || "order_suggest".equals(sel.id) || "invoice_profit".equals(sel.id);
+                || "order_suggest".equals(sel.id) || "invoice_profit".equals(sel.id)
+                || sel.id.startsWith("acc_");
         if (!sel.needsRange && !search) return null;
         FilterSheet.Config c = new FilterSheet.Config();
         c.search = search;
@@ -96,6 +97,7 @@ public class ReportsScreen extends Screen {
         if ("هزینه‌ها".equals(section)) return Theme.ROSE;
         if ("برگشتی و ابطالی".equals(section)) return Theme.DANGER;
         if ("تحلیل ویزیتور و مسیر".equals(section)) return Theme.WARNING;
+        if ("حسابداری".equals(section)) return Theme.TEAL;
         return Theme.MUTED;
     }
 
@@ -115,6 +117,7 @@ public class ReportsScreen extends Screen {
         if ("هزینه‌ها".equals(section)) return R.drawable.mi_trending_down;
         if ("برگشتی و ابطالی".equals(section)) return R.drawable.mi_assignment_return;
         if ("تحلیل ویزیتور و مسیر".equals(section)) return R.drawable.mi_bar_chart;
+        if ("حسابداری".equals(section)) return R.drawable.mi_account_balance;
         return R.drawable.mi_widgets;
     }
 
@@ -642,14 +645,53 @@ java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
         }
         int show = Math.min(rows.size(), 300);
         final boolean callable = "fleeing_customers".equals(spec.id) || "cheque_reliability".equals(spec.id);
+        final boolean journal = "acc_journal".equals(spec.id);
         c.addView(a.kit.dataTable(spec.cols, new ArrayList<>(rows.subList(0, show)),
-                callable ? this::contactDialog : null), a.kit.lp(-1, -2));
+                journal ? this::journalDialog : (callable ? this::contactDialog : null)), a.kit.lp(-1, -2));
         if (rows.size() > show)
             c.addView(a.kit.hint("+" + Money.fa(String.valueOf(rows.size() - show)) + " ردیف دیگر در PDF…"), a.kit.lp(-1, -2));
         LinearLayout.LayoutParams fp = a.kit.lp(-1, -2);
         fp.setMargins(0, Theme.dp(10), 0, 0);
         c.addView(a.exportBar(spec.title, spec.needsRange ? filter.rangeFa() : spec.desc, spec.cols, rows), fp);
         a.kit.addCard(content, c);
+    }
+
+    /** Voucher detail: tap a row in «اسناد حسابداری» to see every line of that voucher. */
+    private void journalDialog(final Row r) {
+        final long docId = (long) r.d("docId");
+        android.widget.LinearLayout body = a.kit.v();
+        body.setPadding(Theme.dp(12), Theme.dp(12), Theme.dp(12), Theme.dp(12));
+        body.addView(a.kit.text("سند شماره " + Money.fa(r.s("no")) + " • " + Jalali.dispFa(r.s("date")),
+                14f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        String descr = r.s("descr");
+        if (descr != null && !descr.trim().isEmpty())
+            body.addView(a.kit.text(descr, 12f, Theme.MUTED, false), a.kit.lp(-1, -2));
+        body.addView(a.kit.gap(10));
+        final LinearLayout list = a.kit.v();
+        list.addView(a.kit.loading("در حال دریافت ردیف‌های سند…"), a.kit.lp(-1, -2));
+        body.addView(list, a.kit.lp(-1, -2));
+        final android.app.AlertDialog dlg = a.kit.dialog("ردیف‌های سند", body, true);
+        dlg.show();
+        a.repo.run(c -> Repo.exec(c, ir.meelano.manager.core.AccountingReports.docLines(new Meta(c), docId)),
+                new Repo.Cb<List<Row>>() {
+                    @Override
+                    public void ok(List<Row> rows) {
+                        list.removeAllViews();
+                        if (rows == null || rows.isEmpty()) {
+                            list.addView(a.kit.empty("ردیفی برای این سند ثبت نشده است", null), a.kit.lp(-1, -2));
+                            return;
+                        }
+                        list.addView(a.kit.dataTable(ir.meelano.manager.core.AccountingReports.LINE_COLS, rows, null),
+                                a.kit.lp(-1, -2));
+                    }
+
+                    @Override
+                    public void fail(String faError) {
+                        list.removeAllViews();
+                        list.addView(a.kit.error(faError == null || faError.isEmpty()
+                                ? "ردیف‌های سند دریافت نشد" : faError, () -> journalDialog(r)), a.kit.lp(-1, -2));
+                    }
+                });
     }
 
     /** Tap-to-call: phone + SMS actions for customer rows that carry a mobile number. */

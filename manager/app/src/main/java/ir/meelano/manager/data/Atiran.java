@@ -101,6 +101,9 @@ public final class Atiran {
             if (o.length() > 40) o = o.substring(0, 40);
             return "ستون «" + o + "» در دیتابیس پیدا نشد";
         }
+        if (l.contains("socket closed") || l.contains("i/o error") || l.contains("connection reset")) {
+            return "ارتباط با سرور قطع شد؛ اتصال شبکه را بررسی و دوباره تلاش کنید";
+        }
         if (l.contains("incorrect syntax")) {
             return "ساختار این گزارش با دیتابیس سازگار نیست؛ به پشتیبانی اطلاع دهید";
         }

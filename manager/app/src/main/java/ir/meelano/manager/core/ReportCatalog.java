@@ -268,6 +268,10 @@ public final class ReportCatalog {
                     new Col[]{c("day", "روز", T_DATE), c("sales", "فروش", T_MONEY), c("cogs", "بهای تمام‌شده", T_MONEY),
                             c("profit", "سود", T_MONEY)},
                     C_LINE, "day", "profit"),
+            s("profit_monthly", "سود ماهانه", "سود و زیان", "فروش، بهای تمام‌شده و سود هر ماه شمسی — برای مقایسهٔ ماه‌ها", true,
+                    new Col[]{c("day", "ماه", T_TEXT), c("sales", "فروش", T_MONEY), c("cogs", "بهای تمام‌شده", T_MONEY),
+                            c("profit", "سود", T_MONEY)},
+                    C_BARS, "day", "profit"),
             s("profit_by_product", "سود کالاها", "سود و زیان", "حاشیه سود هر کالا (مبنای قیمت خرید)", true,
                     new Col[]{c("label", "کالا", T_TEXT), c("qty", "مقدار", T_NUM), c("sales", "فروش", T_MONEY),
                             c("cogs", "بهای تمام‌شده", T_MONEY), c("profit", "سود", T_MONEY)},
@@ -374,6 +378,7 @@ public final class ReportCatalog {
         if ("users".equals(id)) return MasterQueries.usersList(m);
         if ("changes".equals(id)) return MasterQueries.tableChanges(m, ff);
         if ("profit_daily".equals(id)) return MasterQueries.profitDaily(m, ff);
+        if ("profit_monthly".equals(id)) return MasterQueries.profitMonthly(m, ff);
         if ("profit_by_product".equals(id)) return MasterQueries.profitByProduct(m, ff, 50);
         if ("profit_costs".equals(id)) return MasterQueries.profitCosts(m, ff);
         if ("sales_notconfirmed".equals(id)) { ff.status = "not_confirmed"; return Queries.factorList(m, true, ff); }

@@ -702,6 +702,15 @@ public final class MasterQueries {
 
     /** Daily sales vs COGS: day,sales,cogs. */
     public static Queries.Q profitDaily(Meta m, Filter f) throws Queries.Missing {
+        return profitGrouped(m, f, false);
+    }
+
+    /** Monthly sales vs COGS: day(=YYYY/MM),sales,cogs,profit. Same SQL shape as the daily report. */
+    public static Queries.Q profitMonthly(Meta m, Filter f) throws Queries.Missing {
+        return profitGrouped(m, f, true);
+    }
+
+    private static Queries.Q profitGrouped(Meta m, Filter f, boolean monthly) throws Queries.Missing {
         Set<String> cols = m.columns("sailfact");
         String dateCol = m.must("sailfact", "تاریخ", "date");
         String numberCol = m.must("sailfact", "شماره فاکتور", "shfacfo");
@@ -716,7 +725,7 @@ public final class MasterQueries {
         String dc = Sql.dateCond(Sql.date10("x", dateCol), f.from, f.to, binds);
         if (!dc.isEmpty()) conds.add(dc);
         String inner = "WHERE " + (conds.isEmpty() ? "1=1" : Sql.join(conds, " AND ")) + Sql.activeAnd(cols, "x") + Sql.softAnd(cols, "x");
-        String day = Sql.date10("h", dateCol);
+        String day = monthly ? Sql.month7("h", dateCol) : Sql.date10("h", dateCol);
         // Sales per day from the header; COGS per day from the lines (avoid fan-out by aggregating separately).
         String sql = "SELECT day AS day, ISNULL(SUM(sales),0) AS sales, ISNULL(SUM(cogs),0) AS cogs"
                 + ", ISNULL(SUM(sales),0)-ISNULL(SUM(cogs),0) AS profit FROM ("

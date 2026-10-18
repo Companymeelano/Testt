@@ -381,6 +381,46 @@ public final class ReportCatalog {
                     new Col[]{c("name", "مشتری", T_TEXT), c("code", "کد", T_TEXT), c("prevTotal", "۹۰ روز قبل", T_MONEY),
                             c("curTotal", "۹۰ روز اخیر", T_MONEY), c("dropPct", "افت (٪)", T_NUM)},
                     C_NONE, "", ""),
+            s("fin_discount_monthly", "تخفیف دریافت و پرداخت ماهانه", "دریافت و پرداخت", "جمع دریافت و پرداخت و تخفیف‌های اعطاشده در هر ماه شمسی", true,
+                    new Col[]{c("month", "ماه", T_TEXT), c("receipts", "دریافت", T_MONEY), c("payments", "پرداخت", T_MONEY),
+                            c("discountIn", "تخفیف دریافتی", T_MONEY), c("discountOut", "تخفیف پرداختی", T_MONEY)},
+                    C_BARS, "month", "receipts"),
+            s("fin_net_cash", "جریان خالص نقدی ماهانه", "دریافت و پرداخت", "تفاوت دریافت و پرداخت هر ماه به‌همراه مانده تجمعی دوره", true,
+                    new Col[]{c("month", "ماه", T_TEXT), c("receipts", "دریافت", T_MONEY), c("payments", "پرداخت", T_MONEY),
+                            c("net", "خالص ماه", T_MONEY), c("cum", "تجمعی", T_MONEY)},
+                    C_LINE, "month", "cum"),
+            s("fin_cash_mix", "ترکیب وصول: نقد در برابر چک", "دریافت و پرداخت", "سهم وصول نقدی از کل وصول (نقد + چک) در هر ماه", true,
+                    new Col[]{c("month", "ماه", T_TEXT), c("cash", "نقد", T_MONEY), c("cheque", "چک", T_MONEY),
+                            c("cashShare", "سهم نقد (٪)", T_NUM)},
+                    C_BARS, "month", "cash"),
+            s("fin_overpaid", "اسناد دریافتی ناهماهنگ", "دریافت و پرداخت", "قبض‌هایی که جمع نقد و چک آن‌ها بیشتر از مبلغ سند است — کنترل حسابرسی؛ پوز فقط به مبلغ اضافه می‌کند", true,
+                    new Col[]{c("no", "شماره قبض", T_TEXT), c("kind", "نوع", T_TEXT), c("party", "طرف‌حساب", T_TEXT),
+                            c("date", "تاریخ", T_DATE), c("total", "مبلغ سند", T_MONEY), c("paid", "نقد+چک", T_MONEY),
+                            c("excess", "اضافه", T_MONEY)},
+                    C_NONE, "", ""),
+            s("sf_group_totals", "بدهکار و بستانکار گروه سرفصل", "سرفصل‌ها", "جمع بدهکار، بستانکار و مانده هر گروه سرفصل در دوره", true,
+                    new Col[]{c("grp", "گروه سرفصل", T_TEXT), c("debit", "بدهکار", T_MONEY), c("credit", "بستانکار", T_MONEY),
+                            c("balance", "مانده", T_MONEY), c("rows", "ردیف", T_NUM)},
+                    C_BARS, "grp", "balance"),
+            s("sf_monthly_group", "گردش ماهانه گروه‌های سرفصل", "سرفصل‌ها", "بدهکار، بستانکار و خالص هر گروه سرفصل در هر ماه شمسی", true,
+                    new Col[]{c("month", "ماه", T_TEXT), c("grp", "گروه", T_TEXT), c("debit", "بدهکار", T_MONEY),
+                            c("credit", "بستانکار", T_MONEY), c("net", "خالص", T_MONEY)},
+                    C_NONE, "", ""),
+            s("sf_hidden", "گردش‌های پنهان‌شده از گزارش", "سرفصل‌ها", "ردیف‌هایی که با «نمایش در گزارش = خیر» ثبت شده‌اند و در گزارش‌های عادی دیده نمی‌شوند", true,
+                    new Col[]{c("zir", "زیرسرفصل", T_TEXT), c("rows", "ردیف", T_NUM), c("debit", "بدهکار", T_MONEY),
+                            c("credit", "بستانکار", T_MONEY)},
+                    C_NONE, "", ""),
+            s("sf_dormant", "زیرسرفصل‌های فعال بدون گردش", "سرفصل‌ها", "زیرسرفصل‌های فعال که در این دوره هیچ ثبتی ندارند — برای پاکسازی سرفصل‌ها", true,
+                    new Col[]{c("zir", "زیرسرفصل", T_TEXT), c("sarfasl", "سرفصل", T_TEXT), c("grp", "گروه", T_TEXT)},
+                    C_NONE, "", ""),
+            s("sf_unbalanced", "اسناد حسابداری نتراز", "سرفصل‌ها", "اسنادی که جمع بدهکار و بستانکارشان برابر نیست — باید قبل از بستن دوره اصلاح شوند", true,
+                    new Col[]{c("sanad", "شماره سند", T_TEXT), c("date", "تاریخ", T_DATE), c("rows", "ردیف", T_NUM),
+                            c("debit", "بدهکار", T_MONEY), c("credit", "بستانکار", T_MONEY), c("diff", "اختلاف", T_MONEY)},
+                    C_NONE, "", ""),
+            s("sf_biggest", "بزرگ‌ترین اسناد حسابداری", "سرفصل‌ها", "اسناد حسابداری با بیشترین بدهکار در دوره", true,
+                    new Col[]{c("sanad", "شماره سند", T_TEXT), c("date", "تاریخ", T_DATE), c("rows", "ردیف", T_NUM),
+                            c("debit", "بدهکار", T_MONEY), c("credit", "بستانکار", T_MONEY)},
+                    C_NONE, "", ""),
             s("profit_by_product", "سود کالاها", "سود و زیان", "حاشیه سود هر کالا (مبنای قیمت خرید)", true,
                     new Col[]{c("label", "کالا", T_TEXT), c("qty", "مقدار", T_NUM), c("sales", "فروش", T_MONEY),
                             c("cogs", "بهای تمام‌شده", T_MONEY), c("profit", "سود", T_MONEY)},
@@ -495,6 +535,16 @@ public final class ReportCatalog {
         if ("profit_discount_daily".equals(id)) return ProfitReports.discountDaily(m, ff);
         if ("profit_cumulative".equals(id)) return ProfitReports.cumulativeMonthly(m, ff);
         if ("profit_price_realization".equals(id)) return ProfitReports.priceRealization(m, ff, 100);
+        if ("fin_discount_monthly".equals(id)) return FinanceReports.discountMonthly(m, ff);
+        if ("fin_net_cash".equals(id)) return FinanceReports.netCashMonthly(m, ff);
+        if ("fin_cash_mix".equals(id)) return FinanceReports.cashMixMonthly(m, ff);
+        if ("fin_overpaid".equals(id)) return FinanceReports.overpaidVouchers(m, ff, 300);
+        if ("sf_group_totals".equals(id)) return FinanceReports.groupTotals(m, ff);
+        if ("sf_monthly_group".equals(id)) return FinanceReports.monthlyByGroup(m, ff);
+        if ("sf_hidden".equals(id)) return FinanceReports.hiddenMovements(m, ff, 300);
+        if ("sf_dormant".equals(id)) return FinanceReports.dormantSubAccounts(m, ff, 500);
+        if ("sf_unbalanced".equals(id)) return FinanceReports.unbalancedJournals(m, ff, 300);
+        if ("sf_biggest".equals(id)) return FinanceReports.biggestJournals(m, ff, 100);
         if ("uniq_retention".equals(id)) return UniqueReports.customerRetention(m, ff);
         if ("uniq_basket".equals(id)) return UniqueReports.marketBasket(m, ff, 50);
         if ("uniq_credit_alert".equals(id)) return UniqueReports.creditAlerts(m, 300);

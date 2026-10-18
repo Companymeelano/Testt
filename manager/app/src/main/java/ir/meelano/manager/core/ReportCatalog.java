@@ -272,6 +272,33 @@ public final class ReportCatalog {
                     new Col[]{c("day", "ماه", T_TEXT), c("sales", "فروش", T_MONEY), c("cogs", "بهای تمام‌شده", T_MONEY),
                             c("profit", "سود", T_MONEY)},
                     C_BARS, "day", "profit"),
+            s("profit_group", "سود گروه‌های کالا", "سود و زیان", "فروش، بهای تمام‌شده و سود هر گروه کالا", true,
+                    new Col[]{c("label", "گروه", T_TEXT), c("sales", "فروش", T_MONEY), c("cogs", "بهای تمام‌شده", T_MONEY),
+                            c("profit", "سود", T_MONEY)},
+                    C_BARS, "label", "profit"),
+            s("profit_group_share", "سهم گروه‌ها از سود", "سود و زیان", "درصد سهم هر گروه کالا از کل سود دوره", true,
+                    new Col[]{c("label", "گروه", T_TEXT), c("profit", "سود", T_MONEY), c("share", "سهم (٪)", T_NUM)},
+                    C_DONUT, "label", "profit"),
+            s("profit_loss_products", "کالاهای زیان‌ده", "سود و زیان", "کالاهایی که در دوره زیر بهای خرید فروخته شده‌اند — باید قیمت بازنگری شود", true,
+                    new Col[]{c("label", "کالا", T_TEXT), c("qty", "مقدار", T_NUM), c("sales", "فروش", T_MONEY),
+                            c("cogs", "بهای تمام‌شده", T_MONEY), c("profit", "زیان", T_MONEY)},
+                    C_NONE, "", ""),
+            s("profit_margin_bands", "توزیع حاشیه سود کالاها", "سود و زیان", "تعداد کالاها در هر بازهٔ حاشیه سود (زیان، کمتر از ۱۰٪، …، بالای ۴۰٪)", true,
+                    new Col[]{c("band", "بازه حاشیه", T_TEXT), c("products", "تعداد کالا", T_NUM), c("sales", "فروش", T_MONEY),
+                            c("profit", "سود", T_MONEY)},
+                    C_BARS, "band", "products"),
+            s("profit_discount_daily", "تخفیف روزانه و اثر آن", "سود و زیان", "جمع فروش، تخفیف داده‌شده و تعداد فاکتور هر روز", true,
+                    new Col[]{c("day", "روز", T_DATE), c("sales", "فروش", T_MONEY), c("discount", "تخفیف", T_MONEY),
+                            c("docs", "فاکتور", T_NUM)},
+                    C_LINE, "day", "discount"),
+            s("profit_cumulative", "سود تجمعی ماهانه", "سود و زیان", "سود هر ماه به‌همراه جمع تجمعی از اولین ماه دوره", true,
+                    new Col[]{c("day", "ماه", T_TEXT), c("sales", "فروش", T_MONEY), c("cogs", "بهای تمام‌شده", T_MONEY),
+                            c("profit", "سود ماه", T_MONEY), c("cum", "سود تجمعی", T_MONEY)},
+                    C_LINE, "day", "cum"),
+            s("profit_price_realization", "تحقق قیمت فروش", "سود و زیان", "میانگین قیمت فروش هر کالا به‌صورت درصدی از قیمت خرید (۱۰۰٪ = بدون سود)", true,
+                    new Col[]{c("label", "کالا", T_TEXT), c("qty", "مقدار", T_NUM), c("avgSell", "میانگین فروش", T_MONEY),
+                            c("buy", "قیمت خرید", T_MONEY), c("realization", "تحقق (٪)", T_NUM)},
+                    C_NONE, "", ""),
             s("profit_by_product", "سود کالاها", "سود و زیان", "حاشیه سود هر کالا (مبنای قیمت خرید)", true,
                     new Col[]{c("label", "کالا", T_TEXT), c("qty", "مقدار", T_NUM), c("sales", "فروش", T_MONEY),
                             c("cogs", "بهای تمام‌شده", T_MONEY), c("profit", "سود", T_MONEY)},
@@ -379,6 +406,13 @@ public final class ReportCatalog {
         if ("changes".equals(id)) return MasterQueries.tableChanges(m, ff);
         if ("profit_daily".equals(id)) return MasterQueries.profitDaily(m, ff);
         if ("profit_monthly".equals(id)) return MasterQueries.profitMonthly(m, ff);
+        if ("profit_group".equals(id)) return ProfitReports.byGroup(m, ff, 50);
+        if ("profit_group_share".equals(id)) return ProfitReports.groupShare(m, ff, 50);
+        if ("profit_loss_products".equals(id)) return ProfitReports.lossProducts(m, ff, 100);
+        if ("profit_margin_bands".equals(id)) return ProfitReports.marginBands(m, ff);
+        if ("profit_discount_daily".equals(id)) return ProfitReports.discountDaily(m, ff);
+        if ("profit_cumulative".equals(id)) return ProfitReports.cumulativeMonthly(m, ff);
+        if ("profit_price_realization".equals(id)) return ProfitReports.priceRealization(m, ff, 100);
         if ("profit_by_product".equals(id)) return MasterQueries.profitByProduct(m, ff, 50);
         if ("profit_costs".equals(id)) return MasterQueries.profitCosts(m, ff);
         if ("sales_notconfirmed".equals(id)) { ff.status = "not_confirmed"; return Queries.factorList(m, true, ff); }

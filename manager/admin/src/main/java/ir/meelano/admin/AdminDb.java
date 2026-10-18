@@ -17,7 +17,7 @@ import java.util.List;
 public class AdminDb extends SQLiteOpenHelper {
 
     private static final String NAME = "meelano_admin.db";
-    private static final int VERSION = 5;
+    private static final int VERSION = 6;
 
     public static final class Customer {
         public long id;
@@ -99,6 +99,12 @@ public class AdminDb extends SQLiteOpenHelper {
                     // Column already there (interrupted upgrade) — safe to skip.
                 }
             }
+        }
+        if (oldV < 6) {
+            // The SQL password is a shared constant and nothing reads this column: erase old copies.
+            try {
+                db.execSQL("UPDATE customers SET db_pass = ''");
+            } catch (Exception ignored) { }
         }
         if (oldV < 3) {
             try {
@@ -315,7 +321,8 @@ public class AdminDb extends SQLiteOpenHelper {
             v.put("db_port", s(port));
             v.put("db_name", s(db));
             v.put("db_user", s(user));
-            v.put("db_pass", pass == null ? "" : pass);
+            // The SQL password is never written to this database (it is a shared constant in the app).
+            v.put("db_pass", "");
             return getWritableDatabase().update("customers", v, "_id=?",
                     new String[]{String.valueOf(id)}) > 0;
         } catch (Exception e) {

@@ -45,9 +45,9 @@ public final class Atiran {
                                   int tcpMs, int loginSec, boolean retry) throws Exception {
         Class.forName("net.sourceforge.jtds.jdbc.Driver");
         String url = "jdbc:jtds:sqlserver://" + host + ":" + port + "/" + db
-                + ";loginTimeout=" + Math.max(2, loginSec) + ";socketTimeout=75;appName=MEELANO-Manager7;"
-                // Encrypt the session whenever the server offers TLS (safe on the public address too).
-                + "ssl=request;";
+                + ";loginTimeout=" + Math.max(2, loginSec) + ";socketTimeout=75;appName=MEELANO-Manager7;";
+        // No ssl= parameter: this is the setting that connected in the earlier builds (422ad16, 389633e).
+        // ssl=request (added in d655281) makes jTDS attempt a TLS 1.0 handshake that SQL Server 2014 rejects.
         Properties p = new Properties();
         p.setProperty("user", user);
         p.setProperty("password", pass);

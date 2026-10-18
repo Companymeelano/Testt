@@ -40,8 +40,8 @@ public final class ProfitReports {
         s.numberCol = m.must("sailfact", "شماره فاکتور", "shfacfo");
         String linkCol = m.must("subsailfact", "شماره فاکتور", "shfacfo");
         s.shka = m.must("subsailfact", "کد کالا", "SHKA", "shka");
-        String qty = m.must("subsailfact", "تعداد", "TEDVAH", "tedvah");
-        String sum = m.must("subsailfact", "جمع ردیف", "LINESUM", "linesum");
+        String qty = m.must("subsailfact", "تعداد", "tedvah_fel", "TEDVAH", "tedvah");
+        String sum = m.must("subsailfact", "جمع ردیف", "linesum_fel", "LINESUM", "linesum");
         s.qty = qty;
         s.sum = sum;
         s.buy = MasterQueries.cogsBuyCol(m);

@@ -685,7 +685,7 @@ public final class MasterQueries {
         String numberCol = m.must("sailfact", "شماره فاکتور", "shfacfo");
         String linkCol = m.must("subsailfact", "شماره فاکتور", "shfacfo");
         String shka = m.must("subsailfact", "کد کالا", "SHKA", "shka");
-        String qty = m.must("subsailfact", "تعداد", "TEDVAH", "tedvah");
+        String qty = m.must("subsailfact", "تعداد", "tedvah_fel", "TEDVAH", "tedvah");
         String buy = cogsBuyCol(m);
         String invShka = cogsShka(m);
         List<Object> binds = new ArrayList<>();
@@ -717,7 +717,7 @@ public final class MasterQueries {
         String amountCol = m.must("sailfact", "مبلغ", "all_fel", "all");
         String linkCol = m.must("subsailfact", "شماره فاکتور", "shfacfo");
         String shka = m.must("subsailfact", "کد کالا", "SHKA", "shka");
-        String qty = m.must("subsailfact", "تعداد", "TEDVAH", "tedvah");
+        String qty = m.must("subsailfact", "تعداد", "tedvah_fel", "TEDVAH", "tedvah");
         String buy = cogsBuyCol(m);
         String invShka = cogsShka(m);
         List<Object> binds = new ArrayList<>();
@@ -749,8 +749,8 @@ public final class MasterQueries {
         String numberCol = m.must("sailfact", "شماره فاکتور", "shfacfo");
         String linkCol = m.must("subsailfact", "شماره فاکتور", "shfacfo");
         String shka = m.must("subsailfact", "کد کالا", "SHKA", "shka");
-        String qty = m.must("subsailfact", "تعداد", "TEDVAH", "tedvah");
-        String sum = m.must("subsailfact", "جمع ردیف", "LINESUM", "linesum");
+        String qty = m.must("subsailfact", "تعداد", "tedvah_fel", "TEDVAH", "tedvah");
+        String sum = m.must("subsailfact", "جمع ردیف", "linesum_fel", "LINESUM", "linesum");
         String buy = cogsBuyCol(m);
         String invShka = cogsShka(m);
         String invName = m.col("inventory", "naka", "NAKA");
@@ -778,8 +778,8 @@ public final class MasterQueries {
         String numberCol = m.must("sailfact", "شماره فاکتور", "shfacfo");
         String linkCol = m.must("subsailfact", "شماره فاکتور", "shfacfo");
         String shka = m.must("subsailfact", "کد کالا", "SHKA", "shka");
-        String qty = m.must("subsailfact", "تعداد", "TEDVAH", "tedvah");
-        String sum = m.must("subsailfact", "جمع ردیف", "LINESUM", "linesum");
+        String qty = m.must("subsailfact", "تعداد", "tedvah_fel", "TEDVAH", "tedvah");
+        String sum = m.must("subsailfact", "جمع ردیف", "linesum_fel", "LINESUM", "linesum");
         String buy = cogsBuyCol(m);
         String invShka = cogsShka(m);
         String invName = m.col("inventory", "naka", "NAKA");
@@ -1192,8 +1192,8 @@ public final class MasterQueries {
         String partyCol = m.must("sailfact", "طرف‌حساب", "shmo", "SHMO");
         String linkCol = m.must("subsailfact", "شماره فاکتور", "shfacfo");
         String shka = m.must("subsailfact", "کد کالا", "SHKA", "shka");
-        String qty = m.must("subsailfact", "تعداد", "TEDVAH", "tedvah");
-        String sum = m.must("subsailfact", "جمع ردیف", "LINESUM", "linesum");
+        String qty = m.must("subsailfact", "تعداد", "tedvah_fel", "TEDVAH", "tedvah");
+        String sum = m.must("subsailfact", "جمع ردیف", "linesum_fel", "LINESUM", "linesum");
         String buy = cogsBuyCol(m);
         String invShka = cogsShka(m);
         List<Object> binds = new ArrayList<>();
@@ -1266,7 +1266,7 @@ public final class MasterQueries {
     public static Queries.Q lostBasket(Meta m, Filter f) throws Queries.Missing {
         String link = m.must("subsailfact", "شماره فاکتور", "shfacfo");
         String shka = m.must("subsailfact", "کد کالا", "SHKA", "shka");
-        String sum = m.col("subsailfact", "LINESUM", "linesum");
+        String sum = m.col("subsailfact", "linesum_fel", "LINESUM", "linesum");
         String headNo = m.must("sailfact", "شماره فاکتور", "shfacfo");
         String partyCol = m.must("sailfact", "طرف‌حساب", "shmo", "SHMO");
         String custShmo = m.must("CUSTOMERS", "کد", "SHMO", "shmo");
@@ -1444,7 +1444,7 @@ public final class MasterQueries {
         String active = m.col("inventory", "active", "Active");
         String linkCol = m.must("subsailfact", "شماره فاکتور", "shfacfo");
         String lineShka = m.must("subsailfact", "کد کالا", "SHKA", "shka");
-        String qty = m.must("subsailfact", "تعداد", "TEDVAH", "tedvah");
+        String qty = m.must("subsailfact", "تعداد", "tedvah_fel", "TEDVAH", "tedvah");
         Set<String> sail = m.columns("sailfact");
         String dateCol = m.must("sailfact", "تاریخ", "date");
         String numberCol = m.must("sailfact", "شماره فاکتور", "shfacfo");
@@ -1485,7 +1485,7 @@ public final class MasterQueries {
         String discCol = Sql.pick(cols, "tafif", "takhfif");
         String linkCol = m.must("subsailfact", "شماره فاکتور", "shfacfo");
         String lineShka = m.must("subsailfact", "کد کالا", "SHKA", "shka");
-        String qty = m.must("subsailfact", "تعداد", "TEDVAH", "tedvah");
+        String qty = m.must("subsailfact", "تعداد", "tedvah_fel", "TEDVAH", "tedvah");
         String buy = cogsBuyCol(m);
         String invShka = cogsShka(m);
         List<Object> binds = new ArrayList<>();
@@ -1642,7 +1642,7 @@ public final class MasterQueries {
         String active = m.col("inventory", "active", "Active");
         String linkCol = m.must("subsailfact", "شماره فاکتور", "shfacfo");
         String lineShka = m.must("subsailfact", "کد کالا", "SHKA", "shka");
-        String qty = m.must("subsailfact", "تعداد", "TEDVAH", "tedvah");
+        String qty = m.must("subsailfact", "تعداد", "tedvah_fel", "TEDVAH", "tedvah");
         Set<String> sail = m.columns("sailfact");
         String dateCol = m.must("sailfact", "تاریخ", "date");
         String numberCol = m.must("sailfact", "شماره فاکتور", "shfacfo");
@@ -1836,10 +1836,10 @@ public final class MasterQueries {
         String no = m.must("subsailfact", "شماره فاکتور", "shfacfo", "shFacFo");
         String ka = m.col("subsailfact", "SHKA", "shka");
         String nk = m.col("subsailfact", "naka", "NAKA", "name");
-        String qty = m.col("subsailfact", "TEDVAH", "tedvah", "tedad");
+        String qty = m.col("subsailfact", "tedvah_fel", "TEDVAH", "tedvah", "tedad");
         String unt = m.col("subsailfact", "BASTEBANDI", "bastebandi", "vah");
         String prc = m.col("subsailfact", "VAHPRICE", "vahprice", "fi");
-        String sum = m.col("subsailfact", "LINESUM", "linesum");
+        String sum = m.col("subsailfact", "linesum_fel", "LINESUM", "linesum");
         String anb = m.col("subsailfact", "rdf_anbar", "rdfanbar");
         java.util.List<Object> binds = new java.util.ArrayList<>();
         binds.add(shfacfo);

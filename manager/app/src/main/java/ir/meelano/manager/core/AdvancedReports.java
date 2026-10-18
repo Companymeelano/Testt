@@ -22,8 +22,8 @@ public final class AdvancedReports {
         String numberCol = m.must("sailfact", "شماره فاکتور", "shfacfo");
         String linkCol = m.must("subsailfact", "شماره فاکتور", "shfacfo");
         String shka = m.must("subsailfact", "کد کالا", "SHKA", "shka");
-        String qty = m.must("subsailfact", "تعداد", "TEDVAH", "tedvah");
-        String sum = m.must("subsailfact", "جمع ردیف", "LINESUM", "linesum");
+        String qty = m.must("subsailfact", "تعداد", "tedvah_fel", "TEDVAH", "tedvah");
+        String sum = m.must("subsailfact", "جمع ردیف", "linesum_fel", "LINESUM", "linesum");
         String buy = MasterQueries.cogsBuyCol(m);
         String invShka = MasterQueries.cogsShka(m);
         List<Object> binds = new ArrayList<>();
@@ -73,8 +73,8 @@ public final class AdvancedReports {
         String numberCol = m.must("sailfact", "شماره فاکتور", "shfacfo");
         String linkCol = m.must("subsailfact", "شماره فاکتور", "shfacfo");
         String shka = m.must("subsailfact", "کد کالا", "SHKA", "shka");
-        String qty = m.must("subsailfact", "تعداد", "TEDVAH", "tedvah");
-        String sum = m.must("subsailfact", "جمع ردیف", "LINESUM", "linesum");
+        String qty = m.must("subsailfact", "تعداد", "tedvah_fel", "TEDVAH", "tedvah");
+        String sum = m.must("subsailfact", "جمع ردیف", "linesum_fel", "LINESUM", "linesum");
         String invName = m.col("inventory", "naka", "NAKA");
         String invShka = m.col("inventory", "SHKA", "shka");
         List<Object> binds = new ArrayList<>();

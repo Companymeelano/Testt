@@ -92,7 +92,11 @@ public final class Atiran {
         String m = String.valueOf(e.getMessage());
         String l = m.toLowerCase(java.util.Locale.US);
         if (l.contains("timeout") || l.contains("timed out")) return "سرور پاسخ نداد؛ اینترنت و آدرس سرور را بررسی کنید";
-        if (l.contains("refused") || l.contains("unreachable") || l.contains("no route") || l.contains("network"))
+        // TLS first: jTDS reports a failed encrypted handshake as "Network error ... SSL handshake aborted".
+        // That is not a routing problem, so it must not fall into the network branch below.
+        if (l.contains("ssl") || l.contains("tls") || l.contains("handshake") || l.contains("secure connection"))
+            return "اتصال رمزنگاری‌شده (TLS) با سرور برقرار نشد؛ نسخه TLS سرور با درایور برنامه سازگار نیست";
+        if (l.contains("refused") || l.contains("unreachable") || l.contains("no route"))
             return "مسیر شبکه به سرور در دسترس نیست";
         if (l.contains("login failed") || l.contains("logon failed")) return "نام کاربری یا رمز دیتابیس اشتباه است";
         if (l.contains("cannot open database")) return "دیتابیس روی سرور پیدا نشد؛ نام دیتابیس را بررسی کنید";

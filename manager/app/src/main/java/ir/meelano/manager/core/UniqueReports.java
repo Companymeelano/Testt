@@ -117,4 +117,35 @@ public final class UniqueReports {
                 + " WHERE t.prevTotal>0 AND t.curTotal<0.5*t.prevTotal"
                 + " ORDER BY dropPct DESC", new ArrayList<>());
     }
+
+    /**
+     * Customer financial record taken from the system's own view VW_CustomerOperatingRecord
+     * (lifetime values, not date-filtered by the view): balance, credit, invoice total, gain
+     * and receipts by method. Values are read as the database computes them, never recomputed.
+     */
+    public static Queries.Q customerRecord(Meta m, int top) throws Queries.Missing {
+        String v = "VW_CustomerOperatingRecord";
+        if (!m.table(v)) throw new Queries.Missing("نمای کارنامه مشتری در این دیتابیس نیست");
+        String shmo = m.must(v, "کد", "SHMO", "shmo");
+        String name = m.must(v, "نام", "moname", "MONAME");
+        String mandeh = m.must(v, "مانده", "Mandeh", "mandeh");
+        String etebar = m.col(v, "Etebar", "etebar");
+        String sum = m.col(v, "Sum_facttor", "sum_facttor");
+        String cnt = m.col(v, "Ted_facttor", "ted_facttor");
+        String sood = m.col(v, "sood", "Sood");
+        String naghdi = m.col(v, "Mab_Daryafti_Naghdi");
+        String pos = m.col(v, "Mab_Daryafti_POS");
+        String chk = m.col(v, "Mab_Daryafti_Chek");
+        return new Queries.Q("SELECT TOP (" + Queries.clampTop(top) + ") " + Sql.txt("v", name, 200) + " AS name"
+                + ", " + Sql.txt("v", shmo, 60) + " AS code"
+                + ", " + Sql.num("v", mandeh) + " AS balance"
+                + ", " + Sql.num("v", etebar) + " AS credit"
+                + ", " + Sql.num("v", cnt) + " AS invoices"
+                + ", " + Sql.num("v", sum) + " AS sales"
+                + ", " + Sql.num("v", sood) + " AS gain"
+                + ", " + Sql.num("v", naghdi) + " AS cash"
+                + ", " + Sql.num("v", pos) + " AS pos"
+                + ", " + Sql.num("v", chk) + " AS cheque"
+                + " FROM dbo.[" + v + "] v ORDER BY balance DESC", new ArrayList<>());
+    }
 }

@@ -377,6 +377,12 @@ public final class ReportCatalog {
                     new Col[]{c("name", "مشتری", T_TEXT), c("code", "کد", T_TEXT), c("credit", "سقف اعتبار", T_MONEY),
                             c("balance", "مانده", T_MONEY), c("used", "مصرف اعتبار (٪)", T_NUM)},
                     C_NONE, "", ""),
+            s("uniq_customer_record", "کارنامه مالی مشتریان", "گزارش‌های اختصاصی", "مانده، اعتبار، جمع فاکتور، سود و دریافت‌ها به تفکیک روش؛ مقادیر کل عمر مشتری از نمای سیستم", false,
+                    new Col[]{c("name", "مشتری", T_TEXT), c("code", "کد", T_TEXT), c("balance", "مانده", T_MONEY),
+                            c("credit", "اعتبار", T_MONEY), c("invoices", "تعداد فاکتور", T_NUM), c("sales", "جمع فروش", T_MONEY),
+                            c("gain", "سود", T_MONEY), c("cash", "دریافت نقد", T_MONEY), c("pos", "دریافت پوز", T_MONEY),
+                            c("cheque", "دریافت چک", T_MONEY)},
+                    C_BARS, "name", "balance"),
             s("uniq_declining", "افت خرید مشتریان وفادار", "گزارش‌های اختصاصی", "مشتریانی که ۹۰ روز اخیرشان کمتر از نصف ۹۰ روز قبل خرید داشته‌اند — زودتر از ریزش به سراغشان بروید", false,
                     new Col[]{c("name", "مشتری", T_TEXT), c("code", "کد", T_TEXT), c("prevTotal", "۹۰ روز قبل", T_MONEY),
                             c("curTotal", "۹۰ روز اخیر", T_MONEY), c("dropPct", "افت (٪)", T_NUM)},
@@ -549,6 +555,7 @@ public final class ReportCatalog {
         if ("uniq_basket".equals(id)) return UniqueReports.marketBasket(m, ff, 50);
         if ("uniq_credit_alert".equals(id)) return UniqueReports.creditAlerts(m, 300);
         if ("uniq_declining".equals(id)) return UniqueReports.decliningCustomers(m, 200);
+        if ("uniq_customer_record".equals(id)) return UniqueReports.customerRecord(m, 300);
         if ("buy_daily_totals".equals(id)) return BuyCustomerReports.buyDailyTotals(m, ff);
         if ("buy_monthly_totals".equals(id)) return BuyCustomerReports.buyMonthlyTotals(m, ff);
         if ("buy_top_invoices".equals(id)) return BuyCustomerReports.buyTopInvoices(m, ff, 30);

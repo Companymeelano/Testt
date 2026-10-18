@@ -299,6 +299,72 @@ public final class ReportCatalog {
                     new Col[]{c("label", "کالا", T_TEXT), c("qty", "مقدار", T_NUM), c("avgSell", "میانگین فروش", T_MONEY),
                             c("buy", "قیمت خرید", T_MONEY), c("realization", "تحقق (٪)", T_NUM)},
                     C_NONE, "", ""),
+            s("buy_daily_totals", "خرید روزانه با مالیات و تخفیف", "خرید", "جمع خرید، مالیات، تخفیف و تعداد فاکتور هر روز", true,
+                    new Col[]{c("day", "روز", T_DATE), c("total", "جمع خرید", T_MONEY), c("tax", "مالیات", T_MONEY),
+                            c("discount", "تخفیف", T_MONEY), c("docs", "فاکتور", T_NUM)},
+                    C_LINE, "day", "total"),
+            s("buy_monthly_totals", "خرید ماهانه و میانگین فاکتور", "خرید", "جمع خرید، تعداد فاکتور و میانگین مبلغ هر فاکتور در ماه", true,
+                    new Col[]{c("month", "ماه", T_TEXT), c("total", "جمع خرید", T_MONEY), c("docs", "فاکتور", T_NUM),
+                            c("avg", "میانگین فاکتور", T_MONEY)},
+                    C_BARS, "month", "total"),
+            s("buy_top_invoices", "بزرگ‌ترین فاکتورهای خرید", "خرید", "سی فاکتور خرید با بیشترین مبلغ در دوره", true,
+                    new Col[]{c("no", "شماره", T_TEXT), c("date", "تاریخ", T_DATE), c("party", "طرف‌حساب", T_TEXT),
+                            c("total", "مبلغ", T_MONEY)},
+                    C_NONE, "", ""),
+            s("buy_supplier_share", "سهم تأمین‌کنندگان از خرید", "خرید", "درصد سهم هر طرف‌حساب از کل خرید دوره", true,
+                    new Col[]{c("label", "طرف‌حساب", T_TEXT), c("total", "جمع خرید", T_MONEY), c("docs", "فاکتور", T_NUM),
+                            c("share", "سهم (٪)", T_NUM)},
+                    C_DONUT, "label", "total"),
+            s("buy_discount_by_supplier", "تخفیف گرفته‌شده از تأمین‌کنندگان", "خرید", "جمع تخفیف هر طرف‌حساب در خریدهای دوره", true,
+                    new Col[]{c("label", "طرف‌حساب", T_TEXT), c("total", "جمع خرید", T_MONEY), c("discount", "تخفیف", T_MONEY),
+                            c("docs", "فاکتور", T_NUM)},
+                    C_BARS, "label", "discount"),
+            s("buy_product_docs", "کالاهای خریداری‌شده و تعداد فاکتور", "خرید", "تعداد فاکتورهایی که هر کالا در آن خریده شده و مقدار خرید", true,
+                    new Col[]{c("label", "کالا", T_TEXT), c("docs", "فاکتور", T_NUM), c("qty", "مقدار", T_NUM)},
+                    C_BARS, "label", "qty"),
+            s("buy_dormant_stock", "موجودی بدون خرید در دوره", "خرید", "کالاهایی که موجودی دارند اما در این دوره خریداری نشده‌اند", true,
+                    new Col[]{c("label", "کالا", T_TEXT), c("stock", "موجودی", T_NUM), c("unit", "واحد", T_TEXT)},
+                    C_NONE, "", ""),
+            s("buy_party_last", "آخرین خرید از هر تأمین‌کننده", "خرید", "تعداد فاکتور، جمع خرید و تاریخ آخرین خرید از هر طرف‌حساب", true,
+                    new Col[]{c("label", "طرف‌حساب", T_TEXT), c("docs", "فاکتور", T_NUM), c("total", "جمع خرید", T_MONEY),
+                            c("last", "آخرین خرید", T_DATE)},
+                    C_NONE, "", ""),
+            s("buy_stock_cover", "پوشش موجودی نسبت به خرید", "خرید", "نسبت موجودی فعلی به مقدار خریداری‌شده در دوره (عدد بالاتر یعنی کندی گردش)", true,
+                    new Col[]{c("label", "کالا", T_TEXT), c("bought", "خرید دوره", T_NUM), c("stock", "موجودی", T_NUM),
+                            c("cover", "نسبت پوشش", T_NUM)},
+                    C_NONE, "", ""),
+            s("buy_vs_sales_monthly", "خرید در برابر فروش (ماهانه)", "خرید", "مقایسه جمع خرید و جمع فروش هر ماه شمسی", true,
+                    new Col[]{c("month", "ماه", T_TEXT), c("buy", "خرید", T_MONEY), c("sales", "فروش", T_MONEY)},
+                    C_BARS, "month", "buy"),
+            s("cust_by_kind", "فروش به تفکیک نوع مشتری", "مشتریان", "جمع فروش، تعداد مشتری و فاکتور به تفکیک کد نوع مشتری", true,
+                    new Col[]{c("label", "نوع مشتری", T_TEXT), c("customers", "مشتری", T_NUM), c("total", "جمع فروش", T_MONEY),
+                            c("docs", "فاکتور", T_NUM)},
+                    C_BARS, "label", "total"),
+            s("cust_by_personality", "فروش به تفکیک شخصیت مشتری", "مشتریان", "جمع فروش، تعداد مشتری و فاکتور به تفکیک نوع شخصیت", true,
+                    new Col[]{c("label", "شخصیت", T_TEXT), c("customers", "مشتری", T_NUM), c("total", "جمع فروش", T_MONEY),
+                            c("docs", "فاکتور", T_NUM)},
+                    C_DONUT, "label", "total"),
+            s("cust_no_cell", "مشتریان بدون شماره همراه", "مشتریان", "مشتریانی که شماره همراه ندارند — برای پیامک و تماس باید تکمیل شود", false,
+                    new Col[]{c("name", "مشتری", T_TEXT), c("code", "کد", T_TEXT), c("addre", "نشانی", T_TEXT)},
+                    C_NONE, "", ""),
+            s("cust_blacklist", "مشتریان لیست سیاه", "مشتریان", "مشتریان مسدود با مانده حساب", false,
+                    new Col[]{c("name", "مشتری", T_TEXT), c("code", "کد", T_TEXT), c("cell", "همراه", T_TEXT),
+                            c("balance", "مانده", T_MONEY)},
+                    C_NONE, "", ""),
+            s("cust_no_location", "مشتریان بدون موقعیت روی نقشه", "مشتریان", "مشتریانی که مختصات مکانی آن‌ها ثبت نشده — برای مسیریابی ویزیتور لازم است", false,
+                    new Col[]{c("name", "مشتری", T_TEXT), c("code", "کد", T_TEXT), c("addre", "نشانی", T_TEXT)},
+                    C_NONE, "", ""),
+            s("cust_frequency", "تکرار خرید مشتریان", "مشتریان", "تعداد فاکتور، جمع و میانگین خرید هر مشتری با اولین و آخرین تاریخ خرید", true,
+                    new Col[]{c("name", "مشتری", T_TEXT), c("docs", "فاکتور", T_NUM), c("total", "جمع فروش", T_MONEY),
+                            c("avg", "میانگین فاکتور", T_MONEY), c("first", "اولین خرید", T_DATE), c("last", "آخرین خرید", T_DATE)},
+                    C_BARS, "name", "total"),
+            s("cust_new_monthly", "مشتریان جدید هر ماه", "مشتریان", "تعداد مشتریانی که در هر ماه برای اولین بار در این دوره خرید کرده‌اند", true,
+                    new Col[]{c("month", "ماه", T_TEXT), c("customers", "مشتری جدید", T_NUM)},
+                    C_BARS, "month", "customers"),
+            s("cust_avg_invoice", "مشتریان با بالاترین میانگین فاکتور", "مشتریان", "مشتریانی که حداقل دو فاکتور دارند، بر اساس میانگین مبلغ هر فاکتور", true,
+                    new Col[]{c("name", "مشتری", T_TEXT), c("docs", "فاکتور", T_NUM), c("avg", "میانگین فاکتور", T_MONEY),
+                            c("total", "جمع فروش", T_MONEY)},
+                    C_NONE, "", ""),
             s("profit_by_product", "سود کالاها", "سود و زیان", "حاشیه سود هر کالا (مبنای قیمت خرید)", true,
                     new Col[]{c("label", "کالا", T_TEXT), c("qty", "مقدار", T_NUM), c("sales", "فروش", T_MONEY),
                             c("cogs", "بهای تمام‌شده", T_MONEY), c("profit", "سود", T_MONEY)},
@@ -413,6 +479,24 @@ public final class ReportCatalog {
         if ("profit_discount_daily".equals(id)) return ProfitReports.discountDaily(m, ff);
         if ("profit_cumulative".equals(id)) return ProfitReports.cumulativeMonthly(m, ff);
         if ("profit_price_realization".equals(id)) return ProfitReports.priceRealization(m, ff, 100);
+        if ("buy_daily_totals".equals(id)) return BuyCustomerReports.buyDailyTotals(m, ff);
+        if ("buy_monthly_totals".equals(id)) return BuyCustomerReports.buyMonthlyTotals(m, ff);
+        if ("buy_top_invoices".equals(id)) return BuyCustomerReports.buyTopInvoices(m, ff, 30);
+        if ("buy_supplier_share".equals(id)) return BuyCustomerReports.buySupplierShare(m, ff, 50);
+        if ("buy_discount_by_supplier".equals(id)) return BuyCustomerReports.buyDiscountBySupplier(m, ff, 50);
+        if ("buy_product_docs".equals(id)) return BuyCustomerReports.buyProductDocs(m, ff, 100);
+        if ("buy_dormant_stock".equals(id)) return BuyCustomerReports.buyDormantStock(m, ff, 200);
+        if ("buy_party_last".equals(id)) return BuyCustomerReports.buyPartyLast(m, ff, 100);
+        if ("buy_stock_cover".equals(id)) return BuyCustomerReports.buyStockCover(m, ff, 100);
+        if ("buy_vs_sales_monthly".equals(id)) return BuyCustomerReports.buyVsSalesMonthly(m, ff);
+        if ("cust_by_kind".equals(id)) return BuyCustomerReports.custByKind(m, ff);
+        if ("cust_by_personality".equals(id)) return BuyCustomerReports.custByPersonality(m, ff);
+        if ("cust_no_cell".equals(id)) return BuyCustomerReports.custNoCell(m, 300);
+        if ("cust_blacklist".equals(id)) return BuyCustomerReports.custBlacklist(m, 300);
+        if ("cust_no_location".equals(id)) return BuyCustomerReports.custNoLocation(m, 300);
+        if ("cust_frequency".equals(id)) return BuyCustomerReports.custFrequency(m, ff, 100);
+        if ("cust_new_monthly".equals(id)) return BuyCustomerReports.custNewMonthly(m, ff);
+        if ("cust_avg_invoice".equals(id)) return BuyCustomerReports.custAvgInvoice(m, ff, 100);
         if ("profit_by_product".equals(id)) return MasterQueries.profitByProduct(m, ff, 50);
         if ("profit_costs".equals(id)) return MasterQueries.profitCosts(m, ff);
         if ("sales_notconfirmed".equals(id)) { ff.status = "not_confirmed"; return Queries.factorList(m, true, ff); }

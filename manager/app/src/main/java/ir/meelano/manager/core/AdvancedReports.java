@@ -49,7 +49,7 @@ public final class AdvancedReports {
         Set<String> cols = m.columns("sailfact");
         String dateCol = m.must("sailfact", "تاریخ", "date");
         String numberCol = m.must("sailfact", "شماره فاکتور", "shfacfo");
-        String amount = m.must("sailfact", "مبلغ", "all");
+        String amount = m.must("sailfact", "مبلغ", "all_fel", "all");
         String paid = m.must("sailfact", "پرداخت‌شده", "MabDaryaftFactor", "Daryaft");
         List<Object> binds = new ArrayList<>();
         String dc = Sql.dateCond(Sql.date10("x", dateCol), f.from, f.to, binds);

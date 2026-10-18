@@ -248,7 +248,7 @@ public final class MasterQueries {
         // Sales aggregates (OUTER APPLY, deduped).
         Set<String> sail = m.columns("sailfact");
         String saleShmo = m.col("sailfact", "shmo", "SHMO");
-        String saleAmount = m.col("sailfact", "all");
+        String saleAmount = m.col("sailfact", "all_fel", "all");
         String saleNo = m.col("sailfact", "shfacfo");
         String saleDate = m.col("sailfact", "date");
         boolean canSales = saleShmo != null && saleAmount != null && m.table("sailfact");
@@ -492,7 +492,7 @@ public final class MasterQueries {
         String active = m.col("visitors", "active", "Active");
         String phone = m.col("visitors", "vis_cell", "vis_tell1", "cell");
         String saleVis = m.col("sailfact", "vis_rdf", "VisitorID");
-        String saleAmount = m.col("sailfact", "all");
+        String saleAmount = m.col("sailfact", "all_fel", "all");
         String saleNo = m.col("sailfact", "shfacfo");
         String saleDate = m.col("sailfact", "date");
         String saleShmo = m.col("sailfact", "shmo", "SHMO");
@@ -536,7 +536,7 @@ public final class MasterQueries {
     /** Visitor daily sales: day,total,docs. */
     public static Queries.Q visitorTrend(Meta m, int visId, Filter f) throws Queries.Missing {
         String saleVis = m.must("sailfact", "ویزیتور", "vis_rdf", "VisitorID");
-        String saleAmount = m.must("sailfact", "مبلغ", "all");
+        String saleAmount = m.must("sailfact", "مبلغ", "all_fel", "all");
         String saleDate = m.must("sailfact", "تاریخ", "date");
         String saleNo = m.col("sailfact", "shfacfo");
         List<Object> binds = new ArrayList<>();
@@ -555,7 +555,7 @@ public final class MasterQueries {
     /** Visitor's customers: code,name,sales,docs,lastDay. */
     public static Queries.Q visitorCustomers(Meta m, int visId, Filter f) throws Queries.Missing {
         String saleVis = m.must("sailfact", "ویزیتور", "vis_rdf", "VisitorID");
-        String saleAmount = m.must("sailfact", "مبلغ", "all");
+        String saleAmount = m.must("sailfact", "مبلغ", "all_fel", "all");
         String saleDate = m.col("sailfact", "date");
         String saleNo = m.col("sailfact", "shfacfo");
         String saleShmo = m.must("sailfact", "کد مشتری", "shmo", "SHMO");
@@ -714,7 +714,7 @@ public final class MasterQueries {
         Set<String> cols = m.columns("sailfact");
         String dateCol = m.must("sailfact", "تاریخ", "date");
         String numberCol = m.must("sailfact", "شماره فاکتور", "shfacfo");
-        String amountCol = m.must("sailfact", "مبلغ", "all");
+        String amountCol = m.must("sailfact", "مبلغ", "all_fel", "all");
         String linkCol = m.must("subsailfact", "شماره فاکتور", "shfacfo");
         String shka = m.must("subsailfact", "کد کالا", "SHKA", "shka");
         String qty = m.must("subsailfact", "تعداد", "TEDVAH", "tedvah");
@@ -1228,7 +1228,7 @@ public final class MasterQueries {
         String bal = m.col("CUSTOMERS", "man", "Balance", "Mandeh");
         Set<String> sail = m.columns("sailfact");
         String dateCol = m.must("sailfact", "تاریخ", "date");
-        String amountCol = m.must("sailfact", "مبلغ", "all");
+        String amountCol = m.must("sailfact", "مبلغ", "all_fel", "all");
         String numberCol = m.must("sailfact", "شماره فاکتور", "shfacfo");
         String partyCol = m.must("sailfact", "طرف‌حساب", "shmo", "SHMO");
         List<Object> binds = new ArrayList<>();
@@ -1360,7 +1360,7 @@ public final class MasterQueries {
         String custShmo = m.col("CUSTOMERS", "SHMO", "shmo");
         if (custVis == null || custShmo == null) throw new Queries.Missing("ارتباط مشتری با ویزیتور در «مشتریان» پیدا نشد");
         String saleVis = m.col("sailfact", "vis_rdf", "VisitorID");
-        String saleAmount = m.col("sailfact", "all");
+        String saleAmount = m.col("sailfact", "all_fel", "all");
         String saleNo = m.col("sailfact", "shfacfo");
         String saleDate = m.col("sailfact", "date");
         String saleShmo = m.col("sailfact", "shmo", "SHMO");
@@ -1411,7 +1411,7 @@ public final class MasterQueries {
     public static Queries.Q goldenHours(Meta m, Filter f) throws Queries.Missing {
         Set<String> cols = m.columns("sailfact");
         String dateCol = m.must("sailfact", "تاریخ", "date");
-        String amountCol = m.must("sailfact", "مبلغ", "all");
+        String amountCol = m.must("sailfact", "مبلغ", "all_fel", "all");
         String numberCol = Sql.pick(cols, "shfacfo");
         String timeCol = Sql.pick(cols, "time_");
         List<Object> binds = new ArrayList<>();
@@ -1479,7 +1479,7 @@ public final class MasterQueries {
     public static Queries.Q invoiceProfit(Meta m, Filter f) throws Queries.Missing {
         Set<String> cols = m.columns("sailfact");
         String dateCol = m.must("sailfact", "تاریخ", "date");
-        String amountCol = m.must("sailfact", "مبلغ", "all");
+        String amountCol = m.must("sailfact", "مبلغ", "all_fel", "all");
         String numberCol = m.must("sailfact", "شماره فاکتور", "shfacfo");
         String partyCol = Sql.pick(cols, "shmo", "SHMO");
         String discCol = Sql.pick(cols, "tafif", "takhfif");
@@ -1612,7 +1612,7 @@ public final class MasterQueries {
     public static Queries.Q duesInvRaw(Meta m, String from, String to) throws Queries.Missing {
         m.must("sailfact", "وضعیت تسویه", "tasvieh");
         m.must("sailfact", "تاریخ تسویه", "t_date");
-        String amountCol = m.must("sailfact", "مبلغ", "all");
+        String amountCol = m.must("sailfact", "مبلغ", "all_fel", "all");
         String numberCol = m.must("sailfact", "شماره فاکتور", "shfacfo");
         String partyCol = Sql.pick(m.columns("sailfact"), "shmo", "SHMO");
         List<Object> binds = new ArrayList<>();
@@ -1710,7 +1710,7 @@ public final class MasterQueries {
         String dt = m.must("sailfact", "تاریخ فاکتور", "date");
         String shmo = m.col("sailfact", "shmo", "SHMO");
         String vis = m.col("sailfact", "vis_rdf", "visrdf");
-        String all = m.col("sailfact", "all", "All", "sumall");
+        String all = m.col("sailfact", "all_fel", "all", "All", "sumall");
         String tas = m.col("sailfact", "tasvieh", "Tasvieh");
         String custJoin = "";
         String routeJoin = "";
@@ -1782,7 +1782,7 @@ public final class MasterQueries {
         Set<String> cols = m.columns("sailfact");
         String no = m.must("sailfact", "شماره فاکتور", "shfacfo", "shFacFo");
         String dt = m.must("sailfact", "تاریخ فاکتور", "date");
-        String all = m.col("sailfact", "all", "All", "sumall");
+        String all = m.col("sailfact", "all_fel", "all", "All", "sumall");
         List<Object> binds = new ArrayList<>();
         String dc = Sql.dateCond(Sql.date10("x", dt), day, day, binds);
         String inner = "WHERE " + dc + Sql.activeAnd(cols, "x") + Sql.softAnd(cols, "x");
@@ -1974,7 +1974,7 @@ public final class MasterQueries {
         String fdt = null, fall = null;
         try {
             fdt = m.col("sailfact", "date");
-            fall = m.col("sailfact", "all", "All");
+            fall = m.col("sailfact", "all_fel", "all", "All");
         } catch (Exception ignored) { Diag.ignored("MasterQueries:1949", ignored); }
         String todayJ = Jalali.todayStr();
         String todayG = Jalali.todayGregorian();
@@ -2076,7 +2076,7 @@ public final class MasterQueries {
         String nm = m.must("CUSTOMERS", "نام", "moname", "MONAME", "name");
         String man = m.col("CUSTOMERS", "man", "MAN");
         String bShmo = m.col("buyfact", "shmo", "SHMO");
-        String bSum = m.col("buyfact", "all", "All", "sumall", "jam", "mablagh");
+        String bSum = m.col("buyfact", "AllFel", "all", "All", "sumall", "jam", "mablagh");
         String pShmo = m.col("buyfact_pish", "shmo", "SHMO");
         String buyAgg = "0 AS buyN, 0 AS buySum";
         if (bShmo != null && m.table("buyfact")) {

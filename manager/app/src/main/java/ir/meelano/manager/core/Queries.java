@@ -283,7 +283,7 @@ public final class Queries {
         Set<String> sail = m.columns("sailfact");
         m.must("sailfact", "تاریخ تسویه", "t_date");
         m.must("sailfact", "وضعیت تسویه", "tasvieh");
-        m.must("sailfact", "مبلغ", "all");
+        m.must("sailfact", "مبلغ", "all_fel", "all");
         String shmo = Sql.pick(sail, "shmo", "SHMO");
         String number = Sql.pick(sail, "shfacfo");
         String visitorId = Sql.pick(sail, "vis_rdf", "VisitorID");
@@ -306,7 +306,7 @@ public final class Queries {
             daysExpr = "CAST(-1 AS bigint)";
         }
         String sql = "SELECT TOP (" + clampTop(top) + ") " + codeExpr + " AS code, " + nameExpr + " AS party"
-                + ", TRY_CONVERT(decimal(19,2),s.[all]) AS amount"
+                + ", COALESCE(TRY_CONVERT(decimal(19,2),s.[all_fel]),TRY_CONVERT(decimal(19,2),s.[all])) AS amount"
                 + ", LEFT(TRY_CONVERT(nvarchar(30),s.[t_date]),10) AS dueDate, " + daysExpr + " AS days"
                 + ", " + visitorExpr + " AS visitor, " + numExpr + " AS invoice"
                 + " FROM dbo.sailfact s" + joinSql + " WHERE " + Sql.join(where, " AND ")
@@ -332,7 +332,7 @@ public final class Queries {
     public static Q unsettledByMonth(Meta m) throws Missing {
         m.must("sailfact", "تاریخ تسویه", "t_date");
         m.must("sailfact", "وضعیت تسویه", "tasvieh");
-        String amountCol = m.must("sailfact", "مبلغ", "all");
+        String amountCol = m.must("sailfact", "مبلغ", "all_fel", "all");
         Set<String> cols = m.columns("sailfact");
         String mon = Sql.month7("s", "t_date");
         return new Q("SELECT " + mon + " AS month, ISNULL(SUM(" + Sql.num("s", amountCol) + "),0) AS amount"

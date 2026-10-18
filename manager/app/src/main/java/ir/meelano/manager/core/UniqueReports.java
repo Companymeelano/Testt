@@ -95,7 +95,7 @@ public final class UniqueReports {
         String prevEnd = Jalali.addDays(today, -91);
         String dateCol = m.must("sailfact", "تاریخ", "date");
         String numberCol = m.must("sailfact", "شماره فاکتور", "shfacfo");
-        String amount = m.must("sailfact", "مبلغ", "all");
+        String amount = m.must("sailfact", "مبلغ", "all_fel", "all");
         String shmo = m.must("sailfact", "طرف‌حساب", "shmo", "SHMO");
         java.util.Set<String> cols = m.columns("sailfact");
         String x = Sql.date10("x", dateCol);

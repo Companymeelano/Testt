@@ -141,7 +141,7 @@ public final class ProfitReports {
         Src s = build(m, f, false);
         String tafif = m.col("sailfact", "tafif");
         if (tafif == null) throw new Queries.Missing("ستون تخفیف فاکتور فروش در دیتابیس پیدا نشد");
-        String all = m.must("sailfact", "مبلغ", "all");
+        String all = m.must("sailfact", "مبلغ", "all_fel", "all");
         String day = Sql.date10("h", s.dateCol);
         return new Queries.Q("SELECT " + day + " AS day"
                 + ", ISNULL(SUM(" + Sql.num("h", all) + "),0) AS sales"

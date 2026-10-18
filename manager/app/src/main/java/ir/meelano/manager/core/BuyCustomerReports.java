@@ -65,7 +65,7 @@ public final class BuyCustomerReports {
     /** Daily purchase totals with tax and discount: day,total,tax,discount,docs. */
     public static Queries.Q buyDailyTotals(Meta m, Filter f) throws Queries.Missing {
         Head h = head(m, f, "buyfact");
-        String all = m.must("buyfact", "مبلغ", "all");
+        String all = m.must("buyfact", "مبلغ", "AllFel", "all");
         String tax = m.col("buyfact", "tax");
         String tafif = m.col("buyfact", "tafif");
         String day = Sql.date10("h", h.dateCol);
@@ -80,7 +80,7 @@ public final class BuyCustomerReports {
     /** Monthly purchases with average invoice: month,total,docs,avg. */
     public static Queries.Q buyMonthlyTotals(Meta m, Filter f) throws Queries.Missing {
         Head h = head(m, f, "buyfact");
-        String all = m.must("buyfact", "مبلغ", "all");
+        String all = m.must("buyfact", "مبلغ", "AllFel", "all");
         String month = Sql.month7("h", h.dateCol);
         return new Queries.Q("SELECT " + month + " AS month"
                 + ", ISNULL(SUM(" + Sql.num("h", all) + "),0) AS total"
@@ -92,7 +92,7 @@ public final class BuyCustomerReports {
     /** Largest purchase invoices: no,date,party,total. */
     public static Queries.Q buyTopInvoices(Meta m, Filter f, int top) throws Queries.Missing {
         Head h = head(m, f, "buyfact");
-        String all = m.must("buyfact", "مبلغ", "all");
+        String all = m.must("buyfact", "مبلغ", "AllFel", "all");
         return new Queries.Q("SELECT TOP (" + Queries.clampTop(top) + ") "
                 + Sql.txt("h", h.numberCol, 60) + " AS no"
                 + ", " + Sql.date10("h", h.dateCol) + " AS date"
@@ -105,7 +105,7 @@ public final class BuyCustomerReports {
     /** Share of each supplier in purchases: label,total,docs,share(%). */
     public static Queries.Q buySupplierShare(Meta m, Filter f, int top) throws Queries.Missing {
         Head h = head(m, f, "buyfact");
-        String all = m.must("buyfact", "مبلغ", "all");
+        String all = m.must("buyfact", "مبلغ", "AllFel", "all");
         String party = partyName(m);
         Queries.Q inner = new Queries.Q("SELECT TOP (" + Queries.clampTop(top) + ") " + party + " AS label"
                 + ", ISNULL(SUM(" + Sql.num("h", all) + "),0) AS total, COUNT_BIG(1) AS docs"
@@ -119,7 +119,7 @@ public final class BuyCustomerReports {
     /** Purchase discount received per supplier: label,total,discount,docs. */
     public static Queries.Q buyDiscountBySupplier(Meta m, Filter f, int top) throws Queries.Missing {
         Head h = head(m, f, "buyfact");
-        String all = m.must("buyfact", "مبلغ", "all");
+        String all = m.must("buyfact", "مبلغ", "AllFel", "all");
         String tafif = m.col("buyfact", "tafif");
         String party = partyName(m);
         return new Queries.Q("SELECT TOP (" + Queries.clampTop(top) + ") " + party + " AS label"
@@ -178,7 +178,7 @@ public final class BuyCustomerReports {
     /** Last purchase per supplier: label,docs,total,last. */
     public static Queries.Q buyPartyLast(Meta m, Filter f, int top) throws Queries.Missing {
         Head h = head(m, f, "buyfact");
-        String all = m.must("buyfact", "مبلغ", "all");
+        String all = m.must("buyfact", "مبلغ", "AllFel", "all");
         String party = partyName(m);
         return new Queries.Q("SELECT TOP (" + Queries.clampTop(top) + ") " + party + " AS label"
                 + ", COUNT_BIG(1) AS docs"
@@ -217,8 +217,8 @@ public final class BuyCustomerReports {
     public static Queries.Q buyVsSalesMonthly(Meta m, Filter f) throws Queries.Missing {
         Head b = head(m, f, "buyfact", "b");
         Head s = head(m, f, "sailfact", "s");
-        String buyAll = m.must("buyfact", "مبلغ", "all");
-        String saleAll = m.must("sailfact", "مبلغ", "all");
+        String buyAll = m.must("buyfact", "مبلغ", "AllFel", "all");
+        String saleAll = m.must("sailfact", "مبلغ", "all_fel", "all");
         String bm = Sql.month7("b", b.dateCol);
         String sm = Sql.month7("s", s.dateCol);
         List<Object> binds = new ArrayList<>(b.binds);
@@ -247,7 +247,7 @@ public final class BuyCustomerReports {
 
     private static Queries.Q custGroup(Meta m, Filter f, String attr, int len) throws Queries.Missing {
         Head h = head(m, f, "sailfact");
-        String amount = m.must("sailfact", "مبلغ", "all");
+        String amount = m.must("sailfact", "مبلغ", "all_fel", "all");
         String col = m.col("CUSTOMERS", attr);
         if (col == null) throw new Queries.Missing("ستون «" + attr + "» در «مشتریان» پیدا نشد");
         String label = "COALESCE(" + Sql.txt("c", col, len) + ",N'نامشخص')";
@@ -310,7 +310,7 @@ public final class BuyCustomerReports {
     /** Purchase frequency per customer in the period: name,docs,total,avg,first,last. */
     public static Queries.Q custFrequency(Meta m, Filter f, int top) throws Queries.Missing {
         Head h = head(m, f, "sailfact");
-        String amount = m.must("sailfact", "مبلغ", "all");
+        String amount = m.must("sailfact", "مبلغ", "all_fel", "all");
         String date = Sql.date10("h", h.dateCol);
         String party = "COALESCE(" + (m.col("CUSTOMERS", "MONAME") == null ? ""
                 : Sql.txt("c", m.col("CUSTOMERS", "MONAME"), 200) + ",")
@@ -337,7 +337,7 @@ public final class BuyCustomerReports {
     /** Customers with at least two invoices, by average invoice amount: name,docs,avg,total. */
     public static Queries.Q custAvgInvoice(Meta m, Filter f, int top) throws Queries.Missing {
         Head h = head(m, f, "sailfact");
-        String amount = m.must("sailfact", "مبلغ", "all");
+        String amount = m.must("sailfact", "مبلغ", "all_fel", "all");
         String party = "COALESCE(" + (m.col("CUSTOMERS", "MONAME") == null ? ""
                 : Sql.txt("c", m.col("CUSTOMERS", "MONAME"), 200) + ",")
                 + "TRY_CONVERT(nvarchar(60),h.[shmo]),N'—')";

@@ -175,7 +175,9 @@ public final class MasterQueries {
     /** Stock value by kala group: label,value,count. */
     public static Queries.Q stockValueByGroup(Meta m) throws Queries.Missing {
         String vah = m.must("inventory", "موجودی", "mojkavah", "MojKavah");
-        String buy = m.col("inventory", "buy_price", "pure_buy_price", "ImPureBuyPrice");
+        String joz = m.col("inventory", "mojkajoz", "MojKajoz");
+        String mohvah = cogsMohvah(m);
+        String cost = m.col("inventory", "inventory_price", "buy_price", "pure_buy_price", "ImPureBuyPrice");
         String grp = m.col("inventory", "group_rdf");
         String grpName = m.col("kagroup", "group_name");
         String grpKey = m.col("kagroup", "group_rdf");
@@ -183,8 +185,13 @@ public final class MasterQueries {
                 ? "COALESCE(" + Sql.txt("g", grpName, 150) + ",N'بدون گروه')" : "N'همه کالاها'";
         String join = grp != null && grpKey != null && m.table("kagroup")
                 ? " LEFT JOIN dbo.kagroup g ON TRY_CONVERT(nvarchar(50),g.[" + grpKey + "])=TRY_CONVERT(nvarchar(50),i.[" + grp + "])" : "";
+        // Atiran values stock as ((mojkavah*mohvah)+mojkajoz) * inventory_price (see its stock-value procedures).
+        String pieces = "TRY_CONVERT(decimal(19,3),i.[" + vah + "])*COALESCE(TRY_CONVERT(decimal(19,3),"
+                + (mohvah == null ? "1" : "i.[" + mohvah + "]") + "),1)"
+                + (joz == null ? "" : "+COALESCE(TRY_CONVERT(decimal(19,3),i.[" + joz + "]),0)");
         return new Queries.Q("SELECT " + label + " AS label"
-                + ", ISNULL(SUM(TRY_CONVERT(decimal(19,3),i.[" + vah + "])*COALESCE(TRY_CONVERT(decimal(19,2)," + (buy == null ? "NULL" : "i.[" + buy + "]") + "),0)),0) AS value"
+                + ", ISNULL(SUM((" + pieces + ")*COALESCE(TRY_CONVERT(decimal(19,2),"
+                + (cost == null ? "NULL" : "i.[" + cost + "]") + "),0)),0) AS value"
                 + ", COUNT_BIG(1) AS count FROM dbo.inventory i" + join + " GROUP BY " + label + " ORDER BY 2 DESC");
     }
 

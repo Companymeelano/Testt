@@ -24,19 +24,39 @@ public final class MasterQueries {
         String shka = m.must("inventory", "کد کالا", "shka");
         String active = m.col("inventory", "active", "Active");
         String vah = m.must("inventory", "موجودی", "mojkavah", "MojKavah");
-        String buy = m.col("inventory", "buy_price", "pure_buy_price", "ImPureBuyPrice");
+        String cost = m.col("inventory", "inventory_price", "buy_price", "pure_buy_price", "ImPureBuyPrice");
         String actCond = active == null ? "" : " AND " + boolTrue("[" + active + "]");
         String reo = m.col("inventory", "reopoint", "reorder_point");
+        String pcs = stockPieces(m, "");
+        String act = active == null ? "1=1" : boolTrue("[" + active + "]");
         return new Queries.Q("SELECT COUNT_BIG(1) AS count"
                 + ", SUM(CASE WHEN 1=1" + actCond + " THEN 1 ELSE 0 END) AS active"
                 + ", SUM(CASE WHEN TRY_CONVERT(decimal(19,3),[" + vah + "])>0 AND TRY_CONVERT(decimal(19,3),[" + vah + "])<=" + AtiranSchema.LOW_STOCK_VAH + " THEN 1 ELSE 0 END) AS low"
-                + ", SUM(CASE WHEN TRY_CONVERT(decimal(19,3),[" + vah + "])<=0 THEN 1 ELSE 0 END) AS out"
-                + ", ISNULL(SUM(TRY_CONVERT(decimal(19,3),[" + vah + "])*COALESCE(TRY_CONVERT(decimal(19,2)," + (buy == null ? "NULL" : "[" + buy + "]") + "),0)),0) AS value"
-                + (reo == null ? ", CAST(0 AS bigint) AS reorderN" : ", SUM(CASE WHEN TRY_CONVERT(decimal(19,2),[" + reo + "])>0 AND TRY_CONVERT(decimal(19,3),[" + vah + "])<=TRY_CONVERT(decimal(19,2),[" + reo + "]) THEN 1 ELSE 0 END) AS reorderN")
+                + ", SUM(CASE WHEN " + pcs + "<=0 THEN 1 ELSE 0 END) AS out"
+                + ", ISNULL(SUM(CASE WHEN " + act + " THEN " + pcs + "*COALESCE(TRY_CONVERT(decimal(19,2),"
+                + (cost == null ? "NULL" : "[" + cost + "]") + "),0) ELSE 0 END),0) AS value"
+                + (reo == null ? ", CAST(0 AS bigint) AS reorderN" : ", SUM(CASE WHEN TRY_CONVERT(decimal(19,2),[" + reo + "])>0 AND " + pcs + "<=TRY_CONVERT(decimal(19,2),[" + reo + "]) THEN 1 ELSE 0 END) AS reorderN")
                 + " FROM dbo.inventory");
     }
 
-    /** Product list: shka,naka,code,groupName,unit,vah,joz,buy,sale,active,anbarQty. */
+    public static Queries.Q stockValueByGroup(Meta m) throws Queries.Missing {
+        String cost = m.col("inventory", "inventory_price", "buy_price", "pure_buy_price", "ImPureBuyPrice");
+        String active = m.col("inventory", "active", "Active");
+        String grp = m.col("inventory", "group_rdf");
+        String grpName = m.col("kagroup", "group_name");
+        String grpKey = m.col("kagroup", "group_rdf");
+        String label = grp != null && grpName != null && grpKey != null && m.table("kagroup")
+                ? "COALESCE(" + Sql.txt("g", grpName, 150) + ",N'بدون گروه')" : "N'همه کالاها'";
+        String join = grp != null && grpKey != null && m.table("kagroup")
+                ? " LEFT JOIN dbo.kagroup g ON TRY_CONVERT(nvarchar(50),g.[" + grpKey + "])=TRY_CONVERT(nvarchar(50),i.[" + grp + "])" : "";
+        // Atiran's jam_riali_anb: SUM(((mojkavah*mohvah)+mojkajoz)*inventory_price) WHERE active='t'.
+        String where = active == null ? "" : " WHERE " + boolTrue("i.[" + active + "]");
+        return new Queries.Q("SELECT " + label + " AS label"
+                + ", ISNULL(SUM(" + stockPieces(m, "i.") + "*COALESCE(TRY_CONVERT(decimal(19,2),"
+                + (cost == null ? "NULL" : "i.[" + cost + "]") + "),0)),0) AS value"
+                + ", COUNT_BIG(1) AS count FROM dbo.inventory i" + join + where + " GROUP BY " + label + " ORDER BY 2 DESC");
+    }
+
     public static Queries.Q productsList(Meta m, Filter f) throws Queries.Missing {
         String shka = m.must("inventory", "کد کالا", "shka");
         String naka = m.must("inventory", "نام کالا", "naka", "NAKA");
@@ -61,12 +81,12 @@ public final class MasterQueries {
         List<String> conds = new ArrayList<>();
         if (vah != null) {
             if ("low".equals(f.status)) conds.add("(TRY_CONVERT(decimal(19,3),i.[" + vah + "])>0 AND TRY_CONVERT(decimal(19,3),i.[" + vah + "])<=" + AtiranSchema.LOW_STOCK_VAH + ")");
-            if ("out".equals(f.status)) conds.add("TRY_CONVERT(decimal(19,3),i.[" + vah + "])<=0");
+            if ("out".equals(f.status)) conds.add(stockPieces(m, "i.") + "<=0");
             if ("ok".equals(f.status)) conds.add("TRY_CONVERT(decimal(19,3),i.[" + vah + "])>" + AtiranSchema.LOW_STOCK_VAH);
             if ("reorder".equals(f.status)) {
                 if (vah == null || reo == null)
                     throw new Queries.Missing("ستون نقطه سفارش در «کالاها» پیدا نشد");
-                conds.add("(TRY_CONVERT(decimal(19,2),i.[" + reo + "])>0 AND TRY_CONVERT(decimal(19,3),i.[" + vah + "])<=TRY_CONVERT(decimal(19,2),i.[" + reo + "]))");
+                conds.add("(TRY_CONVERT(decimal(19,2),i.[" + reo + "])>0 AND " + stockPieces(m, "i.") + "<=TRY_CONVERT(decimal(19,2),i.[" + reo + "]))");
             }
         }
         if ("inactive".equals(f.status) && active != null)
@@ -680,6 +700,21 @@ public final class MasterQueries {
     /** Joz (piece) column of a sales line, or null when the database has none. */
     static String cogsJoz(Meta m) {
         return m.col("subsailfact", "tedjoz_fel", "TEDJOZ", "tedjoz");
+    }
+
+    /**
+     * Stock in pieces, as Atiran's own procedures count it: (mojkavah*mohvah)+mojkajoz.
+     * p is the table alias prefix including the dot, e.g. "i.".
+     */
+    static String stockPieces(Meta m, String p) throws Queries.Missing {
+        String vah = m.must("inventory", "موجودی", "mojkavah", "MojKavah");
+        String joz = m.col("inventory", "mojkajoz", "MojKajoz");
+        String mohvah = cogsMohvah(m);
+        String v = "TRY_CONVERT(decimal(19,3)," + p + "[" + vah + "])";
+        String base = mohvah == null ? v
+                : "(" + v + "*COALESCE(TRY_CONVERT(decimal(19,3)," + p + "[" + mohvah + "]),1))";
+        if (joz != null) base += "+COALESCE(TRY_CONVERT(decimal(19,3)," + p + "[" + joz + "]),0)";
+        return "(" + base + ")";
     }
 
     /** Pieces per vah (mohvah) on the product, or null when the database has none. */

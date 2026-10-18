@@ -657,15 +657,19 @@ public class LicenseActivity extends Activity {
             copyBtn.setMinHeight(Theme.dp(48));
             copyBtn.setContentDescription("کپی کد دستگاه");
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:511", ignored); }
+        // Copy feedback stays inside the card (not a floating toast that covers the buttons below).
+        final TextView copyNote = kit.text("", 12f, Theme.SUCCESS, true);
+        copyNote.setVisibility(View.GONE);
         copyBtn.setOnClickListener(v -> {
-            if (copyText("کد دستگاه میلانو", device)) {
-                kit.toast("کد دستگاه کپی شد");
-            } else {
-                kit.toast("کپی نشد؛ دوباره تلاش کنید");
-            }
+            boolean ok = copyText("کد دستگاه میلانو", device);
+            copyNote.setTextColor(ok ? Theme.SUCCESS : Theme.DANGER);
+            copyNote.setText(ok ? "کد دستگاه کپی شد" : "کپی نشد؛ دوباره تلاش کنید");
+            copyNote.setVisibility(View.VISIBLE);
+            copyNote.postDelayed(() -> copyNote.setVisibility(View.GONE), 2500);
         });
         top.addView(copyBtn, kit.lp(-2, -2));
         card.addView(top, kit.lp(-1, -2));
+        card.addView(copyNote, kit.lp(-1, -2));
         int wide = Ui.widthDp(this);
         int codeSp = wide < 360 ? 19 : 24;
         TextView dev = kit.text(device.isEmpty() ? "—" : prettyDev(device), codeSp,
@@ -999,15 +1003,18 @@ public class LicenseActivity extends Activity {
         c.addView(kit.text("گزارش خطای اخیر", 14f, Theme.TEXT, true), kit.lp(-1, -2));
         c.addView(kit.hint("برای هنگ‌های بدون گزارش Java همچنان Logcat لازم است. این گزارش محلی است و پیام خطا، IP، رمز یا اطلاعات فروش را شامل نمی‌شود."),
                 kit.lp(-1, -2));
+        final TextView reportNote = kit.text("", 12f, Theme.INFO, true);
+        reportNote.setVisibility(View.GONE);
         c.addView(kit.btnGhost("کپی گزارش فنی", Theme.INFO, v -> {
             String report = CrashReporter.readReport(this);
-            if (report.isEmpty()) {
-                kit.toast("گزارش فنی در دسترس نیست");
-            } else {
-                kit.toast(copyText("گزارش خطای میلانو", report)
-                        ? "گزارش کپی شد؛ برای پشتیبانی بفرستید" : "کپی گزارش ممکن نشد");
-            }
+            boolean ok = !report.isEmpty() && copyText("گزارش خطای میلانو", report);
+            reportNote.setTextColor(ok ? Theme.SUCCESS : Theme.DANGER);
+            reportNote.setText(report.isEmpty() ? "گزارش فنی در دسترس نیست"
+                    : (ok ? "گزارش کپی شد؛ برای پشتیبانی بفرستید" : "کپی گزارش ممکن نشد"));
+            reportNote.setVisibility(View.VISIBLE);
+            reportNote.postDelayed(() -> reportNote.setVisibility(View.GONE), 2500);
         }), kit.lp(-1, -2));
+        c.addView(reportNote, kit.lp(-1, -2));
         c.addView(kit.btnGhost("پاک‌کردن گزارش", Theme.DANGER, v -> {
             CrashReporter.clearReport(this);
             kit.toast("گزارش پاک شد");

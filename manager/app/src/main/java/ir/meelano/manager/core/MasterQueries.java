@@ -706,13 +706,16 @@ public final class MasterQueries {
      * and its cost is per piece, so the vah quantity alone understates COGS by the pack size.
      */
     static String cogsLine(Meta m, String vahCol, String d, String i) throws Queries.Missing {
-        String cost = cogsBuyCol(m);
+        return linePieces(m, vahCol, d, i) + "*COALESCE(TRY_CONVERT(decimal(19,2)," + i + ".[" + cogsBuyCol(m) + "]),0)";
+    }
+
+    /** Pieces of a sale line: TEDVAH*mohvah + TEDJOZ (Atiran's counting unit). */
+    static String linePieces(Meta m, String vahCol, String d, String i) throws Queries.Missing {
         String joz = cogsJoz(m);
         String mohvah = cogsMohvah(m);
         String vahPieces = "TRY_CONVERT(decimal(19,3)," + d + ".[" + vahCol + "])"
                 + (mohvah == null ? "" : "*COALESCE(TRY_CONVERT(decimal(19,3)," + i + ".[" + mohvah + "]),1)");
-        String pieces = "(" + vahPieces + (joz == null ? "" : "+COALESCE(TRY_CONVERT(decimal(19,3)," + d + ".[" + joz + "]),0)") + ")";
-        return pieces + "*COALESCE(TRY_CONVERT(decimal(19,2)," + i + ".[" + cost + "]),0)";
+        return "(" + vahPieces + (joz == null ? "" : "+COALESCE(TRY_CONVERT(decimal(19,3)," + d + ".[" + joz + "]),0)") + ")";
     }
 
     static String cogsBuyCol(Meta m) throws Queries.Missing {
@@ -1500,12 +1503,15 @@ public final class MasterQueries {
         List<Object> binds = new ArrayList<>();
         binds.add(Jalali.addDays(Jalali.todayStr(), -60));
         String inner = "WHERE " + Sql.date10("x", dateCol) + ">=?" + Sql.activeAnd(sail, "x") + Sql.softAnd(sail, "x");
+        // Sales and stock are both counted in pieces (vah*mohvah + joz), so days-to-zero is consistent.
+        String invShka = cogsShka(m);
         String agg = "(SELECT TRY_CONVERT(nvarchar(100),d2.[" + lineShka + "]) AS k"
-                + ", ISNULL(SUM(TRY_CONVERT(decimal(19,3),d2.[" + qty + "])),0)/60.0 AS daily"
+                + ", ISNULL(SUM(" + linePieces(m, qty, "d2", "i2") + "),0)/60.0 AS daily"
                 + " FROM " + Sql.dedupe("sailfact", numberCol, "h2", inner)
                 + " JOIN dbo.subsailfact d2 ON TRY_CONVERT(nvarchar(100),d2.[" + linkCol + "])=TRY_CONVERT(nvarchar(100),h2.[" + numberCol + "])"
+                + " LEFT JOIN dbo.inventory i2 ON TRY_CONVERT(nvarchar(100),i2.[" + invShka + "])=TRY_CONVERT(nvarchar(100),d2.[" + lineShka + "])"
                 + " GROUP BY TRY_CONVERT(nvarchar(100),d2.[" + lineShka + "])) s";
-        String stock = "TRY_CONVERT(decimal(19,3),i.[" + vah + "])";
+        String stock = stockPieces(m, "i.");
         String days = "CASE WHEN ISNULL(s.daily,0)>0 THEN " + stock + "/s.daily ELSE NULL END";
         String status = "CASE WHEN ISNULL(s.daily,0)<=0 THEN N'بدون فروش' WHEN " + stock + "/s.daily<=7 THEN N'⚠ سفارش فوری'"
                 + " WHEN " + stock + "/s.daily<=21 THEN N'هشدار سفارش' ELSE N'عادی' END";

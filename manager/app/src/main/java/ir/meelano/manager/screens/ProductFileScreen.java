@@ -55,9 +55,16 @@ public class ProductFileScreen extends Screen {
         Map<String, String> notes = new LinkedHashMap<>();
     }
 
+    /** Visible way back to the screen the file was opened from (no hidden gesture needed). */
+    private void addBack(LinearLayout content) {
+        content.addView(a.kit.btnGhost("‹ بازگشت", Theme.VIOLET, v -> a.onBackPressed()), a.kit.lp(-2, -2));
+        content.addView(a.kit.gap(6));
+    }
+
     @Override
     public void render(final LinearLayout content) {
         content.removeAllViews();
+        addBack(content);
         final String shka = pendingShka;
         if (shka == null || shka.trim().isEmpty()) {
             content.addView(a.kit.empty("کالایی انتخاب نشده", "از فهرست کالاها یک کالا را باز کنید"), a.kit.lp(-1, -2));
@@ -81,6 +88,7 @@ public class ProductFileScreen extends Screen {
             @Override
             public void fail(String faError) {
                 content.removeAllViews();
+                addBack(content);
                 content.addView(a.kit.error(faError, () -> render(content)), a.kit.lp(-1, -2));
             }
         });
@@ -88,6 +96,7 @@ public class ProductFileScreen extends Screen {
 
     private void build(LinearLayout content, Data d) {
         content.removeAllViews();
+        addBack(content);
         Row h = d.head;
         String name = h.s("naka");
         String group = h.s("groupName");

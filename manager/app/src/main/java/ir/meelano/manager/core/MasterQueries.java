@@ -665,8 +665,37 @@ public final class MasterQueries {
     // =====================================================================================
     // PROFIT — sales − COGS(buy_price basis) − discounts − costs. Basis is labelled in UI.
     // =====================================================================================
+    /**
+     * Per-piece cost used for COGS: inventory_price is the average cost per piece that Atiran's own
+     * inventory valuation uses (SUM(((mojkavah*mohvah)+mojkajoz)*inventory_price)). The pure last-buy
+     * price is only a fallback for databases without it.
+     */
+    /** Joz (piece) column of a sales line, or null when the database has none. */
+    static String cogsJoz(Meta m) {
+        return m.col("subsailfact", "tedjoz_fel", "TEDJOZ", "tedjoz");
+    }
+
+    /** Pieces per vah (mohvah) on the product, or null when the database has none. */
+    static String cogsMohvah(Meta m) {
+        return m.col("inventory", "mohvah");
+    }
+
+    /**
+     * Cost of a sold line. Atiran counts pieces as TEDVAH*mohvah + TEDJOZ (see its ka_act formulas),
+     * and its cost is per piece, so the vah quantity alone understates COGS by the pack size.
+     */
+    static String cogsLine(Meta m, String vahCol, String d, String i) throws Queries.Missing {
+        String cost = cogsBuyCol(m);
+        String joz = cogsJoz(m);
+        String mohvah = cogsMohvah(m);
+        String vahPieces = "TRY_CONVERT(decimal(19,3)," + d + ".[" + vahCol + "])"
+                + (mohvah == null ? "" : "*COALESCE(TRY_CONVERT(decimal(19,3)," + i + ".[" + mohvah + "]),1)");
+        String pieces = "(" + vahPieces + (joz == null ? "" : "+COALESCE(TRY_CONVERT(decimal(19,3)," + d + ".[" + joz + "]),0)") + ")";
+        return pieces + "*COALESCE(TRY_CONVERT(decimal(19,2)," + i + ".[" + cost + "]),0)";
+    }
+
     static String cogsBuyCol(Meta m) throws Queries.Missing {
-        String buy = m.col("inventory", "buy_price", "pure_buy_price", "ImPureBuyPrice");
+        String buy = m.col("inventory", "inventory_price", "buy_price", "pure_buy_price", "ImPureBuyPrice");
         if (buy == null) throw new Queries.Missing("ستون قیمت خرید در «کالاها» پیدا نشد؛ بهای تمام‌شده قابل محاسبه نیست");
         return buy;
     }
@@ -693,7 +722,7 @@ public final class MasterQueries {
         String dc = Sql.dateCond(Sql.date10("x", dateCol), f.from, f.to, binds);
         if (!dc.isEmpty()) conds.add(dc);
         String inner = "WHERE " + (conds.isEmpty() ? "1=1" : Sql.join(conds, " AND ")) + Sql.activeAnd(cols, "x") + Sql.softAnd(cols, "x");
-        return new Queries.Q("SELECT ISNULL(SUM(TRY_CONVERT(decimal(19,3),d.[" + qty + "])*COALESCE(TRY_CONVERT(decimal(19,2),i.[" + buy + "]),0)),0) AS cogs"
+        return new Queries.Q("SELECT ISNULL(SUM(" + cogsLine(m, qty, "d", "i") + "),0) AS cogs"
                 + ", ISNULL(SUM(TRY_CONVERT(decimal(19,3),d.[" + qty + "])),0) AS qty"
                 + " FROM " + Sql.dedupe("sailfact", numberCol, "h", inner)
                 + " JOIN dbo.subsailfact d ON TRY_CONVERT(nvarchar(100),d.[" + linkCol + "])=TRY_CONVERT(nvarchar(100),h.[" + numberCol + "])"
@@ -732,7 +761,7 @@ public final class MasterQueries {
                 + "SELECT " + day + " AS day, " + Sql.num("h", amountCol) + " AS sales, CAST(0 AS decimal(19,2)) AS cogs"
                 + " FROM " + Sql.dedupe("sailfact", numberCol, "h", inner)
                 + " UNION ALL SELECT " + day + " AS day, CAST(0 AS decimal(19,2)) AS sales"
-                + ", TRY_CONVERT(decimal(19,3),d.[" + qty + "])*COALESCE(TRY_CONVERT(decimal(19,2),i.[" + buy + "]),0) AS cogs"
+                + ", " + cogsLine(m, qty, "d", "i") + " AS cogs"
                 + " FROM " + Sql.dedupe("sailfact", numberCol, "h", inner)
                 + " JOIN dbo.subsailfact d ON TRY_CONVERT(nvarchar(100),d.[" + linkCol + "])=TRY_CONVERT(nvarchar(100),h.[" + numberCol + "])"
                 + " LEFT JOIN dbo.inventory i ON TRY_CONVERT(nvarchar(100),i.[" + invShka + "])=TRY_CONVERT(nvarchar(100),d.[" + shka + "])"
@@ -761,7 +790,7 @@ public final class MasterQueries {
         String inner = "WHERE " + (conds.isEmpty() ? "1=1" : Sql.join(conds, " AND ")) + Sql.activeAnd(cols, "x") + Sql.softAnd(cols, "x");
         String label = "COALESCE(" + (invName == null ? "" : Sql.txt("i", invName, 250) + ",") + Sql.txt("d", shka, 120) + ",N'—')";
         String sales = "ISNULL(SUM(" + Sql.num("d", sum) + "),0)";
-        String cogs = "ISNULL(SUM(TRY_CONVERT(decimal(19,3),d.[" + qty + "])*COALESCE(TRY_CONVERT(decimal(19,2),i.[" + buy + "]),0)),0)";
+        String cogs = "ISNULL(SUM(" + cogsLine(m, qty, "d", "i") + "),0)";
         return new Queries.Q("SELECT TOP (" + Queries.clampTop(top) + ") " + label + " AS label"
                 + ", ISNULL(SUM(TRY_CONVERT(decimal(19,3),d.[" + qty + "])),0) AS qty"
                 + ", " + sales + " AS sales, " + cogs + " AS cogs, (" + sales + "-" + cogs + ") AS profit"
@@ -790,8 +819,7 @@ public final class MasterQueries {
         String label = "COALESCE(" + (invName == null ? "" : Sql.txt("i", invName, 250) + ",")
                 + Sql.txt("d", shka, 120) + ",N'—')";
         String sales = "ISNULL(SUM(" + Sql.num("d", sum) + "),0)";
-        String cogs = "ISNULL(SUM(TRY_CONVERT(decimal(19,3),d.[" + qty
-                + "])*COALESCE(TRY_CONVERT(decimal(19,2),i.[" + buy + "]),0)),0)";
+        String cogs = "ISNULL(SUM(" + cogsLine(m, qty, "d", "i") + "),0)";
         String profit = "(" + sales + "-" + cogs + ")";
         String margin = "CASE WHEN " + sales + "<>0 THEN ROUND(" + profit
                 + "*100.0/" + sales + ",1) ELSE 0 END";
@@ -1205,7 +1233,7 @@ public final class MasterQueries {
         String code = "TRY_CONVERT(nvarchar(100),h.[" + partyCol + "])";
         String join = Queries.custJoin(m, "h", partyCol);
         String sales = "ISNULL(SUM(" + Sql.num("d", sum) + "),0)";
-        String cogs = "ISNULL(SUM(TRY_CONVERT(decimal(19,3),d.[" + qty + "])*COALESCE(TRY_CONVERT(decimal(19,2),i.[" + buy + "]),0)),0)";
+        String cogs = "ISNULL(SUM(" + cogsLine(m, qty, "d", "i") + "),0)";
         return new Queries.Q("SELECT TOP (" + Queries.clampTop(top) + ") " + label + " AS label"
                 + ", MIN(" + code + ") AS code, COUNT(DISTINCT h.[" + numberCol + "]) AS docs"
                 + ", " + sales + " AS sales, " + cogs + " AS cogs, (" + sales + "-" + cogs + ") AS profit"
@@ -1492,7 +1520,7 @@ public final class MasterQueries {
         String dc = Sql.dateCond(Sql.date10("x", dateCol), f.from, f.to, binds);
         String inner = "WHERE " + (dc.isEmpty() ? "1=1" : dc) + Sql.activeAnd(cols, "x") + Sql.softAnd(cols, "x");
         String cogsAgg = "(SELECT TRY_CONVERT(nvarchar(80),d2.[" + linkCol + "]) AS no"
-                + ", ISNULL(SUM(TRY_CONVERT(decimal(19,3),d2.[" + qty + "])*COALESCE(TRY_CONVERT(decimal(19,2),i2.[" + buy + "]),0)),0) AS cogs"
+                + ", ISNULL(SUM(" + cogsLine(m, qty, "d2", "i2") + "),0) AS cogs"
                 + " FROM dbo.subsailfact d2"
                 + " LEFT JOIN dbo.inventory i2 ON TRY_CONVERT(nvarchar(100),i2.[" + invShka + "])=TRY_CONVERT(nvarchar(100),d2.[" + lineShka + "])"
                 + " GROUP BY TRY_CONVERT(nvarchar(80),d2.[" + linkCol + "])) cg";

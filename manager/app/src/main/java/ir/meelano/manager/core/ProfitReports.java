@@ -21,6 +21,8 @@ public final class ProfitReports {
         String lineJoin;    // JOIN subsailfact d ... LEFT JOIN inventory i
         String sum;         // line amount expression (sales)
         String qty;         // line quantity expression
+        String qtyCol;      // subsailfact vah column (TEDVAH family)
+        Meta meta;          // schema, for the COGS pieces formula
         String buy;         // inventory buy price column
         String shka;        // line product key
         String invName;     // inventory name column (may be null)
@@ -43,6 +45,8 @@ public final class ProfitReports {
         String qty = m.must("subsailfact", "تعداد", "tedvah_fel", "TEDVAH", "tedvah");
         String sum = m.must("subsailfact", "جمع ردیف", "linesum_fel", "LINESUM", "linesum");
         s.qty = qty;
+        s.qtyCol = qty;
+        s.meta = m;
         s.sum = sum;
         s.buy = MasterQueries.cogsBuyCol(m);
         String invShka = MasterQueries.cogsShka(m);
@@ -76,8 +80,11 @@ public final class ProfitReports {
     }
 
     private static String cogsExpr(Src s) {
-        return "ISNULL(SUM(TRY_CONVERT(decimal(19,3),d.[" + s.qty + "])*COALESCE(TRY_CONVERT(decimal(19,2),i.["
-                + s.buy + "]),0)),0)";
+        try {
+            return "ISNULL(SUM(" + MasterQueries.cogsLine(s.meta, s.qtyCol, "d", "i") + "),0)";
+        } catch (Queries.Missing e) {
+            throw new IllegalStateException(e.getMessage(), e);
+        }
     }
 
     private static String productLabel(Src s) {

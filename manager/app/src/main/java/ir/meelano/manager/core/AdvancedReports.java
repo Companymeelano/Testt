@@ -31,7 +31,7 @@ public final class AdvancedReports {
         String inner = "WHERE " + (dc.isEmpty() ? "1=1" : dc) + Sql.activeAnd(cols, "x") + Sql.softAnd(cols, "x");
         String label = Queries.visNameExpr(m, "h", visCol);
         String sales = "ISNULL(SUM(" + Sql.num("d", sum) + "),0)";
-        String cogs = "ISNULL(SUM(TRY_CONVERT(decimal(19,3),d.[" + qty + "])*COALESCE(TRY_CONVERT(decimal(19,2),i.[" + buy + "]),0)),0)";
+        String cogs = "ISNULL(SUM(" + MasterQueries.cogsLine(m, qty, "d", "i") + "),0)";
         return new Queries.Q("SELECT TOP (" + Queries.clampTop(top) + ") " + label + " AS label"
                 + ", COUNT(DISTINCT h.[" + numberCol + "]) AS docs"
                 + ", " + sales + " AS sales, " + cogs + " AS cogs, (" + sales + "-" + cogs + ") AS profit"

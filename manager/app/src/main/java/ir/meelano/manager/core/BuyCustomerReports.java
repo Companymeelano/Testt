@@ -18,18 +18,18 @@ public final class BuyCustomerReports {
     private BuyCustomerReports() { }
 
     /** Date-filtered, de-duplicated header of a purchase or sales invoice (alias h). */
-    private static final class Head {
+    static final class Head {
         String sql;
         String dateCol;
         String numberCol;
         final List<Object> binds = new ArrayList<>();
     }
 
-    private static Head head(Meta m, Filter f, String table) throws Queries.Missing {
+    static Head head(Meta m, Filter f, String table) throws Queries.Missing {
         return head(m, f, table, "h");
     }
 
-    private static Head head(Meta m, Filter f, String table, String alias) throws Queries.Missing {
+    static Head head(Meta m, Filter f, String table, String alias) throws Queries.Missing {
         Head h = new Head();
         boolean buy = "buyfact".equals(table);
         Set<String> cols = m.columns(table);

@@ -365,6 +365,22 @@ public final class ReportCatalog {
                     new Col[]{c("name", "مشتری", T_TEXT), c("docs", "فاکتور", T_NUM), c("avg", "میانگین فاکتور", T_MONEY),
                             c("total", "جمع فروش", T_MONEY)},
                     C_NONE, "", ""),
+            s("uniq_retention", "ماتریس بازگشت مشتری", "گزارش‌های اختصاصی", "درصد مشتریانی که این ماه خرید کرده‌اند و ماه قبل هم خرید داشته‌اند — ماه اول دوره بدون داده ماه قبل است", true,
+                    new Col[]{c("month", "ماه", T_TEXT), c("active", "مشتریان فعال", T_NUM), c("back", "بازگشتی", T_NUM),
+                            c("rate", "نرخ بازگشت (٪)", T_NUM)},
+                    C_LINE, "month", "rate"),
+            s("uniq_basket", "کالاهایی که با هم خریده می‌شوند", "گزارش‌های اختصاصی", "جفت کالاهایی که در یک فاکتور فروش با هم آمده‌اند؛ درصد، سهم فاکتورهای دارای آن جفت است", true,
+                    new Col[]{c("first", "کالای اول", T_TEXT), c("second", "کالای دوم", T_TEXT), c("together", "دفعات", T_NUM),
+                            c("pct", "سهم فاکتورها (٪)", T_NUM)},
+                    C_NONE, "", ""),
+            s("uniq_credit_alert", "هشدار نزدیکی به سقف اعتبار", "گزارش‌های اختصاصی", "مشتریانی که مانده‌شان به ۸۰٪ سقف اعتبار یا بیشتر رسیده — قبل از قفل شدن خرید اقدام کنید", false,
+                    new Col[]{c("name", "مشتری", T_TEXT), c("code", "کد", T_TEXT), c("credit", "سقف اعتبار", T_MONEY),
+                            c("balance", "مانده", T_MONEY), c("used", "مصرف اعتبار (٪)", T_NUM)},
+                    C_NONE, "", ""),
+            s("uniq_declining", "افت خرید مشتریان وفادار", "گزارش‌های اختصاصی", "مشتریانی که ۹۰ روز اخیرشان کمتر از نصف ۹۰ روز قبل خرید داشته‌اند — زودتر از ریزش به سراغشان بروید", false,
+                    new Col[]{c("name", "مشتری", T_TEXT), c("code", "کد", T_TEXT), c("prevTotal", "۹۰ روز قبل", T_MONEY),
+                            c("curTotal", "۹۰ روز اخیر", T_MONEY), c("dropPct", "افت (٪)", T_NUM)},
+                    C_NONE, "", ""),
             s("profit_by_product", "سود کالاها", "سود و زیان", "حاشیه سود هر کالا (مبنای قیمت خرید)", true,
                     new Col[]{c("label", "کالا", T_TEXT), c("qty", "مقدار", T_NUM), c("sales", "فروش", T_MONEY),
                             c("cogs", "بهای تمام‌شده", T_MONEY), c("profit", "سود", T_MONEY)},
@@ -479,6 +495,10 @@ public final class ReportCatalog {
         if ("profit_discount_daily".equals(id)) return ProfitReports.discountDaily(m, ff);
         if ("profit_cumulative".equals(id)) return ProfitReports.cumulativeMonthly(m, ff);
         if ("profit_price_realization".equals(id)) return ProfitReports.priceRealization(m, ff, 100);
+        if ("uniq_retention".equals(id)) return UniqueReports.customerRetention(m, ff);
+        if ("uniq_basket".equals(id)) return UniqueReports.marketBasket(m, ff, 50);
+        if ("uniq_credit_alert".equals(id)) return UniqueReports.creditAlerts(m, 300);
+        if ("uniq_declining".equals(id)) return UniqueReports.decliningCustomers(m, 200);
         if ("buy_daily_totals".equals(id)) return BuyCustomerReports.buyDailyTotals(m, ff);
         if ("buy_monthly_totals".equals(id)) return BuyCustomerReports.buyMonthlyTotals(m, ff);
         if ("buy_top_invoices".equals(id)) return BuyCustomerReports.buyTopInvoices(m, ff, 30);

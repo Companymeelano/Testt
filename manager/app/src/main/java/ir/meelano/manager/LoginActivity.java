@@ -1,6 +1,7 @@
 package ir.meelano.manager;
 
 import ir.meelano.manager.core.Diag;
+import ir.meelano.manager.core.Finger;
 import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
@@ -40,6 +41,8 @@ public class LoginActivity extends Activity {
     private TextView rememberV;
     private boolean remember = true;
     private boolean busy;
+    private int hintUid = -1;
+    private boolean fpReady;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -102,25 +105,81 @@ public class LoginActivity extends Activity {
         hlp.gravity = Gravity.CENTER_HORIZONTAL;
         hlp.setMargins(0, Theme.dp(8), 0, 0);
         root.addView(hair, hlp);
-        TextView s = kit.text("پس از انتخاب دیتابیس، با حساب مدیریت یا انبارداری وارد شوید",
-                13.5f, Theme.TEXT, false);
-        s.setGravity(Gravity.CENTER);
+        String[] hint = lastHint();
+        hintUid = hint == null ? -1 : hintPrefs().getInt("uid", -1);
         LinearLayout.LayoutParams sp = kit.lp(-1, -2);
         sp.setMargins(0, Theme.dp(6), 0, Theme.dp(16));
-        root.addView(s, sp);
+        if (hint == null) {
+            TextView s = kit.text("پس از انتخاب دیتابیس، با حساب مدیریت یا انبارداری وارد شوید",
+                    13.5f, Theme.TEXT, false);
+            s.setGravity(Gravity.CENTER);
+            root.addView(s, sp);
+        } else {
+            root.addView(returningCard(hint[1], hint[2]), sp);
+        }
 
+        // Returning user on this device: one primary action (fingerprint) when it is set up,
+        // otherwise the password form with the last username already filled in.
+        fpReady = hintUid >= 0 && settings.fpOn() && Finger.supported(this)
+                && AtiranAuth.cachedPw(this, hintUid) != null;
+        if (fpReady) {
+            android.widget.Button fp = kit.btnGold("◉  ورود با اثر انگشت", v -> quickFinger());
+            try {
+                fp.setBackground(Theme.startButton());
+                fp.setMinHeight(Theme.dp(56));
+                fp.setLetterSpacing(0.04f);
+            } catch (Exception ignored) { Diag.ignored("LoginActivity:fp", ignored); }
+            LinearLayout.LayoutParams fpl = kit.lp(-1, -2);
+            fpl.setMargins(0, 0, 0, Theme.dp(14));
+            root.addView(fp, fpl);
+        }
         LinearLayout card = kit.card(Theme.GOLD);
-        // Glass panel: the same hero gradient the rest of the app uses, with generous inner space.
         card.setBackground(Theme.hero(Theme.GOLD));
         card.setPadding(Theme.dp(22), Theme.dp(22), Theme.dp(22), Theme.dp(18));
-        eUser = kit.edit("نام کاربری", "");
+        eUser = kit.edit("نام کاربری", hint == null ? "" : hint[0]);
         try {
             eUser.setTextDirection(View.TEXT_DIRECTION_ANY_RTL);
         } catch (Exception ignored) { Diag.ignored("LoginActivity:82", ignored); }
+        eUser.setMinHeight(Theme.dp(56));
+        eUser.setCompoundDrawablePadding(Theme.dp(10));
+        eUser.setCompoundDrawablesRelativeWithIntrinsicBounds(glyph(R.drawable.mi_person), null, null, null);
         card.addView(eUser, kit.lp(-1, -2));
         card.addView(kit.gap(10));
+        // Password row: lock glyph at the start, show/hide toggle at the end, Go on the keyboard logs in.
+        LinearLayout passRow = kit.h();
+        passRow.setGravity(Gravity.CENTER_VERTICAL);
         ePass = kit.edit("رمز عبور", "", true);
-        card.addView(ePass, kit.lp(-1, -2));
+        ePass.setMinHeight(Theme.dp(56));
+        ePass.setCompoundDrawablePadding(Theme.dp(10));
+        ePass.setCompoundDrawablesRelativeWithIntrinsicBounds(glyph(R.drawable.mi_lock), null, null, null);
+        ePass.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_GO);
+        ePass.setOnEditorActionListener((tv, actionId, ev) -> {
+            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_GO) {
+                doLogin();
+                return true;
+            }
+            return false;
+        });
+        passRow.addView(ePass, kit.wlp(1f));
+        final android.widget.ImageView eye = new android.widget.ImageView(this);
+        eye.setImageDrawable(glyph(R.drawable.mi_visibility));
+        eye.setContentDescription("نمایش رمز عبور");
+        android.widget.FrameLayout eyeBox = new android.widget.FrameLayout(this);
+        eyeBox.setBackground(Theme.ghostButton(Theme.GOLD));
+        eyeBox.addView(eye, new android.widget.FrameLayout.LayoutParams(Theme.dp(22), Theme.dp(22), Gravity.CENTER));
+        LinearLayout.LayoutParams eyeLp = new LinearLayout.LayoutParams(Theme.dp(48), Theme.dp(48));
+        eyeLp.setMargins(Theme.dp(8), 0, 0, 0);
+        Theme.pressable(eyeBox);
+        final boolean[] shown = {false};
+        eyeBox.setOnClickListener(v -> {
+            shown[0] = !shown[0];
+            ePass.setTransformationMethod(shown[0] ? null
+                    : android.text.method.PasswordTransformationMethod.getInstance());
+            eye.setImageDrawable(glyph(shown[0] ? R.drawable.mi_visibility_off : R.drawable.mi_visibility));
+            ePass.setSelection(ePass.getText().length());
+        });
+        passRow.addView(eyeBox, eyeLp);
+        card.addView(passRow, kit.lp(-1, -2));
         card.addView(kit.gap(6));
         rememberV = kit.text("", 12.5f, Theme.GOLD_SOFT, true);
         rememberV.setGravity(Gravity.CENTER);
@@ -155,6 +214,7 @@ public class LoginActivity extends Activity {
         verLine.setGravity(Gravity.CENTER);
         root.addView(verLine, kit.lp(-1, -2));
 
+        if (fpReady && savedInstanceState == null) root.postDelayed(this::quickFinger, 600);
         if (getResources().getConfiguration().smallestScreenWidthDp >= 600
                 || getResources().getDisplayMetrics().widthPixels > Theme.dp(720)) {
             android.widget.FrameLayout frame = new android.widget.FrameLayout(this);
@@ -167,6 +227,89 @@ public class LoginActivity extends Activity {
         } else {
             setContentView(sv);
         }
+    }
+
+    // ================= returning user =================
+
+    private android.content.SharedPreferences hintPrefs() {
+        return getSharedPreferences("login_hint", MODE_PRIVATE);
+    }
+
+    /** {user, name, role} of the last successful login on this device, or null. */
+    private String[] lastHint() {
+        try {
+            android.content.SharedPreferences p = hintPrefs();
+            String user = p.getString("user", "");
+            if (user == null || user.isEmpty()) return null;
+            String name = p.getString("name", "");
+            return new String[]{user, name == null || name.isEmpty() ? user : name, p.getString("role", "")};
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private void saveHint(int uid, String user, String name, String role) {
+        try {
+            hintPrefs().edit().putInt("uid", uid).putString("user", user == null ? "" : user)
+                    .putString("name", name == null ? "" : name)
+                    .putString("role", role == null ? "" : role).apply();
+        } catch (Exception ignored) { Diag.ignored("LoginActivity:hint", ignored); }
+    }
+
+    private android.graphics.drawable.Drawable glyph(int res) {
+        android.graphics.drawable.Drawable d = getDrawable(res).mutate();
+        d.setTint(Theme.GOLD_SOFT);
+        d.setBounds(0, 0, Theme.dp(20), Theme.dp(20));
+        return d;
+    }
+
+    private View returningCard(String name, String role) {
+        LinearLayout box = kit.h();
+        box.setGravity(Gravity.CENTER_VERTICAL);
+        box.setPadding(Theme.dp(14), Theme.dp(12), Theme.dp(16), Theme.dp(12));
+        box.setBackground(Theme.ghostButton(Theme.GOLD));
+        String ini = name == null || name.trim().isEmpty() ? "م" : name.trim().substring(0, 1);
+        TextView mark = kit.text(ini, 20f, Theme.GOLD, true);
+        mark.setGravity(Gravity.CENTER);
+        android.graphics.drawable.GradientDrawable ring = new android.graphics.drawable.GradientDrawable();
+        ring.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        ring.setColor(Theme.alpha(Theme.GOLD, 40));
+        ring.setStroke(Theme.dp(1), Theme.alpha(Theme.GOLD, 160));
+        mark.setBackground(ring);
+        box.addView(mark, new LinearLayout.LayoutParams(Theme.dp(52), Theme.dp(52)));
+        LinearLayout copy = kit.v();
+        copy.setPadding(Theme.dp(12), 0, 0, 0);
+        copy.addView(kit.text("خوش برگشتید، " + name, 16f, Theme.TEXT, true), kit.lp(-1, -2));
+        copy.addView(kit.text(RoleStore.faName(role) + " • ورود قبلی روی همین دستگاه", 11.5f,
+                Theme.MUTED, false), kit.lp(-1, -2));
+        box.addView(copy, kit.wlp(1f));
+        return box;
+    }
+
+    /** Fingerprint unlock for the remembered Atiran account (the password cache is device-bound). */
+    private void quickFinger() {
+        if (busy || hintUid < 0 || isFinishing()) return;
+        Finger.auth(this, new Finger.Cb() {
+            @Override
+            public void ok() {
+                quickComplete();
+            }
+
+            @Override
+            public void fail(String msg) {
+                showErr(msg == null || msg.isEmpty() ? "اثر انگشت تأیید نشد" : msg);
+            }
+        });
+    }
+
+    private void quickComplete() {
+        String[] h = lastHint();
+        if (h == null) return;
+        if (AtiranAuth.cachedPw(this, hintUid) == null) {
+            showErr("برای ورود سریع یک بار با رمز وارد شوید");
+            return;
+        }
+        uiSuccess(hintUid, h[0], h[1], h[2], true, false, "خوش آمدید " + h[1]);
     }
 
     private void paintRemember() {
@@ -404,6 +547,7 @@ public class LoginActivity extends Activity {
                 AtiranAuth.clearNoTable(LoginActivity.this);
                 AtiranAuth.putCache(LoginActivity.this, uid, user, name, role);
                 AtiranAuth.saveSession(LoginActivity.this, uid, user, name, role, rem, boot);
+                saveHint(uid, user, name, role);
                 RoleStore.setCurrent(LoginActivity.this, role);
             } catch (Exception ignored) { Diag.ignored("LoginActivity:365", ignored); }
             kit.toast(hello);

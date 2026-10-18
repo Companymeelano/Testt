@@ -45,7 +45,9 @@ public final class Atiran {
                                   int tcpMs, int loginSec, boolean retry) throws Exception {
         Class.forName("net.sourceforge.jtds.jdbc.Driver");
         String url = "jdbc:jtds:sqlserver://" + host + ":" + port + "/" + db
-                + ";loginTimeout=" + Math.max(2, loginSec) + ";socketTimeout=75;appName=MEELANO-Manager7;";
+                + ";loginTimeout=" + Math.max(2, loginSec) + ";socketTimeout=75;appName=MEELANO-Manager7;"
+                // Encrypt the session whenever the server offers TLS (safe on the public address too).
+                + "ssl=request;";
         Properties p = new Properties();
         p.setProperty("user", user);
         p.setProperty("password", pass);
@@ -59,7 +61,11 @@ public final class Atiran {
         try {
             return validated(DriverManager.getConnection(url, p));
         } catch (Exception first) {
-            if (!retry) throw new Exception(diagnose(first));
+            // A wrong password will not succeed on retry; do not hammer the login.
+            String fm = String.valueOf(first.getMessage()).toLowerCase(java.util.Locale.US);
+            if (!retry || fm.contains("login failed") || fm.contains("logon failed")) {
+                throw new Exception(diagnose(first));
+            }
             Thread.sleep(700);
             try {
                 return validated(DriverManager.getConnection(url, p));

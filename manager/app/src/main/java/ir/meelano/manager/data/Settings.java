@@ -5,12 +5,18 @@ import android.content.Context;
 import android.content.SharedPreferences;
 
 import ir.meelano.manager.core.Money;
+import ir.meelano.manager.core.SecretBox;
 
 /** App settings: connection + PIN lock + luxury theme + notifications + offline cache. */
 public final class Settings {
     private final SharedPreferences p;
+    private final Context app;
+
+    /** Name of the Keystore-encrypted SQL password inside the SecretBox store. */
+    private static final String PASS_SECRET = "db_pass_enc";
 
     public Settings(Context c) {
+        app = c.getApplicationContext();
         p = c.getSharedPreferences("meelano_manager7", Context.MODE_PRIVATE);
     }
 
@@ -56,7 +62,31 @@ public final class Settings {
     public String port() { return p.getString("db_port", "").trim(); }
     public String db() { return p.getString("db_name", "").trim(); }
     public String user() { return p.getString("db_user", "").trim(); }
-    public String pass() { return p.getString("db_pass", ""); }
+    /**
+     * SQL password: read from the Android-Keystore encrypted store. A value saved by
+     * an older build in plain SharedPreferences is moved into the encrypted store once.
+     */
+    public String pass() {
+        String legacy = p.getString("db_pass", "");
+        if (!legacy.isEmpty()) {
+            if (SecretBox.put(app, PASS_SECRET, legacy)) p.edit().remove("db_pass").apply();
+            return legacy;
+        }
+        return SecretBox.get(app, PASS_SECRET);
+    }
+
+    /** Stores the SQL password encrypted; the plain key is never written. */
+    private void savePass(String pass) {
+        String v = pass == null ? "" : pass;
+        if (SecretBox.put(app, PASS_SECRET, v)) {
+            p.edit().remove("db_pass").apply();
+        } else if (!v.isEmpty()) {
+            // Keystore unavailable: keep the login working instead of losing it.
+            p.edit().putString("db_pass", v).apply();
+        } else {
+            p.edit().remove("db_pass").apply();
+        }
+    }
 
     public String effHost() { String h = host(); return h.isEmpty() ? Atiran.defaultHost() : h; }
     public String effDb() { String d = db(); return d.isEmpty() ? Atiran.defaultDb() : d; }
@@ -87,7 +117,8 @@ public final class Settings {
                 .putString("db_port", port == null ? "" : port.trim())
                 .putString("db_name", db == null ? "" : db.trim())
                 .putString("db_user", user == null ? "" : user.trim())
-                .putString("db_pass", pass == null ? "" : pass).apply();
+                .apply();
+        savePass(pass);
     }
 
     /** Save both smart-link profiles at once (either address may be empty). */
@@ -97,7 +128,8 @@ public final class Settings {
                 .putString("db_port", port == null ? "" : port.trim())
                 .putString("db_name", db == null ? "" : db.trim())
                 .putString("db_user", user == null ? "" : user.trim())
-                .putString("db_pass", pass == null ? "" : pass).apply();
+                .apply();
+        savePass(pass);
     }
 
     /**
@@ -115,7 +147,8 @@ public final class Settings {
         e.putString("db_port", port == null ? "" : port.trim())
                 .putString("db_name", db == null ? "" : db.trim())
                 .putString("db_user", user == null ? "" : user.trim())
-                .putString("db_pass", pass == null ? "" : pass).apply();
+                .apply();
+        savePass(pass);
     }
 
     /** One-time migration of the legacy single address into lan/wan. */

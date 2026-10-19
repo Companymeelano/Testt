@@ -2219,7 +2219,8 @@ public final class MasterQueries {
         String[] kj = retKindJoin(m, r);
         List<Object> binds = new ArrayList<>();
         String dc = r.date == null ? "" : Sql.dateCond(Sql.date10("h", r.date), f.from, f.to, binds);
-        String where = dc.isEmpty() ? "" : " WHERE " + dc;
+        // back_sanad.Active = 1 is the live-document flag Atiran's own views use (deleted/revoked returns are 0).
+        String where = " WHERE " + (dc.isEmpty() ? "1=1" : dc) + Sql.activeAnd(m.columns("back_sanad"), "h");
         return new Queries.Q("SELECT " + kj[0] + " AS label, COUNT_BIG(1) AS docs"
                 + ", ISNULL(SUM(" + Sql.num("h", r.amount) + "),0) AS total"
                 + " FROM dbo.[back_sanad] h" + kj[1] + where
@@ -2257,7 +2258,8 @@ public final class MasterQueries {
                 conds.add("(" + Sql.join(likes, " OR ") + ")");
             }
         }
-        String where = conds.isEmpty() ? "" : " WHERE " + Sql.join(conds, " AND ");
+        String where = " WHERE " + (conds.isEmpty() ? "1=1" : Sql.join(conds, " AND "))
+                + Sql.activeAnd(m.columns("back_sanad"), "h");
         String no = r.no == null ? "CAST(NULL AS nvarchar(80))" : Sql.txt("h", r.no, 80);
         String dt = r.date == null ? "CAST(NULL AS nvarchar(20))" : Sql.date10("h", r.date);
         String cu = r.customer == null ? "CAST(NULL AS nvarchar(150))" : Sql.txt("h", r.customer, 150);

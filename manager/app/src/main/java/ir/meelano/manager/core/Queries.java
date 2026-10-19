@@ -757,9 +757,11 @@ public final class Queries {
         if (sub.isEmpty()) throw new Missing("«" + AtiranSchema.faTitle(line) + "» در دیتابیس پیدا نشد");
         String linkCol = m.must(line, "شماره فاکتور", "shfackh", "shfac");
         String shka = m.must(line, "کد کالا", "SHKA", "shka");
-        String sum = Sql.pick(sub, "LINESUM", "linesum");
+        // subbuyfact has no line-total column (sample schema). Atiran prices purchase lines per piece
+        // with JOZPRICE (line = (TEDVAH*mohvah + TEDJOZ) * JOZPRICE), so the unit price is JOZPRICE itself.
+        String unitCol = Sql.pick(sub, "JOZPRICE", "jozprice");
         String qty = Sql.pick(sub, "TEDVAH", "tedvah");
-        if (sum == null || qty == null) throw new Missing("ستون مبلغ یا تعداد خط خرید پیدا نشد");
+        if (unitCol == null || qty == null) throw new Missing("ستون بهای واحد یا تعداد خط خرید پیدا نشد");
         String invName = m.col("inventory", "naka", "NAKA");
         String invShka = m.col("inventory", "SHKA", "shka");
         List<Object> binds = new ArrayList<>();
@@ -772,7 +774,7 @@ public final class Queries {
         boolean useInv = invName != null && invShka != null;
         String label = "COALESCE(" + (useInv ? Sql.txt("i", invName, 250) + "," : "") + Sql.txt("d", shka, 120) + ",N'—')";
         // Unit price per piece: the line amount covers vah and joz, so the denominator must too.
-        String unit = "CAST(" + Sql.num("d", sum) + " AS decimal(19,4)) / NULLIF(" + MasterQueries.countPieces(m, line, qty, "d", useInv ? "i" : null) + ",0)";
+        String unit = "CAST(" + Sql.num("d", unitCol) + " AS decimal(19,4))";
         String sql = "WITH ln AS ("
                 + " SELECT TRY_CONVERT(nvarchar(100),d.[" + shka + "]) AS k, " + label + " AS label"
                 + ", " + Sql.dateKey(Sql.date10("h", dateCol)) + " AS dk"

@@ -109,10 +109,9 @@ public final class AdvancedReports {
         String linkCol = m.must("subbuyfact", "شماره فاکتور", "shfackh", "shfac");
         String shka = m.must("subbuyfact", "کد کالا", "SHKA", "shka");
         String qty = m.must("subbuyfact", "تعداد", "TEDVAH", "tedvah");
-        // The purchase-line amount is not in the verified sample schema (subbuyfact has no LINESUM).
-        // Refuse to guess: the report stays unavailable until the real column is confirmed.
-        String sum = Sql.pick(m.columns("subbuyfact"), "LINESUM", "linesum");
-        if (sum == null) throw new Queries.Missing("ستون مبلغ خط خرید در «اقلام فاکتور خرید» تأیید نشده است");
+        // subbuyfact has no line-total column; Atiran's purchase line is (pieces) * JOZPRICE.
+        String jozPrice = Sql.pick(m.columns("subbuyfact"), "JOZPRICE", "jozprice");
+        if (jozPrice == null) throw new Queries.Missing("ستون بهای واحد (JOZPRICE) در «اقلام فاکتور خرید» پیدا نشد");
         String invName = m.col("inventory", "naka", "NAKA");
         String invShka = m.col("inventory", "SHKA", "shka");
         List<Object> binds = new ArrayList<>();
@@ -124,7 +123,7 @@ public final class AdvancedReports {
         String inv = useInv ? " LEFT JOIN dbo.inventory i ON TRY_CONVERT(nvarchar(100),i.[" + invShka + "])=TRY_CONVERT(nvarchar(100),d.[" + shka + "])" : "";
         String u = "SELECT TRY_CONVERT(nvarchar(100),d.[" + shka + "]) AS k, TRY_CONVERT(nvarchar(100),h.[" + partyCol + "]) AS p"
                 + ", " + prod + " AS prod, " + Queries.custNameExpr(m, "h", partyCol) + " AS sup"
-                + ", " + Sql.num("d", sum) + " AS amt, " + pc + " AS qty"
+                + ", (" + pc + "*" + Sql.num("d", jozPrice) + ") AS amt, " + pc + " AS qty"
                 + " FROM " + Sql.dedupe("buyfact", numberCol, "h", inner)
                 + " JOIN dbo.subbuyfact d ON TRY_CONVERT(nvarchar(100),d.[" + linkCol + "])=TRY_CONVERT(nvarchar(100),h.[" + numberCol + "])"
                 + inv + Queries.custJoin(m, "h", partyCol)

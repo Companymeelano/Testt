@@ -134,9 +134,12 @@ public final class Speaker {
     public static boolean cloudOn(MainActivity a) {
         android.content.SharedPreferences p = a.getSharedPreferences("meelano_ai", android.content.Context.MODE_PRIVATE);
         String provider = p.getString("provider", "gemini");
-        return p.getBoolean("tts_cloud", true) && p.getBoolean("consent", false)
-                && !"grok".equals(provider)
-                && !ir.meelano.manager.screens.AiSettings.keyFor(a, provider).isEmpty();
+        if (!p.getBoolean("tts_cloud", true) || !p.getBoolean("consent", false)) return false;
+        // Natural speech needs a speech-capable service with a key (active or not).
+        for (String s : new String[]{provider, AiClient.GEMINI, AiClient.OPENAI}) {
+            if (AiClient.hasSpeech(s) && !ir.meelano.manager.screens.AiSettings.keyFor(a, s).isEmpty()) return true;
+        }
+        return false;
     }
 
     private static MediaPlayer player;
@@ -161,7 +164,8 @@ public final class Speaker {
         }
         final String base = chosen.equals(active) ? p.getString("baseUrl", "") : "";
         final String model = chosen.equals(active) ? p.getString("tts_model", "") : "";
-        final String voice = p.getString("tts_voice", "");
+        // A saved voice name belongs to the active service only; other services use their default voice.
+        final String voice = chosen.equals(active) ? p.getString("tts_voice", "") : "";
         final String key = ir.meelano.manager.screens.AiSettings.keyFor(a, chosen);
         stopPlayer();
         new Thread(() -> {

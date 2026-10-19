@@ -1685,23 +1685,43 @@ public class MainActivity extends Activity {
     public android.view.View exportBar(final String title, final String subtitle,
                                        final ReportCatalog.Col[] cols, final List<Row> rows,
                                        boolean withPrint) {
+        // One tidy row of equal tiles (no 14dp button padding), so every label fits on a phone
+        // and nothing is clipped at the sheet edge.
         LinearLayout box = kit.v();
-        LinearLayout r1 = kit.h();
-        r1.addView(kit.btnGhost("▤ PDF", Theme.DANGER, v -> sharePdf(title, subtitle, cols, rows)), kit.wlp(1f));
-        r1.addView(kit.space(8));
-        r1.addView(kit.btnGhost("▦ اکسل", Theme.SUCCESS, v -> shareXlsx(title, subtitle, cols, rows)), kit.wlp(1f));
-        r1.addView(kit.space(8));
-        r1.addView(kit.btnGhost("✎ ورد", Theme.INFO, v -> shareDocx(title, subtitle, cols, rows)), kit.wlp(1f));
-        box.addView(r1, kit.lp(-1, -2));
-        box.addView(kit.gap(8));
-        LinearLayout r2 = kit.h();
-        r2.addView(kit.btnGhost("▧ عکس", Theme.VIOLET, v -> sharePng(title, subtitle, cols, rows)), kit.wlp(1f));
-        if (withPrint) {
-            r2.addView(kit.space(8));
-            r2.addView(kit.btnGhost("🖨 چاپ", Theme.GOLD, v -> printPdf(title, subtitle, cols, rows)), kit.wlp(1f));
-        }
-        box.addView(r2, kit.lp(-1, -2));
+        box.setBackground(Theme.card());
+        box.setPadding(Theme.dp(8), Theme.dp(8), Theme.dp(8), Theme.dp(8));
+        LinearLayout row = kit.h();
+        row.setLayoutDirection(android.view.View.LAYOUT_DIRECTION_RTL);
+        addExportTile(row, "PDF", Theme.DANGER, v -> sharePdf(title, subtitle, cols, rows), true);
+        addExportTile(row, "اکسل", Theme.SUCCESS, v -> shareXlsx(title, subtitle, cols, rows), true);
+        addExportTile(row, "ورد", Theme.INFO, v -> shareDocx(title, subtitle, cols, rows), true);
+        addExportTile(row, "عکس", Theme.VIOLET, v -> sharePng(title, subtitle, cols, rows), true);
+        if (withPrint)
+            addExportTile(row, "چاپ", Theme.GOLD, v -> printPdf(title, subtitle, cols, rows), true);
+        box.addView(row, kit.lp(-1, -2));
         return box;
+    }
+
+    private void addExportTile(LinearLayout row, String label, int accent,
+                               android.view.View.OnClickListener click, boolean gapBefore) {
+        android.widget.Button b = new android.widget.Button(this);
+        b.setText(label);
+        b.setAllCaps(false);
+        b.setSingleLine(true);
+        b.setTextSize(12f);
+        b.setTextColor(accent);
+        b.setTypeface(Theme.face(true));
+        b.setBackground(Theme.ghostButton(accent));
+        b.setGravity(android.view.Gravity.CENTER);
+        b.setElevation(Theme.dp(1));
+        b.setPadding(Theme.dp(2), Theme.dp(8), Theme.dp(2), Theme.dp(8));
+        b.setMinHeight(Theme.dp(44));
+        b.setMinimumHeight(Theme.dp(44));
+        b.setMinWidth(0);
+        b.setMinimumWidth(0);
+        b.setOnClickListener(click);
+        if (gapBefore && row.getChildCount() > 0) row.addView(kit.space(5));
+        row.addView(b, kit.wlp(1f));
     }
 
     /** Zoom button: cycle ۱۰۰٪ → ۱۱۵٪ → ۱۳۰٪ → ۹۰٪ → ۱۰۰٪. */

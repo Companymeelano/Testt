@@ -556,7 +556,10 @@ public final class Kit {
     public View chipsRow(java.util.List<String> items, int selected, int accent, final ChipsListener l) {
         HorizontalScrollView sv = new HorizontalScrollView(a);
         sv.setHorizontalScrollBarEnabled(false);
+        sv.setClipToPadding(false);
+        sv.setPadding(Theme.dp(2), 0, Theme.dp(2), 0);
         LinearLayout r = h();
+        r.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         for (int i = 0; i < items.size(); i++) {
             final int idx = i;
             View ch = chip(items.get(i), i == selected, accent, v -> l.onPick(idx));

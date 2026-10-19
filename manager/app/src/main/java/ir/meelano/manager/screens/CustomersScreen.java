@@ -704,20 +704,26 @@ public class CustomersScreen extends Screen {
 
     private void ledgerDialog(Row r) {
         LinearLayout nb = a.kit.v();
-        nb.setPadding(Theme.dp(16), Theme.dp(8), Theme.dp(16), Theme.dp(8));
-        nb.addView(a.kit.kv("تاریخ", Jalali.dispFa(r.s("date")), Theme.TEXT), a.kit.lp(-1, -2));
-        nb.addView(a.kit.kv("عملیات", r.s("opLabel").isEmpty() ? r.s("op") : r.s("opLabel"), Theme.TEXT), a.kit.lp(-1, -2));
-        if (r.d("bed") > 0) nb.addView(a.kit.kv("بدهکار", Money.rial(r.d("bed")), Theme.DANGER), a.kit.lp(-1, -2));
-        if (r.d("bes") > 0) nb.addView(a.kit.kv("بستانکار", Money.rial(r.d("bes")), Theme.SUCCESS), a.kit.lp(-1, -2));
-        if (!r.s("ghno").isEmpty()) nb.addView(a.kit.kv("شماره سند", Money.fa(r.s("ghno")), Theme.TEXT), a.kit.lp(-1, -2));
-        if (!r.s("descrip").isEmpty()) nb.addView(a.kit.kv("شرح", r.s("descrip"), Theme.MUTED), a.kit.lp(-1, -2));
-        if (!r.s("doneDate").isEmpty()) nb.addView(a.kit.kv("تاریخ ثبت", Jalali.dispFa(r.s("doneDate")), Theme.MUTED), a.kit.lp(-1, -2));
-        nb.addView(a.kit.gap(8));
+        nb.setPadding(Theme.dp(4), Theme.dp(4), Theme.dp(4), Theme.dp(4));
+        // Facts sit in one card so the sheet reads as a single record.
+        LinearLayout facts = a.kit.card(Theme.GOLD);
+        facts.addView(a.kit.kv("تاریخ", Jalali.dispFa(r.s("date")), Theme.TEXT), a.kit.lp(-1, -2));
+        facts.addView(a.kit.kv("عملیات", r.s("opLabel").isEmpty() ? r.s("op") : r.s("opLabel"), Theme.TEXT), a.kit.lp(-1, -2));
+        if (r.d("bed") > 0) facts.addView(a.kit.kv("بدهکار", Money.rial(r.d("bed")), Theme.DANGER), a.kit.lp(-1, -2));
+        if (r.d("bes") > 0) facts.addView(a.kit.kv("بستانکار", Money.rial(r.d("bes")), Theme.SUCCESS), a.kit.lp(-1, -2));
+        if (!r.s("ghno").isEmpty()) facts.addView(a.kit.kv("شماره سند", Money.fa(r.s("ghno")), Theme.TEXT), a.kit.lp(-1, -2));
+        if (!r.s("descrip").isEmpty()) facts.addView(a.kit.kv("شرح", r.s("descrip"), Theme.MUTED), a.kit.lp(-1, -2));
+        if (!r.s("doneDate").isEmpty()) facts.addView(a.kit.kv("تاریخ ثبت", Jalali.dispFa(r.s("doneDate")), Theme.MUTED), a.kit.lp(-1, -2));
+        nb.addView(facts, a.kit.lp(-1, -2));
+        nb.addView(a.kit.gap(12));
+        nb.addView(a.kit.text("خروجی این سند", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        nb.addView(a.kit.gap(6));
         nb.addView(a.exportBar("سند گردش حساب", Jalali.dispFa(r.s("date")), LEDGER_COLS,
                 java.util.Collections.singletonList(r)), a.kit.lp(-1, -2));
-        nb.addView(a.kit.gap(8));
+        nb.addView(a.kit.gap(14));
         final AlertDialog[] box = new AlertDialog[1];
-        nb.addView(a.kit.btn("بستن", v -> box[0].dismiss()), a.kit.lp(-1, -2));
+        // Primary-less close: the sheet's only action is dismissal, so it stays quiet.
+        nb.addView(a.kit.btnGhost("بستن", Theme.MUTED, v -> box[0].dismiss()), a.kit.lp(-1, -2));
         box[0] = a.kit.dialog("جزئیات سند", nb, true);
         box[0].show();
     }

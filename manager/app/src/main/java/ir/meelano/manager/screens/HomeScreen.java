@@ -74,6 +74,7 @@ public class HomeScreen extends Screen {
         List<Row> debtors = new ArrayList<>();
         List<Row> overdue = new ArrayList<>();
         List<Row> salesDaily = new ArrayList<>();
+        List<Row> buyDaily = new ArrayList<>();
         List<Row> inDaily = new ArrayList<>();
         List<Row> topItems = new ArrayList<>();
         List<Row> visitors = new ArrayList<>();
@@ -121,6 +122,7 @@ public class HomeScreen extends Screen {
             final String inFrom = Jalali.addDays(to, -13);
             d.salesDaily = live(token, d.notes, "روند فروش", () -> Repo.exec(c, Queries.factorDaily(m, true, from, to)));
             d.inDaily = live(token, d.notes, "روند دریافت", () -> Repo.exec(c, MoneyQueries.darDaily(m, 0, inFrom, to)));
+            d.buyDaily = live(token, d.notes, "روند خرید", () -> Repo.exec(c, Queries.factorDaily(m, false, from, to)));
             Filter todayFilter = new Filter();
             todayFilter.from = to;
             todayFilter.to = to;
@@ -738,18 +740,11 @@ public class HomeScreen extends Screen {
         kpis.add(dayKpi("خرید", "buy", d.buyDay, "docs", "فاکتور", Theme.INFO));
         kpis.add(dayKpi("دریافت", "dar_in", d.inDay, "count", "قبض", Theme.SUCCESS));
         kpis.add(dayKpi("پرداخت", "dar_out", d.outDay, "count", "قبض", Theme.WARNING));
-        // Sales tile: last 14 days of sales as a sparkline (days with no sales count as 0).
-        if (d.salesDaily != null && !d.salesDaily.isEmpty()) {
-            try {
-                String endDay = snapshotDay(d);
-                double[] series = new double[14];
-                for (int i = 0; i < series.length; i++)
-                    series[i] = salesOnDay(d.salesDaily, Jalali.addDays(endDay, i - (series.length - 1)));
-                kpis.get(0).spark = series;
-            } catch (Exception e) {
-                Diag.ignored("Home:sparkline", e);
-            }
-        }
+        // Sparklines: last 14 days per tile (days without a row count as 0). Each tile
+        // draws only from its own daily query; a missing query simply leaves the tile plain.
+        attachSpark(kpis.get(0), d.salesDaily, d);
+        attachSpark(kpis.get(1), d.buyDaily, d);
+        attachSpark(kpis.get(2), d.inDaily, d);
         content.addView(a.kit.kpiGrid(kpis, 2), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(12));
         if (d.salesDaily != null && !d.salesDaily.isEmpty()) {
@@ -1138,6 +1133,19 @@ public class HomeScreen extends Screen {
         double s = 0;
         if (rows != null) for (Row r : rows) s += r.d("amount");
         return s;
+    }
+
+    private void attachSpark(Kit.Kpi tile, List<Row> rows, Data d) {
+        if (rows == null || rows.isEmpty()) return;
+        try {
+            String endDay = snapshotDay(d);
+            double[] series = new double[14];
+            for (int i = 0; i < series.length; i++)
+                series[i] = salesOnDay(rows, Jalali.addDays(endDay, i - (series.length - 1)));
+            tile.spark = series;
+        } catch (Exception e) {
+            Diag.ignored("Home:sparkline", e);
+        }
     }
 
     private double salesOnDay(List<Row> rows, String day) {

@@ -46,7 +46,8 @@ public final class AiSettings {
     /** The stored key for one provider («» when none). */
     public static String keyFor(android.content.Context c, String provider) {
         migrate(c);
-        return SecretBox.get(c, keyName(provider));
+        String saved = SecretBox.get(c, keyName(provider));
+        return saved.isEmpty() ? ir.meelano.manager.core.BuiltinKeys.get(provider) : saved;
     }
 
     /** Names of every service that has a key saved, in the order shown in the chooser. */

@@ -286,9 +286,10 @@ public class LicenseActivity extends Activity {
             sv.addView(box);
         }
         android.widget.FrameLayout wrap = new android.widget.FrameLayout(this);
-        wrap.setBackground(Theme.backdrop());
-        wrap.addView(new ParticlesView(this),
-                new android.widget.FrameLayout.LayoutParams(-1, -1));
+        wrap.setBackground(licenseBackdrop());
+        ParticlesView specks = new ParticlesView(this);
+        specks.setCount(3);
+        wrap.addView(specks, new android.widget.FrameLayout.LayoutParams(-1, -1));
         wrap.addView(sv, new android.widget.FrameLayout.LayoutParams(-1, -1));
         setContentView(wrap);
         try {
@@ -312,6 +313,65 @@ public class LicenseActivity extends Activity {
         sending = false;
         connRadar = null;
         connStage = null;
+    }
+
+    /** Quiet champagne used for card edges and hairlines on the licence screens. */
+    private static final int CHAMPAGNE = 0xFFC9B27C;
+    /** Dark taupe edge for cards: keeps the card frame subtle next to the gold accents. */
+    private static final int CARD_EDGE = 0xFF5A4E36;
+
+    private static int mix(int a, int b, float t) {
+        float it = 1f - t;
+        return android.graphics.Color.argb(
+                Math.round(android.graphics.Color.alpha(a) * it + android.graphics.Color.alpha(b) * t),
+                Math.round(android.graphics.Color.red(a) * it + android.graphics.Color.red(b) * t),
+                Math.round(android.graphics.Color.green(a) * it + android.graphics.Color.green(b) * t),
+                Math.round(android.graphics.Color.blue(a) * it + android.graphics.Color.blue(b) * t));
+    }
+
+    /** Dark theme: a soft sapphire fading to near-black. Light theme keeps the ivory backdrop. */
+    private android.graphics.drawable.Drawable licenseBackdrop() {
+        if (Theme.isLight()) return Theme.backdrop();
+        return new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{0xFF17213B, 0xFF0A0F1C});
+    }
+
+    /** Primary CTA: champagne gold, with only a faint rose tint at the lower edge. */
+    private android.graphics.drawable.GradientDrawable quietStart() {
+        android.graphics.drawable.GradientDrawable d = new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{Theme.shade(Theme.GOLD, 0.06f), Theme.GOLD, mix(Theme.GOLD, Theme.ROSE, 0.28f)});
+        d.setCornerRadius(Theme.dp(16));
+        d.setStroke(Theme.dp(1), Theme.alpha(0xFFFFFFFF, 90));
+        return d;
+    }
+
+    /** Device code plaque: a soft surface with a thin champagne rim. */
+    private android.graphics.drawable.GradientDrawable plaque() {
+        android.graphics.drawable.GradientDrawable d = new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{Theme.alpha(Theme.GOLD, Theme.isLight() ? 30 : 22), Theme.SURFACE});
+        d.setCornerRadius(Theme.dp(18));
+        d.setStroke(Theme.dp(1), Theme.alpha(CHAMPAGNE, 110));
+        return d;
+    }
+
+    /** Input frame: slightly lighter than the page, thin champagne rim, gold only when focused. */
+    private void luxField(EditText e) {
+        android.graphics.drawable.GradientDrawable normal = new android.graphics.drawable.GradientDrawable();
+        normal.setColor(Theme.SURFACE2);
+        normal.setCornerRadius(Theme.dp(14));
+        normal.setStroke(Theme.dp(1), Theme.alpha(CHAMPAGNE, Theme.isLight() ? 90 : 56));
+        android.graphics.drawable.GradientDrawable focused = new android.graphics.drawable.GradientDrawable();
+        focused.setColor(Theme.SURFACE2);
+        focused.setCornerRadius(Theme.dp(14));
+        focused.setStroke(Theme.dp(2), Theme.GOLD);
+        android.graphics.drawable.StateListDrawable s = new android.graphics.drawable.StateListDrawable();
+        s.addState(new int[]{android.R.attr.state_focused}, focused);
+        s.addState(new int[]{}, normal);
+        e.setBackground(s);
+        e.setMinHeight(Theme.dp(54));
     }
 
     /** Animated 3-step progress (v33): 1=request+wait, 2=connect, 3=enter. */
@@ -373,13 +433,13 @@ public class LicenseActivity extends Activity {
     private LinearLayout heroHeader(String title, String sub) {
         LinearLayout h = kit.v();
         h.setGravity(Gravity.CENTER_HORIZONTAL);
-        h.setPadding(0, Theme.dp(6), 0, Theme.dp(10));
+        h.setPadding(0, Theme.dp(4), 0, Theme.dp(14));
         android.widget.FrameLayout ring = new android.widget.FrameLayout(this);
         try {
             android.graphics.drawable.GradientDrawable rg = new android.graphics.drawable.GradientDrawable();
             rg.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-            rg.setStroke(Theme.dp(2), Theme.alpha(Theme.GOLD, 200));
-            rg.setColor(Theme.alpha(Theme.GOLD, Theme.isLight() ? 22 : 16));
+            rg.setStroke(Theme.dp(1), Theme.alpha(CHAMPAGNE, 170));
+            rg.setColor(Theme.alpha(CHAMPAGNE, Theme.isLight() ? 18 : 10));
             ring.setBackground(rg);
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:ring", ignored); }
         ring.addView(kit.logo(88), new android.widget.FrameLayout.LayoutParams(Theme.dp(88), Theme.dp(88),
@@ -387,10 +447,11 @@ public class LicenseActivity extends Activity {
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(Theme.dp(104), Theme.dp(104));
         lp.gravity = Gravity.CENTER_HORIZONTAL;
         h.addView(ring, lp);
-        TextView t = kit.text(title, 19f, Theme.GOLD_SOFT, true);
+        TextView t = kit.text(title, 20f, Theme.GOLD_SOFT, true);
         t.setGravity(Gravity.CENTER);
         h.addView(t, kit.lp(-1, -2));
         TextView s = kit.text(sub, 12.5f, Theme.MUTED, false);
+        s.setLineSpacing(Theme.dp(3), 1f);
         s.setGravity(Gravity.CENTER);
         h.addView(s, kit.lp(-1, -2));
         return h;
@@ -400,7 +461,7 @@ public class LicenseActivity extends Activity {
         box.addView(heroHeader("فعال‌سازی مجوز", "برای شروع، نام و شماره‌تان را ثبت کنید"), kit.lp(-1, -2));
         box.addView(stepBar(1), kit.lp(-1, -2));
         box.addView(kit.gap(10));
-        LinearLayout c = Card3D.card(this, Theme.GOLD);
+        LinearLayout c = Card3D.card(this, CARD_EDGE);
         c.addView(sectionHead(R.drawable.mi_star_shine, Theme.GOLD, "خوش آمدید"), kit.lp(-1, -2));
         c.addView(kit.text("نام و شماره‌تان را بنویسید؛ بقیه‌اش با ما.",
                 13f, Theme.TEXT, false), kit.lp(-1, -2));
@@ -430,6 +491,7 @@ public class LicenseActivity extends Activity {
                 } catch (Exception ignored) { Diag.ignored("LicenseActivity:418", ignored); }
             }
         });
+        luxField(fName);
         c.addView(iconField(fName, R.drawable.mi_person), kit.lp(-1, -2));
         c.addView(errName, kit.lp(-1, -2));
         final EditText fPhone = kit.editLux("شماره تماس", LicenseStore.contactPhone(this));
@@ -463,13 +525,14 @@ public class LicenseActivity extends Activity {
             }
         });
         // Same width as the name row: the validity tick used to narrow this field, so it is no longer placed here.
+        luxField(fPhone);
         LinearLayout prow = iconField(fPhone, R.drawable.mi_call);
         c.addView(prow, kit.lp(-1, -2));
         c.addView(errPhone, kit.lp(-1, -2));
         c.addView(kit.gap(4));
         final android.widget.Button startBtn = goldAction("شروع", R.drawable.mi_arrow_forward, null);
         try {
-            startBtn.setBackground(Theme.startButton());
+            startBtn.setBackground(quietStart());
             startBtn.setTextSize(15f * Theme.fontScale());
             startBtn.setMinHeight(Theme.dp(52));
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:464", ignored); }
@@ -493,6 +556,7 @@ public class LicenseActivity extends Activity {
         body.addView(kit.hint("اگر پیامک نرسید، کد را از فروشنده (واتس‌اپ، تماس یا متن) بگیرید و اینجا بچسبانید."),
                 kit.lp(-1, -2));
         final EditText fCode = kit.editLux("کد فعال‌سازی (M1…)", "");
+        luxField(fCode);
         body.addView(fCode, kit.lp(-1, -2));
         LinearLayout row = kit.h();
         row.addView(kit.btnGhost("چسباندن از حافظه", Theme.MUTED, v -> {
@@ -636,7 +700,7 @@ public class LicenseActivity extends Activity {
     private LinearLayout deviceCodeView() {
         LinearLayout card = kit.v();
         try {
-            card.setBackground(Theme.kpi(Theme.GOLD));
+            card.setBackground(plaque());
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:plaque", ignored); }
         card.setPadding(Theme.dp(14), Theme.dp(12), Theme.dp(14), Theme.dp(12));
         LinearLayout top = kit.h();
@@ -1033,8 +1097,12 @@ public class LicenseActivity extends Activity {
                 editingConnection ? "ویرایش اتصال" : "گام ۲ • اتصال", Theme.GOLD_SOFT),
                 kit.lp(-1, -2));
         box.addView(kit.gap(8));
-        LinearLayout lc = Card3D.card(this, Theme.SUCCESS);
-        lc.addView(Card3D.stepRow(this, kit, "✓", Theme.SUCCESS, "لایسنس"), kit.lp(-1, -2));
+        LinearLayout lc = Card3D.card(this, CARD_EDGE);
+        LinearLayout lrow = kit.h();
+        lrow.setGravity(Gravity.CENTER_VERTICAL);
+        lrow.addView(kit.text("لایسنس", 15f, Theme.TEXT, true), kit.wlp(1f));
+        lrow.addView(kit.text("✓", 16f, Theme.SUCCESS, true), kit.lp(-2, -2));
+        lc.addView(lrow, kit.lp(-1, -2));
         lc.addView(kit.kv("وضعیت", "✓ فعال", Theme.SUCCESS), kit.lp(-1, -2));
         lc.addView(kit.kv("طرح", "«" + License.planFa(s.plan) + "»", Theme.GOLD_SOFT),
                 kit.lp(-1, -2));

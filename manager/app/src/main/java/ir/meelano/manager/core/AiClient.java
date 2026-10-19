@@ -59,6 +59,31 @@ public final class AiClient {
     }
 
     /** Recommended default model per preset (the user may change it in settings). */
+    /** Text-to-speech model for providers that offer natural speech; empty when none. */
+    public static String defaultTtsModel(String provider) {
+        if (GEMINI.equals(provider)) return "gemini-2.5-flash-preview-tts";
+        if (OPENAI.equals(provider)) return "gpt-4o-mini-tts";
+        return "";
+    }
+
+    /** True when the provider has a natural-speech API in this app. */
+    public static boolean hasSpeech(String provider) {
+        return !defaultTtsModel(provider).isEmpty();
+    }
+
+    /**
+     * Model for a task. Analysis uses the stronger model where one exists; quick answers and
+     * writing use the fast one. Other providers keep their default model.
+     */
+    public static String modelFor(String provider, String task) {
+        if (GEMINI.equals(provider)) {
+            if ("analysis".equals(task)) return "gemini-2.5-pro";
+            if ("fast".equals(task) || "writing".equals(task)) return "gemini-2.5-flash";
+        }
+        if (OPENAI.equals(provider) && "analysis".equals(task)) return "gpt-4o";
+        return defaultModel(provider);
+    }
+
     public static String defaultModel(String provider) {
         if (GEMINI.equals(provider)) return "gemini-2.5-flash";
         if (OPENAI.equals(provider)) return "gpt-4o-mini";
@@ -153,7 +178,8 @@ public final class AiClient {
     public static Audio speech(String provider, String baseUrl, String model, String voice, String key,
                                String text) throws Exception {
         if (key == null || key.trim().isEmpty()) throw new IllegalStateException("کلید هوش مصنوعی ثبت نشده است");
-        if (model == null || model.trim().isEmpty()) throw new IllegalStateException("نام مدل صدا را وارد کنید");
+        if (model == null || model.trim().isEmpty()) model = defaultTtsModel(provider);
+        if (model == null || model.trim().isEmpty()) throw new IllegalStateException("این سرویس مدل صدا ندارد");
         if (GROK.equals(provider)) throw new IllegalStateException("این سرویس صدای طبیعی ندارد");
         String base = baseUrl(provider, baseUrl);
         String v = voice == null ? "" : voice.trim();
@@ -163,9 +189,12 @@ public final class AiClient {
                     new JSONArray().put(new JSONObject().put("text", text)))));
             JSONObject voiceCfg = new JSONObject().put("prebuiltVoiceConfig",
                     new JSONObject().put("voiceName", v.isEmpty() ? "Kore" : v));
+            // languageCode pins the reading language to Persian, so the voice never falls back to English.
             body.put("generationConfig", new JSONObject()
                     .put("responseModalities", new JSONArray().put("AUDIO"))
-                    .put("speechConfig", new JSONObject().put("voiceConfig", voiceCfg)));
+                    .put("speechConfig", new JSONObject()
+                            .put("languageCode", "fa-IR")
+                            .put("voiceConfig", voiceCfg)));
             JSONObject res = post(base + "/models/" + model.trim() + ":generateContent", body,
                     "x-goog-api-key", key.trim());
             JSONArray cands = res.optJSONArray("candidates");

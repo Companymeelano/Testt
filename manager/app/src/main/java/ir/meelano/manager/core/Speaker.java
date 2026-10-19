@@ -144,9 +144,22 @@ public final class Speaker {
 
     private static void speakCloud(final MainActivity a, final String clean, final Runnable onDone) {
         final android.content.SharedPreferences p = a.getSharedPreferences("meelano_ai", android.content.Context.MODE_PRIVATE);
-        final String provider = p.getString("provider", AiClient.GEMINI);
-        final String base = p.getString("baseUrl", "");
-        final String model = p.getString("tts_model", "");
+        // The voice comes from a service that has natural speech: the active one if it has speech,
+        // otherwise the first speech-capable service with a saved key.
+        String active = p.getString("provider", AiClient.GEMINI);
+        String provider = null;
+        for (String s : new String[]{active, AiClient.GEMINI, AiClient.OPENAI}) {
+            if (AiClient.hasSpeech(s) && !ir.meelano.manager.screens.AiSettings.keyFor(a, s).isEmpty()) {
+                provider = s;
+                break;
+            }
+        }
+        if (provider == null) {
+            speakLocal(a, clean, onDone);
+            return;
+        }
+        final String base = provider.equals(active) ? p.getString("baseUrl", "") : "";
+        final String model = provider.equals(active) ? p.getString("tts_model", "") : "";
         final String voice = p.getString("tts_voice", "");
         final String key = ir.meelano.manager.screens.AiSettings.keyFor(a, provider);
         stopPlayer();

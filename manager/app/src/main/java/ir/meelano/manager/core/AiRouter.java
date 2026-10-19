@@ -46,13 +46,45 @@ public final class AiRouter {
         return false;
     }
 
+    /** Per-capability preference: the first service with a saved key handles the task. */
+    private static final String[] ANALYSIS_ORDER = {
+            AiClient.DEEPSEEK, AiClient.GEMINI, AiClient.OPENAI, AiClient.OPENROUTER,
+            AiClient.GAPGPT, AiClient.GROQ, AiClient.CEREBRAS, AiClient.HUGGINGFACE, AiClient.GROK};
+    private static final String[] FAST_ORDER = {
+            AiClient.GROQ, AiClient.CEREBRAS, AiClient.GEMINI, AiClient.OPENAI, AiClient.DEEPSEEK,
+            AiClient.OPENROUTER, AiClient.GAPGPT, AiClient.HUGGINGFACE, AiClient.GROK};
+    private static final String[] WRITING_ORDER = {
+            AiClient.GEMINI, AiClient.OPENAI, AiClient.GAPGPT, AiClient.OPENROUTER,
+            AiClient.DEEPSEEK, AiClient.GROQ, AiClient.CEREBRAS, AiClient.HUGGINGFACE, AiClient.GROK};
+
+    /** Picks the capability from the question: numbers and reasoning, writing, or a quick answer. */
+    public static String taskFor(String question) {
+        String q = question == null ? "" : question.replace('ي', 'ی').replace('ك', 'ک');
+        String[] analysis = {"چرا", "تحلیل", "گزارش", "پیش‌بینی", "پیش بینی", "روند", "سود", "مقایسه",
+                "ریسک", "توصیه", "علت", "راهکار", "بررسی"};
+        String[] writing = {"پیام", "متن", "نامه", "یادداشت", "بنویس", "پیامک", "ایمیل", "اطلاعیه"};
+        for (String w : writing) if (q.contains(w)) return "writing";
+        for (String w : analysis) if (q.contains(w)) return "analysis";
+        return q.trim().split("\\s+").length <= 6 ? "fast" : "general";
+    }
+
     public static Result complete(Context c, String system, String user) throws Exception {
+        return complete(c, "general", system, user);
+    }
+
+    public static Result complete(Context c, String task, String system, String user) throws Exception {
         SharedPreferences p = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         String active = p.getString("provider", AiClient.GEMINI);
         List<String> order = new ArrayList<>();
-        order.add(active);
-        for (String s : PRIORITY) {
-            if (!s.equals(active)) order.add(s);
+        if ("general".equals(task)) {
+            order.add(active);
+            for (String s : PRIORITY) {
+                if (!s.equals(active)) order.add(s);
+            }
+        } else {
+            String[] pref = "analysis".equals(task) ? ANALYSIS_ORDER
+                    : "writing".equals(task) ? WRITING_ORDER : FAST_ORDER;
+            for (String s : pref) order.add(s);
         }
         StringBuilder errs = new StringBuilder();
         long now = System.currentTimeMillis();
@@ -63,9 +95,9 @@ public final class AiRouter {
                 errs.append(AiClient.nameOf(provider)).append(": موقتاً کنار گذاشته شده؛ ");
                 continue;
             }
-            boolean isActive = provider.equals(active);
+            boolean isActive = provider.equals(active) && "general".equals(task);
             String savedModel = p.getString("model", "").trim();
-            String model = isActive && !savedModel.isEmpty() ? savedModel : AiClient.defaultModel(provider);
+            String model = isActive && !savedModel.isEmpty() ? savedModel : AiClient.modelFor(provider, task);
             String base = isActive ? p.getString("baseUrl", "") : "";
             try {
                 return new Result(AiClient.complete(provider, base, model, key, system, user), provider);

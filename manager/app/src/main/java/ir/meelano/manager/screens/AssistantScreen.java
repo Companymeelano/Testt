@@ -227,7 +227,7 @@ public final class AssistantScreen extends Screen {
             String reply = null;
             String err = null;
             try {
-                AiRouter.Result r = AiRouter.complete(a, SYSTEM_PROMPT,
+                AiRouter.Result r = AiRouter.complete(a, AiRouter.taskFor(q), SYSTEM_PROMPT,
                         "داده‌های فروشگاه (امروز):\n" + ctx + "\nسؤال مدیر: " + q);
                 reply = r.text;
             } catch (Exception e) {

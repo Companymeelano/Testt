@@ -58,6 +58,8 @@ dependencies {
 
     // Offline Persian voice engine: pinned AAR fetched by CI into libs/ (see .github workflows), plus tar.bz2 unpacking for the model.
     implementation(name: 'sherpa-onnx-1.13.8', ext: 'aar')
+    // The local AAR does not declare its Kotlin runtime, so the stdlib it calls is added here (else: NoClassDefFoundError kotlin/jvm/internal).
+    implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.9.24'
     implementation 'org.apache.commons:commons-compress:1.27.1'
 
     testImplementation 'junit:junit:4.13.2'

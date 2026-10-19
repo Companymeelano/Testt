@@ -154,18 +154,19 @@ public final class Speaker {
                 break;
             }
         }
-        if (provider == null) {
+        final String chosen = provider;
+        if (chosen == null) {
             speakLocal(a, clean, onDone);
             return;
         }
-        final String base = provider.equals(active) ? p.getString("baseUrl", "") : "";
-        final String model = provider.equals(active) ? p.getString("tts_model", "") : "";
+        final String base = chosen.equals(active) ? p.getString("baseUrl", "") : "";
+        final String model = chosen.equals(active) ? p.getString("tts_model", "") : "";
         final String voice = p.getString("tts_voice", "");
-        final String key = ir.meelano.manager.screens.AiSettings.keyFor(a, provider);
+        final String key = ir.meelano.manager.screens.AiSettings.keyFor(a, chosen);
         stopPlayer();
         new Thread(() -> {
             try {
-                AiClient.Audio au = AiClient.speech(provider, base, model, voice, key, clean);
+                AiClient.Audio au = AiClient.speech(chosen, base, model, voice, key, clean);
                 File f = new File(a.getCacheDir(), "assistant_reply." + au.ext);
                 try (FileOutputStream fo = new FileOutputStream(f)) {
                     fo.write(au.data);

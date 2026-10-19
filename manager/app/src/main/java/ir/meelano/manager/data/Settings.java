@@ -18,6 +18,13 @@ public final class Settings {
     public Settings(Context c) {
         app = c.getApplicationContext();
         p = c.getSharedPreferences("meelano_manager7", Context.MODE_PRIVATE);
+        // Scrub any plain-text SQL password left by older builds (or by the old fallback).
+        // It is moved into the Keystore store when possible and never kept in plain text.
+        if (p.contains("db_pass")) {
+            String legacy = p.getString("db_pass", "");
+            if (!legacy.isEmpty()) SecretBox.put(app, PASS_SECRET, legacy);
+            p.edit().remove("db_pass").apply();
+        }
     }
 
     public String host() { return p.getString("db_host", "").trim(); }
@@ -67,24 +74,18 @@ public final class Settings {
      * an older build in plain SharedPreferences is moved into the encrypted store once.
      */
     public String pass() {
-        String legacy = p.getString("db_pass", "");
-        if (!legacy.isEmpty()) {
-            if (SecretBox.put(app, PASS_SECRET, legacy)) p.edit().remove("db_pass").apply();
-            return legacy;
-        }
         return SecretBox.get(app, PASS_SECRET);
     }
 
-    /** Stores the SQL password encrypted; the plain key is never written. */
+    /**
+     * Stores the SQL password only in the Keystore-encrypted store. If the Keystore cannot
+     * encrypt, the password is NOT written in plain text; the user simply re-enters it.
+     */
     private void savePass(String pass) {
         String v = pass == null ? "" : pass;
-        if (SecretBox.put(app, PASS_SECRET, v)) {
-            p.edit().remove("db_pass").apply();
-        } else if (!v.isEmpty()) {
-            // Keystore unavailable: keep the login working instead of losing it.
-            p.edit().putString("db_pass", v).apply();
-        } else {
-            p.edit().remove("db_pass").apply();
+        p.edit().remove("db_pass").apply();
+        if (!SecretBox.put(app, PASS_SECRET, v) && !v.isEmpty()) {
+            ir.meelano.manager.core.Diag.ignored("Settings:savePass", new IllegalStateException("keystore unavailable"));
         }
     }
 

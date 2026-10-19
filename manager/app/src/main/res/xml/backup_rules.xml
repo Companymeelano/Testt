@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Reinstall recovery: the license vault (+ distributor name + connection) -->
-<!-- is restored by Android Auto Backup, so a reinstall just works. -->
+<!-- Android 11 and older (fullBackupContent). Same scope as data_extraction_rules.xml. -->
+<!-- Reinstall recovery: license vault, connection (no password) and company profile. -->
 <full-backup-content>
     <include domain="sharedpref" path="meelano_license.xml" />
     <include domain="sharedpref" path="meelano_manager7.xml" />
     <include domain="sharedpref" path="meelano_company.xml" />
     <include domain="file" path="company_logo.png" />
+    <exclude domain="sharedpref" path="meelano_secrets.xml" />
+    <exclude domain="sharedpref" path="meelano_login.xml" />
 </full-backup-content>

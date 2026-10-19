@@ -738,6 +738,18 @@ public class HomeScreen extends Screen {
         kpis.add(dayKpi("خرید", "buy", d.buyDay, "docs", "فاکتور", Theme.INFO));
         kpis.add(dayKpi("دریافت", "dar_in", d.inDay, "count", "قبض", Theme.SUCCESS));
         kpis.add(dayKpi("پرداخت", "dar_out", d.outDay, "count", "قبض", Theme.WARNING));
+        // Sales tile: last 14 days of sales as a sparkline (days with no sales count as 0).
+        if (d.salesDaily != null && !d.salesDaily.isEmpty()) {
+            try {
+                String endDay = snapshotDay(d);
+                double[] series = new double[14];
+                for (int i = 0; i < series.length; i++)
+                    series[i] = salesOnDay(d.salesDaily, Jalali.addDays(endDay, i - (series.length - 1)));
+                kpis.get(0).spark = series;
+            } catch (Exception e) {
+                Diag.ignored("Home:sparkline", e);
+            }
+        }
         content.addView(a.kit.kpiGrid(kpis, 2), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(12));
         if (d.salesDaily != null && !d.salesDaily.isEmpty()) {

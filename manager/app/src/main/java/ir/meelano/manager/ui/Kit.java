@@ -235,6 +235,8 @@ public final class Kit {
         public final Runnable action;
         /** When not NaN, the tile counts up from 0 to this number. */
         public final double countTo;
+        /** Optional daily series (oldest first) drawn as a sparkline under the value. */
+        public double[] spark;
 
         public Kpi(String label, String value, String sub, int accent) {
             this(label, value, sub, accent, null);
@@ -276,6 +278,11 @@ public final class Kit {
             v.setEllipsize(TextUtils.TruncateAt.END);
         }
         t.addView(v, lp(-1, -2));
+        if (k.spark != null && k.spark.length > 1) {
+            LinearLayout.LayoutParams sp = lp(-1, Theme.dp(26));
+            sp.setMargins(0, Theme.dp(4), 0, Theme.dp(2));
+            t.addView(new Sparkline(a, k.spark, k.accent), sp);
+        }
         if (!Double.isNaN(k.countTo)) {
             ValueAnimator va = ValueAnimator.ofFloat(0f, 1f);
             va.setDuration(900);

@@ -357,7 +357,10 @@ public final class Kit {
 
     public View divider() {
         View v = new View(a);
-        v.setBackgroundColor(Theme.alpha(Theme.GOLD, 26));
+        // Gold hairline that fades out at both ends (no hard line across the card).
+        v.setBackground(new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{Theme.alpha(Theme.GOLD, 0), Theme.alpha(Theme.GOLD, Theme.DARK ? 70 : 90), Theme.alpha(Theme.GOLD, 0)}));
         v.setLayoutParams(new LinearLayout.LayoutParams(-1, Theme.dp(1)));
         return v;
     }

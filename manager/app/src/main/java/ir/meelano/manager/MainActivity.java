@@ -1039,6 +1039,28 @@ public class MainActivity extends Activity {
         refreshChrome();
         scroll.scrollTo(0, 0);
         s.render(content);
+        playEntrance(content);
+    }
+
+    /**
+     * Cards rise in one after another on each section change (fade + 10dp rise, 35ms apart,
+     * first 8 only). Skipped when the system animations are off (reduce motion).
+     */
+    private void playEntrance(LinearLayout page) {
+        try {
+            if (!ir.meelano.manager.ui.Ui.motionOk(this)) return;
+            int n = Math.min(page.getChildCount(), 8);
+            for (int i = 0; i < n; i++) {
+                android.view.View v = page.getChildAt(i);
+                v.setAlpha(0f);
+                v.setTranslationY(Theme.dp(10));
+                v.animate().alpha(1f).translationY(0f).setDuration(280)
+                        .setStartDelay(i * 35L).setInterpolator(new android.view.animation.DecelerateInterpolator())
+                        .start();
+            }
+        } catch (Exception e) {
+            Diag.ignored("MainActivity:entrance", e);
+        }
     }
 
     /** Builds an empty, centred page column and puts it on screen in place of the previous one. */

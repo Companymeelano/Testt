@@ -718,6 +718,20 @@ public final class MasterQueries {
         return "(" + vahPieces + (joz == null ? "" : "+COALESCE(TRY_CONVERT(decimal(19,3)," + d + ".[" + joz + "]),0)") + ")";
     }
 
+    /**
+     * Counting pieces of a document line: qty*mohvah + joz (Atiran's unit for stock and cost).
+     * i is the inventory alias when mohvah is available; with no inventory join the quantity
+     * alone is returned, because joz cannot be combined without the pack size.
+     */
+    static String countPieces(Meta m, String table, String qtyCol, String d, String i) throws Queries.Missing {
+        String q = "TRY_CONVERT(decimal(19,3)," + d + ".[" + qtyCol + "])";
+        String mohvah = cogsMohvah(m);
+        if (i == null || mohvah == null) return "(" + q + ")";
+        String joz = m.col(table, "TEDJOZ", "tedjoz");
+        return "(" + q + "*COALESCE(TRY_CONVERT(decimal(19,3)," + i + ".[" + mohvah + "]),1)"
+                + (joz == null ? "" : "+COALESCE(TRY_CONVERT(decimal(19,3)," + d + ".[" + joz + "]),0)") + ")";
+    }
+
     static String cogsBuyCol(Meta m) throws Queries.Missing {
         String buy = m.col("inventory", "inventory_price", "buy_price", "pure_buy_price", "ImPureBuyPrice");
         if (buy == null) throw new Queries.Missing("ستون قیمت خرید در «کالاها» پیدا نشد؛ بهای تمام‌شده قابل محاسبه نیست");

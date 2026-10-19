@@ -82,13 +82,14 @@ public final class AdvancedReports {
         String inner = "WHERE " + (dc.isEmpty() ? "1=1" : dc) + Sql.activeAnd(cols, "x") + Sql.softAnd(cols, "x");
         boolean useInv = invName != null && invShka != null;
         String label = "COALESCE(" + (useInv ? Sql.txt("i", invName, 250) + "," : "") + Sql.txt("d", shka, 120) + ",N'—')";
-        String unit = "CAST(" + Sql.num("d", sum) + " AS decimal(19,4)) / NULLIF(" + Sql.numNull("d", qty) + ",0)";
+        String pc = MasterQueries.countPieces(m, "subsailfact", qty, "d", useInv ? "i" : null);
+        String unit = "CAST(" + Sql.num("d", sum) + " AS decimal(19,4)) / NULLIF(" + pc + ",0)";
         String inv = useInv ? " LEFT JOIN dbo.inventory i ON TRY_CONVERT(nvarchar(100),i.[" + invShka + "])=TRY_CONVERT(nvarchar(100),d.[" + shka + "])" : "";
         String u = "SELECT TRY_CONVERT(nvarchar(100),d.[" + shka + "]) AS k, " + label + " AS label, (" + unit + ") AS unit, "
-                + Sql.numNull("d", qty) + " AS qty, h.[" + numberCol + "] AS doc"
+                + pc + " AS qty, h.[" + numberCol + "] AS doc"
                 + " FROM " + Sql.dedupe("sailfact", numberCol, "h", inner)
                 + " JOIN dbo.subsailfact d ON TRY_CONVERT(nvarchar(100),d.[" + linkCol + "])=TRY_CONVERT(nvarchar(100),h.[" + numberCol + "])"
-                + inv + " WHERE " + Sql.numNull("d", qty) + " > 0";
+                + inv + " WHERE " + pc + " > 0";
         String sql = "SELECT TOP (" + Queries.clampTop(top) + ") MAX(u.label) AS label"
                 + ", COUNT(DISTINCT u.doc) AS docs, SUM(u.qty) AS qty"
                 + ", MIN(u.unit) AS minUnit, MAX(u.unit) AS maxUnit, AVG(u.unit) AS avgUnit"
@@ -119,14 +120,15 @@ public final class AdvancedReports {
         String inner = "WHERE " + (dc.isEmpty() ? "1=1" : dc) + Sql.activeAnd(cols, "x") + Sql.softAnd(cols, "x");
         boolean useInv = invName != null && invShka != null;
         String prod = "COALESCE(" + (useInv ? Sql.txt("i", invName, 250) + "," : "") + Sql.txt("d", shka, 120) + ",N'—')";
+        String pc = MasterQueries.countPieces(m, "subbuyfact", qty, "d", useInv ? "i" : null);
         String inv = useInv ? " LEFT JOIN dbo.inventory i ON TRY_CONVERT(nvarchar(100),i.[" + invShka + "])=TRY_CONVERT(nvarchar(100),d.[" + shka + "])" : "";
         String u = "SELECT TRY_CONVERT(nvarchar(100),d.[" + shka + "]) AS k, TRY_CONVERT(nvarchar(100),h.[" + partyCol + "]) AS p"
                 + ", " + prod + " AS prod, " + Queries.custNameExpr(m, "h", partyCol) + " AS sup"
-                + ", " + Sql.num("d", sum) + " AS amt, " + Sql.numNull("d", qty) + " AS qty"
+                + ", " + Sql.num("d", sum) + " AS amt, " + pc + " AS qty"
                 + " FROM " + Sql.dedupe("buyfact", numberCol, "h", inner)
                 + " JOIN dbo.subbuyfact d ON TRY_CONVERT(nvarchar(100),d.[" + linkCol + "])=TRY_CONVERT(nvarchar(100),h.[" + numberCol + "])"
                 + inv + Queries.custJoin(m, "h", partyCol)
-                + " WHERE " + Sql.numNull("d", qty) + " > 0";
+                + " WHERE " + pc + " > 0";
         String sql = "WITH u AS (" + u + "), pa AS ("
                 + " SELECT k, p, MAX(prod) AS prod, MAX(sup) AS sup, SUM(amt) AS amt, SUM(qty) AS qty"
                 + " FROM u GROUP BY k, p),"

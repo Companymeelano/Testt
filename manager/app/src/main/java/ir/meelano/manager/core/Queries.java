@@ -771,7 +771,8 @@ public final class Queries {
         String src = Sql.dedupe(head, numberCol, "h", inner);
         boolean useInv = invName != null && invShka != null;
         String label = "COALESCE(" + (useInv ? Sql.txt("i", invName, 250) + "," : "") + Sql.txt("d", shka, 120) + ",N'—')";
-        String unit = "CAST(" + Sql.num("d", sum) + " AS decimal(19,4)) / NULLIF(" + numNull("d", qty, "decimal(19,3)") + ",0)";
+        // Unit price per piece: the line amount covers vah and joz, so the denominator must too.
+        String unit = "CAST(" + Sql.num("d", sum) + " AS decimal(19,4)) / NULLIF(" + MasterQueries.countPieces(m, line, qty, "d", useInv ? "i" : null) + ",0)";
         String sql = "WITH ln AS ("
                 + " SELECT TRY_CONVERT(nvarchar(100),d.[" + shka + "]) AS k, " + label + " AS label"
                 + ", " + Sql.dateKey(Sql.date10("h", dateCol)) + " AS dk"

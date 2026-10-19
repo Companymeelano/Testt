@@ -470,7 +470,7 @@ public class LicenseActivity extends Activity {
         final android.widget.Button startBtn = goldAction("شروع", R.drawable.mi_arrow_forward, null);
         try {
             startBtn.setBackground(Theme.startButton());
-            startBtn.setTextSize(15f);
+            startBtn.setTextSize(15f * Theme.fontScale());
             startBtn.setMinHeight(Theme.dp(52));
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:464", ignored); }
         glowBtn = startBtn;
@@ -579,7 +579,7 @@ public class LicenseActivity extends Activity {
         android.widget.Button b = kit.btnGold(text, l);
         try {
             b.setBackground(Theme.startButton());
-            b.setTextSize(15.5f);
+            b.setTextSize(15.5f * Theme.fontScale());
             b.setMinHeight(Theme.dp(56));
             b.setLetterSpacing(0.04f);
             if (iconRes != 0) {
@@ -1073,7 +1073,7 @@ public class LicenseActivity extends Activity {
             fIp.setSingleLine(true);
             fIp.setInputType(android.text.InputType.TYPE_CLASS_TEXT
                     | android.text.InputType.TYPE_TEXT_VARIATION_URI);
-        } catch (Exception ignored) { }
+        } catch (Exception e) { Diag.ignored("LicenseActivity:ipField", e); }
         c.addView(iconField(fIp, R.drawable.mi_my_location), kit.lp(-1, -2));
         c.addView(kit.text("پس از اتصال مستقیم، دیتابیس‌های دارای ساختار آتیران برای انتخاب نمایش داده می‌شوند.",
                 11.5f, Theme.MUTED, false), kit.lp(-1, -2));
@@ -1098,7 +1098,7 @@ public class LicenseActivity extends Activity {
                 wbtn[0].setCompoundDrawablePadding(Theme.dp(6));
             }
             wbtn[0].setMinHeight(Theme.dp(48));
-        } catch (Exception ignored) { }
+        } catch (Exception e) { Diag.ignored("LicenseActivity:wifiBtn", e); }
         c.addView(wbtn[0], kit.lp(-1, -2));
         if (editingConnection) {
             c.addView(kit.btnGhost("انصراف • بازگشت به برنامه", Theme.MUTED, v -> finish()),

@@ -201,7 +201,7 @@ public class LoginActivity extends Activity {
         loginBtn = kit.btnGold("ورود  ✦", v -> doLogin());
         try {
             loginBtn.setBackground(Theme.startButton());
-            loginBtn.setTextSize(16f);
+            loginBtn.setTextSize(16f * Theme.fontScale());
             loginBtn.setMinHeight(Theme.dp(56));
             loginBtn.setLetterSpacing(0.05f);
         } catch (Exception ignored) { Diag.ignored("LoginActivity:btn", ignored); }

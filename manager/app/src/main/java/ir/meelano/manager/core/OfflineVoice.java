@@ -244,8 +244,8 @@ public final class OfflineVoice {
         AudioTrack t = track;
         track = null;
         if (t == null) return;
-        try { t.stop(); } catch (Exception ignored) { }
-        try { t.release(); } catch (Exception ignored) { }
+        try { t.stop(); } catch (Exception e) { Diag.ignored("OfflineVoice:stop", e); }
+        try { t.release(); } catch (Exception e) { Diag.ignored("OfflineVoice:release", e); }
     }
 
     /** Stops any offline speech that is playing. */

@@ -102,7 +102,7 @@ public final class AiSettings {
                     }
                     rerender.run();
                 });
-                pc.setTextSize(10.5f);
+                pc.setTextSize(10.5f * Theme.fontScale());
                 pc.setPadding(Theme.dp(4), Theme.dp(8), Theme.dp(4), Theme.dp(8));
                 provRow.addView(pc, a.kit.wlp(1f));
             }
@@ -134,7 +134,7 @@ public final class AiSettings {
         final CheckBox consent = new CheckBox(a);
         consent.setText("اجازه می‌دهم خلاصهٔ عددی فروشگاه (فروش، مانده، چک و معوق‌ها) و متن پاسخ‌ها برای هوش مصنوعی و صدای طبیعی به همین سرویس فرستاده شود.");
         consent.setTextColor(Theme.TEXT);
-        consent.setTextSize(12.5f);
+        consent.setTextSize(12.5f * Theme.fontScale());
         consent.setChecked(p.getBoolean("consent", false));
         card.addView(consent, a.kit.lp(-1, -2));
         card.addView(a.kit.gap(10));
@@ -176,7 +176,7 @@ public final class AiSettings {
         final CheckBox cloudTts = new CheckBox(a);
         cloudTts.setText("استفاده از صدای طبیعی سرویس انتخابی");
         cloudTts.setTextColor(Theme.TEXT);
-        cloudTts.setTextSize(12.5f);
+        cloudTts.setTextSize(12.5f * Theme.fontScale());
         cloudTts.setChecked(p.getBoolean("tts_cloud", true));
         card.addView(cloudTts, a.kit.lp(-1, -2));
         card.addView(a.kit.hint("مدل صدا (مدل TTS سرویس شما)"), a.kit.lp(-1, -2));

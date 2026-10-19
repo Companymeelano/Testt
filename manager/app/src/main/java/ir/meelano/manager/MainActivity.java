@@ -721,7 +721,7 @@ public class MainActivity extends Activity {
         cell.addView(icon, new LinearLayout.LayoutParams(Theme.dp(26), Theme.dp(24)));
         TextView t = new TextView(this);
         t.setText(label);
-        t.setTextSize(10);
+        t.setTextSize(10 * Theme.fontScale());
         t.setTextColor(Theme.MUTED);
         t.setGravity(Gravity.CENTER);
         t.setSingleLine(true);
@@ -1708,7 +1708,7 @@ public class MainActivity extends Activity {
         b.setText(label);
         b.setAllCaps(false);
         b.setSingleLine(true);
-        b.setTextSize(12f);
+        b.setTextSize(12f * Theme.fontScale());
         b.setTextColor(accent);
         b.setTypeface(Theme.face(true));
         b.setBackground(Theme.ghostButton(accent));

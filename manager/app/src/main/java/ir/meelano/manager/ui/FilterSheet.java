@@ -87,7 +87,7 @@ public final class FilterSheet {
             final EditText search = new EditText(kit.a);
             search.setHint(cfg.searchHint);
             search.setText(f.search == null ? "" : f.search);
-            search.setTextSize(12.5f);
+            search.setTextSize(12.5f * Theme.fontScale());
             search.setTextColor(Theme.TEXT);
             search.setHintTextColor(Theme.MUTED);
             search.setTypeface(Theme.face(false));

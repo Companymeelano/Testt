@@ -505,7 +505,7 @@ public final class Kit {
     public Button btnGold(String t, View.OnClickListener onClick) {
         Button b = new Button(a);
         b.setText(t);
-        b.setTextSize(13.5f);
+        b.setTextSize(13.5f * Theme.fontScale());
         b.setTextColor(Theme.onAccent());
         b.setTypeface(Theme.face(true));
         b.setBackground(Theme.goldButton());
@@ -526,7 +526,7 @@ public final class Kit {
     public Button btnGhost(String t, int accent, View.OnClickListener onClick) {
         Button b = new Button(a);
         b.setText(t);
-        b.setTextSize(12.5f);
+        b.setTextSize(12.5f * Theme.fontScale());
         b.setTextColor(accent);
         b.setTypeface(Theme.face(true));
         b.setBackground(Theme.ghostButton(accent));
@@ -585,7 +585,7 @@ public final class Kit {
         final EditText e = new EditText(a);
         e.setHint(hint);
         e.setText(initial == null ? "" : initial);
-        e.setTextSize(12.5f);
+        e.setTextSize(12.5f * Theme.fontScale());
         e.setTextColor(Theme.TEXT);
         e.setHintTextColor(Theme.MUTED);
         e.setTypeface(Theme.face(false));
@@ -1263,7 +1263,7 @@ public final class Kit {
         EditText e = new EditText(a);
         e.setHint(hint);
         e.setText(value == null ? "" : value);
-        e.setTextSize(14f);
+        e.setTextSize(14f * Theme.fontScale());
         e.setTextColor(Theme.TEXT);
         e.setHintTextColor(Theme.MUTED);
         e.setTypeface(Theme.face(false));
@@ -1278,7 +1278,7 @@ public final class Kit {
     /** Luxury field (v34): focus ring, 56dp touch height. */
     public EditText editLux(String hint, String value) {
         EditText e = edit(hint, value, false);
-        e.setTextSize(14f);
+        e.setTextSize(14f * Theme.fontScale());
         e.setBackground(Theme.fieldBg());
         e.setMinHeight(Theme.dp(56));
         e.setPadding(Theme.dp(14), Theme.dp(12), Theme.dp(14), Theme.dp(12));

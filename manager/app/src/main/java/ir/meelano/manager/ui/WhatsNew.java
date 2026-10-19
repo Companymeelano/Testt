@@ -224,7 +224,7 @@ public final class WhatsNew {
         CheckBox cb = new CheckBox(a);
         cb.setText("دیگر این پیغام را نشان نده");
         cb.setTextColor(Theme.TEXT);
-        cb.setTextSize(12.5f);
+        cb.setTextSize(12.5f * Theme.fontScale());
         cb.setButtonTintList(ColorStateList.valueOf(Theme.GOLD));
         cb.setOnCheckedChangeListener((x, on) -> never[0] = on);
         foot.addView(cb, kit.lp(-1, -2));

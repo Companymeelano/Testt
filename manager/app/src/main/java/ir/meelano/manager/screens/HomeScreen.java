@@ -487,7 +487,7 @@ public class HomeScreen extends Screen {
         new Thread(() -> {
             // Position: last known or one quick fix (worker thread). Denied or unavailable means Tehran.
             android.location.Location loc = null;
-            try { loc = ir.meelano.manager.core.DeviceLocation.resolve(a, 6000); } catch (Exception ignored) { }
+            try { loc = ir.meelano.manager.core.DeviceLocation.resolve(a, 6000); } catch (Exception e) { Diag.ignored("Home:location", e); }
             final boolean fromDevice = loc != null;
             final double lat = fromDevice ? loc.getLatitude() : MarketWeather.AHVAZ_LAT;
             final double lon = fromDevice ? loc.getLongitude() : MarketWeather.AHVAZ_LON;
@@ -496,8 +496,8 @@ public class HomeScreen extends Screen {
 
             String rRaw = null;
             String wRaw = null;
-            try { rRaw = MarketWeather.get(MarketWeather.RATES_URL); } catch (Exception ignored) { }
-            try { wRaw = MarketWeather.get(MarketWeather.weatherUrl(lat, lon)); } catch (Exception ignored) { }
+            try { rRaw = MarketWeather.get(MarketWeather.RATES_URL); } catch (Exception e) { Diag.ignored("Home:ratesFetch", e); }
+            try { wRaw = MarketWeather.get(MarketWeather.weatherUrl(lat, lon)); } catch (Exception e) { Diag.ignored("Home:weatherFetch", e); }
             final boolean rLive = rRaw != null;
             final boolean wLive = wRaw != null;
             if (rLive) MarketWeather.save(a, MarketWeather.ratesKey(), rRaw);
@@ -526,8 +526,8 @@ public class HomeScreen extends Screen {
         card.removeAllViews();
         List<MarketWeather.Rate> rates = null;
         MarketWeather.Weather w = null;
-        try { if (rJson != null) rates = MarketWeather.parseRates(rJson); } catch (Exception ignored) { }
-        try { if (wJson != null) w = MarketWeather.parseWeather(wJson); } catch (Exception ignored) { }
+        try { if (rJson != null) rates = MarketWeather.parseRates(rJson); } catch (Exception e) { Diag.warn("Home:parseRates", e); }
+        try { if (wJson != null) w = MarketWeather.parseWeather(wJson); } catch (Exception e) { Diag.warn("Home:parseWeather", e); }
 
         LinearLayout head = a.kit.h();
         head.setGravity(Gravity.CENTER_VERTICAL);
@@ -570,7 +570,7 @@ public class HomeScreen extends Screen {
             // Without the device position the card says so and offers the permission again.
             android.widget.Button loc = a.kit.btnGhost("📍 موقعیت من", Theme.GOLD, v -> a.requestLocationAccess());
             loc.setSingleLine(true);
-            loc.setTextSize(11f);
+            loc.setTextSize(11f * Theme.fontScale());
             loc.setPadding(Theme.dp(10), Theme.dp(4), Theme.dp(10), Theme.dp(4));
             loc.setMinHeight(Theme.dp(30));
             LinearLayout.LayoutParams lp = a.kit.lp(-2, -2);

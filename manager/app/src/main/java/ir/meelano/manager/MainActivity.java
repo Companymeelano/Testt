@@ -485,7 +485,7 @@ public class MainActivity extends Activity {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        root.setBackgroundColor(Theme.BG);
+        root.setBackground(Theme.background());
 
         // header (two rows): row 1 = logo, company name (up to two lines, never squeezed
         // to a stub) and the status line (link, licence, user); row 2 = a full-width

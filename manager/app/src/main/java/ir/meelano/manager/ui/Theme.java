@@ -246,6 +246,39 @@ public final class Theme {
     }
 
     /** Standard glass card: translucent navy (or ivory) body with a top sheen and gold edge. */
+    private static android.graphics.Bitmap paperGrain;
+
+    /**
+     * Screen background. Dark theme: the flat night colour. Light theme: ivory with a very
+     * faint, repeating linen grain (a few percent alpha), so large cream areas feel like
+     * paper instead of a flat digital fill. The grain tile is generated once and cached.
+     */
+    public static android.graphics.drawable.Drawable background() {
+        android.graphics.drawable.ColorDrawable base = new android.graphics.drawable.ColorDrawable(BG);
+        if (!light) return base;
+        try {
+            if (paperGrain == null) {
+                int size = 96;
+                paperGrain = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888);
+                java.util.Random rnd = new java.util.Random(7);
+                for (int y = 0; y < size; y++)
+                    for (int x = 0; x < size; x++) {
+                        // Fine horizontal and vertical fibres, very low alpha.
+                        int fibre = ((x % 3 == 0) || (y % 4 == 0)) ? 5 : 0;
+                        int a = Math.min(9, fibre + rnd.nextInt(4));
+                        paperGrain.setPixel(x, y, (a << 24) | 0x5A4A2A);
+                    }
+            }
+            android.graphics.drawable.BitmapDrawable tile = new android.graphics.drawable.BitmapDrawable(
+                    null, paperGrain);
+            tile.setTileModeXY(android.graphics.Shader.TileMode.REPEAT, android.graphics.Shader.TileMode.REPEAT);
+            return new android.graphics.drawable.LayerDrawable(
+                    new android.graphics.drawable.Drawable[]{base, tile});
+        } catch (Exception e) {
+            return base;
+        }
+    }
+
     public static android.graphics.drawable.Drawable card() {
         if (light) {
             return glass(0xFFFFFDF8, 0xFFF4ECDA, 22, 70);

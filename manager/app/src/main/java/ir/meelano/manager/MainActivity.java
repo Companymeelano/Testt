@@ -1039,7 +1039,21 @@ public class MainActivity extends Activity {
         refreshChrome();
         scroll.scrollTo(0, 0);
         s.render(content);
+        playPageIn(content);
         playEntrance(content);
+    }
+
+    /** Section change: the new page slides in 18dp from the start side and fades up (220ms). */
+    private void playPageIn(LinearLayout page) {
+        try {
+            if (!ir.meelano.manager.ui.Ui.motionOk(this)) return;
+            page.setAlpha(0f);
+            page.setTranslationX(Theme.dp(18));
+            page.animate().alpha(1f).translationX(0f).setDuration(220)
+                    .setInterpolator(new android.view.animation.DecelerateInterpolator()).start();
+        } catch (Exception e) {
+            Diag.ignored("MainActivity:pageIn", e);
+        }
     }
 
     /**

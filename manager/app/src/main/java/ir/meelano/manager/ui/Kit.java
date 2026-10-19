@@ -424,10 +424,16 @@ public final class Kit {
 
     public String initials(String name) {
         if (name == null || name.trim().isEmpty()) return "؟";
-        String[] parts = name.trim().split("\\s+");
+        // Customer names often start with a code («04مهدي …»): take the first LETTER of each word,
+        // so a digit never becomes the avatar.
         StringBuilder b = new StringBuilder();
-        for (int i = 0; i < Math.min(2, parts.length); i++)
-            if (!parts[i].isEmpty()) b.append(parts[i].charAt(0));
+        for (String part : name.trim().split("\\s+")) {
+            if (b.length() >= 2) break;
+            for (int i = 0; i < part.length(); i++) {
+                char ch = part.charAt(i);
+                if (Character.isLetter(ch)) { b.append(ch); break; }
+            }
+        }
         return b.length() == 0 ? "؟" : b.toString();
     }
 
@@ -841,7 +847,7 @@ public final class Kit {
                 double dv = (c.type == ReportCatalog.T_MONEY || c.type == ReportCatalog.T_NUM) ? r.d(c.key) : 0;
                 int col = dv < -0.0001 ? Theme.DANGER
                         : (c.type == ReportCatalog.T_MONEY ? Theme.TEXT : (c.type == ReportCatalog.T_TEXT ? Theme.TEXT : Theme.MUTED));
-                TextView cell = text(fmtCol(c, r), 11.5f, col, c.type == ReportCatalog.T_MONEY);
+                TextView cell = text(fmtCol(c, r), c.type == ReportCatalog.T_DATE ? 10.5f : 11.5f, col, c.type == ReportCatalog.T_MONEY);
                 cell.setGravity(Gravity.CENTER);
                 if (c.type == ReportCatalog.T_TEXT) {
                     cell.setMaxLines(2);
@@ -870,7 +876,7 @@ public final class Kit {
     private int colWidth(ReportCatalog.Col c) {
         // Wide enough for «۱۰۲٬۷۵۰٬۰۰۰ تومان» at the largest type scale without clipping.
         if (c.type == ReportCatalog.T_MONEY) return 196;
-        if (c.type == ReportCatalog.T_DATE) return 110;
+        if (c.type == ReportCatalog.T_DATE) return 124; // «۱۴۰۵/۰۷/۱۸» must not clip on a phone
         if (c.type == ReportCatalog.T_NUM) return 80;
         return 140;
     }

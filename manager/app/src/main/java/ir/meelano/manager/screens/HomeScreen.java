@@ -75,6 +75,7 @@ public class HomeScreen extends Screen {
         List<Row> overdue = new ArrayList<>();
         List<Row> salesDaily = new ArrayList<>();
         List<Row> buyDaily = new ArrayList<>();
+        List<Row> outDaily = new ArrayList<>();
         List<Row> inDaily = new ArrayList<>();
         List<Row> topItems = new ArrayList<>();
         List<Row> visitors = new ArrayList<>();
@@ -123,6 +124,7 @@ public class HomeScreen extends Screen {
             d.salesDaily = live(token, d.notes, "روند فروش", () -> Repo.exec(c, Queries.factorDaily(m, true, from, to)));
             d.inDaily = live(token, d.notes, "روند دریافت", () -> Repo.exec(c, MoneyQueries.darDaily(m, 0, inFrom, to)));
             d.buyDaily = live(token, d.notes, "روند خرید", () -> Repo.exec(c, Queries.factorDaily(m, false, from, to)));
+            d.outDaily = live(token, d.notes, "روند پرداخت", () -> Repo.exec(c, MoneyQueries.darDaily(m, 1, inFrom, to)));
             Filter todayFilter = new Filter();
             todayFilter.from = to;
             todayFilter.to = to;
@@ -745,6 +747,7 @@ public class HomeScreen extends Screen {
         attachSpark(kpis.get(0), d.salesDaily, d);
         attachSpark(kpis.get(1), d.buyDaily, d);
         attachSpark(kpis.get(2), d.inDaily, d);
+        attachSpark(kpis.get(3), d.outDaily, d);
         content.addView(a.kit.kpiGrid(kpis, 2), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(12));
         if (d.salesDaily != null && !d.salesDaily.isEmpty()) {

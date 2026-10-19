@@ -186,20 +186,33 @@ public final class OfflineVoice {
         new Thread(() -> {
             float[] samples = null;
             int rate = 22050;
+            String problem = null;
             try {
                 OfflineTts t = engine(app);
                 GeneratedAudio audio;
                 synchronized (t) { audio = t.generate(text, 0, 1.0f); }
                 samples = audio.getSamples();
                 rate = audio.getSampleRate();
+                if (samples == null || samples.length == 0) problem = "متنی برای خواندن تولید نشد";
             } catch (Throwable e) {
                 samples = null;
-                ir.meelano.manager.core.Diag.ignored("OfflineVoice:speak", e);
+                problem = e.getMessage() == null ? e.toString() : e.getMessage();
+                Diag.warn("OfflineVoice:speak", e);
+                // Rebuild the engine on the next utterance in case this one left it unusable.
+                synchronized (LOCK) { engine = null; }
             }
             final float[] s = samples;
             final int sr = rate;
+            final String fp = problem;
             MAIN.post(() -> {
-                if (my != seq || s == null) {
+                if (my != seq) {
+                    if (onDone != null) onDone.run();
+                    return;
+                }
+                if (s == null || s.length == 0) {
+                    // Say so on screen instead of failing silently.
+                    android.widget.Toast.makeText(app, "صدای فارسی داخلی خطا داد: " + fp,
+                            android.widget.Toast.LENGTH_LONG).show();
                     if (onDone != null) onDone.run();
                     return;
                 }
@@ -236,6 +249,7 @@ public final class OfflineVoice {
                 if (onDone != null) onDone.run();
             }, ms);
         } catch (Exception e) {
+            Diag.warn("OfflineVoice:play", e);
             if (onDone != null) onDone.run();
         }
     }

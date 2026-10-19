@@ -98,7 +98,9 @@ public final class Speaker {
             post(onDone);
             return;
         }
-        if (cloudOn(a)) {
+        // The built-in Persian voice works offline and needs no key, so it comes first when it is
+        // installed. The natural cloud voice is used only when the built-in voice is not installed.
+        if (!OfflineVoice.installed(a) && cloudOn(a)) {
             speakCloud(a, clean, onDone);
             return;
         }
@@ -163,7 +165,10 @@ public final class Speaker {
             return;
         }
         final String base = chosen.equals(active) ? p.getString("baseUrl", "") : "";
-        final String model = chosen.equals(active) ? p.getString("tts_model", "") : "";
+        // A saved model is used only when it is a speech model (a chat model would fail on every reply).
+        String savedTts = p.getString("tts_model", "").trim();
+        final String model = chosen.equals(active) && savedTts.toLowerCase(java.util.Locale.ROOT).contains("tts")
+                ? savedTts : "";
         // A saved voice name belongs to the active service only; other services use their default voice.
         final String voice = chosen.equals(active) ? p.getString("tts_voice", "") : "";
         final String key = ir.meelano.manager.screens.AiSettings.keyFor(a, chosen);
@@ -175,7 +180,7 @@ public final class Speaker {
                 try (FileOutputStream fo = new FileOutputStream(f)) {
                     fo.write(au.data);
                 }
-                a.runOnUiThread(() -> play(f, onDone));
+                a.runOnUiThread(() -> play(a, f, onDone));
             } catch (Exception e) {
                 Diag.ignored("Speaker:cloud", e);
                 a.runOnUiThread(() -> {
@@ -186,7 +191,7 @@ public final class Speaker {
         }).start();
     }
 
-    private static void play(File f, Runnable onDone) {
+    private static void play(final MainActivity a, File f, Runnable onDone) {
         stopPlayer();
         try {
             MediaPlayer mp = new MediaPlayer();
@@ -199,7 +204,10 @@ public final class Speaker {
             mp.setDataSource(f.getAbsolutePath());
             mp.setOnCompletionListener(m -> stopPlayer());
             mp.setOnErrorListener((m, w, e) -> {
+                Diag.warn("Speaker:play", new IllegalStateException("MediaPlayer " + w + "/" + e));
                 stopPlayer();
+                a.kit.toast("پخش صدای طبیعی ناموفق بود");
+                if (onDone != null) onDone.run();
                 return true;
             });
             mp.prepare();

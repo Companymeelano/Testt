@@ -331,6 +331,16 @@ public final class Kit {
             LinearLayout.LayoutParams p = wlp(1f);
             if (i % span != span - 1) p.setMarginEnd(Theme.dp(10));
             row.addView(tile, p);
+            // Value reveal: each KPI tile settles from 94% with a short stagger (skipped when
+            // the system animations are off).
+            if (Ui.motionOk(a)) {
+                tile.setAlpha(0f);
+                tile.setScaleX(0.94f);
+                tile.setScaleY(0.94f);
+                tile.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(320)
+                        .setStartDelay(i * 60L).setInterpolator(new android.view.animation.DecelerateInterpolator())
+                        .start();
+            }
         }
         return root;
     }

@@ -46,6 +46,14 @@ public final class AiRouter {
         return false;
     }
 
+    /*
+     * Capability plan. The first service with a saved key (built-in or the user's own) answers;
+     * if it fails, is rate-limited, or is rejected, the next one takes over automatically.
+     *   analysis : DeepSeek V4 Pro -> Gemini 2.5 Pro -> OpenAI gpt-4o -> OpenRouter -> GapGPT -> Groq -> Cerebras -> HF
+     *   fast     : Groq llama-3.3-70b -> Cerebras -> Gemini 2.5 Flash -> OpenAI mini -> DeepSeek Flash -> OpenRouter -> GapGPT -> HF
+     *   writing  : Gemini 2.5 Flash -> OpenAI -> DeepSeek Flash -> GapGPT -> OpenRouter -> Groq -> Cerebras -> HF
+     *   general  : the service the user selected, then the priority list above.
+     */
     /** Per-capability preference: the first service with a saved key handles the task. */
     private static final String[] ANALYSIS_ORDER = {
             AiClient.DEEPSEEK, AiClient.GEMINI, AiClient.OPENAI, AiClient.OPENROUTER,

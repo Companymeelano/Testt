@@ -81,6 +81,7 @@ public final class AiClient {
             if ("fast".equals(task) || "writing".equals(task)) return "gemini-2.5-flash";
         }
         if (OPENAI.equals(provider) && "analysis".equals(task)) return "gpt-4o";
+        if (DEEPSEEK.equals(provider) && "analysis".equals(task)) return "deepseek-v4-pro";
         return defaultModel(provider);
     }
 
@@ -91,7 +92,7 @@ public final class AiClient {
         if (CEREBRAS.equals(provider)) return "llama-3.3-70b";
         if (HUGGINGFACE.equals(provider)) return "meta-llama/Llama-3.3-70B-Instruct";
         if (GROQ.equals(provider)) return "llama-3.3-70b-versatile";
-        if (DEEPSEEK.equals(provider)) return "deepseek-chat";
+        if (DEEPSEEK.equals(provider)) return "deepseek-flash";
         if (OPENROUTER.equals(provider)) return "openai/gpt-4o-mini";
         if (GAPGPT.equals(provider)) return "gpt-4o-mini";
         return "";

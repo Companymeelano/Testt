@@ -385,7 +385,7 @@ public class LicenseActivity extends Activity {
             cell.setGravity(Gravity.CENTER);
             boolean done = idx < active;
             boolean on = idx == active;
-            int stepColor = done ? Theme.SUCCESS : (on ? Theme.GOLD : Theme.SURFACE2);
+            int stepColor = done ? Theme.GOLD_SOFT : (on ? Theme.GOLD : Theme.SURFACE2);
             int stepIcon = done ? R.drawable.mi_check
                     : (idx == 1 ? R.drawable.mi_key : (idx == 2 ? R.drawable.mi_database : R.drawable.mi_login));
             android.widget.FrameLayout dot = new android.widget.FrameLayout(this);
@@ -415,7 +415,7 @@ public class LicenseActivity extends Activity {
             }
             if (idx < 3) {
                 View line = new View(this);
-                line.setBackgroundColor(idx < active ? Theme.SUCCESS : Theme.SURFACE2);
+                line.setBackgroundColor(idx < active ? Theme.alpha(CHAMPAGNE, 190) : Theme.alpha(CHAMPAGNE, 44));
                 LinearLayout.LayoutParams llp = new LinearLayout.LayoutParams(0, Theme.dp(3));
                 llp.weight = 1;
                 llp.gravity = Gravity.CENTER_VERTICAL;
@@ -499,7 +499,7 @@ public class LicenseActivity extends Activity {
             fPhone.setInputType(android.text.InputType.TYPE_CLASS_PHONE);
             fPhone.setTextDirection(View.TEXT_DIRECTION_LOCALE);
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:427", ignored); }
-        final TextView tick = kit.text("✓", 18, Theme.SUCCESS, true);
+        final TextView tick = kit.text("✓", 18, Theme.GOLD_SOFT, true);
         try {
             tick.setVisibility(SmsIo.cleanPhone(LicenseStore.contactPhone(this)).length() == 11
                     ? View.VISIBLE : View.INVISIBLE);
@@ -642,7 +642,7 @@ public class LicenseActivity extends Activity {
     private android.widget.Button goldAction(String text, int iconRes, View.OnClickListener l) {
         android.widget.Button b = kit.btnGold(text, l);
         try {
-            b.setBackground(Theme.startButton());
+            b.setBackground(quietStart());
             b.setTextSize(15.5f * Theme.fontScale());
             b.setMinHeight(Theme.dp(56));
             b.setLetterSpacing(0.04f);
@@ -762,8 +762,8 @@ public class LicenseActivity extends Activity {
         try {
             errName.setText(badName ? "نام را وارد کنید" : "");
             errPhone.setText(badPhone ? "شماره تماس معتبر وارد کنید (مثلاً 09123456789)" : "");
-            fName.setBackground(badName ? Theme.fieldBgError() : Theme.fieldBg());
-            fPhone.setBackground(badPhone ? Theme.fieldBgError() : Theme.fieldBg());
+            if (badName) fName.setBackground(Theme.fieldBgError()); else luxField(fName);
+            if (badPhone) fPhone.setBackground(Theme.fieldBgError()); else luxField(fPhone);
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:551", ignored); }
         if (badName || badPhone) {
             try {
@@ -944,7 +944,7 @@ public class LicenseActivity extends Activity {
             root.setBackgroundColor(0xCC0B0E12);
             ConfettiView cf = new ConfettiView(this);
             root.addView(cf, new android.widget.FrameLayout.LayoutParams(-1, -1));
-            TextView big = kit.text("✓", 90, Theme.SUCCESS, true);
+            TextView big = kit.text("✓", 90, Theme.GOLD_SOFT, true);
             big.setGravity(Gravity.CENTER);
             android.widget.FrameLayout.LayoutParams bp =
                     new android.widget.FrameLayout.LayoutParams(-2, -2);

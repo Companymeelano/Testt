@@ -2,6 +2,7 @@ package ir.meelano.manager.core;
 
 import ir.meelano.manager.data.Meta;
 
+import ir.meelano.manager.data.Row;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;

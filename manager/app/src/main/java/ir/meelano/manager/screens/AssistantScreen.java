@@ -219,16 +219,38 @@ public final class AssistantScreen extends Screen {
         return AiSettings.ready(a);
     }
 
+    /** The answer currently being written, and the text view that shows it (updated in place). */
+    private String[] liveSlot;
+    private TextView liveBody;
+
     private void askAi(final String q, final String rule) {
         final String ctx = Assistant.contextBlock(snap);
         aiBusy = true;
+        final String[] slot = {"ai", "…"};
+        liveSlot = slot;
+        liveBody = null;
+        msgs.add(slot);
         redraw();
         new Thread(() -> {
-            String reply = null;
+            final StringBuilder acc = new StringBuilder();
+            final long[] lastShown = {0};
             String err = null;
+            String reply = null;
             try {
-                AiRouter.Result r = AiRouter.complete(a, AiRouter.taskFor(q), SYSTEM_PROMPT,
-                        "داده‌های فروشگاه (امروز):\n" + ctx + "\nسؤال مدیر: " + q);
+                AiRouter.Result r = AiRouter.completeStream(a, AiRouter.taskFor(q), SYSTEM_PROMPT,
+                        "داده‌های فروشگاه (امروز):\n" + ctx + "\nسؤال مدیر: " + q, piece -> {
+                            acc.append(piece);
+                            long now = System.currentTimeMillis();
+                            if (now - lastShown[0] < 70) return;
+                            lastShown[0] = now;
+                            final String shown = acc.toString();
+                            a.runOnUiThread(() -> {
+                                if (liveBody != null && liveSlot == slot) {
+                                    slot[1] = shown;
+                                    liveBody.setText(shown);
+                                }
+                            });
+                        });
                 reply = r.text;
             } catch (Exception e) {
                 err = e.getMessage() == null ? "خطای ناشناخته" : e.getMessage();
@@ -236,10 +258,21 @@ public final class AssistantScreen extends Screen {
             final String fr = reply, fe = err;
             a.runOnUiThread(() -> {
                 aiBusy = false;
+                liveSlot = null;
+                liveBody = null;
                 if (fr != null) {
-                    addAnswer("ai", fr);
+                    slot[0] = "ai";
+                    slot[1] = fr;
                 } else {
-                    addAnswer("bot", "هوش مصنوعی الان جواب نداد (" + fe + ")؛ با اطلاعات خود برنامه جواب می‌دهم.\n" + rule);
+                    slot[0] = "bot";
+                    slot[1] = "هوش مصنوعی الان جواب نداد (" + fe + ")؛ با اطلاعات خود برنامه جواب می‌دهم.\n" + rule;
+                }
+                redraw();
+                String spoken = slot[1];
+                if (liveOn) {
+                    Speaker.speak(a, spoken, this::listenOnce);
+                } else if (speakOn()) {
+                    Speaker.speak(a, spoken, null);
                 }
             });
         }).start();
@@ -377,7 +410,7 @@ public final class AssistantScreen extends Screen {
             root.addView(a.kit.gap(10));
         }
         for (String[] m : msgs) {
-            root.addView(bubble(m[0], m[1]), a.kit.lp(-1, -2));
+            root.addView(bubble(m[0], m[1], m == liveSlot), a.kit.lp(-1, -2));
             root.addView(a.kit.gap(8));
         }
         if (aiBusy) {
@@ -436,7 +469,7 @@ public final class AssistantScreen extends Screen {
     private View aiRow() {
         boolean ready = aiReady();
         String label = ready
-                ? "✦ هوش مصنوعی فعال • " + AiSettings.prefs(a).getString("model", "")
+                ? "✦ هوش مصنوعی فعال"
                 : "✦ هوش مصنوعی خاموش — تنظیم در «تنظیمات»";
         return a.kit.btnGhost(label, Theme.GOLD, v -> {
             SettingsScreen.pendingSection = "ai";
@@ -466,7 +499,7 @@ public final class AssistantScreen extends Screen {
         return p;
     }
 
-    private View bubble(String role, String text) {
+    private View bubble(String role, String text, boolean live) {
         boolean user = "user".equals(role);
         boolean ai = "ai".equals(role);
         int accent = user ? Theme.STEEL : (ai ? Theme.VIOLET : Theme.GOLD);
@@ -478,9 +511,20 @@ public final class AssistantScreen extends Screen {
         body.setLineSpacing(Theme.dp(3), 1f);
         body.setTextIsSelectable(true);
         card.addView(body, a.kit.lp(-1, -2));
-        if (!user) {
+        if (live) liveBody = body;
+        if (!user && !live) {
             card.addView(a.kit.gap(6));
-            card.addView(a.kit.btnGhost("🔊 بخوان", Theme.GOLD, v -> Speaker.speak(a, text, null)), a.kit.lp(-2, -2));
+            boolean reading = Speaker.isSpeaking();
+            card.addView(a.kit.btnGhost(reading ? "■ توقف" : "🔊 بخوان", Theme.GOLD, v -> {
+                if (Speaker.isSpeaking()) {
+                    Speaker.stopAll();
+                    redraw();
+                    return;
+                }
+                a.kit.toast("در حال آماده‌سازی صدا…");
+                Speaker.speak(a, text, this::redraw);
+                redraw();
+            }), a.kit.lp(-2, -2));
         }
         return card;
     }

@@ -98,13 +98,30 @@ public final class Speaker {
             post(onDone);
             return;
         }
-        // The built-in Persian voice works offline and needs no key, so it comes first when it is
-        // installed. The natural cloud voice is used only when the built-in voice is not installed.
-        if (!OfflineVoice.installed(a) && cloudOn(a)) {
-            speakCloud(a, clean, onDone);
+        speaking = true;
+        final Runnable finished = () -> {
+            speaking = false;
+            if (onDone != null) onDone.run();
+        };
+        // Natural Gemini voice first (clearest Persian); the built-in Persian voice when it is off or fails.
+        if (cloudOn(a)) {
+            speakCloud(a, clean, finished);
             return;
         }
-        speakLocal(a, clean, onDone);
+        speakLocal(a, clean, finished);
+    }
+
+    /** True while an answer is being read aloud (or prepared for reading). */
+    private static volatile boolean speaking = false;
+
+    public static boolean isSpeaking() {
+        return speaking;
+    }
+
+    /** Stops whatever is being read, at once. */
+    public static void stopAll() {
+        speaking = false;
+        stopPlayer();
     }
 
     private static void speakLocal(final MainActivity a, final String clean, final Runnable onDone) {

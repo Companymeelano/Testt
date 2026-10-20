@@ -9,11 +9,10 @@ import java.util.List;
 import ir.meelano.manager.screens.AiSettings;
 
 /**
- * Chooses which generative-AI service answers, with automatic failover.
- * The active service is tried first, then the others in a fixed quality order.
- * A service that is rate-limited (429) is paused for 10 minutes; one that
- * rejects its key or its quota (401/403) is paused for an hour. Only services
- * with a saved key are used, so nothing is sent to a service the user did not set up.
+ * Chooses which service answers, with automatic failover between the three services in use:
+ * Gemini, DeepSeek and Groq. Each kind of question has its own order (see the plan below).
+ * A service that is rate-limited (429) is paused for 10 minutes; one that rejects its key
+ * (401/403) is paused for an hour. Only services with a key are used.
  */
 public final class AiRouter {
     private AiRouter() { }
@@ -22,11 +21,19 @@ public final class AiRouter {
     private static final long PAUSE_RATE_MS = 10 * 60_000L;
     private static final long PAUSE_AUTH_MS = 60 * 60_000L;
 
-    /** Fallback order after the active service: fast and capable first. */
-    private static final String[] PRIORITY = {
-            AiClient.GEMINI, AiClient.GROQ, AiClient.CEREBRAS, AiClient.OPENAI, AiClient.DEEPSEEK,
-            AiClient.OPENROUTER, AiClient.GAPGPT, AiClient.HUGGINGFACE, AiClient.GROK
-    };
+    /*
+     * Capability plan. The first service with a key answers; if it fails, is paused, or rejects
+     * the request, the next one takes over.
+     *   analysis : DeepSeek (deepseek-v4-pro) -> Gemini (2.5 Pro) -> Groq
+     *   fast     : Groq (llama 3.3 70B)       -> Gemini (2.5 Flash) -> DeepSeek
+     *   writing  : Gemini (2.5 Flash)         -> DeepSeek -> Groq
+     *   general  : the service the user selected, then the others
+     * Speech is handled by Speaker (Gemini natural voice, then the built-in Persian voice).
+     */
+    private static final String[] ANALYSIS_ORDER = {AiClient.DEEPSEEK, AiClient.GEMINI, AiClient.GROQ};
+    private static final String[] FAST_ORDER = {AiClient.GROQ, AiClient.GEMINI, AiClient.DEEPSEEK};
+    private static final String[] WRITING_ORDER = {AiClient.GEMINI, AiClient.DEEPSEEK, AiClient.GROQ};
+    private static final String[] GENERAL_ORDER = {AiClient.GEMINI, AiClient.DEEPSEEK, AiClient.GROQ};
 
     public static final class Result {
         public final String text;
@@ -38,34 +45,15 @@ public final class AiRouter {
         }
     }
 
-    /** True when at least one service has a key saved. */
+    /** True when at least one service has a key. */
     public static boolean anyKey(Context c) {
-        for (String p : PRIORITY) {
-            if (!AiSettings.keyFor(c, p).isEmpty()) return true;
+        for (String[] n : AiClient.NAMES) {
+            if (!AiSettings.keyFor(c, n[0]).isEmpty()) return true;
         }
         return false;
     }
 
-    /*
-     * Capability plan. The first service with a saved key (built-in or the user's own) answers;
-     * if it fails, is rate-limited, or is rejected, the next one takes over automatically.
-     *   analysis : DeepSeek V4 Pro -> Gemini 2.5 Pro -> OpenAI gpt-4o -> OpenRouter -> GapGPT -> Groq -> Cerebras -> HF
-     *   fast     : Groq llama-3.3-70b -> Cerebras -> Gemini 2.5 Flash -> OpenAI mini -> DeepSeek Flash -> OpenRouter -> GapGPT -> HF
-     *   writing  : Gemini 2.5 Flash -> OpenAI -> DeepSeek Flash -> GapGPT -> OpenRouter -> Groq -> Cerebras -> HF
-     *   general  : the service the user selected, then the priority list above.
-     */
-    /** Per-capability preference: the first service with a saved key handles the task. */
-    private static final String[] ANALYSIS_ORDER = {
-            AiClient.DEEPSEEK, AiClient.GEMINI, AiClient.OPENAI, AiClient.OPENROUTER,
-            AiClient.GAPGPT, AiClient.GROQ, AiClient.CEREBRAS, AiClient.HUGGINGFACE, AiClient.GROK};
-    private static final String[] FAST_ORDER = {
-            AiClient.GROQ, AiClient.CEREBRAS, AiClient.GEMINI, AiClient.OPENAI, AiClient.DEEPSEEK,
-            AiClient.OPENROUTER, AiClient.GAPGPT, AiClient.HUGGINGFACE, AiClient.GROK};
-    private static final String[] WRITING_ORDER = {
-            AiClient.GEMINI, AiClient.OPENAI, AiClient.GAPGPT, AiClient.OPENROUTER,
-            AiClient.DEEPSEEK, AiClient.GROQ, AiClient.CEREBRAS, AiClient.HUGGINGFACE, AiClient.GROK};
-
-    /** Picks the capability from the question: numbers and reasoning, writing, or a quick answer. */
+    /** Picks the capability from the question: writing, analysis, or a quick answer. */
     public static String taskFor(String question) {
         String q = question == null ? "" : question.replace('ي', 'ی').replace('ك', 'ک');
         String[] analysis = {"چرا", "تحلیل", "گزارش", "پیش‌بینی", "پیش بینی", "روند", "سود", "مقایسه",
@@ -80,20 +68,34 @@ public final class AiRouter {
         return complete(c, "general", system, user);
     }
 
+    /** Full answer at once. */
     public static Result complete(Context c, String task, String system, String user) throws Exception {
+        return attempt(c, task, null, (provider, base, model, key) ->
+                AiClient.complete(provider, base, model, key, system, user));
+    }
+
+    /**
+     * Streams the answer. Pieces reach {@code onPiece} as they arrive. If a service fails before
+     * any text was shown, the next service takes over; once text is on screen it is not replaced.
+     */
+    public static Result completeStream(Context c, String task, String system, String user,
+                                        final AiClient.Delta onPiece) throws Exception {
+        final boolean[] started = {false};
+        return attempt(c, task, started, (provider, base, model, key) ->
+                AiClient.stream(provider, base, model, key, system, user, piece -> {
+                    started[0] = true;
+                    if (onPiece != null) onPiece.on(piece);
+                }));
+    }
+
+    private interface Call {
+        String run(String provider, String base, String model, String key) throws Exception;
+    }
+
+    private static Result attempt(Context c, String task, boolean[] started, Call call) throws Exception {
         SharedPreferences p = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         String active = p.getString("provider", AiClient.GEMINI);
-        List<String> order = new ArrayList<>();
-        if ("general".equals(task)) {
-            order.add(active);
-            for (String s : PRIORITY) {
-                if (!s.equals(active)) order.add(s);
-            }
-        } else {
-            String[] pref = "analysis".equals(task) ? ANALYSIS_ORDER
-                    : "writing".equals(task) ? WRITING_ORDER : FAST_ORDER;
-            for (String s : pref) order.add(s);
-        }
+        List<String> order = orderFor(task, active);
         StringBuilder errs = new StringBuilder();
         long now = System.currentTimeMillis();
         for (String provider : order) {
@@ -103,24 +105,36 @@ public final class AiRouter {
                 errs.append(AiClient.nameOf(provider)).append(": موقتاً کنار گذاشته شده؛ ");
                 continue;
             }
-            boolean isActive = provider.equals(active) && "general".equals(task);
-            String savedModel = p.getString("model", "").trim();
-            String model = isActive && !savedModel.isEmpty() ? savedModel : AiClient.modelFor(provider, task);
-            String base = isActive ? p.getString("baseUrl", "") : "";
+            String model = AiClient.modelFor(provider, task);
             try {
-                return new Result(AiClient.complete(provider, base, model, key, system, user), provider);
+                return new Result(call.run(provider, "", model, key), provider);
             } catch (AiClient.ApiError e) {
                 if (e.code == 429) {
                     p.edit().putLong("cool_" + provider, now + PAUSE_RATE_MS).apply();
                 } else if (e.code == 401 || e.code == 403) {
                     p.edit().putLong("cool_" + provider, now + PAUSE_AUTH_MS).apply();
                 }
+                if (started != null && started[0]) throw e;
                 errs.append(AiClient.nameOf(provider)).append(": ").append(e.getMessage()).append("؛ ");
             } catch (Exception e) {
+                if (started != null && started[0]) throw e;
                 errs.append(AiClient.nameOf(provider)).append(": ").append(e.getMessage()).append("؛ ");
             }
         }
         throw new IllegalStateException(errs.length() == 0
                 ? "هیچ کلید هوش مصنوعی ثبت نشده است" : errs.toString());
+    }
+
+    /** The service the user picked goes first for general questions; the plan orders the rest. */
+    private static List<String> orderFor(String task, String active) {
+        List<String> order = new ArrayList<>();
+        String[] pref = "analysis".equals(task) ? ANALYSIS_ORDER
+                : "writing".equals(task) ? WRITING_ORDER
+                : "fast".equals(task) ? FAST_ORDER : GENERAL_ORDER;
+        if ("general".equals(task)) order.add(active);
+        for (String s : pref) {
+            if (!order.contains(s)) order.add(s);
+        }
+        return order;
     }
 }

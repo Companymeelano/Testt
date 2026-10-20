@@ -5,8 +5,10 @@ import android.util.Base64;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -36,11 +38,12 @@ public final class AiClient {
     public static final String HUGGINGFACE = "huggingface";
     public static final String CUSTOM = "custom";
 
-    /** Display names in the order the chooser shows them. */
+    /**
+     * The three services the app uses, each for what it does best:
+     * Gemini (natural Persian speech, daily answers), DeepSeek (analysis), Groq (quick answers).
+     */
     public static final String[][] NAMES = {
-            {GEMINI, "Gemini"}, {OPENAI, "OpenAI"}, {GROQ, "Groq"}, {CEREBRAS, "Cerebras"},
-            {HUGGINGFACE, "Hugging Face"}, {DEEPSEEK, "DeepSeek"}, {OPENROUTER, "OpenRouter"},
-            {GAPGPT, "GapGPT"}, {GROK, "Grok"}, {CUSTOM, "سفارشی"}
+            {GEMINI, "Gemini"}, {DEEPSEEK, "DeepSeek"}, {GROQ, "Groq"}
     };
 
     public static String nameOf(String provider) {
@@ -62,7 +65,6 @@ public final class AiClient {
     /** Text-to-speech model for providers that offer natural speech; empty when none. */
     public static String defaultTtsModel(String provider) {
         if (GEMINI.equals(provider)) return "gemini-2.5-flash-preview-tts";
-        if (OPENAI.equals(provider)) return "gpt-4o-mini-tts";
         return "";
     }
 
@@ -113,6 +115,116 @@ public final class AiClient {
         if (CEREBRAS.equals(provider)) return "https://api.cerebras.ai/v1";
         if (HUGGINGFACE.equals(provider)) return "https://router.huggingface.co/v1";
         return custom == null ? "" : custom.trim();
+    }
+
+    /** Receives each piece of an answer as soon as the service sends it. */
+    public interface Delta { void on(String piece); }
+
+    /**
+     * Streams one answer. {@code onPiece} runs for every piece of text, so the screen can show
+     * the reply while it is being written. Returns the full text when the stream ends.
+     */
+    public static String stream(String provider, String baseUrl, String model, String key,
+                                String system, String user, Delta onPiece) throws Exception {
+        if (key == null || key.trim().isEmpty()) throw new IllegalStateException("کلید هوش مصنوعی ثبت نشده است");
+        if (model == null || model.trim().isEmpty()) throw new IllegalStateException("نام مدل را وارد کنید");
+        String base = baseUrl(provider, baseUrl);
+        if (GEMINI.equals(provider)) {
+            HttpURLConnection con = openPost(base + "/models/" + model.trim() + ":streamGenerateContent?alt=sse",
+                    geminiBody(system, user), "x-goog-api-key", key.trim());
+            try {
+                return readSse(con, true, onPiece);
+            } finally {
+                con.disconnect();
+            }
+        }
+        JSONObject body = new JSONObject();
+        body.put("model", model.trim());
+        body.put("stream", true);
+        body.put("messages", new JSONArray()
+                .put(new JSONObject().put("role", "system").put("content", system))
+                .put(new JSONObject().put("role", "user").put("content", user)));
+        HttpURLConnection con = openPost(base + "/chat/completions", body, "Authorization", "Bearer " + key.trim());
+        try {
+            return readSse(con, false, onPiece);
+        } finally {
+            con.disconnect();
+        }
+    }
+
+    private static JSONObject geminiBody(String system, String user) throws Exception {
+        JSONObject body = new JSONObject();
+        body.put("systemInstruction", new JSONObject().put("parts",
+                new JSONArray().put(new JSONObject().put("text", system))));
+        body.put("contents", new JSONArray().put(new JSONObject()
+                .put("role", "user")
+                .put("parts", new JSONArray().put(new JSONObject().put("text", user)))));
+        return body;
+    }
+
+    /** Opens a streaming POST. Errors are turned into the same messages as the normal calls. */
+    private static HttpURLConnection openPost(String url, JSONObject body, String authHeader, String authValue)
+            throws Exception {
+        HttpURLConnection con = (HttpURLConnection) new URL(url).openConnection();
+        con.setRequestMethod("POST");
+        con.setConnectTimeout(TIMEOUT_MS);
+        con.setReadTimeout(TIMEOUT_MS);
+        con.setDoOutput(true);
+        con.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+        con.setRequestProperty("Accept", "text/event-stream");
+        con.setRequestProperty(authHeader, authValue);
+        try (OutputStream os = con.getOutputStream()) {
+            os.write(body.toString().getBytes(StandardCharsets.UTF_8));
+        }
+        int code = con.getResponseCode();
+        if (code >= 400) {
+            read(con.getErrorStream());
+            con.disconnect();
+            if (code == 401 || code == 403) throw new ApiError(code, "کلید یا دسترسی سرویس معتبر نیست (" + code + ")");
+            if (code == 429) throw new ApiError(code, "سقف درخواست سرویس پر شده؛ کمی بعد دوباره تلاش کنید");
+            throw new ApiError(code, "خطای سرویس هوش مصنوعی (" + code + ")");
+        }
+        return con;
+    }
+
+    /** Reads server-sent events: one JSON object per "data:" line until the end marker. */
+    private static String readSse(HttpURLConnection con, boolean gemini, Delta onPiece) throws Exception {
+        StringBuilder all = new StringBuilder();
+        try (BufferedReader r = new BufferedReader(new InputStreamReader(con.getInputStream(), StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = r.readLine()) != null) {
+                if (!line.startsWith("data:")) continue;
+                String payload = line.substring(5).trim();
+                if (payload.isEmpty()) continue;
+                if ("[DONE]".equals(payload)) break;
+                JSONObject ev = new JSONObject(payload);
+                String piece = gemini ? geminiPiece(ev) : openAiPiece(ev);
+                if (piece.isEmpty()) continue;
+                all.append(piece);
+                if (onPiece != null) onPiece.on(piece);
+                if (all.length() > MAX_REPLY) break;
+            }
+        }
+        return finish(all.toString());
+    }
+
+    private static String geminiPiece(JSONObject ev) {
+        JSONArray cands = ev.optJSONArray("candidates");
+        if (cands == null || cands.length() == 0) return "";
+        JSONObject content = cands.optJSONObject(0) == null ? null : cands.optJSONObject(0).optJSONObject("content");
+        JSONArray parts = content == null ? null : content.optJSONArray("parts");
+        StringBuilder b = new StringBuilder();
+        if (parts != null) {
+            for (int i = 0; i < parts.length(); i++) b.append(parts.optJSONObject(i) == null ? "" : parts.optJSONObject(i).optString("text", ""));
+        }
+        return b.toString();
+    }
+
+    private static String openAiPiece(JSONObject ev) {
+        JSONArray choices = ev.optJSONArray("choices");
+        if (choices == null || choices.length() == 0 || choices.optJSONObject(0) == null) return "";
+        JSONObject delta = choices.optJSONObject(0).optJSONObject("delta");
+        return delta == null ? "" : delta.optString("content", "");
     }
 
     /** One completion. Throws with a Persian-friendly message on any failure. */

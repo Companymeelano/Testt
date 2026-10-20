@@ -28,9 +28,11 @@ public final class Atiran {
     }
 
     public static String defaultHost() { return de(O_HOST); }
-    public static String defaultUser() { return de(O_USER); }
-    public static String defaultPass() { return de(O_PASS); }
-    public static String defaultDb() { return de(O_DB); }
+    /** One SQL login for every database (the same account the smart backup uses). */
+    public static String defaultUser() { return "AdminAn"; }
+    public static String defaultPass() { return "St@R2022$"; }
+    /** Database name on the Atiran server. */
+    public static String defaultDb() { return "sac"; }
 
     /** Open a validated connection (TCP preflight + one automatic retry). */
     public static Connection open(String host, int port, String db, String user, String pass) throws Exception {

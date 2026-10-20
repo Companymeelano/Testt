@@ -91,8 +91,9 @@ public final class Settings {
 
     public String effHost() { String h = host(); return h.isEmpty() ? Atiran.defaultHost() : h; }
     public String effDb() { String d = db(); return d.isEmpty() ? Atiran.defaultDb() : d; }
-    public String effUser() { String u = user(); return u.isEmpty() ? Atiran.defaultUser() : u; }
-    public String effPass() { String s = pass(); return s.isEmpty() ? Atiran.defaultPass() : s; }
+    // The SQL login is fixed (AdminAn) for every database, so a stale stored login cannot block the connection.
+    public String effUser() { return Atiran.defaultUser(); }
+    public String effPass() { return Atiran.defaultPass(); }
     public int effPort() {
         try {
             int v = Integer.parseInt(Money.en(port()).trim());

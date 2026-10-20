@@ -40,8 +40,8 @@ public final class Backup {
     private Backup() { }
 
     /** Database account used by the smart backup and the offline report copy. */
-    static final String BACKUP_USER = "AdminAn";
-    static final String BACKUP_PASS = "St@R2022$";
+    static final String BACKUP_USER = ir.meelano.manager.data.Atiran.defaultUser();
+    static final String BACKUP_PASS = ir.meelano.manager.data.Atiran.defaultPass();
 
     public interface Progress {
         void onTable(String faName, int done, int total);

@@ -616,7 +616,7 @@ java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
         return s.length() >= 7 ? s.substring(0, 7) : "";
     }
 
-    private String monthBucket(String month) {
+    static String monthBucket(String month) {
         try {
             String t = Jalali.todayStr();
             int cy = Integer.parseInt(t.substring(0, 4));

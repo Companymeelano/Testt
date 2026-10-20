@@ -573,6 +573,7 @@ public final class Queries {
         String sum = Sql.pick(cols, "LINESUM", "linesum");
         String disc = Sql.pick(cols, "TafifLine", "litakhma", "TafifAghlam");
         String tax = Sql.pick(cols, "tax", "Tax");
+        String lineNo = Sql.pick(cols, "rdf", "RDF");
         String nameExpr = "COALESCE(" + (invName == null ? "" : Sql.txt("i", invName, 250) + ",")
                 + (lineName == null ? "" : Sql.txt("d", lineName, 250) + ",")
                 + (shka == null ? "N'—'" : Sql.txt("d", shka, 120) + ",N'—'") + ")";
@@ -587,6 +588,7 @@ public final class Queries {
                 + ", " + Sql.num("d", sum) + " AS lineSum"
                 + ", " + Sql.num("d", disc) + " AS discount"
                 + ", " + Sql.num("d", tax) + " AS tax"
+                + (lineNo == null ? ", CAST(NULL AS int) AS lineNo" : ", " + numNull("d", lineNo, "int") + " AS lineNo")
                 + " FROM dbo.[" + line + "] d"
                 + (shka != null && invName != null && invShka != null
                 ? " OUTER APPLY (SELECT TOP (1) ii.[" + invName + "] AS [" + invName + "] FROM dbo.inventory ii"
@@ -595,6 +597,26 @@ public final class Queries {
                 + " WHERE TRY_CONVERT(nvarchar(80),d.[" + linkCol + "])=?"
                 + " ORDER BY d.[" + linkCol + "]";
         return new Q(sql, binds);
+    }
+
+    /**
+     * One invoice line = one (line sequence, item) pair. The same pair returned twice is a copy of
+     * the same stored line, so only the first is kept. Lines without a sequence number are kept as is.
+     * A missing line amount is filled with quantity × unit price.
+     */
+    public static List<Row> distinctLines(List<Row> rows) {
+        List<Row> out = new ArrayList<>();
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        if (rows == null) return out;
+        for (Row r : rows) {
+            if (r.has("lineNo")) {
+                String key = r.s("lineNo") + "|" + r.s("shka");
+                if (!seen.add(key)) continue;
+            }
+            if (Math.abs(r.d("lineSum")) < 0.005) r.put("lineSum", r.d("qtyVah") * r.d("vahPrice"));
+            out.add(r);
+        }
+        return out;
     }
 
     private static String numNull(String alias, String col, String type) {

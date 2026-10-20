@@ -39,6 +39,10 @@ import java.util.zip.ZipOutputStream;
 public final class Backup {
     private Backup() { }
 
+    /** Database account used by the smart backup and the offline report copy. */
+    static final String BACKUP_USER = "AdminAn";
+    static final String BACKUP_PASS = "St@R2022$";
+
     public interface Progress {
         void onTable(String faName, int done, int total);
     }
@@ -74,7 +78,7 @@ public final class Backup {
         new Thread(() -> {
             boolean bound = s.directConn() && NetRoute.bindDirect(app);
             try {
-                try (Connection c = Atiran.open(s.effHost(), s.effPort(), s.effDb(), s.effUser(), s.effPass())) {
+                try (Connection c = Atiran.open(s.effHost(), s.effPort(), s.effDb(), BACKUP_USER, BACKUP_PASS)) {
                     Meta m = new Meta(c);
                     String stamp = new SimpleDateFormat("yyyyMMdd_HHmm", Locale.US).format(new Date());
                     File dir = new File(app.getCacheDir(), "backup");

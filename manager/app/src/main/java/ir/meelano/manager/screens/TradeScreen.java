@@ -439,7 +439,7 @@ public class TradeScreen extends Screen {
         a.repo.run(c -> {
             Meta m = new Meta(c);
             Row head = Repo.one(c, Queries.factorHeader(m, sales, no));
-            List<Row> lines = Repo.exec(c, Queries.factorLines(m, sales, no));
+            List<Row> lines = Queries.distinctLines(Repo.exec(c, Queries.factorLines(m, sales, no)));
             List<Row> dars = new ArrayList<>();
             try {
                 dars = Repo.exec(c, MoneyQueries.invoiceDars(m, sales ? 0 : 1, no));

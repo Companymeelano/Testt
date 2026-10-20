@@ -26,7 +26,7 @@ public final class OfflineReports {
     public static int refresh(Context app) throws Exception {
         Settings s = new Settings(app);
         int saved = 0;
-        try (Connection c = Atiran.open(s.effHost(), s.effPort(), s.effDb(), s.effUser(), s.effPass())) {
+        try (Connection c = Atiran.open(s.effHost(), s.effPort(), s.effDb(), Backup.BACKUP_USER, Backup.BACKUP_PASS)) {
             Meta m = new Meta(c);
             String label = "بکاپ شبانه " + Jalali.faDate(Jalali.todayStr());
             for (ReportCatalog.Spec sp : ReportCatalog.ALL) {

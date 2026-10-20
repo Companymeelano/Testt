@@ -734,7 +734,7 @@ public class CustomersScreen extends Screen {
         a.repo.run(c -> {
             Meta m = new Meta(c);
             Row head = Repo.one(c, Queries.factorHeader(m, true, no));
-            List<Row> lines = Repo.exec(c, Queries.factorLines(m, true, no));
+            List<Row> lines = Queries.distinctLines(Repo.exec(c, Queries.factorLines(m, true, no)));
             List<Row> dars = new ArrayList<>();
             try {
                 dars = Repo.exec(c, MoneyQueries.invoiceDars(m, 0, no));

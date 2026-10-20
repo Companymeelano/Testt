@@ -589,7 +589,9 @@ public final class Queries {
                 + ", " + Sql.num("d", tax) + " AS tax"
                 + " FROM dbo.[" + line + "] d"
                 + (shka != null && invName != null && invShka != null
-                ? " LEFT JOIN dbo.inventory i ON TRY_CONVERT(nvarchar(100),i.[" + invShka + "])=TRY_CONVERT(nvarchar(100),d.[" + shka + "])" : "")
+                ? " OUTER APPLY (SELECT TOP (1) ii.[" + invName + "] AS [" + invName + "] FROM dbo.inventory ii"
+                + " WHERE TRY_CONVERT(nvarchar(100),ii.[" + invShka + "])=TRY_CONVERT(nvarchar(100),d.[" + shka + "])"
+                + " ORDER BY ii.[" + invName + "]) i" : "")
                 + " WHERE TRY_CONVERT(nvarchar(80),d.[" + linkCol + "])=?"
                 + " ORDER BY d.[" + linkCol + "]";
         return new Q(sql, binds);

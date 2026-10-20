@@ -117,15 +117,15 @@ public final class AiSettings {
         card.addView(a.kit.hint(vBest
                 ? "صدای فارسی روی گوشی است و بدون اینترنت پخش می‌شود. این زبان پیش‌فرض صدای دستیار است."
                 : (vInstalled
-                ? "صدای فارسی فعلی روی گوشی است. برای صدای واضح‌تر، نسخهٔ جدید را دانلود کنید."
+                ? "صدای زن فارسی هنوز دانلود نشده است؛ تا آن زمان صدای فعلی خوانده می‌شود."
                 : "یک بار صدای فارسی (حدود ۶۰ مگابایت) از GitHub دانلود می‌شود. بعد از آن بدون اینترنت کار می‌کند.")),
                 a.kit.lp(-1, -2));
         final android.widget.TextView vStatus = a.kit.text(vBest ? "✓ آماده است"
-                : (vInstalled ? "نسخهٔ قدیمی؛ ارتقا را بزنید" : "دانلود نشده"),
+                : (vInstalled ? "صدای فعلی؛ صدای زن را دانلود کنید" : "دانلود نشده"),
                 12f, vBest ? Theme.SUCCESS : Theme.MUTED, true);
         card.addView(vStatus, a.kit.lp(-1, -2));
         if (!vBest) {
-            card.addView(a.kit.btnGhost(vInstalled ? "⬆ ارتقا به صدای فارسی بهتر" : "⬇ دانلود صدای فارسی",
+            card.addView(a.kit.btnGhost(vInstalled ? "⬇ دانلود صدای زن فارسی" : "⬇ دانلود صدای زن فارسی",
                     Theme.VIOLET, v -> {
                 if (OfflineVoice.downloading()) { a.kit.toast("دانلود در حال انجام است"); return; }
                 vStatus.setText("در حال دانلود…");

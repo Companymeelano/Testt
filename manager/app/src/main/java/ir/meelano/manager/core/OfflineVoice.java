@@ -36,10 +36,12 @@ import java.net.URL;
 public final class OfflineVoice {
     private OfflineVoice() { }
 
-    /** Best Persian voice available in the sherpa-onnx release (Piper «reza ibrahim», medium). */
-    public static final String MODEL_NAME = "vits-piper-fa_IR-reza_ibrahim-medium";
-    /** The earlier Persian voice; kept working for devices that already downloaded it. */
-    static final String LEGACY_NAME = "vits-piper-fa_IR-amir-medium";
+    /** Default Persian voice: the female «haaniye» voice from the sherpa-onnx release. */
+    public static final String MODEL_NAME = "vits-piper-fa-haaniye_low";
+    /** Earlier male voices; still used on devices that downloaded them, until the female voice is installed. */
+    static final String[] OLDER_NAMES = {
+            "vits-piper-fa_IR-reza_ibrahim-medium",
+            "vits-piper-fa_IR-amir-medium"};
     public static final String MODEL_URL =
             "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/" + MODEL_NAME + ".tar.bz2";
 
@@ -73,16 +75,27 @@ public final class OfflineVoice {
         return complete(root(c.getApplicationContext()));
     }
 
-    /** True when any Persian voice (the best one or the earlier one) is on the device. */
-    public static boolean installed(Context c) {
-        Context app = c.getApplicationContext();
-        return complete(root(app)) || complete(rootOf(app, LEGACY_NAME));
+    /** The first complete earlier voice on the device, or null. */
+    private static File olderDir(Context app) {
+        for (String n : OLDER_NAMES) {
+            File d = rootOf(app, n);
+            if (complete(d)) return d;
+        }
+        return null;
     }
 
-    /** The folder of the voice to use: the best one when present, otherwise the earlier one. */
+    /** True when any Persian voice (the default one or an earlier one) is on the device. */
+    public static boolean installed(Context c) {
+        Context app = c.getApplicationContext();
+        return complete(root(app)) || olderDir(app) != null;
+    }
+
+    /** The folder of the voice to use: the default one when present, otherwise an earlier one. */
     private static File modelDir(Context c) {
         File best = root(c);
-        return complete(best) ? best : rootOf(c, LEGACY_NAME);
+        if (complete(best)) return best;
+        File older = olderDir(c);
+        return older != null ? older : best;
     }
 
     public static boolean downloading() { return downloading; }
@@ -159,7 +172,7 @@ public final class OfflineVoice {
                 if (!stage.renameTo(root(app))) throw new IOException("ذخیرهٔ مدل ناموفق بود");
                 synchronized (LOCK) { engine = null; }
                 // The better voice replaces the earlier one, so the old files are removed.
-                deleteRec(rootOf(app, LEGACY_NAME));
+                for (String n : OLDER_NAMES) deleteRec(rootOf(app, n));
             } catch (Exception ex) {
                 err = ex.getMessage() == null ? ex.toString() : ex.getMessage();
             } finally {

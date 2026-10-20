@@ -540,6 +540,9 @@ public final class Queries {
         sb.append(" FROM dbo.[").append(table).append("] h").append(custJoin(m, "h", partyCol, "cu"));
         if (sales) sb.append(visJoin(m, "h", visCol, "v"));
         sb.append(" WHERE TRY_CONVERT(nvarchar(80),h.[").append(numberCol).append("])=?");
+        // Atiran keeps every saved version of an invoice (rdf__); the current one is the highest (mili.sql).
+        String verHead = Sql.pick(cols, "rdf__", "RDF__");
+        if (verHead != null) sb.append(" ORDER BY h.[").append(verHead).append("] DESC");
         return new Q(sb.toString(), binds);
     }
 
@@ -563,6 +566,7 @@ public final class Queries {
         Set<String> cols = m.columns(line);
         String linkCol = sales ? Sql.pick(cols, "shfacfo") : Sql.pick(cols, "shfackh", "shfac");
         if (linkCol == null) throw new Missing("ستون ارتباطی اقلام در «" + AtiranSchema.faTitle(line) + "» پیدا نشد");
+        String verCol = Sql.pick(cols, "rdf__", "RDF__");
         String shka = Sql.pick(cols, "SHKA", "shka");
         String lineName = Sql.pick(cols, "naka", "NAKA");
         String invName = m.col("inventory", "naka", "NAKA");
@@ -596,7 +600,11 @@ public final class Queries {
                 + " WHERE TRY_CONVERT(nvarchar(100),ii.[" + invShka + "])=TRY_CONVERT(nvarchar(100),d.[" + shka + "])"
                 + " ORDER BY ii.[" + invName + "]) i" : "")
                 + " WHERE TRY_CONVERT(nvarchar(80),d.[" + linkCol + "])=?"
+                + (verCol == null ? "" : " AND d.[" + verCol + "] = (SELECT MAX(x.[" + verCol + "]) FROM dbo.["
+                + line + "] x WHERE TRY_CONVERT(nvarchar(80),x.[" + linkCol + "])=?)")
                 + " ORDER BY d.[" + linkCol + "]";
+        // Only the current version of the invoice (highest rdf__, as Atiran's own procedures use).
+        if (verCol != null) binds.add(no);
         return new Q(sql, binds);
     }
 

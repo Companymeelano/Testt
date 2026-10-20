@@ -36,7 +36,10 @@ import java.net.URL;
 public final class OfflineVoice {
     private OfflineVoice() { }
 
-    public static final String MODEL_NAME = "vits-piper-fa_IR-amir-medium";
+    /** Best Persian voice available in the sherpa-onnx release (Piper «reza ibrahim», medium). */
+    public static final String MODEL_NAME = "vits-piper-fa_IR-reza_ibrahim-medium";
+    /** The earlier Persian voice; kept working for devices that already downloaded it. */
+    static final String LEGACY_NAME = "vits-piper-fa_IR-amir-medium";
     public static final String MODEL_URL =
             "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/" + MODEL_NAME + ".tar.bz2";
 
@@ -52,15 +55,34 @@ public final class OfflineVoice {
     private static volatile boolean downloading = false;
     private static int seq = 0;
 
-    private static File root(Context c) {
-        return new File(c.getFilesDir(), "tts/" + MODEL_NAME);
+    private static File rootOf(Context c, String name) {
+        return new File(c.getFilesDir(), "tts/" + name);
     }
 
-    /** True when the model files are on the device. */
-    public static boolean installed(Context c) {
-        File d = root(c.getApplicationContext());
+    private static File root(Context c) {
+        return rootOf(c, MODEL_NAME);
+    }
+
+    private static boolean complete(File d) {
         return find(d, ".onnx") != null && new File(d, "tokens.txt").isFile()
                 && new File(d, "espeak-ng-data").isDirectory();
+    }
+
+    /** True when the best Persian voice is on the device. */
+    public static boolean bestInstalled(Context c) {
+        return complete(root(c.getApplicationContext()));
+    }
+
+    /** True when any Persian voice (the best one or the earlier one) is on the device. */
+    public static boolean installed(Context c) {
+        Context app = c.getApplicationContext();
+        return complete(root(app)) || complete(rootOf(app, LEGACY_NAME));
+    }
+
+    /** The folder of the voice to use: the best one when present, otherwise the earlier one. */
+    private static File modelDir(Context c) {
+        File best = root(c);
+        return complete(best) ? best : rootOf(c, LEGACY_NAME);
     }
 
     public static boolean downloading() { return downloading; }
@@ -136,6 +158,8 @@ public final class OfflineVoice {
                 if (parent != null) parent.mkdirs();
                 if (!stage.renameTo(root(app))) throw new IOException("ذخیرهٔ مدل ناموفق بود");
                 synchronized (LOCK) { engine = null; }
+                // The better voice replaces the earlier one, so the old files are removed.
+                deleteRec(rootOf(app, LEGACY_NAME));
             } catch (Exception ex) {
                 err = ex.getMessage() == null ? ex.toString() : ex.getMessage();
             } finally {
@@ -158,7 +182,7 @@ public final class OfflineVoice {
     private static OfflineTts engine(Context app) {
         synchronized (LOCK) {
             if (engine != null) return engine;
-            File d = root(app);
+            File d = modelDir(app);
             // sherpa-onnx AAR config classes are Kotlin data classes: plain setters from Java.
             OfflineTtsVitsModelConfig vits = new OfflineTtsVitsModelConfig();
             vits.setModel(find(d, ".onnx").getAbsolutePath());
@@ -190,7 +214,8 @@ public final class OfflineVoice {
             try {
                 OfflineTts t = engine(app);
                 GeneratedAudio audio;
-                synchronized (t) { audio = t.generate(text, 0, 1.0f); }
+                // Amounts are read as words so the voice says them clearly.
+                synchronized (t) { audio = t.generate(PersianNumbers.speakable(text), 0, 1.0f); }
                 samples = audio.getSamples();
                 rate = audio.getSampleRate();
                 if (samples == null || samples.length == 0) problem = "متنی برای خواندن تولید نشد";

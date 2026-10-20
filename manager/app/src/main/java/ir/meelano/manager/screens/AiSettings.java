@@ -111,17 +111,22 @@ public final class AiSettings {
         card.addView(a.kit.gap(10));
 
         // ---- Persian voice: built-in, offline, one-time download ----
-        card.addView(a.kit.text("🗣 صدای فارسی", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        card.addView(a.kit.text("🗣 صدای فارسی (پیش‌فرض)", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
         final boolean vInstalled = OfflineVoice.installed(a);
-        card.addView(a.kit.hint(vInstalled
+        final boolean vBest = OfflineVoice.bestInstalled(a);
+        card.addView(a.kit.hint(vBest
                 ? "صدای فارسی روی گوشی است و بدون اینترنت پخش می‌شود. این زبان پیش‌فرض صدای دستیار است."
-                : "یک بار مدل صدای فارسی (حدود ۶۰ مگابایت) از GitHub دانلود می‌شود. بعد از آن بدون اینترنت کار می‌کند."),
+                : (vInstalled
+                ? "صدای فارسی فعلی روی گوشی است. برای صدای واضح‌تر، نسخهٔ جدید را دانلود کنید."
+                : "یک بار صدای فارسی (حدود ۶۰ مگابایت) از GitHub دانلود می‌شود. بعد از آن بدون اینترنت کار می‌کند.")),
                 a.kit.lp(-1, -2));
-        final android.widget.TextView vStatus = a.kit.text(vInstalled ? "✓ آماده است" : "دانلود نشده",
-                12f, vInstalled ? Theme.SUCCESS : Theme.MUTED, true);
+        final android.widget.TextView vStatus = a.kit.text(vBest ? "✓ آماده است"
+                : (vInstalled ? "نسخهٔ قدیمی؛ ارتقا را بزنید" : "دانلود نشده"),
+                12f, vBest ? Theme.SUCCESS : Theme.MUTED, true);
         card.addView(vStatus, a.kit.lp(-1, -2));
-        if (!vInstalled) {
-            card.addView(a.kit.btnGhost("⬇ دانلود صدای فارسی", Theme.VIOLET, v -> {
+        if (!vBest) {
+            card.addView(a.kit.btnGhost(vInstalled ? "⬆ ارتقا به صدای فارسی بهتر" : "⬇ دانلود صدای فارسی",
+                    Theme.VIOLET, v -> {
                 if (OfflineVoice.downloading()) { a.kit.toast("دانلود در حال انجام است"); return; }
                 vStatus.setText("در حال دانلود…");
                 OfflineVoice.download(a, pct -> vStatus.setText("در حال دانلود " + pct + "٪"), err -> {
@@ -143,14 +148,14 @@ public final class AiSettings {
         }
         card.addView(a.kit.gap(8));
 
-        card.addView(a.kit.text("🔊 صدای طبیعی", 13.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
-        card.addView(a.kit.hint("صدای طبیعی Gemini به فارسی واضح‌تر و روان‌تر از صدای داخلی است و به اینترنت و کلید Gemini نیاز دارد. "
-                + "اگر در دسترس نبود، صدای داخلی فارسی خوانده می‌شود."), a.kit.lp(-1, -2));
+        card.addView(a.kit.text("🔊 صدای طبیعی Gemini (اختیاری)", 13.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        card.addView(a.kit.hint("به اینترنت و کلید Gemini نیاز دارد و متن پاسخ‌ها را به سرویس می‌فرستد. "
+                + "اگر خاموش باشد، همیشه صدای داخلی فارسی خوانده می‌شود."), a.kit.lp(-1, -2));
         final CheckBox cloudTts = new CheckBox(a);
         cloudTts.setText("استفاده از صدای طبیعی Gemini");
         cloudTts.setTextColor(Theme.TEXT);
         cloudTts.setTextSize(12.5f * Theme.fontScale());
-        cloudTts.setChecked(p.getBoolean("tts_cloud", true));
+        cloudTts.setChecked(p.getBoolean("tts_cloud", false));
         card.addView(cloudTts, a.kit.lp(-1, -2));
         card.addView(a.kit.gap(10));
 

@@ -153,7 +153,7 @@ public final class Speaker {
     public static boolean cloudOn(MainActivity a) {
         android.content.SharedPreferences p = a.getSharedPreferences("meelano_ai", android.content.Context.MODE_PRIVATE);
         String provider = p.getString("provider", "gemini");
-        if (!p.getBoolean("tts_cloud", true) || !p.getBoolean("consent", false)) return false;
+        if (!p.getBoolean("tts_cloud", false) || !p.getBoolean("consent", false)) return false;
         // Natural speech needs a speech-capable service with a key (active or not).
         for (String s : new String[]{provider, AiClient.GEMINI, AiClient.OPENAI}) {
             if (AiClient.hasSpeech(s) && !ir.meelano.manager.screens.AiSettings.keyFor(a, s).isEmpty()) return true;

@@ -22,7 +22,7 @@ public final class CacheStore {
     private CacheStore() { }
 
     private static File dir(Context c) {
-        File d = new File(c.getCacheDir(), "mcache");
+        File d = new File(c.getFilesDir(), "mcache");
         try {
             if (!d.exists()) d.mkdirs();
         } catch (Exception ignored) { Diag.ignored("CacheStore:28", ignored); }
@@ -53,7 +53,7 @@ public final class CacheStore {
                 } else if (v instanceof List) {
                     StringBuilder b = new StringBuilder();
                     List<?> rows = (List<?>) v;
-                    int cap = Math.min(rows.size(), 400);
+                    int cap = Math.min(rows.size(), 20000);
                     for (int i = 0; i < cap; i++) {
                         Object o = rows.get(i);
                         if (o instanceof Row) b.append(rowStr((Row) o)).append('\n');

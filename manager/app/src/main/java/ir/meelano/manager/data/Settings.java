@@ -355,6 +355,11 @@ public final class Settings {
 
     public void setAbOn(boolean on) { p.edit().putBoolean("ab_on", on).apply(); }
 
+    /** Offline mode: reports are read from the last nightly copy kept on the phone. */
+    public boolean offlineMode() { return p.getBoolean("offline_mode", false); }
+
+    public void setOfflineMode(boolean on) { p.edit().putBoolean("offline_mode", on).apply(); }
+
     /** Nightly auto-backup hour, 0..23 (default 2 AM). */
     public int abHour() {
         try {

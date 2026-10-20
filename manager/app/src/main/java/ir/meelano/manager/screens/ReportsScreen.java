@@ -447,20 +447,8 @@ public class ReportsScreen extends Screen {
         content.addView(a.kit.loading("در حال تهیه گزارش…"), a.kit.lp(-1, -2));
         final Filter f = filter.copy();
         // Offline copy is keyed by the range and search, so a cached report never shows another period.
-        final String cacheKey = "cx_rep_" + spec.id + "_"
-                + Integer.toHexString((f.from + "|" + f.to + "|" + f.search + "|" + f.status).hashCode());
-
-        a.repo.run(c -> {
-            Meta m = new Meta(c);
-            List<Row> rows = Repo.exec(c, ReportCatalog.query(m, spec.id, f));
-            if ("yoy_sales".equals(spec.id)) rows = mapYoY(rows);
-            if ("aging".equals(spec.id)) mapAging(rows, m);
-            if ("unsettled".equals(spec.id)) mapUnsettled(rows);
-            if ("fleeing_customers".equals(spec.id)) mapFleeing(rows);
-            if ("dying_stock".equals(spec.id)) rows = mapDying(rows);
-            if ("fresh_debtors".equals(spec.id)) rows = mapFresh(rows);
-            return rows;
-        }, new Repo.Cb<List<Row>>() {
+        final String cacheKey = cacheKey(spec.id, f);
+        final Repo.Cb<List<Row>> cb = new Repo.Cb<List<Row>>() {
             @Override
             public void ok(List<Row> rows) {
 java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
@@ -490,11 +478,37 @@ java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
                         || faError.contains("تأیید نشده") || faError.contains("قابل تشخیص"));
                 content.addView(schemaGap ? a.kit.unavailable(msg) : a.kit.error(msg, () -> render(content)), a.kit.lp(-1, -2));
             }
-        });
+        };
+        // Offline mode: the report comes from the last nightly copy on the phone, never from the server.
+        if (a.settings.offlineMode()) cb.fail(OFFLINE_MISS);
+        else a.repo.run(c -> {
+            Meta m = new Meta(c);
+            return applyMaps(m, spec.id, Repo.exec(c, ReportCatalog.query(m, spec.id, f)));
+        }, cb);
+    }
+
+    /** Shown when offline and no nightly copy of this report exists yet. */
+    static final String OFFLINE_MISS = "حالت آفلاین: این گزارش در بکاپ شبانه روی گوشی نیست؛ یک‌بار با اتصال باز کنید";
+
+    /** Report-specific shaping shared by the live screen and the nightly offline copy. */
+    public static List<Row> applyMaps(Meta m, String id, List<Row> rows) {
+        if ("yoy_sales".equals(id)) rows = mapYoY(rows);
+        if ("aging".equals(id)) mapAging(rows, m);
+        if ("unsettled".equals(id)) mapUnsettled(rows);
+        if ("fleeing_customers".equals(id)) mapFleeing(rows);
+        if ("dying_stock".equals(id)) rows = mapDying(rows);
+        if ("fresh_debtors".equals(id)) rows = mapFresh(rows);
+        return rows;
+    }
+
+    /** Key of an offline report copy: id plus range and search, so periods never mix. */
+    public static String cacheKey(String id, Filter f) {
+        return "cx_rep_" + id + "_"
+                + Integer.toHexString((f.from + "|" + f.to + "|" + f.search + "|" + f.status).hashCode());
     }
 
     /** Without dif_date_alan the server sends days=−1: derive the delay from the due date. */
-    private void mapUnsettled(List<Row> rows) {
+    static void mapUnsettled(List<Row> rows) {
         if (rows == null) return;
         String today = Jalali.todayStr();
         for (Row r : rows) {
@@ -506,7 +520,7 @@ java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
     }
 
     /** Fleeing customers: the server sends daysAway=−1; derive it from the last-buy date. */
-    private void mapFleeing(List<Row> rows) {
+    static void mapFleeing(List<Row> rows) {
         if (rows == null) return;
         String today = Jalali.todayStr();
         for (Row r : rows) {
@@ -518,7 +532,7 @@ java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
     }
 
     /** Normalize aging rows (k-based or month-based) into bucket/amount/count. */
-    private void mapAging(List<Row> rows, Meta m) {
+    static void mapAging(List<Row> rows, Meta m) {
         boolean useK = m.function("dif_date_alan");
         for (Row r : rows) {
             if (useK && r.has("k")) {
@@ -535,7 +549,7 @@ java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
     }
 
     /** Urgent only: items running out within 7 days (or already out), soonest first. */
-    private List<Row> mapDying(List<Row> rows) {
+    static List<Row> mapDying(List<Row> rows) {
         List<Row> out = new ArrayList<>();
         if (rows == null) return out;
         for (Row r : rows) {
@@ -547,7 +561,7 @@ java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
     }
 
     /** Fresh debtors: bought within the last 30 days. */
-    private List<Row> mapFresh(List<Row> rows) {
+    static List<Row> mapFresh(List<Row> rows) {
         List<Row> out = new ArrayList<>();
         if (rows == null) return out;
         String cut = "";
@@ -562,7 +576,7 @@ java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
     }
 
     /** Merge ~24 monthly rows into 12 month rows: this year vs last year + growth %. */
-    private List<Row> mapYoY(List<Row> rows) {
+    static List<Row> mapYoY(List<Row> rows) {
         List<Row> out = new ArrayList<>();
         if (rows == null) return out;
         String y1 = "";

@@ -434,6 +434,15 @@ public class SettingsScreen extends Screen {
                     a.kit.lp(-1, -2));
         }
         a.kit.addCard(content, auto);
+
+        LinearLayout off = a.kit.card(Theme.GOLD);
+        final boolean offm = a.settings.offlineMode();
+        addRow(off, toggleRow("حالت آفلاین (حافظه گوشی)", "گزارش‌ها از آخرین بکاپ شبانه روی گوشی خوانده می‌شوند", offm, Theme.GOLD, v -> {
+            a.settings.setOfflineMode(!offm);
+            a.kit.toast(!offm ? "حالت آفلاین روشن شد" : "حالت آفلاین خاموش شد");
+            render(content);
+        }));
+        a.kit.addCard(content, off);
     }
 
     private void buildSecurity(final LinearLayout content) {

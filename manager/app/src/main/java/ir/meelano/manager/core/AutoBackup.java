@@ -125,6 +125,9 @@ final class AutoBackupReceiver extends BroadcastReceiver {
                     try {
                         fs.saveBackupInfo(Jalali.faDate(Jalali.todayStr()), Backup.sizeFa(bytes));
                         AutoBackup.notifyResult(app, true, Backup.sizeFa(bytes));
+                        new Thread(() -> {
+                            try { OfflineReports.refresh(app); } catch (Exception ignored) { Diag.ignored("AutoBackup:offline", ignored); }
+                        }, "offline-copy").start();
                     } catch (Exception ignored) { Diag.ignored("AutoBackup:128", ignored); } finally {
                         finishPr(pr);
                     }

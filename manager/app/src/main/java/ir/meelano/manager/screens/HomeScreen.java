@@ -106,10 +106,20 @@ public class HomeScreen extends Screen {
             this.m = new Meta(c);
         }
 
+        /** Probes the link with SELECT 1 (jTDS does not implement Connection.isValid). */
         void ensure(Repo repo) {
+            boolean alive;
+            try (java.sql.Statement st = c.createStatement()) {
+                st.setQueryTimeout(5);
+                st.execute("SELECT 1");
+                alive = true;
+            } catch (Throwable e) {
+                alive = false;
+            }
+            if (alive) return;
             try {
-                if (c == null || c.isClosed() || !c.isValid(3)) reopen(repo);
-            } catch (Exception e) {
+                reopen(repo);
+            } catch (Throwable e) {
                 Diag.ignored("HomeScreen:ensure", e);
             }
         }

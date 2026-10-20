@@ -59,6 +59,11 @@ public final class Repo {
         runOpener(() -> SmartLink.open(appCtx, settings), t, cb);
     }
 
+    /** Opens a fresh connection on the same route, for a long task whose link dropped mid-way. */
+    public Connection reopen() throws Exception {
+        return SmartLink.open(appCtx, settings);
+    }
+
     /** Same as {@link #run}, but against explicit connection values (tests unsaved settings). */
     public <T> void runWith(final String host, final int port, final String db,
                             final String user, final String pass, final Task<T> t, final Cb<T> cb) {

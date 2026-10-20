@@ -96,6 +96,69 @@ public class HomeScreen extends Screen {
         return soft(notes, key, t);
     }
 
+    /** Holds the dashboard's live connection; reopens it if the link dropped during the long load. */
+    private static final class Link {
+        java.sql.Connection c;
+        Meta m;
+
+        Link(java.sql.Connection c) {
+            this.c = c;
+            this.m = new Meta(c);
+        }
+
+        void ensure(Repo repo) {
+            try {
+                if (c == null || c.isClosed() || !c.isValid(3)) reopen(repo);
+            } catch (Exception e) {
+                Diag.ignored("HomeScreen:ensure", e);
+            }
+        }
+
+        void reopen(Repo repo) throws Exception {
+            java.sql.Connection old = c;
+            c = repo.reopen();
+            m = new Meta(c);
+            if (old != null) {
+                try { old.close(); } catch (Exception e) { Diag.ignored("HomeScreen:close", e); }
+            }
+        }
+
+        /** True when the failure came from the connection itself (not from the query). */
+        static boolean dropped(Throwable e) {
+            for (Throwable t = e; t != null; t = t.getCause()) {
+                if (t instanceof java.sql.SQLException) {
+                    String st = ((java.sql.SQLException) t).getSQLState();
+                    if (st != null && (st.startsWith("08") || st.equals("HY010"))) return true;
+                }
+                String msg = String.valueOf(t.getMessage()).toLowerCase(Locale.US);
+                if (msg.contains("connection object is closed") || msg.contains("connection is closed")
+                        || msg.contains("communication link") || msg.contains("connection reset")) return true;
+            }
+            return false;
+        }
+    }
+
+    /** Like live(), but on a dropped link it reopens the connection and runs the section once more. */
+    private <T> T liveL(final int token, final Link L, Map<String, String> notes, String key, Soft<T> t) {
+        if (a.renderGen() != token) return null;
+        L.ensure(a.repo);
+        try {
+            return t.run();
+        } catch (Exception first) {
+            if (!Link.dropped(first)) {
+                notes.put(key, first instanceof Queries.Missing ? first.getMessage() : ir.meelano.manager.data.Atiran.diagnose(first));
+                return null;
+            }
+            try {
+                L.reopen(a.repo);
+                return t.run();
+            } catch (Exception again) {
+                notes.put(key, again instanceof Queries.Missing ? again.getMessage() : ir.meelano.manager.data.Atiran.diagnose(again));
+                return null;
+            }
+        }
+    }
+
     @Override
     public void render(final LinearLayout content) {
         content.removeAllViews();
@@ -105,45 +168,45 @@ public class HomeScreen extends Screen {
         content.addView(a.kit.loading("در حال دریافت داشبورد مدیریتی…"), a.kit.lp(-1, -2));
 
         final int token = a.renderGen();
-        a.repo.run(c -> {
-            Meta m = new Meta(c);
+        a.repo.run(c0 -> {
+            final Link L = new Link(c0);
             Data d = new Data();
-            d.salesDay = live(token, d.notes, "فروش روز", () -> Repo.one(c, Queries.homeSalesDay(m)));
-            d.buyDay = live(token, d.notes, "خرید روز", () -> Repo.one(c, Queries.homeBuyDay(m)));
-            d.inDay = live(token, d.notes, "دریافت روز", () -> Repo.one(c, MoneyQueries.darDay(m, 0)));
-            d.outDay = live(token, d.notes, "پرداخت روز", () -> Repo.one(c, MoneyQueries.darDay(m, 1)));
-            d.custSum = live(token, d.notes, "خلاصه مشتریان", () -> Repo.one(c, MasterQueries.customersSummary(m)));
-            d.debtors = live(token, d.notes, "بدهکاران", () -> Repo.exec(c, Queries.topDebtors(m, 5)));
-            d.overdue = live(token, d.notes, "معوق‌ها", () -> Repo.exec(c, Queries.overdueInvoices(m, 5)));
+            d.salesDay = liveL(token, L, d.notes, "فروش روز", () -> Repo.one(L.c, Queries.homeSalesDay(L.m)));
+            d.buyDay = liveL(token, L, d.notes, "خرید روز", () -> Repo.one(L.c, Queries.homeBuyDay(L.m)));
+            d.inDay = liveL(token, L, d.notes, "دریافت روز", () -> Repo.one(L.c, MoneyQueries.darDay(L.m, 0)));
+            d.outDay = liveL(token, L, d.notes, "پرداخت روز", () -> Repo.one(L.c, MoneyQueries.darDay(L.m, 1)));
+            d.custSum = liveL(token, L, d.notes, "خلاصه مشتریان", () -> Repo.one(L.c, MasterQueries.customersSummary(L.m)));
+            d.debtors = liveL(token, L, d.notes, "بدهکاران", () -> Repo.exec(L.c, Queries.topDebtors(L.m, 5)));
+            d.overdue = liveL(token, L, d.notes, "معوق‌ها", () -> Repo.exec(L.c, Queries.overdueInvoices(L.m, 5)));
             final String to = Jalali.todayStr();
             d.snapshotDay = to;
             // 31 calendar days let the executive overview compare today against
             // yesterday plus rolling 7- and 30-day baselines; the chart itself stays 14 days.
             final String from = Jalali.addDays(to, -30);
             final String inFrom = Jalali.addDays(to, -13);
-            d.salesDaily = live(token, d.notes, "روند فروش", () -> Repo.exec(c, Queries.factorDaily(m, true, from, to)));
-            d.inDaily = live(token, d.notes, "روند دریافت", () -> Repo.exec(c, MoneyQueries.darDaily(m, 0, inFrom, to)));
-            d.buyDaily = live(token, d.notes, "روند خرید", () -> Repo.exec(c, Queries.factorDaily(m, false, from, to)));
-            d.outDaily = live(token, d.notes, "روند پرداخت", () -> Repo.exec(c, MoneyQueries.darDaily(m, 1, inFrom, to)));
+            d.salesDaily = liveL(token, L, d.notes, "روند فروش", () -> Repo.exec(L.c, Queries.factorDaily(L.m, true, from, to)));
+            d.inDaily = liveL(token, L, d.notes, "روند دریافت", () -> Repo.exec(L.c, MoneyQueries.darDaily(L.m, 0, inFrom, to)));
+            d.buyDaily = liveL(token, L, d.notes, "روند خرید", () -> Repo.exec(L.c, Queries.factorDaily(L.m, false, from, to)));
+            d.outDaily = liveL(token, L, d.notes, "روند پرداخت", () -> Repo.exec(L.c, MoneyQueries.darDaily(L.m, 1, inFrom, to)));
             Filter todayFilter = new Filter();
             todayFilter.from = to;
             todayFilter.to = to;
             todayFilter.top = 5;
-            d.topItems = live(token, d.notes, "پرفروش‌ترین کالاهای امروز",
-                    () -> Repo.exec(c, Queries.factorTopProducts(m, true, todayFilter, 5)));
+            d.topItems = liveL(token, L, d.notes, "پرفروش‌ترین کالاهای امروز",
+                    () -> Repo.exec(L.c, Queries.factorTopProducts(L.m, true, todayFilter, 5)));
             Filter vf = new Filter();
             vf.preset = Filter.P_LAST30;
             vf.applyPreset();
-            d.visitors = live(token, d.notes, "ویزیتورها", () -> Repo.exec(c, MasterQueries.visitorsPerf(m, vf)));
-            d.dueIn = live(token, d.notes, "سررسید دریافتی", () -> Repo.exec(c, MoneyQueries.chequeDue(m, true, 3)));
-            d.dueOut = live(token, d.notes, "سررسید پرداختی", () -> Repo.exec(c, MoneyQueries.chequeDue(m, false, 3)));
+            d.visitors = liveL(token, L, d.notes, "ویزیتورها", () -> Repo.exec(L.c, MasterQueries.visitorsPerf(L.m, vf)));
+            d.dueIn = liveL(token, L, d.notes, "سررسید دریافتی", () -> Repo.exec(L.c, MoneyQueries.chequeDue(L.m, true, 3)));
+            d.dueOut = liveL(token, L, d.notes, "سررسید پرداختی", () -> Repo.exec(L.c, MoneyQueries.chequeDue(L.m, false, 3)));
             String stFrom = Jalali.addDays(to, -29);
-            d.saleState = live(token, d.notes, "وضعیت فروش", () -> Repo.exec(c, Queries.factorStatusSummary(m, true, stFrom, to)));
-            d.buyState = live(token, d.notes, "وضعیت خرید", () -> Repo.exec(c, Queries.factorStatusSummary(m, false, stFrom, to)));
+            d.saleState = liveL(token, L, d.notes, "وضعیت فروش", () -> Repo.exec(L.c, Queries.factorStatusSummary(L.m, true, stFrom, to)));
+            d.buyState = liveL(token, L, d.notes, "وضعیت خرید", () -> Repo.exec(L.c, Queries.factorStatusSummary(L.m, false, stFrom, to)));
             Filter rf = new Filter();
             rf.from = stFrom;
             rf.to = to;
-            d.returns = live(token, d.notes, "برگشتی", () -> Repo.exec(c, MasterQueries.returnsByKind(m, rf)));
+            d.returns = liveL(token, L, d.notes, "برگشتی", () -> Repo.exec(L.c, MasterQueries.returnsByKind(L.m, rf)));
             if (d.salesDay == null && d.inDay == null && d.custSum == null && d.buyDay == null && d.outDay == null)
                 throw new Exception(firstNote(d.notes));
             return d;

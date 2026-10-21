@@ -540,6 +540,7 @@ public final class Queries {
         sb.append(" FROM dbo.[").append(table).append("] h").append(custJoin(m, "h", partyCol, "cu"));
         if (sales) sb.append(visJoin(m, "h", visCol, "v"));
         sb.append(" WHERE TRY_CONVERT(nvarchar(80),h.[").append(numberCol).append("])=?");
+        sb.append(Sql.activeAnd(cols, "h"));
         // Atiran keeps every saved version of an invoice (rdf__); the current one is the highest (mili.sql).
         String verHead = Sql.pick(cols, "rdf__", "RDF__");
         if (verHead != null) sb.append(" ORDER BY h.[").append(verHead).append("] DESC");
@@ -575,7 +576,7 @@ public final class Queries {
         String qtyJ = Sql.pick(cols, "TEDJOZ", "tedjoz");
         String vp = Sql.pick(cols, "VAHPRICE", "vahprice");
         String jp = Sql.pick(cols, "JOZPRICE", "jozprice");
-        String sum = Sql.pick(cols, "LINESUM", "linesum");
+        String sum = Sql.pick(cols, "LINESUM", "linesum", "tamam_joz");
         String disc = Sql.pick(cols, "TafifLine", "litakhma", "TafifAghlam");
         String tax = Sql.pick(cols, "tax", "Tax");
         String lineNo = Sql.pick(cols, "rdf", "RDF");
@@ -602,6 +603,7 @@ public final class Queries {
                 + " WHERE TRY_CONVERT(nvarchar(80),d.[" + linkCol + "])=?"
                 + (verCol == null ? "" : " AND d.[" + verCol + "] = (SELECT MAX(x.[" + verCol + "]) FROM dbo.["
                 + line + "] x WHERE TRY_CONVERT(nvarchar(80),x.[" + linkCol + "])=?)")
+                + Sql.activeAnd(cols, "d")
                 + " ORDER BY d.[" + linkCol + "]";
         // Only the current version of the invoice (highest rdf__, as Atiran's own procedures use).
         if (verCol != null) binds.add(no);
@@ -715,7 +717,7 @@ public final class Queries {
         if (sub.isEmpty()) throw new Missing("«" + AtiranSchema.faTitle(line) + "» در دیتابیس پیدا نشد");
         String linkCol = sales ? m.must(line, "شماره فاکتور", "shfacfo") : m.must(line, "شماره فاکتور", "shfackh", "shfac");
         String shka = m.must(line, "کد کالا", "SHKA", "shka");
-        String sum = Sql.pick(sub, "LINESUM", "linesum");
+        String sum = Sql.pick(sub, "LINESUM", "linesum", "tamam_joz");
         String qty = Sql.pick(sub, "TEDVAH", "tedvah");
         String invShka = m.col("inventory", "SHKA", "shka");
         String grp = m.col("inventory", "group_rdf");
@@ -752,7 +754,7 @@ public final class Queries {
         if (sub.isEmpty()) throw new Missing("«" + AtiranSchema.faTitle(line) + "» در دیتابیس پیدا نشد");
         String linkCol = sales ? m.must(line, "شماره فاکتور", "shfacfo") : m.must(line, "شماره فاکتور", "shfackh", "shfac");
         String shka = m.must(line, "کد کالا", "SHKA", "shka");
-        String sum = Sql.pick(sub, "LINESUM", "linesum");
+        String sum = Sql.pick(sub, "LINESUM", "linesum", "tamam_joz");
         String qty = Sql.pick(sub, "TEDVAH", "tedvah");
         String invName = m.col("inventory", "naka", "NAKA");
         String invShka = m.col("inventory", "SHKA", "shka");

@@ -171,87 +171,168 @@ public class HomeScreen extends Screen {
 
     @Override
     public void render(final LinearLayout content) {
-        content.removeAllViews();
-        content.addView(greetingHero(), a.kit.lp(-1, -2));
-        content.addView(a.kit.gap(10));
-        content.addView(a.kit.gap(6));
-        content.addView(a.kit.loading("در حال دریافت داشبورد مدیریتی…"), a.kit.lp(-1, -2));
-
         final int token = a.renderGen();
-        a.repo.run(c0 -> {
-            final Link L = new Link(c0);
-            Data d = new Data();
-            d.salesDay = liveL(token, L, d.notes, "فروش روز", () -> Repo.one(L.c, Queries.homeSalesDay(L.m)));
-            d.buyDay = liveL(token, L, d.notes, "خرید روز", () -> Repo.one(L.c, Queries.homeBuyDay(L.m)));
-            d.inDay = liveL(token, L, d.notes, "دریافت روز", () -> Repo.one(L.c, MoneyQueries.darDay(L.m, 0)));
-            d.outDay = liveL(token, L, d.notes, "پرداخت روز", () -> Repo.one(L.c, MoneyQueries.darDay(L.m, 1)));
-            d.custSum = liveL(token, L, d.notes, "خلاصه مشتریان", () -> Repo.one(L.c, MasterQueries.customersSummary(L.m)));
-            d.debtors = liveL(token, L, d.notes, "بدهکاران", () -> Repo.exec(L.c, Queries.topDebtors(L.m, 5)));
-            d.overdue = liveL(token, L, d.notes, "معوق‌ها", () -> Repo.exec(L.c, Queries.overdueInvoices(L.m, 5)));
-            final String to = Jalali.todayStr();
-            d.snapshotDay = to;
-            // 31 calendar days let the executive overview compare today against
-            // yesterday plus rolling 7- and 30-day baselines; the chart itself stays 14 days.
-            final String from = Jalali.addDays(to, -30);
-            final String inFrom = Jalali.addDays(to, -13);
-            d.salesDaily = liveL(token, L, d.notes, "روند فروش", () -> Repo.exec(L.c, Queries.factorDaily(L.m, true, from, to)));
-            d.inDaily = liveL(token, L, d.notes, "روند دریافت", () -> Repo.exec(L.c, MoneyQueries.darDaily(L.m, 0, inFrom, to)));
-            d.buyDaily = liveL(token, L, d.notes, "روند خرید", () -> Repo.exec(L.c, Queries.factorDaily(L.m, false, from, to)));
-            d.outDaily = liveL(token, L, d.notes, "روند پرداخت", () -> Repo.exec(L.c, MoneyQueries.darDaily(L.m, 1, inFrom, to)));
-            Filter todayFilter = new Filter();
-            todayFilter.from = to;
-            todayFilter.to = to;
-            todayFilter.top = 5;
-            d.topItems = liveL(token, L, d.notes, "پرفروش‌ترین کالاهای امروز",
-                    () -> Repo.exec(L.c, Queries.factorTopProducts(L.m, true, todayFilter, 5)));
-            Filter vf = new Filter();
-            vf.preset = Filter.P_LAST30;
-            vf.applyPreset();
-            d.visitors = liveL(token, L, d.notes, "ویزیتورها", () -> Repo.exec(L.c, MasterQueries.visitorsPerf(L.m, vf)));
-            d.dueIn = liveL(token, L, d.notes, "سررسید دریافتی", () -> Repo.exec(L.c, MoneyQueries.chequeDue(L.m, true, 3)));
-            d.dueOut = liveL(token, L, d.notes, "سررسید پرداختی", () -> Repo.exec(L.c, MoneyQueries.chequeDue(L.m, false, 3)));
-            String stFrom = Jalali.addDays(to, -29);
-            d.saleState = liveL(token, L, d.notes, "وضعیت فروش", () -> Repo.exec(L.c, Queries.factorStatusSummary(L.m, true, stFrom, to)));
-            d.buyState = liveL(token, L, d.notes, "وضعیت خرید", () -> Repo.exec(L.c, Queries.factorStatusSummary(L.m, false, stFrom, to)));
-            Filter rf = new Filter();
-            rf.from = stFrom;
-            rf.to = to;
-            d.returns = liveL(token, L, d.notes, "برگشتی", () -> Repo.exec(L.c, MasterQueries.returnsByKind(L.m, rf)));
-            if (d.salesDay == null && d.inDay == null && d.custSum == null && d.buyDay == null && d.outDay == null)
-                throw new Exception(firstNote(d.notes));
-            return d;
-        }, new Repo.Cb<Data>() {
+        // Smart first paint: the last saved dashboard appears at once and live data replaces it when ready.
+        final String[] cachedTs = {""};
+        final Data cached = loadCached(cachedTs);
+        if (cached != null) {
+            build(content, cached);
+            LinearLayout hint = a.kit.card(Theme.WARNING);
+            hint.addView(a.kit.text("⟳ در حال به‌روزرسانی داشبورد…", 12f, Theme.TEXT, true), a.kit.lp(-1, -2));
+            if (!cachedTs[0].isEmpty())
+                hint.addView(a.kit.kv("آخرین داده ذخیره‌شده", Money.fa(cachedTs[0]), Theme.MUTED), a.kit.lp(-1, -2));
+            content.addView(hint, 0);
+            content.addView(a.kit.gap(10), 1);
+        } else {
+            content.removeAllViews();
+            content.addView(greetingHero(), a.kit.lp(-1, -2));
+            content.addView(a.kit.gap(10));
+            content.addView(a.kit.gap(6));
+            content.addView(a.kit.loading("در حال دریافت داشبورد مدیریتی…"), a.kit.lp(-1, -2));
+        }
+
+        // Two groups run in parallel on their own connections (the runner has three workers).
+        final Data shared = new Data();
+        final int[] left = {2};
+        final boolean[] kpiOk = {false};
+        final String[] kpiErr = {null};
+        final Runnable settle = () -> {
+            if (a.renderGen() != token) return;
+            if (kpiOk[0]) {
+                saveCache(shared);
+                build(content, shared);
+            } else {
+                showFailure(content, kpiErr[0], cached);
+            }
+        };
+        final Runnable[] done = {null};
+        done[0] = () -> { if (--left[0] == 0) settle.run(); };
+
+        a.repo.run(c0 -> loadKpis(token, c0), new Repo.Cb<Data>() {
             @Override
-            public void ok(Data d) {
+            public void ok(Data g) {
                 if (a.renderGen() != token) return;
-                saveCache(d);
-                build(content, d);
+                mergeKpis(shared, g);
+                kpiOk[0] = true;
+                done[0].run();
             }
 
             @Override
             public void fail(String faError) {
-                if (a.renderGen() != token) return;
-                String[] ts = {""};
-                Data cached = loadCached(ts);
-                if (cached != null) {
-                    build(content, cached);
-                    LinearLayout bc = a.kit.card(Theme.WARNING);
-                    bc.addView(a.kit.text("📴 حالت آفلاین — آخرین داده ذخیره‌شده", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
-                    if (!ts[0].isEmpty())
-                        bc.addView(a.kit.kv("آخرین به‌روزرسانی", Money.fa(ts[0]), Theme.WARNING), a.kit.lp(-1, -2));
-                    bc.addView(a.kit.kv("خطا", faError == null ? "" : faError, Theme.MUTED), a.kit.lp(-1, -2));
-                    bc.addView(a.kit.btn("تلاش مجدد", v -> render(content)), a.kit.lp(-1, -2));
-                    content.addView(bc, 0);
-                    content.addView(a.kit.gap(10), 1);
-                    return;
-                }
-                content.removeAllViews();
-                content.addView(greetingHero(), a.kit.lp(-1, -2));
-                content.addView(a.kit.gap(10));
-                        content.addView(a.kit.gap(8));
-                content.addView(a.kit.error(faError, () -> render(content)), a.kit.lp(-1, -2));
+                kpiErr[0] = faError;
+                done[0].run();
             }
         });
+        a.repo.run(c0 -> loadCharts(token, c0), new Repo.Cb<Data>() {
+            @Override
+            public void ok(Data g) {
+                if (a.renderGen() != token) return;
+                mergeCharts(shared, g);
+                done[0].run();
+            }
+
+            @Override
+            public void fail(String faError) {
+                shared.notes.put("نمودارها", faError == null ? "" : faError);
+                done[0].run();
+            }
+        });
+    }
+
+    /** KPI group: day totals, customers, debtors, invoice states and returns. */
+    private Data loadKpis(final int token, java.sql.Connection c0) throws Exception {
+        final Link L = new Link(c0);
+        Data d = new Data();
+        final String to = Jalali.todayStr();
+        d.snapshotDay = to;
+        d.salesDay = liveL(token, L, d.notes, "فروش روز", () -> Repo.one(L.c, Queries.homeSalesDay(L.m)));
+        d.buyDay = liveL(token, L, d.notes, "خرید روز", () -> Repo.one(L.c, Queries.homeBuyDay(L.m)));
+        d.inDay = liveL(token, L, d.notes, "دریافت روز", () -> Repo.one(L.c, MoneyQueries.darDay(L.m, 0)));
+        d.outDay = liveL(token, L, d.notes, "پرداخت روز", () -> Repo.one(L.c, MoneyQueries.darDay(L.m, 1)));
+        d.custSum = liveL(token, L, d.notes, "خلاصه مشتریان", () -> Repo.one(L.c, MasterQueries.customersSummary(L.m)));
+        d.debtors = liveL(token, L, d.notes, "بدهکاران", () -> Repo.exec(L.c, Queries.topDebtors(L.m, 5)));
+        d.overdue = liveL(token, L, d.notes, "معوق‌ها", () -> Repo.exec(L.c, Queries.overdueInvoices(L.m, 5)));
+        String stFrom = Jalali.addDays(to, -29);
+        d.saleState = liveL(token, L, d.notes, "وضعیت فروش", () -> Repo.exec(L.c, Queries.factorStatusSummary(L.m, true, stFrom, to)));
+        d.buyState = liveL(token, L, d.notes, "وضعیت خرید", () -> Repo.exec(L.c, Queries.factorStatusSummary(L.m, false, stFrom, to)));
+        Filter rf = new Filter();
+        rf.from = stFrom;
+        rf.to = to;
+        d.returns = liveL(token, L, d.notes, "برگشتی", () -> Repo.exec(L.c, MasterQueries.returnsByKind(L.m, rf)));
+        if (d.salesDay == null && d.inDay == null && d.custSum == null && d.buyDay == null && d.outDay == null)
+            throw new Exception(firstNote(d.notes));
+        return d;
+    }
+
+    /** Chart group: daily series, top items, visitors and cheque due lists. */
+    private Data loadCharts(final int token, java.sql.Connection c0) throws Exception {
+        final Link L = new Link(c0);
+        Data d = new Data();
+        final String to = Jalali.todayStr();
+        final String from = Jalali.addDays(to, -30);
+        final String inFrom = Jalali.addDays(to, -13);
+        d.salesDaily = liveL(token, L, d.notes, "روند فروش", () -> Repo.exec(L.c, Queries.factorDaily(L.m, true, from, to)));
+        d.inDaily = liveL(token, L, d.notes, "روند دریافت", () -> Repo.exec(L.c, MoneyQueries.darDaily(L.m, 0, inFrom, to)));
+        d.buyDaily = liveL(token, L, d.notes, "روند خرید", () -> Repo.exec(L.c, Queries.factorDaily(L.m, false, from, to)));
+        d.outDaily = liveL(token, L, d.notes, "روند پرداخت", () -> Repo.exec(L.c, MoneyQueries.darDaily(L.m, 1, inFrom, to)));
+        Filter todayFilter = new Filter();
+        todayFilter.from = to;
+        todayFilter.to = to;
+        todayFilter.top = 5;
+        d.topItems = liveL(token, L, d.notes, "پرفروش‌ترین کالاهای امروز",
+                () -> Repo.exec(L.c, Queries.factorTopProducts(L.m, true, todayFilter, 5)));
+        Filter vf = new Filter();
+        vf.preset = Filter.P_LAST30;
+        vf.applyPreset();
+        d.visitors = liveL(token, L, d.notes, "ویزیتورها", () -> Repo.exec(L.c, MasterQueries.visitorsPerf(L.m, vf)));
+        d.dueIn = liveL(token, L, d.notes, "سررسید دریافتی", () -> Repo.exec(L.c, MoneyQueries.chequeDue(L.m, true, 3)));
+        d.dueOut = liveL(token, L, d.notes, "سررسید پرداختی", () -> Repo.exec(L.c, MoneyQueries.chequeDue(L.m, false, 3)));
+        return d;
+    }
+
+    private static void mergeKpis(Data s, Data g) {
+        s.snapshotDay = g.snapshotDay;
+        s.salesDay = g.salesDay;
+        s.buyDay = g.buyDay;
+        s.inDay = g.inDay;
+        s.outDay = g.outDay;
+        s.custSum = g.custSum;
+        s.debtors = g.debtors;
+        s.overdue = g.overdue;
+        s.saleState = g.saleState;
+        s.buyState = g.buyState;
+        s.returns = g.returns;
+        s.notes.putAll(g.notes);
+    }
+
+    private static void mergeCharts(Data s, Data g) {
+        s.salesDaily = g.salesDaily;
+        s.inDaily = g.inDaily;
+        s.buyDaily = g.buyDaily;
+        s.outDaily = g.outDaily;
+        s.topItems = g.topItems;
+        s.visitors = g.visitors;
+        s.dueIn = g.dueIn;
+        s.dueOut = g.dueOut;
+        s.notes.putAll(g.notes);
+    }
+
+    private void showFailure(final LinearLayout content, String faError, Data cached) {
+        if (cached != null) {
+            build(content, cached);
+            LinearLayout bc = a.kit.card(Theme.WARNING);
+            bc.addView(a.kit.text("📴 حالت آفلاین — آخرین داده ذخیره‌شده", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
+            bc.addView(a.kit.kv("خطا", faError == null ? "" : faError, Theme.MUTED), a.kit.lp(-1, -2));
+            bc.addView(a.kit.btn("تلاش مجدد", v -> render(content)), a.kit.lp(-1, -2));
+            content.addView(bc, 0);
+            content.addView(a.kit.gap(10), 1);
+            return;
+        }
+        content.removeAllViews();
+        content.addView(greetingHero(), a.kit.lp(-1, -2));
+        content.addView(a.kit.gap(10));
+        content.addView(a.kit.gap(8));
+        content.addView(a.kit.error(faError, () -> render(content)), a.kit.lp(-1, -2));
     }
 
     // ---------------- offline cache (manager cues, top items, sales history and timestamp) ----------------

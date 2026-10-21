@@ -159,6 +159,9 @@ public final class AiSettings {
         card.addView(cloudTts, a.kit.lp(-1, -2));
         card.addView(a.kit.gap(10));
 
+        card.addView(a.kit.btnGold("⚡ اتصال و فعال‌سازی هوش مصنوعی", v -> connectAndActivate(a, provider,
+                key.getText().toString().trim(), p, rerender)), a.kit.lp(-1, -2));
+        card.addView(a.kit.gap(6));
         card.addView(a.kit.btnGold("✦ ذخیره", v -> {
             String k = key.getText().toString().trim();
             if (!k.isEmpty() && !SecretBox.put(a, keyName(provider), k)) {
@@ -183,6 +186,45 @@ public final class AiSettings {
         }), a.kit.lp(-1, -2));
 
         content.addView(card, a.kit.lp(-1, -2));
+    }
+
+    /**
+     * One-tap connection: stores the typed key (or keeps the saved one), checks it with a short
+     * request, and turns the assistant on only when the service answers.
+     */
+    private static void connectAndActivate(final MainActivity a, final String provider, final String typedKey,
+                                           final SharedPreferences p, final Runnable rerender) {
+        final String k = typedKey.isEmpty() ? keyFor(a, provider) : typedKey;
+        if (k.isEmpty()) {
+            a.kit.toast("ابتدا کلید API را وارد کنید");
+            return;
+        }
+        if (!typedKey.isEmpty() && !SecretBox.put(a, keyName(provider), typedKey)) {
+            a.kit.toast("ذخیرهٔ امن کلید ممکن نشد");
+            return;
+        }
+        a.kit.toast("در حال اتصال به " + AiClient.nameOf(provider) + "…");
+        new Thread(() -> {
+            String msg;
+            boolean ok = false;
+            try {
+                AiClient.complete(provider, "", AiClient.modelFor(provider, "fast"), k,
+                        "پاسخ کوتاه بده.", "فقط بنویس: آمادهٔ کمک هستم.");
+                ok = true;
+                msg = "اتصال برقرار شد و هوش مصنوعی فعال است ✓";
+            } catch (Exception e) {
+                msg = "اتصال ناموفق: " + (e.getMessage() == null ? "خطا" : e.getMessage());
+            }
+            final boolean fok = ok;
+            final String fm = msg;
+            a.runOnUiThread(() -> {
+                if (fok) {
+                    p.edit().putString("provider", provider).putBoolean("consent", true).apply();
+                }
+                a.kit.toast(fm);
+                if (rerender != null) rerender.run();
+            });
+        }).start();
     }
 
     private static void testConnection(final MainActivity a, final String provider, final String typedKey) {

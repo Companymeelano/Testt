@@ -24,6 +24,7 @@ import ir.meelano.manager.core.Assistant;
 import ir.meelano.manager.core.Diag;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.Notify;
+import ir.meelano.manager.core.OfflineAsr;
 import ir.meelano.manager.core.SecretBox;
 import ir.meelano.manager.core.SpeechQueue;
 import ir.meelano.manager.core.Speaker;
@@ -310,7 +311,7 @@ public final class AssistantScreen extends Screen {
             });
             return;
         }
-        if (!SpeechRecognizer.isRecognitionAvailable(a)) {
+        if (!OfflineAsr.installed(a) && !SpeechRecognizer.isRecognitionAvailable(a)) {
             a.kit.toast("تشخیص گفتار در این گوشی پشتیبانی نمی‌شود");
             return;
         }
@@ -323,6 +324,7 @@ public final class AssistantScreen extends Screen {
     private void stopLive(String note) {
         liveOn = false;
         listening = false;
+        OfflineAsr.cancel();
         try {
             if (recognizer != null) {
                 recognizer.stopListening();
@@ -344,6 +346,23 @@ public final class AssistantScreen extends Screen {
             return;
         }
         if (aiBusy) return; // answer still coming; listenOnce runs again after it is spoken
+        if (OfflineAsr.installed(a)) {
+            // Offline Persian recognition: records until the speaker pauses, then transcribes on the phone.
+            listening = true;
+            redraw();
+            OfflineAsr.listen(a, (text, err) -> {
+                listening = false;
+                if (!liveOn) return;
+                if (err != null) {
+                    stopLive("شنیدن صدا ممکن نشد: " + err);
+                } else if (text.isEmpty()) {
+                    handler.postDelayed(AssistantScreen.this::listenOnce, 300);
+                } else {
+                    ask(text);
+                }
+            });
+            return;
+        }
         try {
             if (recognizer == null) {
                 recognizer = SpeechRecognizer.createSpeechRecognizer(a);

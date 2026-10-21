@@ -11,6 +11,7 @@ import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.core.AiClient;
 import ir.meelano.manager.core.AiRouter;
 import ir.meelano.manager.core.BuiltinKeys;
+import ir.meelano.manager.core.OfflineAsr;
 import ir.meelano.manager.core.OfflineVoice;
 import ir.meelano.manager.core.SecretBox;
 import ir.meelano.manager.core.Speaker;
@@ -101,6 +102,32 @@ public final class AiSettings {
         key.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         card.addView(key, a.kit.lp(-1, -2));
         card.addView(a.kit.gap(8));
+
+        // ---- Offline speech recognition (listening) ----
+        card.addView(a.kit.text("🎙 شنیدن فارسی آفلاین", 13.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        final boolean asrOk = OfflineAsr.installed(a);
+        card.addView(a.kit.hint(asrOk
+                ? "گفتگوی زنده با صدای شما بدون اینترنت شنیده می‌شود."
+                : "یک بار مدل شنیدن فارسی (حدود ۲۰۰ مگابایت) دانلود می‌شود. بعد از آن بدون اینترنت کار می‌کند."),
+                a.kit.lp(-1, -2));
+        final android.widget.TextView asrStatus = a.kit.text(asrOk ? "✓ آماده است" : "دانلود نشده",
+                12f, asrOk ? Theme.SUCCESS : Theme.MUTED, true);
+        card.addView(asrStatus, a.kit.lp(-1, -2));
+        if (!asrOk) {
+            card.addView(a.kit.btnGhost("⬇ دانلود شنیدن فارسی", Theme.VIOLET, v -> {
+                if (OfflineAsr.downloading()) { a.kit.toast("دانلود در حال انجام است"); return; }
+                asrStatus.setText("در حال دانلود…");
+                OfflineAsr.download(a, pct -> asrStatus.setText("در حال دانلود " + pct + "٪"), (t, err) -> {
+                    if (err == null) {
+                        a.kit.toast("شنیدن فارسی آفلاین آماده شد");
+                        if (rerender != null) rerender.run();
+                    } else {
+                        asrStatus.setText("خطا در دانلود: " + err);
+                    }
+                });
+            }), a.kit.lp(-1, -2));
+        }
+        card.addView(a.kit.gap(10));
 
         final CheckBox consent = new CheckBox(a);
         consent.setText("اجازه می‌دهم خلاصهٔ عددی فروشگاه (فروش، مانده، چک و معوق‌ها) و متن پاسخ‌ها برای هوش مصنوعی و صدای طبیعی به همین سرویس فرستاده شود.");

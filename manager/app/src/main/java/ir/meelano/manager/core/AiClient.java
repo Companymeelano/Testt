@@ -43,7 +43,7 @@ public final class AiClient {
      * Gemini (natural Persian speech, daily answers), DeepSeek (analysis), Groq (quick answers).
      */
     public static final String[][] NAMES = {
-            {GEMINI, "Gemini"}, {DEEPSEEK, "DeepSeek"}, {GROQ, "Groq"}
+            {GEMINI, "Gemini"}, {DEEPSEEK, "DeepSeek"}, {GROQ, "Groq"}, {OPENAI, "ChatGPT"}
     };
 
     public static String nameOf(String provider) {

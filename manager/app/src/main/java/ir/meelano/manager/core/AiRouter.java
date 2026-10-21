@@ -30,10 +30,10 @@ public final class AiRouter {
      *   general  : the service the user selected, then the others
      * Speech is handled by Speaker (Gemini natural voice, then the built-in Persian voice).
      */
-    private static final String[] ANALYSIS_ORDER = {AiClient.DEEPSEEK, AiClient.GEMINI, AiClient.GROQ};
-    private static final String[] FAST_ORDER = {AiClient.GROQ, AiClient.GEMINI, AiClient.DEEPSEEK};
-    private static final String[] WRITING_ORDER = {AiClient.GEMINI, AiClient.DEEPSEEK, AiClient.GROQ};
-    private static final String[] GENERAL_ORDER = {AiClient.GEMINI, AiClient.DEEPSEEK, AiClient.GROQ};
+    private static final String[] ANALYSIS_ORDER = {AiClient.DEEPSEEK, AiClient.GEMINI, AiClient.GROQ, AiClient.OPENAI};
+    private static final String[] FAST_ORDER = {AiClient.GROQ, AiClient.GEMINI, AiClient.DEEPSEEK, AiClient.OPENAI};
+    private static final String[] WRITING_ORDER = {AiClient.GEMINI, AiClient.DEEPSEEK, AiClient.GROQ, AiClient.OPENAI};
+    private static final String[] GENERAL_ORDER = {AiClient.GEMINI, AiClient.DEEPSEEK, AiClient.GROQ, AiClient.OPENAI};
 
     public static final class Result {
         public final String text;

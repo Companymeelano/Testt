@@ -10,6 +10,7 @@ import android.os.Looper;
 import com.k2fsa.sherpa.onnx.GeneratedAudio;
 import com.k2fsa.sherpa.onnx.OfflineTts;
 import com.k2fsa.sherpa.onnx.OfflineTtsConfig;
+import com.k2fsa.sherpa.onnx.OfflineTtsMatchaModelConfig;
 import com.k2fsa.sherpa.onnx.OfflineTtsModelConfig;
 import com.k2fsa.sherpa.onnx.OfflineTtsVitsModelConfig;
 
@@ -28,18 +29,25 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 
 /**
- * Built-in Persian voice: sherpa-onnx (offline VITS) with the Piper «amir» Persian model.
+ * Built-in Persian voice: sherpa-onnx (offline Matcha, female «Khadijah» model) with the vocos vocoder.
  *
- * The engine ships inside the APK. The model (about 60 MB) is downloaded once, on the user's
+ * The engine ships inside the APK. The model (about 130 MB with its vocoder) is downloaded once, on the user's
  * request, from the sherpa-onnx GitHub release, and then works without internet.
  */
 public final class OfflineVoice {
     private OfflineVoice() { }
 
-    /** Default Persian voice: the female «haaniye» voice from the sherpa-onnx release. */
-    public static final String MODEL_NAME = "vits-piper-fa-haaniye_low";
-    /** Earlier male voices; still used on devices that downloaded them, until the female voice is installed. */
+    /**
+     * Default Persian voice: the female «Khadijah» Matcha model from the sherpa-onnx release.
+     * Matcha needs a separate vocoder file, which is fetched together with the model.
+     */
+    public static final String MODEL_NAME = "matcha-tts-fa_en-khadijah";
+    public static final String VOCODER_NAME = "vocos-22khz-univ.onnx";
+    public static final String VOCODER_URL =
+            "https://github.com/k2-fsa/sherpa-onnx/releases/download/vocoder-models/" + VOCODER_NAME;
+    /** Earlier voices; still used on devices that downloaded them, until the default voice is installed. */
     static final String[] OLDER_NAMES = {
+            "vits-piper-fa-haaniye_low",
             "vits-piper-fa_IR-reza_ibrahim-medium",
             "vits-piper-fa_IR-amir-medium"};
     public static final String MODEL_URL =
@@ -65,9 +73,31 @@ public final class OfflineVoice {
         return rootOf(c, MODEL_NAME);
     }
 
+    private static boolean isMatcha(File d) {
+        return d.getName().startsWith("matcha-");
+    }
+
+    /** The acoustic model: the first .onnx file that is not the vocoder. */
+    private static File acoustic(File d) {
+        File[] files = d.listFiles();
+        if (files == null) return null;
+        for (File f : files) {
+            if (f.isFile() && f.getName().endsWith(".onnx") && !f.getName().startsWith("vocos")) return f;
+        }
+        return null;
+    }
+
+    /** True when all files needed by the given kind of model are present. */
+    private static boolean filesOk(File d, boolean matcha) {
+        if (acoustic(d) == null || !new File(d, "tokens.txt").isFile()) return false;
+        boolean lexicon = new File(d, "lexicon.txt").isFile();
+        boolean espeak = new File(d, "espeak-ng-data").isDirectory();
+        if (!lexicon && !espeak) return false;
+        return !matcha || new File(d, VOCODER_NAME).isFile();
+    }
+
     private static boolean complete(File d) {
-        return find(d, ".onnx") != null && new File(d, "tokens.txt").isFile()
-                && new File(d, "espeak-ng-data").isDirectory();
+        return filesOk(d, isMatcha(d));
     }
 
     /** True when the best Persian voice is on the device. */
@@ -163,7 +193,8 @@ public final class OfflineVoice {
                         }
                     }
                 }
-                if (find(stage, ".onnx") == null || !new File(stage, "tokens.txt").isFile()) {
+                if (MODEL_NAME.startsWith("matcha-")) fetchTo(VOCODER_URL, new File(stage, VOCODER_NAME));
+                if (!filesOk(stage, MODEL_NAME.startsWith("matcha-"))) {
                     throw new IOException("فایل‌های مدل ناقص است");
                 }
                 deleteRec(root(app));
@@ -185,6 +216,21 @@ public final class OfflineVoice {
         }, "tts-download").start();
     }
 
+    /** Downloads one file into dest (used for the vocoder). */
+    private static void fetchTo(String url, File dest) throws IOException {
+        HttpURLConnection con = (HttpURLConnection) new URL(url).openConnection();
+        con.setInstanceFollowRedirects(true);
+        con.setConnectTimeout(20000);
+        con.setReadTimeout(30000);
+        int code = con.getResponseCode();
+        if (code / 100 != 2) throw new IOException("HTTP " + code);
+        try (InputStream in = con.getInputStream(); OutputStream out = new FileOutputStream(dest)) {
+            byte[] buf = new byte[64 * 1024];
+            int n;
+            while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+        }
+    }
+
     private static void deleteRec(File f) {
         if (f == null || !f.exists()) return;
         File[] kids = f.listFiles();
@@ -197,12 +243,23 @@ public final class OfflineVoice {
             if (engine != null) return engine;
             File d = modelDir(app);
             // sherpa-onnx AAR config classes are Kotlin data classes: plain setters from Java.
-            OfflineTtsVitsModelConfig vits = new OfflineTtsVitsModelConfig();
-            vits.setModel(find(d, ".onnx").getAbsolutePath());
-            vits.setTokens(new File(d, "tokens.txt").getAbsolutePath());
-            vits.setDataDir(new File(d, "espeak-ng-data").getAbsolutePath());
             OfflineTtsModelConfig model = new OfflineTtsModelConfig();
-            model.setVits(vits);
+            if (isMatcha(d)) {
+                OfflineTtsMatchaModelConfig mt = new OfflineTtsMatchaModelConfig();
+                mt.setAcousticModel(acoustic(d).getAbsolutePath());
+                mt.setVocoder(new File(d, VOCODER_NAME).getAbsolutePath());
+                mt.setTokens(new File(d, "tokens.txt").getAbsolutePath());
+                File lexicon = new File(d, "lexicon.txt");
+                if (lexicon.isFile()) mt.setLexicon(lexicon.getAbsolutePath());
+                else mt.setDataDir(new File(d, "espeak-ng-data").getAbsolutePath());
+                model.setMatcha(mt);
+            } else {
+                OfflineTtsVitsModelConfig vits = new OfflineTtsVitsModelConfig();
+                vits.setModel(acoustic(d).getAbsolutePath());
+                vits.setTokens(new File(d, "tokens.txt").getAbsolutePath());
+                vits.setDataDir(new File(d, "espeak-ng-data").getAbsolutePath());
+                model.setVits(vits);
+            }
             model.setNumThreads(3);
             model.setProvider("cpu");
             OfflineTtsConfig cfg = new OfflineTtsConfig();

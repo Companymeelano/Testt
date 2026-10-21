@@ -594,7 +594,7 @@ public final class Queries {
                 + ", " + Sql.num("d", sum) + " AS lineSum"
                 + ", " + Sql.num("d", disc) + " AS discount"
                 + ", " + Sql.num("d", tax) + " AS tax"
-                + (lineNo == null ? ", CAST(NULL AS int) AS lineNo" : ", " + numNull("d", lineNo, "int") + " AS lineNo")
+                + (lineNo == null ? ", CAST(NULL AS int) AS [lineNo]" : ", " + numNull("d", lineNo, "int") + " AS [lineNo]")
                 + " FROM dbo.[" + line + "] d"
                 + (shka != null && invName != null && invShka != null
                 ? " OUTER APPLY (SELECT TOP (1) ii.[" + invName + "] AS [" + invName + "] FROM dbo.inventory ii"

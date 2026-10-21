@@ -125,7 +125,7 @@ public final class SarfaslReports {
                 + " COALESCE(CAST(" + desc + " AS nvarchar(300)),N'') AS descr,"
                 + " ISNULL(v." + Sql.q(s.bed) + ",0) AS debit,"
                 + " ISNULL(v." + Sql.q(s.bes) + ",0) AS credit,"
-                + " COALESCE(CAST(" + user + " AS nvarchar(60)),N'') AS user"
+                + " COALESCE(CAST(" + user + " AS nvarchar(60)),N'') AS [user]"
                 + " FROM " + s.view + " v" + where
                 + " ORDER BY " + Sql.date10("v", s.date) + " DESC";
         return new Queries.Q(sql, binds);

@@ -25,6 +25,7 @@ import ir.meelano.manager.core.Diag;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.Notify;
 import ir.meelano.manager.core.SecretBox;
+import ir.meelano.manager.core.SpeechQueue;
 import ir.meelano.manager.core.Speaker;
 import ir.meelano.manager.core.WarehouseSync;
 import ir.meelano.manager.data.Repo;
@@ -224,6 +225,8 @@ public final class AssistantScreen extends Screen {
 
     /** The answer currently being written, and the text view that shows it (updated in place). */
     private String[] liveSlot;
+    /** The sentence-by-sentence reader of the answer being read now. */
+    private SpeechQueue currentSpeech;
     private TextView liveBody;
 
     private void askAi(final String q, final String rule) {
@@ -234,6 +237,11 @@ public final class AssistantScreen extends Screen {
         liveBody = null;
         msgs.add(slot);
         redraw();
+        // A new question silences the answer that is still being read.
+        if (currentSpeech != null) currentSpeech.cancel();
+        final boolean speakIt = liveOn || speakOn();
+        final SpeechQueue[] speech = {speakIt ? new SpeechQueue(a, liveOn ? this::listenOnce : null) : null};
+        currentSpeech = speech[0];
         new Thread(() -> {
             final StringBuilder acc = new StringBuilder();
             final long[] lastShown = {0};
@@ -252,6 +260,7 @@ public final class AssistantScreen extends Screen {
                                     slot[1] = shown;
                                     liveBody.setText(shown);
                                 }
+                                if (speech[0] != null) speech[0].feed(shown, false);
                             });
                         });
                 reply = r.text;
@@ -272,10 +281,16 @@ public final class AssistantScreen extends Screen {
                 }
                 redraw();
                 String spoken = slot[1];
-                if (liveOn) {
-                    Speaker.speak(a, spoken, this::listenOnce);
-                } else if (speakOn()) {
-                    Speaker.speak(a, spoken, null);
+                if (speech[0] != null && fr != null) {
+                    // Streamed sentences were already read; finish the queue with the last part.
+                    speech[0].feed(spoken, true);
+                } else {
+                    if (speech[0] != null) speech[0].cancel();
+                    if (liveOn) {
+                        Speaker.speak(a, spoken, this::listenOnce);
+                    } else if (speakOn()) {
+                        Speaker.speak(a, spoken, null);
+                    }
                 }
             });
         }).start();

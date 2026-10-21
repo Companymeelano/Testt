@@ -182,8 +182,10 @@ public final class SmartLink {
         List<String> fails = new ArrayList<>();
         for (Cand k : cands) {
             try {
+                // LAN answers in milliseconds; a public (WAN) address over mobile data needs longer.
+                int tcpMs = LAN.equals(k.kind) ? 1500 : 6000;
                 Connection conn = Atiran.open(k.host, s.effPort(), s.effDb(),
-                        s.effUser(), s.effPass(), 1500, 5, false);
+                        s.effUser(), s.effPass(), tcpMs, 5, false);
                 try {
                     s.setLinkLast(k.kind);
                 } catch (Exception ignored) { Diag.ignored("SmartLink:189", ignored); }

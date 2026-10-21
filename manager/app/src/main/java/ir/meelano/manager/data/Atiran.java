@@ -113,6 +113,9 @@ public final class Atiran {
             if (o.length() > 40) o = o.substring(0, 40);
             return "ستون «" + o + "» در دیتابیس پیدا نشد";
         }
+        if (l.contains("failed to connect") || l.contains("connect timed out") || l.contains("etimedout")) {
+            return "اتصال به سرور در مهلت تعیین‌شده برقرار نشد؛ اتصال شبکه، آدرس و پورت سرور را بررسی کنید";
+        }
         if (l.contains("socket closed") || l.contains("i/o error") || l.contains("connection reset")) {
             return "ارتباط با سرور قطع شد؛ اتصال شبکه را بررسی و دوباره تلاش کنید";
         }

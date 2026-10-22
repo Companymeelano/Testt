@@ -528,6 +528,15 @@ public class MainActivity extends Activity {
         companyName.setMaxLines(2);
         companyName.setEllipsize(android.text.TextUtils.TruncateAt.END);
         titleCol.addView(companyName, kit.lp(-1, -2));
+        if (Theme.DARK) {
+            // Gold-to-champagne gradient across the company name, as in the reference header.
+            companyName.addOnLayoutChangeListener((title_v, x1, x2, x3, x4, x5, x6, x7, x8) -> {
+                android.graphics.Shader sh = new android.graphics.LinearGradient(0, 0, 0, title_v.getHeight(),
+                        Theme.GOLD_SOFT, Theme.GOLD, android.graphics.Shader.TileMode.CLAMP);
+                companyName.getPaint().setShader(sh);
+                title_v.invalidate();
+            });
+        }
 
         // status line: link state, licence chip, Atiran user chip (small, always visible)
         LinearLayout status = kit.h();

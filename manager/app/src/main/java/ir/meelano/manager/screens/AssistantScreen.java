@@ -21,6 +21,8 @@ import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.core.AiClient;
 import ir.meelano.manager.core.AiRouter;
 import ir.meelano.manager.core.Assistant;
+import ir.meelano.manager.core.AssistantEngine;
+import ir.meelano.manager.core.RoleStore;
 import ir.meelano.manager.core.Diag;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.Notify;
@@ -78,6 +80,8 @@ public final class AssistantScreen extends Screen {
     private boolean aiBusy = false;
     private LinearLayout root;
     private String draft = "";
+    /** Short-term context of this screen only (last few turns, bounded). */
+    private final AssistantEngine.Session session = new AssistantEngine.Session();
 
     // live conversation
     private boolean liveOn = false;
@@ -128,8 +132,14 @@ public final class AssistantScreen extends Screen {
 
     /** Reloads the snapshot when it is stale (or forced), then runs the queued actions. */
     private void refresh(boolean force, Runnable after) {
+        refresh(force, after, null);
+    }
+
+    /** {@code offline} runs instead of {@code after} when no snapshot can be read at all. */
+    private void refresh(boolean force, Runnable after, Runnable offline) {
         boolean fresh = snap != null && System.currentTimeMillis() - snap.loadedAt < Assistant.FRESH_MS;
         if (after != null) pending.add(after);
+        if (offline != null) pendingOffline.add(offline);
         if (loading) return;
         if (fresh && !force) {
             flushPending();
@@ -143,7 +153,10 @@ public final class AssistantScreen extends Screen {
             // The database did not answer in time: stop spinning and offer a retry.
             loading = false;
             lastError = "پاسخ پایگاه‌داده دیر رسید";
-            if (snap == null) pending.clear();
+            if (snap == null) {
+                pending.clear();
+                runOffline();
+            }
             redraw();
         }, LOAD_TIMEOUT_MS);
         a.repo.run(c -> Assistant.load(c), new Repo.Cb<Assistant.Snap>() {
@@ -167,6 +180,7 @@ public final class AssistantScreen extends Screen {
                 if (snap == null) {
                     // No data at all yet: answering now would invent zeros, so ask the user to retry.
                     pending.clear();
+                    runOffline();
                     redraw();
                     return;
                 }
@@ -175,7 +189,23 @@ public final class AssistantScreen extends Screen {
         });
     }
 
+    /** Questions that arrived while the server was unreachable; each gets an honest offline answer. */
+    private final List<Runnable> pendingOffline = new ArrayList<>();
+
+    private void runOffline() {
+        List<Runnable> run = new ArrayList<>(pendingOffline);
+        pendingOffline.clear();
+        for (Runnable r : run) {
+            try {
+                r.run();
+            } catch (Exception e) {
+                Diag.ignored("AssistantScreen:offline", e);
+            }
+        }
+    }
+
     private void flushPending() {
+        pendingOffline.clear();
         List<Runnable> run = new ArrayList<>(pending);
         pending.clear();
         for (Runnable r : run) {
@@ -197,17 +227,46 @@ public final class AssistantScreen extends Screen {
         draft = "";
         msgs.add(new String[]{"user", q});
         redraw();
-        refresh(false, () -> {
+        Runnable answer = () -> {
+            // On-device router first: fixed tools, role check, no network and no model needed.
+            AssistantEngine.Reply r = AssistantEngine.respond(snap, q, session);
+            if (r.handled()) {
+                if (r.tool() != null && r.tool().screen != null && !RoleStore.allowed(a, r.tool().screen)) {
+                    addAnswer("bot", "این اطلاعات برای نقش فعلی شما دسترسی ندارد.");
+                    return;
+                }
+                addAnswer("bot", r.text());
+                return;
+            }
             String rule = Assistant.answer(snap, q);
-            if (aiReady()) {
+            if (aiReady() && hasNetwork()) {
                 askAi(q, rule);
             } else {
                 addAnswer("bot", rule);
             }
+        };
+        refresh(false, answer, () -> {
+            // No server snapshot: only tools that need no business data can answer.
+            AssistantEngine.Reply r = AssistantEngine.respond(null, q, session);
+            addAnswer("bot", r.handled() ? r.text()
+                    : "سرور در دسترس نیست و این سؤال نیاز به اطلاعات کسب‌وکار دارد. راهنما بدون اتصال کار می‌کند.");
         });
     }
 
     /** Adds an assistant reply; in live mode it is read aloud and then listening resumes. */
+    /** True when the phone reports an internet connection (the optional online model needs it). */
+    private boolean hasNetwork() {
+        try {
+            android.net.ConnectivityManager cm =
+                    (android.net.ConnectivityManager) a.getSystemService(android.content.Context.CONNECTIVITY_SERVICE);
+            if (cm == null) return false;
+            android.net.NetworkCapabilities nc = cm.getNetworkCapabilities(cm.getActiveNetwork());
+            return nc != null && nc.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     private void addAnswer(String role, String text) {
         msgs.add(new String[]{role, text});
         redraw();

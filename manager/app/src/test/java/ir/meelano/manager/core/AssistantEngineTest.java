@@ -132,4 +132,52 @@ public class AssistantEngineTest {
             }
         }
     }
+
+    // ---- Negative and offline cases (Phase 9) ----
+
+    @Test
+    public void emptyAndBlankInputIsNotHandled() {
+        assertFalse(AssistantEngine.respond(snap(), "", null).handled());
+        assertFalse(AssistantEngine.respond(snap(), "   \t  ", null).handled());
+    }
+
+    @Test
+    public void sqlOrCodeLikeTextIsNotExecutedAndNotHandled() {
+        // The model never produces SQL or code: such text matches no rule and gets no answer.
+        assertFalse(AssistantEngine.respond(snap(), "DROP TABLE dbo.sales; --", null).handled());
+        assertFalse(AssistantEngine.respond(snap(), "SELECT * FROM dbo.Customers", null).handled());
+        assertFalse(AssistantEngine.respond(snap(), "Runtime.getRuntime().exec('rm -rf /')", null).handled());
+    }
+
+    @Test
+    public void veryLongInputDoesNotBreakTheRouter() {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 5000; i++) sb.append("امروز ");
+        AssistantEngine.Reply r = AssistantEngine.respond(snap(), sb.toString(), null);
+        assertNotNull(r);
+        assertTrue(r.handled());
+    }
+
+    @Test
+    public void everyDataToolRefusesWhenServerIsDownWithoutNumbers() {
+        for (AssistantEngine.Tool t : AssistantEngine.Tool.values()) {
+            if (t == AssistantEngine.Tool.HELP) continue;
+            AssistantEngine.Reply r = AssistantEngine.respond(null, t.canonical, null);
+            assertTrue(t.name(), r.handled());
+            assertTrue(t.name() + ": " + r.text(), r.text().contains("سرور در دسترس نیست"));
+            assertFalse(t.name() + ": " + r.text(), hasDigit(r.text()));
+        }
+    }
+
+    @Test
+    public void helpStillAnswersWhenOffline() {
+        AssistantEngine.Reply r = AssistantEngine.respond(null, "راهنما", null);
+        assertTrue(r.handled());
+        assertEquals(AssistantEngine.Tool.HELP, r.tool());
+    }
+
+    @Test
+    public void mixedLatinAndPersianDigitsStillRouteToTheSameTool() {
+        assertEquals(AssistantEngine.match("فروش امروز"), AssistantEngine.match("فروش امروز ۱۴۰۵"));
+    }
 }

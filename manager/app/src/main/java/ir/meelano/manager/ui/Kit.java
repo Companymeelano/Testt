@@ -274,10 +274,11 @@ public final class Kit {
             // Optional gold glyph above the label (dashboard tiles).
             android.widget.ImageView ic = new android.widget.ImageView(a);
             try {
-                ic.setImageResource(k.icon);
-                ic.setColorFilter(Theme.GOLD);
+                ic.setImageResource(Theme.icon3d(k.icon));
+                if (!Theme.isIcon3d(Theme.icon3d(k.icon))) ic.setColorFilter(Theme.GOLD);
             } catch (Exception ignored) { Diag.ignored("Kit:kpiIcon", ignored); }
-            LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(Theme.dp(24), Theme.dp(24));
+            int isz = Theme.isIcon3d(Theme.icon3d(k.icon)) ? 30 : 24;
+            LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(Theme.dp(isz), Theme.dp(isz));
             ip.gravity = Gravity.CENTER_HORIZONTAL;
             ip.bottomMargin = Theme.dp(4);
             t.addView(ic, ip);

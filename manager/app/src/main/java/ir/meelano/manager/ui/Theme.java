@@ -1,5 +1,6 @@
 package ir.meelano.manager.ui;
 
+import ir.meelano.manager.R;
 import ir.meelano.manager.core.Diag;
 import android.content.Context;
 import android.graphics.Color;
@@ -63,6 +64,25 @@ public final class Theme {
 
     public static boolean isLight() { return light; }
 
+    /**
+     * Light skin uses rendered 3D gold icons in place of the flat vector glyphs. Dark skin keeps
+     * the vectors. Returns the drawable to show for a vector glyph id.
+     */
+    public static int icon3d(int vector) {
+        if (!light) return vector;
+        if (vector == R.drawable.mi_point_of_sale) return R.drawable.icon3d_sales;
+        if (vector == R.drawable.mi_shopping_cart) return R.drawable.icon3d_purchase;
+        if (vector == R.drawable.mi_receipt_long) return R.drawable.icon3d_cash_in;
+        if (vector == R.drawable.mi_payments) return R.drawable.icon3d_cash_out;
+        return vector;
+    }
+
+    /** True for bitmap 3D icons, which must not be tinted. */
+    public static boolean isIcon3d(int res) {
+        return res == R.drawable.icon3d_sales || res == R.drawable.icon3d_purchase
+                || res == R.drawable.icon3d_cash_in || res == R.drawable.icon3d_cash_out;
+    }
+
     /** 1.0 normal, 1.3 large-text mode (applied in Kit.text). */
     public static float fontScale() { return fontScale; }
 
@@ -102,13 +122,14 @@ public final class Theme {
         int dark = 0xFFD4AF37, darkSoft = 0xFFF0D98C, lite = 0xFF9C7A1A, liteSoft = 0xFF5C4510;
         if (light) {
             // «عاج سلطنتی»: warm pearl background, near-white cards, clear separation.
-            BG = 0xFFF5F1E6;
-            SURFACE = 0xFFFFFDF8;
-            SURFACE2 = 0xFFEEE7D4;
-            GOLD = lite;
-            GOLD_SOFT = liteSoft;
-            TEXT = 0xFF0F172A;
-            MUTED = 0xFF5B6478;
+            // Reference light skin: pearl-white base, champagne panels, metallic gold accents.
+            BG = 0xFFFBF7EE;
+            SURFACE = 0xFFFFFFFF;
+            SURFACE2 = 0xFFF6EEDA;
+            GOLD = 0xFF9C6B12;
+            GOLD_SOFT = 0xFFC9A24A;
+            TEXT = 0xFF14181F;
+            MUTED = 0xFF6B6657;
             SUCCESS = 0xFF1B7A4B;
             DANGER = 0xFFB3261E;
             WARNING = 0xFF9A5B00;

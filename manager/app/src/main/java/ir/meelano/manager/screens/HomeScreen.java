@@ -883,7 +883,7 @@ public class HomeScreen extends Screen {
         unit.setGravity(Gravity.CENTER_HORIZONTAL);
         t.addView(unit, a.kit.lp(-1, -2));
         int color = r.changePct > 0 ? Theme.SUCCESS : (r.changePct < 0 ? Theme.DANGER : Theme.MUTED);
-        String arrow = r.changePct > 0 ? "▲ " : (r.changePct < 0 ? "▼ " : "");
+        String arrow = r.changePct > 0 ? "↗ " : (r.changePct < 0 ? "↘ " : "");
         TextView ch = a.kit.text(arrow + Money.fa(String.format(Locale.US, "%.1f", Math.abs(r.changePct))) + "٪",
                 10f, color, true);
         ch.setMaxLines(1);

@@ -317,7 +317,12 @@ public final class Kit {
         }
         // Every tile reserves the same lines (sub + action), so tiles in one row
         // match in height and their values line up whether or not they have a note.
-        TextView s = text(k.sub == null || k.sub.isEmpty() ? " " : k.sub, 10f, k.accent, true);
+        // Trend notes read green when up and red when down, as in the reference market tiles.
+        String sub0 = k.sub == null ? "" : k.sub.trim();
+        int subColor = k.accent;
+        if (sub0.startsWith("▲") || sub0.startsWith("↗") || sub0.startsWith("+")) subColor = Theme.SUCCESS;
+        else if (sub0.startsWith("▼") || sub0.startsWith("↘") || sub0.startsWith("-")) subColor = Theme.DANGER;
+        TextView s = text(k.sub == null || k.sub.isEmpty() ? " " : k.sub, 10f, subColor, true);
         s.setGravity(Gravity.CENTER_HORIZONTAL);
         s.setSingleLine(true);
         s.setEllipsize(TextUtils.TruncateAt.END);

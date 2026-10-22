@@ -722,7 +722,7 @@ public class MainActivity extends Activity {
         TextView t = new TextView(this);
         t.setText(label);
         t.setTextSize(10 * Theme.fontScale());
-        t.setTextColor(Theme.MUTED);
+        t.setTextColor(Theme.DARK ? Theme.GOLD_SOFT : Theme.MUTED);
         t.setGravity(Gravity.CENTER);
         t.setSingleLine(true);
         cell.addView(t, new LinearLayout.LayoutParams(-2, -2));

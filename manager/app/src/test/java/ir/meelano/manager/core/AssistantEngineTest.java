@@ -152,10 +152,10 @@ public class AssistantEngineTest {
     @Test
     public void veryLongInputDoesNotBreakTheRouter() {
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < 5000; i++) sb.append("امروز ");
+        for (int i = 0; i < 5000; i++) sb.append("فروش ");
         AssistantEngine.Reply r = AssistantEngine.respond(snap(), sb.toString(), null);
         assertNotNull(r);
-        assertTrue(r.handled());
+        assertEquals(AssistantEngine.Tool.SALES, r.tool());
     }
 
     @Test
@@ -178,6 +178,7 @@ public class AssistantEngineTest {
 
     @Test
     public void mixedLatinAndPersianDigitsStillRouteToTheSameTool() {
+        assertNotNull(AssistantEngine.match("فروش امروز"));
         assertEquals(AssistantEngine.match("فروش امروز"), AssistantEngine.match("فروش امروز ۱۴۰۵"));
     }
 }

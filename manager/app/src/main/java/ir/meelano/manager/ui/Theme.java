@@ -116,14 +116,14 @@ public final class Theme {
             VIOLET = 0xFF6343D6;
             STEEL = 0xFF546177;
         } else {
-            // «نیوی و طلا»: deep navy surfaces with a polished gold accent.
-            BG = 0xFF0F172A;
-            SURFACE = 0xFF162139;
-            SURFACE2 = 0xFF1E2B47;
-            GOLD = dark;
-            GOLD_SOFT = darkSoft;
-            TEXT = 0xFFF8F4E8;
-            MUTED = 0xFF9EAAC4;
+            // «ابسیدین و طلا»: near-black obsidian surfaces, glass cards and a bright polished gold.
+            BG = 0xFF07090E;
+            SURFACE = 0xFF0E121A;
+            SURFACE2 = 0xFF161B26;
+            GOLD = 0xFFE2B865;
+            GOLD_SOFT = 0xFFF6DFA0;
+            TEXT = 0xFFFAF6EC;
+            MUTED = 0xFF9AA3B5;
             SUCCESS = 0xFF34D399;
             DANGER = 0xFFF87171;
             WARNING = 0xFFFBBF24;
@@ -198,7 +198,7 @@ public final class Theme {
 
     /** Navigation-bar color: champagne in light mode so the dark system keys stay visible. */
     public static int navBar() {
-        return light ? 0xFFEBE2CC : 0xFF0F172A;
+        return light ? 0xFFEBE2CC : 0xFF07090E;
     }
 
     // ---------------- drawable factories ----------------

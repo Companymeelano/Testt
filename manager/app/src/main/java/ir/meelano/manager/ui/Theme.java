@@ -283,7 +283,29 @@ public final class Theme {
      * faint, repeating linen grain (a few percent alpha), so large cream areas feel like
      * paper instead of a flat digital fill. The grain tile is generated once and cached.
      */
+    /** Screen background. Light skin adds soft gold light in the top-right and bottom-left corners. */
     public static android.graphics.drawable.Drawable background() {
+        android.graphics.drawable.Drawable base = backgroundBase();
+        if (!light) return base;
+        try {
+            GradientDrawable topRight = new GradientDrawable();
+            topRight.setGradientType(GradientDrawable.RADIAL_GRADIENT);
+            topRight.setColors(new int[]{alpha(GOLD_SOFT, 90), alpha(GOLD_SOFT, 0)});
+            topRight.setGradientCenter(0.95f, 0.02f);
+            topRight.setGradientRadius(dp(420));
+            GradientDrawable bottomLeft = new GradientDrawable();
+            bottomLeft.setGradientType(GradientDrawable.RADIAL_GRADIENT);
+            bottomLeft.setColors(new int[]{alpha(GOLD_SOFT, 70), alpha(GOLD_SOFT, 0)});
+            bottomLeft.setGradientCenter(0.05f, 0.98f);
+            bottomLeft.setGradientRadius(dp(480));
+            return new android.graphics.drawable.LayerDrawable(
+                    new android.graphics.drawable.Drawable[]{base, topRight, bottomLeft});
+        } catch (Exception e) {
+            return base;
+        }
+    }
+
+    private static android.graphics.drawable.Drawable backgroundBase() {
         android.graphics.drawable.ColorDrawable base = new android.graphics.drawable.ColorDrawable(BG);
         if (!light) {
             // Obsidian screen with a soft gold light from the top-left corner, as in the reference.
@@ -353,7 +375,8 @@ public final class Theme {
         int accent = GOLD;
         if (light) {
             // Champagne-gold hero: a clearly golden sheen fading into ivory, with a brighter bronze rim.
-            return glass(alpha(accent, 120), 0xFFF1E2C2, 28, 200);
+            // Reference header: ivory card with a bright gold frame, fading to champagne.
+            return glass(0xFFFFFFFF, 0xFFF4E7C8, 28, 220);
         }
         // Obsidian hero with a soft gold light falling from the top-left corner.
         return glass(alpha(accent, 44), alpha(SURFACE, 250), 28, 150);

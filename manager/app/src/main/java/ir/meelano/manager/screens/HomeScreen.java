@@ -762,7 +762,9 @@ public class HomeScreen extends Screen {
         LinearLayout t = a.kit.v();
         t.setBackground(Theme.kpi(Theme.GOLD));
         t.setPadding(Theme.dp(8), Theme.dp(8), Theme.dp(8), Theme.dp(8));
+        t.setGravity(Gravity.CENTER_HORIZONTAL);
         TextView label = a.kit.text(r.label, 10f, Theme.MUTED, false);
+        label.setGravity(Gravity.CENTER_HORIZONTAL);
         label.setMinLines(2);
         label.setMaxLines(2);
         label.setEllipsize(TextUtils.TruncateAt.END);
@@ -770,16 +772,19 @@ public class HomeScreen extends Screen {
         // Prices are always in toman (the source's unit), whatever unit the rest of the app uses.
         TextView price = a.kit.text(Money.fa(Money.num(r.toman)), 13f, Theme.TEXT, true);
         price.setMaxLines(1);
+        price.setGravity(Gravity.CENTER_HORIZONTAL);
         price.setAutoSizeTextTypeUniformWithConfiguration(10, 13, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
         t.addView(price, a.kit.lp(-1, -2));
         TextView unit = a.kit.text("تومان", 9.5f, Theme.GOLD_SOFT, true);
         unit.setMaxLines(1);
+        unit.setGravity(Gravity.CENTER_HORIZONTAL);
         t.addView(unit, a.kit.lp(-1, -2));
         int color = r.changePct > 0 ? Theme.SUCCESS : (r.changePct < 0 ? Theme.DANGER : Theme.MUTED);
         String arrow = r.changePct > 0 ? "▲ " : (r.changePct < 0 ? "▼ " : "");
         TextView ch = a.kit.text(arrow + Money.fa(String.format(Locale.US, "%.1f", Math.abs(r.changePct))) + "٪",
                 10f, color, true);
         ch.setMaxLines(1);
+        ch.setGravity(Gravity.CENTER_HORIZONTAL);
         t.addView(ch, a.kit.lp(-1, -2));
         t.setContentDescription(r.label + "، " + Money.fa(Money.num(r.toman)) + " تومان");
         return t;

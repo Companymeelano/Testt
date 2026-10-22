@@ -94,6 +94,9 @@ public class MainActivity extends Activity {
     private int renderGen = 0;
     private ScrollView scroll;
     private LinearLayout bottomBar;
+    /** Host of the bottom bar: holds the sliding selection capsule behind the tabs. */
+    private android.widget.FrameLayout bottomHost;
+    private View navCapsule;
     private android.widget.ImageView linkIcon;
     private android.net.ConnectivityManager.NetworkCallback linkCb = null;
     private boolean linkCbReg = false;
@@ -609,11 +612,7 @@ public class MainActivity extends Activity {
         }), toolLp());
 
         if (!compact) {
-            android.widget.ImageView zoom = new android.widget.ImageView(this);
-            try {
-                zoom.setImageResource(R.drawable.mi_zoom);
-                zoom.setColorFilter(Theme.GOLD_SOFT);
-            } catch (Exception ignored) { Diag.ignored("MainActivity:584", ignored); }
+            android.widget.ImageView zoom = toolIcon(R.drawable.mi_zoom);
             tools.addView(toolCell(zoom, "بزرگ‌نمایی", "بزرگ‌نمایی متن", () -> cycleZoom()), toolLp());
         }
 
@@ -652,9 +651,16 @@ public class MainActivity extends Activity {
         bottomBar = new LinearLayout(this);
         bottomBar.setOrientation(LinearLayout.HORIZONTAL);
         bottomBar.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        bottomBar.setBackground(Theme.bottomBar());
         bottomBar.setPadding(Theme.dp(6), Theme.dp(8), Theme.dp(6), Theme.dp(10));
-        root.addView(bottomBar, kit.lp(-1, -2));
+        bottomHost = new android.widget.FrameLayout(this);
+        bottomHost.setBackground(Theme.bottomBar());
+        navCapsule = new View(this);
+        navCapsule.setVisibility(View.GONE);
+        navCapsule.setBackground(Theme.bottomNavSelected());
+        bottomHost.addView(navCapsule, new android.widget.FrameLayout.LayoutParams(Theme.dp(40), Theme.dp(40),
+                Gravity.TOP | Gravity.LEFT));
+        bottomHost.addView(bottomBar, new android.widget.FrameLayout.LayoutParams(-1, -2));
+        root.addView(bottomHost, kit.lp(-1, -2));
 
         setContentView(root);
 
@@ -731,8 +737,9 @@ public class MainActivity extends Activity {
     private android.widget.ImageView toolIcon(int res) {
         android.widget.ImageView iv = new android.widget.ImageView(this);
         try {
-            iv.setImageResource(res);
-            iv.setColorFilter(Theme.GOLD_SOFT);
+            int res3 = Theme.icon3d(res);
+            iv.setImageResource(res3);
+            if (!Theme.isIcon3d(res3)) iv.setColorFilter(Theme.GOLD_SOFT);
         } catch (Exception ignored) { Diag.ignored("MainActivity:694", ignored); }
         return iv;
     }
@@ -806,8 +813,11 @@ public class MainActivity extends Activity {
             LinearLayout badge = new LinearLayout(this);
             badge.setGravity(Gravity.CENTER);
             int iconRes = MeelanoIcons.iconFor(s.glyph());
+            // A 3D bitmap must not be tinted; remember that on the symbol.
+            boolean is3d = iconRes != 0 && Theme.isIcon3d(Theme.icon3d(iconRes));
             if (iconRes != 0) {
                 android.widget.ImageView symbol = kit.icon(iconRes, Theme.MUTED, 22);
+                symbol.setTag(is3d ? Boolean.TRUE : Boolean.FALSE);
                 badge.addView(symbol, new LinearLayout.LayoutParams(Theme.dp(24), Theme.dp(24)));
             } else {
                 TextView symbol = kit.text(s.glyph(), 20, Theme.MUTED, true);
@@ -837,7 +847,39 @@ public class MainActivity extends Activity {
         paintBottom();
     }
 
+    private int selectedNavIndex = -1;
+
+    /** Slides the selection capsule to the selected tab (animated after the first layout). */
+    private void moveCapsule(final boolean animate) {
+        if (navCapsule == null || bottomBar == null) return;
+        if (selectedNavIndex < 0 || selectedNavIndex >= bottomBar.getChildCount()) {
+            navCapsule.setVisibility(View.GONE);
+            return;
+        }
+        final View tab = bottomBar.getChildAt(selectedNavIndex);
+        Runnable go = () -> {
+            if (tab.getWidth() <= 0 || tab.getHeight() <= 0) return;
+            android.widget.FrameLayout.LayoutParams lp =
+                    (android.widget.FrameLayout.LayoutParams) navCapsule.getLayoutParams();
+            lp.width = tab.getWidth() - Theme.dp(8);
+            lp.height = tab.getHeight() - Theme.dp(4);
+            lp.topMargin = tab.getTop() + Theme.dp(2);
+            lp.leftMargin = 0;
+            navCapsule.setLayoutParams(lp);
+            float x = tab.getLeft() + Theme.dp(4);
+            navCapsule.setVisibility(View.VISIBLE);
+            if (animate) {
+                navCapsule.animate().translationX(x).setDuration(280)
+                        .setInterpolator(new android.view.animation.DecelerateInterpolator()).start();
+            } else {
+                navCapsule.setTranslationX(x);
+            }
+        };
+        if (tab.getWidth() > 0) go.run(); else tab.post(go);
+    }
+
     private void paintBottom() {
+        selectedNavIndex = -1;
         for (int i = 0; i < bottomBar.getChildCount(); i++) {
             LinearLayout b = (LinearLayout) bottomBar.getChildAt(i);
             boolean on = i < tabs.length && (tabs[i].equals(currentId)
@@ -858,7 +900,8 @@ public class MainActivity extends Activity {
             }
             View symbol = badge.getChildAt(0);
             if (symbol instanceof android.widget.ImageView) {
-                ((android.widget.ImageView) symbol).setColorFilter(on ? Theme.selectedNavInk() : Theme.MUTED);
+                if (!Boolean.TRUE.equals(symbol.getTag()))
+                    ((android.widget.ImageView) symbol).setColorFilter(on ? Theme.selectedNavInk() : Theme.MUTED);
             } else if (symbol instanceof TextView) {
                 ((TextView) symbol).setTextColor(on ? Theme.selectedNavInk() : Theme.MUTED);
             }
@@ -867,12 +910,14 @@ public class MainActivity extends Activity {
             label.setTextSize(on ? 11f : 10.5f);
             b.getChildAt(2).setVisibility(on ? View.VISIBLE : View.INVISIBLE);
             b.getChildAt(2).setBackground(on ? Theme.bottomNavMarker() : null);
-            b.setBackground(on ? Theme.bottomNavSelected() : null);
+            b.setBackground(null); // the sliding capsule marks the selected tab instead
+            if (on) selectedNavIndex = i;
             b.setSelected(on);
             b.setElevation(on ? Theme.dp(2) : 0f);
             b.setContentDescription(label.getText() + (on ? "، بخش فعال" : "، رفتن به بخش"));
             Theme.pressable(b); // Re-wrap the selected-state background with touch feedback.
         }
+        moveCapsule(true);
     }
 
     private boolean isTab(String id) {

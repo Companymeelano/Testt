@@ -70,6 +70,11 @@ public final class Theme {
      */
     public static int icon3d(int vector) {
         if (!light) return vector;
+        if (vector == R.drawable.mi_grid_view) return R.drawable.icon3d_products;
+        if (vector == R.drawable.mi_star_shine) return R.drawable.icon3d_assistant;
+        if (vector == R.drawable.mi_widgets) return R.drawable.icon3d_more;
+        if (vector == R.drawable.mi_calendar_month) return R.drawable.icon3d_dues;
+        if (vector == R.drawable.mi_zoom) return R.drawable.icon3d_zoom;
         if (vector == R.drawable.mi_point_of_sale) return R.drawable.icon3d_sales;
         if (vector == R.drawable.mi_shopping_cart) return R.drawable.icon3d_purchase;
         if (vector == R.drawable.mi_receipt_long) return R.drawable.icon3d_cash_in;
@@ -100,7 +105,9 @@ public final class Theme {
                 || res == R.drawable.icon3d_gold || res == R.drawable.icon3d_coin
                 || res == R.drawable.icon3d_home || res == R.drawable.icon3d_search
                 || res == R.drawable.icon3d_account || res == R.drawable.icon3d_refresh
-                || res == R.drawable.icon3d_theme;
+                || res == R.drawable.icon3d_theme || res == R.drawable.icon3d_products
+                || res == R.drawable.icon3d_assistant || res == R.drawable.icon3d_more
+                || res == R.drawable.icon3d_dues || res == R.drawable.icon3d_zoom;
     }
 
     /** 1.0 normal, 1.3 large-text mode (applied in Kit.text). */

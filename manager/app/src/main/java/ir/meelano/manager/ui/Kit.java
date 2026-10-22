@@ -267,6 +267,8 @@ public final class Kit {
         LinearLayout t = v();
         t.setBackground(Theme.kpi(k.accent));
         t.setPadding(Theme.dp(12), Theme.dp(11), Theme.dp(12), Theme.dp(11));
+        // Centred composition like the reference: icon, label, value and note share one axis.
+        t.setGravity(Gravity.CENTER_HORIZONTAL);
         if (k.icon != 0) {
             // Optional gold glyph above the label (dashboard tiles).
             android.widget.ImageView ic = new android.widget.ImageView(a);
@@ -280,10 +282,12 @@ public final class Kit {
             t.addView(ic, ip);
         }
         TextView l = text(k.label, 10.5f, Theme.MUTED, false);
+        l.setGravity(Gravity.CENTER_HORIZONTAL);
         l.setSingleLine(true);
         l.setEllipsize(TextUtils.TruncateAt.END);
         t.addView(l, lp(-1, -2));
         TextView v = text(k.value, 16.5f, Theme.TEXT, true);
+        v.setGravity(Gravity.CENTER_HORIZONTAL);
         v.setSingleLine(true);
         // Large amounts shrink to fit the tile instead of ending in "…".
         if (android.os.Build.VERSION.SDK_INT >= 26) {
@@ -313,10 +317,12 @@ public final class Kit {
         // Every tile reserves the same lines (sub + action), so tiles in one row
         // match in height and their values line up whether or not they have a note.
         TextView s = text(k.sub == null || k.sub.isEmpty() ? " " : k.sub, 10f, k.accent, true);
+        s.setGravity(Gravity.CENTER_HORIZONTAL);
         s.setSingleLine(true);
         s.setEllipsize(TextUtils.TruncateAt.END);
         t.addView(s, lp(-1, -2));
         TextView more = text(k.action != null ? "مشاهده جزئیات ›" : " ", 9.5f, Theme.MUTED, true);
+        more.setGravity(Gravity.CENTER_HORIZONTAL);
         more.setSingleLine(true);
         t.addView(more, lp(-1, -2));
         if (k.action != null) {

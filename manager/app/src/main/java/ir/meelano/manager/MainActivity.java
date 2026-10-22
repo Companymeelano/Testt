@@ -825,6 +825,12 @@ public class MainActivity extends Activity {
                     || ("more".equals(tabs[i]) && !isTab(currentId)));
             LinearLayout badge = (LinearLayout) b.getChildAt(0);
             badge.setBackground(on ? Theme.bottomNavIconSelected() : null);
+            // Gold halo under the selected capsule (API 28+ coloured shadow; older devices keep the rim).
+            if (android.os.Build.VERSION.SDK_INT >= 28) {
+                badge.setElevation(on ? Theme.dp(6) : 0f);
+                badge.setOutlineSpotShadowColor(Theme.GOLD);
+                badge.setOutlineAmbientShadowColor(Theme.GOLD);
+            }
             View symbol = badge.getChildAt(0);
             if (symbol instanceof android.widget.ImageView) {
                 ((android.widget.ImageView) symbol).setColorFilter(on ? Theme.selectedNavInk() : Theme.MUTED);
@@ -1429,13 +1435,13 @@ public class MainActivity extends Activity {
             }
             licChip.setVisibility(View.VISIBLE);
             if (s.plan == License.P_PERM) {
-                ir.meelano.manager.ui.MeelanoIcons.set(licChip, "◈ دائمی");
+                ir.meelano.manager.ui.MeelanoIcons.set(licChip, "📅 دائمی");
                 licChip.setTextColor(Theme.GOLD_SOFT);
             } else if (s.daysLeft <= 7) {
-                ir.meelano.manager.ui.MeelanoIcons.set(licChip, "◈ " + Money.fa(String.valueOf(s.daysLeft)) + " روز!");
+                ir.meelano.manager.ui.MeelanoIcons.set(licChip, "📅 " + Money.fa(String.valueOf(s.daysLeft)) + " روز!");
                 licChip.setTextColor(Theme.DANGER);
             } else {
-                ir.meelano.manager.ui.MeelanoIcons.set(licChip, "◈ " + Money.fa(String.valueOf(s.daysLeft)) + " روز");
+                ir.meelano.manager.ui.MeelanoIcons.set(licChip, "📅 " + Money.fa(String.valueOf(s.daysLeft)) + " روز");
                 licChip.setTextColor(Theme.GOLD_SOFT);
             }
         } catch (Exception e) {

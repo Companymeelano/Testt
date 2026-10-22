@@ -730,7 +730,15 @@ public class HomeScreen extends Screen {
             card.addView(a.kit.gap(8));
             LinearLayout wr = a.kit.h();
             wr.setGravity(Gravity.CENTER_VERTICAL);
-            wr.addView(a.kit.text(MarketWeather.glyph(w.code), 22f, Theme.GOLD, false), a.kit.lp(-2, -2));
+            // Gold vector icon instead of a text glyph (visual only; same weather code mapping).
+            android.widget.ImageView wi = new android.widget.ImageView(a);
+            int wRes = w.code <= 1 ? R.drawable.mi_light_mode
+                    : w.code <= 3 ? R.drawable.mi_wb_twilight
+                    : (w.code >= 95 ? R.drawable.mi_bolt
+                    : (w.code >= 51 ? R.drawable.mi_beach_access : R.drawable.mi_wb_twilight));
+            try { wi.setImageResource(wRes); } catch (Exception ignored) { Diag.ignored("HomeScreen:weatherIcon", ignored); }
+            wi.setColorFilter(Theme.GOLD);
+            wr.addView(wi, a.kit.lp(Theme.dp(26), Theme.dp(26)));
             wr.addView(a.kit.space(8));
             LinearLayout wc = a.kit.v();
             TextView line = a.kit.text(weatherPlace + " • " + Money.fa(String.valueOf(Math.round(w.temp))) + "°  "

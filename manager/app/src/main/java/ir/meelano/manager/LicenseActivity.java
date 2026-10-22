@@ -1116,39 +1116,32 @@ public class LicenseActivity extends Activity {
     }
 
     private void buildConnPage(LinearLayout box, LicenseStore.Status s) {
-        box.addView(stepBar(2), kit.lp(-1, -2));
-        box.addView(kit.gap(10));
-        box.addView(Card3D.hero(this, kit, R.drawable.mi_database, Theme.GOLD,
-                editingConnection ? "تغییر سرور اختصاصی" : "اتصال اختصاصی فروشگاه",
-                editingConnection ? "آدرس فعلی را جایگزین کنید و دیتابیس را دوباره انتخاب کنید."
-                        : "آدرس سرور را وارد کنید، سپس دیتابیس سازگار را انتخاب کنید.",
-                editingConnection ? "ویرایش اتصال" : "گام ۲ • اتصال", Theme.GOLD_SOFT),
-                kit.lp(-1, -2));
-        box.addView(kit.gap(8));
-        LinearLayout lc = Card3D.card(this, CARD_EDGE);
-        LinearLayout lrow = kit.h();
-        lrow.setGravity(Gravity.CENTER_VERTICAL);
-        lrow.addView(kit.text("لایسنس", 15f, Theme.TEXT, true), kit.wlp(1f));
-        lrow.addView(kit.text("✓", 16f, Theme.SUCCESS, true), kit.lp(-2, -2));
-        lc.addView(lrow, kit.lp(-1, -2));
-        lc.addView(kit.kv("وضعیت", "✓ فعال", Theme.SUCCESS), kit.lp(-1, -2));
-        lc.addView(kit.kv("طرح", "«" + License.planFa(s.plan) + "»", Theme.GOLD_SOFT),
-                kit.lp(-1, -2));
-        if (s.plan == License.P_PERM) {
-            lc.addView(kit.kv("اعتبار", "دائمی ♾", Theme.SUCCESS), kit.lp(-1, -2));
-        } else {
-            lc.addView(kit.kv("اعتبار", Money.fa(String.valueOf(s.daysLeft)) + " روز",
-                    leftColor(s.daysLeft)), kit.lp(-1, -2));
-        }
-        Card3D.mount(box, lc);
+        // Top brand mark: the same crown-M medallion used across the app.
+        android.widget.ImageView topLogo = new android.widget.ImageView(this);
+        topLogo.setImageResource(R.drawable.meelano_3d);
+        topLogo.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+        LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(Theme.dp(84), Theme.dp(84));
+        tlp.gravity = Gravity.CENTER_HORIZONTAL;
+        box.addView(topLogo, tlp);
+        // Licence in one compact strip (status, plan and days left), so it takes little room.
+        LinearLayout lic = kit.h();
+        lic.setGravity(Gravity.CENTER_VERTICAL);
+        lic.setBackground(Theme.pill(Theme.alpha(Theme.SUCCESS, 46)));
+        lic.setPadding(Theme.dp(12), Theme.dp(6), Theme.dp(12), Theme.dp(6));
+        String licLeft = s.plan == License.P_PERM ? "دائمی ♾" : Money.fa(String.valueOf(s.daysLeft)) + " روز";
+        lic.addView(kit.text("✓ لایسنس فعال", 12f, Theme.SUCCESS, true), kit.lp(-2, -2));
+        lic.addView(kit.text("  •  «" + License.planFa(s.plan) + "»  •  " + licLeft, 11.5f,
+                s.plan == License.P_PERM ? Theme.SUCCESS : leftColor(s.daysLeft), false), kit.lp(-2, -2));
+        LinearLayout.LayoutParams llp = kit.lp(-2, -2);
+        llp.gravity = Gravity.CENTER_HORIZONTAL;
+        llp.setMargins(0, Theme.dp(8), 0, Theme.dp(10));
+        box.addView(lic, llp);
         LinearLayout c = Card3D.card(this, Theme.GOLD);
         LinearLayout chead = kit.h();
         chead.setGravity(Gravity.CENTER_VERTICAL);
         chead.addView(Card3D.stepRow(this, kit, "✦", Theme.GOLD, "اتصال به سرور"), kit.wlp(1f));
         chead.addView(refreshIconView(), kit.lp(-2, -2));
         c.addView(chead, kit.lp(-1, -2));
-        c.addView(kit.text("لایسنس فعال است؛ IP سرور را وارد کنید تا دیتابیس‌های سازگار نمایش داده شوند.",
-                13f, Theme.TEXT, false), kit.lp(-1, -2));
         connRadar = new RadarView(this);
         LinearLayout.LayoutParams rlp =
                 new LinearLayout.LayoutParams(Theme.dp(110), Theme.dp(110));
@@ -1171,8 +1164,6 @@ public class LicenseActivity extends Activity {
                     | android.text.InputType.TYPE_TEXT_VARIATION_URI);
         } catch (Exception e) { Diag.ignored("LicenseActivity:ipField", e); }
         c.addView(iconField(fIp, R.drawable.mi_my_location), kit.lp(-1, -2));
-        c.addView(kit.text("پس از اتصال مستقیم، دیتابیس‌های دارای ساختار آتیران برای انتخاب نمایش داده می‌شوند.",
-                11.5f, Theme.MUTED, false), kit.lp(-1, -2));
         if (editingConnection) {
             c.addView(kit.hint("برای اتصال به سرور دیگر، آدرس بالا را کامل جایگزین کنید؛ دیتابیس قبلی به‌صورت خودکار انتخاب نمی‌شود."),
                     kit.lp(-1, -2));

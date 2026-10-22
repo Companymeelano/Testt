@@ -711,24 +711,12 @@ public class MainActivity extends Activity {
         styleBars();
         checkConn();
         refreshCompany();
-        // Only ONE startup popup per launch: the post-login tour, else «تازه‌های نسخه», else the update prompt.
-        boolean tourShown = false;
+        // No startup announcements (what's-new tour or update prompt): the flag is cleared silently.
         try {
-            if (ir.meelano.manager.core.LicenseStore.tourPending(this)) {
-                ir.meelano.manager.core.LicenseStore.setTourPending(this, false);
-                ir.meelano.manager.ui.WhatsNew.showCurrent(this);
-                tourShown = true;
-            }
+            ir.meelano.manager.core.LicenseStore.setTourPending(this, false);
         } catch (Exception ignored) { Diag.ignored("MainActivity:677", ignored); }
         Notify.boot(this);
         syncBackFab();
-        // v24: What's New on upgrade (once), then the silent licensed update check.
-        try {
-            if (!tourShown) {
-                // When «تازه‌های نسخه» opens, the update prompt waits for the next launch.
-                UpdateCenter.autoCheck(this);
-            }
-        } catch (Exception ignored) { Diag.ignored("MainActivity:683", ignored); }
         watchLink();
     }
 

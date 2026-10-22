@@ -488,7 +488,7 @@ public final class Theme {
         // Rounded top edge with a gold hairline: the bar reads as a floating luxury dock.
         float r = dp(22);
         d.setCornerRadii(new float[]{r, r, r, r, 0, 0, 0, 0});
-        d.setStroke(dp(1), alpha(GOLD, 70));
+        d.setStroke(dp(1), alpha(GOLD, light ? 70 : 120));
         return d;
     }
 

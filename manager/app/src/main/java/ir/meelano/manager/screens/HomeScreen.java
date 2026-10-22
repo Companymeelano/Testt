@@ -730,7 +730,7 @@ public class HomeScreen extends Screen {
             card.addView(a.kit.gap(8));
             LinearLayout wr = a.kit.h();
             wr.setGravity(Gravity.CENTER_VERTICAL);
-            wr.addView(a.kit.text(MarketWeather.glyph(w.code), 18f, Theme.GOLD, false), a.kit.lp(-2, -2));
+            wr.addView(a.kit.text(MarketWeather.glyph(w.code), 22f, Theme.GOLD, false), a.kit.lp(-2, -2));
             wr.addView(a.kit.space(8));
             LinearLayout wc = a.kit.v();
             TextView line = a.kit.text(weatherPlace + " • " + Money.fa(String.valueOf(Math.round(w.temp))) + "°  "

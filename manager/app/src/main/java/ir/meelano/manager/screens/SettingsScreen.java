@@ -630,15 +630,6 @@ public class SettingsScreen extends Screen {
         ab.addView(tag, a.kit.lp(-1, -2));
         ab.addView(a.kit.gap(4));
         ab.addView(a.kit.kv("نسخه", appVersion() + " • " + editionNow(), Theme.TEXT), a.kit.lp(-1, -2));
-        final boolean autoNews = !ir.meelano.manager.ui.WhatsNew.isAutoOff(a);
-        addRow(ab, toggleRow("نمایش خودکار تازه‌های نسخه",
-                "بعد از هر به‌روزرسانی یک‌بار نشان داده شود", autoNews, Theme.GOLD, v -> {
-                    ir.meelano.manager.ui.WhatsNew.setAutoOff(a, autoNews);
-                    a.kit.toast(autoNews ? "نمایش خودکار خاموش شد" : "نمایش خودکار روشن شد");
-                    render(content);
-                }));
-        ab.addView(a.kit.btnGhost("✦  تازه‌های نسخه", Theme.GOLD, v ->
-                ir.meelano.manager.ui.WhatsNew.showCurrent(a)), a.kit.lp(-1, -2));
         addUpdateCard(ab);
         ab.addView(a.kit.kv("منبع داده", "SQL Server آتیران (اتصال مستقیم)", Theme.TEXT), a.kit.lp(-1, -2));
         ab.addView(a.kit.text("✦ پشتیبانی میلانو", 13f, Theme.GOLD_SOFT, true), a.kit.lp(-1, -2));
@@ -651,7 +642,6 @@ public class SettingsScreen extends Screen {
         }
         ab.addView(a.kit.hint("همه بخش‌ها داده زنده نمایش می‌دهند؛ بدون اتصال، اطلاع‌رسانی می‌شود."), a.kit.lp(-1, -2));
         a.kit.addCard(content, ab);
-        buildChangelog(content);
     }
 
     /** Themed update card: manual check, status, and a manual release-page fallback. */

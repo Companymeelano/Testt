@@ -714,8 +714,7 @@ public class MainActivity extends Activity {
         try {
             if (!tourShown) {
                 // When «تازه‌های نسخه» opens, the update prompt waits for the next launch.
-                boolean news = WhatsNew.pending(this);
-                WhatsNew.maybeShow(this, news ? null : () -> UpdateCenter.autoCheck(this));
+                UpdateCenter.autoCheck(this);
             }
         } catch (Exception ignored) { Diag.ignored("MainActivity:683", ignored); }
         watchLink();
@@ -1035,16 +1034,10 @@ public class MainActivity extends Activity {
             if (companyName != null) ir.meelano.manager.ui.MeelanoIcons.set(companyName, companyTitle());
             android.graphics.Bitmap b = Company.logo(this);
             if (logoImg != null && logoGlyph != null) {
-                if (b != null) {
-                    logoImg.setImageBitmap(b);
-                    logoImg.setVisibility(View.VISIBLE);
-                    logoGlyph.setVisibility(View.GONE);
-                } else {
-                    // No company logo cached: show the app's own M mark instead of a generic glyph.
-                    logoImg.setImageResource(R.drawable.meelano_3d);
-                    logoImg.setVisibility(View.VISIBLE);
-                    logoGlyph.setVisibility(View.GONE);
-                }
+                // Same crown-M medallion as the dashboard crest (b is intentionally not shown here).
+                logoImg.setImageResource(R.drawable.meelano_3d);
+                logoImg.setVisibility(View.VISIBLE);
+                logoGlyph.setVisibility(View.GONE);
             }
         } catch (Exception ignored) { Diag.ignored("MainActivity:997", ignored); }
     }

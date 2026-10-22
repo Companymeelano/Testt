@@ -1572,43 +1572,34 @@ public class LicenseActivity extends Activity {
     // ================= done =================
 
     private void buildDonePage(LinearLayout box, LicenseStore.Status s) {
-        // Compact licence header: one gold 3D ticket with three chips, so the screen stays calm.
-        LinearLayout c = Card3D.card(this, Theme.SUCCESS);
-        LinearLayout top = kit.h();
-        top.setGravity(Gravity.CENTER_VERTICAL);
-        top.addView(iconChip(R.drawable.mi_verified_user, Theme.SUCCESS, 52),
-                new LinearLayout.LayoutParams(Theme.dp(52), Theme.dp(52)));
-        top.addView(kit.space(12));
-        LinearLayout copy = kit.v();
-        copy.addView(kit.text("لایسنس فعال", 16f, Theme.TEXT, true), kit.lp(-1, -2));
-        copy.addView(kit.text("طرح «" + License.planFa(s.plan) + "»", 12f, Theme.MUTED, false), kit.lp(-1, -2));
-        top.addView(copy, kit.wlp(1f));
-        c.addView(top, kit.lp(-1, -2));
-        c.addView(kit.gap(10));
+        // Relaunch page: licence details live in the app header now; this page only confirms and enters.
+        LinearLayout hero = kit.v();
+        hero.setGravity(Gravity.CENTER_HORIZONTAL);
+        android.widget.FrameLayout ring = new android.widget.FrameLayout(this);
+        ring.setBackground(Theme.accentAvatar(Theme.GOLD));
+        android.widget.ImageView mark = new android.widget.ImageView(this);
+        mark.setImageResource(R.drawable.meelano_3d);
+        mark.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
+        mark.setClipToOutline(true);
+        mark.setOutlineProvider(new android.view.ViewOutlineProvider() {
+            @Override
+            public void getOutline(View v, android.graphics.Outline o) {
+                o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), Theme.dp(26));
+            }
+        });
+        ring.addView(mark, new android.widget.FrameLayout.LayoutParams(Theme.dp(104), Theme.dp(104), Gravity.CENTER));
+        hero.addView(ring, new LinearLayout.LayoutParams(Theme.dp(112), Theme.dp(112)));
+        TextView t = kit.text("همه‌چیز آماده است", 21f, Theme.TEXT, true);
+        t.setGravity(Gravity.CENTER);
+        hero.addView(t, kit.lp(-1, -2));
+        TextView sub = kit.text("لایسنس فعال است؛ با یک لمس وارد میلانو شوید.", 12.5f, Theme.MUTED, false);
+        sub.setGravity(Gravity.CENTER);
+        hero.addView(sub, kit.lp(-1, -2));
+        box.addView(kit.gap(18));
+        box.addView(hero, kit.lp(-1, -2));
+        box.addView(kit.gap(18));
 
-        boolean perm = s.plan == License.P_PERM;
-        String left = perm ? "دائمی" : Money.fa(String.valueOf(s.daysLeft)) + " روز";
-        int leftCol = perm ? Theme.SUCCESS : leftColor(s.daysLeft);
-        String sh = connSummaryHost();
-        String masked = sh;
-        try {
-            if (!sh.isEmpty()) masked = SmartLink.maskHost(sh);
-        } catch (Exception ignored) { Diag.ignored("LicenseActivity:done", ignored); }
-        String stn = connSummaryTables();
-
-        LinearLayout chips = kit.h();
-        chips.addView(miniChip(perm ? R.drawable.mi_diamond : R.drawable.mi_timer, Theme.GOLD,
-                perm ? "اعتبار" : "زمان باقی‌مانده", left, leftCol), kit.wlp(1f));
-        chips.addView(kit.space(6));
-        chips.addView(miniChip(R.drawable.mi_database, Theme.GOLD, "سرور",
-                sh.isEmpty() ? "تنظیم نشده" : masked, sh.isEmpty() ? Theme.MUTED : Theme.SUCCESS), kit.wlp(1f));
-        if (!stn.isEmpty()) {
-            chips.addView(kit.space(6));
-            chips.addView(miniChip(R.drawable.mi_inventory_2, Theme.VIOLET, "جدول‌ها",
-                    Money.fa(stn), Theme.TEXT), kit.wlp(1f));
-        }
-        c.addView(chips, kit.lp(-1, -2));
-        c.addView(kit.gap(12));
+        LinearLayout c = Card3D.card(this, Theme.GOLD);
         c.addView(goldAction("ورود به برنامه", R.drawable.mi_login, v -> enterApp()), kit.lp(-1, -2));
         c.addView(kit.gap(8));
         c.addView(ghostAction("تغییر سرور یا دیتابیس", Theme.GOLD, R.drawable.mi_swap_horiz, v -> {

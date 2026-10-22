@@ -7,7 +7,7 @@ public final class BuiltinKeys {
     /* Order follows the list supplied by the owner. */
     static final String GEMINI_KEY = "AIzaSyARwYMgJaVKt6LlU1-ZwTC4fThrlqAX1RE";
     static final String GROQ_KEY = "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";
-    static final String DEEPSEEK_KEY = "sk-3530d712eaaa4b5aafcc815891b3e619";
+    static final String DEEPSEEK_KEY = ""; // rotated: the old embedded key was revoked; set a new key in AI settings
 
     /** Built-in key for a provider id, or an empty string when none is embedded. */
     public static String get(String provider) {

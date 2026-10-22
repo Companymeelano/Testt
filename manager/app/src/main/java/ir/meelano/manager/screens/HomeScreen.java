@@ -927,10 +927,8 @@ public class HomeScreen extends Screen {
         String nowTs = Money.fa(String.format(Locale.US, "%02d:%02d",
                 Calendar.getInstance().get(Calendar.HOUR_OF_DAY), Calendar.getInstance().get(Calendar.MINUTE)));
         content.addView(updateBanner(nowTs, true), a.kit.lp(-1, -2));
-        // The greeting hero overlaps the clock banner's lower edge: one integrated header unit.
-        LinearLayout.LayoutParams gh = a.kit.lp(-1, -2);
-        gh.setMargins(0, Theme.dp(-14), 0, 0);
-        content.addView(greetingHero(), gh);
+        content.addView(a.kit.gap(10));
+        content.addView(greetingHero(), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
         content.addView(a.kit.gap(8));
 

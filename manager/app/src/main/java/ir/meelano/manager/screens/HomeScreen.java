@@ -324,6 +324,8 @@ public class HomeScreen extends Screen {
 
     @Override
     public void render(final LinearLayout content) {
+        // Faint gold dot grid behind the dashboard (both skins; very low contrast, decorative only).
+        if (!(content.getBackground() instanceof DotGrid)) content.setBackground(new DotGrid());
         final int token = a.renderGen();
         // Smart first paint: the last saved dashboard appears at once and live data replaces it when ready.
         final String[] cachedTs = {""};
@@ -1008,6 +1010,29 @@ public class HomeScreen extends Screen {
         }
         renderNotes(content, d.notes);
         staggerIn(content);
+    }
+
+    /** Decorative dot grid drawn behind the home content. */
+    private static final class DotGrid extends android.graphics.drawable.Drawable {
+        private final android.graphics.Paint dot = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        private final float step = Theme.dp(22);
+
+        DotGrid() {
+            dot.setColor(Theme.alpha(Theme.GOLD, Theme.isLight() ? 26 : 16));
+        }
+
+        @Override
+        public void draw(android.graphics.Canvas c) {
+            android.graphics.Rect b = getBounds();
+            float r = Theme.dp(1f);
+            for (float y = b.top + step; y < b.bottom; y += step)
+                for (float x = b.left + step; x < b.right; x += step)
+                    c.drawCircle(x, y, r, dot);
+        }
+
+        @Override public void setAlpha(int alpha) { }
+        @Override public void setColorFilter(android.graphics.ColorFilter cf) { }
+        @Override public int getOpacity() { return android.graphics.PixelFormat.TRANSLUCENT; }
     }
 
     /** One-time staggered fade and slide for the first home cards (skipped when animations are off). */

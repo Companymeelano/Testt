@@ -76,6 +76,9 @@ public final class Theme {
         if (vector == R.drawable.mi_payments) return R.drawable.icon3d_cash_out;
         if (vector == R.drawable.mi_cheque) return R.drawable.icon3d_cheque;
         if (vector == R.drawable.mi_inventory_2) return R.drawable.icon3d_inventory;
+        if (vector == R.drawable.mi_group) return R.drawable.icon3d_customers;
+        if (vector == R.drawable.mi_bar_chart) return R.drawable.icon3d_reports;
+        if (vector == R.drawable.mi_settings) return R.drawable.icon3d_settings;
         return vector;
     }
 
@@ -83,7 +86,9 @@ public final class Theme {
     public static boolean isIcon3d(int res) {
         return res == R.drawable.icon3d_sales || res == R.drawable.icon3d_purchase
                 || res == R.drawable.icon3d_cash_in || res == R.drawable.icon3d_cash_out
-                || res == R.drawable.icon3d_cheque || res == R.drawable.icon3d_inventory;
+                || res == R.drawable.icon3d_cheque || res == R.drawable.icon3d_inventory
+                || res == R.drawable.icon3d_customers || res == R.drawable.icon3d_reports
+                || res == R.drawable.icon3d_settings;
     }
 
     /** 1.0 normal, 1.3 large-text mode (applied in Kit.text). */

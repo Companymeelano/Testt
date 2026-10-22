@@ -1335,6 +1335,16 @@ public final class Kit {
     /** Static vector icon (v34): one family (Material Symbols Rounded), decorative by default. */
     public ImageView icon(int res, int color, int dp) {
         ImageView v = new ImageView(a);
+        // Light skin: rendered 3D gold icon instead of the flat glyph; it keeps its own colours.
+        int res3 = Theme.icon3d(res);
+        if (Theme.isIcon3d(res3)) {
+            v.setImageResource(res3);
+            v.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+            int s3 = Theme.dp(dp);
+            v.setLayoutParams(new LinearLayout.LayoutParams(s3, s3));
+            v.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+            return v;
+        }
         try {
             android.graphics.drawable.Drawable d = a.getDrawable(res);
             if (d != null) {

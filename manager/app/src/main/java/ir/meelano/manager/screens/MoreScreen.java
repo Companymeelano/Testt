@@ -370,8 +370,9 @@ public class MoreScreen extends Screen {
         int iconRes = MeelanoIcons.iconFor(glyph);
         if (iconRes != 0) {
             ImageView image = new ImageView(a);
-            image.setImageResource(iconRes);
-            image.setColorFilter(accent);
+            int res3 = Theme.icon3d(iconRes);
+            image.setImageResource(res3);
+            if (!Theme.isIcon3d(res3)) image.setColorFilter(accent);
             image.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
             int inside = Math.max(18, Math.round(sizeDp * 0.52f));
             android.widget.FrameLayout.LayoutParams ip = new android.widget.FrameLayout.LayoutParams(

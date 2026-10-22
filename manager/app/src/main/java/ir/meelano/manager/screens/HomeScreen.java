@@ -546,7 +546,11 @@ public class HomeScreen extends Screen {
 
         // Crest: the company logo from the local cache (synced from the database), or a fine default mark.
         FrameLayout crest = new FrameLayout(a);
-        crest.setBackground(Theme.bottomNavIconSelected());
+        android.graphics.drawable.GradientDrawable frame = new android.graphics.drawable.GradientDrawable();
+        frame.setCornerRadius(Theme.dp(18));
+        frame.setColor(Theme.BG);
+        frame.setStroke(Theme.dp(2), Theme.GOLD);
+        crest.setBackground(frame);
         crest.setElevation(Theme.dp(3));
         android.graphics.Bitmap logo = ir.meelano.manager.data.Company.logo(a);
         if (logo != null) {
@@ -557,7 +561,7 @@ public class HomeScreen extends Screen {
             li.setOutlineProvider(new android.view.ViewOutlineProvider() {
                 @Override
                 public void getOutline(View v, android.graphics.Outline o) {
-                    o.setOval(0, 0, v.getWidth(), v.getHeight());
+                    o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), Theme.dp(16));
                 }
             });
             crest.addView(li, new FrameLayout.LayoutParams(Theme.dp(50), Theme.dp(50), Gravity.CENTER));
@@ -569,7 +573,7 @@ public class HomeScreen extends Screen {
             mark.setOutlineProvider(new android.view.ViewOutlineProvider() {
                 @Override
                 public void getOutline(View v, android.graphics.Outline o) {
-                    o.setOval(0, 0, v.getWidth(), v.getHeight());
+                    o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), Theme.dp(16));
                 }
             });
             crest.addView(mark, new FrameLayout.LayoutParams(Theme.dp(50), Theme.dp(50), Gravity.CENTER));

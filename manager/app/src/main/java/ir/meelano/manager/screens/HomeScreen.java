@@ -893,9 +893,9 @@ public class HomeScreen extends Screen {
         // remaining KPIs visible, but make the missing metric explicit and inert.
         List<Kit.Kpi> kpis = new ArrayList<>();
         kpis.add(dayKpi("فروش", "sales", d.salesDay, "docs", "فاکتور", Theme.GOLD));
-        kpis.add(dayKpi("خرید", "buy", d.buyDay, "docs", "فاکتور", Theme.INFO));
-        kpis.add(dayKpi("دریافت", "dar_in", d.inDay, "count", "قبض", Theme.SUCCESS));
-        kpis.add(dayKpi("پرداخت", "dar_out", d.outDay, "count", "قبض", Theme.WARNING));
+        kpis.add(dayKpi("خرید", "buy", d.buyDay, "docs", "فاکتور", Theme.GOLD));
+        kpis.add(dayKpi("دریافت", "dar_in", d.inDay, "count", "قبض", Theme.GOLD));
+        kpis.add(dayKpi("پرداخت", "dar_out", d.outDay, "count", "قبض", Theme.GOLD));
         // Sparklines: last 14 days per tile (days without a row count as 0). Each tile
         // draws only from its own daily query; a missing query simply leaves the tile plain.
         attachSpark(kpis.get(0), d.salesDaily, d);
@@ -919,8 +919,8 @@ public class HomeScreen extends Screen {
             List<Kit.Kpi> cmp = new ArrayList<>();
             cmp.add(new Kit.Kpi(compareLabel, Money.compactRial(todaySales), "تغییر ۷ روزه " + delta, Theme.GOLD));
             cmp.add(new Kit.Kpi("دیروز", Money.compactRial(yesterday), "", Theme.TEXT));
-            cmp.add(new Kit.Kpi("میانگین ۷ روز قبل", Money.compactRial(avg7), "", Theme.INFO));
-            cmp.add(new Kit.Kpi("میانگین ۳۰ روز قبل", Money.compactRial(avg30), "", Theme.VIOLET));
+            cmp.add(new Kit.Kpi("میانگین ۷ روز قبل", Money.compactRial(avg7), "", Theme.GOLD_SOFT));
+            cmp.add(new Kit.Kpi("میانگین ۳۰ روز قبل", Money.compactRial(avg30), "", Theme.GOLD_SOFT));
             compare.addView(a.kit.kpiGrid(cmp, 2), a.kit.lp(-1, -2));
             if (todaySales <= 0)
                 compare.addView(a.kit.hint("برای " + compareLabel + " هنوز فروشی ثبت نشده است. اعداد بالا از روزهای قبل محاسبه شده‌اند."),

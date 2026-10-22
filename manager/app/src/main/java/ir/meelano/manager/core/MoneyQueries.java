@@ -236,6 +236,59 @@ public final class MoneyQueries {
                 new ArrayList<>());
     }
 
+    /**
+     * Receipts by means of payment, each on its own row (cash, card reader, transfer, received cheques).
+     * Cheques are never added into the other three: label,amount,docs.
+     */
+    public static Queries.Q paymentMix(Meta m, Filter f) throws Queries.Missing {
+        Dar d = darCols(m);
+        if (!darBreakdownAvailable(m, d, 0)) throw new Queries.Missing("تفکیک نقد، کارت‌خوان، حواله و چک در دیتابیس پیدا نشد");
+        Set<String> cols = m.columns("dar");
+        DarParts parts = darParts(m, d, "h", 0);
+        List<Object> binds = new ArrayList<>();
+        binds.add(0);
+        List<String> conds = new ArrayList<>();
+        conds.add("h.[p]=?");
+        String dc = Sql.dateCond(Sql.date10("h", d.date), f.from, f.to, binds);
+        if (!dc.isEmpty()) conds.add(dc);
+        String rows = darRows(d, m, parts, cols, Sql.join(conds, " AND "));
+        String[][] kinds = {{"نقد", "cash"}, {"کارت‌خوان", "pos"}, {"حواله", "havaleh"}, {"چک‌های دریافتی", "cheque"}};
+        List<String> unions = new ArrayList<>();
+        List<Object> all = new ArrayList<>();
+        for (String[] k : kinds) {
+            unions.add("SELECT N'" + k[0] + "' AS label, ISNULL(SUM(x." + k[1] + "),0) AS amount"
+                    + ", COUNT_BIG(CASE WHEN x." + k[1] + " <> 0 THEN 1 END) AS docs FROM (" + rows + ") x");
+            all.addAll(binds);
+        }
+        return new Queries.Q(Sql.join(unions, " UNION ALL "), all);
+    }
+
+    /** Daily cash box: receipts (p=0) and payments (p=1) in cash only: day,receipts,payments,net,docs. */
+    public static Queries.Q cashDaily(Meta m, Filter f) throws Queries.Missing {
+        Dar d = darCols(m);
+        if (d.cash == null) throw new Queries.Missing("ستون نقد در «قبوض دریافت و پرداخت» پیدا نشد");
+        Set<String> cols = m.columns("dar");
+        List<Object> binds = new ArrayList<>();
+        List<String> sides = new ArrayList<>();
+        for (int p = 0; p <= 1; p++) {
+            DarParts parts = darParts(m, d, "h", p);
+            List<String> conds = new ArrayList<>();
+            binds.add(p);
+            conds.add("h.[p]=?");
+            String dc = Sql.dateCond(Sql.date10("h", d.date), f.from, f.to, binds);
+            if (!dc.isEmpty()) conds.add(dc);
+            String day = Sql.dateKey(Sql.date10("h", d.date));
+            String sel = "SELECT " + day + " AS day, " + parts.cash + " AS amt FROM dbo.dar h WHERE "
+                    + Sql.join(conds, " AND ") + Sql.activeAnd(cols, "h") + Sql.softAnd(cols, "h");
+            sides.add(p == 0
+                    ? "SELECT x.day AS day, x.amt AS inAmt, CAST(0 AS decimal(19,2)) AS outAmt FROM (" + sel + ") x"
+                    : "SELECT x.day AS day, CAST(0 AS decimal(19,2)) AS inAmt, x.amt AS outAmt FROM (" + sel + ") x");
+        }
+        return new Queries.Q("SELECT z.day AS day, ISNULL(SUM(z.inAmt),0) AS receipts, ISNULL(SUM(z.outAmt),0) AS payments"
+                + ", ISNULL(SUM(z.inAmt),0)-ISNULL(SUM(z.outAmt),0) AS net, COUNT_BIG(1) AS docs"
+                + " FROM (" + Sql.join(sides, " UNION ALL ") + ") z GROUP BY z.day ORDER BY z.day", binds);
+    }
+
     /** Per-day totals in a range: day,total,count. */
     public static Queries.Q darDaily(Meta m, int p, String from, String to) throws Queries.Missing {
         Dar d = darCols(m);

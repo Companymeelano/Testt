@@ -150,10 +150,10 @@ public class MoreScreen extends Screen {
     }
 
     private static final String[][] REPORT_GROUPS = {
-            {"ویژه مدیر", "⭐"}, {"فروش", "🧾"}, {"خرید", "🧺"}, {"دریافت و پرداخت", "💰"},
-            {"چک‌ها", "📝"}, {"کالا و انبار", "📦"}, {"مشتریان", "👥"}, {"تحلیل ویزیتور و مسیر", "🚚"},
-            {"سود و زیان", "📈"}, {"هزینه‌ها", "🧾"}, {"بانک و صندوق", "🏦"}, {"برگشتی و ابطالی", "↩"},
-            {"هوشمند", "✦"}, {"گزارش‌های اختصاصی", "🔎"}, {"کاربران و نظارت", "🛡"}, {"سرفصل‌ها", "🗂"}
+            {"ویژه مدیر", "⭐"}, {"فروش", "🧾"}, {"خرید", "🧺"}, {"خزانه‌داری", "🏦"},
+            {"کالا و انبار", "📦"}, {"مشتریان", "👥"}, {"تحلیل ویزیتور و مسیر", "🚚"},
+            {"سود و زیان", "📈"}, {"برگشتی و ابطالی", "↩"}, {"هوشمند", "✦"},
+            {"گزارش‌های اختصاصی", "🔎"}, {"کاربران و نظارت", "🛡"}
     };
 
     private void renderReportsHub(LinearLayout c) {
@@ -199,7 +199,8 @@ public class MoreScreen extends Screen {
     private static int groupColor(String group) {
         if ("فروش".equals(group)) return Theme.SALES_HUE;
         if ("خرید".equals(group)) return Theme.BUY_HUE;
-        if ("دریافت و پرداخت".equals(group)) return Theme.SUCCESS;
+        if ("خزانه‌داری".equals(group)) return Theme.GOLD;
+        if ("دریافتی‌ها و پرداخت".equals(group)) return Theme.SUCCESS;
         if ("چک‌ها".equals(group)) return Theme.INFO;
         if ("کالا و انبار".equals(group)) return Theme.VIOLET;
         if ("مشتریان".equals(group)) return Theme.GOLD;

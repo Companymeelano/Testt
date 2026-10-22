@@ -85,8 +85,10 @@ public class ReportsScreen extends Screen {
         if ("ویژه مدیر".equals(section)) return Theme.GOLD;
         if ("فروش".equals(section)) return Theme.SALES_HUE;
         if ("خرید".equals(section)) return Theme.BUY_HUE;
-        if ("دریافت و پرداخت".equals(section)) return Theme.SUCCESS;
+        if ("دریافتی‌ها و پرداخت".equals(section)) return Theme.SUCCESS;
         if ("چک‌ها".equals(section)) return Theme.INFO;
+        if ("عملکرد صندوق".equals(section)) return Theme.GOLD;
+        if ("خزانه‌داری".equals(section)) return Theme.GOLD;
         if ("کالا و انبار".equals(section)) return Theme.VIOLET;
         if ("مشتریان".equals(section)) return Theme.SUCCESS;
         if ("ویزیتورها".equals(section)) return Theme.WARNING;
@@ -105,8 +107,10 @@ public class ReportsScreen extends Screen {
         if ("ویژه مدیر".equals(section)) return R.drawable.mi_military_tech;
         if ("فروش".equals(section)) return R.drawable.mi_point_of_sale;
         if ("خرید".equals(section)) return R.drawable.mi_shopping_cart;
-        if ("دریافت و پرداخت".equals(section)) return R.drawable.mi_payments;
+        if ("دریافتی‌ها و پرداخت".equals(section)) return R.drawable.mi_payments;
         if ("چک‌ها".equals(section)) return R.drawable.mi_receipt_long;
+        if ("عملکرد صندوق".equals(section)) return R.drawable.mi_account_balance_wallet;
+        if ("خزانه‌داری".equals(section)) return R.drawable.mi_account_balance;
         if ("کالا و انبار".equals(section)) return R.drawable.mi_inventory_2;
         if ("مشتریان".equals(section)) return R.drawable.mi_group;
         if ("ویزیتورها".equals(section)) return R.drawable.mi_directions_car;
@@ -212,7 +216,16 @@ public class ReportsScreen extends Screen {
         if (selCat == null) {
             java.util.List<String> secs = new java.util.ArrayList<>();
             java.util.List<Integer> counts = new java.util.ArrayList<>();
+            int treasuryCount = 0;
             for (ReportCatalog.Spec spec : ReportCatalog.ALL) {
+                if (ReportCatalog.isTreasurySection(spec.section)) {
+                    treasuryCount++;
+                    // All treasury sub-sections live behind one «خزانه‌داری» card.
+                    if (!secs.contains(ReportCatalog.TREASURY)) { secs.add(ReportCatalog.TREASURY); counts.add(0); }
+                    int tx = secs.indexOf(ReportCatalog.TREASURY);
+                    counts.set(tx, counts.get(tx) + 1);
+                    continue;
+                }
                 int ix = secs.indexOf(spec.section);
                 if (ix < 0) {
                     secs.add(spec.section);
@@ -239,8 +252,38 @@ public class ReportsScreen extends Screen {
             return;
         }
 
-        content.addView(a.kit.btnGhost("‹ همه دسته‌ها", Theme.GOLD, v -> {
-            selCat = null;
+        if (ReportCatalog.TREASURY.equals(selCat)) {
+            // The treasury group: its sub-sections, each opening its own report list.
+            content.addView(a.kit.btnGhost("‹ همه دسته‌ها", Theme.GOLD, v -> {
+                selCat = null;
+                render(contentRef);
+            }), a.kit.lp(-1, -2));
+            content.addView(a.kit.gap(10));
+            int treasuryTotal = 0;
+            for (ReportCatalog.Spec spec : ReportCatalog.ALL)
+                if (ReportCatalog.isTreasurySection(spec.section)) treasuryTotal++;
+            content.addView(a.kit.hero("▤", ReportCatalog.TREASURY,
+                    "بخش‌های مالی و بانکی • " + Money.fa(String.valueOf(treasuryTotal)) + " گزارش",
+                    sectionAccent(selCat)), a.kit.lp(-1, -2));
+            content.addView(a.kit.gap(12));
+            java.util.List<String> subs = new java.util.ArrayList<>();
+            java.util.List<Integer> subCounts = new java.util.ArrayList<>();
+            for (ReportCatalog.Spec spec : ReportCatalog.ALL) {
+                if (!ReportCatalog.isTreasurySection(spec.section)) continue;
+                int ix = subs.indexOf(spec.section);
+                if (ix < 0) { subs.add(spec.section); subCounts.add(1); }
+                else subCounts.set(ix, subCounts.get(ix) + 1);
+            }
+            for (int i = 0; i < subs.size(); i++) {
+                if (i > 0) content.addView(a.kit.gap(10));
+                content.addView(catCard(subs.get(i), subCounts.get(i)), a.kit.lp(-1, -2));
+            }
+            return;
+        }
+
+        final boolean inTreasury = ReportCatalog.isTreasurySection(selCat);
+        content.addView(a.kit.btnGhost(inTreasury ? "‹ " + ReportCatalog.TREASURY : "‹ همه دسته‌ها", Theme.GOLD, v -> {
+            selCat = inTreasury ? ReportCatalog.TREASURY : null;
             render(contentRef);
         }), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));

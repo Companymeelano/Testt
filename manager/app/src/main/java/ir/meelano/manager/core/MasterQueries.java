@@ -1135,6 +1135,34 @@ public final class MasterQueries {
                 + " GROUP BY " + label + " ORDER BY 2 DESC", binds);
     }
 
+    /** Bank operations per account and month (banking only): bank,month,in,out,net,count. */
+    public static Queries.Q bankOpsMonthly(Meta m, Filter f) throws Queries.Missing {
+        if (!m.table("ban_act")) throw new Queries.Missing("«گردش بانک» در دیتابیس پیدا نشد");
+        String bank = m.must("ban_act", "بانک", "bank_rdf", "BankRdf", "bankrdf");
+        String date = m.colFlex("ban_act", "act_date", "done_act");
+        if (date == null) throw new Queries.Missing("تاریخ عملیات بانکی در دیتابیس پیدا نشد");
+        String bed = m.colFlex("ban_act", "act_bed", "bed", "bedehkar");
+        String bes = m.colFlex("ban_act", "act_bes", "bes", "bestankar");
+        String bankKey = m.col("BANK", "RDF", "rdf");
+        String bankName = m.colFlex("BANK", "name", "bankname", "title", "onvan");
+        String label = bankKey != null && bankName != null && m.table("BANK")
+                ? "COALESCE(" + Sql.txt("b", bankName, 150) + "," + Sql.txt("h", bank, 60) + ",N'—')"
+                : "COALESCE(" + Sql.txt("h", bank, 60) + ",N'—')";
+        String join = bankKey != null && m.table("BANK")
+                ? " LEFT JOIN dbo.BANK b ON TRY_CONVERT(nvarchar(60),b.[" + bankKey + "])=TRY_CONVERT(nvarchar(60),h.[" + bank + "])" : "";
+        String inExpr = bes != null ? "ISNULL(SUM(" + Sql.num("h", bes) + "),0)" : "CAST(0 AS decimal(19,2))";
+        String outExpr = bed != null ? "ISNULL(SUM(" + Sql.num("h", bed) + "),0)" : "CAST(0 AS decimal(19,2))";
+        String month = "LEFT(" + Sql.date10("h", date) + ",7)";
+        List<Object> binds = new ArrayList<>();
+        List<String> conds = new ArrayList<>();
+        String dc = Sql.dateCond(Sql.date10("h", date), f.from, f.to, binds);
+        if (!dc.isEmpty()) conds.add(dc);
+        String where = conds.isEmpty() ? "" : " WHERE " + Sql.join(conds, " AND ");
+        return new Queries.Q("SELECT " + label + " AS bank, " + month + " AS month, " + inExpr + " AS [in], " + outExpr
+                + " AS [out], " + inExpr + "-" + outExpr + " AS net, COUNT_BIG(1) AS count FROM dbo.ban_act h" + join + where
+                + " GROUP BY " + label + ", " + month + " ORDER BY 2 DESC, 1", binds);
+    }
+
     /** Cash boxes (best-effort): name,balance. */
     public static Queries.Q cowList(Meta m) throws Queries.Missing {
         if (!m.table("COW")) throw new Queries.Missing("«صندوق‌ها» در دیتابیس پیدا نشد");

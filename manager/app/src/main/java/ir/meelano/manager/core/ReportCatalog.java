@@ -62,6 +62,16 @@ public final class ReportCatalog {
         return new Col(k, t, type);
     }
 
+    /** The group that holds the financial sections (treasury). */
+    public static final String TREASURY = "خزانه‌داری";
+
+    /** Sub-sections shown under «خزانه‌داری». */
+    public static boolean isTreasurySection(String section) {
+        return "دریافتی‌ها و پرداخت".equals(section) || "چک‌ها".equals(section)
+                || "عملکرد صندوق".equals(section) || "بانک و صندوق".equals(section)
+                || "سرفصل‌ها".equals(section) || "هزینه‌ها".equals(section);
+    }
+
     public static final Spec[] ALL = {
             // ---- ویژه مدیر (v22: the vital few, checked every morning) ----
             s("today_top", "پرفروش‌ترین‌های امروز", "ویژه مدیر", "کالاهای دارای بیشترین فروش ریالی امروز", false,
@@ -152,6 +162,11 @@ public final class ReportCatalog {
             s("sales_by_kala_group", "فروش گروه‌های کالا", "فروش", "سهم هر گروه کالا از فروش بازه", true,
                     new Col[]{c("label", "گروه کالا", T_TEXT), c("qty", "مقدار", T_NUM), c("total", "جمع فروش", T_MONEY), c("docs", "اسناد", T_NUM)},
                     C_DONUT, "label", "total"),
+            s("invoice_unsettled", "فاکتورهای غیر نقدی (تسویه‌نشده)", "فروش", "فاکتورهای فروش که هنوز به‌طور کامل تسویه نشده‌اند — همه فیلترهای بازه و مشتری فعال است", true,
+                    new Col[]{c("no", "فاکتور", T_TEXT), c("date", "تاریخ", T_DATE), c("customer", "مشتری", T_TEXT),
+                            c("visitor", "ویزیتور", T_TEXT), c("total", "مبلغ فاکتور", T_MONEY), c("paid", "پرداختی", T_MONEY),
+                            c("remain", "مانده", T_MONEY), c("dueDate", "سررسید", T_DATE)},
+                    C_BARS, "customer", "remain"),
             s("unsettled", "فاکتورهای معوق", "فروش", "فاکتورهای تسویه‌نشده با سررسید گذشته", false,
                     new Col[]{c("invoice", "فاکتور", T_TEXT), c("party", "مشتری", T_TEXT), c("amount", "مبلغ", T_MONEY),
                             c("dueDate", "سررسید", T_DATE), c("days", "روز تأخیر", T_NUM), c("visitor", "ویزیتور", T_TEXT)},
@@ -194,14 +209,14 @@ public final class ReportCatalog {
             s("buy_by_party", "خرید از طرف‌حساب‌ها", "خرید", "برترین فروشندگان/تأمین‌کنندگان", true,
                     new Col[]{c("label", "طرف‌حساب", T_TEXT), c("total", "جمع خرید", T_MONEY), c("docs", "اسناد", T_NUM)},
                     C_BARS, "label", "total"),
-            // ---- دریافت و پرداخت ----
-            s("in_daily", "دریافت روزانه", "دریافت و پرداخت", "جمع قبوض دریافت هر روز", true,
+            // ---- دریافتی‌ها و پرداخت (زیرمجموعه خزانه‌داری) ----
+            s("in_daily", "دریافتی‌های روزانه", "دریافتی‌ها و پرداخت", "جمع قبوض دریافت هر روز", true,
                     new Col[]{c("day", "روز", T_DATE), c("total", "جمع دریافت", T_MONEY), c("count", "قبوض", T_NUM)},
                     C_LINE, "day", "total"),
-            s("out_daily", "پرداخت روزانه", "دریافت و پرداخت", "جمع قبوض پرداخت هر روز", true,
+            s("out_daily", "پرداخت روزانه", "دریافتی‌ها و پرداخت", "جمع قبوض پرداخت هر روز", true,
                     new Col[]{c("day", "روز", T_DATE), c("total", "جمع پرداخت", T_MONEY), c("count", "قبوض", T_NUM)},
                     C_LINE, "day", "total"),
-            s("pos_by_bank", "گردش پوز بانک‌ها", "دریافت و پرداخت", "تفکیک مبالغ کارت‌خوان به بانک", true,
+            s("pos_by_bank", "گردش پوز بانک‌ها", "دریافتی‌ها و پرداخت", "تفکیک مبالغ کارت‌خوان به بانک", true,
                     new Col[]{c("bank", "بانک", T_TEXT), c("total", "جمع", T_MONEY), c("count", "تراکنش", T_NUM)},
                     C_DONUT, "bank", "total"),
             // ---- چک ----
@@ -387,19 +402,27 @@ public final class ReportCatalog {
                     new Col[]{c("name", "مشتری", T_TEXT), c("code", "کد", T_TEXT), c("prevTotal", "۹۰ روز قبل", T_MONEY),
                             c("curTotal", "۹۰ روز اخیر", T_MONEY), c("dropPct", "افت (٪)", T_NUM)},
                     C_NONE, "", ""),
-            s("fin_discount_monthly", "تخفیف دریافت و پرداخت ماهانه", "دریافت و پرداخت", "جمع دریافت و پرداخت و تخفیف‌های اعطاشده در هر ماه شمسی", true,
+            s("fin_discount_monthly", "تخفیف دریافت و پرداخت ماهانه", "دریافتی‌ها و پرداخت", "جمع دریافت و پرداخت و تخفیف‌های اعطاشده در هر ماه شمسی", true,
                     new Col[]{c("month", "ماه", T_TEXT), c("receipts", "دریافت", T_MONEY), c("payments", "پرداخت", T_MONEY),
                             c("discountIn", "تخفیف دریافتی", T_MONEY), c("discountOut", "تخفیف پرداختی", T_MONEY)},
                     C_BARS, "month", "receipts"),
-            s("fin_net_cash", "جریان خالص نقدی ماهانه", "دریافت و پرداخت", "تفاوت دریافت و پرداخت هر ماه به‌همراه مانده تجمعی دوره", true,
+            s("fin_net_cash", "جریان خالص نقدی ماهانه", "دریافتی‌ها و پرداخت", "تفاوت دریافت و پرداخت هر ماه به‌همراه مانده تجمعی دوره", true,
                     new Col[]{c("month", "ماه", T_TEXT), c("receipts", "دریافت", T_MONEY), c("payments", "پرداخت", T_MONEY),
                             c("net", "خالص ماه", T_MONEY), c("cum", "تجمعی", T_MONEY)},
                     C_LINE, "month", "cum"),
-            s("fin_cash_mix", "ترکیب وصول: نقد در برابر چک", "دریافت و پرداخت", "سهم وصول نقدی از کل وصول (نقد + چک) در هر ماه", true,
+            s("fin_cash_mix", "ترکیب وصول: نقد در برابر چک", "دریافتی‌ها و پرداخت", "سهم وصول نقدی از کل وصول (نقد + چک) در هر ماه", true,
                     new Col[]{c("month", "ماه", T_TEXT), c("cash", "نقد", T_MONEY), c("cheque", "چک", T_MONEY),
                             c("cashShare", "سهم نقد (٪)", T_NUM)},
                     C_BARS, "month", "cash"),
-            s("fin_overpaid", "اسناد دریافتی ناهماهنگ", "دریافت و پرداخت", "قبض‌هایی که جمع نقد و چک آن‌ها بیشتر از مبلغ سند است — کنترل حسابرسی؛ پوز فقط به مبلغ اضافه می‌کند", true,
+            // ---- عملکرد صندوق (زیرمجموعه خزانه‌داری) ----
+            s("cash_daily", "عملکرد صندوق روزانه", "عملکرد صندوق", "مبالغ نقدی دریافتی و پرداختی هر روز و خالص صندوق", true,
+                    new Col[]{c("day", "روز", T_DATE), c("receipts", "نقد دریافتی", T_MONEY), c("payments", "نقد پرداختی", T_MONEY),
+                            c("net", "خالص صندوق", T_MONEY), c("docs", "اسناد", T_NUM)},
+                    C_LINE, "day", "net"),
+            s("cash_receipts_mix", "دریافتی‌ها: نقد، کارت‌خوان، حواله و چک", "عملکرد صندوق", "نقد، کارت‌خوان، حواله و چک‌های دریافتی هرکدام جداگانه (چک‌ها با سه مورد دیگر جمع نمی‌شوند)", true,
+                    new Col[]{c("label", "نوع دریافتی", T_TEXT), c("amount", "مبلغ", T_MONEY), c("docs", "تعداد اسناد", T_NUM)},
+                    C_DONUT, "label", "amount"),
+            s("fin_overpaid", "اسناد دریافتی ناهماهنگ", "دریافتی‌ها و پرداخت", "قبض‌هایی که جمع نقد و چک آن‌ها بیشتر از مبلغ سند است — کنترل حسابرسی؛ پوز فقط به مبلغ اضافه می‌کند", true,
                     new Col[]{c("no", "شماره قبض", T_TEXT), c("kind", "نوع", T_TEXT), c("party", "طرف‌حساب", T_TEXT),
                             c("date", "تاریخ", T_DATE), c("total", "مبلغ سند", T_MONEY), c("paid", "نقد+چک", T_MONEY),
                             c("excess", "اضافه", T_MONEY)},
@@ -460,6 +483,10 @@ public final class ReportCatalog {
             s("bank_turnover", "گردش بانک‌ها", "بانک و صندوق", "ورودی/خروجی هر حساب بانکی در بازه", true,
                     new Col[]{c("bank", "بانک", T_TEXT), c("in", "ورودی", T_MONEY), c("out", "خروجی", T_MONEY), c("count", "سند", T_NUM)},
                     C_BARS, "bank", "in"),
+            s("bank_ops", "عملیات بانکی به تفکیک ماه", "بانک و صندوق", "ورودی، خروجی و خالص عملیات هر حساب بانکی در هر ماه — فقط عملیات بانکی", true,
+                    new Col[]{c("bank", "بانک", T_TEXT), c("month", "ماه", T_TEXT), c("in", "ورودی", T_MONEY),
+                            c("out", "خروجی", T_MONEY), c("net", "خالص", T_MONEY), c("count", "عملیات", T_NUM)},
+                    C_BARS, "bank", "net"),
             s("cows", "صندوق‌ها", "بانک و صندوق", "فهرست صندوق‌ها و مانده", false,
                     new Col[]{c("name", "صندوق", T_TEXT), c("balance", "مانده", T_MONEY)},
                     C_NONE, "", ""),
@@ -502,6 +529,10 @@ public final class ReportCatalog {
         if ("sales_by_kala_group".equals(id)) return Queries.factorByProductGroup(m, true, ff, 50);
         if ("sales_top_products".equals(id)) return Queries.factorTopProducts(m, true, ff, 50);
         if ("unsettled".equals(id)) { ff.top = Math.max(ff.top, 100); return Queries.overdueInvoices(m, ff.top); }
+        if ("invoice_unsettled".equals(id)) { ff.status = "unsettled"; return Queries.factorList(m, true, ff); }
+        if ("cash_daily".equals(id)) return MoneyQueries.cashDaily(m, ff);
+        if ("cash_receipts_mix".equals(id)) return MoneyQueries.paymentMix(m, ff);
+        if ("bank_ops".equals(id)) return MasterQueries.bankOpsMonthly(m, ff);
         if ("aging".equals(id)) {
             if (m.function("dif_date_alan")) return MasterQueries.agingBuckets(m);
             return Queries.unsettledByMonth(m);

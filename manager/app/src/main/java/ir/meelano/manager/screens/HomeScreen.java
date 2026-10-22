@@ -788,7 +788,7 @@ public class HomeScreen extends Screen {
 
         LinearLayout head = a.kit.h();
         head.setGravity(Gravity.CENTER_VERTICAL);
-        head.addView(a.kit.text("بازار و هوای امروز", 12.5f, Theme.GOLD_SOFT, true), a.kit.wlp(1f));
+        head.addView(a.kit.text("بازار و هوای امروز", 14f, Theme.GOLD_SOFT, true), a.kit.wlp(1f));
         boolean live = rLive || wLive;
         head.addView(a.kit.pill(live ? "به‌روز" : "ذخیره‌شده", live ? Theme.SUCCESS : Theme.MUTED), a.kit.lp(-2, -2));
         card.addView(head, a.kit.lp(-1, -2));
@@ -817,7 +817,7 @@ public class HomeScreen extends Screen {
                     : (w.code >= 51 ? R.drawable.mi_beach_access : R.drawable.mi_wb_twilight));
             try { wi.setImageResource(wRes); } catch (Exception ignored) { Diag.ignored("HomeScreen:weatherIcon", ignored); }
             wi.setColorFilter(Theme.GOLD);
-            wr.addView(wi, a.kit.lp(Theme.dp(26), Theme.dp(26)));
+            wr.addView(wi, a.kit.lp(Theme.dp(34), Theme.dp(34)));
             wr.addView(a.kit.space(8));
             LinearLayout wc = a.kit.v();
             TextView line = a.kit.text(weatherPlace + " • " + Money.fa(String.valueOf(Math.round(w.temp))) + "°  "
@@ -854,7 +854,12 @@ public class HomeScreen extends Screen {
         t.setBackground(Theme.kpi(Theme.GOLD));
         t.setPadding(Theme.dp(8), Theme.dp(8), Theme.dp(8), Theme.dp(8));
         t.setGravity(Gravity.CENTER_HORIZONTAL);
-        TextView label = a.kit.text(r.label, 10f, Theme.MUTED, false);
+        // Gold icon per instrument, as in the reference: coin, gold bar, dollar trend.
+        String lbl = r.label == null ? "" : r.label;
+        int tileIcon = lbl.contains("دلار") ? R.drawable.mi_trending_up
+                : (lbl.contains("طلا") ? R.drawable.mi_diamond : R.drawable.mi_payments);
+        t.addView(a.kit.icon(tileIcon, Theme.GOLD, 24), new LinearLayout.LayoutParams(Theme.dp(24), Theme.dp(24)));
+        TextView label = a.kit.text(r.label, 10.5f, Theme.TEXT, false);
         label.setGravity(Gravity.CENTER_HORIZONTAL);
         label.setMinLines(2);
         label.setMaxLines(2);

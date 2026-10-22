@@ -602,7 +602,7 @@ public class SettingsScreen extends Screen {
                         a.kit.toast("گزارش فنی در دسترس نیست");
                         return;
                     }
-                    cm.setPrimaryClip(android.content.ClipData.newPlainText("گزارش خطای میلانو", report));
+                    cm.setPrimaryClip(android.content.ClipData.newPlainText("گزارش خطای دانه درخشان", report));
                     a.kit.toast("گزارش کپی شد؛ آن را برای پشتیبانی بفرستید");
                 } catch (Exception e) {
                     a.kit.toast("کپی گزارش ممکن نشد");
@@ -625,14 +625,14 @@ public class SettingsScreen extends Screen {
         TextView dr = a.kit.text("✦ طراح و توسعه‌دهنده ✦", 13f, Theme.TEXT, true);
         dr.setGravity(Gravity.CENTER);
         ab.addView(dr, a.kit.lp(-1, -2));
-        TextView tag = a.kit.text("میلانو • داشبورد مدیریتی آتیران", 11f, Theme.MUTED, false);
+        TextView tag = a.kit.text("دانه درخشان • داشبورد مدیریتی آتیران", 11f, Theme.MUTED, false);
         tag.setGravity(Gravity.CENTER);
         ab.addView(tag, a.kit.lp(-1, -2));
         ab.addView(a.kit.gap(4));
         ab.addView(a.kit.kv("نسخه", appVersion() + " • " + editionNow(), Theme.TEXT), a.kit.lp(-1, -2));
         addUpdateCard(ab);
         ab.addView(a.kit.kv("منبع داده", "SQL Server آتیران (اتصال مستقیم)", Theme.TEXT), a.kit.lp(-1, -2));
-        ab.addView(a.kit.text("✦ پشتیبانی میلانو", 13f, Theme.GOLD_SOFT, true), a.kit.lp(-1, -2));
+        ab.addView(a.kit.text("✦ پشتیبانی دانه درخشان", 13f, Theme.GOLD_SOFT, true), a.kit.lp(-1, -2));
         ab.addView(a.kit.btnGhost("🌐  " + ir.meelano.manager.core.Brand.SITE_LABEL, Theme.GOLD, v ->
                 ir.meelano.manager.core.Brand.openSite(a)), a.kit.lp(-1, -2));
         for (String ph : ir.meelano.manager.core.Brand.PHONES) {
@@ -740,7 +740,7 @@ public class SettingsScreen extends Screen {
                 render(content);
                 try {
                     java.io.File shared = Backup.toShareDir(a, zip);
-                    if (shared != null) ShareProvider.share(a, shared, "application/zip", "بکاپ هوشمند میلانو");
+                    if (shared != null) ShareProvider.share(a, shared, "application/zip", "بکاپ هوشمند دانه درخشان");
                     else a.kit.toast("فایل در پوشه Downloads ذخیره شد");
                 } catch (Exception e) {
                     a.kit.toast("فایل در پوشه Downloads ذخیره شد");

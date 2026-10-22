@@ -274,7 +274,7 @@ public final class LicenseStore {
             String n = Company.get(c).name;
             if (n != null && !n.trim().isEmpty()) return n.trim();
         } catch (Exception ignored) { Diag.ignored("LicenseStore:271", ignored); }
-        return "میلانو";
+        return "دانه درخشان";
     }
 
     /** Customer contact number, remembered for request resends. */

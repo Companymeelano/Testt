@@ -170,7 +170,7 @@ public final class AiSettings {
         } else {
             card.addView(a.kit.btnGhost("🔈 شنیدن نمونهٔ صدای فارسی", Theme.SUCCESS, v -> {
                 a.kit.toast("در حال آماده‌سازی صدا…");
-                Speaker.speak(a, "سلام، من دستیار هوشمند میلانو هستم. امروز چه کاری برایتان انجام دهم؟", null);
+                Speaker.speak(a, "سلام، من دستیار هوشمند دانه درخشان هستم. امروز چه کاری برایتان انجام دهم؟", null);
             }), a.kit.lp(-1, -2));
         }
         card.addView(a.kit.gap(8));

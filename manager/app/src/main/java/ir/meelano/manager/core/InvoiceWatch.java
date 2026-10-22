@@ -210,7 +210,7 @@ public final class InvoiceWatch {
             Notification.Builder b = new Notification.Builder(c, Notify.CH_WH)
                     .setContentTitle(title)
                     .setContentText(lines.get(0))
-                    .setSubText("انبار • میلانو")
+                    .setSubText("انبار • دانه درخشان")
                     .setTicker(title)
                     .setWhen(System.currentTimeMillis())
                     .setShowWhen(true)

@@ -158,7 +158,7 @@ public final class Guard {
             PendingIntent pi = PendingIntent.getActivity(c, Notify.GUARD_NOTIF_ID, open,
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             Notification n = new Notification.Builder(c, Notify.CH)
-                    .setContentTitle("🛡 نگهبان فروش میلانو")
+                    .setContentTitle("🛡 نگهبان فروش دانه درخشان")
                     .setContentText(b.toString())
                     .setStyle(new Notification.BigTextStyle().bigText(b.toString()))
                     .setSmallIcon(R.mipmap.ic_launcher)

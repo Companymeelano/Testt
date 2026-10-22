@@ -138,7 +138,7 @@ public final class Backup {
     }
 
     private static String readme(String stamp, String db) {
-        return "بکاپ هوشمند میلانو\n"
+        return "بکاپ هوشمند دانه درخشان\n"
                 + "تاریخ ساخت (میلادی): " + stamp + "\n"
                 + "دیتابیس: " + db + "\n"
                 + "هر جدول یک فایل CSV با سرستون است (UTF-8).\n"

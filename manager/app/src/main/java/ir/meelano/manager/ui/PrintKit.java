@@ -65,7 +65,7 @@ public final class PrintKit {
                     }
                 }
             };
-            pm.print(jobName == null || jobName.isEmpty() ? "گزارش میلانو" : jobName, adapter, null);
+            pm.print(jobName == null || jobName.isEmpty() ? "گزارش دانه درخشان" : jobName, adapter, null);
         } catch (Exception ignored) { Diag.ignored("PrintKit:68", ignored); }
     }
 }

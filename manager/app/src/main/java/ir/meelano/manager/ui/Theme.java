@@ -324,7 +324,8 @@ public final class Theme {
 
     public static android.graphics.drawable.Drawable card() {
         if (light) {
-            return glass(0xFFFFFDF8, 0xFFF4ECDA, 22, 70);
+            // Reference light cards: white panels with a clearer metallic gold edge.
+            return glass(0xFFFFFFFF, 0xFFFBF5E6, 22, 130);
         }
         return glass(alpha(SURFACE, 242), alpha(SURFACE, 214), 22, 92);
     }
@@ -361,9 +362,9 @@ public final class Theme {
     /** Selected destination on the premium bottom navigation rail. */
     public static GradientDrawable bottomNavSelected() {
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{alpha(GOLD, light ? 34 : 28), alpha(GOLD, light ? 15 : 12)});
+                new int[]{alpha(GOLD, light ? 70 : 28), alpha(GOLD, light ? 40 : 12)});
         d.setCornerRadius(dp(20));
-        d.setStroke(dp(1), alpha(GOLD, light ? 105 : 90));
+        d.setStroke(dp(1), alpha(GOLD, light ? 170 : 90));
         return d;
     }
 
@@ -514,11 +515,11 @@ public final class Theme {
 
     public static GradientDrawable bottomBar() {
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                light ? new int[]{0xFFFFFDF6, 0xFFEFE6CF} : new int[]{0xFF0E121A, 0xFF07090E});
+                light ? new int[]{0xFFFFFFFF, 0xFFF3EAD2} : new int[]{0xFF0E121A, 0xFF07090E});
         // Rounded top edge with a gold hairline: the bar reads as a floating luxury dock.
         float r = dp(22);
         d.setCornerRadii(new float[]{r, r, r, r, 0, 0, 0, 0});
-        d.setStroke(dp(1), alpha(GOLD, light ? 70 : 120));
+        d.setStroke(dp(1), alpha(GOLD, light ? 140 : 120));
         return d;
     }
 

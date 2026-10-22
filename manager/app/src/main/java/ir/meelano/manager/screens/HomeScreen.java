@@ -336,7 +336,7 @@ public class HomeScreen extends Screen {
     private void showFailure(final LinearLayout content, String faError, Data cached) {
         if (cached != null) {
             build(content, cached);
-            LinearLayout bc = a.kit.card(Theme.WARNING);
+            LinearLayout bc = a.kit.card(Theme.GOLD);
             bc.addView(a.kit.text("📴 حالت آفلاین — آخرین داده ذخیره‌شده", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
             bc.addView(a.kit.kv("خطا", faError == null ? "" : faError, Theme.MUTED), a.kit.lp(-1, -2));
             bc.addView(a.kit.btn("تلاش مجدد", v -> render(content)), a.kit.lp(-1, -2));
@@ -960,7 +960,7 @@ public class HomeScreen extends Screen {
 
     private void secAlerts(LinearLayout content, Data d) {
         // ---- alerts ----
-        LinearLayout alerts = a.kit.card(Theme.DANGER);
+        LinearLayout alerts = a.kit.card(Theme.GOLD);
         alerts.addView(a.kit.text("هشدار امروز", 14.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
         int n = 0;
         n += alert(alerts, d, n);
@@ -969,7 +969,7 @@ public class HomeScreen extends Screen {
             final FollowUps.Due fd = dues.get(0);
             String who = dues.size() == 1 ? fd.note.name : Money.fa(String.valueOf(dues.size())) + " یادداشت";
             alerts.addView(a.kit.alertRow("پیگیری مشتری", who + " • سررسید یادداشت",
-                    Theme.VIOLET, v -> gotoCustomer(fd.code)), padTop(n));
+                    Theme.GOLD, v -> gotoCustomer(fd.code)), padTop(n));
             n++;
         }
         if (n == 0) alerts.addView(a.kit.text("فعلاً هشدار مهمی وجود ندارد.", 11.5f, Theme.MUTED, false), a.kit.lp(-1, -2));
@@ -983,7 +983,7 @@ public class HomeScreen extends Screen {
      * through to the full list is what makes it actionable.
      */
     private void secInvStatus(LinearLayout content, Data d) {
-        LinearLayout c = a.kit.card(Theme.WARNING);
+        LinearLayout c = a.kit.card(Theme.GOLD);
         c.addView(a.kit.sectionHead("وضعیت فاکتورهای ۳۰ روز اخیر", "گزارش ›", v -> a.nav("reports")),
                 a.kit.lp(-1, -2));
         addState(c, "فروش", d.saleState);
@@ -1017,7 +1017,7 @@ public class HomeScreen extends Screen {
      * in the profit figures.
      */
     private void secReturns(LinearLayout content, Data d) {
-        LinearLayout c = a.kit.card(Theme.DANGER);
+        LinearLayout c = a.kit.card(Theme.GOLD);
         c.addView(a.kit.sectionHead("برگشتی‌های ۳۰ روز اخیر", "گزارش ›", v -> a.nav("reports")),
                 a.kit.lp(-1, -2));
         long n = 0;
@@ -1032,7 +1032,7 @@ public class HomeScreen extends Screen {
             c.addView(a.kit.kv("هیچ سند برگشتی در این بازه ثبت نشده", "✓", Theme.SUCCESS), a.kit.lp(-1, -2));
         } else {
             c.addView(a.kit.kv(Money.fa(String.valueOf(n)) + " سند برگشتی",
-                    Money.compactMoney(sum), Theme.DANGER), a.kit.lp(-1, -2));
+                    Money.compactMoney(sum), Theme.GOLD), a.kit.lp(-1, -2));
             int shown = 0;
             for (Row r : d.returns) {
                 if (shown++ >= 3) break;
@@ -1118,7 +1118,7 @@ public class HomeScreen extends Screen {
             List<Charts.Point> pts = new ArrayList<>();
             pts.add(new Charts.Point("نقد", d.inDay.d("cash"), Theme.SUCCESS));
             pts.add(new Charts.Point("کارت", d.inDay.d("pos"), Theme.INFO));
-            pts.add(new Charts.Point("حواله", d.inDay.d("havaleh"), Theme.VIOLET));
+            pts.add(new Charts.Point("حواله", d.inDay.d("havaleh"), Theme.GOLD));
             pts.add(new Charts.Point("چک", d.inDay.d("cheque"), Theme.GOLD));
             dn.setData(pts, "جمع دریافت", Money.compactRial(d.inDay.d("total")));
             c.addView(dn, new LinearLayout.LayoutParams(-1, Theme.dp(300)));
@@ -1136,9 +1136,9 @@ public class HomeScreen extends Screen {
                 final String code = r.s("code");
                 final String party = r.s("party");
                 codes.add(code);
-                View av = ir.meelano.manager.data.CustomerPhotos.avatar(a, code, a.kit.initials(party), Theme.DANGER, 48, slots);
+                View av = ir.meelano.manager.data.CustomerPhotos.avatar(a, code, a.kit.initials(party), Theme.GOLD, 48, slots);
                 View row = a.kit.personRow(party, "کد " + Money.fa(code), Money.rial(r.d("amount")),
-                        "مانده بدهی", Theme.DANGER, v -> gotoCustomer(code), av);
+                        "مانده بدهی", Theme.GOLD, v -> gotoCustomer(code), av);
                 LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
                 p.setMargins(0, 0, 0, Theme.dp(10));
                 content.addView(row, p);
@@ -1151,7 +1151,7 @@ public class HomeScreen extends Screen {
     private void secVisitors(LinearLayout content, Data d) {
         // ---- visitors ----
         if (d.visitors != null && !d.visitors.isEmpty()) {
-            LinearLayout c = a.kit.card(Theme.WARNING);
+            LinearLayout c = a.kit.card(Theme.GOLD);
             c.addView(a.kit.sectionHead("عملکرد ۳۰ روزه ویزیتورها", "ویزیتورها ›", v -> a.nav("visitors")), a.kit.lp(-1, -2));
             Charts.HBars hb = new Charts.HBars(a);
             List<Charts.Point> pts = new ArrayList<>();
@@ -1175,7 +1175,7 @@ public class HomeScreen extends Screen {
             if (d.dueIn != null && !d.dueIn.isEmpty())
                 c.addView(a.kit.kv("دریافتی (" + Money.fa(String.valueOf(d.dueIn.size())) + " فقره)", Money.rial(dueInSum), Theme.SUCCESS), a.kit.lp(-1, -2));
             if (d.dueOut != null && !d.dueOut.isEmpty())
-                c.addView(a.kit.kv("پرداختی (" + Money.fa(String.valueOf(d.dueOut.size())) + " فقره)", Money.rial(dueOutSum), Theme.DANGER), a.kit.lp(-1, -2));
+                c.addView(a.kit.kv("پرداختی (" + Money.fa(String.valueOf(d.dueOut.size())) + " فقره)", Money.rial(dueOutSum), Theme.GOLD), a.kit.lp(-1, -2));
             a.kit.addCard(content, c);
         }
     }
@@ -1191,7 +1191,7 @@ public class HomeScreen extends Screen {
             return;
         }
         if (txt == null || txt.isEmpty()) return;
-        LinearLayout c = a.kit.card(Theme.VIOLET);
+        LinearLayout c = a.kit.card(Theme.GOLD);
         String when = "";
         try {
             when = dt == null || dt.isEmpty() ? "" : Jalali.dispFa(dt);
@@ -1202,7 +1202,7 @@ public class HomeScreen extends Screen {
         c.addView(a.kit.gap(6));
         final String share = "🌙 جمع‌بندی پایان روز میلانو" + (when.isEmpty() ? "" : " (" + when + ")")
                 + "\n" + txt;
-        c.addView(a.kit.btnGhost("↗ اشتراک‌گذاری", Theme.VIOLET, v -> {
+        c.addView(a.kit.btnGhost("↗ اشتراک‌گذاری", Theme.GOLD, v -> {
             try {
                 android.content.Intent i = new android.content.Intent(android.content.Intent.ACTION_SEND);
                 i.setType("text/plain");
@@ -1245,20 +1245,20 @@ public class HomeScreen extends Screen {
             if (dd < 0) dd = Jalali.diffDays(o.s("dueDate"), Jalali.todayStr());
             String days = dd >= 0 ? " • تأخیر " + Money.fa(String.valueOf(dd)) + " روز" : "";
             box.addView(a.kit.alertRow("فاکتور معوق", o.s("party") + " • " + Money.rial(o.d("amount")) + days,
-                    Theme.DANGER, v -> gotoUnsettled()), padTop(n));
+                    Theme.GOLD, v -> gotoUnsettled()), padTop(n));
             n++;
         }
         // top debtor
         if (d.debtors != null && !d.debtors.isEmpty()) {
             Row r = d.debtors.get(0);
             box.addView(a.kit.alertRow("بدهکار اولویت‌دار", r.s("party") + " • مانده " + Money.rial(r.d("amount")),
-                    Theme.WARNING, v -> gotoCustomer(r.s("code"))), padTop(n));
+                    Theme.GOLD, v -> gotoCustomer(r.s("code"))), padTop(n));
             n++;
         }
         // liquidity
         if (d.salesDay != null && d.buyDay != null && d.salesDay.d("total") > 0 && d.buyDay.d("total") > d.salesDay.d("total") * 1.15) {
             box.addView(a.kit.alertRow("فشار نقدینگی", "خرید روز از فروش جلو زده؛ پرداخت‌ها را کنترل کنید.",
-                    Theme.WARNING, v -> a.nav("buy")), padTop(n));
+                    Theme.GOLD, v -> a.nav("buy")), padTop(n));
             n++;
         }
         // due cheques

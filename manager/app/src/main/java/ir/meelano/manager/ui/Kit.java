@@ -237,6 +237,8 @@ public final class Kit {
         public final double countTo;
         /** Optional daily series (oldest first) drawn as a sparkline under the value. */
         public double[] spark;
+        /** Optional drawable shown above the label (0 = none). */
+        public int icon = 0;
 
         public Kpi(String label, String value, String sub, int accent) {
             this(label, value, sub, accent, null);
@@ -265,6 +267,18 @@ public final class Kit {
         LinearLayout t = v();
         t.setBackground(Theme.kpi(k.accent));
         t.setPadding(Theme.dp(12), Theme.dp(11), Theme.dp(12), Theme.dp(11));
+        if (k.icon != 0) {
+            // Optional gold glyph above the label (dashboard tiles).
+            android.widget.ImageView ic = new android.widget.ImageView(a);
+            try {
+                ic.setImageResource(k.icon);
+                ic.setColorFilter(Theme.GOLD);
+            } catch (Exception ignored) { Diag.ignored("Kit:kpiIcon", ignored); }
+            LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(Theme.dp(24), Theme.dp(24));
+            ip.gravity = Gravity.CENTER_HORIZONTAL;
+            ip.bottomMargin = Theme.dp(4);
+            t.addView(ic, ip);
+        }
         TextView l = text(k.label, 10.5f, Theme.MUTED, false);
         l.setSingleLine(true);
         l.setEllipsize(TextUtils.TruncateAt.END);

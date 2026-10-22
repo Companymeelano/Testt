@@ -914,6 +914,10 @@ public class HomeScreen extends Screen {
         kpis.add(dayKpi("پرداخت", "dar_out", d.outDay, "count", "قبض", Theme.GOLD));
         // Sparklines: last 14 days per tile (days without a row count as 0). Each tile
         // draws only from its own daily query; a missing query simply leaves the tile plain.
+        kpis.get(0).icon = R.drawable.mi_point_of_sale;
+        kpis.get(1).icon = R.drawable.mi_shopping_cart;
+        kpis.get(2).icon = R.drawable.mi_receipt_long;
+        kpis.get(3).icon = R.drawable.mi_payments;
         attachSpark(kpis.get(0), d.salesDaily, d);
         attachSpark(kpis.get(1), d.buyDaily, d);
         attachSpark(kpis.get(2), d.inDaily, d);

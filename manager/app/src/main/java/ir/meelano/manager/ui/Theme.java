@@ -74,13 +74,16 @@ public final class Theme {
         if (vector == R.drawable.mi_shopping_cart) return R.drawable.icon3d_purchase;
         if (vector == R.drawable.mi_receipt_long) return R.drawable.icon3d_cash_in;
         if (vector == R.drawable.mi_payments) return R.drawable.icon3d_cash_out;
+        if (vector == R.drawable.mi_cheque) return R.drawable.icon3d_cheque;
+        if (vector == R.drawable.mi_inventory_2) return R.drawable.icon3d_inventory;
         return vector;
     }
 
     /** True for bitmap 3D icons, which must not be tinted. */
     public static boolean isIcon3d(int res) {
         return res == R.drawable.icon3d_sales || res == R.drawable.icon3d_purchase
-                || res == R.drawable.icon3d_cash_in || res == R.drawable.icon3d_cash_out;
+                || res == R.drawable.icon3d_cash_in || res == R.drawable.icon3d_cash_out
+                || res == R.drawable.icon3d_cheque || res == R.drawable.icon3d_inventory;
     }
 
     /** 1.0 normal, 1.3 large-text mode (applied in Kit.text). */

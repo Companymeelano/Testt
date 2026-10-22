@@ -311,8 +311,8 @@ public final class Theme {
             // Champagne-gold hero: a clearly golden sheen fading into ivory, with a brighter bronze rim.
             return glass(alpha(accent, 120), 0xFFF1E2C2, 28, 200);
         }
-        // Navy hero with a gold light falling from the top-left corner.
-        return glass(alpha(accent, 70), alpha(SURFACE, 250), 28, 130);
+        // Obsidian hero with a soft gold light falling from the top-left corner.
+        return glass(alpha(accent, 44), alpha(SURFACE, 250), 28, 150);
     }
 
     /** Selected destination on the premium bottom navigation rail. */
@@ -471,7 +471,7 @@ public final class Theme {
 
     public static GradientDrawable bottomBar() {
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                light ? new int[]{0xFFFFFDF6, 0xFFEFE6CF} : new int[]{0xFF1B2A47, 0xFF0B1222});
+                light ? new int[]{0xFFFFFDF6, 0xFFEFE6CF} : new int[]{0xFF0E121A, 0xFF07090E});
         // Rounded top edge with a gold hairline: the bar reads as a floating luxury dock.
         float r = dp(22);
         d.setCornerRadii(new float[]{r, r, r, r, 0, 0, 0, 0});

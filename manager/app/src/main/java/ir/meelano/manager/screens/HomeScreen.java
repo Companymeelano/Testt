@@ -169,6 +169,20 @@ public class HomeScreen extends Screen {
         }
     }
 
+    /** Dark card with the gold clock artwork behind the text (the "updating dashboard" banner). */
+    private static android.graphics.drawable.Drawable clockCard(android.content.Context c) {
+        android.graphics.drawable.GradientDrawable base = new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                new int[]{0xFF0E121A, 0xFF07090E});
+        base.setCornerRadius(Theme.dp(22));
+        base.setStroke(Theme.dp(1), Theme.alpha(Theme.GOLD, 120));
+        android.graphics.drawable.Drawable art = c.getResources().getDrawable(R.drawable.home_clock_bg, c.getTheme());
+        android.graphics.drawable.LayerDrawable ld = new android.graphics.drawable.LayerDrawable(
+                new android.graphics.drawable.Drawable[]{base, art});
+        ld.setLayerGravity(1, Gravity.FILL);
+        return ld;
+    }
+
     @Override
     public void render(final LinearLayout content) {
         final int token = a.renderGen();
@@ -177,7 +191,9 @@ public class HomeScreen extends Screen {
         final Data cached = loadCached(cachedTs);
         if (cached != null) {
             build(content, cached);
-            LinearLayout hint = a.kit.card(Theme.WARNING);
+            LinearLayout hint = a.kit.v();
+            hint.setPadding(Theme.dp(16), Theme.dp(14), Theme.dp(16), Theme.dp(14));
+            hint.setBackground(clockCard(a));
             hint.addView(a.kit.text("⟳ در حال به‌روزرسانی داشبورد…", 12f, Theme.TEXT, true), a.kit.lp(-1, -2));
             if (!cachedTs[0].isEmpty())
                 hint.addView(a.kit.kv("آخرین داده ذخیره‌شده", Money.fa(cachedTs[0]), Theme.MUTED), a.kit.lp(-1, -2));

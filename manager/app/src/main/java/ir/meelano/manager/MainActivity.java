@@ -556,7 +556,7 @@ public class MainActivity extends Activity {
         status.addView(linkIcon, new LinearLayout.LayoutParams(Theme.dp(20), Theme.dp(20)));
         status.addView(kit.space(6));
         licChip = kit.text("", 10.5f, Theme.GOLD_SOFT, true);
-        licChip.setBackground(Theme.ghostButton(Theme.GOLD));
+        licChip.setBackground(Theme.pill(Theme.GOLD));
         licChip.setPadding(Theme.dp(8), Theme.dp(3), Theme.dp(8), Theme.dp(3));
         licChip.setSingleLine(true);
         licChip.setMaxWidth(Theme.dp(120));
@@ -566,7 +566,7 @@ public class MainActivity extends Activity {
         status.addView(licChip, kit.lp(-2, -2));
         status.addView(kit.space(6));
         userChip = kit.text("", 10.5f, Theme.GOLD_SOFT, true);
-        userChip.setBackground(Theme.ghostButton(Theme.GOLD));
+        userChip.setBackground(Theme.pill(Theme.GOLD));
         userChip.setPadding(Theme.dp(8), Theme.dp(3), Theme.dp(8), Theme.dp(3));
         userChip.setSingleLine(true);
         userChip.setMaxWidth(Theme.dp(120));

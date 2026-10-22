@@ -283,7 +283,7 @@ public final class Theme {
         if (light) {
             return glass(0xFFFFFDF8, 0xFFF4ECDA, 22, 70);
         }
-        return glass(alpha(SURFACE, 242), alpha(SURFACE, 214), 22, 64);
+        return glass(alpha(SURFACE, 242), alpha(SURFACE, 214), 22, 92);
     }
 
     /** Card with an accent glow edge. */

@@ -120,8 +120,9 @@ public final class Theme {
             BG = 0xFF07090E;
             SURFACE = 0xFF0E121A;
             SURFACE2 = 0xFF161B26;
-            GOLD = 0xFFE2B865;
-            GOLD_SOFT = 0xFFF6DFA0;
+            // Brighter, more luminous gold so every accent reads clearly on the obsidian surfaces.
+            GOLD = 0xFFFFD45C;
+            GOLD_SOFT = 0xFFFFEDB0;
             TEXT = 0xFFFAF6EC;
             MUTED = 0xFF9AA3B5;
             SUCCESS = 0xFF34D399;

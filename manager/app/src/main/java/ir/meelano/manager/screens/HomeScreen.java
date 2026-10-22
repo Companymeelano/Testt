@@ -184,11 +184,18 @@ public class HomeScreen extends Screen {
         private final android.graphics.Paint hand = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
         private final android.graphics.Path path = new android.graphics.Path();
         private final android.graphics.RectF dst = new android.graphics.RectF();
+        private final android.graphics.Paint rim = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        private final android.graphics.RectF panel = new android.graphics.RectF();
 
         ClockView(android.content.Context c, android.graphics.Bitmap bmp) {
             super(c);
             this.bmp = bmp;
             hand.setStyle(android.graphics.Paint.Style.FILL);
+            rim.setStyle(android.graphics.Paint.Style.STROKE);
+            rim.setStrokeWidth(Theme.dp(1.6f));
+            rim.setColor(Theme.GOLD);
+            rim.setShadowLayer(Theme.dp(6), 0, 0, Theme.alpha(Theme.GOLD, 150));
+            setLayerType(View.LAYER_TYPE_SOFTWARE, rim); // the glow needs a software layer
         }
 
         @Override
@@ -201,9 +208,13 @@ public class HomeScreen extends Screen {
             dst.set(0, 0, w, h);
             c.drawBitmap(bmp, null, dst, art);
             // Dissolve the artwork's right edge into the card colour so no box edge shows.
-            fade.setShader(new android.graphics.LinearGradient(w * 0.55f, 0, w, 0,
+            fade.setShader(new android.graphics.LinearGradient(w * 0.6f, 0, w, 0,
                     0x000A0D13, 0xFF0A0D13, android.graphics.Shader.TileMode.CLAMP));
-            c.drawRect(w * 0.55f, 0, w, h, fade);
+            c.drawRect(w * 0.6f, 0, w, h, fade);
+            // Gold frame around the clock picture itself.
+            float inset = Theme.dp(4);
+            panel.set(inset, inset, w * 0.6f - inset / 2f, h - inset);
+            c.drawRoundRect(panel, Theme.dp(14), Theme.dp(14), rim);
 
             java.util.Calendar now = java.util.Calendar.getInstance();
             float minute = now.get(java.util.Calendar.MINUTE) + now.get(java.util.Calendar.SECOND) / 60f;
@@ -246,6 +257,10 @@ public class HomeScreen extends Screen {
      * Shown on every dashboard load, cached or not.
      */
     private View updateBanner(String savedTs) {
+        return updateBanner(savedTs, false);
+    }
+
+    private View updateBanner(String savedTs, boolean done) {
         android.content.Context c = a;
         if (clockBitmap == null) {
             try {
@@ -265,9 +280,14 @@ public class HomeScreen extends Screen {
         text.setOrientation(LinearLayout.VERTICAL);
         // Text sits on the right; the end side keeps room for the clock artwork.
         text.setPaddingRelative(Theme.dp(16), Theme.dp(14), Theme.dp(118), Theme.dp(14));
-        text.addView(a.kit.text("⟳ در حال به‌روزرسانی داشبورد…", 12f, Theme.TEXT, true), new LinearLayout.LayoutParams(-1, -2));
-        if (savedTs != null && !savedTs.isEmpty()) {
-            text.addView(a.kit.text("آخرین داده ذخیره‌شده: " + Money.fa(savedTs), 11f, Theme.MUTED, false), new LinearLayout.LayoutParams(-1, -2));
+        if (done) {
+            text.addView(a.kit.text("✓ داشبورد به‌روز است", 12f, Theme.GOLD_SOFT, true), new LinearLayout.LayoutParams(-1, -2));
+            text.addView(a.kit.text("ساعت به‌روزرسانی: " + savedTs, 11f, Theme.MUTED, false), new LinearLayout.LayoutParams(-1, -2));
+        } else {
+            text.addView(a.kit.text("⟳ در حال به‌روزرسانی داشبورد…", 12f, Theme.TEXT, true), new LinearLayout.LayoutParams(-1, -2));
+            if (savedTs != null && !savedTs.isEmpty()) {
+                text.addView(a.kit.text("آخرین داده ذخیره‌شده: " + Money.fa(savedTs), 11f, Theme.MUTED, false), new LinearLayout.LayoutParams(-1, -2));
+            }
         }
         box.addView(text, new FrameLayout.LayoutParams(-1, -2));
         return box;
@@ -900,6 +920,11 @@ public class HomeScreen extends Screen {
 
     private void build(LinearLayout content, Data d) {
         content.removeAllViews();
+        // The clock banner stays on top after live data arrives; it now reports the refresh time.
+        String nowTs = Money.fa(String.format(Locale.US, "%02d:%02d",
+                Calendar.getInstance().get(Calendar.HOUR_OF_DAY), Calendar.getInstance().get(Calendar.MINUTE)));
+        content.addView(updateBanner(nowTs, true), a.kit.lp(-1, -2));
+        content.addView(a.kit.gap(10));
         content.addView(greetingHero(), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
         content.addView(a.kit.gap(8));

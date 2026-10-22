@@ -264,7 +264,7 @@ public class HomeScreen extends Screen {
         LinearLayout text = new LinearLayout(c);
         text.setOrientation(LinearLayout.VERTICAL);
         // Text sits on the right; the end side keeps room for the clock artwork.
-        text.setPaddingRelative(Theme.dp(16), Theme.dp(14), Theme.dp(150), Theme.dp(14));
+        text.setPaddingRelative(Theme.dp(16), Theme.dp(14), Theme.dp(118), Theme.dp(14));
         text.addView(a.kit.text("⟳ در حال به‌روزرسانی داشبورد…", 12f, Theme.TEXT, true), new LinearLayout.LayoutParams(-1, -2));
         if (savedTs != null && !savedTs.isEmpty()) {
             text.addView(a.kit.text("آخرین داده ذخیره‌شده: " + Money.fa(savedTs), 11f, Theme.MUTED, false), new LinearLayout.LayoutParams(-1, -2));
@@ -847,6 +847,7 @@ public class HomeScreen extends Screen {
             loc.setMinHeight(Theme.dp(30));
             LinearLayout.LayoutParams lp = a.kit.lp(-2, -2);
             lp.setMargins(0, Theme.dp(6), 0, 0);
+            lp.gravity = Gravity.END;
             card.addView(loc, lp);
         }
 

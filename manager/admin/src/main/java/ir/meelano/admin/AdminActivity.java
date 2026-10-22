@@ -247,7 +247,7 @@ public class AdminActivity extends Activity {
 
     private void showHome() {
         LinearLayout box = AdminKit.vbox(this);
-        box.addView(AdminKit.titleBar(this, "دانه درخشان • فروش لایسنس", null));
+        box.addView(AdminKit.titleBar(this, "زرین‌فرمان • فروش لایسنس", null));
 
         long today = License.today();
         int nc = db.customerCount();
@@ -783,7 +783,7 @@ public class AdminActivity extends Activity {
     }
 
     private String shareText(AdminDb.Lic l) {
-        return "کد فعال‌سازی دانه درخشان\n"
+        return "کد فعال‌سازی زرین‌فرمان\n"
                 + AdminKit.prettifyPack(l.pack) + "\n"
                 + "طرح: «" + License.planFa(planOf(l)) + "»\n"
                 + "انقضا: " + expText(l) + "\n"
@@ -1113,7 +1113,7 @@ public class AdminActivity extends Activity {
             try {
                 String line = License.revokeLine(rDev);
                 if (SmsIo.cleanPhone(rPhone).length() >= 10) {
-                    directSms(rPhone, "دانه درخشان منیجر\n" + line
+                    directSms(rPhone, "زرین‌فرمان منیجر\n" + line
                             + "\nلایسنس شما لغو شد؛ برای فعال‌سازی مجدد با فروشنده در تماس باشید.");
                     db.setRevoked(l.id, true);
                     reload();
@@ -1131,7 +1131,7 @@ public class AdminActivity extends Activity {
             try {
                 String line = License.blockLine(rDev, AdminKit.txt(fReason));
                 if (SmsIo.cleanPhone(rPhone).length() >= 10) {
-                    directSms(rPhone, "دانه درخشان منیجر\n" + line);
+                    directSms(rPhone, "زرین‌فرمان منیجر\n" + line);
                     db.setRevoked(l.id, true);
                     reload();
                 } else {
@@ -1148,7 +1148,7 @@ public class AdminActivity extends Activity {
             try {
                 String line = License.unblockLine(rDev);
                 if (SmsIo.cleanPhone(rPhone).length() >= 10) {
-                    directSms(rPhone, "دانه درخشان منیجر\n" + line
+                    directSms(rPhone, "زرین‌فرمان منیجر\n" + line
                             + "\nمسدودی برداشته شد؛ برنامه را فعال کنید.");
                 } else {
                     AdminKit.copy(this, "متن رفع مسدودی", line);
@@ -1314,7 +1314,7 @@ public class AdminActivity extends Activity {
                 AdminKit.toast(this, "کارت کپی شد");
             });
             out.addView(bCopy);
-            final String fmsg = "کارت اتصال دانه درخشان (" + fname + ")\n" + fcard
+            final String fmsg = "کارت اتصال زرین‌فرمان (" + fname + ")\n" + fcard
                     + "\nراهنما: برنامه را باز نگه دارید؛ کارت خودکار ثبت می‌شود.";
             Button bShare = AdminKit.btn(this, "اشتراک‌گذاری برای مشتری", false);
             bShare.setOnClickListener(x -> AdminKit.share(this, "ارسال کارت اتصال", fmsg));

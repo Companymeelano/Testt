@@ -361,7 +361,7 @@ public final class Notify {
             PendingIntent pi = PendingIntent.getActivity(c, EOD_NOTIF_ID, open,
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             Notification n = new Notification.Builder(c, CH)
-                    .setContentTitle("🌙 جمع‌بندی روز دانه درخشان")
+                    .setContentTitle("🌙 جمع‌بندی روز زرین‌فرمان")
                     .setContentText(full)
                     .setStyle(new Notification.BigTextStyle().bigText(full))
                     .setSmallIcon(R.mipmap.ic_launcher)
@@ -444,7 +444,7 @@ public final class Notify {
             PendingIntent pi = PendingIntent.getActivity(c, WEEKLY_NOTIF_ID, open,
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             Notification n = new Notification.Builder(c, CH)
-                    .setContentTitle("📊 گزارش هفتگی دانه درخشان")
+                    .setContentTitle("📊 گزارش هفتگی زرین‌فرمان")
                     .setContentText(msg)
                     .setStyle(new Notification.BigTextStyle().bigText(msg))
                     .setSmallIcon(R.mipmap.ic_launcher)
@@ -568,14 +568,14 @@ public final class Notify {
             boolean onlyMorning = morning && parts.size() == 1;
             Notification.InboxStyle inbox = new Notification.InboxStyle();
             for (String p : parts) inbox.addLine(p);
-            inbox.setBigContentTitle(onlyMorning ? "☀ گزارش صبحگاهی دانه درخشان" : "⚠ هشدار سررسید دانه درخشان");
+            inbox.setBigContentTitle(onlyMorning ? "☀ گزارش صبحگاهی زرین‌فرمان" : "⚠ هشدار سررسید زرین‌فرمان");
             inbox.setSummaryText(Money.fa(String.valueOf(parts.size())) + " مورد نیازمند توجه • برای جزئیات لمس کنید");
             Intent open = new Intent(c, MainActivity.class);
             open.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
             PendingIntent pi = PendingIntent.getActivity(c, NOTIF_ID, open,
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             Notification n = new Notification.Builder(c, CH)
-                    .setContentTitle(onlyMorning ? "☀ گزارش صبحگاهی دانه درخشان" : "⚠ هشدار سررسید دانه درخشان")
+                    .setContentTitle(onlyMorning ? "☀ گزارش صبحگاهی زرین‌فرمان" : "⚠ هشدار سررسید زرین‌فرمان")
                     .setContentText(parts.isEmpty() ? "" : parts.get(0))
                     .setStyle(inbox)
                     .setSmallIcon(R.mipmap.ic_launcher)
@@ -598,7 +598,7 @@ public final class Notify {
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             String msg = "امروز جمعه است؛ از دیتابیس آتیران نسخه پشتیبان بگیرید تا داده فروشگاه امن بماند.";
             Notification n = new Notification.Builder(c, CH)
-                    .setContentTitle("⛁ یادآوری پشتیبان‌گیری دانه درخشان")
+                    .setContentTitle("⛁ یادآوری پشتیبان‌گیری زرین‌فرمان")
                     .setContentText(msg)
                     .setStyle(new Notification.BigTextStyle().bigText(msg))
                     .setSmallIcon(R.mipmap.ic_launcher)

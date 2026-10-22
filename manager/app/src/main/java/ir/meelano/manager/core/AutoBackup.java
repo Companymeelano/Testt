@@ -80,7 +80,7 @@ public final class AutoBackup {
             String msg = ok ? ("بکاپ خودکار ساخته شد (" + detail + ") و در Downloads ذخیره شد.")
                     : ("بکاپ خودکار ناموفق بود (" + detail + ")؛ امشب دوباره تلاش می‌شود.");
             Notification n = new Notification.Builder(c, CH)
-                    .setContentTitle(ok ? "⛁ بکاپ خودکار دانه درخشان ✓" : "⛁ بکاپ خودکار دانه درخشان ✕")
+                    .setContentTitle(ok ? "⛁ بکاپ خودکار زرین‌فرمان ✓" : "⛁ بکاپ خودکار زرین‌فرمان ✕")
                     .setContentText(msg)
                     .setStyle(new Notification.BigTextStyle().bigText(msg))
                     .setSmallIcon(R.mipmap.ic_launcher)

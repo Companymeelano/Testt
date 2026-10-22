@@ -81,7 +81,7 @@ public class LoginActivity extends Activity {
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(Theme.dp(190), Theme.dp(170));
         lp.gravity = Gravity.CENTER;
         root.addView(halo, lp);
-        TextView t = kit.text("ورود به دانه درخشان", 26, Theme.TEXT, true);
+        TextView t = kit.text("ورود به زرین‌فرمان", 26, Theme.TEXT, true);
         t.setGravity(Gravity.CENTER);
         try {
             t.setLetterSpacing(0.04f);
@@ -210,7 +210,7 @@ public class LoginActivity extends Activity {
         root.addView(kit.hint("با حساب محلی مدیریت یا انبارداری وارد شوید؛ محیط متناسب با نقش شما باز می‌شود."),
                 kit.lp(-1, -2));
         root.addView(kit.gap(6));
-        TextView verLine = kit.text("دانه درخشان • " + appVer(), 10.5f, Theme.MUTED, false);
+        TextView verLine = kit.text("زرین‌فرمان • " + appVer(), 10.5f, Theme.MUTED, false);
         verLine.setGravity(Gravity.CENTER);
         root.addView(verLine, kit.lp(-1, -2));
 
@@ -482,7 +482,7 @@ public class LoginActivity extends Activity {
             try {
                 // Tap the message to copy a diagnostics report for support.
                 err.setOnClickListener(v -> {
-                    boolean ok = copyText("گزارش ورود دانه درخشان", report);
+                    boolean ok = copyText("گزارش ورود زرین‌فرمان", report);
                     kit.toast(ok ? "گزارش کپی شد" : "کپی نشد");
                 });
             } catch (Exception ignored) { Diag.ignored("LoginActivity:302", ignored); }

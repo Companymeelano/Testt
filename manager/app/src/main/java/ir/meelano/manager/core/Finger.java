@@ -36,7 +36,7 @@ public final class Finger {
         try {
             final Executor ex = a.getMainExecutor();
             BiometricPrompt bp = new BiometricPrompt.Builder(a)
-                    .setTitle("ورود مدیریتی دانه درخشان")
+                    .setTitle("ورود مدیریتی زرین‌فرمان")
                     .setSubtitle("اثر انگشت خود را تأیید کنید")
                     .setNegativeButton("انصراف", ex, (d, w) -> cb.fail("لغو شد"))
                     .build();

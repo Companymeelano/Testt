@@ -69,7 +69,8 @@ public final class Kit {
     }
 
     public TextView title(String s) {
-        return text(s, 15f, Theme.TEXT, true);
+        // Section titles take the gold accent in the dark theme, matching the reference.
+        return text(s, 15f, Theme.DARK ? Theme.GOLD_SOFT : Theme.TEXT, true);
     }
 
     public TextView sub(String s) {

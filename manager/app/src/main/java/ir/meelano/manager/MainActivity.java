@@ -520,11 +520,11 @@ public class MainActivity extends Activity {
         logoImg.setPadding(lpad, lpad, lpad, lpad);
         logoImg.setVisibility(View.GONE);
         logoBox.addView(logoImg, new android.widget.FrameLayout.LayoutParams(-1, -1));
-        brand.addView(logoBox, new LinearLayout.LayoutParams(Theme.dp(64), Theme.dp(64)));
+        brand.addView(logoBox, new LinearLayout.LayoutParams(Theme.dp(80), Theme.dp(80)));
         brand.addView(kit.space(10));
 
         LinearLayout titleCol = kit.v();
-        companyName = kit.text(companyTitle(), 16, Theme.TEXT, true);
+        companyName = kit.text(companyTitle(), 22, Theme.TEXT, true);
         companyName.setMaxLines(2);
         companyName.setEllipsize(android.text.TextUtils.TruncateAt.END);
         titleCol.addView(companyName, kit.lp(-1, -2));
@@ -574,6 +574,17 @@ public class MainActivity extends Activity {
         Theme.pressable(userChip);
         userChip.setOnClickListener(v -> userMenu());
         status.addView(userChip, kit.lp(-2, -2));
+        // Gold tag badge at the end of the chips row, as in the reference header (decorative).
+        android.widget.ImageView tagBadge = new android.widget.ImageView(this);
+        try {
+            tagBadge.setImageResource(R.drawable.mi_sell);
+            tagBadge.setColorFilter(Theme.GOLD);
+        } catch (Exception ignored) { Diag.ignored("MainActivity:tagBadge", ignored); }
+        tagBadge.setPadding(Theme.dp(5), Theme.dp(5), Theme.dp(5), Theme.dp(5));
+        tagBadge.setBackground(Theme.ghostButton(Theme.GOLD));
+        tagBadge.setClickable(false);
+        status.addView(kit.space(8));
+        status.addView(tagBadge, new LinearLayout.LayoutParams(Theme.dp(30), Theme.dp(30)));
         titleCol.addView(status, kit.lp(-2, -2));
         brand.addView(titleCol, kit.wlp(1f));
         header.addView(brand, kit.lp(-1, -2));
@@ -723,14 +734,14 @@ public class MainActivity extends Activity {
         cell.setOrientation(LinearLayout.VERTICAL);
         cell.setGravity(Gravity.CENTER);
         cell.setContentDescription(desc);
-        cell.setMinimumHeight(Theme.dp(54));
+        cell.setMinimumHeight(Theme.dp(62));
         Theme.pressable(cell);
         cell.setOnClickListener(v -> onTap.run());
         icon.setClickable(false);
-        cell.addView(icon, new LinearLayout.LayoutParams(Theme.dp(26), Theme.dp(24)));
+        cell.addView(icon, new LinearLayout.LayoutParams(Theme.dp(28), Theme.dp(28)));
         TextView t = new TextView(this);
         t.setText(label);
-        t.setTextSize(10 * Theme.fontScale());
+        t.setTextSize(11 * Theme.fontScale());
         t.setTextColor(Theme.DARK ? Theme.GOLD_SOFT : Theme.MUTED);
         t.setGravity(Gravity.CENTER);
         t.setSingleLine(true);
@@ -739,7 +750,7 @@ public class MainActivity extends Activity {
     }
 
     private LinearLayout.LayoutParams toolLp() {
-        return new LinearLayout.LayoutParams(0, Theme.dp(54), 1f);
+        return new LinearLayout.LayoutParams(0, Theme.dp(62), 1f);
     }
 
     /** Hairline divider between header tool buttons. */
@@ -825,6 +836,12 @@ public class MainActivity extends Activity {
                     || ("more".equals(tabs[i]) && !isTab(currentId)));
             LinearLayout badge = (LinearLayout) b.getChildAt(0);
             badge.setBackground(on ? Theme.bottomNavIconSelected() : null);
+            // Gold underline under the selected tab (the marker was never shown before).
+            View under = b.getChildCount() > 2 ? b.getChildAt(2) : null;
+            if (under != null) {
+                under.setVisibility(on ? View.VISIBLE : View.INVISIBLE);
+                under.setBackground(Theme.pill(Theme.GOLD));
+            }
             // Gold halo under the selected capsule (API 28+ coloured shadow; older devices keep the rim).
             if (android.os.Build.VERSION.SDK_INT >= 28) {
                 badge.setElevation(on ? Theme.dp(6) : 0f);

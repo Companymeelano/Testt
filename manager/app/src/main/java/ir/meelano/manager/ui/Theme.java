@@ -346,7 +346,7 @@ public final class Theme {
                 ? new int[]{shade(SURFACE2, 0.05f), SURFACE2, shade(SURFACE2, -0.03f)}
                 : new int[]{shade(GOLD, 0.22f), GOLD, shade(GOLD, -0.2f)};
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR, colors);
-        d.setCornerRadius(dp(16));
+        d.setCornerRadius(dp(22));
         d.setStroke(dp(1), alpha(0xFFFFFFFF, light ? 110 : 120));
         return d;
     }

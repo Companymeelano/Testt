@@ -671,7 +671,7 @@ public class HomeScreen extends Screen {
         TextView overline = a.kit.text("MEELANO  •  اتاق فرمان", 10.5f, Theme.GOLD_SOFT, true);
         overline.setSingleLine(true);
         copy.addView(overline, a.kit.lp(-1, -2));
-        TextView headline = a.kit.text(greeting + "، " + roleName, 21.5f, Theme.TEXT, true);
+        TextView headline = a.kit.text(greeting + "، " + roleName, 24f, Theme.TEXT, true);
         headline.setMaxLines(1);
         headline.setEllipsize(android.text.TextUtils.TruncateAt.END);
         LinearLayout.LayoutParams hp = a.kit.lp(-1, -2);

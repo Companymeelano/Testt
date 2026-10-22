@@ -291,7 +291,35 @@ public class HomeScreen extends Screen {
             }
         }
         box.addView(text, new FrameLayout.LayoutParams(-1, -2));
+        if (!done) addShimmer(box);
         return box;
+    }
+
+    /** A soft gold band sweeps across the card while it waits for live data (light, one animator). */
+    private void addShimmer(final FrameLayout box) {
+        final View band = new View(a);
+        android.graphics.drawable.GradientDrawable g = new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{Theme.alpha(Theme.GOLD, 0), Theme.alpha(Theme.GOLD, 60), Theme.alpha(Theme.GOLD, 0)});
+        band.setBackground(g);
+        band.setClickable(false);
+        band.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        box.addView(band, new FrameLayout.LayoutParams(Theme.dp(120), -1));
+        final android.animation.ObjectAnimator[] sweepRef = new android.animation.ObjectAnimator[1];
+        box.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, orr, ob) -> {
+            if (r - l <= 0 || sweepRef[0] != null) return;
+            sweepRef[0] = android.animation.ObjectAnimator.ofFloat(band, View.TRANSLATION_X, -Theme.dp(120), r - l);
+            sweepRef[0].setDuration(1600);
+            sweepRef[0].setRepeatCount(android.animation.ObjectAnimator.INFINITE);
+            sweepRef[0].start();
+        });
+        // Stop the repeating animation when the card leaves the screen.
+        box.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
+            @Override public void onViewAttachedToWindow(View v) { }
+            @Override public void onViewDetachedFromWindow(View v) {
+                if (sweepRef[0] != null) sweepRef[0].cancel();
+            }
+        });
     }
 
     @Override
@@ -686,7 +714,16 @@ public class HomeScreen extends Screen {
             });
             crest.addView(mark, new FrameLayout.LayoutParams(Theme.dp(50), Theme.dp(50), Gravity.CENTER));
         }
-        top.addView(crest, new LinearLayout.LayoutParams(Theme.dp(66), Theme.dp(66)));
+        FrameLayout crestWrap = new FrameLayout(a);
+        android.graphics.drawable.GradientDrawable halo = new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                new int[]{Theme.alpha(Theme.GOLD, 90), Theme.alpha(Theme.GOLD, 0)});
+        halo.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        View haloView = new View(a);
+        haloView.setBackground(halo);
+        crestWrap.addView(haloView, new FrameLayout.LayoutParams(-1, -1));
+        crestWrap.addView(crest, new FrameLayout.LayoutParams(Theme.dp(66), Theme.dp(66), Gravity.CENTER));
+        top.addView(crestWrap, new LinearLayout.LayoutParams(Theme.dp(78), Theme.dp(78)));
         top.addView(a.kit.space(12));
 
         LinearLayout copy = a.kit.v();
@@ -695,7 +732,8 @@ public class HomeScreen extends Screen {
         copy.addView(overline, a.kit.lp(-1, -2));
         TextView headline = a.kit.text(greeting + "، " + roleName, 26f, Theme.TEXT, true);
         headline.setMaxLines(1);
-        headline.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        // Long names shrink to fit the line instead of being cut off.
+        headline.setAutoSizeTextTypeUniformWithConfiguration(16, 26, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
         LinearLayout.LayoutParams hp = a.kit.lp(-1, -2);
         hp.setMargins(0, Theme.dp(2), 0, 0);
         copy.addView(headline, hp);

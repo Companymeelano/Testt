@@ -274,6 +274,7 @@ public class HomeScreen extends Screen {
         base.setCornerRadius(Theme.dp(22));
         base.setStroke(Theme.dp(1), Theme.alpha(Theme.GOLD, 120));
         box.setBackground(base);
+        box.setMinimumHeight(Theme.dp(124));
         box.addView(new ClockView(c, clockBitmap), new FrameLayout.LayoutParams(-1, -1));
 
         LinearLayout text = new LinearLayout(c);
@@ -684,14 +685,14 @@ public class HomeScreen extends Screen {
             });
             crest.addView(mark, new FrameLayout.LayoutParams(Theme.dp(50), Theme.dp(50), Gravity.CENTER));
         }
-        top.addView(crest, new LinearLayout.LayoutParams(Theme.dp(58), Theme.dp(58)));
+        top.addView(crest, new LinearLayout.LayoutParams(Theme.dp(66), Theme.dp(66)));
         top.addView(a.kit.space(12));
 
         LinearLayout copy = a.kit.v();
         TextView overline = a.kit.text("MEELANO  •  اتاق فرمان", 10.5f, Theme.GOLD_SOFT, true);
         overline.setSingleLine(true);
         copy.addView(overline, a.kit.lp(-1, -2));
-        TextView headline = a.kit.text(greeting + "، " + roleName, 24f, Theme.TEXT, true);
+        TextView headline = a.kit.text(greeting + "، " + roleName, 26f, Theme.TEXT, true);
         headline.setMaxLines(1);
         headline.setEllipsize(android.text.TextUtils.TruncateAt.END);
         LinearLayout.LayoutParams hp = a.kit.lp(-1, -2);
@@ -844,7 +845,7 @@ public class HomeScreen extends Screen {
                     : (w.code >= 51 ? R.drawable.mi_beach_access : R.drawable.mi_wb_twilight));
             try { wi.setImageResource(wRes); } catch (Exception ignored) { Diag.ignored("HomeScreen:weatherIcon", ignored); }
             wi.setColorFilter(Theme.GOLD);
-            wr.addView(wi, a.kit.lp(Theme.dp(34), Theme.dp(34)));
+            wr.addView(wi, a.kit.lp(Theme.dp(44), Theme.dp(44)));
             wr.addView(a.kit.space(8));
             LinearLayout wc = a.kit.v();
             TextView line = a.kit.text(weatherPlace + " • " + Money.fa(String.valueOf(Math.round(w.temp))) + "°  "
@@ -898,10 +899,10 @@ public class HomeScreen extends Screen {
         label.setEllipsize(TextUtils.TruncateAt.END);
         t.addView(label, a.kit.lp(-1, -2));
         // Prices are always in toman (the source's unit), whatever unit the rest of the app uses.
-        TextView price = a.kit.text(Money.fa(Money.num(r.toman)), 13f, Theme.TEXT, true);
+        TextView price = a.kit.text(Money.fa(Money.num(r.toman)), 18f, Theme.TEXT, true);
         price.setMaxLines(1);
         price.setGravity(Gravity.CENTER_HORIZONTAL);
-        price.setAutoSizeTextTypeUniformWithConfiguration(10, 13, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
+        price.setAutoSizeTextTypeUniformWithConfiguration(11, 18, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
         t.addView(price, a.kit.lp(-1, -2));
         TextView unit = a.kit.text("تومان", 9.5f, Theme.GOLD_SOFT, true);
         unit.setMaxLines(1);

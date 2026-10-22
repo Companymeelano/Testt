@@ -626,6 +626,9 @@ public class MainActivity extends Activity {
         compactUserAction = account;
         tools.addView(toolCell(account, "حساب", "حساب کاربری؛ خروج یا تغییر کاربر", () -> userMenu()), toolLp());
 
+        for (int i = tools.getChildCount() - 1; i > 0; i--) {
+            tools.addView(vdiv(), i, new LinearLayout.LayoutParams(Theme.dp(1), Theme.dp(40)));
+        }
         header.addView(tools, kit.lp(-1, -2));
         refreshUserChip();
         root.addView(header, kit.lp(-1, -2));

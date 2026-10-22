@@ -334,9 +334,14 @@ public class HomeScreen extends Screen {
             build(content, cached);
             // build() already put a banner on top: replace it with the updating state (one banner only).
             content.removeViewAt(0);
-            content.addView(updateBanner(cachedTs[0]), 0);
+            // The banner changes state with a short cross-fade instead of a jump.
+            View updating = updateBanner(cachedTs[0]);
+            updating.setAlpha(0f);
+            updating.animate().alpha(1f).setDuration(280).start();
+            content.addView(updating, 0);
         } else {
             content.removeAllViews();
+            bannerWasLoading = true;
             content.addView(updateBanner(""), a.kit.lp(-1, -2));
             content.addView(a.kit.gap(10));
             content.addView(greetingHero(), a.kit.lp(-1, -2));
@@ -976,7 +981,14 @@ public class HomeScreen extends Screen {
         // The clock banner stays on top after live data arrives; it now reports the refresh time.
         String nowTs = Money.fa(String.format(Locale.US, "%02d:%02d",
                 Calendar.getInstance().get(Calendar.HOUR_OF_DAY), Calendar.getInstance().get(Calendar.MINUTE)));
-        content.addView(updateBanner(nowTs, true), a.kit.lp(-1, -2));
+        View doneBanner = updateBanner(nowTs, true);
+        // Loading → done: fade the single card into its finished state (only after the first entry).
+        if (bannerWasLoading && entered) {
+            doneBanner.setAlpha(0f);
+            doneBanner.animate().alpha(1f).setDuration(320).start();
+        }
+        bannerWasLoading = false;
+        content.addView(doneBanner, a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
         content.addView(greetingHero(), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
@@ -1034,6 +1046,9 @@ public class HomeScreen extends Screen {
         @Override public void setColorFilter(android.graphics.ColorFilter cf) { }
         @Override public int getOpacity() { return android.graphics.PixelFormat.TRANSLUCENT; }
     }
+
+    /** True while the clock card shows the loading state (so the finished state can fade in). */
+    private boolean bannerWasLoading;
 
     /** One-time staggered fade and slide for the first home cards (skipped when animations are off). */
     private boolean entered;

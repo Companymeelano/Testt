@@ -540,7 +540,6 @@ public class LicenseActivity extends Activity {
         startBtn.setOnClickListener(v -> requestStart(txt(fName), txt(fPhone),
                 fName, fPhone, errName, errPhone, startBtn));
         c.addView(startBtn, kit.lp(-1, -2));
-        addManualEntry(c);
         Card3D.mount(box, c);
         buildDevFooter(box);
     }
@@ -603,6 +602,35 @@ public class LicenseActivity extends Activity {
     }
 
     /** Section title with a medallion icon on the leading edge. */
+    /** Manual code entry hidden until {@code delayMs} passes: the SMS path stays automatic. */
+    private void addManualEntryLater(LinearLayout c, long delayMs) {
+        final LinearLayout holder = kit.v();
+        addManualEntry(holder);
+        holder.setVisibility(View.GONE);
+        c.addView(holder, kit.lp(-1, -2));
+        uiHandler.postDelayed(() -> {
+            if (!isFinishing()) holder.setVisibility(View.VISIBLE);
+        }, delayMs);
+    }
+
+    /** Small glass chip for the compact licence header: icon, caption and value. */
+    private LinearLayout miniChip(int iconRes, int iconColor, String caption, String value, int valueColor) {
+        LinearLayout c = kit.v();
+        c.setGravity(Gravity.CENTER_HORIZONTAL);
+        c.setPadding(Theme.dp(6), Theme.dp(8), Theme.dp(6), Theme.dp(8));
+        c.setBackground(Theme.glass(0xFFFFFFFF, 0xFFF6EEDA, 14, 110));
+        c.addView(kit.icon(iconRes, iconColor, 20), new LinearLayout.LayoutParams(Theme.dp(20), Theme.dp(20)));
+        TextView cap = kit.text(caption, 10f, Theme.MUTED, false);
+        cap.setGravity(Gravity.CENTER_HORIZONTAL);
+        c.addView(cap, kit.lp(-1, -2));
+        TextView val = kit.text(value, 12.5f, valueColor, true);
+        val.setGravity(Gravity.CENTER_HORIZONTAL);
+        val.setSingleLine(true);
+        val.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        c.addView(val, kit.lp(-1, -2));
+        return c;
+    }
+
     private LinearLayout sectionHead(int iconRes, int color, String title) {
         LinearLayout h = kit.h();
         h.setGravity(Gravity.CENTER_VERTICAL);
@@ -911,7 +939,7 @@ public class LicenseActivity extends Activity {
         recall[0] = kit.btnGold("✦ دریافت کلید", v -> recallFlow(recall[0]));
         row.addView(recall[0], kit.wlp(1f));
         c.addView(row, kit.lp(-1, -2));
-        addManualEntry(c);
+        addManualEntryLater(c, 60_000L);
         Card3D.mount(box, c);
         buildDevFooter(box);
         startDots();
@@ -1544,51 +1572,42 @@ public class LicenseActivity extends Activity {
     // ================= done =================
 
     private void buildDonePage(LinearLayout box, LicenseStore.Status s) {
-        box.addView(stepBar(3), kit.lp(-1, -2));
-        box.addView(kit.gap(10));
-        LinearLayout hero = kit.v();
-        hero.setGravity(Gravity.CENTER_HORIZONTAL);
-        hero.addView(iconChip(R.drawable.mi_verified_user, Theme.SUCCESS, 88),
-                new LinearLayout.LayoutParams(Theme.dp(88), Theme.dp(88)));
-        TextView t = kit.text("همه‌چیز آماده است", 21f, Theme.TEXT, true);
-        t.setGravity(Gravity.CENTER);
-        hero.addView(t, kit.lp(-1, -2));
-        TextView sub = kit.text("لایسنس شما فعال است؛ با یک لمس وارد میلانو شوید.", 12.5f, Theme.MUTED, false);
-        sub.setGravity(Gravity.CENTER);
-        hero.addView(sub, kit.lp(-1, -2));
-        box.addView(hero, kit.lp(-1, -2));
-        box.addView(kit.gap(12));
-
+        // Compact licence header: one gold 3D ticket with three chips, so the screen stays calm.
         LinearLayout c = Card3D.card(this, Theme.SUCCESS);
-        c.addView(statRow(R.drawable.mi_verified_user, Theme.SUCCESS, "لایسنس",
-                "فعال • «" + License.planFa(s.plan) + "»", Theme.SUCCESS), kit.lp(-1, -2));
-        c.addView(hairline(), kit.lp(-1, Theme.dp(1)));
-        if (s.plan == License.P_PERM) {
-            c.addView(statRow(R.drawable.mi_diamond, Theme.SUCCESS, "اعتبار", "دائمی", Theme.SUCCESS),
-                    kit.lp(-1, -2));
-        } else {
-            c.addView(statRow(R.drawable.mi_timer, Theme.GOLD, "زمان باقی‌مانده",
-                    Money.fa(String.valueOf(s.daysLeft)) + " روز", leftColor(s.daysLeft)), kit.lp(-1, -2));
-        }
-        c.addView(hairline(), kit.lp(-1, Theme.dp(1)));
-        c.addView(statRow(R.drawable.mi_database, Theme.GOLD, "اتصال به سرور", "تنظیم شده", Theme.SUCCESS),
-                kit.lp(-1, -2));
+        LinearLayout top = kit.h();
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        top.addView(iconChip(R.drawable.mi_verified_user, Theme.SUCCESS, 52),
+                new LinearLayout.LayoutParams(Theme.dp(52), Theme.dp(52)));
+        top.addView(kit.space(12));
+        LinearLayout copy = kit.v();
+        copy.addView(kit.text("لایسنس فعال", 16f, Theme.TEXT, true), kit.lp(-1, -2));
+        copy.addView(kit.text("طرح «" + License.planFa(s.plan) + "»", 12f, Theme.MUTED, false), kit.lp(-1, -2));
+        top.addView(copy, kit.wlp(1f));
+        c.addView(top, kit.lp(-1, -2));
+        c.addView(kit.gap(10));
+
+        boolean perm = s.plan == License.P_PERM;
+        String left = perm ? "دائمی" : Money.fa(String.valueOf(s.daysLeft)) + " روز";
+        int leftCol = perm ? Theme.SUCCESS : leftColor(s.daysLeft);
         String sh = connSummaryHost();
+        String masked = sh;
+        try {
+            if (!sh.isEmpty()) masked = SmartLink.maskHost(sh);
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:done", ignored); }
         String stn = connSummaryTables();
-        if (!sh.isEmpty()) {
-            String masked = sh;
-            try {
-                masked = SmartLink.maskHost(sh);
-            } catch (Exception ignored) { Diag.ignored("LicenseActivity:1333", ignored); }
-            c.addView(hairline(), kit.lp(-1, Theme.dp(1)));
-            c.addView(statRow(R.drawable.mi_my_location, Theme.GOLD, "سرور", masked, Theme.GOLD_SOFT),
-                    kit.lp(-1, -2));
-        }
+
+        LinearLayout chips = kit.h();
+        chips.addView(miniChip(perm ? R.drawable.mi_diamond : R.drawable.mi_timer, Theme.GOLD,
+                perm ? "اعتبار" : "زمان باقی‌مانده", left, leftCol), kit.wlp(1f));
+        chips.addView(kit.space(6));
+        chips.addView(miniChip(R.drawable.mi_database, Theme.GOLD, "سرور",
+                sh.isEmpty() ? "تنظیم نشده" : masked, sh.isEmpty() ? Theme.MUTED : Theme.SUCCESS), kit.wlp(1f));
         if (!stn.isEmpty()) {
-            c.addView(hairline(), kit.lp(-1, Theme.dp(1)));
-            c.addView(statRow(R.drawable.mi_inventory_2, Theme.VIOLET, "جدول‌های آتیران",
-                    Money.fa(stn), Theme.TEXT), kit.lp(-1, -2));
+            chips.addView(kit.space(6));
+            chips.addView(miniChip(R.drawable.mi_inventory_2, Theme.VIOLET, "جدول‌ها",
+                    Money.fa(stn), Theme.TEXT), kit.wlp(1f));
         }
+        c.addView(chips, kit.lp(-1, -2));
         c.addView(kit.gap(12));
         c.addView(goldAction("ورود به برنامه", R.drawable.mi_login, v -> enterApp()), kit.lp(-1, -2));
         c.addView(kit.gap(8));

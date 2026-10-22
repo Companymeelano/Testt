@@ -170,45 +170,45 @@ public class HomeScreen extends Screen {
     }
 
     /**
-     * Gold clock artwork on the left of the "updating" banner. The face is drawn without hands
-     * so the hour and minute hands are drawn live here, set to the phone's current time.
+     * The gold clock artwork (drawn without hands) with the hour and minute hands drawn live,
+     * set to the phone's current time. Plain View: no drawable layering, so it always paints.
      */
-    static final class ClockArt extends android.graphics.drawable.Drawable {
+    static final class ClockView extends View {
         private static final float IMG_W = 1104f, IMG_H = 616f;
-        private static final float CX = 317f, CY = 309f;      // clock centre in artwork space
-        private static final float RING = 168f;               // dial radius (vertical) in artwork space
-        private static final float X_SQUASH = 0.79f;          // the dial is seen slightly turned
+        private static final float CX = 317f, CY = 309f;   // clock centre in artwork space
+        private static final float RING = 168f;            // dial radius (vertical) in artwork space
+        private static final float X_SQUASH = 0.79f;       // the dial is seen slightly turned
         private final android.graphics.Bitmap bmp;
-        private final android.graphics.Paint paint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG | android.graphics.Paint.FILTER_BITMAP_FLAG);
-        private final android.graphics.Paint hand = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        private final android.graphics.Paint art = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG | android.graphics.Paint.FILTER_BITMAP_FLAG);
         private final android.graphics.Paint fade = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        private final android.graphics.Paint hand = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
         private final android.graphics.Path path = new android.graphics.Path();
+        private final android.graphics.RectF dst = new android.graphics.RectF();
 
-        ClockArt(android.graphics.Bitmap bmp) {
+        ClockView(android.content.Context c, android.graphics.Bitmap bmp) {
+            super(c);
             this.bmp = bmp;
             hand.setStyle(android.graphics.Paint.Style.FILL);
-            fade.setXfermode(new android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.DST_IN));
         }
 
         @Override
-        public void draw(android.graphics.Canvas c) {
-            android.graphics.Rect b = getBounds();
-            if (bmp == null || b.height() <= 0) return;
-            float s = b.height() / IMG_H;
+        protected void onDraw(android.graphics.Canvas c) {
+            super.onDraw(c);
+            int h = getHeight();
+            if (bmp == null || h <= 0) return;
+            float s = h / IMG_H;
             float w = IMG_W * s;
-            int save = c.saveLayer(b.left, b.top, b.left + w, b.bottom, null);
-            android.graphics.RectF dst = new android.graphics.RectF(b.left, b.top, b.left + w, b.bottom);
-            c.drawBitmap(bmp, null, dst, paint);
-            // Fade the right edge into the card so the artwork melts into the banner.
-            fade.setShader(new android.graphics.LinearGradient(b.left + w * 0.62f, 0, b.left + w, 0,
-                    0xFFFFFFFF, 0x00FFFFFF, android.graphics.Shader.TileMode.CLAMP));
-            c.drawRect(b.left + w * 0.62f, b.top, b.left + w, b.bottom, fade);
-            c.restoreToCount(save);
+            dst.set(0, 0, w, h);
+            c.drawBitmap(bmp, null, dst, art);
+            // Dissolve the artwork's right edge into the card colour so no box edge shows.
+            fade.setShader(new android.graphics.LinearGradient(w * 0.55f, 0, w, 0,
+                    0x000A0D13, 0xFF0A0D13, android.graphics.Shader.TileMode.CLAMP));
+            c.drawRect(w * 0.55f, 0, w, h, fade);
 
             java.util.Calendar now = java.util.Calendar.getInstance();
             float minute = now.get(java.util.Calendar.MINUTE) + now.get(java.util.Calendar.SECOND) / 60f;
-            float hour = (now.get(java.util.Calendar.HOUR) + minute / 60f);
-            float cx = b.left + CX * s, cy = b.top + CY * s;
+            float hour = now.get(java.util.Calendar.HOUR) + minute / 60f;
+            float cx = CX * s, cy = CY * s;
             drawHand(c, cx, cy, hour / 12f, RING * 0.52f * s, 5.2f * s, 0xFFFFE9A8);
             drawHand(c, cx, cy, minute / 60f, RING * 0.84f * s, 3.4f * s, 0xFFFFD97A);
             hand.setColor(0xFFFFF3CC);
@@ -218,8 +218,8 @@ public class HomeScreen extends Screen {
         }
 
         private void drawHand(android.graphics.Canvas c, float cx, float cy, float turn, float len, float wid, int color) {
-            double a = turn * Math.PI * 2;
-            float dx = (float) Math.sin(a) * X_SQUASH, dy = (float) -Math.cos(a);
+            double ang = turn * Math.PI * 2;
+            float dx = (float) Math.sin(ang) * X_SQUASH, dy = (float) -Math.cos(ang);
             float tipX = cx + dx * len, tipY = cy + dy * len;
             float tailX = cx - dx * len * 0.18f, tailY = cy - dy * len * 0.18f;
             float nx = -dy * wid, ny = dx * wid;
@@ -237,28 +237,40 @@ public class HomeScreen extends Screen {
             hand.setColor(color);
             c.drawPath(path, hand);
         }
-
-        @Override public void setAlpha(int alpha) { paint.setAlpha(alpha); }
-        @Override public void setColorFilter(android.graphics.ColorFilter f) { paint.setColorFilter(f); }
-        @Override public int getOpacity() { return android.graphics.PixelFormat.TRANSLUCENT; }
     }
 
     private static android.graphics.Bitmap clockBitmap;
 
-    /** Dark card with the gold clock artwork on the left and the status text on the right. */
-    private static android.graphics.drawable.Drawable clockCard(android.content.Context c) {
+    /**
+     * «در حال به‌روزرسانی» banner: clock artwork on the left, status text on the right.
+     * Shown on every dashboard load, cached or not.
+     */
+    private View updateBanner(String savedTs) {
+        android.content.Context c = a;
+        if (clockBitmap == null) {
+            try {
+                clockBitmap = android.graphics.BitmapFactory.decodeResource(c.getResources(), R.drawable.home_clock_face);
+            } catch (Exception e) { Diag.ignored("Home:clockArt", e); }
+        }
+        FrameLayout box = new FrameLayout(c);
         android.graphics.drawable.GradientDrawable base = new android.graphics.drawable.GradientDrawable(
                 android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
                 new int[]{0xFF0E121A, 0xFF07090E});
         base.setCornerRadius(Theme.dp(22));
         base.setStroke(Theme.dp(1), Theme.alpha(Theme.GOLD, 120));
-        if (clockBitmap == null) {
-            clockBitmap = android.graphics.BitmapFactory.decodeResource(c.getResources(), R.drawable.home_clock_face);
+        box.setBackground(base);
+        box.addView(new ClockView(c, clockBitmap), new FrameLayout.LayoutParams(-1, -1));
+
+        LinearLayout text = new LinearLayout(c);
+        text.setOrientation(LinearLayout.VERTICAL);
+        // Text sits on the right; the end side keeps room for the clock artwork.
+        text.setPaddingRelative(Theme.dp(16), Theme.dp(14), Theme.dp(150), Theme.dp(14));
+        text.addView(a.kit.text("⟳ در حال به‌روزرسانی داشبورد…", 12f, Theme.TEXT, true), new LinearLayout.LayoutParams(-1, -2));
+        if (savedTs != null && !savedTs.isEmpty()) {
+            text.addView(a.kit.text("آخرین داده ذخیره‌شده: " + Money.fa(savedTs), 11f, Theme.MUTED, false), new LinearLayout.LayoutParams(-1, -2));
         }
-        android.graphics.drawable.Drawable art = new ClockArt(clockBitmap);
-        android.graphics.drawable.LayerDrawable ld = new android.graphics.drawable.LayerDrawable(
-                new android.graphics.drawable.Drawable[]{base, art});
-        return ld;
+        box.addView(text, new FrameLayout.LayoutParams(-1, -2));
+        return box;
     }
 
     @Override
@@ -269,17 +281,12 @@ public class HomeScreen extends Screen {
         final Data cached = loadCached(cachedTs);
         if (cached != null) {
             build(content, cached);
-            LinearLayout hint = a.kit.v();
-            // Text sits on the right; the end side keeps room for the clock artwork.
-            hint.setPaddingRelative(Theme.dp(16), Theme.dp(14), Theme.dp(150), Theme.dp(14));
-            hint.setBackground(clockCard(a));
-            hint.addView(a.kit.text("⟳ در حال به‌روزرسانی داشبورد…", 12f, Theme.TEXT, true), a.kit.lp(-1, -2));
-            if (!cachedTs[0].isEmpty())
-                hint.addView(a.kit.kv("آخرین داده ذخیره‌شده", Money.fa(cachedTs[0]), Theme.MUTED), a.kit.lp(-1, -2));
-            content.addView(hint, 0);
+            content.addView(updateBanner(cachedTs[0]), 0);
             content.addView(a.kit.gap(10), 1);
         } else {
             content.removeAllViews();
+            content.addView(updateBanner(""), a.kit.lp(-1, -2));
+            content.addView(a.kit.gap(10));
             content.addView(greetingHero(), a.kit.lp(-1, -2));
             content.addView(a.kit.gap(10));
             content.addView(a.kit.gap(6));

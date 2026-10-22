@@ -1450,9 +1450,12 @@ public class MainActivity extends Activity {
             if (s.plan == License.P_PERM) {
                 ir.meelano.manager.ui.MeelanoIcons.set(licChip, "📅 دائمی");
                 licChip.setTextColor(Theme.GOLD_SOFT);
-            } else if (s.daysLeft <= 7) {
+            } else if (s.daysLeft <= 2) {
                 ir.meelano.manager.ui.MeelanoIcons.set(licChip, "📅 " + Money.fa(String.valueOf(s.daysLeft)) + " روز!");
                 licChip.setTextColor(Theme.DANGER);
+            } else if (s.daysLeft <= 7) {
+                ir.meelano.manager.ui.MeelanoIcons.set(licChip, "📅 " + Money.fa(String.valueOf(s.daysLeft)) + " روز");
+                licChip.setTextColor(Theme.WARNING);
             } else {
                 ir.meelano.manager.ui.MeelanoIcons.set(licChip, "📅 " + Money.fa(String.valueOf(s.daysLeft)) + " روز");
                 licChip.setTextColor(Theme.GOLD_SOFT);

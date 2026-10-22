@@ -274,7 +274,7 @@ public class HomeScreen extends Screen {
         base.setCornerRadius(Theme.dp(22));
         base.setStroke(Theme.dp(1), Theme.alpha(Theme.GOLD, 120));
         box.setBackground(base);
-        box.setMinimumHeight(Theme.dp(124));
+        box.setMinimumHeight(Theme.dp(96));
         box.addView(new ClockView(c, clockBitmap), new FrameLayout.LayoutParams(-1, -1));
 
         LinearLayout text = new LinearLayout(c);
@@ -904,9 +904,14 @@ public class HomeScreen extends Screen {
         TextView price = a.kit.text(Money.fa(Money.num(r.toman)), 18f, Theme.TEXT, true);
         price.setMaxLines(1);
         price.setGravity(Gravity.CENTER_HORIZONTAL);
+        // Tabular figures: digits keep their width when the price updates.
+        price.setFontFeatureSettings("tnum");
         price.setAutoSizeTextTypeUniformWithConfiguration(11, 18, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
-        t.addView(price, a.kit.lp(-1, -2));
-        TextView unit = a.kit.text("تومان", 9.5f, Theme.GOLD_SOFT, true);
+        LinearLayout.LayoutParams pp = a.kit.lp(-1, -2);
+        pp.setMargins(0, Theme.dp(6), 0, 0);
+        t.addView(price, pp);
+        // Unit is smaller and quieter than the figure.
+        TextView unit = a.kit.text("تومان", 9f, Theme.MUTED, false);
         unit.setMaxLines(1);
         unit.setGravity(Gravity.CENTER_HORIZONTAL);
         t.addView(unit, a.kit.lp(-1, -2));
@@ -916,7 +921,12 @@ public class HomeScreen extends Screen {
                 10f, color, true);
         ch.setMaxLines(1);
         ch.setGravity(Gravity.CENTER_HORIZONTAL);
-        t.addView(ch, a.kit.lp(-1, -2));
+        ch.setBackground(Theme.pill(color));
+        ch.setPadding(Theme.dp(8), Theme.dp(2), Theme.dp(8), Theme.dp(2));
+        LinearLayout.LayoutParams cp = a.kit.lp(-2, -2);
+        cp.gravity = Gravity.CENTER_HORIZONTAL;
+        cp.setMargins(0, Theme.dp(6), 0, 0);
+        t.addView(ch, cp);
         t.setContentDescription(r.label + "، " + Money.fa(Money.num(r.toman)) + " تومان");
         return t;
     }

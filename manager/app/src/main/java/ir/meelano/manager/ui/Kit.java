@@ -528,7 +528,7 @@ public final class Kit {
         b.setTextSize(13.5f * Theme.fontScale());
         b.setTextColor(Theme.onAccent());
         b.setTypeface(Theme.face(true));
-        b.setBackground(Theme.goldButton());
+        b.setBackground(Theme.stated(Theme.goldButton()));
         b.setGravity(Gravity.CENTER);
         b.setLetterSpacing(0.015f);
         b.setElevation(Theme.dp(2));
@@ -549,7 +549,7 @@ public final class Kit {
         b.setTextSize(12.5f * Theme.fontScale());
         b.setTextColor(accent);
         b.setTypeface(Theme.face(true));
-        b.setBackground(Theme.ghostButton(accent));
+        b.setBackground(Theme.stated(Theme.ghostButton(accent)));
         b.setGravity(Gravity.CENTER);
         b.setElevation(Theme.dp(1));
         b.setPadding(Theme.dp(14), Theme.dp(9), Theme.dp(14), Theme.dp(9));

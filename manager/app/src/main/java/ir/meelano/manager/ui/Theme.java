@@ -408,6 +408,24 @@ public final class Theme {
         return d;
     }
 
+    /**
+     * Wraps a button background with pressed and disabled states. The shape and colours stay the
+     * same; pressed is a little softer and disabled is dimmed, so the state is visible at a glance.
+     */
+    public static android.graphics.drawable.Drawable stated(GradientDrawable normal) {
+        android.graphics.drawable.Drawable.ConstantState cs = normal.getConstantState();
+        if (cs == null) return normal;
+        GradientDrawable pressed = (GradientDrawable) cs.newDrawable().mutate();
+        pressed.setAlpha(205);
+        GradientDrawable disabled = (GradientDrawable) cs.newDrawable().mutate();
+        disabled.setAlpha(105);
+        android.graphics.drawable.StateListDrawable s = new android.graphics.drawable.StateListDrawable();
+        s.addState(new int[]{-android.R.attr.state_enabled}, disabled);
+        s.addState(new int[]{android.R.attr.state_pressed}, pressed);
+        s.addState(new int[]{}, normal);
+        return s;
+    }
+
     public static GradientDrawable ghostButton(int accent) {
         return base(alpha(accent, light ? 18 : 26), 16, dp(1), alpha(accent, light ? 130 : 110));
     }

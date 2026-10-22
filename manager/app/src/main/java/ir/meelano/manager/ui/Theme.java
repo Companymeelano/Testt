@@ -255,7 +255,20 @@ public final class Theme {
      */
     public static android.graphics.drawable.Drawable background() {
         android.graphics.drawable.ColorDrawable base = new android.graphics.drawable.ColorDrawable(BG);
-        if (!light) return base;
+        if (!light) {
+            // Obsidian screen with a soft gold light from the top-left corner, as in the reference.
+            try {
+                GradientDrawable glow = new GradientDrawable();
+                glow.setGradientType(GradientDrawable.RADIAL_GRADIENT);
+                glow.setColors(new int[]{alpha(GOLD, 34), alpha(GOLD, 0)});
+                glow.setGradientCenter(0.06f, 0.02f);
+                glow.setGradientRadius(dp(460));
+                return new android.graphics.drawable.LayerDrawable(
+                        new android.graphics.drawable.Drawable[]{base, glow});
+            } catch (Exception e) {
+                return base;
+            }
+        }
         try {
             if (paperGrain == null) {
                 int size = 96;

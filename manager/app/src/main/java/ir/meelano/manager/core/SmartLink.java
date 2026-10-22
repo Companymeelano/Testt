@@ -487,7 +487,7 @@ public final class SmartLink {
 
     private static String copyFa(Report r, int port, String db) {
         StringBuilder b = new StringBuilder();
-        b.append("گزارش اتصال زرین‌فرمان\n");
+        b.append("گزارش اتصال میلانو زرین‌فرمان\n");
         b.append("شبکه گوشی: ").append(r.transportFa);
         if (r.vpnOn) b.append(" + فیلترشکن");
         b.append("\nپورت: ").append(port).append(" • دیتابیس: ").append(db).append("\n");

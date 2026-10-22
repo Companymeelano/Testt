@@ -70,7 +70,7 @@
         <receiver
             android:name=".widget.CashWidget"
             android:exported="false"
-            android:label="زرین‌فرمان • امروز">
+            android:label="میلانو زرین‌فرمان • امروز">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
@@ -93,7 +93,7 @@
             android:name=".LicenseActivity"
             android:configChanges="keyboard|keyboardHidden|screenSize|uiMode"
             android:exported="true"
-            android:label="فعال‌سازی زرین‌فرمان"
+            android:label="فعال‌سازی میلانو زرین‌فرمان"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

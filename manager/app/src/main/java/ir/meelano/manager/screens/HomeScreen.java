@@ -734,7 +734,7 @@ public class HomeScreen extends Screen {
         top.addView(a.kit.space(12));
 
         LinearLayout copy = a.kit.v();
-        TextView overline = a.kit.text("زرین‌فرمان  •  اتاق فرمان", 10.5f, Theme.GOLD_SOFT, true);
+        TextView overline = a.kit.text("میلانو زرین‌فرمان  •  اتاق فرمان", 10.5f, Theme.GOLD_SOFT, true);
         overline.setSingleLine(true);
         copy.addView(overline, a.kit.lp(-1, -2));
         TextView headline = a.kit.text(greeting + "، " + roleName, 26f, Theme.TEXT, true);
@@ -937,7 +937,7 @@ public class HomeScreen extends Screen {
         String lbl = r.label == null ? "" : r.label;
         int tileIcon = lbl.contains("دلار") ? R.drawable.mi_trending_up
                 : (lbl.contains("طلا") ? R.drawable.mi_diamond
-                : (Theme.isLight() ? R.drawable.icon3d_coin : R.drawable.mi_payments));
+                : R.drawable.icon3d_coin);
         t.addView(a.kit.icon(tileIcon, Theme.GOLD, 24), new LinearLayout.LayoutParams(Theme.dp(24), Theme.dp(24)));
         TextView label = a.kit.text(r.label, 10.5f, Theme.TEXT, false);
         label.setGravity(Gravity.CENTER_HORIZONTAL);
@@ -1455,7 +1455,7 @@ public class HomeScreen extends Screen {
                 null, null), a.kit.lp(-1, -2));
         c.addView(a.kit.text(txt, 13f, Theme.TEXT, false), a.kit.lp(-1, -2));
         c.addView(a.kit.gap(6));
-        final String share = "🌙 جمع‌بندی پایان روز زرین‌فرمان" + (when.isEmpty() ? "" : " (" + when + ")")
+        final String share = "🌙 جمع‌بندی پایان روز میلانو زرین‌فرمان" + (when.isEmpty() ? "" : " (" + when + ")")
                 + "\n" + txt;
         c.addView(a.kit.btnGhost("↗ اشتراک‌گذاری", Theme.GOLD, v -> {
             try {

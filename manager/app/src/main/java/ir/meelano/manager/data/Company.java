@@ -39,7 +39,7 @@ public final class Company {
                 String m = new Settings(c).shopName();
                 if (!m.isEmpty()) return m;
             } catch (Exception ignored) { Diag.ignored("Company:40", ignored); }
-            return "فروشگاه زرین‌فرمان";
+            return "فروشگاه میلانو زرین‌فرمان";
         }
 
         /** Best contact phone: mobile → tel1 → tel2 → fax → manual. */

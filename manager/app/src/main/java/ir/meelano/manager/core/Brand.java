@@ -24,7 +24,7 @@ public final class Brand {
             "09355559305",
     };
 
-    public static final String TAGLINE = "پشتیبانی زرین‌فرمان • همراه همیشگی کسب‌وکار شما";
+    public static final String TAGLINE = "پشتیبانی میلانو زرین‌فرمان • همراه همیشگی کسب‌وکار شما";
 
     public static void openSite(Context c) {
         try {

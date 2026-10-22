@@ -65,11 +65,11 @@ public final class Theme {
     public static boolean isLight() { return light; }
 
     /**
-     * Light skin uses rendered 3D gold icons in place of the flat vector glyphs. Dark skin keeps
-     * the vectors. Returns the drawable to show for a vector glyph id.
+     * Rendered 3D gold icons replace the flat vector glyphs in both skins. Returns the drawable to
+     * show for a vector glyph id.
      */
     public static int icon3d(int vector) {
-        if (!light) return vector;
+        // Both skins use the same rendered gold 3D icons (they read well on black and on ivory).
         if (vector == R.drawable.mi_grid_view) return R.drawable.icon3d_products;
         if (vector == R.drawable.mi_star_shine) return R.drawable.icon3d_assistant;
         if (vector == R.drawable.mi_widgets) return R.drawable.icon3d_more;

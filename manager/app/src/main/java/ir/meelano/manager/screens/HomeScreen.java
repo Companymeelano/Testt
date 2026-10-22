@@ -851,6 +851,10 @@ public class HomeScreen extends Screen {
         }
 
         String stamp = rates != null && !rates.isEmpty() ? rates.get(0).asOf : "";
+        // Gold hairline above the source line, as in the reference market card.
+        View rule = new View(a);
+        rule.setBackgroundColor(Theme.alpha(Theme.GOLD, 90));
+        card.addView(rule, a.kit.lp(-1, Theme.dp(1)));
         card.addView(a.kit.gap(6));
         card.addView(a.kit.hint("به‌روزرسانی: " + Money.fa(stamp == null || stamp.isEmpty() ? "—" : stamp)
                 + " • تومان • TGJU"), a.kit.lp(-1, -2));

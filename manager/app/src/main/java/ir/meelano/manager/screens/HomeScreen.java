@@ -969,6 +969,28 @@ public class HomeScreen extends Screen {
             content.addView(block, a.kit.lp(-1, -2));
         }
         renderNotes(content, d.notes);
+        staggerIn(content);
+    }
+
+    /** One-time staggered fade and slide for the first home cards (skipped when animations are off). */
+    private boolean entered;
+
+    private void staggerIn(LinearLayout content) {
+        if (entered) return;
+        entered = true;
+        try {
+            if (android.provider.Settings.Global.getFloat(a.getContentResolver(),
+                    android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f) return;
+        } catch (Exception ignored) { Diag.ignored("HomeScreen:stagger", ignored); }
+        float dy = Theme.dp(14);
+        int n = Math.min(content.getChildCount(), 8);
+        for (int i = 0; i < n; i++) {
+            View v = content.getChildAt(i);
+            if (v.getVisibility() != View.VISIBLE) continue;
+            v.setAlpha(0f);
+            v.setTranslationY(dy);
+            v.animate().alpha(1f).translationY(0f).setStartDelay(i * 45L).setDuration(320).start();
+        }
     }
 
     private void renderHomeSection(LinearLayout content, Data d, String key) {

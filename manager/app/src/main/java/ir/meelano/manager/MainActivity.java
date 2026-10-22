@@ -599,7 +599,9 @@ public class MainActivity extends Activity {
 
         if (!tiny) tools.addView(toolCell(toolIcon(R.drawable.mi_search), "جستجو", "جستجو", () -> nav("search")), toolLp());
 
-        if (!tiny) tools.addView(toolCell(toolIcon(R.drawable.mi_contrast), "تم", "تغییر تم روشن / تیره", () -> {
+        final android.widget.ImageView themeIcon = toolIcon(R.drawable.mi_contrast);
+        if (!tiny) tools.addView(toolCell(themeIcon, "تم", "تغییر تم روشن / تیره", () -> {
+            themeIcon.animate().rotationBy(180f).setDuration(420).start();
             boolean toLight = !"light".equals(settings.themeMode());
             settings.setThemeMode(toLight ? "light" : "dark");
             kit.toast(toLight ? "تم روشن فعال شد" : "تم تیره فعال شد");
@@ -615,7 +617,11 @@ public class MainActivity extends Activity {
             tools.addView(toolCell(zoom, "بزرگ‌نمایی", "بزرگ‌نمایی متن", () -> cycleZoom()), toolLp());
         }
 
-        tools.addView(toolCell(toolIcon(R.drawable.mi_refresh), "تازه‌سازی", "تازه‌سازی", () -> renderCurrent()), toolLp());
+        final android.widget.ImageView refreshIcon = toolIcon(R.drawable.mi_refresh);
+        tools.addView(toolCell(refreshIcon, "تازه‌سازی", "تازه‌سازی", () -> {
+            refreshIcon.animate().rotationBy(360f).setDuration(600).start();
+            renderCurrent();
+        }), toolLp());
         tools.addView(toolCell(toolIcon(R.drawable.mi_settings), "تنظیمات", "تنظیمات", () -> nav("settings")), toolLp());
 
         android.widget.ImageView account = new android.widget.ImageView(this);

@@ -79,6 +79,14 @@ public final class Theme {
         if (vector == R.drawable.mi_group) return R.drawable.icon3d_customers;
         if (vector == R.drawable.mi_bar_chart) return R.drawable.icon3d_reports;
         if (vector == R.drawable.mi_settings) return R.drawable.icon3d_settings;
+        if (vector == R.drawable.mi_trending_up) return R.drawable.icon3d_dollar;
+        if (vector == R.drawable.mi_diamond) return R.drawable.icon3d_gold;
+        if (vector == R.drawable.mi_home) return R.drawable.icon3d_home;
+        if (vector == R.drawable.mi_grid_view) return R.drawable.icon3d_inventory;
+        if (vector == R.drawable.mi_person) return R.drawable.icon3d_account;
+        if (vector == R.drawable.mi_search) return R.drawable.icon3d_search;
+        if (vector == R.drawable.mi_refresh) return R.drawable.icon3d_refresh;
+        if (vector == R.drawable.mi_contrast) return R.drawable.icon3d_theme;
         return vector;
     }
 
@@ -88,7 +96,11 @@ public final class Theme {
                 || res == R.drawable.icon3d_cash_in || res == R.drawable.icon3d_cash_out
                 || res == R.drawable.icon3d_cheque || res == R.drawable.icon3d_inventory
                 || res == R.drawable.icon3d_customers || res == R.drawable.icon3d_reports
-                || res == R.drawable.icon3d_settings;
+                || res == R.drawable.icon3d_settings || res == R.drawable.icon3d_dollar
+                || res == R.drawable.icon3d_gold || res == R.drawable.icon3d_coin
+                || res == R.drawable.icon3d_home || res == R.drawable.icon3d_search
+                || res == R.drawable.icon3d_account || res == R.drawable.icon3d_refresh
+                || res == R.drawable.icon3d_theme;
     }
 
     /** 1.0 normal, 1.3 large-text mode (applied in Kit.text). */

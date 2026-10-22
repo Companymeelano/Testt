@@ -302,6 +302,9 @@ public class HomeScreen extends Screen {
         final Data cached = loadCached(cachedTs);
         if (cached != null) {
             build(content, cached);
+            // build() already put a banner on top: replace it with the updating state (one banner only).
+            content.removeViewAt(0);
+            content.removeViewAt(0);
             content.addView(updateBanner(cachedTs[0]), 0);
             content.addView(a.kit.gap(10), 1);
         } else {
@@ -890,7 +893,8 @@ public class HomeScreen extends Screen {
         // Gold icon per instrument, as in the reference: coin, gold bar, dollar trend.
         String lbl = r.label == null ? "" : r.label;
         int tileIcon = lbl.contains("دلار") ? R.drawable.mi_trending_up
-                : (lbl.contains("طلا") ? R.drawable.mi_diamond : R.drawable.mi_payments);
+                : (lbl.contains("طلا") ? R.drawable.mi_diamond
+                : (Theme.isLight() ? R.drawable.icon3d_coin : R.drawable.mi_payments));
         t.addView(a.kit.icon(tileIcon, Theme.GOLD, 24), new LinearLayout.LayoutParams(Theme.dp(24), Theme.dp(24)));
         TextView label = a.kit.text(r.label, 10.5f, Theme.TEXT, false);
         label.setGravity(Gravity.CENTER_HORIZONTAL);

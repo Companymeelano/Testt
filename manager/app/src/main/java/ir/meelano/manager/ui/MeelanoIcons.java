@@ -63,7 +63,7 @@ public final class MeelanoIcons {
         any("◇", R.drawable.mi_inbox); any("★", R.drawable.mi_star_fill); any("🎉", R.drawable.mi_celebration);
         any("😊", R.drawable.mi_sentiment_satisfied); any("↗", R.drawable.mi_trending_up); any("↙", R.drawable.mi_shopping_bag);
         any("↘", R.drawable.mi_login); any("⎋", R.drawable.mi_logout); any("⇧", R.drawable.mi_upload); any("↩", R.drawable.mi_undo);
-        any("♙", R.drawable.mi_person); any("👤", R.drawable.mi_person); any("👥", R.drawable.mi_group);
+        any("♙", R.drawable.mi_group); any("👤", R.drawable.mi_person); any("👥", R.drawable.mi_group);
         any("🧑", R.drawable.mi_badge); any("💼", R.drawable.mi_badge); any("🪪", R.drawable.mi_badge);
         any("♛", R.drawable.mi_admin_panel_settings); any("◈", R.drawable.mi_inventory_2); any("◍", R.drawable.mi_inventory_2);
         any("◼", R.drawable.mi_category); any("▦", R.drawable.mi_grid_view); any("▣", R.drawable.mi_widgets);

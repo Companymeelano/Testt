@@ -100,7 +100,7 @@ jobs:
           javac -d "$RUNNER_TEMP/reldesc" manager/licensing/src/main/java/ir/meelano/licensing/License.java tools/release/ReleaseDescriptor.java
           SHA=$(printf 'meelano' | sha256sum | cut -d' ' -f1)
           java -cp "$RUNNER_TEMP/reldesc" ReleaseDescriptor 59 36.27.0 meelano-manager-v36.27.0-release.apk 1000 "$SHA" https://github.com/Companymeelano/Testt/releases/download/manager-v36.27.0/meelano-manager-v36.27.0-release.apk "test" | tee descriptor-check.json
-          grep -F '"code": 58' descriptor-check.json
+          grep -F '"code": 59' descriptor-check.json
 
       - name: Verify APK identity, version and signature
         run: |

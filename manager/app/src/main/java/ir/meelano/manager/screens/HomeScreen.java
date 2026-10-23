@@ -676,7 +676,7 @@ public class HomeScreen extends Screen {
         String roleName = RoleStore.faName(role);
 
         final LinearLayout hero = a.kit.v();
-        hero.setBackground(Theme.executiveHero());
+        hero.setBackground(heroBackground());
         hero.setPadding(Theme.dp(18), Theme.dp(17), Theme.dp(18), Theme.dp(14));
         Theme.lift(hero, Theme.cardElevation() + Theme.dp(2));
 
@@ -1022,6 +1022,30 @@ public class HomeScreen extends Screen {
         }
         renderNotes(content, d.notes);
         staggerIn(content);
+    }
+
+    /**
+     * TRIAL (light skin only): a soft gold silk drape in the corner of the welcome card.
+     * Set HERO_SILK_TRIAL to false to return to the plain hero background.
+     */
+    private static final boolean HERO_SILK_TRIAL = true;
+
+    private android.graphics.drawable.Drawable heroBackground() {
+        android.graphics.drawable.Drawable base = Theme.executiveHero();
+        if (!HERO_SILK_TRIAL || !Theme.isLight()) return base;
+        try {
+            android.graphics.drawable.Drawable silk = a.getDrawable(R.drawable.home_hero_light);
+            if (silk == null) return base;
+            android.graphics.drawable.LayerDrawable ld = new android.graphics.drawable.LayerDrawable(
+                    new android.graphics.drawable.Drawable[]{base, silk});
+            ld.setLayerGravity(1, Gravity.END | Gravity.TOP);
+            ld.setLayerWidth(1, Theme.dp(260));
+            ld.setLayerHeight(1, Theme.dp(142));
+            return ld;
+        } catch (Exception e) {
+            Diag.ignored("HomeScreen:heroSilk", e);
+            return base;
+        }
     }
 
     /** Decorative dot grid drawn behind the home content. */

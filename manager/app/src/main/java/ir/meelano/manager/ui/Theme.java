@@ -646,6 +646,15 @@ public final class Theme {
         return d;
     }
 
+    /** Nut theme: a floating ivory dock with a gold hairline, like the reference bottom bar. */
+    public static GradientDrawable navDock() {
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{0xFFFFFFFF, 0xFFF4ECD6});
+        d.setCornerRadius(dp(28));
+        d.setStroke(dp(1), 0xFFC9A24A);
+        return d;
+    }
+
     public static GradientDrawable bottomBar() {
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
                 light ? new int[]{0xFFFFFFFF, 0xFFF4ECD6} : new int[]{0xFF0E121A, 0xFF07090E});

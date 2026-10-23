@@ -653,14 +653,16 @@ public class MainActivity extends Activity {
         bottomBar.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         bottomBar.setPadding(Theme.dp(6), Theme.dp(8), Theme.dp(6), Theme.dp(10));
         bottomHost = new android.widget.FrameLayout(this);
-        bottomHost.setBackground(Theme.bottomBar());
+        bottomHost.setBackground(Theme.isNuts() ? Theme.navDock() : Theme.bottomBar());
         navCapsule = new View(this);
         navCapsule.setVisibility(View.GONE);
         navCapsule.setBackground(Theme.bottomNavSelected());
         bottomHost.addView(navCapsule, new android.widget.FrameLayout.LayoutParams(Theme.dp(40), Theme.dp(40),
                 Gravity.TOP | Gravity.LEFT));
         bottomHost.addView(bottomBar, new android.widget.FrameLayout.LayoutParams(-1, -2));
-        root.addView(bottomHost, kit.lp(-1, -2));
+        LinearLayout.LayoutParams hostLp = kit.lp(-1, -2);
+        if (Theme.isNuts()) hostLp.setMargins(Theme.dp(12), 0, Theme.dp(12), Theme.dp(10));
+        root.addView(bottomHost, hostLp);
 
         setContentView(root);
 
@@ -807,15 +809,16 @@ public class MainActivity extends Activity {
             if (iconRes != 0) {
                 android.widget.ImageView symbol = kit.icon(iconRes, Theme.MUTED, Theme.isNuts() ? 46 : 22);
                 symbol.setTag(is3d ? Boolean.TRUE : Boolean.FALSE);
-                badge.addView(symbol, new LinearLayout.LayoutParams(Theme.dp(24), Theme.dp(24)));
+                int sz = Theme.isNuts() ? 44 : 24;
+                badge.addView(symbol, new LinearLayout.LayoutParams(Theme.dp(sz), Theme.dp(sz)));
             } else {
                 TextView symbol = kit.text(s.glyph(), 20, Theme.MUTED, true);
                 symbol.setGravity(Gravity.CENTER);
                 badge.addView(symbol, kit.lp(-2, -2));
             }
-            b.addView(badge, new LinearLayout.LayoutParams(Theme.dp(46), Theme.dp(36)));
+            b.addView(badge, new LinearLayout.LayoutParams(Theme.dp(Theme.isNuts() ? 54 : 46), Theme.dp(Theme.isNuts() ? 46 : 36)));
             String tl = RoleStore.tabLabel(id);
-            TextView l = kit.text(tl != null ? tl : s.title(), 10.5f, Theme.MUTED, true);
+            TextView l = kit.text(tl != null ? tl : s.title(), Theme.isNuts() ? 11.5f : 10.5f, Theme.MUTED, true);
             l.setGravity(Gravity.CENTER);
             l.setSingleLine(true);
             l.setEllipsize(android.text.TextUtils.TruncateAt.END);

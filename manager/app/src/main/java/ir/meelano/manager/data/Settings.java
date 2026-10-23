@@ -222,7 +222,11 @@ public final class Settings {
         if (!p.getBoolean("theme_dark_default_v38", false)) {
             p.edit().putString("theme_mode", "dark").putBoolean("theme_dark_default_v38", true).apply();
         }
-        String m = p.getString("theme_mode", "dark");
+        // v39: «آجیل و خشکبار» is the default for everyone once; a later manual choice is kept.
+        if (!p.getBoolean("theme_nuts_default_v39", false)) {
+            p.edit().putString("theme_mode", "nuts").putBoolean("theme_nuts_default_v39", true).apply();
+        }
+        String m = p.getString("theme_mode", "nuts");
         return "light".equals(m) ? "light" : "nuts".equals(m) ? "nuts" : "dark";
     }
 

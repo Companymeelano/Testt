@@ -76,7 +76,25 @@ public final class Theme {
      * Rendered 3D gold icons replace the flat vector glyphs in both skins. Returns the drawable to
      * show for a vector glyph id.
      */
+    /** Nut-theme medallion icons (emerald medallion, gold rim) for the main sections; 0 = none. */
+    private static int medal(int vector) {
+        if (vector == R.drawable.mi_home) return R.drawable.icon3d_medal_home;
+        if (vector == R.drawable.mi_group) return R.drawable.icon3d_medal_customers;
+        if (vector == R.drawable.mi_inventory_2) return R.drawable.icon3d_medal_inventory;
+        if (vector == R.drawable.mi_grid_view) return R.drawable.icon3d_medal_products;
+        if (vector == R.drawable.mi_bar_chart) return R.drawable.icon3d_medal_reports;
+        if (vector == R.drawable.mi_settings) return R.drawable.icon3d_medal_settings;
+        if (vector == R.drawable.mi_search) return R.drawable.icon3d_medal_search;
+        if (vector == R.drawable.mi_cheque) return R.drawable.icon3d_medal_cheque;
+        if (vector == R.drawable.mi_calendar_month) return R.drawable.icon3d_medal_dues;
+        return 0;
+    }
+
     public static int icon3d(int vector) {
+        if (nuts) {
+            int m = medal(vector);
+            if (m != 0) return m;
+        }
         if (!light) {
             // Dark skin: icons rendered on black, with a brighter gold glow.
             if (vector == R.drawable.mi_trending_up) return R.drawable.icon3d_dark_dollar;
@@ -129,6 +147,11 @@ public final class Theme {
 
     /** True for bitmap 3D icons, which must not be tinted. */
     public static boolean isIcon3d(int res) {
+        if (res == R.drawable.icon3d_medal_home || res == R.drawable.icon3d_medal_customers
+                || res == R.drawable.icon3d_medal_inventory || res == R.drawable.icon3d_medal_products
+                || res == R.drawable.icon3d_medal_reports || res == R.drawable.icon3d_medal_settings
+                || res == R.drawable.icon3d_medal_search || res == R.drawable.icon3d_medal_cheque
+                || res == R.drawable.icon3d_medal_dues) return true;
         return res == R.drawable.icon3d_medal_sales || res == R.drawable.icon3d_medal_purchase
                 || res == R.drawable.icon3d_medal_cash_in || res == R.drawable.icon3d_medal_cash_out
                 || res == R.drawable.icon3d_sales || res == R.drawable.icon3d_purchase

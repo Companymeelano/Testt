@@ -44,6 +44,8 @@ public final class Theme {
     public static final int BUY_HUE = 0xFFFF5FA2;
 
     private static boolean light = false;
+    /** Application context, used only to load the light skin artwork. */
+    private static Context appCtx;
     /** Mirror of !light for call sites (charts, tables). */
     public static boolean DARK = true;
     private static float fontScale = 1f;
@@ -169,6 +171,7 @@ public final class Theme {
 
     /** Re-read theme settings and repaint the whole palette. Call before any render. */
     public static void apply(Context c) {
+        appCtx = c.getApplicationContext();
         Settings s = new Settings(c);
         light = "light".equals(s.themeMode());
         DARK = !light;
@@ -181,15 +184,14 @@ public final class Theme {
         // Exactly two curated themes; the accent is part of each theme, not a user choice.
         int dark = 0xFFD4AF37, darkSoft = 0xFFF0D98C, lite = 0xFF9C7A1A, liteSoft = 0xFF5C4510;
         if (light) {
-            // «زمرد مرواریدی»: cool pearl background, white cards, deep emerald accent.
-            // Antique gold stays as the ornament colour (3D icons, rims). Every text pair is
-            // at least 4.5:1: TEXT 15.5:1, MUTED 5.2:1, GOLD_SOFT 5.7:1, GOLD 7.5:1 on pearl.
-            BG = 0xFFF3F6F4;
+            // «ایوری و زمرد»: ivory base, deep emerald accent, antique gold ornaments.
+            // Reference mockup: ivory silk, emerald panels, gold rims. Text pairs stay ≥4.5:1.
+            BG = 0xFFFBF6EA;
             SURFACE = 0xFFFFFFFF;
-            SURFACE2 = 0xFFE4EEE9;
-            GOLD = 0xFF0E5A4B;
-            GOLD_SOFT = 0xFF7A5C1E;
-            TEXT = 0xFF10201C;
+            SURFACE2 = 0xFFF4ECD6;
+            GOLD = 0xFF0F5B45;
+            GOLD_SOFT = 0xFF8A6418;
+            TEXT = 0xFF0E1F1A;
             MUTED = 0xFF5B6B66;
             SUCCESS = 0xFF15803D;
             DANGER = 0xFFB3261E;
@@ -339,20 +341,13 @@ public final class Theme {
     /** Screen background. Light skin adds soft gold light in the top-right and bottom-left corners. */
     public static android.graphics.drawable.Drawable background() {
         android.graphics.drawable.Drawable base = backgroundBase();
-        if (!light) return base;
+        if (!light || appCtx == null) return base;
         try {
-            GradientDrawable topRight = new GradientDrawable();
-            topRight.setGradientType(GradientDrawable.RADIAL_GRADIENT);
-            topRight.setColors(new int[]{alpha(GOLD_SOFT, 90), alpha(GOLD_SOFT, 0)});
-            topRight.setGradientCenter(0.95f, 0.02f);
-            topRight.setGradientRadius(dp(420));
-            GradientDrawable bottomLeft = new GradientDrawable();
-            bottomLeft.setGradientType(GradientDrawable.RADIAL_GRADIENT);
-            bottomLeft.setColors(new int[]{alpha(GOLD_SOFT, 70), alpha(GOLD_SOFT, 0)});
-            bottomLeft.setGradientCenter(0.05f, 0.98f);
-            bottomLeft.setGradientRadius(dp(480));
+            android.graphics.drawable.Drawable art = appCtx.getResources()
+                    .getDrawable(ir.meelano.manager.R.drawable.light_bg_art);
+            art.setAlpha(230);
             return new android.graphics.drawable.LayerDrawable(
-                    new android.graphics.drawable.Drawable[]{base, topRight, bottomLeft});
+                    new android.graphics.drawable.Drawable[]{base, art});
         } catch (Exception e) {
             return base;
         }

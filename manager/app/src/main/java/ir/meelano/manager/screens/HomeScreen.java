@@ -1028,7 +1028,7 @@ public class HomeScreen extends Screen {
      * TRIAL (light skin only): a soft gold silk drape in the corner of the welcome card.
      * Set HERO_SILK_TRIAL to false to return to the plain hero background.
      */
-    private static final boolean HERO_SILK_TRIAL = true;
+    private static final boolean HERO_SILK_TRIAL = false;
 
     private android.graphics.drawable.Drawable heroBackground() {
         android.graphics.drawable.Drawable base = Theme.executiveHero();

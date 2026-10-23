@@ -1084,7 +1084,7 @@ public final class Kit {
     public ImageView logo(int sizeDp) {
         ImageView v = new ImageView(a);
         try {
-            v.setImageResource(a.getResources().getIdentifier("meelano_3d", "drawable", a.getPackageName()));
+            v.setImageResource(Theme.logoRes());
         } catch (Exception ignored) { Diag.ignored("Kit:957", ignored); }
         v.setAdjustViewBounds(true);
         v.setScaleType(ImageView.ScaleType.CENTER_CROP);

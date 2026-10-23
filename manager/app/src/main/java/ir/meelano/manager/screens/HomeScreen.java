@@ -723,7 +723,7 @@ public class HomeScreen extends Screen {
             crest.addView(li, new FrameLayout.LayoutParams(Theme.dp(50), Theme.dp(50), Gravity.CENTER));
         } else {
             ImageView mark = new ImageView(a);
-            mark.setImageResource(R.drawable.meelano_3d);
+            mark.setImageResource(Theme.logoRes());
             mark.setScaleType(ImageView.ScaleType.CENTER_CROP);
             mark.setClipToOutline(true);
             mark.setOutlineProvider(new android.view.ViewOutlineProvider() {

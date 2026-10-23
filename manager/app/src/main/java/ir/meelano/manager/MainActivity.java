@@ -1074,7 +1074,7 @@ public class MainActivity extends Activity {
             android.graphics.Bitmap b = Company.logo(this);
             if (logoImg != null && logoGlyph != null) {
                 // Same crown-M medallion as the dashboard crest (b is intentionally not shown here).
-                logoImg.setImageResource(R.drawable.meelano_3d);
+                logoImg.setImageResource(Theme.logoRes());
                 logoImg.setVisibility(View.VISIBLE);
                 logoGlyph.setVisibility(View.GONE);
             }

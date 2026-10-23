@@ -47,6 +47,9 @@ public final class Theme {
     /** «آجیل و خشکبار»: the light skin plus nut artwork and nut icons. */
     private static boolean nuts = false;
     public static boolean isNuts() { return nuts; }
+
+    /** MEELANO crest: gold on emerald in the nut theme, the classic black-and-gold badge otherwise. */
+    public static int logoRes() { return nuts ? R.drawable.meelano_nuts : R.drawable.meelano_3d; }
     /** Application context, used only to load the light skin artwork. */
     private static Context appCtx;
     /** Mirror of !light for call sites (charts, tables). */
@@ -104,10 +107,10 @@ public final class Theme {
         if (vector == R.drawable.mi_calendar_month) return R.drawable.icon3d_dues;
         if (vector == R.drawable.mi_zoom) return R.drawable.icon3d_zoom;
         if (vector == R.drawable.mi_sell) return light ? R.drawable.icon3d_light_tag : R.drawable.icon3d_dark_tag;
-        if (vector == R.drawable.mi_point_of_sale) return nuts ? R.drawable.icon3d_nut_sales : R.drawable.icon3d_sales;
-        if (vector == R.drawable.mi_shopping_cart) return nuts ? R.drawable.icon3d_nut_purchase : R.drawable.icon3d_purchase;
-        if (vector == R.drawable.mi_receipt_long) return nuts ? R.drawable.icon3d_nut_cash_in : R.drawable.icon3d_cash_in;
-        if (vector == R.drawable.mi_payments) return nuts ? R.drawable.icon3d_nut_cash_out : R.drawable.icon3d_cash_out;
+        if (vector == R.drawable.mi_point_of_sale) return nuts ? R.drawable.icon3d_medal_sales : R.drawable.icon3d_sales;
+        if (vector == R.drawable.mi_shopping_cart) return nuts ? R.drawable.icon3d_medal_purchase : R.drawable.icon3d_purchase;
+        if (vector == R.drawable.mi_receipt_long) return nuts ? R.drawable.icon3d_medal_cash_in : R.drawable.icon3d_cash_in;
+        if (vector == R.drawable.mi_payments) return nuts ? R.drawable.icon3d_medal_cash_out : R.drawable.icon3d_cash_out;
         if (vector == R.drawable.mi_cheque) return R.drawable.icon3d_cheque;
         if (vector == R.drawable.mi_inventory_2) return R.drawable.icon3d_inventory;
         if (vector == R.drawable.mi_group) return R.drawable.icon3d_customers;
@@ -126,8 +129,8 @@ public final class Theme {
 
     /** True for bitmap 3D icons, which must not be tinted. */
     public static boolean isIcon3d(int res) {
-        return res == R.drawable.icon3d_nut_sales || res == R.drawable.icon3d_nut_purchase
-                || res == R.drawable.icon3d_nut_cash_in || res == R.drawable.icon3d_nut_cash_out
+        return res == R.drawable.icon3d_medal_sales || res == R.drawable.icon3d_medal_purchase
+                || res == R.drawable.icon3d_medal_cash_in || res == R.drawable.icon3d_medal_cash_out
                 || res == R.drawable.icon3d_sales || res == R.drawable.icon3d_purchase
                 || res == R.drawable.icon3d_cash_in || res == R.drawable.icon3d_cash_out
                 || res == R.drawable.icon3d_cheque || res == R.drawable.icon3d_inventory

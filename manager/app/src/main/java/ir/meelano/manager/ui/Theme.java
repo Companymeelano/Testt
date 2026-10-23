@@ -76,6 +76,12 @@ public final class Theme {
      * Rendered 3D gold icons replace the flat vector glyphs in both skins. Returns the drawable to
      * show for a vector glyph id.
      */
+    /**
+     * Nut theme icons: false = the gold 3D set from the approved reference (plain gold on the
+     * ivory and emerald surfaces). true = the emerald medallion set. One flag switches back.
+     */
+    public static final boolean NUT_MEDALLIONS = false;
+
     /** Nut-theme medallion icons (emerald medallion, gold rim) for the main sections; 0 = none. */
     private static int medal(int vector) {
         if (vector == R.drawable.mi_home) return R.drawable.icon3d_medal_home;
@@ -99,7 +105,7 @@ public final class Theme {
     }
 
     public static int icon3d(int vector) {
-        if (nuts) {
+        if (NUT_MEDALLIONS && nuts) {
             int m = medal(vector);
             if (m != 0) return m;
         }

@@ -98,6 +98,7 @@ public final class Theme {
         if (vector == R.drawable.mi_widgets) return R.drawable.icon3d_more;
         if (vector == R.drawable.mi_calendar_month) return R.drawable.icon3d_dues;
         if (vector == R.drawable.mi_zoom) return R.drawable.icon3d_zoom;
+        if (vector == R.drawable.mi_sell) return light ? R.drawable.icon3d_light_tag : R.drawable.icon3d_dark_tag;
         if (vector == R.drawable.mi_point_of_sale) return R.drawable.icon3d_sales;
         if (vector == R.drawable.mi_shopping_cart) return R.drawable.icon3d_purchase;
         if (vector == R.drawable.mi_receipt_long) return R.drawable.icon3d_cash_in;
@@ -138,6 +139,7 @@ public final class Theme {
                 || res == R.drawable.icon3d_dark_purchase || res == R.drawable.icon3d_dark_customers
                 || res == R.drawable.icon3d_dark_home || res == R.drawable.icon3d_dark_settings
                 || res == R.drawable.icon3d_dark_assistant
+                || res == R.drawable.icon3d_dark_tag || res == R.drawable.icon3d_light_tag
                 || res == R.drawable.icon3d_dark_cash_in || res == R.drawable.icon3d_dark_cash_out || res == R.drawable.icon3d_dark_cheque || res == R.drawable.icon3d_dark_inventory || res == R.drawable.icon3d_dark_reports || res == R.drawable.icon3d_dark_account || res == R.drawable.icon3d_dark_products || res == R.drawable.icon3d_dark_more || res == R.drawable.icon3d_dark_dues;
     }
 

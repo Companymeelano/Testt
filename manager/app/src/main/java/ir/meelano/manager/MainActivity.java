@@ -580,8 +580,9 @@ public class MainActivity extends Activity {
         // Gold tag badge at the end of the chips row, as in the reference header (decorative).
         android.widget.ImageView tagBadge = new android.widget.ImageView(this);
         try {
-            tagBadge.setImageResource(R.drawable.mi_sell);
-            tagBadge.setColorFilter(Theme.GOLD);
+            int tagRes = Theme.icon3d(R.drawable.mi_sell);
+            tagBadge.setImageResource(tagRes);
+            if (!Theme.isIcon3d(tagRes)) tagBadge.setColorFilter(Theme.GOLD);
         } catch (Exception ignored) { Diag.ignored("MainActivity:tagBadge", ignored); }
         tagBadge.setPadding(Theme.dp(5), Theme.dp(5), Theme.dp(5), Theme.dp(5));
         tagBadge.setBackground(Theme.ghostButton(Theme.GOLD));

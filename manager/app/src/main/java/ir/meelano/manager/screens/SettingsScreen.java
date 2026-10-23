@@ -4,6 +4,7 @@ import ir.meelano.manager.core.Diag;
 import android.app.AlertDialog;
 import android.view.Gravity;
 import android.view.View;
+import ir.meelano.manager.R;
 import android.widget.EditText;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
@@ -137,9 +138,41 @@ public class SettingsScreen extends Screen {
     }
 
     /** Section header inside the open section: a title and one line of guidance. */
+    /** 3D dark-skin icon for a settings section title that starts with its emoji (0 = none). */
+    private static int sectionIcon3d(String title) {
+        if (title == null) return 0;
+        if (title.startsWith("🔌")) return R.drawable.icon3d_dark_plug;
+        if (title.startsWith("🎨")) return R.drawable.icon3d_dark_palette;
+        if (title.startsWith("🔔")) return R.drawable.icon3d_dark_bell;
+        if (title.startsWith("🏪")) return R.drawable.icon3d_dark_shop;
+        if (title.startsWith("💾")) return R.drawable.icon3d_dark_backup;
+        if (title.startsWith("🔐")) return R.drawable.icon3d_dark_lock;
+        if (title.startsWith("👥")) return R.drawable.icon3d_dark_roles;
+        if (title.startsWith("🧭")) return R.drawable.icon3d_dark_compass;
+        if (title.startsWith("ℹ")) return R.drawable.icon3d_dark_info;
+        return 0;
+    }
+
     private LinearLayout sectionHead(String title, String subtitle, int accent) {
         LinearLayout h = a.kit.card(accent);
-        h.addView(a.kit.text(title, 15f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        int ic = Theme.isLight() ? 0 : sectionIcon3d(title);
+        if (ic != 0) {
+            // Dark skin: the emoji becomes a 3D gold icon; the title keeps its words.
+            LinearLayout hr = a.kit.h();
+            hr.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            android.widget.ImageView iv = new android.widget.ImageView(a);
+            iv.setImageResource(ic);
+            iv.setScaleType(android.widget.ImageView.ScaleType.CENTER_INSIDE);
+            iv.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+            hr.addView(iv, new LinearLayout.LayoutParams(Theme.dp(34), Theme.dp(34)));
+            hr.addView(a.kit.space(10));
+            int sp = title.indexOf(' ');
+            String words = sp > 0 ? title.substring(sp + 1) : title;
+            hr.addView(a.kit.text(words, 15f, Theme.TEXT, true), a.kit.wlp(1f));
+            h.addView(hr, a.kit.lp(-1, -2));
+        } else {
+            h.addView(a.kit.text(title, 15f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        }
         if (subtitle != null && !subtitle.isEmpty())
             h.addView(a.kit.hint(subtitle), a.kit.lp(-1, -2));
         return h;

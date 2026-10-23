@@ -727,9 +727,10 @@ public class MainActivity extends Activity {
     private android.widget.ImageView toolIcon(int res) {
         android.widget.ImageView iv = new android.widget.ImageView(this);
         try {
-            int res3 = Theme.chrome3d(res);
-            iv.setImageResource(res3);
-            if (!Theme.isIcon3d(res3)) iv.setColorFilter(Theme.GOLD_SOFT);
+            // Tint only flat vectors: decide on the base icon, since emerald twins are not in isIcon3d().
+            int base3 = Theme.icon3d(res);
+            iv.setImageResource(Theme.chrome3d(res));
+            if (!Theme.isIcon3d(base3)) iv.setColorFilter(Theme.GOLD_SOFT);
         } catch (Exception ignored) { Diag.ignored("MainActivity:694", ignored); }
         return iv;
     }

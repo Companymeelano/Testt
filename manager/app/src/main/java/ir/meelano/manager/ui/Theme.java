@@ -187,6 +187,7 @@ public final class Theme {
         int dark = 0xFFD4AF37, darkSoft = 0xFFF0D98C, lite = 0xFF9C7A1A, liteSoft = 0xFF5C4510;
         if (light) {
             // «ایوری و زمرد»: ivory base, deep emerald accent, antique gold ornaments.
+            // v31 adds nut-themed 3D icons on the light skin (see icon3d_nut_*).
             // Reference mockup: ivory silk, emerald panels, gold rims. Text pairs stay ≥4.5:1.
             BG = 0xFFFBF6EA;
             SURFACE = 0xFFFFFFFF;

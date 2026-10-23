@@ -867,7 +867,7 @@ public final class Kit {
         sv.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         sv.setBackground(Theme.isNuts() ? Theme.nutPanel() : Theme.card());
         sv.setPadding(Theme.dp(4), Theme.dp(4), Theme.dp(4), Theme.dp(4));
-        final int headInk = Theme.isNuts() ? 0xFFF3D98C : Theme.GOLD_SOFT;
+        final int headInk = Theme.isNuts() ? 0xFFF3D98C : Theme.GOLD_SOFT;  // nut tables: gold ink on emerald header
         LinearLayout t = v();
         t.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         t.setPadding(Theme.dp(2), Theme.dp(2), Theme.dp(2), Theme.dp(2));

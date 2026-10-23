@@ -89,10 +89,13 @@ public final class UpdateCenter {
                 purgeStale(app, info.code);
                 if (info.code <= currentCode(app)) return;
                 SharedPreferences p = prefs(app);
-                if (info.code == p.getInt("dismissed_code", -1)
-                        && System.currentTimeMillis() - p.getLong("dismissed_at", 0)
-                        < UpdateConfig.AUTO_INTERVAL_MS) return;
-                run(a, () -> showUpdateDialog(a, info));
+                // Automatic: on Wi-Fi / unmetered data the update downloads with a progress screen;
+                // on metered data the user is asked first. Android still shows its own install confirmation.
+                if (metered(app)) {
+                    run(a, () -> showUpdateDialog(a, info));
+                } else {
+                    run(a, () -> startDownload(a, info));
+                }
             }).start();
         } catch (Exception ignored) { Diag.ignored("UpdateCenter:96", ignored); }
     }
@@ -324,6 +327,14 @@ public final class UpdateCenter {
             kit = new Kit(a);
             LinearLayout body = kit.v();
             body.setPadding(Theme.dp(18), Theme.dp(4), Theme.dp(18), Theme.dp(12));
+            if (Theme.isNuts()) {
+                // Nut theme: the artwork sits above the progress, like a branded splash.
+                android.widget.ImageView art = new android.widget.ImageView(a);
+                art.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
+                art.setImageResource(ir.meelano.manager.R.drawable.light_banner_nuts);
+                body.addView(art, new LinearLayout.LayoutParams(-1, Theme.dp(120)));
+                body.addView(kit.gap(8));
+            }
             stage = kit.text("آماده‌سازی…", 13.5f, Theme.TEXT, true);
             stage.setGravity(Gravity.CENTER);
             body.addView(stage, kit.lp(-1, -2));
@@ -817,6 +828,15 @@ public final class UpdateCenter {
             return c.getPackageName().endsWith(".debug");
         } catch (Exception e) {
             return false;
+        }
+    }
+
+    private static boolean metered(Context c) {
+        try {
+            ConnectivityManager cm = (ConnectivityManager) c.getSystemService(Context.CONNECTIVITY_SERVICE);
+            return cm == null || cm.isActiveNetworkMetered();
+        } catch (Exception e) {
+            return true;
         }
     }
 

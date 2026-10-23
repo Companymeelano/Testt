@@ -223,11 +223,12 @@ public final class Settings {
             p.edit().putString("theme_mode", "dark").putBoolean("theme_dark_default_v38", true).apply();
         }
         String m = p.getString("theme_mode", "dark");
-        return "light".equals(m) ? "light" : "dark";
+        return "light".equals(m) ? "light" : "nuts".equals(m) ? "nuts" : "dark";
     }
 
     public void setThemeMode(String mode) {
-        p.edit().putString("theme_mode", "light".equals(mode) ? "light" : "dark").apply();
+        String v = "light".equals(mode) ? "light" : "nuts".equals(mode) ? "nuts" : "dark";
+        p.edit().putString("theme_mode", v).apply();
     }
 
     /** Accent key: gold / emerald / sapphire / ruby / violet / teal. */

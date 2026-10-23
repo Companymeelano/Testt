@@ -299,13 +299,15 @@ public class SettingsScreen extends Screen {
 
     private void buildTheme(final LinearLayout content) {
         content.addView(sectionHead("🎨 ظاهر لاکچری",
-                "دو قالب طراحی‌شدهٔ برنامه و واحد نمایش. تغییرات فوراً روی همهٔ بخش‌ها اعمال می‌شود.",
+                "سه قالب طراحی‌شده و واحد نمایش. تغییرات فوراً روی همهٔ بخش‌ها اعمال می‌شود.",
                 Theme.GOLD), a.kit.lp(-1, -2));
         LinearLayout th = a.kit.card(Theme.GOLD);
         th.addView(a.kit.text("قالب", 12f, Theme.MUTED, true), a.kit.lp(-1, -2));
         final boolean isLight = "light".equals(a.settings.themeMode());
-        th.addView(a.kit.chips(new String[]{"◐ تیره • ابسیدین طلایی", "◑ روشن • عاج سلطنتی"}, isLight ? 1 : 0, idx -> {
-            a.settings.setThemeMode(idx == 1 ? "light" : "dark");
+        final boolean isNuts = "nuts".equals(a.settings.themeMode());
+        final int themeIdx = isNuts ? 2 : isLight ? 1 : 0;
+        th.addView(a.kit.chips(new String[]{"◐ تیره • ابسیدین طلایی", "◑ روشن • عاج سلطنتی", "🥜 آجیل و خشکبار"}, themeIdx, idx -> {
+            a.settings.setThemeMode(idx == 2 ? "nuts" : idx == 1 ? "light" : "dark");
             a.refreshTheme();
         }), a.kit.lp(-1, -2));
         th.addView(a.kit.gap(8));

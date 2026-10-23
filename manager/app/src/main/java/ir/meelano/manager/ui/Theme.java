@@ -101,10 +101,10 @@ public final class Theme {
         if (vector == R.drawable.mi_calendar_month) return R.drawable.icon3d_dues;
         if (vector == R.drawable.mi_zoom) return R.drawable.icon3d_zoom;
         if (vector == R.drawable.mi_sell) return light ? R.drawable.icon3d_light_tag : R.drawable.icon3d_dark_tag;
-        if (vector == R.drawable.mi_point_of_sale) return R.drawable.icon3d_sales;
-        if (vector == R.drawable.mi_shopping_cart) return R.drawable.icon3d_purchase;
-        if (vector == R.drawable.mi_receipt_long) return R.drawable.icon3d_cash_in;
-        if (vector == R.drawable.mi_payments) return R.drawable.icon3d_cash_out;
+        if (vector == R.drawable.mi_point_of_sale) return light ? R.drawable.icon3d_nut_sales : R.drawable.icon3d_sales;
+        if (vector == R.drawable.mi_shopping_cart) return light ? R.drawable.icon3d_nut_purchase : R.drawable.icon3d_purchase;
+        if (vector == R.drawable.mi_receipt_long) return light ? R.drawable.icon3d_nut_cash_in : R.drawable.icon3d_cash_in;
+        if (vector == R.drawable.mi_payments) return light ? R.drawable.icon3d_nut_cash_out : R.drawable.icon3d_cash_out;
         if (vector == R.drawable.mi_cheque) return R.drawable.icon3d_cheque;
         if (vector == R.drawable.mi_inventory_2) return R.drawable.icon3d_inventory;
         if (vector == R.drawable.mi_group) return R.drawable.icon3d_customers;
@@ -123,7 +123,9 @@ public final class Theme {
 
     /** True for bitmap 3D icons, which must not be tinted. */
     public static boolean isIcon3d(int res) {
-        return res == R.drawable.icon3d_sales || res == R.drawable.icon3d_purchase
+        return res == R.drawable.icon3d_nut_sales || res == R.drawable.icon3d_nut_purchase
+                || res == R.drawable.icon3d_nut_cash_in || res == R.drawable.icon3d_nut_cash_out
+                || res == R.drawable.icon3d_sales || res == R.drawable.icon3d_purchase
                 || res == R.drawable.icon3d_cash_in || res == R.drawable.icon3d_cash_out
                 || res == R.drawable.icon3d_cheque || res == R.drawable.icon3d_inventory
                 || res == R.drawable.icon3d_customers || res == R.drawable.icon3d_reports
@@ -196,8 +198,8 @@ public final class Theme {
             SUCCESS = 0xFF15803D;
             DANGER = 0xFFB3261E;
             WARNING = 0xFF9A5B00;
-            INFO = 0xFF1F5FAD;
-            VIOLET = 0xFF6343D6;
+            INFO = 0xFF2D6A5A;
+            VIOLET = 0xFF8A6418;
             STEEL = 0xFF546177;
         } else {
             // «ابسیدین و طلا»: near-black obsidian surfaces, glass cards and a bright polished gold.

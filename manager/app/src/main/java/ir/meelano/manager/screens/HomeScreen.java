@@ -280,7 +280,15 @@ public class HomeScreen extends Screen {
         base.setStroke(Theme.dp(1), Theme.isLight() ? 0xFFC9A24A : Theme.alpha(Theme.GOLD, 120));
         box.setBackground(base);
         box.setMinimumHeight(Theme.dp(96));
-        box.addView(new ClockView(c, clockBitmap), new FrameLayout.LayoutParams(-1, -1));
+        if (Theme.isLight()) {
+            // Light skin: the nut-and-gold artwork fills the left side of the banner.
+            android.widget.ImageView nuts = new android.widget.ImageView(c);
+            nuts.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
+            nuts.setImageResource(R.drawable.light_banner_nuts);
+            box.addView(nuts, new FrameLayout.LayoutParams(-1, -1));
+        } else {
+            box.addView(new ClockView(c, clockBitmap), new FrameLayout.LayoutParams(-1, -1));
+        }
 
         LinearLayout text = new LinearLayout(c);
         text.setOrientation(LinearLayout.VERTICAL);

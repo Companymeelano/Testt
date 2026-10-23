@@ -737,11 +737,11 @@ public class MainActivity extends Activity {
         cell.setOrientation(LinearLayout.VERTICAL);
         cell.setGravity(Gravity.CENTER);
         cell.setContentDescription(desc);
-        cell.setMinimumHeight(Theme.dp(62));
+        cell.setMinimumHeight(Theme.dp(Theme.isNuts() ? 80 : 62));
         Theme.pressable(cell);
         cell.setOnClickListener(v -> onTap.run());
         icon.setClickable(false);
-        int ic = Theme.isNuts() ? 44 : 28;
+        int ic = Theme.isNuts() ? 50 : 28;
         cell.addView(icon, new LinearLayout.LayoutParams(Theme.dp(ic), Theme.dp(ic)));
         TextView t = new TextView(this);
         t.setText(label);
@@ -754,7 +754,7 @@ public class MainActivity extends Activity {
     }
 
     private LinearLayout.LayoutParams toolLp() {
-        return new LinearLayout.LayoutParams(0, Theme.dp(62), 1f);
+        return new LinearLayout.LayoutParams(0, Theme.dp(Theme.isNuts() ? 80 : 62), 1f);
     }
 
     /** Hairline divider between header tool buttons. */
@@ -805,7 +805,7 @@ public class MainActivity extends Activity {
             // A 3D bitmap must not be tinted; remember that on the symbol.
             boolean is3d = iconRes != 0 && Theme.isIcon3d(Theme.icon3d(iconRes));
             if (iconRes != 0) {
-                android.widget.ImageView symbol = kit.icon(iconRes, Theme.MUTED, Theme.isNuts() ? 40 : 22);
+                android.widget.ImageView symbol = kit.icon(iconRes, Theme.MUTED, Theme.isNuts() ? 46 : 22);
                 symbol.setTag(is3d ? Boolean.TRUE : Boolean.FALSE);
                 badge.addView(symbol, new LinearLayout.LayoutParams(Theme.dp(24), Theme.dp(24)));
             } else {

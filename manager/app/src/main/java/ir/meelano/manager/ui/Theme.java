@@ -83,6 +83,15 @@ public final class Theme {
             if (vector == R.drawable.mi_home) return R.drawable.icon3d_dark_home;
             if (vector == R.drawable.mi_settings) return R.drawable.icon3d_dark_settings;
             if (vector == R.drawable.mi_star_shine) return R.drawable.icon3d_dark_assistant;
+            if (vector == R.drawable.mi_receipt_long) return R.drawable.icon3d_dark_cash_in;
+            if (vector == R.drawable.mi_payments) return R.drawable.icon3d_dark_cash_out;
+            if (vector == R.drawable.mi_cheque) return R.drawable.icon3d_dark_cheque;
+            if (vector == R.drawable.mi_inventory_2) return R.drawable.icon3d_dark_inventory;
+            if (vector == R.drawable.mi_bar_chart) return R.drawable.icon3d_dark_reports;
+            if (vector == R.drawable.mi_person) return R.drawable.icon3d_dark_account;
+            if (vector == R.drawable.mi_grid_view) return R.drawable.icon3d_dark_products;
+            if (vector == R.drawable.mi_widgets) return R.drawable.icon3d_dark_more;
+            if (vector == R.drawable.mi_calendar_month) return R.drawable.icon3d_dark_dues;
         }
         if (vector == R.drawable.mi_grid_view) return R.drawable.icon3d_products;
         if (vector == R.drawable.mi_star_shine) return R.drawable.icon3d_assistant;
@@ -128,7 +137,8 @@ public final class Theme {
                 || res == R.drawable.icon3d_dark_coin || res == R.drawable.icon3d_dark_sales
                 || res == R.drawable.icon3d_dark_purchase || res == R.drawable.icon3d_dark_customers
                 || res == R.drawable.icon3d_dark_home || res == R.drawable.icon3d_dark_settings
-                || res == R.drawable.icon3d_dark_assistant;
+                || res == R.drawable.icon3d_dark_assistant
+                || res == R.drawable.icon3d_dark_cash_in || res == R.drawable.icon3d_dark_cash_out || res == R.drawable.icon3d_dark_cheque || res == R.drawable.icon3d_dark_inventory || res == R.drawable.icon3d_dark_reports || res == R.drawable.icon3d_dark_account || res == R.drawable.icon3d_dark_products || res == R.drawable.icon3d_dark_more || res == R.drawable.icon3d_dark_dues;
     }
 
     /** 1.0 normal, 1.3 large-text mode (applied in Kit.text). */

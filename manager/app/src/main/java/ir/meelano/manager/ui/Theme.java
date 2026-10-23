@@ -104,6 +104,22 @@ public final class Theme {
         return 0;
     }
 
+    /**
+     * Header toolbar and bottom nav icons. In the nut theme they use the emerald set, pulled from
+     * the emerald of the MEELANO nut crest, so the chrome and the logo read as one colour family.
+     * Content icons keep the gold set. Falls back to the gold icon if no emerald twin exists.
+     */
+    public static int chrome3d(int vector) {
+        int base = icon3d(vector);
+        if (!nuts || NUT_MEDALLIONS || appCtx == null || !isIcon3d(base)) return base;
+        try {
+            String n = appCtx.getResources().getResourceEntryName(base);
+            if (!n.startsWith("icon3d_")) return base;
+            int e = appCtx.getResources().getIdentifier("icon3d_emerald_" + n.substring(7), "drawable", appCtx.getPackageName());
+            return e != 0 ? e : base;
+        } catch (Exception ignored) { return base; }
+    }
+
     public static int icon3d(int vector) {
         if (NUT_MEDALLIONS && nuts) {
             int m = medal(vector);

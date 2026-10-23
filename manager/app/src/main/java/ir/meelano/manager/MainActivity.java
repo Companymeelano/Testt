@@ -727,7 +727,7 @@ public class MainActivity extends Activity {
     private android.widget.ImageView toolIcon(int res) {
         android.widget.ImageView iv = new android.widget.ImageView(this);
         try {
-            int res3 = Theme.icon3d(res);
+            int res3 = Theme.chrome3d(res);
             iv.setImageResource(res3);
             if (!Theme.isIcon3d(res3)) iv.setColorFilter(Theme.GOLD_SOFT);
         } catch (Exception ignored) { Diag.ignored("MainActivity:694", ignored); }
@@ -808,6 +808,7 @@ public class MainActivity extends Activity {
             boolean is3d = iconRes != 0 && Theme.isIcon3d(Theme.icon3d(iconRes));
             if (iconRes != 0) {
                 android.widget.ImageView symbol = kit.icon(iconRes, Theme.MUTED, Theme.isNuts() ? 46 : 22);
+                if (Theme.isNuts() && is3d) symbol.setImageResource(Theme.chrome3d(iconRes));
                 symbol.setTag(is3d ? Boolean.TRUE : Boolean.FALSE);
                 int sz = Theme.isNuts() ? 44 : 24;
                 badge.addView(symbol, new LinearLayout.LayoutParams(Theme.dp(sz), Theme.dp(sz)));

@@ -341,7 +341,7 @@ public class LicenseActivity extends Activity {
     private android.graphics.drawable.GradientDrawable quietStart() {
         android.graphics.drawable.GradientDrawable d = new android.graphics.drawable.GradientDrawable(
                 android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{Theme.shade(Theme.GOLD, 0.06f), Theme.GOLD, mix(Theme.GOLD, Theme.ROSE, 0.28f)});
+                new int[]{Theme.shade(Theme.GOLD, 0.06f), Theme.GOLD, Theme.isNuts() ? 0xFFB8862E : mix(Theme.GOLD, Theme.ROSE, 0.28f)});
         d.setCornerRadius(Theme.dp(16));
         d.setStroke(Theme.dp(1), Theme.alpha(0xFFFFFFFF, 90));
         return d;

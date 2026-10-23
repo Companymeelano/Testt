@@ -741,7 +741,8 @@ public class MainActivity extends Activity {
         Theme.pressable(cell);
         cell.setOnClickListener(v -> onTap.run());
         icon.setClickable(false);
-        cell.addView(icon, new LinearLayout.LayoutParams(Theme.dp(28), Theme.dp(28)));
+        int ic = Theme.isNuts() ? 34 : 28;
+        cell.addView(icon, new LinearLayout.LayoutParams(Theme.dp(ic), Theme.dp(ic)));
         TextView t = new TextView(this);
         t.setText(label);
         t.setTextSize(11 * Theme.fontScale());
@@ -804,7 +805,7 @@ public class MainActivity extends Activity {
             // A 3D bitmap must not be tinted; remember that on the symbol.
             boolean is3d = iconRes != 0 && Theme.isIcon3d(Theme.icon3d(iconRes));
             if (iconRes != 0) {
-                android.widget.ImageView symbol = kit.icon(iconRes, Theme.MUTED, 22);
+                android.widget.ImageView symbol = kit.icon(iconRes, Theme.MUTED, Theme.isNuts() ? 30 : 22);
                 symbol.setTag(is3d ? Boolean.TRUE : Boolean.FALSE);
                 badge.addView(symbol, new LinearLayout.LayoutParams(Theme.dp(24), Theme.dp(24)));
             } else {

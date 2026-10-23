@@ -87,6 +87,14 @@ public final class Theme {
         if (vector == R.drawable.mi_search) return R.drawable.icon3d_medal_search;
         if (vector == R.drawable.mi_cheque) return R.drawable.icon3d_medal_cheque;
         if (vector == R.drawable.mi_calendar_month) return R.drawable.icon3d_medal_dues;
+        if (vector == R.drawable.mi_person) return R.drawable.icon3d_medal_account;
+        if (vector == R.drawable.mi_refresh) return R.drawable.icon3d_medal_refresh;
+        if (vector == R.drawable.mi_contrast) return R.drawable.icon3d_medal_theme;
+        if (vector == R.drawable.mi_zoom) return R.drawable.icon3d_medal_zoom;
+        if (vector == R.drawable.mi_star_shine) return R.drawable.icon3d_medal_assistant;
+        if (vector == R.drawable.mi_widgets) return R.drawable.icon3d_medal_more;
+        if (vector == R.drawable.mi_diamond) return R.drawable.icon3d_medal_goldbar;
+        if (vector == R.drawable.mi_trending_up) return R.drawable.icon3d_medal_dollar;
         return 0;
     }
 
@@ -147,6 +155,7 @@ public final class Theme {
 
     /** True for bitmap 3D icons, which must not be tinted. */
     public static boolean isIcon3d(int res) {
+        if (res == R.drawable.icon3d_medal_account || res == R.drawable.icon3d_medal_refresh || res == R.drawable.icon3d_medal_theme || res == R.drawable.icon3d_medal_zoom || res == R.drawable.icon3d_medal_assistant || res == R.drawable.icon3d_medal_more || res == R.drawable.icon3d_medal_goldbar || res == R.drawable.icon3d_medal_dollar || res == R.drawable.icon3d_medal_coin) return true;
         if (res == R.drawable.icon3d_medal_home || res == R.drawable.icon3d_medal_customers
                 || res == R.drawable.icon3d_medal_inventory || res == R.drawable.icon3d_medal_products
                 || res == R.drawable.icon3d_medal_reports || res == R.drawable.icon3d_medal_settings
@@ -257,7 +266,7 @@ public final class Theme {
      * falling onto graphite black. Light: a warm gold glow over the ivory pearl base.
      */
     public static GradientDrawable backdrop() {
-        int glow = light ? alpha(GOLD, 52) : alpha(GOLD, 40);
+        int glow = light ? (nuts ? alpha(0xFFC9A24A, 70) : alpha(GOLD, 52)) : alpha(GOLD, 40);
         return new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
                 new int[]{glow, BG});
     }

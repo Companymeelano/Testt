@@ -181,16 +181,17 @@ public final class Theme {
         // Exactly two curated themes; the accent is part of each theme, not a user choice.
         int dark = 0xFFD4AF37, darkSoft = 0xFFF0D98C, lite = 0xFF9C7A1A, liteSoft = 0xFF5C4510;
         if (light) {
-            // «عاج سلطنتی»: warm pearl background, near-white cards, clear separation.
-            // Reference light skin: pearl-white base, champagne panels, metallic gold accents.
-            BG = 0xFFFBF7EE;
+            // «زمرد مرواریدی»: cool pearl background, white cards, deep emerald accent.
+            // Antique gold stays as the ornament colour (3D icons, rims). Every text pair is
+            // at least 4.5:1: TEXT 15.5:1, MUTED 5.2:1, GOLD_SOFT 5.7:1, GOLD 7.5:1 on pearl.
+            BG = 0xFFF3F6F4;
             SURFACE = 0xFFFFFFFF;
-            SURFACE2 = 0xFFF6EEDA;
-            GOLD = 0xFF9C6B12;
-            GOLD_SOFT = 0xFFC9A24A;
-            TEXT = 0xFF14181F;
-            MUTED = 0xFF6B6657;
-            SUCCESS = 0xFF1B7A4B;
+            SURFACE2 = 0xFFE4EEE9;
+            GOLD = 0xFF0E5A4B;
+            GOLD_SOFT = 0xFF7A5C1E;
+            TEXT = 0xFF10201C;
+            MUTED = 0xFF5B6B66;
+            SUCCESS = 0xFF15803D;
             DANGER = 0xFFB3261E;
             WARNING = 0xFF9A5B00;
             INFO = 0xFF1F5FAD;
@@ -275,12 +276,12 @@ public final class Theme {
 
     // ---------------- system bars ----------------
     public static int statusBar() {
-        return light ? 0xFFF5F1E6 : 0xFF0F172A;
+        return light ? 0xFFFFFFFF : 0xFF0F172A;
     }
 
     /** Navigation-bar color: champagne in light mode so the dark system keys stay visible. */
     public static int navBar() {
-        return light ? 0xFFEBE2CC : 0xFF07090E;
+        return light ? 0xFFE4EEE9 : 0xFF07090E;
     }
 
     // ---------------- drawable factories ----------------
@@ -306,7 +307,7 @@ public final class Theme {
         if (android.os.Build.VERSION.SDK_INT >= 28) {
             try {
                 v.setOutlineAmbientShadowColor(light ? 0x2A3A2A10 : 0xCC000000);
-                v.setOutlineSpotShadowColor(light ? 0x406B5210 : alpha(GOLD, 120));
+                v.setOutlineSpotShadowColor(light ? 0x40103A30 : alpha(GOLD, 120));
             } catch (Exception ignored) { Diag.ignored("Theme:lift", ignored); }
         }
     }

@@ -596,7 +596,7 @@ public final class Theme {
 
     public static GradientDrawable bottomBar() {
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                light ? new int[]{0xFFFFFFFF, 0xFFF3EAD2} : new int[]{0xFF0E121A, 0xFF07090E});
+                light ? new int[]{0xFFFFFFFF, 0xFFF4ECD6} : new int[]{0xFF0E121A, 0xFF07090E});
         // Rounded top edge with a gold hairline: the bar reads as a floating luxury dock.
         float r = dp(22);
         d.setCornerRadii(new float[]{r, r, r, r, 0, 0, 0, 0});

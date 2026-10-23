@@ -256,6 +256,11 @@ public class HomeScreen extends Screen {
      * «در حال به‌روزرسانی» banner: clock artwork on the left, status text on the right.
      * Shown on every dashboard load, cached or not.
      */
+    /** Banner ink: dark-skin colour, or a light ink on the emerald banner in the light skin. */
+    private static int bannerInk(int dark, int light) {
+        return Theme.isLight() ? light : dark;
+    }
+
     private View updateBanner(String savedTs) {
         return updateBanner(savedTs, false);
     }
@@ -270,9 +275,9 @@ public class HomeScreen extends Screen {
         FrameLayout box = new FrameLayout(c);
         android.graphics.drawable.GradientDrawable base = new android.graphics.drawable.GradientDrawable(
                 android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
-                new int[]{0xFF0E121A, 0xFF07090E});
+                Theme.isLight() ? new int[]{0xFF17684F, 0xFF0A3B2E} : new int[]{0xFF0E121A, 0xFF07090E});
         base.setCornerRadius(Theme.dp(22));
-        base.setStroke(Theme.dp(1), Theme.alpha(Theme.GOLD, 120));
+        base.setStroke(Theme.dp(1), Theme.isLight() ? 0xFFC9A24A : Theme.alpha(Theme.GOLD, 120));
         box.setBackground(base);
         box.setMinimumHeight(Theme.dp(96));
         box.addView(new ClockView(c, clockBitmap), new FrameLayout.LayoutParams(-1, -1));
@@ -282,12 +287,12 @@ public class HomeScreen extends Screen {
         // Text sits on the right; the end side keeps room for the clock artwork.
         text.setPaddingRelative(Theme.dp(16), Theme.dp(14), Theme.dp(118), Theme.dp(14));
         if (done) {
-            text.addView(a.kit.text("✓ داشبورد به‌روز است", 12f, Theme.GOLD_SOFT, true), new LinearLayout.LayoutParams(-1, -2));
-            text.addView(a.kit.text("ساعت به‌روزرسانی: " + savedTs, 11f, Theme.MUTED, false), new LinearLayout.LayoutParams(-1, -2));
+            text.addView(a.kit.text("✓ داشبورد به‌روز است", 12f, bannerInk(Theme.GOLD_SOFT, 0xFFF3D98C), true), new LinearLayout.LayoutParams(-1, -2));
+            text.addView(a.kit.text("ساعت به‌روزرسانی: " + savedTs, 11f, bannerInk(Theme.MUTED, 0xFFD3E6DD), false), new LinearLayout.LayoutParams(-1, -2));
         } else {
-            text.addView(a.kit.text("⟳ در حال به‌روزرسانی داشبورد…", 12f, Theme.TEXT, true), new LinearLayout.LayoutParams(-1, -2));
+            text.addView(a.kit.text("⟳ در حال به‌روزرسانی داشبورد…", 12f, bannerInk(Theme.TEXT, 0xFFFFF4D6), true), new LinearLayout.LayoutParams(-1, -2));
             if (savedTs != null && !savedTs.isEmpty()) {
-                text.addView(a.kit.text("آخرین داده ذخیره‌شده: " + Money.fa(savedTs), 11f, Theme.MUTED, false), new LinearLayout.LayoutParams(-1, -2));
+                text.addView(a.kit.text("آخرین داده ذخیره‌شده: " + Money.fa(savedTs), 11f, bannerInk(Theme.MUTED, 0xFFD3E6DD), false), new LinearLayout.LayoutParams(-1, -2));
             }
         }
         box.addView(text, new FrameLayout.LayoutParams(-1, -2));

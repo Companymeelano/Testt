@@ -345,7 +345,7 @@ public final class Theme {
         try {
             android.graphics.drawable.Drawable art = appCtx.getResources()
                     .getDrawable(ir.meelano.manager.R.drawable.light_bg_art);
-            art.setAlpha(230);
+            art.setAlpha(110);
             return new android.graphics.drawable.LayerDrawable(
                     new android.graphics.drawable.Drawable[]{base, art});
         } catch (Exception e) {
@@ -581,6 +581,16 @@ public final class Theme {
                 new int[]{accent, shade(accent, relief)});
         d.setCornerRadius(dp(999));
         d.setStroke(dp(1), alpha(onAccent(accent), 86));
+        return d;
+    }
+
+    /** Header tool row: solid ivory panel in light mode so labels read over the artwork. */
+    public static android.graphics.drawable.Drawable toolbarPanel() {
+        if (!light) return ghostButton(GOLD);
+        GradientDrawable d = new GradientDrawable();
+        d.setCornerRadius(dp(18));
+        d.setColor(0xF2FFFFFF);
+        d.setStroke(dp(1), alpha(GOLD, 110));
         return d;
     }
 

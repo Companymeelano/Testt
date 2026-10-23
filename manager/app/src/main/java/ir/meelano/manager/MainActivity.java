@@ -598,7 +598,7 @@ public class MainActivity extends Activity {
         // ---- row 2: toolbar (equal-width cells with Persian labels) ----
         LinearLayout tools = kit.h();
         tools.setGravity(Gravity.CENTER_VERTICAL);
-        tools.setBackground(Theme.ghostButton(Theme.GOLD));
+        tools.setBackground(Theme.toolbarPanel());
         tools.setPadding(Theme.dp(3), Theme.dp(3), Theme.dp(3), Theme.dp(3));
 
         if (!tiny) tools.addView(toolCell(toolIcon(R.drawable.mi_search), "جستجو", "جستجو", () -> nav("search")), toolLp());
@@ -743,7 +743,7 @@ public class MainActivity extends Activity {
         TextView t = new TextView(this);
         t.setText(label);
         t.setTextSize(11 * Theme.fontScale());
-        t.setTextColor(Theme.DARK ? Theme.GOLD_SOFT : Theme.MUTED);
+        t.setTextColor(Theme.DARK ? Theme.GOLD_SOFT : Theme.TEXT);
         t.setGravity(Gravity.CENTER);
         t.setSingleLine(true);
         cell.addView(t, new LinearLayout.LayoutParams(-2, -2));

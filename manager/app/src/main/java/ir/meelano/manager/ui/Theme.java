@@ -77,6 +77,12 @@ public final class Theme {
             if (vector == R.drawable.mi_refresh) return R.drawable.icon3d_dark_refresh;
             if (vector == R.drawable.mi_contrast) return R.drawable.icon3d_dark_theme;
             if (vector == R.drawable.mi_zoom) return R.drawable.icon3d_dark_zoom;
+            if (vector == R.drawable.mi_point_of_sale) return R.drawable.icon3d_dark_sales;
+            if (vector == R.drawable.mi_shopping_cart) return R.drawable.icon3d_dark_purchase;
+            if (vector == R.drawable.mi_group) return R.drawable.icon3d_dark_customers;
+            if (vector == R.drawable.mi_home) return R.drawable.icon3d_dark_home;
+            if (vector == R.drawable.mi_settings) return R.drawable.icon3d_dark_settings;
+            if (vector == R.drawable.mi_star_shine) return R.drawable.icon3d_dark_assistant;
         }
         if (vector == R.drawable.mi_grid_view) return R.drawable.icon3d_products;
         if (vector == R.drawable.mi_star_shine) return R.drawable.icon3d_assistant;
@@ -119,7 +125,10 @@ public final class Theme {
                 || res == R.drawable.icon3d_dark_dollar || res == R.drawable.icon3d_dark_gold
                 || res == R.drawable.icon3d_dark_search || res == R.drawable.icon3d_dark_refresh
                 || res == R.drawable.icon3d_dark_theme || res == R.drawable.icon3d_dark_zoom
-                || res == R.drawable.icon3d_dark_coin;
+                || res == R.drawable.icon3d_dark_coin || res == R.drawable.icon3d_dark_sales
+                || res == R.drawable.icon3d_dark_purchase || res == R.drawable.icon3d_dark_customers
+                || res == R.drawable.icon3d_dark_home || res == R.drawable.icon3d_dark_settings
+                || res == R.drawable.icon3d_dark_assistant;
     }
 
     /** 1.0 normal, 1.3 large-text mode (applied in Kit.text). */

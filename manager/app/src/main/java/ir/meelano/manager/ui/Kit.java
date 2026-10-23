@@ -1341,7 +1341,7 @@ public final class Kit {
         if (Theme.isIcon3d(res3)) {
             v.setImageResource(res3);
             v.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-            int s3 = Theme.dp(dp);
+            int s3 = Theme.dp(Theme.isNuts() ? Math.round(dp * 1.35f) : dp);
             v.setLayoutParams(new LinearLayout.LayoutParams(s3, s3));
             v.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
             return v;

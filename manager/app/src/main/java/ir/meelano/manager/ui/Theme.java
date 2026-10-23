@@ -387,8 +387,7 @@ public final class Theme {
         if (!nuts || appCtx == null) return base;
         try {
             android.graphics.drawable.Drawable art = appCtx.getResources()
-                    .getDrawable(ir.meelano.manager.R.drawable.light_bg_art);
-            art.setAlpha(110);
+                    .getDrawable(ir.meelano.manager.R.drawable.nut_bg);
             return new android.graphics.drawable.LayerDrawable(
                     new android.graphics.drawable.Drawable[]{base, art});
         } catch (Exception e) {
@@ -436,6 +435,10 @@ public final class Theme {
     }
 
     public static android.graphics.drawable.Drawable card() {
+        if (nuts) {
+            // Nut theme: near-solid cards so the nut artwork stays behind the content, not through it.
+            return glass(0xFFFFFFFF, 0xFFF9F3E0, 22, 230);
+        }
         if (light) {
             // Reference light cards: white panels with a clearer metallic gold edge.
             return glass(0xFFFFFFFF, 0xFFFBF5E6, 22, 130);

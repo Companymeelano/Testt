@@ -951,7 +951,8 @@ public class HomeScreen extends Screen {
         int tileIcon = lbl.contains("دلار") ? R.drawable.mi_trending_up
                 : (lbl.contains("طلا") ? R.drawable.mi_diamond
                 : (Theme.isNuts() ? R.drawable.icon3d_medal_coin : Theme.isLight() ? R.drawable.icon3d_coin : R.drawable.icon3d_dark_coin));
-        t.addView(a.kit.icon(tileIcon, Theme.GOLD, 42), new LinearLayout.LayoutParams(Theme.dp(42), Theme.dp(42)));
+        int tile = Theme.isNuts() ? 54 : 42;
+        t.addView(a.kit.icon(tileIcon, Theme.GOLD, tile), new LinearLayout.LayoutParams(Theme.dp(tile), Theme.dp(tile)));
         TextView label = a.kit.text(r.label, 10.5f, Theme.TEXT, false);
         label.setGravity(Gravity.CENTER_HORIZONTAL);
         label.setMinLines(2);

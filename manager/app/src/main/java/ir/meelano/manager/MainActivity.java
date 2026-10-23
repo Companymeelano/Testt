@@ -98,6 +98,16 @@ public class MainActivity extends Activity {
     private android.widget.FrameLayout bottomHost;
     private View navCapsule;
     private android.widget.ImageView linkIcon;
+
+    /** Connection-state icon: emerald and gold in the nut theme, the navy set otherwise. */
+    private int linkRes(int base) {
+        if (!Theme.isNuts()) return base;
+        if (base == R.drawable.link_probe) return R.drawable.link_probe_nut;
+        if (base == R.drawable.link_wan) return R.drawable.link_wan_nut;
+        if (base == R.drawable.link_lan) return R.drawable.link_lan_nut;
+        if (base == R.drawable.link_off) return R.drawable.link_off_nut;
+        return base;
+    }
     private android.net.ConnectivityManager.NetworkCallback linkCb = null;
     private boolean linkCbReg = false;
     private final android.os.Handler linkHandler =
@@ -546,7 +556,7 @@ public class MainActivity extends Activity {
         status.setGravity(Gravity.CENTER_VERTICAL);
         linkIcon = new android.widget.ImageView(this);
         try {
-            linkIcon.setImageResource(R.drawable.link_probe);
+            linkIcon.setImageResource(linkRes(R.drawable.link_probe));
         } catch (Exception ignored) { Diag.ignored("MainActivity:528", ignored); }
         linkIcon.setContentDescription("وضعیت اتصال — لمس برای جزئیات");
         linkIcon.setPadding(Theme.dp(1), Theme.dp(1), Theme.dp(1), Theme.dp(1));
@@ -1629,7 +1639,7 @@ public class MainActivity extends Activity {
         try {
             linkIcon.clearAnimation();
             if ("probe".equals(kind)) {
-                linkIcon.setImageResource(R.drawable.link_probe);
+                linkIcon.setImageResource(linkRes(R.drawable.link_probe));
                 android.view.animation.RotateAnimation spin =
                         new android.view.animation.RotateAnimation(0, 360,
                                 android.view.animation.Animation.RELATIVE_TO_SELF, 0.5f,
@@ -1640,13 +1650,13 @@ public class MainActivity extends Activity {
                 linkIcon.startAnimation(spin);
                 linkIcon.setContentDescription("در حال بررسی اتصال");
             } else if (SmartLink.WAN.equals(kind)) {
-                linkIcon.setImageResource(R.drawable.link_wan);
+                linkIcon.setImageResource(linkRes(R.drawable.link_wan));
                 linkIcon.setContentDescription("متصل از خارج شبکه — لمس برای جزئیات");
             } else if (SmartLink.LAN.equals(kind)) {
-                linkIcon.setImageResource(R.drawable.link_lan);
+                linkIcon.setImageResource(linkRes(R.drawable.link_lan));
                 linkIcon.setContentDescription("متصل از داخل شبکه — لمس برای جزئیات");
             } else {
-                linkIcon.setImageResource(R.drawable.link_off);
+                linkIcon.setImageResource(linkRes(R.drawable.link_off));
                 linkIcon.setContentDescription("قطع — لمس برای عیب‌یابی");
             }
         } catch (Exception ignored) { Diag.ignored("MainActivity:1481", ignored); }

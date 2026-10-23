@@ -288,6 +288,11 @@ public final class Theme {
      * falling onto graphite black. Light: a warm gold glow over the ivory pearl base.
      */
     public static GradientDrawable backdrop() {
+        if (nuts) {
+            // Nut theme: opaque ivory with a soft gold glow at the top (no dark window showing through).
+            return new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                    new int[]{0xFFF3E6BE, 0xFFF9F3E0, BG});
+        }
         int glow = light ? (nuts ? alpha(0xFFC9A24A, 70) : alpha(GOLD, 52)) : alpha(GOLD, 40);
         return new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
                 new int[]{glow, BG});
@@ -557,6 +562,14 @@ public final class Theme {
 
     /** Primary start button: gold-to-rose sheen, both stops matched to the active ink. */
     public static GradientDrawable startButton() {
+        if (nuts) {
+            // Nut theme: emerald to antique gold, the same as the main action buttons (no rose).
+            GradientDrawable n = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                    new int[]{0xFF1F6F55, 0xFF0B5C44, 0xFF9C7A1A});
+            n.setCornerRadius(dp(18));
+            n.setStroke(dp(1), alpha(ACCENT_PAPER, 110));
+            return n;
+        }
         boolean darkInk = darkAccentInk(GOLD);
         int gold = shade(GOLD, darkInk ? 0.04f : -0.08f);
         int rose = shade(ROSE, darkInk ? 0.22f : -0.18f);

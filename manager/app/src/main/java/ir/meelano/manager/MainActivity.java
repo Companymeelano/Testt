@@ -623,11 +623,8 @@ public class MainActivity extends Activity {
         }), toolLp());
         tools.addView(toolCell(toolIcon(R.drawable.mi_settings), "تنظیمات", "تنظیمات", () -> nav("settings")), toolLp());
 
-        android.widget.ImageView account = new android.widget.ImageView(this);
-        try {
-            account.setImageResource(R.drawable.mi_person);
-            account.setColorFilter(Theme.GOLD_SOFT);
-        } catch (Exception ignored) { Diag.ignored("MainActivity:595", ignored); }
+        // toolIcon() shows the 3D icon in both skins (and tints only flat vectors).
+        android.widget.ImageView account = toolIcon(R.drawable.mi_person);
         compactUserAction = account;
         tools.addView(toolCell(account, "حساب", "حساب کاربری؛ خروج یا تغییر کاربر", () -> userMenu()), toolLp());
 

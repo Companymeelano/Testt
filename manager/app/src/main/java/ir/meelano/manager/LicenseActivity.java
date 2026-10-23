@@ -1118,7 +1118,7 @@ public class LicenseActivity extends Activity {
     private void buildConnPage(LinearLayout box, LicenseStore.Status s) {
         // Top brand mark: the same crown-M medallion used across the app.
         android.widget.ImageView topLogo = new android.widget.ImageView(this);
-        topLogo.setImageResource(R.drawable.meelano_3d);
+        topLogo.setImageResource(ir.meelano.manager.ui.Theme.logoRes());
         topLogo.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
         LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(Theme.dp(84), Theme.dp(84));
         tlp.gravity = Gravity.CENTER_HORIZONTAL;
@@ -1569,7 +1569,7 @@ public class LicenseActivity extends Activity {
         android.widget.FrameLayout ring = new android.widget.FrameLayout(this);
         ring.setBackground(Theme.accentAvatar(Theme.GOLD));
         android.widget.ImageView mark = new android.widget.ImageView(this);
-        mark.setImageResource(R.drawable.meelano_3d);
+        mark.setImageResource(ir.meelano.manager.ui.Theme.logoRes());
         mark.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
         mark.setClipToOutline(true);
         mark.setOutlineProvider(new android.view.ViewOutlineProvider() {

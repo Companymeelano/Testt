@@ -865,20 +865,21 @@ public final class Kit {
     public View dataTable(ReportCatalog.Col[] cols, List<Row> rows, final RowClick click) {
         LinearLayout sv = v();
         sv.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        sv.setBackground(Theme.card());
+        sv.setBackground(Theme.isNuts() ? Theme.nutPanel() : Theme.card());
         sv.setPadding(Theme.dp(4), Theme.dp(4), Theme.dp(4), Theme.dp(4));
+        final int headInk = Theme.isNuts() ? 0xFFF3D98C : Theme.GOLD_SOFT;
         LinearLayout t = v();
         t.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         t.setPadding(Theme.dp(2), Theme.dp(2), Theme.dp(2), Theme.dp(2));
         LinearLayout head = h();
         head.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        head.setBackground(Theme.tableHeader());
+        head.setBackground(Theme.isNuts() ? Theme.nutTableHeader() : Theme.tableHeader());
         head.setPadding(Theme.dp(4), Theme.dp(9), Theme.dp(4), Theme.dp(9));
-        TextView rn0 = text("#", 11.5f, Theme.GOLD_SOFT, true);
+        TextView rn0 = text("#", 11.5f, headInk, true);
         rn0.setGravity(Gravity.CENTER);
         head.addView(rn0, new LinearLayout.LayoutParams(0, -2, 0.6f));
         for (ReportCatalog.Col c : cols) {
-            TextView h = text(c.title, 11f, Theme.GOLD_SOFT, true);
+            TextView h = text(c.title, 11f, headInk, true);
             h.setGravity(Gravity.CENTER);
             h.setMaxLines(2);
             head.addView(h, new LinearLayout.LayoutParams(0, -2, colWeight(c)));
@@ -889,7 +890,7 @@ public final class Kit {
             LinearLayout row = h();
             row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
             row.setPadding(Theme.dp(4), Theme.dp(10), Theme.dp(4), Theme.dp(10));
-            if (i % 2 == 1) row.setBackgroundColor(Theme.alpha(Theme.GOLD, Theme.DARK ? 16 : 30));
+            if (i % 2 == 1) row.setBackgroundColor(Theme.isNuts() ? 0x2EC9A24A : Theme.alpha(Theme.GOLD, Theme.DARK ? 16 : 30));
             TextView rn = text(Money.fa(String.valueOf(i + 1)), 11f, Theme.MUTED, true);
             rn.setGravity(Gravity.CENTER);
             row.addView(rn, new LinearLayout.LayoutParams(0, -2, 0.6f));

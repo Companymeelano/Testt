@@ -646,6 +646,24 @@ public final class Theme {
         return d;
     }
 
+    /** Nut theme: ivory panel framed in gold, the frame of every data table. */
+    public static GradientDrawable nutPanel() {
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{0xFFFFFFFF, 0xFFF7F0DC});
+        d.setCornerRadius(dp(20));
+        d.setStroke(dp(1), 0xFFC9A24A);
+        return d;
+    }
+
+    /** Nut theme: deep emerald header band with a gold hairline, like the dashboard banner. */
+    public static GradientDrawable nutTableHeader() {
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{0xFF0A3B2E, 0xFF17684F, 0xFF0A3B2E});
+        d.setCornerRadius(dp(14));
+        d.setStroke(dp(1), alpha(0xFFC9A24A, 170));
+        return d;
+    }
+
     public static GradientDrawable tableHeader() {
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
                 new int[]{alpha(GOLD, light ? 90 : 60), alpha(GOLD, light ? 40 : 26)});

@@ -69,7 +69,15 @@ public final class Theme {
      * show for a vector glyph id.
      */
     public static int icon3d(int vector) {
-        // Both skins use the same rendered gold 3D icons (they read well on black and on ivory).
+        if (!light) {
+            // Dark skin: icons rendered on black, with a brighter gold glow.
+            if (vector == R.drawable.mi_trending_up) return R.drawable.icon3d_dark_dollar;
+            if (vector == R.drawable.mi_diamond) return R.drawable.icon3d_dark_gold;
+            if (vector == R.drawable.mi_search) return R.drawable.icon3d_dark_search;
+            if (vector == R.drawable.mi_refresh) return R.drawable.icon3d_dark_refresh;
+            if (vector == R.drawable.mi_contrast) return R.drawable.icon3d_dark_theme;
+            if (vector == R.drawable.mi_zoom) return R.drawable.icon3d_dark_zoom;
+        }
         if (vector == R.drawable.mi_grid_view) return R.drawable.icon3d_products;
         if (vector == R.drawable.mi_star_shine) return R.drawable.icon3d_assistant;
         if (vector == R.drawable.mi_widgets) return R.drawable.icon3d_more;
@@ -107,7 +115,11 @@ public final class Theme {
                 || res == R.drawable.icon3d_account || res == R.drawable.icon3d_refresh
                 || res == R.drawable.icon3d_theme || res == R.drawable.icon3d_products
                 || res == R.drawable.icon3d_assistant || res == R.drawable.icon3d_more
-                || res == R.drawable.icon3d_dues || res == R.drawable.icon3d_zoom;
+                || res == R.drawable.icon3d_dues || res == R.drawable.icon3d_zoom
+                || res == R.drawable.icon3d_dark_dollar || res == R.drawable.icon3d_dark_gold
+                || res == R.drawable.icon3d_dark_search || res == R.drawable.icon3d_dark_refresh
+                || res == R.drawable.icon3d_dark_theme || res == R.drawable.icon3d_dark_zoom
+                || res == R.drawable.icon3d_dark_coin;
     }
 
     /** 1.0 normal, 1.3 large-text mode (applied in Kit.text). */

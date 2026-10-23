@@ -937,7 +937,7 @@ public class HomeScreen extends Screen {
         String lbl = r.label == null ? "" : r.label;
         int tileIcon = lbl.contains("دلار") ? R.drawable.mi_trending_up
                 : (lbl.contains("طلا") ? R.drawable.mi_diamond
-                : R.drawable.icon3d_coin);
+                : (Theme.isLight() ? R.drawable.icon3d_coin : R.drawable.icon3d_dark_coin));
         t.addView(a.kit.icon(tileIcon, Theme.GOLD, 24), new LinearLayout.LayoutParams(Theme.dp(24), Theme.dp(24)));
         TextView label = a.kit.text(r.label, 10.5f, Theme.TEXT, false);
         label.setGravity(Gravity.CENTER_HORIZONTAL);

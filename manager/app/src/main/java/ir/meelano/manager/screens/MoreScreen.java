@@ -125,9 +125,9 @@ public class MoreScreen extends Screen {
             expandedGroup = RoleStore.WAREHOUSE.equals(role) ? "stock" : "operations";
         }
         content.removeAllViews();
-        content.addView(Theme.isCups()
-                ? a.kit.heroIconRes(R.drawable.icon3d_cup_command, "اتاق فرمان",
-                        "گزارش‌ها و همهٔ بخش‌ها در یک جا", Theme.GOLD)
+        content.addView(Theme.isCups() || Theme.isNuts()
+                ? a.kit.heroIconRes(Theme.isCups() ? R.drawable.icon3d_cup_command : R.drawable.icon3d_emerald_command,
+                        "اتاق فرمان", "گزارش‌ها و همهٔ بخش‌ها در یک جا", Theme.GOLD)
                 : a.kit.hero("▣", "اتاق فرمان", "گزارش‌ها و همهٔ بخش‌ها در یک جا", Theme.GOLD),
                 a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
@@ -372,10 +372,67 @@ public class MoreScreen extends Screen {
         return tile;
     }
 
+    /** Emerald 3D icon per command-room section in the nut skin (same keys as cupsRes). */
+    private static int nutRes(String key) {
+        if (key == null) return 0;
+        switch (key) {
+            case "operations": case "ویژه مدیر": return R.drawable.icon3d_emerald_crown;
+            case "finance": case "dar_in": return R.drawable.icon3d_emerald_cash_in;
+            case "dar_out": case "خزانه‌داری": return R.drawable.icon3d_emerald_cash_out;
+            case "stock": case "کالا و انبار": return R.drawable.icon3d_emerald_products;
+            case "insights": case "reports": return R.drawable.icon3d_emerald_reports;
+            case "system": case "settings": return R.drawable.icon3d_emerald_settings;
+            case "home": return R.drawable.icon3d_emerald_home;
+            case "closeout": case "cash": return R.drawable.icon3d_emerald_coin;
+            case "manager_alerts": case "search": case "shomarsh": return R.drawable.icon3d_emerald_search;
+            case "sales": case "takmil": case "فروش": return R.drawable.icon3d_emerald_sales;
+            case "buy": case "خرید": return R.drawable.icon3d_emerald_purchase;
+            case "customers": case "مشتریان": return R.drawable.icon3d_emerald_customers;
+            case "visitors": case "تحلیل ویزیتور و مسیر": return R.drawable.icon3d_emerald_route;
+            case "cheques": return R.drawable.icon3d_emerald_cheque;
+            case "dues": return R.drawable.icon3d_emerald_dues;
+            case "anbar": case "resid": return R.drawable.icon3d_emerald_inventory;
+            case "tahvil": case "pick_wave": return R.drawable.icon3d_emerald_products;
+            case "sync_queue": return R.drawable.icon3d_emerald_refresh;
+            case "score": case "هوشمند": return R.drawable.icon3d_emerald_smart;
+            case "profit": case "سود و زیان": return R.drawable.icon3d_emerald_dollar;
+            case "voice": return R.drawable.icon3d_emerald_assistant;
+            case "برگشتی و ابطالی": return R.drawable.icon3d_emerald_return;
+            case "گزارش‌های اختصاصی": return R.drawable.icon3d_emerald_custom;
+            case "users": case "کاربران و نظارت": return R.drawable.icon3d_emerald_users;
+            case "tv": return R.drawable.icon3d_emerald_tv;
+            default: return 0;
+        }
+    }
+
     /** Cups skin: one dedicated 3D cup per command-room section (keyed by group id, report group or entry id). */
     private static int cupsRes(String key) {
         if (key == null) return 0;
         switch (key) {
+            case "home": return R.drawable.icon3d_cup_home;
+            case "closeout": return R.drawable.icon3d_cup_value;
+            case "manager_alerts": return R.drawable.icon3d_cup_low;
+            case "sales": case "takmil": return R.drawable.icon3d_cup_sales;
+            case "buy": return R.drawable.icon3d_cup_purchase;
+            case "customers": return R.drawable.icon3d_cup_customers;
+            case "visitors": return R.drawable.icon3d_cup_route;
+            case "dar_in": return R.drawable.icon3d_cup_cash_in;
+            case "dar_out": return R.drawable.icon3d_cup_cash_out;
+            case "cheques": return R.drawable.icon3d_cup_cheque;
+            case "dues": return R.drawable.icon3d_cup_dues;
+            case "cash": return R.drawable.icon3d_cup_coin;
+            case "products": return R.drawable.icon3d_cup_products;
+            case "anbar": case "resid": return R.drawable.icon3d_cup_inventory;
+            case "tahvil": case "pick_wave": return R.drawable.icon3d_cup_out;
+            case "sync_queue": return R.drawable.icon3d_cup_refresh;
+            case "shomarsh": return R.drawable.icon3d_cup_search;
+            case "score": return R.drawable.icon3d_cup_smart;
+            case "reports": return R.drawable.icon3d_cup_reports;
+            case "profit": return R.drawable.icon3d_cup_dollar;
+            case "voice": return R.drawable.icon3d_cup_more;
+            case "users": return R.drawable.icon3d_cup_users;
+            case "settings": return R.drawable.icon3d_cup_settings;
+            case "search": return R.drawable.icon3d_cup_search;
             case "operations": case "ویژه مدیر": return R.drawable.icon3d_cup_crown;
             case "finance": return R.drawable.icon3d_cup_cash_in;
             case "stock": case "کالا و انبار": return R.drawable.icon3d_cup_products;
@@ -398,7 +455,7 @@ public class MoreScreen extends Screen {
 
     /** Badge for a section: the cups 3D icon when the skin has one, otherwise the emoji badge. */
     private View badgeFor(String key, String glyph, int accent, int sizeDp) {
-        int res = Theme.isCups() ? cupsRes(key) : 0;
+        int res = Theme.isCups() ? cupsRes(key) : Theme.isNuts() ? nutRes(key) : 0;
         if (res == 0) return iconBadge(glyph, accent, sizeDp);
         android.widget.FrameLayout badge = new android.widget.FrameLayout(a);
         badge.setBackground(Theme.avatar(Theme.alpha(accent, Theme.isLight() ? 34 : 46)));

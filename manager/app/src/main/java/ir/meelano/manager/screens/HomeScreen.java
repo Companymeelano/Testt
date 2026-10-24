@@ -1479,9 +1479,9 @@ public class HomeScreen extends Screen {
             LinearLayout c = a.kit.card(Theme.INFO);
             c.addView(a.kit.sectionHead("سررسید ۳ روز آینده", "چک‌ها ›", v -> a.nav("cheques")), a.kit.lp(-1, -2));
             if (d.dueIn != null && !d.dueIn.isEmpty())
-                c.addView(a.kit.kvIcon(R.drawable.mi_receipt_long, "دریافتی (" + Money.fa(String.valueOf(d.dueIn.size())) + " فقره)", Money.rial(dueInSum), Theme.SUCCESS), a.kit.lp(-1, -2));
+                c.addView(a.kit.kvIcon(R.drawable.mi_cheque, "دریافتی (" + Money.fa(String.valueOf(d.dueIn.size())) + " فقره)", Money.rial(dueInSum), Theme.SUCCESS), a.kit.lp(-1, -2));
             if (d.dueOut != null && !d.dueOut.isEmpty())
-                c.addView(a.kit.kvIcon(R.drawable.mi_payments, "پرداختی (" + Money.fa(String.valueOf(d.dueOut.size())) + " فقره)", Money.rial(dueOutSum), Theme.GOLD), a.kit.lp(-1, -2));
+                c.addView(a.kit.kvIcon(R.drawable.mi_cheque, "پرداختی (" + Money.fa(String.valueOf(d.dueOut.size())) + " فقره)", Money.rial(dueOutSum), Theme.GOLD), a.kit.lp(-1, -2));
             a.kit.addCard(content, c);
         }
     }

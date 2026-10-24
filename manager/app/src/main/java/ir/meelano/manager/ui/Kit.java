@@ -516,7 +516,7 @@ public final class Kit {
         if (t.contains("معوق") || t.contains("فاکتور")) return R.drawable.mi_calendar_month;
         if (t.contains("بدهکار") || t.contains("مشتری")) return R.drawable.mi_group;
         if (t.contains("نقدینگی")) return R.drawable.mi_trending_up;
-        if (t.contains("سررسید") || t.contains("چک")) return R.drawable.mi_receipt_long;
+        if (t.contains("سررسید") || t.contains("چک")) return R.drawable.mi_cheque;
         if (t.contains("پیگیری")) return R.drawable.mi_person;
         return 0;
     }

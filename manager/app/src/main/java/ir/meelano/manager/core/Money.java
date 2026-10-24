@@ -63,9 +63,6 @@ public final class Money {
     /** Chart axis label in the selected unit (rial values are converted to toman when toman is on). */
     public static String axis(double v) { return compact(toUnit(v)); }
 
-    /** Chart axis label in the selected unit (rial values are converted to toman when toman is on). */
-    public static String axis(double v) { return compact(toUnit(v)); }
-
     /** Compact amount WITH the current unit for tiles/cards: «۱۲٫۴ میلیون تومان». */
     public static String compactMoney(double v) {
         return compact(toUnit(v)) + " " + unitName();

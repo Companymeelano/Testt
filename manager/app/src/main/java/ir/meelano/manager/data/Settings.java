@@ -327,7 +327,8 @@ public final class Settings {
 
     // ---------------- home dashboard order ----------------
     /** Day KPIs and the sales comparison first (as in the reference design), then trends, then alerts. */
-    public static final String HOME_ORDER_DEFAULT = "kpis,trend,donut,today_top,alerts,invstatus,returns,due,debtors,visitors,eod,shortcuts";
+    public static final String HOME_ORDER_DEFAULT = "alerts,due,kpis,today_top,returns,trend,donut,invstatus,debtors,visitors,eod,shortcuts";
+    private static final String HOME_ORDER_V2_DEFAULT = "kpis,trend,donut,today_top,alerts,invstatus,returns,due,debtors,visitors,eod,shortcuts";
     private static final String HOME_ORDER_V1_DEFAULT = "kpis,alerts,due,invstatus,returns,today_top,trend,debtors,visitors,donut,eod,shortcuts";
     private static final String HOME_ORDER_PREVIOUS_DEFAULT = "kpis,alerts,trend,donut,debtors,visitors,due,invstatus,returns,shortcuts";
 
@@ -336,7 +337,8 @@ public final class Settings {
         if (v == null || v.trim().isEmpty()) return HOME_ORDER_DEFAULT;
         // Move installations still using the untouched old default to the new
         // manager-first order, while preserving any order the user customized.
-        if (HOME_ORDER_V1_DEFAULT.equals(v.trim()) || HOME_ORDER_PREVIOUS_DEFAULT.equals(v.trim())) {
+        if (HOME_ORDER_V1_DEFAULT.equals(v.trim()) || HOME_ORDER_PREVIOUS_DEFAULT.equals(v.trim())
+                || HOME_ORDER_V2_DEFAULT.equals(v.trim())) {
             p.edit().putString("home_order", HOME_ORDER_DEFAULT).apply();
             return HOME_ORDER_DEFAULT;
         }

@@ -1236,6 +1236,11 @@ public class HomeScreen extends Screen {
             cmp.add(new Kit.Kpi("دیروز", Money.compactRial(yesterday), "", Theme.TEXT));
             cmp.add(new Kit.Kpi("میانگین ۷ روز قبل", Money.compactRial(avg7), "", Theme.GOLD_SOFT));
             cmp.add(new Kit.Kpi("میانگین ۳۰ روز قبل", Money.compactRial(avg30), "", Theme.GOLD_SOFT));
+            // Emerald 3D icon per tile, the same family as the KPI row.
+            cmp.get(0).icon = R.drawable.mi_point_of_sale;
+            cmp.get(1).icon = R.drawable.mi_calendar_month;
+            cmp.get(2).icon = R.drawable.mi_trending_up;
+            cmp.get(3).icon = R.drawable.mi_bar_chart;
             compare.addView(a.kit.kpiGrid(cmp, 2), a.kit.lp(-1, -2));
             if (todaySales <= 0)
                 compare.addView(a.kit.hint("برای " + compareLabel + " هنوز فروشی ثبت نشده است. اعداد بالا از روزهای قبل محاسبه شده‌اند."),
@@ -1330,14 +1335,16 @@ public class HomeScreen extends Screen {
         if (n == 0) {
             c.addView(a.kit.kv("هیچ سند برگشتی در این بازه ثبت نشده", "✓", Theme.SUCCESS), a.kit.lp(-1, -2));
         } else {
-            c.addView(a.kit.kv(Money.fa(String.valueOf(n)) + " سند برگشتی",
+            c.addView(a.kit.kvIcon(R.drawable.mi_refresh, Money.fa(String.valueOf(n)) + " سند برگشتی",
                     Money.compactMoney(sum), Theme.GOLD), a.kit.lp(-1, -2));
             int shown = 0;
             for (Row r : d.returns) {
                 if (shown++ >= 3) break;
                 String label = r.s("label");
                 if (label == null || label.trim().isEmpty()) continue;
-                c.addView(a.kit.kv(label,
+                int retIcon = label.contains("فروش") ? R.drawable.mi_payments
+                        : label.contains("مشتری") ? R.drawable.mi_receipt_long : R.drawable.mi_refresh;
+                c.addView(a.kit.kvIcon(retIcon, label,
                         Money.fa(String.valueOf(r.l("docs"))) + " سند • " + Money.compactMoney(r.d("total")),
                         Theme.TEXT), a.kit.lp(-1, -2));
             }
@@ -1472,9 +1479,9 @@ public class HomeScreen extends Screen {
             LinearLayout c = a.kit.card(Theme.INFO);
             c.addView(a.kit.sectionHead("سررسید ۳ روز آینده", "چک‌ها ›", v -> a.nav("cheques")), a.kit.lp(-1, -2));
             if (d.dueIn != null && !d.dueIn.isEmpty())
-                c.addView(a.kit.kv("دریافتی (" + Money.fa(String.valueOf(d.dueIn.size())) + " فقره)", Money.rial(dueInSum), Theme.SUCCESS), a.kit.lp(-1, -2));
+                c.addView(a.kit.kvIcon(R.drawable.mi_receipt_long, "دریافتی (" + Money.fa(String.valueOf(d.dueIn.size())) + " فقره)", Money.rial(dueInSum), Theme.SUCCESS), a.kit.lp(-1, -2));
             if (d.dueOut != null && !d.dueOut.isEmpty())
-                c.addView(a.kit.kv("پرداختی (" + Money.fa(String.valueOf(d.dueOut.size())) + " فقره)", Money.rial(dueOutSum), Theme.GOLD), a.kit.lp(-1, -2));
+                c.addView(a.kit.kvIcon(R.drawable.mi_payments, "پرداختی (" + Money.fa(String.valueOf(d.dueOut.size())) + " فقره)", Money.rial(dueOutSum), Theme.GOLD), a.kit.lp(-1, -2));
             a.kit.addCard(content, c);
         }
     }

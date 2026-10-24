@@ -217,9 +217,9 @@ public final class Kit {
 
     private int sectionAccent(String title) {
         String s = title == null ? "" : title.replace('ي', 'ی').replace('ك', 'ک');
-        if (s.contains("هشدار") || s.contains("برگشت") || s.contains("معوق")) return Theme.DANGER;
-        // Nut theme: one emerald family for every section (gold only as the shared accent).
+        // Nut theme: one emerald family for every section, returns and alerts included.
         if (Theme.isNuts()) return Theme.GOLD;
+        if (s.contains("هشدار") || s.contains("برگشت") || s.contains("معوق")) return Theme.DANGER;
         if (s.contains("دریافت") || s.contains("وصول")) return Theme.SUCCESS;
         if (s.contains("پرداخت") || s.contains("نقدینگی")) return Theme.INFO;
         if (s.contains("خرید")) return Theme.VIOLET;
@@ -386,6 +386,23 @@ public final class Kit {
         return kv(k, v, Theme.TEXT);
     }
 
+    /** Key-value row; in the nut theme a matching emerald 3D icon sits at the start of the row. */
+    public View kvIcon(int vector, String k, String v, int vColor) {
+        View base = kv(k, v, vColor);
+        if (!Theme.isNuts() || vector == 0) return base;
+        LinearLayout row = h();
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        ImageView iv = new ImageView(a);
+        iv.setImageResource(Theme.chrome3d(vector));
+        iv.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        iv.setPadding(Theme.dp(4), Theme.dp(4), Theme.dp(4), Theme.dp(4));
+        iv.setBackground(Theme.avatar(Theme.alpha(Theme.GOLD, 38)));
+        row.addView(iv, new LinearLayout.LayoutParams(Theme.dp(40), Theme.dp(40)));
+        row.addView(space(10));
+        row.addView(base, wlp(1f));
+        return row;
+    }
+
     public View kv(String k, String v, int vColor) {
         // Label stacked above value, both full width and right-aligned (RTL start).
         // Side-by-side rows collided when the label and value were both long.
@@ -493,12 +510,34 @@ public final class Kit {
         return b.length() == 0 ? "؟" : b.toString();
     }
 
+    /** The 3D icon that matches an alert's topic (nut theme); 0 keeps the plain dot. */
+    static int alertVector(String title) {
+        String t = title == null ? "" : title.replace('ي', 'ی').replace('ك', 'ک');
+        if (t.contains("معوق") || t.contains("فاکتور")) return R.drawable.mi_calendar_month;
+        if (t.contains("بدهکار") || t.contains("مشتری")) return R.drawable.mi_group;
+        if (t.contains("نقدینگی")) return R.drawable.mi_trending_up;
+        if (t.contains("سررسید") || t.contains("چک")) return R.drawable.mi_receipt_long;
+        if (t.contains("پیگیری")) return R.drawable.mi_person;
+        return 0;
+    }
+
     public View alertRow(String title, String body, int accent, View.OnClickListener onClick) {
         LinearLayout line = h();
         line.setPadding(Theme.dp(11), Theme.dp(10), Theme.dp(11), Theme.dp(10));
         line.setBackground(Theme.ghostButton(accent));
-        TextView dot = text("●", 15, accent, true);
-        line.addView(dot, new LinearLayout.LayoutParams(Theme.dp(24), -2));
+        int vec = alertVector(title);
+        if (Theme.isNuts() && vec != 0) {
+            ImageView iv = new ImageView(a);
+            iv.setImageResource(Theme.chrome3d(vec));
+            iv.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+            iv.setPadding(Theme.dp(3), Theme.dp(3), Theme.dp(3), Theme.dp(3));
+            iv.setBackground(Theme.avatar(Theme.alpha(Theme.GOLD, 34)));
+            line.addView(iv, new LinearLayout.LayoutParams(Theme.dp(40), Theme.dp(40)));
+            line.addView(space(8));
+        } else {
+            TextView dot = text("●", 15, accent, true);
+            line.addView(dot, new LinearLayout.LayoutParams(Theme.dp(24), -2));
+        }
         LinearLayout copy = v();
         copy.addView(text(title, 12f, Theme.TEXT, true), lp(-1, -2));
         if (body != null && !body.isEmpty()) {

@@ -1262,10 +1262,46 @@ public class HomeScreen extends Screen {
                 () -> gotoDay(target, row));
     }
 
+    /** Summary tile: a 3D icon on a soft gold pill, with a label and a bold value. */
+    private View summaryTile(int vector, String label, String value, int color) {
+        LinearLayout t = a.kit.h();
+        t.setGravity(Gravity.CENTER_VERTICAL);
+        t.setPadding(Theme.dp(10), Theme.dp(10), Theme.dp(10), Theme.dp(10));
+        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+        bg.setColor(Theme.alpha(Theme.GOLD, 20));
+        bg.setCornerRadius(Theme.dp(16));
+        t.setBackground(bg);
+        ImageView iv = new ImageView(a);
+        iv.setImageResource(Theme.chrome3d(vector));
+        iv.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        iv.setPadding(Theme.dp(2), Theme.dp(2), Theme.dp(2), Theme.dp(2));
+        t.addView(iv, new LinearLayout.LayoutParams(Theme.dp(46), Theme.dp(46)));
+        LinearLayout col = new LinearLayout(a);
+        col.setOrientation(LinearLayout.VERTICAL);
+        col.setPadding(Theme.dp(10), 0, 0, 0);
+        col.addView(a.kit.text(label, 11f, Theme.MUTED, false), a.kit.lp(-1, -2));
+        TextView v = a.kit.text(value, 14f, color, true);
+        v.setSingleLine(true);
+        v.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        col.addView(v, a.kit.lp(-1, -2));
+        t.addView(col, a.kit.wlp(1f));
+        return t;
+    }
+
     private void secAlerts(LinearLayout content, Data d) {
         // ---- alerts ----
         LinearLayout alerts = a.kit.card(Theme.GOLD);
-        alerts.addView(a.kit.text("هشدار امروز", 14.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        LinearLayout head = a.kit.h();
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        head.addView(a.kit.text("هشدار امروز", 14.5f, Theme.TEXT, true), a.kit.wlp(1f));
+        final TextView badge = a.kit.text("", 11f, Theme.GOLD, true);
+        badge.setPadding(Theme.dp(9), Theme.dp(3), Theme.dp(9), Theme.dp(3));
+        android.graphics.drawable.GradientDrawable pill = new android.graphics.drawable.GradientDrawable();
+        pill.setColor(Theme.alpha(Theme.GOLD, 36));
+        pill.setCornerRadius(Theme.dp(12));
+        badge.setBackground(pill);
+        head.addView(badge, a.kit.lp(-2, -2));
+        alerts.addView(head, a.kit.lp(-1, -2));
         int n = 0;
         n += alert(alerts, d, n);
         List<FollowUps.Due> dues = FollowUps.dueToday(a);
@@ -1276,6 +1312,7 @@ public class HomeScreen extends Screen {
                     Theme.GOLD, v -> gotoCustomer(fd.code)), padTop(n));
             n++;
         }
+        badge.setText(n == 0 ? "✓ بدون هشدار" : Money.fa(String.valueOf(n)) + " مورد");
         if (n == 0) alerts.addView(a.kit.text("فعلاً هشدار مهمی وجود ندارد.", 11.5f, Theme.MUTED, false), a.kit.lp(-1, -2));
         a.kit.addCard(content, alerts);
     }
@@ -1335,8 +1372,8 @@ public class HomeScreen extends Screen {
         if (n == 0) {
             c.addView(a.kit.kv("هیچ سند برگشتی در این بازه ثبت نشده", "✓", Theme.SUCCESS), a.kit.lp(-1, -2));
         } else {
-            c.addView(a.kit.kvIcon(R.drawable.mi_refresh, Money.fa(String.valueOf(n)) + " سند برگشتی",
-                    Money.compactMoney(sum), Theme.GOLD), a.kit.lp(-1, -2));
+            c.addView(summaryTile(R.drawable.mi_refresh, "برگشتی ۳۰ روز اخیر",
+                    Money.fa(String.valueOf(n)) + " سند • " + Money.compactMoney(sum), Theme.GOLD), a.kit.lp(-1, -2));
             int shown = 0;
             for (Row r : d.returns) {
                 if (shown++ >= 3) break;
@@ -1478,10 +1515,15 @@ public class HomeScreen extends Screen {
         if ((d.dueIn != null && !d.dueIn.isEmpty()) || (d.dueOut != null && !d.dueOut.isEmpty())) {
             LinearLayout c = a.kit.card(Theme.INFO);
             c.addView(a.kit.sectionHead("سررسید ۳ روز آینده", "چک‌ها ›", v -> a.nav("cheques")), a.kit.lp(-1, -2));
-            if (d.dueIn != null && !d.dueIn.isEmpty())
-                c.addView(a.kit.kvIcon(R.drawable.mi_cheque, "دریافتی (" + Money.fa(String.valueOf(d.dueIn.size())) + " فقره)", Money.rial(dueInSum), Theme.SUCCESS), a.kit.lp(-1, -2));
-            if (d.dueOut != null && !d.dueOut.isEmpty())
-                c.addView(a.kit.kvIcon(R.drawable.mi_cheque, "پرداختی (" + Money.fa(String.valueOf(d.dueOut.size())) + " فقره)", Money.rial(dueOutSum), Theme.GOLD), a.kit.lp(-1, -2));
+            LinearLayout row = a.kit.h();
+            boolean hasIn = d.dueIn != null && !d.dueIn.isEmpty();
+            boolean hasOut = d.dueOut != null && !d.dueOut.isEmpty();
+            if (hasIn) row.addView(summaryTile(R.drawable.mi_cheque, "دریافتی • " + Money.fa(String.valueOf(d.dueIn.size())) + " فقره",
+                    Money.rial(dueInSum), Theme.SUCCESS), a.kit.wlp(1f));
+            if (hasIn && hasOut) row.addView(a.kit.space(8));
+            if (hasOut) row.addView(summaryTile(R.drawable.mi_cheque, "پرداختی • " + Money.fa(String.valueOf(d.dueOut.size())) + " فقره",
+                    Money.rial(dueOutSum), Theme.GOLD), a.kit.wlp(1f));
+            c.addView(row, a.kit.lp(-1, -2));
             a.kit.addCard(content, c);
         }
     }

@@ -341,7 +341,8 @@ public final class LinkPanel {
                     int h = name.getHeight();
                     if (h <= 0) h = Theme.dp(28);
                     name.getPaint().setShader(new LinearGradient(0, 0, 0, h,
-                            new int[]{0xFFFFF6DE, 0xFFE9C37C, 0xFF8A6420, 0xFFF1D493, 0xFFFFF6DE},
+                            Theme.isCups() ? new int[]{0xFFFFE3DA, 0xFFF08A7A, 0xFFB3261E, 0xFFFF9C8C, 0xFFFFE3DA}
+                                    : new int[]{0xFFFFF6DE, 0xFFE9C37C, 0xFF8A6420, 0xFFF1D493, 0xFFFFF6DE},
                             new float[]{0f, 0.35f, 0.55f, 0.75f, 1f}, Shader.TileMode.CLAMP));
                     name.invalidate();
                 } catch (Exception ignored) { Diag.ignored("LinkPanel:346", ignored); }

@@ -10,11 +10,14 @@ import android.net.Uri;
 import android.view.Gravity;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.content.ContentValues;
 import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
+import android.provider.MediaStore;
 import android.net.NetworkInfo;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.widget.Toast;
@@ -55,6 +58,10 @@ public final class DebugUpdate {
     /** Public descriptor written by the CI on every build. */
     public static final String MANIFEST_URL =
             "https://github.com/Companymeelano/Testt/raw/arena/fc6fe9b2-testt/dist/update.json";
+
+    /** Direct link to the debug APK on the session branch (opens a download in the browser). */
+    public static final String APK_URL =
+            "https://github.com/Companymeelano/Testt/raw/arena/fc6fe9b2-testt/dist/meelano-manager-v36-debug-9.apk";
 
     /** Only downloads from this repository are accepted. */
     private static final String ALLOWED_PREFIX = "https://github.com/Companymeelano/Testt/";
@@ -254,26 +261,100 @@ public final class DebugUpdate {
         }
     }
 
-    /** Signer differs from the installed app: Android cannot update it in place. Explain it honestly. */
+    /**
+     * The signer differs from the installed app, so Android will not update it in place.
+     * The new APK is first copied to the public Downloads folder: uninstalling the old app
+     * deletes this app's own cache, and the file must survive that step.
+     */
     private static void signerDialog(final Activity a, final File apk) {
-        String msg = "این نسخه با امضای نسخه‌ی نصب‌شده روی این گوشی یکی نیست، پس اندروید اجازه‌ی به‌روزرسانی مستقیم نمی‌دهد.\n\n"
-                + "برای یک‌بار باید نسخه‌ی قبلی حذف شود و بعد این نسخه نصب شود. با حذف، اطلاعات محلی برنامه ممکن است پاک شود (از جمله ورود و فعال‌سازی).\n\n"
-                + "اول فایل را با «اشتراک فایل» ذخیره کنید، بعد نسخه‌ی قبلی را حذف کنید.";
+        String msg = "این نسخه با امضای نسخه‌ی نصب‌شده فرق دارد، پس اندروید روی آن به‌روزرسانی نمی‌کند.\n\n"
+                + "مراحل:\n"
+                + "۱) فایل جدید در پوشه‌ی Downloads با نام meelano-update.apk ذخیره می‌شود.\n"
+                + "۲) نسخه‌ی قبلی حذف می‌شود. ممکن است اطلاعات محلی برنامه، از جمله ورود و فعال‌سازی، پاک شود.\n"
+                + "۳) از «فایل‌های من» یا «Downloads» همان فایل را باز کنید و نصب کنید.";
         new AlertDialog.Builder(a)
-                .setTitle("نصب مستقیم ممکن نیست")
+                .setTitle("نصب نسخه جدید")
                 .setMessage(msg)
-                .setPositiveButton("اشتراک فایل", (d, w) ->
-                        ShareProvider.share(a, apk, "application/vnd.android.package-archive", "میلانو"))
-                .setNeutralButton("حذف نسخه قبلی", (d, w) -> {
-                    try {
-                        a.startActivity(new Intent(Intent.ACTION_DELETE,
-                                Uri.parse("package:" + a.getPackageName())));
-                    } catch (Exception e) {
-                        Diag.ignored("DebugUpdate:delete", e);
+                .setPositiveButton("ذخیره و حذف نسخه قبلی", (d, w) -> {
+                    String saved = saveToDownloads(a, apk);
+                    if (saved == null) {
+                        shareFallback(a, apk);
+                        return;
                     }
+                    toast(a, "فایل در Downloads ذخیره شد: " + saved);
+                    uninstallCurrent(a);
+                })
+                .setNeutralButton("فقط ذخیره", (d, w) -> {
+                    String saved = saveToDownloads(a, apk);
+                    if (saved == null) shareFallback(a, apk);
+                    else toast(a, "فایل در Downloads ذخیره شد: " + saved);
                 })
                 .setNegativeButton("بعداً", null)
                 .show();
+    }
+
+    private static void shareFallback(Activity a, File apk) {
+        toast(a, "ذخیره در Downloads ممکن نشد؛ فایل را اشتراک‌گذاری می‌کنم");
+        try {
+            ShareProvider.share(a, apk, "application/vnd.android.package-archive", "MEELANO Manager");
+        } catch (Exception e) {
+            Diag.ignored("DebugUpdate:share", e);
+        }
+    }
+
+    /** Opens the system uninstall page for this app. Android may hide it on some builds; then say so. */
+    private static void uninstallCurrent(Activity a) {
+        try {
+            a.startActivity(new Intent(Intent.ACTION_DELETE, Uri.parse("package:" + a.getPackageName())));
+        } catch (Exception e) {
+            Diag.ignored("DebugUpdate:delete", e);
+            toast(a, "صفحه‌ی حذف باز نشد؛ برنامه را از تنظیمات > برنامه‌ها حذف کنید");
+        }
+    }
+
+    /** Copies the APK to the public Downloads folder. Returns the file name, or null when that is not possible. */
+    private static String saveToDownloads(Context c, File apk) {
+        final String name = "meelano-update.apk";
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= 29) {
+                ContentValues v = new ContentValues();
+                v.put(MediaStore.Downloads.DISPLAY_NAME, name);
+                v.put(MediaStore.Downloads.MIME_TYPE, "application/vnd.android.package-archive");
+                v.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS);
+                v.put(MediaStore.Downloads.IS_PENDING, 1);
+                android.net.Uri uri = c.getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, v);
+                if (uri == null) return null;
+                try (InputStream in = new java.io.FileInputStream(apk);
+                     OutputStream os = c.getContentResolver().openOutputStream(uri)) {
+                    if (os == null) return null;
+                    copyStream(in, os);
+                }
+                ContentValues done = new ContentValues();
+                done.put(MediaStore.Downloads.IS_PENDING, 0);
+                c.getContentResolver().update(uri, done, null, null);
+                return name;
+            }
+            // Android 8 and 9 need the storage permission for the public folder.
+            if (c.checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                    != PackageManager.PERMISSION_GRANTED) return null;
+            File dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+            //noinspection ResultOfMethodCallIgnored
+            dir.mkdirs();
+            try (InputStream in = new java.io.FileInputStream(apk);
+                 OutputStream os = new FileOutputStream(new File(dir, name))) {
+                copyStream(in, os);
+            }
+            return name;
+        } catch (Exception e) {
+            Diag.ignored("DebugUpdate:save", e);
+            return null;
+        }
+    }
+
+    private static void copyStream(InputStream in, OutputStream os) throws IOException {
+        byte[] buf = new byte[64 * 1024];
+        int n;
+        while ((n = in.read(buf)) > 0) os.write(buf, 0, n);
     }
 
     /** Runs on the UI thread. Installs only a package that matches this app's name and signer. */

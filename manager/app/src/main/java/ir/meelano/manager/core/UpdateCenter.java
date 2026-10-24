@@ -104,7 +104,8 @@ public final class UpdateCenter {
     public static void manualCheck(Activity a) {
         try {
             if (isDebug(a)) {
-                toast(a, "در نسخه توسعه‌دهنده، بروزرسانی غیرفعال است");
+                // Debug edition has its own channel: read dist/update.json and offer the GitHub APK.
+                DebugUpdate.checkNow(a);
                 return;
             }
             if (!LicenseStore.unlocked(a)) {
@@ -204,6 +205,7 @@ public final class UpdateCenter {
 
     /** Public URL of the release list (manual download fallback). */
     public static String releasesPage() {
+        if (ir.meelano.manager.BuildConfig.DEBUG) return DebugUpdate.APK_URL;
         return "https://github.com/" + UpdateConfig.OWNER + "/" + UpdateConfig.REPO + "/releases/latest";
     }
 

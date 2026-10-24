@@ -110,7 +110,10 @@ public final class Theme {
     }
 
     /** MEELANO crest: gold on emerald in the nut theme, the classic black-and-gold badge otherwise. */
-    public static int logoRes() { return nuts ? R.drawable.meelano_nuts : R.drawable.meelano_3d; }
+    public static int logoRes() {
+        if (cups) return R.drawable.meelano_cups;
+        return nuts ? R.drawable.meelano_nuts : R.drawable.meelano_3d;
+    }
     /** Application context, used only to load the light skin artwork. */
     private static Context appCtx;
     /** Mirror of !light for call sites (charts, tables). */

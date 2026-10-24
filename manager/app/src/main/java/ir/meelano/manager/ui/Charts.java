@@ -304,7 +304,11 @@ public final class Charts {
             text.setTextAlign(Paint.Align.CENTER);
             int step = Math.max(1, (n + 5) / 6);
             for (int i = 0; i < n; i += step) {
-                g.drawText(Money.fa(ellipsize(data.get(i).label, 8)), xs[i], plot.bottom + Theme.dp(16), text);
+                String xl = Money.fa(ellipsize(data.get(i).label, 8));
+                // keep the first and last labels inside the view instead of clipping them at the edge
+                float tw = text.measureText(xl);
+                float lx = Math.max(tw / 2f + Theme.dp(2), Math.min(w - tw / 2f - Theme.dp(2), xs[i]));
+                g.drawText(xl, lx, plot.bottom + Theme.dp(16), text);
             }
             // selected dot + tooltip bubble
             if (selected >= 0 && selected < n) {
@@ -518,8 +522,11 @@ public final class Charts {
             double sum = 0;
             for (Point p : data) sum += Math.max(0, p.value);
             float cx = w / 2f;
-            float radius = Math.min(w, h - Theme.dp(46)) / 2f - Theme.dp(8);
-            float cy = radius + Theme.dp(10);
+            // Ring outer edge = radius * 1.17 (stroke) + extrusion; lay everything out from that edge
+            // so the top is not clipped and the legend starts below the ring, not inside it.
+            float radius = Math.min(w, h - Theme.dp(92)) / 2f - Theme.dp(10);
+            float ringOuter = radius * 1.17f + Theme.dp(6);
+            float cy = ringOuter + Theme.dp(6);
             if (data.isEmpty() || sum <= 0) {
                 paint.setColor(Theme.MUTED);
                 paint.setTextSize(Theme.dp(11));
@@ -571,7 +578,7 @@ public final class Charts {
             g.drawText(cb, cx, cy + Theme.dp(17), paint);
             paint.setTypeface(Theme.face(false));
             // legend (two columns, up to 8)
-            float ly = cy + radius + Theme.dp(20);
+            float ly = cy + ringOuter + Theme.dp(16);
             paint.setTextSize(Theme.dp(10));
             int shown = Math.min(8, data.size());
             for (int i = 0; i < shown; i++) {

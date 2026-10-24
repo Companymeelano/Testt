@@ -455,7 +455,14 @@ public final class Kit {
         head.addView(copy, wlp(1f));
         LinearLayout side = v();
         side.setGravity(Gravity.END);
-        if (value != null && !value.isEmpty()) side.addView(text(value, 13.5f, Theme.TEXT, true), lp(-2, -2));
+        if (value != null && !value.isEmpty()) {
+            // Capped width: a long amount ellipsises instead of squeezing the name beside it.
+            TextView vt = text(value, 13.5f, Theme.TEXT, true);
+            vt.setSingleLine(true);
+            vt.setEllipsize(TextUtils.TruncateAt.END);
+            vt.setMaxWidth(Theme.dp(150));
+            side.addView(vt, lp(-2, -2));
+        }
         if (pillText != null && !pillText.isEmpty()) {
             View p = pill(pillText, accent);
             LinearLayout.LayoutParams pp = lp(-2, -2);

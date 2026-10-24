@@ -50,6 +50,7 @@ public class LoginActivity extends Activity {
         Theme.init(this);
         try {
             getWindow().setStatusBarColor(Theme.BG);
+            Theme.lightBars(getWindow());
             getWindow().setNavigationBarColor(Theme.BG);
         } catch (Exception ignored) { Diag.ignored("LoginActivity:50", ignored); }
         kit = new Kit(this);
@@ -71,7 +72,9 @@ public class LoginActivity extends Activity {
         android.widget.FrameLayout halo = new android.widget.FrameLayout(this);
         android.graphics.drawable.GradientDrawable glow = new android.graphics.drawable.GradientDrawable();
         glow.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-        glow.setColors(new int[]{Theme.alpha(Theme.GOLD, 90), Theme.alpha(Theme.GOLD, 0)});
+        // Nut theme: a warm gold halo (GOLD is emerald there, which read as grey mud on ivory).
+        int haloRgb = Theme.isNuts() ? 0xFFE2BE5E : Theme.GOLD;
+        glow.setColors(new int[]{Theme.alpha(haloRgb, Theme.isNuts() ? 110 : 90), Theme.alpha(haloRgb, 0)});
         glow.setGradientType(android.graphics.drawable.GradientDrawable.RADIAL_GRADIENT);
         glow.setGradientRadius(Theme.dp(96));
         halo.setBackground(glow);

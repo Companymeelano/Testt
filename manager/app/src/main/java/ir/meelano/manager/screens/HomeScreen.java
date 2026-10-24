@@ -1211,7 +1211,10 @@ public class HomeScreen extends Screen {
         attachSpark(kpis.get(1), d.buyDaily, d);
         attachSpark(kpis.get(2), d.inDaily, d);
         attachSpark(kpis.get(3), d.outDaily, d);
-        content.addView(a.kit.kpiGrid(kpis, 2), a.kit.lp(-1, -2));
+        // Breathing room under the header toolbar so the first KPI row does not touch it.
+        LinearLayout.LayoutParams kg = a.kit.lp(-1, -2);
+        kg.topMargin = Theme.dp(12);
+        content.addView(a.kit.kpiGrid(kpis, 2), kg);
         content.addView(a.kit.gap(12));
         if (d.salesDaily != null && !d.salesDaily.isEmpty()) {
             String compareDay = snapshotDay(d);

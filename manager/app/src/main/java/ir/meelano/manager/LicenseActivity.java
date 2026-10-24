@@ -150,6 +150,7 @@ public class LicenseActivity extends Activity {
         try {
             getWindow().setStatusBarColor(Theme.BG);
             getWindow().setNavigationBarColor(Theme.BG);
+            Theme.lightBars(getWindow());
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:152", ignored); }
         kit = new Kit(this);
         settings = new Settings(this);

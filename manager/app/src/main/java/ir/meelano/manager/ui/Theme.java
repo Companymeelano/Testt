@@ -347,6 +347,17 @@ public final class Theme {
     }
 
     // ---------------- system bars ----------------
+    /** Dark system-bar icons on light skins (time, battery, nav keys); light icons on dark skins. */
+    public static void lightBars(android.view.Window w) {
+        try {
+            android.view.View dv = w.getDecorView();
+            int vis = dv.getSystemUiVisibility();
+            if (light) vis |= android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+            else vis &= ~android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+            dv.setSystemUiVisibility(vis);
+        } catch (Exception ignored) { }
+    }
+
     public static int statusBar() {
         return light ? 0xFFFFFFFF : 0xFF0F172A;
     }

@@ -682,6 +682,8 @@ public class SettingsScreen extends Screen {
         ab.addView(a.kit.hint(ir.meelano.manager.core.UpdateCenter.lastCheckLine(a)), a.kit.lp(-1, -2));
         ab.addView(a.kit.btnGold("⟳  بررسی و دریافت نسخه جدید", v ->
                 ir.meelano.manager.core.UpdateCenter.manualCheck(a)), a.kit.lp(-1, -2));
+        ab.addView(a.kit.btnGhost("⬇  نسخه توسعه: بررسی و دریافت از گیت‌هاب", Theme.GOLD, v ->
+                ir.meelano.manager.core.DebugUpdate.checkNow(a)), a.kit.lp(-1, -2));
         ab.addView(a.kit.btnGhost("📦  صفحه نسخه‌های منتشرشده", Theme.GOLD, v -> openReleasesPage()),
                 a.kit.lp(-1, -2));
         ab.addView(a.kit.hint("دانلود امن، بررسی امضا و نصب روی همین گوشی انجام می‌شود؛ داده‌ها حفظ می‌شوند. "

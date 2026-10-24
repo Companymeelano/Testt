@@ -149,6 +149,8 @@ public class MainActivity extends Activity {
             toLicense();
             return;
         }
+        // Cold start: silent check for a newer debug build (offers only when one exists).
+        ir.meelano.manager.core.DebugUpdate.checkOnOpen(this);
         // License → explicit server/database selection → account login.
         if (!new Settings(this).connConfigured()) {
             toLicense();

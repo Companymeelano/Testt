@@ -164,9 +164,13 @@ jobs:
             echo "Commit: $(git rev-parse --short HEAD)"
             echo "SHA-256: $(sha256sum dist/meelano-manager-v36-debug-9.apk | cut -d' ' -f1)"
           } > dist/manager-v36-build-info.txt
+          APK_SHA=$(sha256sum dist/meelano-manager-v36-debug-9.apk | cut -d' ' -f1)
+          APK_SIZE=$(stat -c %s dist/meelano-manager-v36-debug-9.apk)
+          printf '{"build":"%s","sha256":"%s","size":%s,"name":"v36.27.0 build %s","url":"https://github.com/Companymeelano/Testt/raw/%s/dist/meelano-manager-v36-debug-9.apk","notes":"نسخه توسعه؛ همان برنامه با آخرین تغییرات این شاخه."}\n' \
+            "$GITHUB_SHA" "$APK_SHA" "$APK_SIZE" "${GITHUB_RUN_ID}" "${GITHUB_REF_NAME}" > dist/update.json
           git config user.name "arena-ci"
           git config user.email "arena-ci@local"
-          git add -f dist/meelano-manager-v36-debug-9.apk dist/manager-v36-build-info.txt
+          git add -f dist/meelano-manager-v36-debug-9.apk dist/manager-v36-build-info.txt dist/update.json
           git commit -m "dist: MEELANO Manager v36.27.0 debug APK"
           git push origin HEAD:refs/heads/${GITHUB_REF_NAME}
 

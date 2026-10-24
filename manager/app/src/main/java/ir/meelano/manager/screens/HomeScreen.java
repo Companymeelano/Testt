@@ -1113,20 +1113,16 @@ public class HomeScreen extends Screen {
         if ("kpis".equals(key)) secKpis(content, d);
         else if ("alerts".equals(key)) secAlerts(content, d);
         else if ("trend".equals(key)) secTrend(content, d);
-        else if ("donut".equals(key)) secDonut(content, d);
-        else if ("today_top".equals(key)) secTopItems(content, d);
         else if ("debtors".equals(key)) secDebtors(content, d);
         else if ("visitors".equals(key)) secVisitors(content, d);
         else if ("due".equals(key)) secDue(content, d);
-        else if ("invstatus".equals(key)) secInvStatus(content, d);
         else if ("returns".equals(key)) secReturns(content, d);
         else if ("eod".equals(key)) secEod(content);
         else if ("shortcuts".equals(key)) secShortcuts(content, d);
     }
 
     private boolean isEssentialHomeSection(String key) {
-        return "kpis".equals(key) || "alerts".equals(key) || "due".equals(key)
-                || "invstatus".equals(key) || "returns".equals(key) || "today_top".equals(key);
+        return "kpis".equals(key) || "alerts".equals(key) || "due".equals(key) || "returns".equals(key);
     }
 
     private View homeDetailsToggle(final List<LinearLayout> blocks, final List<Boolean> essential,
@@ -1184,7 +1180,7 @@ public class HomeScreen extends Screen {
     /** Dashboard order from settings; unknown keys dropped, missing sections appended. */
     private List<String> orderedKeys() {
         List<String> out = new ArrayList<>();
-        String[] known = {"kpis", "alerts", "due", "invstatus", "returns", "today_top", "trend", "debtors", "visitors", "donut", "eod", "shortcuts"};
+        String[] known = {"kpis", "alerts", "due", "returns", "trend", "debtors", "visitors", "eod", "shortcuts"};
         for (String k : a.settings.homeOrder().split(",")) {
             String t = k == null ? "" : k.trim();
             if (!t.isEmpty() && !out.contains(t)) {
@@ -1288,6 +1284,33 @@ public class HomeScreen extends Screen {
         return t;
     }
 
+    /** Compact tile for a breakdown item: icon above, label and value below, centred. */
+    private View miniTile(int vector, String label, String value) {
+        LinearLayout t = new LinearLayout(a);
+        t.setOrientation(LinearLayout.VERTICAL);
+        t.setGravity(Gravity.CENTER_HORIZONTAL);
+        t.setPadding(Theme.dp(6), Theme.dp(8), Theme.dp(6), Theme.dp(8));
+        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+        bg.setColor(Theme.alpha(Theme.GOLD, 18));
+        bg.setCornerRadius(Theme.dp(14));
+        t.setBackground(bg);
+        ImageView iv = new ImageView(a);
+        iv.setImageResource(Theme.chrome3d(vector));
+        iv.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        t.addView(iv, new LinearLayout.LayoutParams(Theme.dp(34), Theme.dp(34)));
+        TextView l = a.kit.text(label, 10.5f, Theme.MUTED, false);
+        l.setGravity(Gravity.CENTER);
+        l.setSingleLine(true);
+        l.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        t.addView(l, a.kit.lp(-1, -2));
+        TextView v = a.kit.text(value, 12.5f, Theme.TEXT, true);
+        v.setGravity(Gravity.CENTER);
+        v.setSingleLine(true);
+        v.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        t.addView(v, a.kit.lp(-1, -2));
+        return t;
+    }
+
     private void secAlerts(LinearLayout content, Data d) {
         // ---- alerts ----
         LinearLayout alerts = a.kit.card(Theme.GOLD);
@@ -1318,40 +1341,6 @@ public class HomeScreen extends Screen {
     }
 
     /**
-     * Confirmation state of the last 30 days' invoices. An invoice that never
-     * reached Status=1 is still provisional: it sits in the ledger without ever
-     * having been finalised, and nobody is told. Surfacing the count with a tap
-     * through to the full list is what makes it actionable.
-     */
-    private void secInvStatus(LinearLayout content, Data d) {
-        LinearLayout c = a.kit.card(Theme.GOLD);
-        c.addView(a.kit.sectionHead("وضعیت فاکتورهای ۳۰ روز اخیر", "گزارش ›", v -> a.nav("reports")),
-                a.kit.lp(-1, -2));
-        addState(c, "فروش", d.saleState);
-        addState(c, "خرید", d.buyState);
-        if ((d.saleState == null || d.saleState.isEmpty()) && (d.buyState == null || d.buyState.isEmpty()))
-            c.addView(a.kit.text("داده‌ای برای این بازه یافت نشد.", 11.5f, Theme.MUTED, false), a.kit.lp(-1, -2));
-        a.kit.addCard(content, c);
-    }
-
-    /** One line per state of one side (sales or purchases): how many, and for how much. */
-    private void addState(LinearLayout c, String side, List<Row> rows) {
-        if (rows == null || rows.isEmpty()) return;
-        long pendingN = 0;
-        double pendingSum = 0;
-        for (Row r : rows) {
-            if (r.i("state") == 1) continue; // 1 = confirmed, the rest are provisional
-            pendingN += r.l("docs");
-            pendingSum += r.d("total");
-        }
-        int col = pendingN > 0 ? Theme.WARNING : Theme.SUCCESS;
-        String txt = side + ": " + (pendingN > 0
-                ? Money.fa(String.valueOf(pendingN)) + " فاکتور تأییدنشده (" + Money.compactMoney(pendingSum) + ")"
-                : "همه تأیید شده‌اند");
-        c.addView(a.kit.kv(txt, pendingN > 0 ? "نیاز به بررسی" : "✓", col), a.kit.lp(-1, -2));
-    }
-
-    /**
      * Return documents of the last 30 days. dbo.back_sanad is the ledger of goods
      * moving back — out of the warehouse, back from a customer, and so on — so a
      * sudden rise here is a quality or logistics problem long before it shows up
@@ -1374,62 +1363,18 @@ public class HomeScreen extends Screen {
         } else {
             c.addView(summaryTile(R.drawable.mi_refresh, "برگشتی ۳۰ روز اخیر",
                     Money.fa(String.valueOf(n)) + " سند • " + Money.compactMoney(sum), Theme.GOLD), a.kit.lp(-1, -2));
+            LinearLayout grid = a.kit.h();
             int shown = 0;
             for (Row r : d.returns) {
-                if (shown++ >= 3) break;
+                if (shown >= 3) break;
                 String label = r.s("label");
                 if (label == null || label.trim().isEmpty()) continue;
                 int retIcon = label.contains("فروش") ? R.drawable.mi_payments
                         : label.contains("مشتری") ? R.drawable.mi_receipt_long : R.drawable.mi_refresh;
-                c.addView(a.kit.kvIcon(retIcon, label,
-                        Money.fa(String.valueOf(r.l("docs"))) + " سند • " + Money.compactMoney(r.d("total")),
-                        Theme.TEXT), a.kit.lp(-1, -2));
+                if (shown++ > 0) grid.addView(a.kit.space(6));
+                grid.addView(miniTile(retIcon, label, Money.fa(String.valueOf(r.l("docs"))) + " سند"), a.kit.wlp(1f));
             }
-        }
-        a.kit.addCard(content, c);
-    }
-
-    /** Top five by the snapshot day's invoiced sales, following the dashboard benchmark. */
-    private void secTopItems(LinearLayout content, Data d) {
-        String period = snapshotLabel(d);
-        LinearLayout c = a.kit.card(Theme.GOLD);
-        c.addView(a.kit.sectionHead("پرفروش‌ترین کالاهای " + period, "گزارش کامل ›", v -> a.nav("reports")),
-                a.kit.lp(-1, -2));
-        if (d.topItems == null || d.topItems.isEmpty()) {
-            c.addView(a.kit.text("هنوز کالایی برای " + period + " ثبت نشده است.", 11.5f, Theme.MUTED, false),
-                    a.kit.lp(-1, -2));
-        } else {
-            int show = Math.min(5, d.topItems.size());
-            for (int i = 0; i < show; i++) {
-                Row item = d.topItems.get(i);
-                LinearLayout row = a.kit.h();
-                row.setGravity(android.view.Gravity.CENTER_VERTICAL);
-                TextView rank = a.kit.text(Money.fa(String.valueOf(i + 1)), 11f, Theme.GOLD, true);
-                rank.setGravity(android.view.Gravity.CENTER);
-                rank.setBackground(Theme.avatar(Theme.alpha(Theme.GOLD, 44)));
-                row.addView(rank, new LinearLayout.LayoutParams(Theme.dp(32), Theme.dp(32)));
-                row.addView(a.kit.space(8));
-
-                LinearLayout copy = a.kit.v();
-                TextView name = a.kit.text(item.s("label"), 12f, Theme.TEXT, true);
-                name.setSingleLine(true);
-                name.setEllipsize(android.text.TextUtils.TruncateAt.END);
-                copy.addView(name, a.kit.lp(-1, -2));
-                String detail = Money.qty(item.d("qty")) + " واحد • "
-                        + Money.fa(String.valueOf(item.l("docs"))) + " ردیف فروش";
-                copy.addView(a.kit.text(detail, 10f, Theme.MUTED, false), a.kit.lp(-1, -2));
-                row.addView(copy, a.kit.wlp(1f));
-                row.addView(a.kit.space(8));
-
-                TextView total = a.kit.text(Money.compactRial(item.d("total")), 11.5f, Theme.GOLD, true);
-                total.setGravity(android.view.Gravity.END | android.view.Gravity.CENTER_VERTICAL);
-                total.setMaxLines(1);
-                total.setEllipsize(android.text.TextUtils.TruncateAt.END);
-                row.addView(total, a.kit.lp(-2, -2));
-                c.addView(row, a.kit.lp(-1, -2));
-                if (i + 1 < show) c.addView(a.kit.gap(8));
-            }
-            c.addView(a.kit.hint("رتبه‌بندی بر پایهٔ مبلغ فروش " + period), a.kit.lp(-1, -2));
+            if (shown > 0) c.addView(grid, a.kit.lp(-1, -2));
         }
         a.kit.addCard(content, c);
     }
@@ -1448,23 +1393,6 @@ public class HomeScreen extends Screen {
             ch.setListener((idx, p) -> cap.setText(Money.fa(p.label) + " • " + Money.rial(p.value)));
             c.addView(ch, new LinearLayout.LayoutParams(-1, Theme.dp(190)));
             c.addView(cap, a.kit.lp(-1, -2));
-            a.kit.addCard(content, c);
-        }
-    }
-
-    private void secDonut(LinearLayout content, Data d) {
-        // ---- receipts mix donut ----
-        if (d.inDay != null && d.inDay.d("total") > 0) {
-            LinearLayout c = a.kit.card(Theme.SUCCESS);
-            c.addView(a.kit.sectionHead("ترکیب دریافت " + dayOf(d.inDay), "دریافت‌ها ›", v -> a.nav("dar_in")), a.kit.lp(-1, -2));
-            Charts.Donut dn = new Charts.Donut(a);
-            List<Charts.Point> pts = new ArrayList<>();
-            pts.add(new Charts.Point("نقد", d.inDay.d("cash"), Theme.SUCCESS));
-            pts.add(new Charts.Point("کارت", d.inDay.d("pos"), Theme.INFO));
-            pts.add(new Charts.Point("حواله", d.inDay.d("havaleh"), Theme.GOLD));
-            pts.add(new Charts.Point("چک", d.inDay.d("cheque"), Theme.GOLD));
-            dn.setData(pts, "جمع دریافت", Money.compactRial(d.inDay.d("total")));
-            c.addView(dn, new LinearLayout.LayoutParams(-1, Theme.dp(300)));
             a.kit.addCard(content, c);
         }
     }
@@ -1585,17 +1513,6 @@ public class HomeScreen extends Screen {
     }
 
     private int alert(LinearLayout box, Data d, int n) {
-        // overdue top-1
-        if (d.overdue != null && !d.overdue.isEmpty()) {
-            Row o = d.overdue.get(0);
-            long dd = o.l("days");
-            // Without dif_date_alan the server sends −1: derive the delay from the due date.
-            if (dd < 0) dd = Jalali.diffDays(o.s("dueDate"), Jalali.todayStr());
-            String days = dd >= 0 ? " • تأخیر " + Money.fa(String.valueOf(dd)) + " روز" : "";
-            box.addView(a.kit.alertRow("فاکتور معوق", o.s("party") + " • " + Money.rial(o.d("amount")) + days,
-                    Theme.GOLD, v -> gotoUnsettled()), padTop(n));
-            n++;
-        }
         // top debtor
         if (d.debtors != null && !d.debtors.isEmpty()) {
             Row r = d.debtors.get(0);

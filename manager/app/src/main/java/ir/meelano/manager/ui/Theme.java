@@ -91,7 +91,11 @@ public final class Theme {
                 || res == R.drawable.icon3d_cup_out || res == R.drawable.icon3d_cup_low
                 || res == R.drawable.icon3d_cup_dead || res == R.drawable.icon3d_cup_cash_in
                 || res == R.drawable.icon3d_cup_cash_out || res == R.drawable.icon3d_cup_account
-                || res == R.drawable.icon3d_cup_search || res == R.drawable.icon3d_cup_more;
+                || res == R.drawable.icon3d_cup_search || res == R.drawable.icon3d_cup_more
+                || res == R.drawable.icon3d_cup_crown || res == R.drawable.icon3d_cup_route
+                || res == R.drawable.icon3d_cup_return || res == R.drawable.icon3d_cup_smart
+                || res == R.drawable.icon3d_cup_users || res == R.drawable.icon3d_cup_command
+                || res == R.drawable.icon3d_cup_tv || res == R.drawable.icon3d_cup_custom;
     }
 
     /** MEELANO crest: gold on emerald in the nut theme, the classic black-and-gold badge otherwise. */

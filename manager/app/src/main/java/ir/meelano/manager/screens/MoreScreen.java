@@ -8,6 +8,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import ir.meelano.manager.MainActivity;
+import ir.meelano.manager.R;
 import ir.meelano.manager.core.AtiranAuth;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.RoleStore;
@@ -124,8 +125,11 @@ public class MoreScreen extends Screen {
             expandedGroup = RoleStore.WAREHOUSE.equals(role) ? "stock" : "operations";
         }
         content.removeAllViews();
-        content.addView(a.kit.hero("▣", "اتاق فرمان",
-                "گزارش‌ها و همهٔ بخش‌ها در یک جا", Theme.GOLD), a.kit.lp(-1, -2));
+        content.addView(Theme.isCups()
+                ? a.kit.heroIconRes(R.drawable.icon3d_cup_command, "اتاق فرمان",
+                        "گزارش‌ها و همهٔ بخش‌ها در یک جا", Theme.GOLD)
+                : a.kit.hero("▣", "اتاق فرمان", "گزارش‌ها و همهٔ بخش‌ها در یک جا", Theme.GOLD),
+                a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
 
         LinearLayout segRow = a.kit.h();
@@ -180,7 +184,7 @@ public class MoreScreen extends Screen {
         tile.setGravity(Gravity.CENTER_VERTICAL);
         tile.setMinimumHeight(Theme.dp(60));
         tile.setPadding(Theme.dp(10), Theme.dp(10), Theme.dp(10), Theme.dp(10));
-        tile.addView(iconBadge(group[1], accent, 36), new LinearLayout.LayoutParams(Theme.dp(36), Theme.dp(36)));
+        tile.addView(badgeFor(group[0], group[1], accent, 36), new LinearLayout.LayoutParams(Theme.dp(36), Theme.dp(36)));
         tile.addView(a.kit.space(8));
         TextView label = a.kit.text(group[0], 12.5f, Theme.TEXT, true);
         label.setMaxLines(2);
@@ -254,7 +258,7 @@ public class MoreScreen extends Screen {
         header.setFocusable(true);
         header.setContentDescription(group.title + "، " + (open ? "بستن" : "بازکردن"));
 
-        header.addView(iconBadge(group.glyph, accent, 46),
+        header.addView(badgeFor(group.id, group.glyph, accent, 46),
                 new LinearLayout.LayoutParams(Theme.dp(46), Theme.dp(46)));
         header.addView(a.kit.space(10));
 
@@ -334,7 +338,7 @@ public class MoreScreen extends Screen {
         tile.setMinimumHeight(Theme.dp(122));
         tile.setPadding(Theme.dp(10), Theme.dp(12), Theme.dp(10), Theme.dp(10));
 
-        tile.addView(iconBadge(glyph, accent, 44),
+        tile.addView(badgeFor(entry.id, glyph, accent, 44),
                 new LinearLayout.LayoutParams(Theme.dp(44), Theme.dp(44)));
         tile.addView(a.kit.gap(5));
 
@@ -361,6 +365,46 @@ public class MoreScreen extends Screen {
             else a.nav(entry.id);
         });
         return tile;
+    }
+
+    /** Cups skin: one dedicated 3D cup per command-room section (keyed by group id, report group or entry id). */
+    private static int cupsRes(String key) {
+        if (key == null) return 0;
+        switch (key) {
+            case "operations": case "ویژه مدیر": return R.drawable.icon3d_cup_crown;
+            case "finance": return R.drawable.icon3d_cup_cash_in;
+            case "stock": case "کالا و انبار": return R.drawable.icon3d_cup_products;
+            case "insights": return R.drawable.icon3d_cup_reports;
+            case "system": return R.drawable.icon3d_cup_settings;
+            case "فروش": return R.drawable.icon3d_cup_sales;
+            case "خرید": return R.drawable.icon3d_cup_purchase;
+            case "خزانه‌داری": return R.drawable.icon3d_cup_cash_out;
+            case "مشتریان": return R.drawable.icon3d_cup_customers;
+            case "تحلیل ویزیتور و مسیر": return R.drawable.icon3d_cup_route;
+            case "سود و زیان": return R.drawable.icon3d_cup_dollar;
+            case "برگشتی و ابطالی": return R.drawable.icon3d_cup_return;
+            case "هوشمند": return R.drawable.icon3d_cup_smart;
+            case "گزارش‌های اختصاصی": return R.drawable.icon3d_cup_custom;
+            case "کاربران و نظارت": return R.drawable.icon3d_cup_users;
+            case "tv": return R.drawable.icon3d_cup_tv;
+            default: return 0;
+        }
+    }
+
+    /** Badge for a section: the cups 3D icon when the skin has one, otherwise the emoji badge. */
+    private View badgeFor(String key, String glyph, int accent, int sizeDp) {
+        int res = Theme.isCups() ? cupsRes(key) : 0;
+        if (res == 0) return iconBadge(glyph, accent, sizeDp);
+        android.widget.FrameLayout badge = new android.widget.FrameLayout(a);
+        badge.setBackground(Theme.avatar(Theme.alpha(accent, Theme.isLight() ? 34 : 46)));
+        badge.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        ImageView image = new ImageView(a);
+        image.setImageResource(res);
+        image.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        int inside = Math.max(18, Math.round(sizeDp * 0.7f));
+        badge.addView(image, new android.widget.FrameLayout.LayoutParams(
+                Theme.dp(inside), Theme.dp(inside), Gravity.CENTER));
+        return badge;
     }
 
     private View iconBadge(String glyph, int accent, int sizeDp) {

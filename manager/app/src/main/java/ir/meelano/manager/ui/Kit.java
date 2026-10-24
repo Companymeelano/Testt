@@ -165,12 +165,17 @@ public final class Kit {
 
     /** Same card as {@link #hero}, with a 3D icon in place of the text glyph. */
     public View heroIcon(int vector, String title, String subtitle, int accent) {
+        return heroIconRes(Theme.icon3d(vector), title, subtitle, accent);
+    }
+
+    /** Same as {@link #heroIcon} but takes a ready drawable (for icons that have no vector glyph). */
+    public View heroIconRes(int res, String title, String subtitle, int accent) {
         LinearLayout c = v();
         c.setBackground(Theme.hero(accent));
         c.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(15));
         LinearLayout head = h();
         ImageView iv = new ImageView(a);
-        iv.setImageResource(Theme.icon3d(vector));
+        iv.setImageResource(res);
         iv.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         iv.setPadding(Theme.dp(5), Theme.dp(5), Theme.dp(5), Theme.dp(5));
         iv.setBackground(Theme.avatar(Theme.alpha(accent, 60)));

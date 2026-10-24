@@ -618,11 +618,11 @@ public class MainActivity extends Activity {
         final android.widget.ImageView themeIcon = toolIcon(R.drawable.mi_contrast);
         if (!tiny) tools.addView(toolCell(themeIcon, "تم", "تغییر تم روشن / تیره", () -> {
             themeIcon.animate().rotationBy(180f).setDuration(420).start();
-            // Cycle: dark → light → nuts → dark.
+            // Cycle: dark → light → nuts → cups → dark.
             String cur = settings.themeMode();
-            String next = "dark".equals(cur) ? "light" : "light".equals(cur) ? "nuts" : "dark";
+            String next = "dark".equals(cur) ? "light" : "light".equals(cur) ? "nuts" : "nuts".equals(cur) ? "cups" : "dark";
             settings.setThemeMode(next);
-            kit.toast("nuts".equals(next) ? "تم آجیل و خشکبار فعال شد" : "light".equals(next) ? "تم روشن فعال شد" : "تم تیره فعال شد");
+            kit.toast("cups".equals(next) ? "تم ظروف یک‌بارمصرف فعال شد" : "nuts".equals(next) ? "تم آجیل و خشکبار فعال شد" : "light".equals(next) ? "تم روشن فعال شد" : "تم تیره فعال شد");
             refreshTheme();
         }), toolLp());
 

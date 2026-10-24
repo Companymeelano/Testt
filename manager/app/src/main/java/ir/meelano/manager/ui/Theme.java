@@ -47,6 +47,32 @@ public final class Theme {
     /** «آجیل و خشکبار»: the light skin plus nut artwork and nut icons. */
     private static boolean nuts = false;
     public static boolean isNuts() { return nuts; }
+    /** «ظروف یک‌بارمصرف»: a light skin for disposable tableware and fast-food sales. */
+    private static boolean cups = false;
+    public static boolean isCups() { return cups; }
+
+    /** 3D cup-theme icons. Any glyph without a cup twin keeps the light-skin icon. */
+    private static int cupsIcon(int vector) {
+        if (vector == R.drawable.mi_home) return R.drawable.icon3d_cup_home;
+        if (vector == R.drawable.mi_group) return R.drawable.icon3d_cup_customers;
+        if (vector == R.drawable.mi_inventory_2) return R.drawable.icon3d_cup_inventory;
+        if (vector == R.drawable.mi_grid_view) return R.drawable.icon3d_cup_products;
+        if (vector == R.drawable.mi_bar_chart) return R.drawable.icon3d_cup_reports;
+        if (vector == R.drawable.mi_settings) return R.drawable.icon3d_cup_settings;
+        if (vector == R.drawable.mi_cheque) return R.drawable.icon3d_cup_cheque;
+        if (vector == R.drawable.mi_calendar_month) return R.drawable.icon3d_cup_dues;
+        if (vector == R.drawable.mi_point_of_sale) return R.drawable.icon3d_cup_sales;
+        if (vector == R.drawable.mi_shopping_cart) return R.drawable.icon3d_cup_purchase;
+        return 0;
+    }
+
+    private static boolean isCupIcon(int res) {
+        return res == R.drawable.icon3d_cup_home || res == R.drawable.icon3d_cup_customers
+                || res == R.drawable.icon3d_cup_inventory || res == R.drawable.icon3d_cup_products
+                || res == R.drawable.icon3d_cup_reports || res == R.drawable.icon3d_cup_settings
+                || res == R.drawable.icon3d_cup_cheque || res == R.drawable.icon3d_cup_dues
+                || res == R.drawable.icon3d_cup_sales || res == R.drawable.icon3d_cup_purchase;
+    }
 
     /** MEELANO crest: gold on emerald in the nut theme, the classic black-and-gold badge otherwise. */
     public static int logoRes() { return nuts ? R.drawable.meelano_nuts : R.drawable.meelano_3d; }
@@ -121,6 +147,10 @@ public final class Theme {
     }
 
     public static int icon3d(int vector) {
+        if (cups) {
+            int c = cupsIcon(vector);
+            if (c != 0) return c;
+        }
         if (NUT_MEDALLIONS && nuts) {
             int m = medal(vector);
             if (m != 0) return m;
@@ -177,6 +207,7 @@ public final class Theme {
 
     /** True for bitmap 3D icons, which must not be tinted. */
     public static boolean isIcon3d(int res) {
+        if (isCupIcon(res)) return true;
         if (res == R.drawable.icon3d_return || res == R.drawable.icon3d_trend || res == R.drawable.icon3d_cancel) return true;
         if (res == R.drawable.icon3d_medal_account || res == R.drawable.icon3d_medal_refresh || res == R.drawable.icon3d_medal_theme || res == R.drawable.icon3d_medal_zoom || res == R.drawable.icon3d_medal_assistant || res == R.drawable.icon3d_medal_more || res == R.drawable.icon3d_medal_goldbar || res == R.drawable.icon3d_medal_dollar || res == R.drawable.icon3d_medal_coin) return true;
         if (res == R.drawable.icon3d_medal_home || res == R.drawable.icon3d_medal_customers
@@ -238,7 +269,8 @@ public final class Theme {
         Settings s = new Settings(c);
         String tm = s.themeMode();
         nuts = "nuts".equals(tm);
-        light = "light".equals(tm) || nuts;
+        cups = "cups".equals(tm);
+        light = "light".equals(tm) || nuts || cups;
         DARK = !light;
         int zi = 1;
         try {
@@ -282,6 +314,22 @@ public final class Theme {
             INFO = 0xFF60A5FA;
             VIOLET = 0xFF9A7BFF;
             STEEL = 0xFF7C8DA6;
+        }
+        if (cups) {
+            // «ظروف یک‌بارمصرف»: warm white base, tomato-red accent, kraft and teal details.
+            BG = 0xFFFFF8F0;
+            SURFACE = 0xFFFFFFFF;
+            SURFACE2 = 0xFFFBEBDD;
+            GOLD = 0xFFD6402B;
+            GOLD_SOFT = 0xFFB3261E;
+            TEXT = 0xFF2B1A14;
+            MUTED = 0xFF7A625A;
+            SUCCESS = 0xFF15803D;
+            DANGER = 0xFFB3261E;
+            WARNING = 0xFFB45309;
+            INFO = 0xFF0F766E;
+            VIOLET = 0xFF0F766E;
+            STEEL = 0xFF6B5B55;
         }
     }
 

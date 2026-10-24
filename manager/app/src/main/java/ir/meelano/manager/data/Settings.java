@@ -227,11 +227,11 @@ public final class Settings {
             p.edit().putString("theme_mode", "nuts").putBoolean("theme_nuts_default_v39", true).apply();
         }
         String m = p.getString("theme_mode", "nuts");
-        return "light".equals(m) ? "light" : "nuts".equals(m) ? "nuts" : "dark";
+        return "light".equals(m) ? "light" : "nuts".equals(m) ? "nuts" : "cups".equals(m) ? "cups" : "dark";
     }
 
     public void setThemeMode(String mode) {
-        String v = "light".equals(mode) ? "light" : "nuts".equals(mode) ? "nuts" : "dark";
+        String v = "light".equals(mode) ? "light" : "nuts".equals(mode) ? "nuts" : "cups".equals(mode) ? "cups" : "dark";
         p.edit().putString("theme_mode", v).apply();
     }
 

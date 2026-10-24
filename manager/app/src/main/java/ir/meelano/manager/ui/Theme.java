@@ -73,6 +73,14 @@ public final class Theme {
         if (vector == R.drawable.mi_person) return R.drawable.icon3d_cup_account;
         if (vector == R.drawable.mi_search) return R.drawable.icon3d_cup_search;
         if (vector == R.drawable.mi_widgets) return R.drawable.icon3d_cup_more;
+        if (vector == R.drawable.mi_refresh) return R.drawable.icon3d_cup_refresh;
+        if (vector == R.drawable.mi_contrast) return R.drawable.icon3d_cup_theme;
+        if (vector == R.drawable.mi_star_shine) return R.drawable.icon3d_cup_smart;
+        if (vector == R.drawable.mi_zoom || vector == R.drawable.icon3d_zoom) return R.drawable.icon3d_cup_low;
+        if (vector == R.drawable.icon3d_trend) return R.drawable.icon3d_cup_trend;
+        if (vector == R.drawable.icon3d_return) return R.drawable.icon3d_cup_return;
+        if (vector == R.drawable.icon3d_coin) return R.drawable.icon3d_cup_coin;
+        if (vector == R.drawable.mi_wb_twilight) return R.drawable.icon3d_cup_sun;
         return 0;
     }
 
@@ -95,7 +103,10 @@ public final class Theme {
                 || res == R.drawable.icon3d_cup_crown || res == R.drawable.icon3d_cup_route
                 || res == R.drawable.icon3d_cup_return || res == R.drawable.icon3d_cup_smart
                 || res == R.drawable.icon3d_cup_users || res == R.drawable.icon3d_cup_command
-                || res == R.drawable.icon3d_cup_tv || res == R.drawable.icon3d_cup_custom;
+                || res == R.drawable.icon3d_cup_tv || res == R.drawable.icon3d_cup_custom
+                || res == R.drawable.icon3d_cup_refresh || res == R.drawable.icon3d_cup_theme
+                || res == R.drawable.icon3d_cup_trend || res == R.drawable.icon3d_cup_coin
+                || res == R.drawable.icon3d_cup_sun;
     }
 
     /** MEELANO crest: gold on emerald in the nut theme, the classic black-and-gold badge otherwise. */

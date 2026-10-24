@@ -258,6 +258,8 @@ public class HomeScreen extends Screen {
      */
     /** Banner ink: dark-skin colour, or a light ink on the emerald banner in the light skin. */
     private static int bannerInk(int dark, int light) {
+        // Cups skin: the banner is ivory, so it takes the skin's own ink (dark argument) instead of the dark-green pair.
+        if (Theme.isCups()) return dark;
         return Theme.isLight() ? light : dark;
     }
 
@@ -275,9 +277,11 @@ public class HomeScreen extends Screen {
         FrameLayout box = new FrameLayout(c);
         android.graphics.drawable.GradientDrawable base = new android.graphics.drawable.GradientDrawable(
                 android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
-                Theme.isLight() ? new int[]{0xFF17684F, 0xFF0A3B2E} : new int[]{0xFF0E121A, 0xFF07090E});
+                Theme.isCups() ? new int[]{0xFFFFFFFF, 0xFFFBEBDD}
+                        : Theme.isLight() ? new int[]{0xFF17684F, 0xFF0A3B2E} : new int[]{0xFF0E121A, 0xFF07090E});
         base.setCornerRadius(Theme.dp(22));
-        base.setStroke(Theme.dp(1), Theme.isLight() ? 0xFFC9A24A : Theme.alpha(Theme.GOLD, 120));
+        base.setStroke(Theme.dp(1), Theme.isCups() ? Theme.alpha(Theme.GOLD, 150)
+                : Theme.isLight() ? 0xFFC9A24A : Theme.alpha(Theme.GOLD, 120));
         box.setBackground(base);
         box.setMinimumHeight(Theme.dp(96));
         if (Theme.isNuts()) {
@@ -889,10 +893,15 @@ public class HomeScreen extends Screen {
         if (rates == null || rates.isEmpty()) {
             card.addView(a.kit.hint("قیمت‌ها در دسترس نیست؛ اتصال اینترنت را بررسی کنید."), a.kit.lp(-1, -2));
         } else {
+            // One price size for the whole row; a long figure (gold) shrinks every tile, so none gets cut.
+            float psz = 15f;
+            for (MarketWeather.Rate r : rates) {
+                if (Money.fa(Money.num(r.toman)).length() > 8) psz = 12f;
+            }
             LinearLayout row = a.kit.h();
             for (int i = 0; i < rates.size(); i++) {
                 if (i > 0) row.addView(a.kit.space(6));
-                row.addView(rateTile(rates.get(i)), a.kit.wlp(1f));
+                row.addView(rateTile(rates.get(i), psz), a.kit.wlp(1f));
             }
             card.addView(row, a.kit.lp(-1, -2));
         }
@@ -946,7 +955,7 @@ public class HomeScreen extends Screen {
                 + " • تومان • TGJU"), a.kit.lp(-1, -2));
     }
 
-    private View rateTile(MarketWeather.Rate r) {
+    private View rateTile(MarketWeather.Rate r, float priceSp) {
         LinearLayout t = a.kit.v();
         t.setBackground(Theme.kpi(Theme.GOLD));
         t.setPadding(Theme.dp(8), Theme.dp(8), Theme.dp(8), Theme.dp(8));
@@ -971,7 +980,7 @@ public class HomeScreen extends Screen {
         // Tabular figures: digits keep their width when the price updates.
         price.setFontFeatureSettings("tnum");
         // One fixed size for every tile, so the prices line up across the row.
-        price.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 15f);
+        price.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, priceSp);
         LinearLayout.LayoutParams pp = a.kit.lp(-1, -2);
         pp.setMargins(0, Theme.dp(6), 0, 0);
         t.addView(price, pp);
@@ -1170,9 +1179,9 @@ public class HomeScreen extends Screen {
             // A day that is still running is not comparable yet: show the time instead of a false drop.
             String nowFa = Money.fa(String.format(Locale.US, "%02d:%02d",
                     Calendar.getInstance().get(Calendar.HOUR_OF_DAY), Calendar.getInstance().get(Calendar.MINUTE)));
-            String sub = partialDay ? "تا ساعت " + nowFa + " • هنوز کامل نشده" : "تغییر ۷ روزه " + delta;
+            String sub = partialDay ? "تا " + nowFa + " • ناقص" : "تغییر ۷ روزه " + delta;
             cmp.add(new Kit.Kpi(compareLabel, Money.compactRial(todaySales), sub, Theme.GOLD));
-            cmp.add(new Kit.Kpi("دیروز", Money.compactRial(yesterday), "", Theme.TEXT));
+            cmp.add(new Kit.Kpi("دیروز", Money.compactRial(yesterday), "", Theme.isCups() ? Theme.INFO : Theme.TEXT));
             cmp.add(new Kit.Kpi("میانگین ۷ روز قبل", Money.compactRial(avg7), "", Theme.GOLD_SOFT));
             cmp.add(new Kit.Kpi("میانگین ۳۰ روز قبل", Money.compactRial(avg30), "", Theme.GOLD_SOFT));
             // Emerald 3D icon per tile, the same family as the KPI row.

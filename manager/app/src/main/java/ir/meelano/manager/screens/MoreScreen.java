@@ -201,6 +201,11 @@ public class MoreScreen extends Screen {
 
     /** Fixed colours for report groups: sales and purchases stand out from the theme gold. */
     private static int groupColor(String group) {
+        // Cups skin: teal for purchases and gold-red for the smart group, so no tile is a muddy grey.
+        if (Theme.isCups()) {
+            if ("خرید".equals(group)) return Theme.INFO;
+            if ("هوشمند".equals(group)) return Theme.GOLD;
+        }
         if ("فروش".equals(group)) return Theme.SALES_HUE;
         if ("خرید".equals(group)) return Theme.BUY_HUE;
         if ("خزانه‌داری".equals(group)) return Theme.GOLD;

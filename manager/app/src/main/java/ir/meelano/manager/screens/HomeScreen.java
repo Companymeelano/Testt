@@ -970,7 +970,8 @@ public class HomeScreen extends Screen {
         price.setGravity(Gravity.CENTER_HORIZONTAL);
         // Tabular figures: digits keep their width when the price updates.
         price.setFontFeatureSettings("tnum");
-        price.setAutoSizeTextTypeUniformWithConfiguration(10, 16, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
+        // One fixed size for every tile, so the prices line up across the row.
+        price.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 15f);
         LinearLayout.LayoutParams pp = a.kit.lp(-1, -2);
         pp.setMargins(0, Theme.dp(6), 0, 0);
         t.addView(price, pp);
@@ -1157,7 +1158,9 @@ public class HomeScreen extends Screen {
             LinearLayout compare = a.kit.card(Theme.GOLD);
             compare.addView(sectionBanner(R.drawable.mi_bar_chart, "فروش " + compareLabel + " در مقایسه", "میانگین و مقایسه با روزهای قبل", v -> a.nav("sales")),
                     a.kit.lp(-1, -2));
-            String delta = avg7 > 0 ? Money.pct((todaySales - avg7) * 100.0 / avg7) : "—";
+            double deltaPct = avg7 > 0 ? (todaySales - avg7) * 100.0 / avg7 : 0;
+            String delta = avg7 > 0 ? (deltaPct > 0 ? "+" : deltaPct < 0 ? "−" : "")
+                    + Money.fa(String.format(Locale.US, "%.1f", Math.abs(deltaPct)).replace('.', '٫')) + "٪" : "—";
             int deltaColor = avg7 <= 0 ? Theme.MUTED : (todaySales >= avg7 ? Theme.SUCCESS : Theme.WARNING);
             List<Kit.Kpi> cmp = new ArrayList<>();
             cmp.add(new Kit.Kpi(compareLabel, Money.compactRial(todaySales), "تغییر ۷ روزه " + delta, Theme.GOLD));
@@ -1312,7 +1315,7 @@ public class HomeScreen extends Screen {
      */
     private void secReturns(LinearLayout content, Data d) {
         LinearLayout c = a.kit.card(Theme.GOLD);
-        c.addView(sectionBanner(R.drawable.mi_refresh, "برگشتی‌های ۳۰ روز اخیر", "ابطال و برگشت، ۳۰ روز گذشته", v -> a.nav("reports")),
+        c.addView(sectionBanner(R.drawable.icon3d_return, "برگشتی‌های ۳۰ روز اخیر", "ابطال و برگشت، ۳۰ روز گذشته", v -> a.nav("reports")),
                 a.kit.lp(-1, -2));
         long n = 0;
         double sum = 0;
@@ -1333,9 +1336,9 @@ public class HomeScreen extends Screen {
                 if (shown >= 3) break;
                 String label = r.s("label");
                 if (label == null || label.trim().isEmpty()) continue;
-                int retIcon = label.contains("ابطال") ? R.drawable.mi_refresh
-                        : label.contains("فروش") ? R.drawable.mi_payments
-                        : label.contains("مشتری") ? R.drawable.mi_receipt_long : R.drawable.mi_refresh;
+                int retIcon = label.contains("ابطال") ? R.drawable.icon3d_cancel
+                        : label.contains("فروش") ? R.drawable.icon3d_return
+                        : label.contains("مشتری") ? R.drawable.mi_group : R.drawable.icon3d_return;
                 if (shown++ > 0) grid.addView(a.kit.space(6));
                 grid.addView(miniTile(retIcon, label, Money.fa(String.valueOf(r.l("docs"))) + " سند"), a.kit.wlp(1f));
             }
@@ -1350,12 +1353,12 @@ public class HomeScreen extends Screen {
             String endDay = snapshotDay(d);
             String period = snapshotLabel(d);
             LinearLayout c = a.kit.card(Theme.GOLD);
-            c.addView(sectionBanner(R.drawable.mi_trending_up, "روند ۱۴ روزه فروش تا " + period, "فروش روزانه، ۱۴ روز اخیر", v -> a.nav("sales")), a.kit.lp(-1, -2));
+            c.addView(sectionBanner(R.drawable.icon3d_trend, "روند ۱۴ روزه فروش تا " + period, "فروش روزانه، ۱۴ روز اخیر", v -> a.nav("sales")), a.kit.lp(-1, -2));
             Charts.Area ch = new Charts.Area(a);
             List<Charts.Point> pts = filled(d.salesDaily, endDay);
             final TextView cap = a.kit.text(pts.isEmpty() ? "" : lastCap(pts), 11f, Theme.MUTED, false);
             ch.setData(pts, Theme.GOLD, Charts.COMPACT);
-            ch.setListener((idx, p) -> cap.setText(Money.fa(p.label) + " • " + Money.rial(p.value)));
+            ch.setListener((idx, p) -> cap.setText(Money.fa(p.label) + " • " + Money.compactRial(p.value)));
             c.addView(ch, new LinearLayout.LayoutParams(-1, Theme.dp(190)));
             c.addView(cap, a.kit.lp(-1, -2));
             a.kit.addCard(content, c);
@@ -1533,7 +1536,7 @@ public class HomeScreen extends Screen {
 
     private String lastCap(List<Charts.Point> pts) {
         Charts.Point p = pts.get(pts.size() - 1);
-        return Money.fa(p.label) + " • " + Money.rial(p.value);
+        return Money.fa(p.label) + " • " + Money.compactRial(p.value);
     }
 
     private void gotoUnsettled() {

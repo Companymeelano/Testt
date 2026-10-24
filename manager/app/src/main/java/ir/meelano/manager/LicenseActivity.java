@@ -50,7 +50,6 @@ import ir.meelano.manager.data.Settings;
 import ir.meelano.manager.ui.Card3D;
 import ir.meelano.manager.ui.ConfettiView;
 import ir.meelano.manager.ui.Kit;
-import ir.meelano.manager.ui.ParticlesView;
 import ir.meelano.manager.ui.RadarView;
 import ir.meelano.manager.ui.Ui;
 import ir.meelano.manager.ui.Theme;
@@ -288,9 +287,6 @@ public class LicenseActivity extends Activity {
         }
         android.widget.FrameLayout wrap = new android.widget.FrameLayout(this);
         wrap.setBackground(licenseBackdrop());
-        ParticlesView specks = new ParticlesView(this);
-        specks.setCount(3);
-        wrap.addView(specks, new android.widget.FrameLayout.LayoutParams(-1, -1));
         wrap.addView(sv, new android.widget.FrameLayout.LayoutParams(-1, -1));
         setContentView(wrap);
         try {

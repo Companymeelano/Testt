@@ -1137,8 +1137,11 @@ public class HomeScreen extends Screen {
         LinearLayout row = a.kit.h();
         row.setGravity(android.view.Gravity.CENTER_VERTICAL);
 
-        TextView icon = a.kit.text("▦", 21f, Theme.INFO, true);
-        icon.setGravity(android.view.Gravity.CENTER);
+        // Same 3D family as the rest of the dashboard (emerald in the nut theme) instead of a blue text glyph.
+        android.widget.ImageView icon = new android.widget.ImageView(a);
+        icon.setImageResource(Theme.chrome3d(R.drawable.mi_widgets));
+        icon.setScaleType(android.widget.ImageView.ScaleType.CENTER_INSIDE);
+        icon.setPadding(Theme.dp(6), Theme.dp(6), Theme.dp(6), Theme.dp(6));
         icon.setBackground(Theme.avatar(Theme.alpha(Theme.INFO, 50)));
         row.addView(icon, new LinearLayout.LayoutParams(Theme.dp(46), Theme.dp(46)));
         row.addView(a.kit.space(10));

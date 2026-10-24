@@ -277,7 +277,7 @@ public final class Kit {
                 ic.setImageResource(Theme.icon3d(k.icon));
                 if (!Theme.isIcon3d(Theme.icon3d(k.icon))) ic.setColorFilter(Theme.GOLD);
             } catch (Exception ignored) { Diag.ignored("Kit:kpiIcon", ignored); }
-            int isz = Theme.isIcon3d(Theme.icon3d(k.icon)) ? (Theme.isNuts() ? 54 : 30) : 24;
+            int isz = Theme.isIcon3d(Theme.icon3d(k.icon)) ? (Theme.isNuts() ? 60 : 30) : 24;
             LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(Theme.dp(isz), Theme.dp(isz));
             ip.gravity = Gravity.CENTER_HORIZONTAL;
             ip.bottomMargin = Theme.dp(4);

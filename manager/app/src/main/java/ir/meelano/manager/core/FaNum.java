@@ -74,7 +74,7 @@ public final class FaNum {
         if (m.find()) {
             try {
                 return Double.parseDouble(m.group(1));
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("FaNum:77", ignored); }
         }
         // Persian words: split on spaces/و.
         String w = t.replace("ي", "ی").replace("ك", "ک").replace("‌", " ")

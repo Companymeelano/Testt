@@ -1,5 +1,6 @@
 package ir.meelano.manager.ui;
 
+import ir.meelano.manager.core.Diag;
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
@@ -59,9 +60,54 @@ public final class Charts {
             0xFFD92D20, 0xFF0E9384, 0xFFD6508B, 0xFF669F2A, 0xFF667085
     };
 
+    /** Gold tones for accounting/chart-of-accounts charts: deep gold, light gold, bronze, champagne. */
+    public static int goldTone(int i) {
+        int[] t = {Theme.GOLD, Theme.GOLD_SOFT, mix(Theme.GOLD, 0xFF000000, 0.28f), mix(Theme.GOLD, 0xFFFFFFFF, 0.30f)};
+        return t[Math.abs(i) % t.length];
+    }
+
+    static int mix(int a, int b, float t) {
+        int r = (int) (((a >> 16) & 255) * (1 - t) + ((b >> 16) & 255) * t);
+        int g = (int) (((a >> 8) & 255) * (1 - t) + ((b >> 8) & 255) * t);
+        int bl = (int) ((a & 255) * (1 - t) + (b & 255) * t);
+        return 0xFF000000 | (r << 16) | (g << 8) | bl;
+    }
+
+    /** Short label for tight axes: at most n characters, ellipsis when cut. */
+    public static String trim(String s, int n) {
+        return ellipsize(s == null ? "" : s.trim(), n);
+    }
+
     public static int palette(int i) {
         int[] p = Theme.DARK ? PALETTE : PALETTE_LIGHT;
         return p[Math.abs(i) % p.length];
+    }
+
+
+    /** Pseudo-3D block: front face with gradient, lighter top face, darker side face (light from upper-left). */
+    static void drawBar3D(Canvas g, RectF r, int col, float radius) {
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        float d = Theme.dp(5);
+        Path side = new Path();
+        side.moveTo(r.right, r.top + radius);
+        side.lineTo(r.right + d, r.top + radius - d);
+        side.lineTo(r.right + d, r.bottom - d);
+        side.lineTo(r.right, r.bottom);
+        side.close();
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Theme.shade(col, -0.38f));
+        g.drawPath(side, paint);
+        Path top = new Path();
+        top.moveTo(r.left + radius, r.top);
+        top.lineTo(r.left + radius + d, r.top - d);
+        top.lineTo(r.right + d - radius, r.top - d);
+        top.lineTo(r.right - radius, r.top);
+        top.close();
+        paint.setColor(Theme.shade(col, 0.28f));
+        g.drawPath(top, paint);
+        paint.setShader(new LinearGradient(0, r.top, 0, r.bottom, Theme.shade(col, 0.08f), Theme.shade(col, -0.22f), Shader.TileMode.CLAMP));
+        g.drawRoundRect(r, radius, radius, paint);
+        paint.setShader(null);
     }
 
     // ================= base =================
@@ -103,7 +149,7 @@ public final class Charts {
         void holdParent() {
             try {
                 if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(true);
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("Charts:133", ignored); }
         }
 
         void animateIn() {
@@ -374,12 +420,12 @@ public final class Charts {
                 float bot = Math.max(yv, zeroY);
                 if (bot - top < Theme.dp(3)) bot = top + Theme.dp(3);
                 RectF r = new RectF(cx - bw / 2f, top, cx + bw / 2f, bot);
-                paint.setShader(new LinearGradient(0, top, 0, bot, col, Theme.alpha(col, 120), Shader.TileMode.CLAMP));
-                g.drawRoundRect(r, Theme.dp(6), Theme.dp(6), paint);
-                paint.setShader(null);
+                drawBar3D(g, r, col, Theme.dp(6));
                 if (i % step == 0) {
                     text.setColor(Theme.MUTED);
-                    g.drawText(Money.fa(ellipsize(p.label, 7)), cx, plot.bottom + Theme.dp(16), text);
+                    // Label length follows the bar slot, so neighbouring labels never overlap or leave the plot.
+                    int maxChars = (int) Math.max(4, Math.min(12, slot / Theme.dp(6)));
+                    g.drawText(Money.fa(ellipsize(p.label, maxChars)), cx, plot.bottom + Theme.dp(16), text);
                 }
             }
             // tooltip bubble over the selected bar
@@ -479,7 +525,21 @@ public final class Charts {
             paint.setStyle(Paint.Style.STROKE);
             paint.setStrokeWidth(radius * 0.34f);
             paint.setStrokeCap(Paint.Cap.BUTT);
+            // extruded depth: darker copy of the ring offset downward, then the lit top ring
+            float depth = Theme.dp(6);
+            RectF od = new RectF(o.left, o.top + depth, o.right, o.bottom + depth);
             float start = -90f;
+            for (int i = 0; i < data.size(); i++) {
+                Point p = data.get(i);
+                float sweep = (float) (360.0 * Math.max(0, p.value) / sum * progress);
+                int col = p.color != 0 ? p.color : palette(i);
+                if (sweep > 1f) {
+                    paint.setColor(Theme.shade(col, -0.4f));
+                    g.drawArc(od, start + 1.2f, sweep - 2.4f, false, paint);
+                }
+                start += (float) (360.0 * Math.max(0, p.value) / sum);
+            }
+            start = -90f;
             for (int i = 0; i < data.size(); i++) {
                 Point p = data.get(i);
                 float sweep = (float) (360.0 * Math.max(0, p.value) / sum * progress);
@@ -519,7 +579,7 @@ public final class Charts {
                 g.drawCircle(lx - Theme.dp(5), row - Theme.dp(3.5f), Theme.dp(4), paint);
                 paint.setColor(Theme.TEXT);
                 paint.setTextAlign(Paint.Align.RIGHT);
-                String leg = ellipsize(p.label, 12) + "  " + Money.pct(sum > 0 ? Math.max(0, p.value) * 100.0 / sum : 0);
+                String leg = ellipsize(p.label, 16) + "  " + Money.pct(sum > 0 ? Math.max(0, p.value) * 100.0 / sum : 0);
                 g.drawText(Money.fa(leg), lx - Theme.dp(13), row, paint);
             }
         }
@@ -551,7 +611,14 @@ public final class Charts {
         protected void onDraw(Canvas g) {
             super.onDraw(g);
             int w = getWidth();
-            if (w <= 0 || data.isEmpty()) return;
+            if (w <= 0) return;
+            if (data.isEmpty()) {
+                paint.setColor(Theme.MUTED);
+                paint.setTextSize(Theme.dp(11));
+                paint.setTextAlign(Paint.Align.CENTER);
+                g.drawText("داده‌ای برای نمایش نیست", w / 2f, getHeight() / 2f, paint);
+                return;
+            }
             double mx = Math.max(0, max());
             double mn = Math.min(0, min());
             if (mx - mn <= 0) mx = mn + 1;

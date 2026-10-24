@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+ backup and device-transfer rules.
+  Only the reinstall-recovery state is backed up: the license vault, the non-secret
+  connection settings, the company profile and its logo. Everything else is excluded by
+  default because it is not listed. The SQL password (meelano_secrets, Keystore-encrypted),
+  Atiran login caches (meelano_login) and the follow-up/cache stores are never copied.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="sharedpref" path="meelano_license.xml" />
+        <include domain="sharedpref" path="meelano_manager7.xml" />
+        <include domain="sharedpref" path="meelano_company.xml" />
+        <include domain="file" path="company_logo.png" />
+        <exclude domain="sharedpref" path="meelano_secrets.xml" />
+        <exclude domain="sharedpref" path="meelano_login.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="sharedpref" path="meelano_license.xml" />
+        <include domain="sharedpref" path="meelano_manager7.xml" />
+        <include domain="sharedpref" path="meelano_company.xml" />
+        <include domain="file" path="company_logo.png" />
+        <exclude domain="sharedpref" path="meelano_secrets.xml" />
+        <exclude domain="sharedpref" path="meelano_login.xml" />
+    </device-transfer>
+</data-extraction-rules>

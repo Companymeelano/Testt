@@ -1,5 +1,6 @@
 package ir.meelano.manager.screens;
 
+import ir.meelano.manager.core.Diag;
 import android.app.AlertDialog;
 import android.view.View;
 import android.widget.LinearLayout;
@@ -60,6 +61,7 @@ public class VisitorsScreen extends Screen {
 
     private static final class Data {
         List<Row> perf = new ArrayList<>();
+        List<Row> aging = new ArrayList<>();
         Map<String, String> notes = new LinkedHashMap<>();
     }
 
@@ -75,6 +77,8 @@ public class VisitorsScreen extends Screen {
             Meta m = new Meta(c);
             Data d = new Data();
             d.perf = soft(d.notes, "عملکرد", () -> Repo.exec(c, MasterQueries.visitorsPerf(m, f)));
+            d.aging = soft(d.notes, "سن بدهی", () -> Repo.exec(c, MasterQueries.agingVisitors(m)));
+            if (d.aging == null) d.aging = new ArrayList<>();
             if (d.perf == null) throw new Exception(firstNote(d.notes));
             return d;
         }, new Repo.Cb<Data>() {
@@ -147,6 +151,24 @@ public class VisitorsScreen extends Screen {
             return;
         }
 
+        if (d.aging != null && !d.aging.isEmpty()) {
+            double over60 = 0, all = 0;
+            for (Row r : d.aging) {
+                all += r.d("total");
+                over60 += r.d("b3") + r.d("b4") + r.d("b5");
+            }
+            LinearLayout ag = a.kit.card(Theme.DANGER);
+            ag.addView(a.kit.text("سن بدهی ویزیتورها", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
+            ag.addView(a.kit.hint("مانده فاکتورهای تسویه‌نشده به تفکیک ویزیتور. بیش از ۶۰ روز از سررسید گذشته: "
+                    + Money.compactRial(over60) + " از " + Money.compactRial(all)), a.kit.lp(-1, -2));
+            Charts.HBars agBars = new Charts.HBars(a);
+            List<Charts.Point> agPts = new ArrayList<>();
+            for (int i = 0; i < Math.min(8, d.aging.size()); i++)
+                agPts.add(new Charts.Point(d.aging.get(i).s("visitor"), d.aging.get(i).d("total")));
+            agBars.setData(agPts, Charts.COMPACT);
+            ag.addView(agBars, a.kit.lp(-1, -2));
+            a.kit.addCard(content, ag);
+        }
         LinearLayout c = a.kit.card(accent());
         c.addView(a.kit.text("رتبه‌بندی فروش", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
         Charts.HBars hb = new Charts.HBars(a);
@@ -228,12 +250,12 @@ public class VisitorsScreen extends Screen {
             if (visId >= 0) {
                 try {
                     trend = Repo.exec(c, MasterQueries.visitorTrend(m, visId, f));
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("VisitorsScreen:252", ignored); }
                 try {
                     Filter cf = f.copy();
                     cf.top = 30;
                     custs = Repo.exec(c, MasterQueries.visitorCustomers(m, visId, cf));
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("VisitorsScreen:257", ignored); }
             }
             return new Detail(head, trend, custs);
         }, new Repo.Cb<Detail>() {

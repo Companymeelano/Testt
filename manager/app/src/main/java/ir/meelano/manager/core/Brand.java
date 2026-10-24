@@ -24,7 +24,7 @@ public final class Brand {
             "09355559305",
     };
 
-    public static final String TAGLINE = "پشتیبانی میلانو • همراه همیشگی کسب‌وکار شما";
+    public static final String TAGLINE = "پشتیبانی میلانو زرین‌فرمان • همراه همیشگی کسب‌وکار شما";
 
     public static void openSite(Context c) {
         try {
@@ -34,7 +34,7 @@ public final class Brand {
         } catch (Exception e) {
             try {
                 Toast.makeText(c, SITE_LABEL, Toast.LENGTH_LONG).show();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("Brand:37", ignored); }
         }
     }
 
@@ -48,7 +48,7 @@ public final class Brand {
         } catch (Exception e) {
             try {
                 Toast.makeText(c, phone, Toast.LENGTH_LONG).show();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("Brand:51", ignored); }
         }
     }
 }

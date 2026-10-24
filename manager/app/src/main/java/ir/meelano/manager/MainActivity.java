@@ -1,5 +1,6 @@
 package ir.meelano.manager;
 
+import ir.meelano.manager.core.Diag;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
@@ -34,6 +35,7 @@ import ir.meelano.manager.data.Repo;
 import ir.meelano.manager.data.Row;
 import ir.meelano.manager.data.Settings;
 import ir.meelano.manager.screens.AnbarScreen;
+import ir.meelano.manager.screens.AssistantScreen;
 import ir.meelano.manager.screens.CashScreen;
 import ir.meelano.manager.screens.CloseoutScreen;
 import ir.meelano.manager.screens.ManagerAlertsScreen;
@@ -54,6 +56,8 @@ import ir.meelano.manager.screens.ScoreScreen;
 import ir.meelano.manager.screens.SearchScreen;
 import ir.meelano.manager.screens.SettingsScreen;
 import ir.meelano.manager.screens.TradeScreen;
+import ir.meelano.manager.screens.AnalyticsScreen;
+import ir.meelano.manager.screens.ProductFileScreen;
 import ir.meelano.manager.screens.ShomarshScreen;
 import ir.meelano.manager.screens.TahvilScreen;
 import ir.meelano.manager.screens.TakmilScreen;
@@ -84,16 +88,34 @@ public class MainActivity extends Activity {
     public Settings settings;
 
     private LinearLayout content;
+    /** Column that holds the current page; each render swaps in a fresh page. */
+    private LinearLayout contentWrap;
+    /** Incremented on every render. Async work captures it and stops once it changes. */
+    private int renderGen = 0;
     private ScrollView scroll;
     private LinearLayout bottomBar;
+    /** Host of the bottom bar: holds the sliding selection capsule behind the tabs. */
+    private android.widget.FrameLayout bottomHost;
+    private View navCapsule;
     private android.widget.ImageView linkIcon;
+
+    /** Connection-state icon: emerald and gold in the nut theme, the navy set otherwise. */
+    private int linkRes(int base) {
+        if (!Theme.isNuts()) return base;
+        if (base == R.drawable.link_probe) return R.drawable.link_probe_nut;
+        if (base == R.drawable.link_wan) return R.drawable.link_wan_nut;
+        if (base == R.drawable.link_lan) return R.drawable.link_lan_nut;
+        if (base == R.drawable.link_off) return R.drawable.link_off_nut;
+        return base;
+    }
     private android.net.ConnectivityManager.NetworkCallback linkCb = null;
     private boolean linkCbReg = false;
     private final android.os.Handler linkHandler =
             new android.os.Handler(android.os.Looper.getMainLooper());
     private Runnable linkPending = null;
     private TextView licChip;
-    private TextView backFab;
+    private View backFab;
+    private TextView backLabel;
     private TextView companyName;
     private android.widget.FrameLayout logoBox;
     private android.widget.ImageView logoImg;
@@ -155,6 +177,10 @@ public class MainActivity extends Activity {
         if (!isFinishing() && !LicenseStore.unlocked(this)) toLicense();
         if (!isFinishing() && LicenseStore.unlocked(this)
                 && !new Settings(this).connConfigured()) toLicense();
+        // Persian voice is a prerequisite: guide the install before the app is used.
+        if (!isFinishing() && LicenseStore.unlocked(this) && new Settings(this).connConfigured()) {
+            ir.meelano.manager.core.Speaker.onResume(this);
+        }
         if (!isFinishing() && AtiranAuth.gate(this)) toLogin();
         Usage.touch(this);
         if (repo != null && !isFinishing() && RoleStore.WAREHOUSE.equals(effRole()))
@@ -183,7 +209,7 @@ public class MainActivity extends Activity {
             Intent i = new Intent(this, LicenseActivity.class);
             i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
             startActivity(i);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:189", ignored); }
         finish();
     }
 
@@ -192,7 +218,7 @@ public class MainActivity extends Activity {
             Intent i = new Intent(this, LoginActivity.class);
             i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
             startActivity(i);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:198", ignored); }
         finish();
     }
 
@@ -200,7 +226,7 @@ public class MainActivity extends Activity {
     public void logout() {
         try {
             AtiranAuth.clearSession(this);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:206", ignored); }
         toLogin();
     }
 
@@ -214,14 +240,14 @@ public class MainActivity extends Activity {
         root.setPadding(Theme.dp(28), Theme.dp(28), Theme.dp(28), Theme.dp(28));
         android.widget.ImageView logoV = kit.logo(110);
         root.addView(logoV, new LinearLayout.LayoutParams(Theme.dp(110), Theme.dp(110)));
-        TextView t = kit.text("میلانو", 26, Theme.TEXT, true);
+        TextView t = kit.text("میلانو زرین‌فرمان", 26, Theme.TEXT, true);
         t.setGravity(Gravity.CENTER);
         root.addView(t, kit.lp(-1, -2));
         String splashSub = "داشبورد مدیریتی آتیران";
         try {
             String sr = AtiranAuth.sessionRole(this);
             if (RoleStore.WAREHOUSE.equals(sr)) splashSub = "نسخه انباردار • آتیران";
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:227", ignored); }
         TextView s = kit.text(splashSub, 12.5f, Theme.MUTED, false);
         s.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams sp = kit.lp(-1, -2);
@@ -297,7 +323,7 @@ public class MainActivity extends Activity {
             else
                 vis &= ~(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
             getWindow().getDecorView().setSystemUiVisibility(vis);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:303", ignored); }
     }
 
     /** Re-apply the luxury theme and rebuild the shell on the current screen. */
@@ -315,12 +341,12 @@ public class MainActivity extends Activity {
                         (android.net.ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
                 if (cm != null && linkCb != null) cm.unregisterNetworkCallback(linkCb);
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:321", ignored); }
         linkCbReg = false;
         try {
             if (linkPending != null) linkHandler.removeCallbacks(linkPending);
-        } catch (Exception ignored) { }
-        try { repo.close(); } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:325", ignored); }
+        try { repo.close(); } catch (Exception ignored) { Diag.ignored("MainActivity:326", ignored); }
         super.onDestroy();
     }
 
@@ -342,7 +368,7 @@ public class MainActivity extends Activity {
             };
             cm.registerDefaultNetworkCallback(linkCb);
             linkCbReg = true;
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:348", ignored); }
     }
 
     private void linkChanged() {
@@ -351,10 +377,10 @@ public class MainActivity extends Activity {
             linkPending = () -> {
                 try {
                     if (!isFinishing()) checkConn();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("MainActivity:357", ignored); }
             };
             linkHandler.postDelayed(linkPending, 1500);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:360", ignored); }
     }
 
     // ================= PIN gate =================
@@ -365,7 +391,7 @@ public class MainActivity extends Activity {
         root.setBackgroundColor(Theme.BG);
         root.setPadding(Theme.dp(28), Theme.dp(28), Theme.dp(28), Theme.dp(28));
         root.addView(kit.logo(120), new LinearLayout.LayoutParams(Theme.dp(120), Theme.dp(120)));
-        TextView t = kit.text("میلانو", 22, Theme.TEXT, true);
+        TextView t = kit.text("میلانو زرین‌فرمان", 22, Theme.TEXT, true);
         t.setGravity(Gravity.CENTER);
         root.addView(t, kit.lp(-1, -2));
         TextView s = kit.text("رمز عبور مدیریتی را وارد کنید", 12.5f, Theme.MUTED, false);
@@ -472,58 +498,21 @@ public class MainActivity extends Activity {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        root.setBackgroundColor(Theme.BG);
+        root.setBackground(Theme.background());
 
-        // header: connection dot + company logo (from Atiran) + company name + tools
-        // On narrow phones, drop the long license/name chips first. On the tiniest
-        // widths also hide secondary search/theme/zoom tools, keeping refresh, settings
-        // and the account/logout shortcut reachable without overflowing the header.
+        // header (two rows): row 1 = logo, company name (up to two lines, never squeezed
+        // to a stub) and the status line (link, licence, user); row 2 = a full-width
+        // toolbar with equal-width, labelled buttons. Nothing competes for the same width.
         android.util.DisplayMetrics dm = getResources().getDisplayMetrics();
         int widthDp = dm.widthPixels * 160 / dm.densityDpi;
-        final boolean compact = widthDp < 520;
         final boolean tiny = widthDp < 360;
-        LinearLayout header = kit.h();
-        header.setGravity(Gravity.CENTER_VERTICAL);
-        header.setPadding(Theme.dp(14), Theme.dp(10), Theme.dp(14), Theme.dp(8));
-        linkIcon = new android.widget.ImageView(this);
-        try {
-            linkIcon.setImageResource(R.drawable.link_probe);
-        } catch (Exception ignored) { }
-        linkIcon.setContentDescription("وضعیت اتصال — لمس برای جزئیات");
-        linkIcon.setPadding(Theme.dp(2), Theme.dp(2), Theme.dp(2), Theme.dp(2));
-        Theme.pressable(linkIcon);
-        linkIcon.setOnClickListener(v -> {
-            try {
-                LinkPanel.showStatus(this, settings, () -> checkConn());
-            } catch (Exception ignored) { }
-        });
-        header.addView(linkIcon, new LinearLayout.LayoutParams(Theme.dp(30), Theme.dp(30)));
-        header.addView(kit.space(8));
-        // License chip: subtle remaining-time pill, taps through to activation/support.
-        licChip = kit.text("", 10.5f, Theme.GOLD_SOFT, true);
-        licChip.setBackground(Theme.ghostButton(Theme.GOLD));
-        licChip.setPadding(Theme.dp(9), Theme.dp(4), Theme.dp(9), Theme.dp(4));
-        licChip.setSingleLine(true);
-        licChip.setMaxWidth(Theme.dp(96));
-        Theme.pressable(licChip);
-        licChip.setOnClickListener(v -> openLicense());
-        if (!compact) {
-            header.addView(licChip, kit.lp(-2, -2));
-            header.addView(kit.space(8));
-        }
-        // Atiran user chip: who is logged in, taps through to logout.
-        userChip = kit.text("", 10.5f, Theme.GOLD_SOFT, true);
-        userChip.setBackground(Theme.ghostButton(Theme.GOLD));
-        userChip.setPadding(Theme.dp(9), Theme.dp(4), Theme.dp(9), Theme.dp(4));
-        userChip.setSingleLine(true);
-        userChip.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        Theme.pressable(userChip);
-        userChip.setOnClickListener(v -> userMenu());
-        if (!compact) {
-            header.addView(userChip, kit.lp(-2, -2));
-            header.addView(kit.space(8));
-        }
-        refreshUserChip();
+        final boolean compact = widthDp < 520;
+        LinearLayout header = kit.v();
+        header.setPadding(Theme.dp(12), Theme.dp(10), Theme.dp(12), Theme.dp(8));
+
+        // ---- row 1: brand ----
+        LinearLayout brand = kit.h();
+        brand.setGravity(Gravity.CENTER_VERTICAL);
         logoBox = new android.widget.FrameLayout(this);
         logoBox.setBackground(Theme.accentAvatar(Theme.GOLD));
         logoGlyph = kit.text("♛", 20, Theme.onAccent(), true);
@@ -539,117 +528,157 @@ public class MainActivity extends Activity {
                     o.setOval(0, 0, v.getWidth(), v.getHeight());
                 }
             });
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:508", ignored); }
         int lpad = Theme.dp(2);
         logoImg.setPadding(lpad, lpad, lpad, lpad);
         logoImg.setVisibility(View.GONE);
         logoBox.addView(logoImg, new android.widget.FrameLayout.LayoutParams(-1, -1));
-        header.addView(logoBox, new LinearLayout.LayoutParams(Theme.dp(46), Theme.dp(46)));
-        header.addView(kit.space(8));
-        companyName = kit.text(companyTitle(), 16, Theme.TEXT, true);
-        companyName.setSingleLine(true);
+        brand.addView(logoBox, new LinearLayout.LayoutParams(Theme.dp(80), Theme.dp(80)));
+        brand.addView(kit.space(10));
+
+        LinearLayout titleCol = kit.v();
+        companyName = kit.text(companyTitle(), 22, Theme.TEXT, true);
+        companyName.setMaxLines(2);
         companyName.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        header.addView(companyName, kit.wlp(1f));
+        titleCol.addView(companyName, kit.lp(-1, -2));
+        if (Theme.DARK) {
+            // Gold-to-champagne gradient across the company name, as in the reference header.
+            companyName.addOnLayoutChangeListener((title_v, x1, x2, x3, x4, x5, x6, x7, x8) -> {
+                android.graphics.Shader sh = new android.graphics.LinearGradient(0, 0, 0, title_v.getHeight(),
+                        Theme.GOLD_SOFT, Theme.GOLD, android.graphics.Shader.TileMode.CLAMP);
+                companyName.getPaint().setShader(sh);
+                title_v.invalidate();
+            });
+        }
+
+        // status line: link state, licence chip, Atiran user chip (small, always visible)
+        LinearLayout status = kit.h();
+        status.setGravity(Gravity.CENTER_VERTICAL);
+        linkIcon = new android.widget.ImageView(this);
+        try {
+            linkIcon.setImageResource(linkRes(R.drawable.link_probe));
+        } catch (Exception ignored) { Diag.ignored("MainActivity:528", ignored); }
+        linkIcon.setContentDescription("وضعیت اتصال — لمس برای جزئیات");
+        linkIcon.setPadding(Theme.dp(1), Theme.dp(1), Theme.dp(1), Theme.dp(1));
+        Theme.pressable(linkIcon);
+        linkIcon.setOnClickListener(v -> {
+            try {
+                LinkPanel.showStatus(this, settings, () -> checkConn());
+            } catch (Exception ignored) { Diag.ignored("MainActivity:535", ignored); }
+        });
+        status.addView(linkIcon, new LinearLayout.LayoutParams(Theme.dp(20), Theme.dp(20)));
+        status.addView(kit.space(6));
+        licChip = kit.text("", 10.5f, Theme.GOLD_SOFT, true);
+        licChip.setBackground(Theme.pill(Theme.GOLD));
+        licChip.setPadding(Theme.dp(8), Theme.dp(3), Theme.dp(8), Theme.dp(3));
+        licChip.setSingleLine(true);
+        licChip.setMaxWidth(Theme.dp(120));
+        licChip.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        Theme.pressable(licChip);
+        licChip.setOnClickListener(v -> openLicense());
+        status.addView(licChip, kit.lp(-2, -2));
+        status.addView(kit.space(6));
+        userChip = kit.text("", 10.5f, Theme.GOLD_SOFT, true);
+        userChip.setBackground(Theme.pill(Theme.GOLD));
+        userChip.setPadding(Theme.dp(8), Theme.dp(3), Theme.dp(8), Theme.dp(3));
+        userChip.setSingleLine(true);
+        userChip.setMaxWidth(Theme.dp(120));
+        userChip.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        Theme.pressable(userChip);
+        userChip.setOnClickListener(v -> userMenu());
+        status.addView(userChip, kit.lp(-2, -2));
+        // Gold tag badge at the end of the chips row, as in the reference header (decorative).
+        android.widget.ImageView tagBadge = new android.widget.ImageView(this);
+        try {
+            int tagRes = Theme.icon3d(R.drawable.mi_sell);
+            tagBadge.setImageResource(tagRes);
+            if (!Theme.isIcon3d(tagRes)) tagBadge.setColorFilter(Theme.GOLD);
+        } catch (Exception ignored) { Diag.ignored("MainActivity:tagBadge", ignored); }
+        tagBadge.setPadding(Theme.dp(5), Theme.dp(5), Theme.dp(5), Theme.dp(5));
+        tagBadge.setBackground(Theme.ghostButton(Theme.GOLD));
+        tagBadge.setClickable(false);
+        status.addView(kit.space(8));
+        status.addView(tagBadge, new LinearLayout.LayoutParams(Theme.dp(30), Theme.dp(30)));
+        titleCol.addView(status, kit.lp(-2, -2));
+        brand.addView(titleCol, kit.wlp(1f));
+        header.addView(brand, kit.lp(-1, -2));
+        refreshUserChip();
+        header.addView(kit.space(8));
+
+        // ---- row 2: toolbar (equal-width cells with Persian labels) ----
         LinearLayout tools = kit.h();
         tools.setGravity(Gravity.CENTER_VERTICAL);
-        tools.setBackground(Theme.ghostButton(Theme.GOLD));
-        tools.setPadding(Theme.dp(2), Theme.dp(2), Theme.dp(2), Theme.dp(2));
-        TextView gsearch = kit.text("⌕", 18, Theme.GOLD_SOFT, true);
-        gsearch.setPadding(Theme.dp(11), Theme.dp(6), Theme.dp(11), Theme.dp(6));
-        Theme.pressable(gsearch);
-        gsearch.setOnClickListener(v -> nav("search"));
-        MeelanoIcons.iconize(gsearch);
-        if (!tiny) {
-            tools.addView(gsearch, kit.lp(-2, -2));
-            tools.addView(vdiv(), kit.lp(Theme.dp(1), Theme.dp(22)));
-        }
-        TextView themeBtn = kit.text("◐", 18, Theme.GOLD, true);
-        themeBtn.setPadding(Theme.dp(11), Theme.dp(6), Theme.dp(11), Theme.dp(6));
-        themeBtn.setContentDescription("تغییر تم روشن / تیره");
-        Theme.pressable(themeBtn);
-        themeBtn.setOnClickListener(v -> {
-            boolean toLight = !"light".equals(settings.themeMode());
-            settings.setThemeMode(toLight ? "light" : "dark");
-            kit.toast(toLight ? "تم روشن فعال شد" : "تم تیره فعال شد");
+        tools.setBackground(Theme.toolbarPanel());
+        tools.setPadding(Theme.dp(3), Theme.dp(3), Theme.dp(3), Theme.dp(3));
+
+        if (!tiny) tools.addView(toolCell(toolIcon(R.drawable.mi_search), "جستجو", "جستجو", () -> nav("search")), toolLp());
+
+        final android.widget.ImageView themeIcon = toolIcon(R.drawable.mi_contrast);
+        if (!tiny) tools.addView(toolCell(themeIcon, "تم", "تغییر تم روشن / تیره", () -> {
+            themeIcon.animate().rotationBy(180f).setDuration(420).start();
+            // Cycle: dark → light → nuts → dark.
+            String cur = settings.themeMode();
+            String next = "dark".equals(cur) ? "light" : "light".equals(cur) ? "nuts" : "dark";
+            settings.setThemeMode(next);
+            kit.toast("nuts".equals(next) ? "تم آجیل و خشکبار فعال شد" : "light".equals(next) ? "تم روشن فعال شد" : "تم تیره فعال شد");
             refreshTheme();
-        });
-        MeelanoIcons.iconize(themeBtn);
-        if (!tiny) {
-            tools.addView(themeBtn, kit.lp(-2, -2));
-            tools.addView(vdiv(), kit.lp(Theme.dp(1), Theme.dp(22)));
+        }), toolLp());
+
+        if (!compact) {
+            android.widget.ImageView zoom = toolIcon(R.drawable.mi_zoom);
+            tools.addView(toolCell(zoom, "بزرگ‌نمایی", "بزرگ‌نمایی متن", () -> cycleZoom()), toolLp());
         }
-        TextView refresh = kit.text("⟳", 18, Theme.GOLD_SOFT, true);
-        refresh.setPadding(Theme.dp(11), Theme.dp(6), Theme.dp(11), Theme.dp(6));
-        Theme.pressable(refresh);
-        refresh.setOnClickListener(v -> renderCurrent());
-        MeelanoIcons.iconize(refresh);
-        tools.addView(refresh, kit.lp(-2, -2));
-        tools.addView(vdiv(), kit.lp(Theme.dp(1), Theme.dp(22)));
-        TextView sett = kit.text("⚙", 18, Theme.GOLD_SOFT, true);
-        sett.setPadding(Theme.dp(11), Theme.dp(6), Theme.dp(11), Theme.dp(6));
-        sett.setContentDescription("تنظیمات");
-        Theme.pressable(sett);
-        sett.setOnClickListener(v -> nav("settings"));
-        MeelanoIcons.iconize(sett);
-        tools.addView(sett, kit.lp(-2, -2));
-        android.widget.ImageView zoom = new android.widget.ImageView(this);
-        try {
-            zoom.setImageResource(R.drawable.mi_zoom);
-            zoom.setColorFilter(Theme.GOLD_SOFT);
-        } catch (Exception ignored) { }
-        zoom.setPadding(Theme.dp(11), Theme.dp(8), Theme.dp(11), Theme.dp(8));
-        zoom.setContentDescription("بزرگ‌نمایی متن");
-        Theme.pressable(zoom);
-        zoom.setOnClickListener(v -> cycleZoom());
-        if (compact) {
-            tools.addView(vdiv(), kit.lp(Theme.dp(1), Theme.dp(22)));
-            compactUserAction = new android.widget.ImageView(this);
-            try {
-                compactUserAction.setImageResource(R.drawable.mi_person);
-                compactUserAction.setColorFilter(Theme.GOLD_SOFT);
-            } catch (Exception ignored) { }
-            compactUserAction.setBackground(Theme.ghostButton(Theme.GOLD));
-            compactUserAction.setPadding(Theme.dp(9), Theme.dp(7), Theme.dp(9), Theme.dp(7));
-            compactUserAction.setContentDescription("حساب کاربری؛ خروج یا تغییر کاربر");
-            Theme.pressable(compactUserAction);
-            compactUserAction.setOnClickListener(v -> userMenu());
-            tools.addView(compactUserAction,
-                    new LinearLayout.LayoutParams(Theme.dp(40), Theme.dp(36)));
-        } else {
-            compactUserAction = null;
-            if (!tiny) {
-                tools.addView(vdiv(), kit.lp(Theme.dp(1), Theme.dp(22)));
-                tools.addView(zoom, new LinearLayout.LayoutParams(Theme.dp(42), Theme.dp(36)));
-            }
+
+        final android.widget.ImageView refreshIcon = toolIcon(R.drawable.mi_refresh);
+        tools.addView(toolCell(refreshIcon, "تازه‌سازی", "تازه‌سازی", () -> {
+            refreshIcon.animate().rotationBy(360f).setDuration(600).start();
+            renderCurrent();
+        }), toolLp());
+        tools.addView(toolCell(toolIcon(R.drawable.mi_settings), "تنظیمات", "تنظیمات", () -> nav("settings")), toolLp());
+
+        // toolIcon() shows the 3D icon in both skins (and tints only flat vectors).
+        android.widget.ImageView account = toolIcon(R.drawable.mi_person);
+        compactUserAction = account;
+        tools.addView(toolCell(account, "حساب", "حساب کاربری؛ خروج یا تغییر کاربر", () -> userMenu()), toolLp());
+
+        for (int i = tools.getChildCount() - 1; i > 0; i--) {
+            tools.addView(vdiv(), i, new LinearLayout.LayoutParams(Theme.dp(1), Theme.dp(40)));
         }
-        header.addView(tools, kit.lp(-2, -2));
+        header.addView(tools, kit.lp(-1, -2));
         refreshUserChip();
         root.addView(header, kit.lp(-1, -2));
         refreshLicChip();
 
         // content (centered max-width column on tablets / wide screens)
         scroll = new ScrollView(this);
-        LinearLayout centerWrap = kit.h();
-        centerWrap.setGravity(Gravity.CENTER_HORIZONTAL);
-        content = kit.v();
-        content.setPadding(Theme.dp(12), Theme.dp(4), Theme.dp(12), Theme.dp(16));
-        scroll.addView(centerWrap, new ScrollView.LayoutParams(-1, -2));
-        int sw = getResources().getDisplayMetrics().widthPixels;
-        centerWrap.addView(content, new LinearLayout.LayoutParams(sw > Theme.dp(720) ? Theme.dp(640) : -1, -2));
+        contentWrap = kit.h();
+        contentWrap.setGravity(Gravity.CENTER_HORIZONTAL);
+        scroll.addView(contentWrap, new ScrollView.LayoutParams(-1, -2));
+        content = newPage();
         root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1f));
 
         // bottom bar
         bottomBar = new LinearLayout(this);
         bottomBar.setOrientation(LinearLayout.HORIZONTAL);
         bottomBar.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        bottomBar.setBackground(Theme.bottomBar());
         bottomBar.setPadding(Theme.dp(6), Theme.dp(8), Theme.dp(6), Theme.dp(10));
-        root.addView(bottomBar, kit.lp(-1, -2));
+        bottomHost = new android.widget.FrameLayout(this);
+        bottomHost.setBackground(Theme.isNuts() ? Theme.navDock() : Theme.bottomBar());
+        navCapsule = new View(this);
+        navCapsule.setVisibility(View.GONE);
+        navCapsule.setBackground(Theme.bottomNavSelected());
+        bottomHost.addView(navCapsule, new android.widget.FrameLayout.LayoutParams(Theme.dp(40), Theme.dp(40),
+                Gravity.TOP | Gravity.LEFT));
+        bottomHost.addView(bottomBar, new android.widget.FrameLayout.LayoutParams(-1, -2));
+        LinearLayout.LayoutParams hostLp = kit.lp(-1, -2);
+        if (Theme.isNuts()) hostLp.setMargins(Theme.dp(12), 0, Theme.dp(12), Theme.dp(10));
+        root.addView(bottomHost, hostLp);
 
         setContentView(root);
 
         // screens
         reg(new HomeScreen(this));
+        reg(new AssistantScreen(this));
         reg(new TradeScreen(this, true));
         reg(new TradeScreen(this, false));
         reg(new MoneyScreen(this, 0));
@@ -657,12 +686,14 @@ public class MainActivity extends Activity {
         reg(new ChequesScreen(this));
         reg(new CashScreen(this));
         reg(new ProductsScreen(this));
+        reg(new ProductFileScreen(this));
         reg(new CustomersScreen(this));
         reg(new VisitorsScreen(this));
         reg(new UsersScreen(this));
         reg(new ProfitScreen(this));
         reg(new DuesScreen(this));
         reg(new ReportsScreen(this));
+        reg(new AnalyticsScreen(this));
         reg(new SettingsScreen(this));
         reg(new MoreScreen(this));
         reg(new SearchScreen(this));
@@ -687,24 +718,56 @@ public class MainActivity extends Activity {
         try {
             android.content.Intent gi = getIntent();
             if (gi != null) want = gi.getStringExtra(EXTRA_SCREEN);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:667", ignored); }
         if (want != null && !want.isEmpty() && screens.containsKey(want)) nav(want);
         styleBars();
         checkConn();
         refreshCompany();
+        // No startup announcements (what's-new tour or update prompt): the flag is cleared silently.
         try {
-            if (ir.meelano.manager.core.LicenseStore.tourPending(this)) {
-                ir.meelano.manager.core.LicenseStore.setTourPending(this, false);
-                ir.meelano.manager.ui.WhatsNew.showCurrent(this);
-            }
-        } catch (Exception ignored) { }
+            ir.meelano.manager.core.LicenseStore.setTourPending(this, false);
+        } catch (Exception ignored) { Diag.ignored("MainActivity:677", ignored); }
         Notify.boot(this);
         syncBackFab();
-        // v24: What's New on upgrade (once), then the silent licensed update check.
-        try {
-            WhatsNew.maybeShow(this, () -> UpdateCenter.autoCheck(this));
-        } catch (Exception ignored) { }
         watchLink();
+    }
+
+    /** One toolbar cell: icon above a small Persian label, equal width via {@link #toolLp()}. */
+    /** Gold vector icon for the header toolbar (replaces text glyphs, which rendered unevenly). */
+    private android.widget.ImageView toolIcon(int res) {
+        android.widget.ImageView iv = new android.widget.ImageView(this);
+        try {
+            // Tint only flat vectors: decide on the base icon, since emerald twins are not in isIcon3d().
+            int base3 = Theme.icon3d(res);
+            iv.setImageResource(Theme.chrome3d(res));
+            if (!Theme.isIcon3d(base3)) iv.setColorFilter(Theme.GOLD_SOFT);
+        } catch (Exception ignored) { Diag.ignored("MainActivity:694", ignored); }
+        return iv;
+    }
+
+    private LinearLayout toolCell(View icon, String label, String desc, Runnable onTap) {
+        LinearLayout cell = new LinearLayout(this);
+        cell.setOrientation(LinearLayout.VERTICAL);
+        cell.setGravity(Gravity.CENTER);
+        cell.setContentDescription(desc);
+        cell.setMinimumHeight(Theme.dp(Theme.isNuts() ? 80 : 62));
+        Theme.pressable(cell);
+        cell.setOnClickListener(v -> onTap.run());
+        icon.setClickable(false);
+        int ic = Theme.isNuts() ? 50 : 28;
+        cell.addView(icon, new LinearLayout.LayoutParams(Theme.dp(ic), Theme.dp(ic)));
+        TextView t = new TextView(this);
+        t.setText(label);
+        t.setTextSize(11 * Theme.fontScale());
+        t.setTextColor(Theme.DARK ? Theme.GOLD_SOFT : Theme.TEXT);
+        t.setGravity(Gravity.CENTER);
+        t.setSingleLine(true);
+        cell.addView(t, new LinearLayout.LayoutParams(-2, -2));
+        return cell;
+    }
+
+    private LinearLayout.LayoutParams toolLp() {
+        return new LinearLayout.LayoutParams(0, Theme.dp(Theme.isNuts() ? 80 : 62), 1f);
     }
 
     /** Hairline divider between header tool buttons. */
@@ -730,7 +793,7 @@ public class MainActivity extends Activity {
         try {
             String r = AtiranAuth.sessionRole(this);
             if (r != null && !r.isEmpty()) return r;
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:745", ignored); }
         return RoleStore.current(this);
     }
 
@@ -752,17 +815,22 @@ public class MainActivity extends Activity {
             LinearLayout badge = new LinearLayout(this);
             badge.setGravity(Gravity.CENTER);
             int iconRes = MeelanoIcons.iconFor(s.glyph());
+            // A 3D bitmap must not be tinted; remember that on the symbol.
+            boolean is3d = iconRes != 0 && Theme.isIcon3d(Theme.icon3d(iconRes));
             if (iconRes != 0) {
-                android.widget.ImageView symbol = kit.icon(iconRes, Theme.MUTED, 22);
-                badge.addView(symbol, new LinearLayout.LayoutParams(Theme.dp(24), Theme.dp(24)));
+                android.widget.ImageView symbol = kit.icon(iconRes, Theme.MUTED, Theme.isNuts() ? 46 : 22);
+                if (Theme.isNuts() && is3d) symbol.setImageResource(Theme.chrome3d(iconRes));
+                symbol.setTag(is3d ? Boolean.TRUE : Boolean.FALSE);
+                int sz = Theme.isNuts() ? 44 : 24;
+                badge.addView(symbol, new LinearLayout.LayoutParams(Theme.dp(sz), Theme.dp(sz)));
             } else {
                 TextView symbol = kit.text(s.glyph(), 20, Theme.MUTED, true);
                 symbol.setGravity(Gravity.CENTER);
                 badge.addView(symbol, kit.lp(-2, -2));
             }
-            b.addView(badge, new LinearLayout.LayoutParams(Theme.dp(46), Theme.dp(36)));
+            b.addView(badge, new LinearLayout.LayoutParams(Theme.dp(Theme.isNuts() ? 54 : 46), Theme.dp(Theme.isNuts() ? 46 : 36)));
             String tl = RoleStore.tabLabel(id);
-            TextView l = kit.text(tl != null ? tl : s.title(), 10.5f, Theme.MUTED, true);
+            TextView l = kit.text(tl != null ? tl : s.title(), Theme.isNuts() ? 11.5f : 10.5f, Theme.MUTED, true);
             l.setGravity(Gravity.CENTER);
             l.setSingleLine(true);
             l.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -783,16 +851,61 @@ public class MainActivity extends Activity {
         paintBottom();
     }
 
+    private int selectedNavIndex = -1;
+
+    /** Slides the selection capsule to the selected tab (animated after the first layout). */
+    private void moveCapsule(final boolean animate) {
+        if (navCapsule == null || bottomBar == null) return;
+        if (selectedNavIndex < 0 || selectedNavIndex >= bottomBar.getChildCount()) {
+            navCapsule.setVisibility(View.GONE);
+            return;
+        }
+        final View tab = bottomBar.getChildAt(selectedNavIndex);
+        Runnable go = () -> {
+            if (tab.getWidth() <= 0 || tab.getHeight() <= 0) return;
+            android.widget.FrameLayout.LayoutParams lp =
+                    (android.widget.FrameLayout.LayoutParams) navCapsule.getLayoutParams();
+            lp.width = tab.getWidth() - Theme.dp(8);
+            lp.height = tab.getHeight() - Theme.dp(4);
+            lp.topMargin = tab.getTop() + Theme.dp(2);
+            lp.leftMargin = 0;
+            navCapsule.setLayoutParams(lp);
+            float x = tab.getLeft() + Theme.dp(4);
+            navCapsule.setVisibility(View.VISIBLE);
+            if (animate) {
+                navCapsule.animate().translationX(x).setDuration(280)
+                        .setInterpolator(new android.view.animation.DecelerateInterpolator()).start();
+            } else {
+                navCapsule.setTranslationX(x);
+            }
+        };
+        if (tab.getWidth() > 0) go.run(); else tab.post(go);
+    }
+
     private void paintBottom() {
+        selectedNavIndex = -1;
         for (int i = 0; i < bottomBar.getChildCount(); i++) {
             LinearLayout b = (LinearLayout) bottomBar.getChildAt(i);
             boolean on = i < tabs.length && (tabs[i].equals(currentId)
                     || ("more".equals(tabs[i]) && !isTab(currentId)));
             LinearLayout badge = (LinearLayout) b.getChildAt(0);
             badge.setBackground(on ? Theme.bottomNavIconSelected() : null);
+            // Gold underline under the selected tab (the marker was never shown before).
+            View under = b.getChildCount() > 2 ? b.getChildAt(2) : null;
+            if (under != null) {
+                under.setVisibility(on ? View.VISIBLE : View.INVISIBLE);
+                under.setBackground(Theme.pill(Theme.GOLD));
+            }
+            // Gold halo under the selected capsule (API 28+ coloured shadow; older devices keep the rim).
+            if (android.os.Build.VERSION.SDK_INT >= 28) {
+                badge.setElevation(on ? Theme.dp(6) : 0f);
+                badge.setOutlineSpotShadowColor(Theme.GOLD);
+                badge.setOutlineAmbientShadowColor(Theme.GOLD);
+            }
             View symbol = badge.getChildAt(0);
             if (symbol instanceof android.widget.ImageView) {
-                ((android.widget.ImageView) symbol).setColorFilter(on ? Theme.selectedNavInk() : Theme.MUTED);
+                if (!Boolean.TRUE.equals(symbol.getTag()))
+                    ((android.widget.ImageView) symbol).setColorFilter(on ? Theme.selectedNavInk() : Theme.MUTED);
             } else if (symbol instanceof TextView) {
                 ((TextView) symbol).setTextColor(on ? Theme.selectedNavInk() : Theme.MUTED);
             }
@@ -801,12 +914,14 @@ public class MainActivity extends Activity {
             label.setTextSize(on ? 11f : 10.5f);
             b.getChildAt(2).setVisibility(on ? View.VISIBLE : View.INVISIBLE);
             b.getChildAt(2).setBackground(on ? Theme.bottomNavMarker() : null);
-            b.setBackground(on ? Theme.bottomNavSelected() : null);
+            b.setBackground(null); // the sliding capsule marks the selected tab instead
+            if (on) selectedNavIndex = i;
             b.setSelected(on);
             b.setElevation(on ? Theme.dp(2) : 0f);
             b.setContentDescription(label.getText() + (on ? "، بخش فعال" : "، رفتن به بخش"));
             Theme.pressable(b); // Re-wrap the selected-state background with touch feedback.
         }
+        moveCapsule(true);
     }
 
     private boolean isTab(String id) {
@@ -939,7 +1054,8 @@ public class MainActivity extends Activity {
             content.setTranslationX((forward ? -1 : 1) * Theme.dp(48));
             content.setAlpha(0.35f);
             content.animate().translationX(0f).alpha(1f).setDuration(220).start();
-        } catch (Exception ignored) { }
+            ir.meelano.manager.ui.Ui.reveal(content);
+        } catch (Exception ignored) { Diag.ignored("MainActivity:954", ignored); }
     }
 
     /** Paint the company header from cache, then refresh from Atiran in background. */
@@ -954,7 +1070,7 @@ public class MainActivity extends Activity {
                 paintCompany();
                 if (after != null) after.run();
             });
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:969", ignored); }
     }
 
     private String companyTitle() {
@@ -962,7 +1078,7 @@ public class MainActivity extends Activity {
         try {
             nm = Company.get(this).displayName(this);
         } catch (Exception e) {
-            nm = "میلانو";
+            nm = "میلانو زرین‌فرمان";
         }
         String g = Theme.seasonGlyph(this);
         return g.isEmpty() ? nm : nm + " " + g;
@@ -973,16 +1089,12 @@ public class MainActivity extends Activity {
             if (companyName != null) ir.meelano.manager.ui.MeelanoIcons.set(companyName, companyTitle());
             android.graphics.Bitmap b = Company.logo(this);
             if (logoImg != null && logoGlyph != null) {
-                if (b != null) {
-                    logoImg.setImageBitmap(b);
-                    logoImg.setVisibility(View.VISIBLE);
-                    logoGlyph.setVisibility(View.GONE);
-                } else {
-                    logoImg.setVisibility(View.GONE);
-                    logoGlyph.setVisibility(View.VISIBLE);
-                }
+                // Same crown-M medallion as the dashboard crest (b is intentionally not shown here).
+                logoImg.setImageResource(Theme.logoRes());
+                logoImg.setVisibility(View.VISIBLE);
+                logoGlyph.setVisibility(View.GONE);
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:997", ignored); }
     }
 
     /**
@@ -997,16 +1109,75 @@ public class MainActivity extends Activity {
             if (s == null) return;
             if (shown) s.onShown();
             else s.onHidden();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:1012", ignored); }
     }
 
     private void renderCurrent() {
         Screen s = screens.get(currentId);
         if (s == null) return;
+        renderGen++;
+        // A new page for every render: a slow query that returns after the user has moved to
+        // another section fills the old, detached page and can no longer repaint the screen on display.
+        content = newPage();
         refreshChrome();
         scroll.scrollTo(0, 0);
         s.render(content);
+        playPageIn(content);
+        playEntrance(content);
     }
+
+    /** Section change: the new page slides in 18dp from the start side and fades up (220ms). */
+    private void playPageIn(LinearLayout page) {
+        try {
+            if (!ir.meelano.manager.ui.Ui.motionOk(this)) return;
+            page.setAlpha(0f);
+            page.setTranslationX(Theme.dp(18));
+            page.animate().alpha(1f).translationX(0f).setDuration(220)
+                    .setInterpolator(new android.view.animation.DecelerateInterpolator()).start();
+        } catch (Exception e) {
+            Diag.ignored("MainActivity:pageIn", e);
+        }
+    }
+
+    /**
+     * Cards rise in one after another on each section change (fade + 10dp rise, 35ms apart,
+     * first 8 only). Skipped when the system animations are off (reduce motion).
+     */
+    private void playEntrance(LinearLayout page) {
+        try {
+            if (!ir.meelano.manager.ui.Ui.motionOk(this)) return;
+            int n = Math.min(page.getChildCount(), 8);
+            for (int i = 0; i < n; i++) {
+                android.view.View v = page.getChildAt(i);
+                v.setAlpha(0f);
+                v.setTranslationY(Theme.dp(10));
+                v.animate().alpha(1f).translationY(0f).setDuration(280)
+                        .setStartDelay(i * 35L).setInterpolator(new android.view.animation.DecelerateInterpolator())
+                        .start();
+            }
+        } catch (Exception e) {
+            Diag.ignored("MainActivity:entrance", e);
+        }
+    }
+
+    /** Builds an empty, centred page column and puts it on screen in place of the previous one. */
+    private LinearLayout newPage() {
+        LinearLayout page = kit.v();
+        // Bottom room so the back capsule never covers the last row.
+        page.setPadding(Theme.dp(12), Theme.dp(4), Theme.dp(12), Theme.dp(128));
+        int sw = getResources().getDisplayMetrics().widthPixels;
+        if (contentWrap != null) {
+            contentWrap.removeAllViews();
+            contentWrap.addView(page, new LinearLayout.LayoutParams(sw > Theme.dp(720) ? Theme.dp(640) : -1, -2));
+        }
+        return page;
+    }
+
+    /** Current render generation; changes whenever a different page or a re-render replaces what is on screen. */
+    public int renderGen() { return renderGen; }
+
+    /** Id of the screen that is on display right now. */
+    public String currentScreenId() { return currentId; }
 
     /** Repaint bottom bar + back FAB (screens call this after internal state changes). */
     public void refreshChrome() {
@@ -1014,6 +1185,15 @@ public class MainActivity extends Activity {
         if (s == null) return;
         paintBottom();
         if (backFab != null) backFab.setVisibility("home".equals(currentId) ? View.GONE : View.VISIBLE);
+        updateBackLabel();
+    }
+
+    /** The back capsule names the screen it will actually return to. */
+    private void updateBackLabel() {
+        if (backLabel == null) return;
+        String target = history.isEmpty() ? "home" : history.get(history.size() - 1);
+        Screen t = screens.get(target);
+        backLabel.setText(t == null ? "بازگشت" : "بازگشت به «" + t.title() + "»");
     }
 
     public void openFilter() {
@@ -1046,30 +1226,44 @@ public class MainActivity extends Activity {
     }
 
     /** Golden circular back button, floating above the bottom bar on every section but Home. */
+    /**
+     * The single back control for every screen: one gold capsule with a round arrow
+     * and the word «بازگشت», docked bottom-centre just above the tab bar. It stays in
+     * the same place on every page so the user always knows where to find it.
+     */
     private void syncBackFab() {
         try {
             if (backFab != null && backFab.getParent() instanceof android.view.ViewGroup)
                 ((android.view.ViewGroup) backFab.getParent()).removeView(backFab);
-        } catch (Exception ignored) {
-        }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:1079", ignored); }
         backFab = null;
-        TextView f = kit.text("\u2192", 26, Theme.onAccent(), true);
-        f.setGravity(Gravity.CENTER);
-        f.setBackground(Theme.accentAvatar(Theme.GOLD));
-        f.setElevation(Theme.dp(6));
-        f.setContentDescription("برگشت");
-        Theme.pressable(f);
-        f.setOnClickListener(v -> goBack());
+        // Floating gold disc: one arrow, no label, a soft gold glow underneath.
+        final int ink = Theme.onAccent(Theme.GOLD);
+        android.graphics.drawable.GradientDrawable disc = new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                new int[]{Theme.GOLD_SOFT, Theme.GOLD});
+        disc.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        disc.setStroke(Theme.dp(1), Theme.alpha(ink, 60));
+        TextView arrow = kit.text("\u2192", 22f, ink, true);
+        arrow.setGravity(Gravity.CENTER);
+        arrow.setBackground(disc);
+        arrow.setElevation(Theme.dp(14));
+        arrow.setContentDescription("بازگشت به صفحه قبلی");
+        Theme.pressable(arrow);
+        arrow.setOnClickListener(v -> goBack());
+        backLabel = null;
+        // Compact disc in the bottom corner, above the tab bar, so list rows stay readable.
         android.widget.FrameLayout.LayoutParams p = new android.widget.FrameLayout.LayoutParams(
-                Theme.dp(58), Theme.dp(58), Gravity.BOTTOM | Gravity.LEFT);
-        p.setMargins(Theme.dp(16), 0, 0, Theme.dp(100));
+                Theme.dp(46), Theme.dp(46), Gravity.BOTTOM | Gravity.END);
+        p.setMargins(Theme.dp(14), 0, Theme.dp(14), Theme.dp(96));
         try {
-            addContentView(f, p);
+            addContentView(arrow, p);
         } catch (Exception ignored) {
             return;
         }
-        backFab = f;
+        backFab = arrow;
         backFab.setVisibility("home".equals(currentId) ? View.GONE : View.VISIBLE);
+        updateBackLabel();
     }
 
     // ================= Persian voice search =================
@@ -1077,6 +1271,22 @@ public class MainActivity extends Activity {
     private java.util.function.Consumer<String> voiceCb;
 
     /** Start Persian speech recognition; the transcript is delivered to cb. */
+    /** Asks for the microphone (used by live assistant conversation). */
+    public void requestMic(java.util.function.Consumer<Boolean> cb) {
+        micCb = cb;
+        requestPermissions(new String[]{android.Manifest.permission.RECORD_AUDIO}, MIC_PERM);
+    }
+
+    private static final int MIC_PERM = 4471;
+    private static final int LOC_PERM = 4472;
+
+    /** Asks for approximate and precise location, used only by the weather card. */
+    public void requestLocationAccess() {
+        requestPermissions(new String[]{android.Manifest.permission.ACCESS_COARSE_LOCATION,
+                android.Manifest.permission.ACCESS_FINE_LOCATION}, LOC_PERM);
+    }
+    private java.util.function.Consumer<Boolean> micCb;
+
     public void startVoiceSearch(java.util.function.Consumer<String> cb) {
         voiceCb = cb;
         try {
@@ -1099,7 +1309,7 @@ public class MainActivity extends Activity {
         if (requestCode == UpdateCenter.REQ_UNKNOWN) {
             try {
                 UpdateCenter.onUnknownSourcesReturn(this);
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("MainActivity:1145", ignored); }
             return;
         }
         if (requestCode == VOICE_REQ && resultCode == Activity.RESULT_OK && data != null && voiceCb != null) {
@@ -1136,7 +1346,7 @@ public class MainActivity extends Activity {
                     while ((n = in.read(buf)) > 0) b.append(new String(buf, 0, n, "UTF-8"));
                     try {
                         in.close();
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("MainActivity:1182", ignored); }
                     docCb.accept(b.toString());
                 } else kit.toast("فایلی انتخاب نشد");
             } catch (Exception e) {
@@ -1162,6 +1372,17 @@ public class MainActivity extends Activity {
         // Notification permission is best-effort; the app works fully without it.
         boolean granted = grantResults != null && grantResults.length > 0
                 && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED;
+        if (requestCode == LOC_PERM) {
+            // Location is optional: redraw the home card so weather follows the new permission at once.
+            if ("home".equals(currentId)) renderCurrent();
+            return;
+        }
+        if (requestCode == MIC_PERM) {
+            java.util.function.Consumer<Boolean> cb = micCb;
+            micCb = null;
+            if (cb != null) cb.accept(granted);
+            return;
+        }
         if (requestCode == SCAN_PERM) {
             if (granted && scanCb != null) launchScanner();
             else {
@@ -1172,7 +1393,7 @@ public class MainActivity extends Activity {
             try {
                 Screen s = screens.get(currentId);
                 if (s != null) s.onSmsPermission(granted);
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("MainActivity:1218", ignored); }
         } else if (requestCode == FisPrint.BT_REQ) {
             FisPrint.onPermissionResult(this, granted);
         }
@@ -1282,26 +1503,29 @@ public class MainActivity extends Activity {
             }
             licChip.setVisibility(View.VISIBLE);
             if (s.plan == License.P_PERM) {
-                ir.meelano.manager.ui.MeelanoIcons.set(licChip, "◈ دائمی");
+                ir.meelano.manager.ui.MeelanoIcons.set(licChip, "📅 دائمی");
                 licChip.setTextColor(Theme.GOLD_SOFT);
-            } else if (s.daysLeft <= 7) {
-                ir.meelano.manager.ui.MeelanoIcons.set(licChip, "◈ " + Money.fa(String.valueOf(s.daysLeft)) + " روز!");
+            } else if (s.daysLeft <= 2) {
+                ir.meelano.manager.ui.MeelanoIcons.set(licChip, "📅 " + Money.fa(String.valueOf(s.daysLeft)) + " روز!");
                 licChip.setTextColor(Theme.DANGER);
+            } else if (s.daysLeft <= 7) {
+                ir.meelano.manager.ui.MeelanoIcons.set(licChip, "📅 " + Money.fa(String.valueOf(s.daysLeft)) + " روز");
+                licChip.setTextColor(Theme.WARNING);
             } else {
-                ir.meelano.manager.ui.MeelanoIcons.set(licChip, "◈ " + Money.fa(String.valueOf(s.daysLeft)) + " روز");
+                ir.meelano.manager.ui.MeelanoIcons.set(licChip, "📅 " + Money.fa(String.valueOf(s.daysLeft)) + " روز");
                 licChip.setTextColor(Theme.GOLD_SOFT);
             }
         } catch (Exception e) {
             try {
                 licChip.setVisibility(View.GONE);
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("MainActivity:1340", ignored); }
         }
     }
 
     private void openLicense() {
         try {
             startActivity(new Intent(this, LicenseActivity.class));
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:1347", ignored); }
     }
 
     /** Open the license connection flow directly in edit mode, preserving the current session. */
@@ -1353,7 +1577,7 @@ public class MainActivity extends Activity {
                 compactUserAction.setContentDescription(hasSession
                         ? "حساب کاربری؛ خروج یا تغییر کاربر" : "ورود به حساب کاربری");
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:1399", ignored); }
     }
 
     /** Who am I + logout (+ PIN-management shortcut for the manager). */
@@ -1376,18 +1600,18 @@ public class MainActivity extends Activity {
                 body.addView(kit.btnGhost("تعیین رمز کاربران", Theme.GOLD, v -> {
                     try {
                         box[0].dismiss();
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("MainActivity:1422", ignored); }
                     nav("users");
                 }), kit.lp(-1, -2));
             body.addView(kit.btnGhost("↪ خروج از حساب / تغییر کاربر", Theme.DANGER, v -> {
                 try {
                     box[0].dismiss();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("MainActivity:1428", ignored); }
                 logout();
             }), kit.lp(-1, -2));
             box[0] = kit.dialog("حساب کاربری", body, true);
             box[0].show();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:1433", ignored); }
     }
 
     public void checkConn() {
@@ -1398,7 +1622,7 @@ public class MainActivity extends Activity {
                 String last = "";
                 try {
                     last = settings.linkLast();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("MainActivity:1444", ignored); }
                 setLinkIcon(last.isEmpty() ? SmartLink.LAN : last);
             }
 
@@ -1415,7 +1639,7 @@ public class MainActivity extends Activity {
         try {
             linkIcon.clearAnimation();
             if ("probe".equals(kind)) {
-                linkIcon.setImageResource(R.drawable.link_probe);
+                linkIcon.setImageResource(linkRes(R.drawable.link_probe));
                 android.view.animation.RotateAnimation spin =
                         new android.view.animation.RotateAnimation(0, 360,
                                 android.view.animation.Animation.RELATIVE_TO_SELF, 0.5f,
@@ -1426,23 +1650,23 @@ public class MainActivity extends Activity {
                 linkIcon.startAnimation(spin);
                 linkIcon.setContentDescription("در حال بررسی اتصال");
             } else if (SmartLink.WAN.equals(kind)) {
-                linkIcon.setImageResource(R.drawable.link_wan);
+                linkIcon.setImageResource(linkRes(R.drawable.link_wan));
                 linkIcon.setContentDescription("متصل از خارج شبکه — لمس برای جزئیات");
             } else if (SmartLink.LAN.equals(kind)) {
-                linkIcon.setImageResource(R.drawable.link_lan);
+                linkIcon.setImageResource(linkRes(R.drawable.link_lan));
                 linkIcon.setContentDescription("متصل از داخل شبکه — لمس برای جزئیات");
             } else {
-                linkIcon.setImageResource(R.drawable.link_off);
+                linkIcon.setImageResource(linkRes(R.drawable.link_off));
                 linkIcon.setContentDescription("قطع — لمس برای عیب‌یابی");
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:1481", ignored); }
     }
 
     public void testConnection(final Repo.Cb<String> cb) {
         boolean vpn = false;
         try {
             vpn = NetRoute.isVpnActive(this);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("MainActivity:1488", ignored); }
         SmartLink.diagnose(this, settings, vpn, r -> {
             try {
                 if (r.anyOk) {
@@ -1451,7 +1675,7 @@ public class MainActivity extends Activity {
                 } else {
                     cb.fail(r.verdict);
                 }
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("MainActivity:1497", ignored); }
         });
     }
 
@@ -1576,21 +1800,50 @@ public class MainActivity extends Activity {
     /** Two-row export bar: PDF + Excel + Word / image + print (share sheet covers social apps + Bluetooth). */
     public android.view.View exportBar(final String title, final String subtitle,
                                        final ReportCatalog.Col[] cols, final List<Row> rows) {
+        return exportBar(title, subtitle, cols, rows, true);
+    }
+
+    /** Same bar; pass withPrint=false where the screen already has its own print action. */
+    public android.view.View exportBar(final String title, final String subtitle,
+                                       final ReportCatalog.Col[] cols, final List<Row> rows,
+                                       boolean withPrint) {
+        // One tidy row of equal tiles (no 14dp button padding), so every label fits on a phone
+        // and nothing is clipped at the sheet edge.
         LinearLayout box = kit.v();
-        LinearLayout r1 = kit.h();
-        r1.addView(kit.btnGhost("▤ PDF", Theme.DANGER, v -> sharePdf(title, subtitle, cols, rows)), kit.wlp(1f));
-        r1.addView(kit.space(8));
-        r1.addView(kit.btnGhost("▦ اکسل", Theme.SUCCESS, v -> shareXlsx(title, subtitle, cols, rows)), kit.wlp(1f));
-        r1.addView(kit.space(8));
-        r1.addView(kit.btnGhost("✎ ورد", Theme.INFO, v -> shareDocx(title, subtitle, cols, rows)), kit.wlp(1f));
-        box.addView(r1, kit.lp(-1, -2));
-        box.addView(kit.gap(8));
-        LinearLayout r2 = kit.h();
-        r2.addView(kit.btnGhost("▧ عکس", Theme.VIOLET, v -> sharePng(title, subtitle, cols, rows)), kit.wlp(1f));
-        r2.addView(kit.space(8));
-        r2.addView(kit.btnGhost("🖨 چاپ", Theme.GOLD, v -> printPdf(title, subtitle, cols, rows)), kit.wlp(1f));
-        box.addView(r2, kit.lp(-1, -2));
+        box.setBackground(Theme.card());
+        box.setPadding(Theme.dp(8), Theme.dp(8), Theme.dp(8), Theme.dp(8));
+        LinearLayout row = kit.h();
+        row.setLayoutDirection(android.view.View.LAYOUT_DIRECTION_RTL);
+        addExportTile(row, "PDF", Theme.DANGER, v -> sharePdf(title, subtitle, cols, rows), true);
+        addExportTile(row, "اکسل", Theme.SUCCESS, v -> shareXlsx(title, subtitle, cols, rows), true);
+        addExportTile(row, "ورد", Theme.INFO, v -> shareDocx(title, subtitle, cols, rows), true);
+        addExportTile(row, "عکس", Theme.VIOLET, v -> sharePng(title, subtitle, cols, rows), true);
+        if (withPrint)
+            addExportTile(row, "چاپ", Theme.GOLD, v -> printPdf(title, subtitle, cols, rows), true);
+        box.addView(row, kit.lp(-1, -2));
         return box;
+    }
+
+    private void addExportTile(LinearLayout row, String label, int accent,
+                               android.view.View.OnClickListener click, boolean gapBefore) {
+        android.widget.Button b = new android.widget.Button(this);
+        b.setText(label);
+        b.setAllCaps(false);
+        b.setSingleLine(true);
+        b.setTextSize(12f * Theme.fontScale());
+        b.setTextColor(accent);
+        b.setTypeface(Theme.face(true));
+        b.setBackground(Theme.ghostButton(accent));
+        b.setGravity(android.view.Gravity.CENTER);
+        b.setElevation(Theme.dp(1));
+        b.setPadding(Theme.dp(2), Theme.dp(8), Theme.dp(2), Theme.dp(8));
+        b.setMinHeight(Theme.dp(44));
+        b.setMinimumHeight(Theme.dp(44));
+        b.setMinWidth(0);
+        b.setMinimumWidth(0);
+        b.setOnClickListener(click);
+        if (gapBefore && row.getChildCount() > 0) row.addView(kit.space(5));
+        row.addView(b, kit.wlp(1f));
     }
 
     /** Zoom button: cycle ۱۰۰٪ → ۱۱۵٪ → ۱۳۰٪ → ۹۰٪ → ۱۰۰٪. */

@@ -64,7 +64,7 @@ public final class InvoiceWatch {
                 public void ok(List<Row> rows) {
                     try {
                         repo.close();
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("InvoiceWatch:67", ignored); }
                     finishCb(onDone);
                     if (rows == null) return;
                     try {
@@ -91,14 +91,14 @@ public final class InvoiceWatch {
                         while (seen.size() > MAX_SEEN) seen.remove(seen.iterator().next());
                         s2.setWhSeen(join(seen));
                         if (!fresh.isEmpty()) notifyNew(c, fresh);
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("InvoiceWatch:94", ignored); }
                 }
 
                 @Override
                 public void fail(String faError) {
                     try {
                         repo.close();
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("InvoiceWatch:101", ignored); }
                     finishCb(onDone);
                 }
             });
@@ -139,50 +139,143 @@ public final class InvoiceWatch {
         return sb.toString();
     }
 
+    /** Sample loads for the «نمایش نمونه» button in Settings (no database access). */
+    public static void preview(Context c) {
+        List<Row> rows = new ArrayList<>();
+        Row a = new Row();
+        a.put("no", "1047");
+        a.put("customer", "فروشگاه نمونه آذر");
+        a.put("total", 12500000d);
+        a.put("registrant", "علی رضایی");
+        rows.add(a);
+        Row b = new Row();
+        b.put("no", "1048");
+        b.put("customer", "داروخانه مهر");
+        b.put("total", 4800000d);
+        b.put("registrant", "مریم احمدی");
+        rows.add(b);
+        notifyNew(c.getApplicationContext(), rows);
+    }
+
+    /**
+     * The warehouse alert: who the load is for, its value, who registered it, and a closing
+     * line that depends on the time of day. Several loads become an inbox-style list.
+     */
     private static void notifyNew(Context c, List<Row> fresh) {
         try {
-            Notify.channel(c);
-            String title = fresh.size() == 1
-                    ? "🧾 فاکتور فروش جدید"
-                    : "🧾 " + Money.fa(String.valueOf(fresh.size())) + " فاکتور فروش جدید";
-            StringBuilder b = new StringBuilder();
-            int shown = Math.min(fresh.size(), 4);
-            for (int i = 0; i < shown; i++) {
-                Row r = fresh.get(i);
-                if (b.length() > 0) b.append(" • ");
-                b.append("فاکتور ").append(Money.fa(r.s("no")));
-                String cust = r.s("customer");
-                if (cust != null && !cust.isEmpty() && !"—".equals(cust))
-                    b.append(" («").append(cust).append("»)");
-                b.append(" — ").append(Money.compactRial(r.d("total")));
+            Notify.whChannel(c);
+            int n = fresh.size();
+            String now = Money.fa(new java.text.SimpleDateFormat("HH:mm", java.util.Locale.US)
+                    .format(new java.util.Date()));
+            int hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY);
+            double sum = 0;
+            List<String> lines = new ArrayList<>();
+            for (Row r : fresh) {
+                sum += r.d("total");
+                lines.add(loadLine(r));
             }
-            if (fresh.size() > shown)
-                b.append(" • و ").append(Money.fa(String.valueOf(fresh.size() - shown))).append(" مورد دیگر");
-            b.append("؛ برای تحویل لمس کنید.");
-            String body = b.toString();
+            String title = n == 1
+                    ? "🚚 بار جدید برای تحویل"
+                    : "🚚 " + Money.fa(String.valueOf(n)) + " بار جدید برای تحویل";
+            String summary = "جمع ارزش " + Money.compactRial(sum) + " • ثبت شد ساعت " + now;
+            String closing = hour < 12
+                    ? "بار امروز را پیش از ظهر آماده و با فاکتور کنترل کنید."
+                    : "پیش از خروج، بار را با فاکتور و امضای تحویل کنترل کنید.";
+
+            Notification.Style style;
+            if (n == 1) {
+                style = new Notification.BigTextStyle()
+                        .setBigContentTitle(title)
+                        .setSummaryText(summary)
+                        .bigText(lines.get(0) + "\n\n" + closing);
+            } else {
+                Notification.InboxStyle inbox = new Notification.InboxStyle()
+                        .setBigContentTitle(title)
+                        .setSummaryText(summary);
+                int shown = Math.min(lines.size(), 5);
+                for (int i = 0; i < shown; i++) inbox.addLine(lines.get(i));
+                if (lines.size() > shown) {
+                    inbox.addLine("… و " + Money.fa(String.valueOf(lines.size() - shown)) + " بار دیگر");
+                }
+                inbox.addLine(closing);
+                style = inbox;
+            }
 
             Intent open = new Intent(c, MainActivity.class);
             open.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
             open.putExtra(MainActivity.EXTRA_SCREEN, "tahvil");
             PendingIntent pi = PendingIntent.getActivity(c, Notify.NEWINV_NOTIF_ID, open,
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-            Notification n = new Notification.Builder(c, Notify.CH)
+
+            Notification.Builder b = new Notification.Builder(c, Notify.CH_WH)
                     .setContentTitle(title)
-                    .setContentText(body)
-                    .setStyle(new Notification.BigTextStyle().bigText(body))
+                    .setContentText(lines.get(0))
+                    .setSubText("انبار • میلانو زرین‌فرمان")
+                    .setTicker(title)
+                    .setWhen(System.currentTimeMillis())
+                    .setShowWhen(true)
+                    .setCategory(Notification.CATEGORY_REMINDER)
                     .setSmallIcon(R.mipmap.ic_launcher)
+                    .setColor(0xFFE8C77A)
+                    .setGroup("meelano_warehouse")
                     .setContentIntent(pi)
                     .setAutoCancel(true)
-                    .setColor(0xFF3ED6C5)
-                    .build();
+                    .setStyle(style);
+            if (android.os.Build.VERSION.SDK_INT >= 24) b.setColorized(true);
+            try {
+                b.addAction(new Notification.Action.Builder(
+                        android.graphics.drawable.Icon.createWithResource(c, R.mipmap.ic_launcher),
+                        "مشاهده بار", pi).build());
+            } catch (Exception ignored) { Diag.ignored("InvoiceWatch:action", ignored); }
+            try {
+                b.setLargeIcon(loadBadge(c, n));
+            } catch (Exception ignored) { Diag.ignored("InvoiceWatch:large", ignored); }
             NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
-            if (nm != null) nm.notify(Notify.NEWINV_NOTIF_ID, n);
-        } catch (Exception ignored) { }
+            if (nm != null) nm.notify(Notify.NEWINV_NOTIF_ID, b.build());
+        } catch (Exception ignored) { Diag.ignored("InvoiceWatch:180", ignored); }
+    }
+
+    /** Black-and-gold badge with the number of loads, used as the notification's large icon. */
+    private static android.graphics.Bitmap loadBadge(Context c, int count) {
+        int size = 256;
+        android.graphics.Bitmap bmp = android.graphics.Bitmap.createBitmap(size, size,
+                android.graphics.Bitmap.Config.ARGB_8888);
+        android.graphics.Canvas cv = new android.graphics.Canvas(bmp);
+        android.graphics.Paint p = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        float cx = size / 2f, cy = size / 2f, r = size / 2f - 8;
+        p.setShader(new android.graphics.RadialGradient(cx - 30, cy - 40, r * 1.6f,
+                new int[]{0xFF2A2A2E, 0xFF0B0B0D}, null, android.graphics.Shader.TileMode.CLAMP));
+        cv.drawCircle(cx, cy, r, p);
+        p.setShader(null);
+        p.setStyle(android.graphics.Paint.Style.STROKE);
+        p.setStrokeWidth(10);
+        p.setColor(0xFFE8C77A);
+        cv.drawCircle(cx, cy, r - 12, p);
+        p.setStyle(android.graphics.Paint.Style.FILL);
+        p.setColor(0xFFF2F2F4);
+        p.setTextAlign(android.graphics.Paint.Align.CENTER);
+        p.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.BOLD));
+        p.setTextSize(count > 9 ? 84 : 104);
+        String txt = String.valueOf(Math.min(count, 99));
+        android.graphics.Paint.FontMetrics fm = p.getFontMetrics();
+        cv.drawText(txt, cx, cy - (fm.ascent + fm.descent) / 2f, p);
+        return bmp;
+    }
+
+    /** One load as a readable line: «🧾 ۱۰۴۷ • مشتری «…» • ۱۲٫۵ میلیون ریال • ثبت: …». */
+    private static String loadLine(Row r) {
+        StringBuilder b = new StringBuilder("🧾 ").append(Money.fa(r.s("no")));
+        String cust = r.s("customer");
+        if (cust != null && !cust.isEmpty() && !"—".equals(cust)) b.append(" • مشتری «").append(cust).append("»");
+        b.append(" • ").append(Money.compactRial(r.d("total")));
+        String reg = r.s("registrant");
+        if (reg != null && !reg.trim().isEmpty()) b.append(" • ثبت: ").append(reg.trim());
+        return b.toString();
     }
 
     private static void finishCb(Runnable r) {
         try {
             if (r != null) r.run();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("InvoiceWatch:186", ignored); }
     }
 }

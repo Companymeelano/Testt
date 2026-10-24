@@ -1,5 +1,6 @@
 package ir.meelano.manager.screens;
 
+import ir.meelano.manager.core.Diag;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.ImageView;
@@ -28,6 +29,8 @@ import java.util.List;
 public class ReportsScreen extends Screen {
     private final Filter filter = new Filter();
     private ReportCatalog.Spec sel;
+    /** Set by the command room to open one report group directly. */
+    public static String pendingCategory = null;
     private String selCat;
     /** Browse search is separate from the report's date/status filter. */
     private String browseQuery = "";
@@ -58,7 +61,8 @@ public class ReportsScreen extends Screen {
         boolean search = "fleeing_customers".equals(sel.id) || "lost_basket".equals(sel.id)
                 || "cheque_reliability".equals(sel.id) || "stock_forecast".equals(sel.id)
                 || "dying_stock".equals(sel.id) || "fresh_debtors".equals(sel.id)
-                || "order_suggest".equals(sel.id) || "invoice_profit".equals(sel.id);
+                || "order_suggest".equals(sel.id) || "invoice_profit".equals(sel.id)
+                || sel.id.startsWith("sf_");
         if (!sel.needsRange && !search) return null;
         FilterSheet.Config c = new FilterSheet.Config();
         c.search = search;
@@ -79,19 +83,23 @@ public class ReportsScreen extends Screen {
 
     private int sectionAccent(String section) {
         if ("ویژه مدیر".equals(section)) return Theme.GOLD;
-        if ("فروش".equals(section)) return Theme.GOLD;
-        if ("خرید".equals(section)) return Theme.INFO;
-        if ("دریافت و پرداخت".equals(section)) return Theme.SUCCESS;
+        if ("فروش".equals(section)) return Theme.SALES_HUE;
+        if ("خرید".equals(section)) return Theme.BUY_HUE;
+        if ("دریافتی‌ها و پرداخت".equals(section)) return Theme.SUCCESS;
         if ("چک‌ها".equals(section)) return Theme.INFO;
+        if ("عملکرد صندوق".equals(section)) return Theme.GOLD;
+        if ("خزانه‌داری".equals(section)) return Theme.GOLD;
         if ("کالا و انبار".equals(section)) return Theme.VIOLET;
         if ("مشتریان".equals(section)) return Theme.SUCCESS;
         if ("ویزیتورها".equals(section)) return Theme.WARNING;
         if ("سود و زیان".equals(section)) return Theme.GOLD;
         if ("بانک و صندوق".equals(section)) return Theme.INFO;
         if ("کاربران و نظارت".equals(section)) return Theme.STEEL;
-        if ("هوشمند".equals(section)) return Theme.TEAL;
+        if ("هوشمند".equals(section)) return Theme.VIOLET;
         if ("هزینه‌ها".equals(section)) return Theme.ROSE;
         if ("برگشتی و ابطالی".equals(section)) return Theme.DANGER;
+        if ("تحلیل ویزیتور و مسیر".equals(section)) return Theme.WARNING;
+        if ("سرفصل‌ها".equals(section)) return Theme.GOLD_SOFT;
         return Theme.MUTED;
     }
 
@@ -99,8 +107,10 @@ public class ReportsScreen extends Screen {
         if ("ویژه مدیر".equals(section)) return R.drawable.mi_military_tech;
         if ("فروش".equals(section)) return R.drawable.mi_point_of_sale;
         if ("خرید".equals(section)) return R.drawable.mi_shopping_cart;
-        if ("دریافت و پرداخت".equals(section)) return R.drawable.mi_payments;
+        if ("دریافتی‌ها و پرداخت".equals(section)) return R.drawable.mi_payments;
         if ("چک‌ها".equals(section)) return R.drawable.mi_receipt_long;
+        if ("عملکرد صندوق".equals(section)) return R.drawable.mi_account_balance_wallet;
+        if ("خزانه‌داری".equals(section)) return R.drawable.mi_account_balance;
         if ("کالا و انبار".equals(section)) return R.drawable.mi_inventory_2;
         if ("مشتریان".equals(section)) return R.drawable.mi_group;
         if ("ویزیتورها".equals(section)) return R.drawable.mi_directions_car;
@@ -110,14 +120,62 @@ public class ReportsScreen extends Screen {
         if ("هوشمند".equals(section)) return R.drawable.mi_lightbulb;
         if ("هزینه‌ها".equals(section)) return R.drawable.mi_trending_down;
         if ("برگشتی و ابطالی".equals(section)) return R.drawable.mi_assignment_return;
+        if ("تحلیل ویزیتور و مسیر".equals(section)) return R.drawable.mi_bar_chart;
+        if ("سرفصل‌ها".equals(section)) return R.drawable.mi_account_balance;
         return R.drawable.mi_widgets;
     }
 
     @Override
     public void render(final LinearLayout content) {
         contentRef = content;
+        if (!restored) {
+            restored = true;
+            restoreState();
+        }
+        if (pendingCategory != null) {
+            selCat = pendingCategory;
+            sel = null;
+            pendingCategory = null;
+        }
         if (sel == null) renderList(content);
         else renderReport(content, sel);
+        saveState();
+    }
+
+    private static final String STATE_PREFS = "reports_state";
+    private boolean restored = false;
+
+    /** Restores the last section, report, period and search so returning to Reports picks up where the user left off. */
+    private void restoreState() {
+        try {
+            android.content.SharedPreferences p = a.getSharedPreferences(STATE_PREFS, android.content.Context.MODE_PRIVATE);
+            String rep = p.getString("rep", "");
+            String cat = p.getString("cat", "");
+            if (!rep.isEmpty()) sel = ReportCatalog.byId(rep);
+            if (sel == null && !cat.isEmpty()) selCat = cat;
+            int preset = p.getInt("preset", -1);
+            if (preset >= 0) filter.preset = preset;
+            filter.from = p.getString("from", filter.from);
+            filter.to = p.getString("to", filter.to);
+            filter.search = p.getString("search", filter.search);
+        } catch (Exception ignored) {
+            Diag.ignored("ReportsScreen:restore", ignored);
+        }
+    }
+
+    private void saveState() {
+        try {
+            a.getSharedPreferences(STATE_PREFS, android.content.Context.MODE_PRIVATE).edit()
+                    .putString("rep", sel == null ? "" : sel.id)
+                    .putString("cat", selCat == null ? "" : selCat)
+                    .putInt("preset", filter.preset)
+                    .putString("from", filter.from == null ? "" : filter.from)
+                    .putString("to", filter.to == null ? "" : filter.to)
+                    .putString("search", filter.search == null ? "" : filter.search)
+                    .apply();
+        } catch (Exception ignored) {
+            Diag.ignored("ReportsScreen:save", ignored);
+        }
     }
 
     private void renderList(final LinearLayout content) {
@@ -125,6 +183,14 @@ public class ReportsScreen extends Screen {
         content.addView(a.kit.hero(glyph(), title(),
                 Money.fa(String.valueOf(ReportCatalog.ALL.length)) + " گزارش مدیریتی • جست‌وجوی سریع و دسته‌بندی‌شده",
                 accent()), a.kit.lp(-1, -2));
+        content.addView(a.kit.gap(10));
+        content.addView(a.kit.btnGhost("📈  داشبورد تحلیلی فروش", Theme.VIOLET, v -> a.nav("analytics")), a.kit.lp(-1, -2));
+        content.addView(a.kit.gap(8));
+        LinearLayout tr = a.kit.h();
+        tr.addView(a.kit.btnGhost("🧾  فاکتورهای فروش", Theme.SALES_HUE, v -> a.nav("sales")), a.kit.wlp(1f));
+        tr.addView(a.kit.space(8));
+        tr.addView(a.kit.btnGhost("🧺  فاکتورهای خرید", Theme.BUY_HUE, v -> a.nav("buy")), a.kit.wlp(1f));
+        content.addView(tr, a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
         content.addView(a.kit.searchBar("جست‌وجوی نام، کاربرد یا دستهٔ گزارش…", browseQuery, q -> {
             browseQuery = q == null ? "" : q.trim();
@@ -150,7 +216,16 @@ public class ReportsScreen extends Screen {
         if (selCat == null) {
             java.util.List<String> secs = new java.util.ArrayList<>();
             java.util.List<Integer> counts = new java.util.ArrayList<>();
+            int treasuryCount = 0;
             for (ReportCatalog.Spec spec : ReportCatalog.ALL) {
+                if (ReportCatalog.isTreasurySection(spec.section)) {
+                    treasuryCount++;
+                    // All treasury sub-sections live behind one «خزانه‌داری» card.
+                    if (!secs.contains(ReportCatalog.TREASURY)) { secs.add(ReportCatalog.TREASURY); counts.add(0); }
+                    int tx = secs.indexOf(ReportCatalog.TREASURY);
+                    counts.set(tx, counts.get(tx) + 1);
+                    continue;
+                }
                 int ix = secs.indexOf(spec.section);
                 if (ix < 0) {
                     secs.add(spec.section);
@@ -177,8 +252,38 @@ public class ReportsScreen extends Screen {
             return;
         }
 
-        content.addView(a.kit.btnGhost("‹ همه دسته‌ها", Theme.GOLD, v -> {
-            selCat = null;
+        if (ReportCatalog.TREASURY.equals(selCat)) {
+            // The treasury group: its sub-sections, each opening its own report list.
+            content.addView(a.kit.btnGhost("‹ همه دسته‌ها", Theme.GOLD, v -> {
+                selCat = null;
+                render(contentRef);
+            }), a.kit.lp(-1, -2));
+            content.addView(a.kit.gap(10));
+            int treasuryTotal = 0;
+            for (ReportCatalog.Spec spec : ReportCatalog.ALL)
+                if (ReportCatalog.isTreasurySection(spec.section)) treasuryTotal++;
+            content.addView(a.kit.hero("▤", ReportCatalog.TREASURY,
+                    "بخش‌های مالی و بانکی • " + Money.fa(String.valueOf(treasuryTotal)) + " گزارش",
+                    sectionAccent(selCat)), a.kit.lp(-1, -2));
+            content.addView(a.kit.gap(12));
+            java.util.List<String> subs = new java.util.ArrayList<>();
+            java.util.List<Integer> subCounts = new java.util.ArrayList<>();
+            for (ReportCatalog.Spec spec : ReportCatalog.ALL) {
+                if (!ReportCatalog.isTreasurySection(spec.section)) continue;
+                int ix = subs.indexOf(spec.section);
+                if (ix < 0) { subs.add(spec.section); subCounts.add(1); }
+                else subCounts.set(ix, subCounts.get(ix) + 1);
+            }
+            for (int i = 0; i < subs.size(); i++) {
+                if (i > 0) content.addView(a.kit.gap(10));
+                content.addView(catCard(subs.get(i), subCounts.get(i)), a.kit.lp(-1, -2));
+            }
+            return;
+        }
+
+        final boolean inTreasury = ReportCatalog.isTreasurySection(selCat);
+        content.addView(a.kit.btnGhost(inTreasury ? "‹ " + ReportCatalog.TREASURY : "‹ همه دسته‌ها", Theme.GOLD, v -> {
+            selCat = inTreasury ? ReportCatalog.TREASURY : null;
             render(contentRef);
         }), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
@@ -230,7 +335,7 @@ public class ReportsScreen extends Screen {
         c.setGravity(Gravity.CENTER_VERTICAL);
         c.setBackground(Theme.card());
         c.setPadding(Theme.dp(12), Theme.dp(11), Theme.dp(12), Theme.dp(11));
-        c.setElevation(Theme.cardElevation());
+        Theme.lift(c, Theme.cardElevation());
 
         ImageView icon = new ImageView(a);
         icon.setImageResource(reportIcon(spec));
@@ -336,7 +441,7 @@ public class ReportsScreen extends Screen {
         try {
             iv.setImageResource(sectionIcon(section));
             iv.setColorFilter(sectionAccent(section));
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("ReportsScreen:349", ignored); }
         int sz = Theme.dp(44);
         c.addView(iv, new LinearLayout.LayoutParams(sz, sz));
         c.addView(a.kit.gap(6));
@@ -368,6 +473,13 @@ public class ReportsScreen extends Screen {
     }
 
     private void renderReport(final LinearLayout content, final ReportCatalog.Spec spec) {
+        // Returns open on «امروز» (daily) instead of the generic 30-day window.
+        if (("returns_by_kind".equals(spec.id) || "returns_list".equals(spec.id))
+                && filter.preset == Filter.P_LAST30) {
+            filter.defaultPreset = Filter.P_TODAY;
+            filter.preset = Filter.P_TODAY;
+            filter.applyPreset();
+        }
         content.removeAllViews();
         content.addView(a.kit.btnGhost("‹ بازگشت به فهرست", Theme.GOLD, v -> onBack()), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
@@ -377,30 +489,21 @@ public class ReportsScreen extends Screen {
         content.addView(a.kit.gap(12));
         content.addView(a.kit.loading("در حال تهیه گزارش…"), a.kit.lp(-1, -2));
         final Filter f = filter.copy();
-
-        a.repo.run(c -> {
-            Meta m = new Meta(c);
-            List<Row> rows = Repo.exec(c, ReportCatalog.query(m, spec.id, f));
-            if ("yoy_sales".equals(spec.id)) rows = mapYoY(rows);
-            if ("aging".equals(spec.id)) mapAging(rows, m);
-            if ("unsettled".equals(spec.id)) mapUnsettled(rows);
-            if ("fleeing_customers".equals(spec.id)) mapFleeing(rows);
-            if ("dying_stock".equals(spec.id)) rows = mapDying(rows);
-            if ("fresh_debtors".equals(spec.id)) rows = mapFresh(rows);
-            return rows;
-        }, new Repo.Cb<List<Row>>() {
+        // Offline copy is keyed by the range and search, so a cached report never shows another period.
+        final String cacheKey = cacheKey(spec.id, f);
+        final Repo.Cb<List<Row>> cb = new Repo.Cb<List<Row>>() {
             @Override
             public void ok(List<Row> rows) {
 java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
                 sm.put("rows", rows);
-                CacheStore.saveData(a, "cx_rep_" + spec.id, cacheNow(), sm);
+                CacheStore.saveData(a, cacheKey, cacheNow(), sm);
                 buildReport(content, spec, rows);
             }
 
             @Override
             public void fail(String faError) {
                 String[] lab = {""};
-                java.util.Map<String, Object> cm = CacheStore.loadData(a, "cx_rep_" + spec.id, lab);
+                java.util.Map<String, Object> cm = CacheStore.loadData(a, cacheKey, lab);
                 if (cm != null) {
                     buildReport(content, spec, CacheStore.rows(cm, "rows"));
                     offlineBanner(content, lab[0], faError);
@@ -414,13 +517,41 @@ java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
             filterBarInto(content, spec);
                 content.addView(a.kit.gap(12));
                 String msg = faError == null || faError.isEmpty() ? "گزارش قابل تهیه نیست" : faError;
-                content.addView(a.kit.error(msg, () -> render(content)), a.kit.lp(-1, -2));
+                boolean schemaGap = faError != null && (faError.contains("پیدا نشد")
+                        || faError.contains("تأیید نشده") || faError.contains("قابل تشخیص"));
+                content.addView(schemaGap ? a.kit.unavailable(msg) : a.kit.error(msg, () -> render(content)), a.kit.lp(-1, -2));
             }
-        });
+        };
+        // Offline mode: the report comes from the last nightly copy on the phone, never from the server.
+        if (a.settings.offlineMode()) cb.fail(OFFLINE_MISS);
+        else a.repo.run(c -> {
+            Meta m = new Meta(c);
+            return applyMaps(m, spec.id, Repo.exec(c, ReportCatalog.query(m, spec.id, f)));
+        }, cb);
+    }
+
+    /** Shown when offline and no nightly copy of this report exists yet. */
+    static final String OFFLINE_MISS = "حالت آفلاین: این گزارش در بکاپ شبانه روی گوشی نیست؛ یک‌بار با اتصال باز کنید";
+
+    /** Report-specific shaping shared by the live screen and the nightly offline copy. */
+    public static List<Row> applyMaps(Meta m, String id, List<Row> rows) {
+        if ("yoy_sales".equals(id)) rows = mapYoY(rows);
+        if ("aging".equals(id)) mapAging(rows, m);
+        if ("unsettled".equals(id)) mapUnsettled(rows);
+        if ("fleeing_customers".equals(id)) mapFleeing(rows);
+        if ("dying_stock".equals(id)) rows = mapDying(rows);
+        if ("fresh_debtors".equals(id)) rows = mapFresh(rows);
+        return rows;
+    }
+
+    /** Key of an offline report copy: id plus range and search, so periods never mix. */
+    public static String cacheKey(String id, Filter f) {
+        return "cx_rep_" + id + "_"
+                + Integer.toHexString((f.from + "|" + f.to + "|" + f.search + "|" + f.status).hashCode());
     }
 
     /** Without dif_date_alan the server sends days=−1: derive the delay from the due date. */
-    private void mapUnsettled(List<Row> rows) {
+    static void mapUnsettled(List<Row> rows) {
         if (rows == null) return;
         String today = Jalali.todayStr();
         for (Row r : rows) {
@@ -432,7 +563,7 @@ java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
     }
 
     /** Fleeing customers: the server sends daysAway=−1; derive it from the last-buy date. */
-    private void mapFleeing(List<Row> rows) {
+    static void mapFleeing(List<Row> rows) {
         if (rows == null) return;
         String today = Jalali.todayStr();
         for (Row r : rows) {
@@ -444,7 +575,7 @@ java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
     }
 
     /** Normalize aging rows (k-based or month-based) into bucket/amount/count. */
-    private void mapAging(List<Row> rows, Meta m) {
+    static void mapAging(List<Row> rows, Meta m) {
         boolean useK = m.function("dif_date_alan");
         for (Row r : rows) {
             if (useK && r.has("k")) {
@@ -461,7 +592,7 @@ java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
     }
 
     /** Urgent only: items running out within 7 days (or already out), soonest first. */
-    private List<Row> mapDying(List<Row> rows) {
+    static List<Row> mapDying(List<Row> rows) {
         List<Row> out = new ArrayList<>();
         if (rows == null) return out;
         for (Row r : rows) {
@@ -473,13 +604,13 @@ java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
     }
 
     /** Fresh debtors: bought within the last 30 days. */
-    private List<Row> mapFresh(List<Row> rows) {
+    static List<Row> mapFresh(List<Row> rows) {
         List<Row> out = new ArrayList<>();
         if (rows == null) return out;
         String cut = "";
         try {
             cut = Jalali.addDays(Jalali.todayStr(), -30);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("ReportsScreen:501", ignored); }
         for (Row r : rows) {
             String ls = Jalali.disp(r.s("lastSale"));
             if (!ls.isEmpty() && ls.compareTo(cut) >= 0) out.add(r);
@@ -488,7 +619,7 @@ java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
     }
 
     /** Merge ~24 monthly rows into 12 month rows: this year vs last year + growth %. */
-    private List<Row> mapYoY(List<Row> rows) {
+    static List<Row> mapYoY(List<Row> rows) {
         List<Row> out = new ArrayList<>();
         if (rows == null) return out;
         String y1 = "";
@@ -528,7 +659,7 @@ java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
         return s.length() >= 7 ? s.substring(0, 7) : "";
     }
 
-    private String monthBucket(String month) {
+    static String monthBucket(String month) {
         try {
             String t = Jalali.todayStr();
             int cy = Integer.parseInt(t.substring(0, 4));
@@ -566,10 +697,15 @@ java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
             int cap = spec.chart == ReportCatalog.C_DONUT ? 8 : 31;
             for (int i = 0; i < Math.min(cap, rows.size()); i++) {
                 Row r = rows.get(i);
-                String x = chartLabel(spec, r.s(spec.chartX));
-                if (spec.chart == ReportCatalog.C_DONUT)
-                    pts.add(new Charts.Point(x, r.d(spec.chartY), Charts.palette(i)));
-                else pts.add(new Charts.Point(x, r.d(spec.chartY)));
+                boolean acc = "سرفصل‌ها".equals(spec.section);
+                String x = acc ? Charts.trim(chartLabel(spec, r.s(spec.chartX)), 8) : chartLabel(spec, r.s(spec.chartX));
+                double yv = r.d(spec.chartY);
+                if (acc) {
+                    // Gold family for the chart of accounts; negative balances stay in the danger colour.
+                    pts.add(new Charts.Point(x, yv, yv < 0 ? Theme.DANGER : Charts.goldTone(i)));
+                } else if (spec.chart == ReportCatalog.C_DONUT)
+                    pts.add(new Charts.Point(x, yv, Charts.palette(i)));
+                else pts.add(new Charts.Point(x, yv));
             }
             c.addView(a.kit.chartHead("نمودار", () -> {
                 if (spec.chart == ReportCatalog.C_LINE) {
@@ -669,7 +805,7 @@ java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
         try {
             if ("day".equals(spec.chartX)) return Jalali.shortLabel(x);
             if ("month".equals(spec.chartX)) return Jalali.monthName(x + "/01") + " " + Money.fa(x.substring(0, 4));
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("ReportsScreen:691", ignored); }
         String t = Money.fa(x);
         return t.length() > 16 ? t.substring(0, 16) + "…" : t;
     }

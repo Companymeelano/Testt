@@ -1,5 +1,6 @@
 package ir.meelano.manager.data;
 
+import ir.meelano.manager.core.Diag;
 import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
@@ -56,6 +57,11 @@ public final class Repo {
     /** Smart run: inside/outside profiles in auto-detected order with failover. */
     public <T> void run(final Task<T> t, final Cb<T> cb) {
         runOpener(() -> SmartLink.open(appCtx, settings), t, cb);
+    }
+
+    /** Opens a fresh connection on the same route, for a long task whose link dropped mid-way. */
+    public Connection reopen() throws Exception {
+        return SmartLink.open(appCtx, settings);
     }
 
     /** Same as {@link #run}, but against explicit connection values (tests unsaved settings). */
@@ -140,6 +146,6 @@ public final class Repo {
     }
 
     public void close() {
-        try { pool.shutdownNow(); } catch (Exception ignored) { }
+        try { pool.shutdownNow(); } catch (Exception ignored) { Diag.ignored("Repo:143", ignored); }
     }
 }

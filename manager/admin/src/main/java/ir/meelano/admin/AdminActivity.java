@@ -247,7 +247,7 @@ public class AdminActivity extends Activity {
 
     private void showHome() {
         LinearLayout box = AdminKit.vbox(this);
-        box.addView(AdminKit.titleBar(this, "میلانو • فروش لایسنس", null));
+        box.addView(AdminKit.titleBar(this, "میلانو زرین‌فرمان • فروش لایسنس", null));
 
         long today = License.today();
         int nc = db.customerCount();
@@ -272,6 +272,10 @@ public class AdminActivity extends Activity {
         try {
             inboxN = db.inboxCount();
         } catch (Exception ignored) { }
+        Button bManual = AdminKit.btn(this, "⚡  صدور دستی (کد دستگاه را خودتان وارد کنید)", false);
+        bManual.setOnClickListener(v -> show(() -> showMint(new MintCtx())));
+        box.addView(bManual);
+
         Button bInbox = AdminKit.btn(this,
                 inboxN > 0 ? ("📥  صندوق درخواست‌ها (" + AdminKit.fa(inboxN) + " تازه)") : "📥  صندوق درخواست‌ها",
                 inboxN > 0);
@@ -605,8 +609,8 @@ public class AdminActivity extends Activity {
 
         Button issue = AdminKit.btn(this, "صدور کد", true);
         issue.setOnClickListener(v -> {
-            ctx.dev = AdminKit.txt(fDev).toUpperCase()
-                    .replaceAll("[^A-Z0-9]", "");
+            // Crockford normalization: a typed O becomes 0, I/L become 1, separators drop.
+            ctx.dev = License.normalize(AdminKit.txt(fDev));
             ctx.name = AdminKit.txt(fName);
             ctx.family = AdminKit.txt(fFamily);
             ctx.shop = AdminKit.txt(fShop);
@@ -614,8 +618,8 @@ public class AdminActivity extends Activity {
             ctx.city = AdminKit.txt(fCity);
             ctx.note = AdminKit.txt(fNote);
             if (fCustom != null) ctx.customDate = AdminKit.txt(fCustom);
-            if (ctx.dev.length() != 8) {
-                AdminKit.toast(this, "کد دستگاه باید ۸ حرف باشد");
+            if (!ctx.dev.matches("[0-9ABCDEFGHJKMNPQRSTVWXYZ]{8}")) {
+                AdminKit.toast(this, "کد دستگاه باید ۸ حرف/عدد باشد (همان کدی که در برنامه مشتری نشان داده می‌شود)");
                 return;
             }
             int days = TRIAL_DAYS;
@@ -779,11 +783,13 @@ public class AdminActivity extends Activity {
     }
 
     private String shareText(AdminDb.Lic l) {
-        return "کد فعال‌سازی میلانو\n"
+        return "کد فعال‌سازی میلانو زرین‌فرمان\n"
                 + AdminKit.prettifyPack(l.pack) + "\n"
                 + "طرح: «" + License.planFa(planOf(l)) + "»\n"
                 + "انقضا: " + expText(l) + "\n"
-                + "راهنما: برنامه را باز نگه دارید؛ کد خودکار فعال می‌شود.";
+                + "راهنما: برنامه را باز نگه دارید؛ کد خودکار فعال می‌شود.\n"
+                + "اگر فعال نشد: در برنامه، بخش «فعال‌سازی»، کادر «کد فعال‌سازی» را باز کنید، "
+                + "کد را بچسبانید و دکمه «فعال‌سازی با کد» را بزنید.";
     }
 
     // ---------- customers ----------
@@ -1107,7 +1113,7 @@ public class AdminActivity extends Activity {
             try {
                 String line = License.revokeLine(rDev);
                 if (SmsIo.cleanPhone(rPhone).length() >= 10) {
-                    directSms(rPhone, "میلانو منیجر\n" + line
+                    directSms(rPhone, "میلانو زرین‌فرمان منیجر\n" + line
                             + "\nلایسنس شما لغو شد؛ برای فعال‌سازی مجدد با فروشنده در تماس باشید.");
                     db.setRevoked(l.id, true);
                     reload();
@@ -1125,7 +1131,7 @@ public class AdminActivity extends Activity {
             try {
                 String line = License.blockLine(rDev, AdminKit.txt(fReason));
                 if (SmsIo.cleanPhone(rPhone).length() >= 10) {
-                    directSms(rPhone, "میلانو منیجر\n" + line);
+                    directSms(rPhone, "میلانو زرین‌فرمان منیجر\n" + line);
                     db.setRevoked(l.id, true);
                     reload();
                 } else {
@@ -1142,7 +1148,7 @@ public class AdminActivity extends Activity {
             try {
                 String line = License.unblockLine(rDev);
                 if (SmsIo.cleanPhone(rPhone).length() >= 10) {
-                    directSms(rPhone, "میلانو منیجر\n" + line
+                    directSms(rPhone, "میلانو زرین‌فرمان منیجر\n" + line
                             + "\nمسدودی برداشته شد؛ برنامه را فعال کنید.");
                 } else {
                     AdminKit.copy(this, "متن رفع مسدودی", line);
@@ -1308,7 +1314,7 @@ public class AdminActivity extends Activity {
                 AdminKit.toast(this, "کارت کپی شد");
             });
             out.addView(bCopy);
-            final String fmsg = "کارت اتصال میلانو (" + fname + ")\n" + fcard
+            final String fmsg = "کارت اتصال میلانو زرین‌فرمان (" + fname + ")\n" + fcard
                     + "\nراهنما: برنامه را باز نگه دارید؛ کارت خودکار ثبت می‌شود.";
             Button bShare = AdminKit.btn(this, "اشتراک‌گذاری برای مشتری", false);
             bShare.setOnClickListener(x -> AdminKit.share(this, "ارسال کارت اتصال", fmsg));

@@ -126,7 +126,7 @@ public class SmsReceiver extends BroadcastReceiver {
             NotificationManager nm = (NotificationManager) app.getSystemService(Context.NOTIFICATION_SERVICE);
             if (nm == null) return;
             if (Build.VERSION.SDK_INT >= 26) {
-                NotificationChannel ch = new NotificationChannel("milano_sms", "پیامک میلانو",
+                NotificationChannel ch = new NotificationChannel("milano_sms", "پیامک میلانو زرین‌فرمان",
                         NotificationManager.IMPORTANCE_HIGH);
                 try {
                     nm.createNotificationChannel(ch);
@@ -147,7 +147,7 @@ public class SmsReceiver extends BroadcastReceiver {
                     ? new android.app.Notification.Builder(app, "milano_sms")
                     : new android.app.Notification.Builder(app);
             nb.setSmallIcon(R.mipmap.ic_launcher)
-                    .setContentTitle("✦ پیامک میلانو")
+                    .setContentTitle("✦ پیامک میلانو زرین‌فرمان")
                     .setContentText(txt)
                     .setAutoCancel(true)
                     .setContentIntent(pi);

@@ -22,10 +22,10 @@ public final class CacheStore {
     private CacheStore() { }
 
     private static File dir(Context c) {
-        File d = new File(c.getCacheDir(), "mcache");
+        File d = new File(c.getFilesDir(), "mcache");
         try {
             if (!d.exists()) d.mkdirs();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("CacheStore:28", ignored); }
         return d;
     }
 
@@ -53,7 +53,7 @@ public final class CacheStore {
                 } else if (v instanceof List) {
                     StringBuilder b = new StringBuilder();
                     List<?> rows = (List<?>) v;
-                    int cap = Math.min(rows.size(), 400);
+                    int cap = Math.min(rows.size(), 20000);
                     for (int i = 0; i < cap; i++) {
                         Object o = rows.get(i);
                         if (o instanceof Row) b.append(rowStr((Row) o)).append('\n');
@@ -68,7 +68,7 @@ public final class CacheStore {
                 }
             }
             write(new File(dir(c), fn(prefix + "_index")), idx.toString());
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("CacheStore:71", ignored); }
     }
 
     /** Load a screen state saved with {@link #saveData} (null when nothing cached). */
@@ -169,9 +169,9 @@ public final class CacheStore {
             } finally {
                 try {
                     out.close();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("CacheStore:172", ignored); }
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("CacheStore:174", ignored); }
     }
 
     private static String read(File f) {
@@ -187,7 +187,7 @@ public final class CacheStore {
             } finally {
                 try {
                     in.close();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("CacheStore:190", ignored); }
             }
         } catch (Exception e) {
             return null;

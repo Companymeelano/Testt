@@ -46,7 +46,7 @@ public final class RoleStore {
     /** Warehouse side: his own build (phase 2) + stock views. */
     private static final String[] WAREHOUSE_OK = {
             "anbar", "tahvil", "resid", "shomarsh", "score", "sync_queue", "pick_wave",
-            "home", "products", "customers", "search", "voice", "more"};
+            "home", "products", "customers", "search", "voice", "more", "settings"};
     /** Moadian (tax) side: invoices + tax reports. */
     private static final String[] MOADIAN_OK = {
             "home", "sales", "customers", "reports", "search", "voice", "more"};
@@ -66,7 +66,7 @@ public final class RoleStore {
     public static void setEnabled(Context c, boolean on) {
         try {
             prefs(c).edit().putBoolean("roles_on", on).apply();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("RoleStore:69", ignored); }
     }
 
     /** Current role id (always a valid role, defaults to admin). */
@@ -74,7 +74,7 @@ public final class RoleStore {
         try {
             String r = prefs(c).getString("role_current", ADMIN);
             if (isValid(r)) return r;
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("RoleStore:77", ignored); }
         return ADMIN;
     }
 
@@ -82,7 +82,7 @@ public final class RoleStore {
         try {
             if (!isValid(role)) role = ADMIN;
             prefs(c).edit().putString("role_current", role).apply();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("RoleStore:85", ignored); }
     }
 
     public static boolean isValid(String role) {
@@ -131,9 +131,9 @@ public final class RoleStore {
             return new String[]{"sales", "customers", "cheques", "dues", "more"};
         if (MOADIAN.equals(role))
             return new String[]{"sales", "customers", "reports", "more"};
-        // Manager's five steady destinations: move products into the grouped
-        // «کالا و عملیات انبار» hub so the bottom bar is comfortable on phones.
-        return new String[]{"home", "sales", "customers", "reports", "more"};
+        // Manager's bar: home, product file, customers, a dedicated assistant tab, and the
+        // command room («اتاق فرمان») which holds reports and every section.
+        return new String[]{"home", "products", "customers", "assistant", "more"};
     }
 
     /** Short tab label (some screen titles are too long for a tab). */
@@ -142,6 +142,8 @@ public final class RoleStore {
         if ("resid".equals(screenId)) return "رسید";
         if ("shomarsh".equals(screenId)) return "شمارش";
         if ("score".equals(screenId)) return "امتیاز";
+        if ("assistant".equals(screenId)) return "دستیار";
+        if ("more".equals(screenId)) return "اتاق فرمان";
         return null; // fall back to the screen title
     }
 
@@ -195,7 +197,7 @@ public final class RoleStore {
             if (pin.length() < 4) e.putString(pinKey(role), "");
             else e.putString(pinKey(role), sha(pin));
             e.apply();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("RoleStore:198", ignored); }
     }
 
     /**

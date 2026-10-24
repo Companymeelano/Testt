@@ -1,5 +1,6 @@
 package ir.meelano.manager.screens;
 
+import ir.meelano.manager.core.Diag;
 import android.app.AlertDialog;
 import android.view.View;
 import android.widget.LinearLayout;
@@ -32,7 +33,7 @@ import java.util.Map;
 /** Sales (sailfact) and Purchases (buyfact) — one screen, two personalities. */
 public class TradeScreen extends Screen {
     private final boolean sales;
-    private final Filter filter = new Filter();
+    private final Filter filter = Filter.daily();
     private int tab;
 
     public TradeScreen(MainActivity a, boolean sales) {
@@ -68,7 +69,7 @@ public class TradeScreen extends Screen {
         c.custGroups = true;
         c.statusTitle = "وضعیت تسویه";
         c.status = new FilterSheet.Opt[]{
-                new FilterSheet.Opt("", "همه"),
+                // «همه» is added by FilterSheet itself; listing it here showed it twice.
                 new FilterSheet.Opt("settled", "تسویه‌شده"),
                 new FilterSheet.Opt("unsettled", "تسویه‌نشده"),
         };
@@ -426,17 +427,23 @@ public class TradeScreen extends Screen {
         return Money.pct(part * 100.0 / whole);
     }
 
+    /** Opens one invoice by its number (used by product movements and reports). */
+    public void openInvoice(final String no) {
+        if (no == null || no.trim().isEmpty()) return;
+        openDetailByNo(no.trim());
+    }
+
     // ---------------- invoice detail ----------------
     private void openDetailByNo(final String no) {
         a.kit.toast("در حال دریافت فاکتور…");
         a.repo.run(c -> {
             Meta m = new Meta(c);
             Row head = Repo.one(c, Queries.factorHeader(m, sales, no));
-            List<Row> lines = Repo.exec(c, Queries.factorLines(m, sales, no));
+            List<Row> lines = Queries.distinctLines(Repo.exec(c, Queries.factorLines(m, sales, no)));
             List<Row> dars = new ArrayList<>();
             try {
                 dars = Repo.exec(c, MoneyQueries.invoiceDars(m, sales ? 0 : 1, no));
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("TradeScreen:445", ignored); }
             return new Detail(head, lines, dars);
         }, new Repo.Cb<Detail>() {
             @Override
@@ -536,7 +543,7 @@ public class TradeScreen extends Screen {
         };
         if (!fLines.isEmpty()) {
             body.addView(a.kit.gap(8));
-            body.addView(a.exportBar("فاکتور " + fNo, fParty + " • " + fDate, expCols, fLines), a.kit.lp(-1, -2));
+            body.addView(a.exportBar("فاکتور " + fNo, fParty + " • " + fDate, expCols, fLines, false), a.kit.lp(-1, -2));
         }
         LinearLayout footer = a.kit.h();
         footer.addView(a.kit.btnGhost("🖨 چاپ", Theme.GOLD, v -> FisPrint.print(a, head, fLines, sales)), a.kit.wlp(1f));

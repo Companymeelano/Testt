@@ -39,6 +39,10 @@ import java.util.zip.ZipOutputStream;
 public final class Backup {
     private Backup() { }
 
+    /** Database account used by the smart backup and the offline report copy. */
+    static final String BACKUP_USER = ir.meelano.manager.data.Atiran.defaultUser();
+    static final String BACKUP_PASS = ir.meelano.manager.data.Atiran.defaultPass();
+
     public interface Progress {
         void onTable(String faName, int done, int total);
     }
@@ -74,7 +78,7 @@ public final class Backup {
         new Thread(() -> {
             boolean bound = s.directConn() && NetRoute.bindDirect(app);
             try {
-                try (Connection c = Atiran.open(s.effHost(), s.effPort(), s.effDb(), s.effUser(), s.effPass())) {
+                try (Connection c = Atiran.open(s.effHost(), s.effPort(), s.effDb(), BACKUP_USER, BACKUP_PASS)) {
                     Meta m = new Meta(c);
                     String stamp = new SimpleDateFormat("yyyyMMdd_HHmm", Locale.US).format(new Date());
                     File dir = new File(app.getCacheDir(), "backup");
@@ -92,7 +96,7 @@ public final class Backup {
                             main.post(() -> {
                                 try {
                                     pg.onTable(fa, di, TABLES.length);
-                                } catch (Exception ignored) { }
+                                } catch (Exception ignored) { Diag.ignored("Backup:95", ignored); }
                             });
                             String t = TABLES[i][0];
                             if (!m.table(t)) {
@@ -134,7 +138,7 @@ public final class Backup {
     }
 
     private static String readme(String stamp, String db) {
-        return "بکاپ هوشمند میلانو\n"
+        return "بکاپ هوشمند میلانو زرین‌فرمان\n"
                 + "تاریخ ساخت (میلادی): " + stamp + "\n"
                 + "دیتابیس: " + db + "\n"
                 + "هر جدول یک فایل CSV با سرستون است (UTF-8).\n"
@@ -230,14 +234,13 @@ public final class Backup {
                 out = new FileOutputStream(new File(docs, zip.getName()));
                 copy(in, out);
             }
-        } catch (Exception ignored) {
-        } finally {
+        } catch (Exception ignored) { Diag.ignored("Backup:233", ignored); } finally {
             try {
                 if (in != null) in.close();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("Backup:237", ignored); }
             try {
                 if (out != null) out.close();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("Backup:240", ignored); }
         }
     }
 
@@ -283,10 +286,10 @@ public final class Backup {
             } finally {
                 try {
                     if (in != null) in.close();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("Backup:286", ignored); }
                 try {
                     if (out != null) out.close();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("Backup:289", ignored); }
             }
             return dst;
         } catch (Exception e) {

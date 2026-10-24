@@ -36,7 +36,7 @@ public final class CloseoutDb {
                     + "[note] nvarchar(1000) NULL, "
                     + "[snapshot] nvarchar(max) NOT NULL, "
                     + "[closedAt] bigint NOT NULL)");
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("CloseoutDb:39", ignored); }
     }
 
     private static void ensureHistory(Connection c) {
@@ -50,7 +50,7 @@ public final class CloseoutDb {
                     + "[action] varchar(16) NOT NULL, "
                     + "[snapshot] nvarchar(max) NOT NULL, "
                     + "[closedAt] bigint NOT NULL)");
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("CloseoutDb:53", ignored); }
     }
 
     public static boolean available(Connection c) {
@@ -171,12 +171,12 @@ public final class CloseoutDb {
                     try {
                         if (originalAutoCommit) c.rollback();
                         else if (savepoint != null) c.rollback(savepoint);
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("CloseoutDb:174", ignored); }
                 }
                 return false;
             } finally {
                 if (originalAutoCommit) {
-                    try { c.setAutoCommit(true); } catch (Exception ignored) { }
+                    try { c.setAutoCommit(true); } catch (Exception ignored) { Diag.ignored("CloseoutDb:179", ignored); }
                 }
             }
         } catch (Exception ignored) {

@@ -1,5 +1,6 @@
 package ir.meelano.manager.screens;
 
+import ir.meelano.manager.core.Diag;
 import android.app.AlertDialog;
 import android.view.View;
 import android.widget.LinearLayout;
@@ -19,6 +20,7 @@ import ir.meelano.manager.data.Repo;
 import ir.meelano.manager.data.Row;
 import ir.meelano.manager.ui.Charts;
 import ir.meelano.manager.ui.FilterSheet;
+import ir.meelano.manager.ui.FlowRow;
 import ir.meelano.manager.ui.Kit;
 import ir.meelano.manager.ui.Theme;
 
@@ -30,7 +32,7 @@ import java.util.Map;
 /** Receipts (dar p=0) and Payments (dar p=1). */
 public class MoneyScreen extends Screen {
     private final int p;
-    private final Filter filter = new Filter();
+    private final Filter filter = Filter.daily();
     private int tab;
 
     public MoneyScreen(MainActivity a, int p) {
@@ -188,18 +190,82 @@ public class MoneyScreen extends Screen {
         renderNotes(content, d.notes);
     }
 
-    private void buildList(LinearLayout content, Data d) {
+    /** Selected receipt filter: "", "today", "cash", "pos", "havaleh" or "cheque". */
+    private String typeF = "";
+
+    private boolean matchType(Row r) {
+        switch (typeF) {
+            case "today":
+                return Jalali.disp(r.s("date")).startsWith(Jalali.todayStr());
+            case "cash":
+                return r.d("cash") > 0.5;
+            case "pos":
+                return r.d("pos") > 0.5;
+            case "havaleh":
+                return r.d("havaleh") > 0.5;
+            case "cheque":
+                return r.d("cheque") > 0.5;
+            default:
+                return true;
+        }
+    }
+
+    /** Accent of a receipt = its largest payment part (نقد، کارت، حواله، چک). */
+    private int methodColor(Row r) {
+        double cash = r.d("cash"), pos = r.d("pos"), hav = r.d("havaleh"), chq = r.d("cheque");
+        double max = Math.max(Math.max(cash, pos), Math.max(hav, chq));
+        if (max < 0.5) return accent();
+        if (max == cash) return Theme.SUCCESS;
+        if (max == pos) return Theme.INFO;
+        if (max == hav) return Theme.VIOLET;
+        return Theme.GOLD;
+    }
+
+    /** Footer of a receipt card: payment-method chips, then who registered it. */
+    private View receiptFoot(Row r) {
+        LinearLayout foot = a.kit.v();
+        foot.addView(a.kit.docKinds(r), a.kit.lp(-1, -2));
+        String by = r.s("username").trim();
+        if (!by.isEmpty()) {
+            TextView who = a.kit.text("👤 ثبت‌کننده: " + by, 10.5f, Theme.MUTED, false);
+            who.setSingleLine(true);
+            who.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            LinearLayout.LayoutParams wp = a.kit.lp(-1, -2);
+            wp.setMargins(0, Theme.dp(6), 0, 0);
+            foot.addView(who, wp);
+        }
+        return foot;
+    }
+
+    private void buildList(final LinearLayout content, Data d) {
         if (d.list == null || d.list.isEmpty()) {
             content.addView(a.kit.empty("قبضی در این بازه یافت نشد", "فیلتر را تغییر دهید"), a.kit.lp(-1, -2));
             return;
         }
+        // Type filter: narrows the receipts to one payment form, or to today's documents.
+        // Applied on the rows already fetched, so switching is instant.
+        String[][] types = {{"", "همه"}, {"today", "امروز"}, {"cash", "نقد"},
+                {"pos", "کارت"}, {"havaleh", "حواله"}, {"cheque", "چک"}};
+        FlowRow typeRow = new FlowRow(a);
+        for (String[] t : types) {
+            final String key = t[0];
+            View ch = a.kit.chip(t[1], key.equals(typeF), accent(), v -> {
+                typeF = key;
+                render(content);
+            });
+            typeRow.addView(ch, a.kit.lp(-2, -2));
+        }
+        content.addView(typeRow, a.kit.lp(-1, -2));
+        content.addView(a.kit.gap(10));
+
         for (Row r : d.list) {
+            if (!matchType(r)) continue;
             final String ghno = r.s("ghno");
             String pill = r.s("kind");
             if (pill.isEmpty()) pill = "—";
             View v = a.kit.docRow("قبض " + Money.fa(ghno), r.s("customer"),
                     Jalali.shortLabel(r.s("date")), Money.rial(r.d("total")),
-                    pill, accent(), v2 -> openDetail(ghno));
+                    pill, methodColor(r), receiptFoot(r), v2 -> openDetail(ghno));
             LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
             p.setMargins(0, 0, 0, Theme.dp(10));
             content.addView(v, p);
@@ -213,6 +279,7 @@ public class MoneyScreen extends Screen {
                 new ReportCatalog.Col("ghno", "قبض", ReportCatalog.T_TEXT),
                 new ReportCatalog.Col("date", "تاریخ", ReportCatalog.T_DATE),
                 new ReportCatalog.Col("customer", "طرف‌حساب", ReportCatalog.T_TEXT),
+                new ReportCatalog.Col("username", "ثبت‌کننده", ReportCatalog.T_TEXT),
                 new ReportCatalog.Col("cash", "نقد", ReportCatalog.T_MONEY),
                 new ReportCatalog.Col("pos", "کارت", ReportCatalog.T_MONEY),
                 new ReportCatalog.Col("havaleh", "حواله", ReportCatalog.T_MONEY),
@@ -260,15 +327,15 @@ public class MoneyScreen extends Screen {
             List<Row> pos = new ArrayList<>();
             try {
                 pos = Repo.exec(c, MoneyQueries.darPos(m, p, ghno));
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("MoneyScreen:329", ignored); }
             List<Row> chqs = new ArrayList<>();
             try {
                 chqs = Repo.exec(c, MoneyQueries.darCheques(m, p, ghno));
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("MoneyScreen:333", ignored); }
             List<Row> invs = new ArrayList<>();
             try {
                 invs = Repo.exec(c, MoneyQueries.darSettled(m, p, ghno));
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("MoneyScreen:337", ignored); }
             return new Detail(head, pos, chqs, invs);
         }, new Repo.Cb<Detail>() {
             @Override
@@ -312,7 +379,7 @@ public class MoneyScreen extends Screen {
             body.addView(a.kit.kv("چک (" + Money.fa(String.valueOf(head.l("chkCount"))) + " فقره)", Money.rial(head.d("cheque")), Theme.TEXT), a.kit.lp(-1, -2));
         body.addView(a.kit.kv("جمع", Money.rial(head.d("total")), Theme.GOLD_SOFT), a.kit.lp(-1, -2));
         if (!head.s("descrip").isEmpty()) body.addView(a.kit.kv("شرح", head.s("descrip"), Theme.MUTED), a.kit.lp(-1, -2));
-        if (!head.s("username").isEmpty()) body.addView(a.kit.kv("کاربر", head.s("username"), Theme.MUTED), a.kit.lp(-1, -2));
+        if (!head.s("username").isEmpty()) body.addView(a.kit.kv("ثبت‌کننده", head.s("username"), Theme.TEXT), a.kit.lp(-1, -2));
         String doneDate = Jalali.disp(head.s("doneDate"));
         if (!doneDate.isEmpty() && !doneDate.equals(Jalali.disp(head.s("date"))))
             body.addView(a.kit.kv("تاریخ ثبت", Jalali.dispFa(doneDate), Theme.MUTED), a.kit.lp(-1, -2));

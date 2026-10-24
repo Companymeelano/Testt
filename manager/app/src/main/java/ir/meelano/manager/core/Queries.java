@@ -2,6 +2,7 @@ package ir.meelano.manager.core;
 
 import ir.meelano.manager.data.Meta;
 
+import ir.meelano.manager.data.Row;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -240,7 +241,23 @@ public final class Queries {
         String amountCol = m.must(table, "مبلغ", "all");
         String numberCol = Sql.pick(cols, sales ? "shfacfo" : "shfackh");
         List<Object> binds = new ArrayList<>();
-        String dc = Sql.dateCond(Sql.date10("x", dateCol), from, to, binds);
+        // Some rows store Gregorian dates («2026-10-14…») beside Atiran Jalali («1405/07/22»).
+        // The Jalali range alone drops the Gregorian rows, so recent days looked empty.
+        // Match both spellings; Java folds them onto the same Jalali day.
+        String raw = Sql.date10("x", dateCol);
+        String dc;
+        boolean bothEnds = from != null && !from.trim().isEmpty() && to != null && !to.trim().isEmpty();
+        String gf = bothEnds ? Jalali.toGregorian(from.trim()) : "";
+        String gt = bothEnds ? Jalali.toGregorian(to.trim()) : "";
+        if (bothEnds && !gf.isEmpty() && !gt.isEmpty()) {
+            String f = from.trim(), t = to.trim();
+            if (f.compareTo(t) > 0) { String x = f; f = t; t = x; String y = gf; gf = gt; gt = y; }
+            String dk = Sql.dateKey(raw);
+            dc = "((" + dk + ">=? AND " + dk + "<=?) OR (" + raw + ">=? AND " + raw + "<=?))";
+            binds.add(f); binds.add(t); binds.add(gf); binds.add(gt);
+        } else {
+            dc = Sql.dateCond(raw, from, to, binds);
+        }
         String inner = "WHERE " + (dc.isEmpty() ? "1=1" : dc) + Sql.activeAnd(cols, "x") + Sql.softAnd(cols, "x");
         String src = Sql.dedupe(table, numberCol, "h", inner);
         String day = Sql.date10("h", dateCol);
@@ -267,7 +284,7 @@ public final class Queries {
         Set<String> sail = m.columns("sailfact");
         m.must("sailfact", "تاریخ تسویه", "t_date");
         m.must("sailfact", "وضعیت تسویه", "tasvieh");
-        m.must("sailfact", "مبلغ", "all");
+        m.must("sailfact", "مبلغ", "all_fel", "all");
         String shmo = Sql.pick(sail, "shmo", "SHMO");
         String number = Sql.pick(sail, "shfacfo");
         String visitorId = Sql.pick(sail, "vis_rdf", "VisitorID");
@@ -290,7 +307,7 @@ public final class Queries {
             daysExpr = "CAST(-1 AS bigint)";
         }
         String sql = "SELECT TOP (" + clampTop(top) + ") " + codeExpr + " AS code, " + nameExpr + " AS party"
-                + ", TRY_CONVERT(decimal(19,2),s.[all]) AS amount"
+                + ", COALESCE(TRY_CONVERT(decimal(19,2),s.[all_fel]),TRY_CONVERT(decimal(19,2),s.[all])) AS amount"
                 + ", LEFT(TRY_CONVERT(nvarchar(30),s.[t_date]),10) AS dueDate, " + daysExpr + " AS days"
                 + ", " + visitorExpr + " AS visitor, " + numExpr + " AS invoice"
                 + " FROM dbo.sailfact s" + joinSql + " WHERE " + Sql.join(where, " AND ")
@@ -316,7 +333,7 @@ public final class Queries {
     public static Q unsettledByMonth(Meta m) throws Missing {
         m.must("sailfact", "تاریخ تسویه", "t_date");
         m.must("sailfact", "وضعیت تسویه", "tasvieh");
-        String amountCol = m.must("sailfact", "مبلغ", "all");
+        String amountCol = m.must("sailfact", "مبلغ", "all_fel", "all");
         Set<String> cols = m.columns("sailfact");
         String mon = Sql.month7("s", "t_date");
         return new Q("SELECT " + mon + " AS month, ISNULL(SUM(" + Sql.num("s", amountCol) + "),0) AS amount"
@@ -326,19 +343,6 @@ public final class Queries {
     }
 
     /** Aging buckets via dif_date_alan (only call when the function exists): k,amount,count. */
-    public static Q agingBuckets(Meta m) throws Missing {
-        String dateDiffFn = m.qFunction("dif_date_alan");
-        if (dateDiffFn == null) throw new Missing("تابع محاسبه سررسید در دیتابیس نیست");
-        m.must("sailfact", "تاریخ تسویه", "t_date");
-        m.must("sailfact", "وضعیت تسویه", "tasvieh");
-        String amountCol = m.must("sailfact", "مبلغ", "all");
-        return new Q("SELECT k AS k, ISNULL(SUM(amount),0) AS amount, COUNT_BIG(1) AS count FROM (SELECT"
-                + " CASE WHEN " + dateDiffFn + "([t_date])<0 THEN 0 WHEN " + dateDiffFn + "([t_date])<=30 THEN 1"
-                + " WHEN " + dateDiffFn + "([t_date])<=60 THEN 2 WHEN " + dateDiffFn + "([t_date])<=90 THEN 3 ELSE 4 END AS k"
-                + ", TRY_CONVERT(decimal(19,2),[all]) AS amount FROM dbo.sailfact"
-                + " WHERE [tasvieh]='f' AND NULLIF([t_date],'') IS NOT NULL) g GROUP BY k ORDER BY k");
-    }
-
     // =====================================================================================
     // SALES + PURCHASES
     // =====================================================================================
@@ -433,6 +437,11 @@ public final class Queries {
         if ("total_desc".equals(f.sort)) orderBy = totalExpr + " DESC";
         if ("remain_desc".equals(f.sort)) orderBy = "((" + totalExpr + ")-(" + paidExpr + ")) DESC";
         if ("total_desc".equals(f.sort) || "remain_desc".equals(f.sort)) orderBy += ", h.[" + dateCol + "] DESC";
+        // Registrant (who entered the invoice): best-effort, empty when the column is absent.
+        String userCol = sales ? Sql.pick(cols, "UserID", "user_id", "ShUser", "shuser", "CreateUser", "sabt_user") : null;
+        String regApply = MoneyQueries.registrantApplyFor(m, userCol);
+        String regSel = regApply == null ? "N''" : "COALESCE(ru.regName,N'')";
+        if (regApply != null) join = join + regApply;
         String sql = "SELECT " + Sql.txt("h", numberCol, 80) + " AS no"
                 + ", " + Sql.date10("h", dateCol) + " AS date"
                 + ", " + (partyCol == null ? "CAST(NULL AS nvarchar(100))" : Sql.txt("h", partyCol, 100)) + " AS code"
@@ -443,6 +452,7 @@ public final class Queries {
                 + ", " + (tasviehCol == null ? "N''" : Sql.txt("h", tasviehCol, 10)) + " AS tasvieh"
                 + ", " + (dueCol == null ? "CAST(NULL AS nvarchar(10))" : Sql.date10("h", dueCol)) + " AS dueDate"
                 + ", " + (descCol == null ? "CAST(NULL AS nvarchar(500))" : Sql.txt("h", descCol, 500)) + " AS descrip"
+                + ", " + regSel + " AS registrant"
                 + " FROM " + Sql.dedupe(table, numberCol, "h", "") + join
                 + where + extra
                 + " ORDER BY " + orderBy
@@ -467,9 +477,14 @@ public final class Queries {
         String amountCol = m.must(table, "\u0645\u0628\u0644\u063a", "all");
         String numberCol = sales ? m.must(table, "\u0634\u0645\u0627\u0631\u0647 \u0641\u0627\u06a9\u062a\u0648\u0631", "shfacfo")
                 : m.must(table, "\u0634\u0645\u0627\u0631\u0647 \u0641\u0627\u06a9\u062a\u0648\u0631", "shfackh", "shfac");
-        String statusCol = Sql.pick(cols, "Status");
+        // Sales: sailfact.Status (1 = confirmed). Purchases: buyfact has no Status column;
+        // its confirmation flag is taeed (int). Same convention (1 = confirmed) is assumed
+        // here and must be verified against Atiran's own confirmation screen.
+        String statusCol = sales ? Sql.pick(cols, "Status") : Sql.pick(cols, "taeed", "Taeed");
         String st = statusCol == null ? "CAST(0 AS int)" : "ISNULL(TRY_CONVERT(int,h.[" + statusCol + "]),0)";
-        String lbl = "CASE WHEN " + st + "=1 THEN N'\u062a\u0623\u06cc\u06cc\u062f\u0634\u062f\u0647' ELSE N'\u062a\u0623\u06cc\u06cc\u062f\u0646\u0634\u062f\u0647 / \u0627\u0628\u0637\u0627\u0644\u06cc' END";
+        String lbl = statusCol == null
+                ? "N'\u0648\u0636\u0639\u06cc\u062a \u062b\u0628\u062a\u200c\u0646\u0634\u062f\u0647 \u062f\u0631 \u062f\u06cc\u062a\u0627\u0628\u06cc\u0633'"
+                : "CASE WHEN " + st + "=1 THEN N'\u062a\u0623\u06cc\u06cc\u062f\u0634\u062f\u0647' ELSE N'\u062a\u0623\u06cc\u06cc\u062f\u0646\u0634\u062f\u0647 / \u0627\u0628\u0637\u0627\u0644\u06cc' END";
         List<Object> binds = new ArrayList<>();
         String dc = Sql.dateCond(Sql.date10("h", dateCol), from, to, binds);
         String act = Sql.activeAnd(cols, "h") + Sql.softAnd(cols, "h");
@@ -478,11 +493,15 @@ public final class Queries {
         else where = " WHERE " + dc + act;
         // A numeric code travels with the label: matching Persian text between SQL
         // and Java is hostage to ي/ی normalisation, a number is not.
-        return new Q("SELECT CASE WHEN " + st + "=1 THEN 1 ELSE 0 END AS state, "
+        String head = "SELECT CASE WHEN " + st + "=1 THEN 1 ELSE 0 END AS state, "
                 + lbl + " AS label, COUNT_BIG(1) AS docs"
                 + ", ISNULL(SUM(" + Sql.num("h", amountCol) + "),0) AS total"
                 + " FROM " + Sql.dedupe(table, numberCol, "h", "")
-                + where + " GROUP BY CASE WHEN " + st + "=1 THEN 1 ELSE 0 END, " + lbl
+                + where;
+        // Without a status column every row falls into one constant group: a GROUP BY on a
+        // constant is rejected by SQL Server, so the single aggregate row is returned directly.
+        if (statusCol == null) return new Q(head, binds);
+        return new Q(head + " GROUP BY CASE WHEN " + st + "=1 THEN 1 ELSE 0 END, " + lbl
                 + " ORDER BY 4 DESC", binds);
     }
 
@@ -521,6 +540,10 @@ public final class Queries {
         sb.append(" FROM dbo.[").append(table).append("] h").append(custJoin(m, "h", partyCol, "cu"));
         if (sales) sb.append(visJoin(m, "h", visCol, "v"));
         sb.append(" WHERE TRY_CONVERT(nvarchar(80),h.[").append(numberCol).append("])=?");
+        sb.append(Sql.activeAnd(cols, "h"));
+        // Atiran keeps every saved version of an invoice (rdf__); the current one is the highest (mili.sql).
+        String verHead = Sql.pick(cols, "rdf__", "RDF__");
+        if (verHead != null) sb.append(" ORDER BY h.[").append(verHead).append("] DESC");
         return new Q(sb.toString(), binds);
     }
 
@@ -544,6 +567,7 @@ public final class Queries {
         Set<String> cols = m.columns(line);
         String linkCol = sales ? Sql.pick(cols, "shfacfo") : Sql.pick(cols, "shfackh", "shfac");
         if (linkCol == null) throw new Missing("ستون ارتباطی اقلام در «" + AtiranSchema.faTitle(line) + "» پیدا نشد");
+        String verCol = Sql.pick(cols, "rdf__", "RDF__");
         String shka = Sql.pick(cols, "SHKA", "shka");
         String lineName = Sql.pick(cols, "naka", "NAKA");
         String invName = m.col("inventory", "naka", "NAKA");
@@ -552,9 +576,10 @@ public final class Queries {
         String qtyJ = Sql.pick(cols, "TEDJOZ", "tedjoz");
         String vp = Sql.pick(cols, "VAHPRICE", "vahprice");
         String jp = Sql.pick(cols, "JOZPRICE", "jozprice");
-        String sum = Sql.pick(cols, "LINESUM", "linesum");
+        String sum = Sql.pick(cols, "LINESUM", "linesum", "tamam_joz");
         String disc = Sql.pick(cols, "TafifLine", "litakhma", "TafifAghlam");
         String tax = Sql.pick(cols, "tax", "Tax");
+        String lineNo = Sql.pick(cols, "rdf", "RDF");
         String nameExpr = "COALESCE(" + (invName == null ? "" : Sql.txt("i", invName, 250) + ",")
                 + (lineName == null ? "" : Sql.txt("d", lineName, 250) + ",")
                 + (shka == null ? "N'—'" : Sql.txt("d", shka, 120) + ",N'—'") + ")";
@@ -569,12 +594,40 @@ public final class Queries {
                 + ", " + Sql.num("d", sum) + " AS lineSum"
                 + ", " + Sql.num("d", disc) + " AS discount"
                 + ", " + Sql.num("d", tax) + " AS tax"
+                + (lineNo == null ? ", CAST(NULL AS int) AS [lineNo]" : ", " + numNull("d", lineNo, "int") + " AS [lineNo]")
                 + " FROM dbo.[" + line + "] d"
                 + (shka != null && invName != null && invShka != null
-                ? " LEFT JOIN dbo.inventory i ON TRY_CONVERT(nvarchar(100),i.[" + invShka + "])=TRY_CONVERT(nvarchar(100),d.[" + shka + "])" : "")
+                ? " OUTER APPLY (SELECT TOP (1) ii.[" + invName + "] AS [" + invName + "] FROM dbo.inventory ii"
+                + " WHERE TRY_CONVERT(nvarchar(100),ii.[" + invShka + "])=TRY_CONVERT(nvarchar(100),d.[" + shka + "])"
+                + " ORDER BY ii.[" + invName + "]) i" : "")
                 + " WHERE TRY_CONVERT(nvarchar(80),d.[" + linkCol + "])=?"
+                + (verCol == null ? "" : " AND d.[" + verCol + "] = (SELECT MAX(x.[" + verCol + "]) FROM dbo.["
+                + line + "] x WHERE TRY_CONVERT(nvarchar(80),x.[" + linkCol + "])=?)")
+                + Sql.activeAnd(cols, "d")
                 + " ORDER BY d.[" + linkCol + "]";
+        // Only the current version of the invoice (highest rdf__, as Atiran's own procedures use).
+        if (verCol != null) binds.add(no);
         return new Q(sql, binds);
+    }
+
+    /**
+     * One invoice line = one (line sequence, item) pair. The same pair returned twice is a copy of
+     * the same stored line, so only the first is kept. Lines without a sequence number are kept as is.
+     * A missing line amount is filled with quantity × unit price.
+     */
+    public static List<Row> distinctLines(List<Row> rows) {
+        List<Row> out = new ArrayList<>();
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        if (rows == null) return out;
+        for (Row r : rows) {
+            if (r.has("lineNo")) {
+                String key = r.s("lineNo") + "|" + r.s("shka");
+                if (!seen.add(key)) continue;
+            }
+            if (Math.abs(r.d("lineSum")) < 0.005) r.put("lineSum", r.d("qtyVah") * r.d("vahPrice"));
+            out.add(r);
+        }
+        return out;
     }
 
     private static String numNull(String alias, String col, String type) {
@@ -649,6 +702,47 @@ public final class Queries {
         return factorBreakdown(m, sales, f, "custgroup", top);
     }
 
+    /**
+     * Sales (or purchases) by product group: label,qty,total,docs. Lines are joined to the
+     * inventory and kagroup tables the same way the product list does it. Lines whose product
+     * has no group are shown as «بدون گروه».
+     */
+    public static Q factorByProductGroup(Meta m, boolean sales, Filter f, int top) throws Missing {
+        String head = sales ? "sailfact" : "buyfact";
+        String line = sales ? "subsailfact" : "subbuyfact";
+        Set<String> cols = m.columns(head);
+        String dateCol = sales ? m.must(head, "تاریخ", "date") : m.must(head, "تاریخ", "DATE", "date");
+        String numberCol = sales ? m.must(head, "شماره فاکتور", "shfacfo") : m.must(head, "شماره فاکتور", "shfackh", "shfac");
+        Set<String> sub = m.columns(line);
+        if (sub.isEmpty()) throw new Missing("«" + AtiranSchema.faTitle(line) + "» در دیتابیس پیدا نشد");
+        String linkCol = sales ? m.must(line, "شماره فاکتور", "shfacfo") : m.must(line, "شماره فاکتور", "shfackh", "shfac");
+        String shka = m.must(line, "کد کالا", "SHKA", "shka");
+        String sum = Sql.pick(sub, "LINESUM", "linesum", "tamam_joz");
+        String qty = Sql.pick(sub, "TEDVAH", "tedvah");
+        String invShka = m.col("inventory", "SHKA", "shka");
+        String grp = m.col("inventory", "group_rdf");
+        String grpName = m.col("kagroup", "group_name");
+        String grpKey = m.col("kagroup", "group_rdf");
+        if (invShka == null || grp == null || grpName == null || grpKey == null || !m.table("kagroup"))
+            throw new Missing("گروه کالا در دیتابیس پیدا نشد");
+        List<Object> binds = new ArrayList<>();
+        List<String> conds = new ArrayList<>();
+        String dc = Sql.dateCond(Sql.date10("x", dateCol), f.from, f.to, binds);
+        if (!dc.isEmpty()) conds.add(dc);
+        String inner = "WHERE " + (conds.isEmpty() ? "1=1" : Sql.join(conds, " AND "))
+                + Sql.activeAnd(cols, "x") + Sql.softAnd(cols, "x");
+        String src = Sql.dedupe(head, numberCol, "h", inner);
+        String label = "COALESCE(" + Sql.txt("g", grpName, 150) + ",N'بدون گروه')";
+        return new Q("SELECT TOP (" + clampTop(top) + ") " + label + " AS label"
+                + ", ISNULL(SUM(" + numNull("d", qty, "decimal(19,3)") + "),0) AS qty"
+                + ", ISNULL(SUM(" + Sql.num("d", sum) + "),0) AS total, COUNT_BIG(1) AS docs"
+                + " FROM " + src
+                + " JOIN dbo.[" + line + "] d ON TRY_CONVERT(nvarchar(100),d.[" + linkCol + "])=TRY_CONVERT(nvarchar(100),h.[" + numberCol + "])"
+                + " LEFT JOIN dbo.inventory i ON TRY_CONVERT(nvarchar(100),i.[" + invShka + "])=TRY_CONVERT(nvarchar(100),d.[" + shka + "])"
+                + " LEFT JOIN dbo.kagroup g ON TRY_CONVERT(nvarchar(50),g.[" + grpKey + "])=TRY_CONVERT(nvarchar(50),i.[" + grp + "])"
+                + " GROUP BY " + label + " ORDER BY 3 DESC", binds);
+    }
+
     /** Top products by sales/purchase lines: label,qty,total,docs. */
     public static Q factorTopProducts(Meta m, boolean sales, Filter f, int top) throws Missing {
         String head = sales ? "sailfact" : "buyfact";
@@ -660,7 +754,7 @@ public final class Queries {
         if (sub.isEmpty()) throw new Missing("«" + AtiranSchema.faTitle(line) + "» در دیتابیس پیدا نشد");
         String linkCol = sales ? m.must(line, "شماره فاکتور", "shfacfo") : m.must(line, "شماره فاکتور", "shfackh", "shfac");
         String shka = m.must(line, "کد کالا", "SHKA", "shka");
-        String sum = Sql.pick(sub, "LINESUM", "linesum");
+        String sum = Sql.pick(sub, "LINESUM", "linesum", "tamam_joz");
         String qty = Sql.pick(sub, "TEDVAH", "tedvah");
         String invName = m.col("inventory", "naka", "NAKA");
         String invShka = m.col("inventory", "SHKA", "shka");
@@ -680,5 +774,64 @@ public final class Queries {
                 + " JOIN dbo.[" + line + "] d ON TRY_CONVERT(nvarchar(100),d.[" + linkCol + "])=TRY_CONVERT(nvarchar(100),h.[" + numberCol + "])"
                 + (useInv ? " LEFT JOIN dbo.inventory i ON TRY_CONVERT(nvarchar(100),i.[" + invShka + "])=TRY_CONVERT(nvarchar(100),d.[" + shka + "])" : "")
                 + " GROUP BY " + label + " ORDER BY 3 DESC", binds);
+    }
+
+    /**
+     * Purchase price drift per product. For each item bought in the range, the unit price
+     * (LINESUM / TEDVAH) of its latest purchase is compared with the purchase before it.
+     * Only products bought at least twice are listed; the largest moves come first.
+     * Columns are the same ones factorTopProducts already reads from buyfact/subbuyfact.
+     */
+    public static Q buyPriceTrend(Meta m, Filter f, int top) throws Missing {
+        String head = "buyfact";
+        String line = "subbuyfact";
+        Set<String> cols = m.columns(head);
+        String dateCol = m.must(head, "تاریخ", "DATE", "date");
+        String numberCol = m.must(head, "شماره فاکتور", "shfackh", "shfac");
+        Set<String> sub = m.columns(line);
+        if (sub.isEmpty()) throw new Missing("«" + AtiranSchema.faTitle(line) + "» در دیتابیس پیدا نشد");
+        String linkCol = m.must(line, "شماره فاکتور", "shfackh", "shfac");
+        String shka = m.must(line, "کد کالا", "SHKA", "shka");
+        // subbuyfact has no line-total column (sample schema). Atiran prices purchase lines per piece
+        // with JOZPRICE (line = (TEDVAH*mohvah + TEDJOZ) * JOZPRICE), so the unit price is JOZPRICE itself.
+        String unitCol = Sql.pick(sub, "JOZPRICE", "jozprice");
+        String qty = Sql.pick(sub, "TEDVAH", "tedvah");
+        if (unitCol == null || qty == null) throw new Missing("ستون بهای واحد یا تعداد خط خرید پیدا نشد");
+        String invName = m.col("inventory", "naka", "NAKA");
+        String invShka = m.col("inventory", "SHKA", "shka");
+        List<Object> binds = new ArrayList<>();
+        List<String> conds = new ArrayList<>();
+        String dc = Sql.dateCond(Sql.date10("x", dateCol), f.from, f.to, binds);
+        if (!dc.isEmpty()) conds.add(dc);
+        String inner = "WHERE " + (conds.isEmpty() ? "1=1" : Sql.join(conds, " AND "))
+                + Sql.activeAnd(cols, "x") + Sql.softAnd(cols, "x");
+        String src = Sql.dedupe(head, numberCol, "h", inner);
+        boolean useInv = invName != null && invShka != null;
+        String label = "COALESCE(" + (useInv ? Sql.txt("i", invName, 250) + "," : "") + Sql.txt("d", shka, 120) + ",N'—')";
+        // Unit price per piece: the line amount covers vah and joz, so the denominator must too.
+        String unit = "CAST(" + Sql.num("d", unitCol) + " AS decimal(19,4))";
+        String sql = "WITH ln AS ("
+                + " SELECT TRY_CONVERT(nvarchar(100),d.[" + shka + "]) AS k, " + label + " AS label"
+                + ", " + Sql.dateKey(Sql.date10("h", dateCol)) + " AS dk"
+                + ", (" + unit + ") AS unit"
+                + " FROM " + src
+                + " JOIN dbo.[" + line + "] d ON TRY_CONVERT(nvarchar(100),d.[" + linkCol + "])=TRY_CONVERT(nvarchar(100),h.[" + numberCol + "])"
+                + (useInv ? " LEFT JOIN dbo.inventory i ON TRY_CONVERT(nvarchar(100),i.[" + invShka + "])=TRY_CONVERT(nvarchar(100),d.[" + shka + "])" : "")
+                + " WHERE d.[" + qty + "] IS NOT NULL"
+                + "), r AS ("
+                + " SELECT k, label, unit, dk, ROW_NUMBER() OVER (PARTITION BY k ORDER BY dk DESC) AS rn"
+                + ", COUNT(*) OVER (PARTITION BY k) AS n"
+                + " FROM ln WHERE unit IS NOT NULL AND unit > 0"
+                + ") SELECT TOP (" + clampTop(top) + ") MAX(r1.label) AS label"
+                + ", MAX(CASE WHEN r1.rn=1 THEN r1.unit END) AS lastUnit"
+                + ", MAX(CASE WHEN r1.rn=2 THEN r1.unit END) AS prevUnit"
+                + ", CAST(100.0 * (MAX(CASE WHEN r1.rn=1 THEN r1.unit END) - MAX(CASE WHEN r1.rn=2 THEN r1.unit END))"
+                + " / NULLIF(MAX(CASE WHEN r1.rn=2 THEN r1.unit END),0) AS decimal(19,2)) AS change"
+                + ", MAX(r1.n) AS docs"
+                + " FROM r r1 WHERE r1.n >= 2 GROUP BY r1.k"
+                + " HAVING MAX(CASE WHEN r1.rn=2 THEN r1.unit END) > 0"
+                + " ORDER BY ABS(100.0 * (MAX(CASE WHEN r1.rn=1 THEN r1.unit END) - MAX(CASE WHEN r1.rn=2 THEN r1.unit END))"
+                + " / MAX(CASE WHEN r1.rn=2 THEN r1.unit END)) DESC";
+        return new Q(sql, binds);
     }
 }

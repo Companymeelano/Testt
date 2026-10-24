@@ -1,5 +1,6 @@
 package ir.meelano.manager.data;
 
+import ir.meelano.manager.core.Diag;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.sql.Connection;
@@ -27,9 +28,11 @@ public final class Atiran {
     }
 
     public static String defaultHost() { return de(O_HOST); }
-    public static String defaultUser() { return de(O_USER); }
-    public static String defaultPass() { return de(O_PASS); }
-    public static String defaultDb() { return de(O_DB); }
+    /** One SQL login for every database (the same account the smart backup uses). */
+    public static String defaultUser() { return "AdminAn"; }
+    public static String defaultPass() { return "St@R2022$"; }
+    /** Database name on the Atiran server. */
+    public static String defaultDb() { return "sac"; }
 
     /** Open a validated connection (TCP preflight + one automatic retry). */
     public static Connection open(String host, int port, String db, String user, String pass) throws Exception {
@@ -45,6 +48,8 @@ public final class Atiran {
         Class.forName("net.sourceforge.jtds.jdbc.Driver");
         String url = "jdbc:jtds:sqlserver://" + host + ":" + port + "/" + db
                 + ";loginTimeout=" + Math.max(2, loginSec) + ";socketTimeout=75;appName=MEELANO-Manager7;";
+        // No ssl= parameter: this is the setting that connected in the earlier builds (422ad16, 389633e).
+        // ssl=request (added in d655281) makes jTDS attempt a TLS 1.0 handshake that SQL Server 2014 rejects.
         Properties p = new Properties();
         p.setProperty("user", user);
         p.setProperty("password", pass);
@@ -58,7 +63,11 @@ public final class Atiran {
         try {
             return validated(DriverManager.getConnection(url, p));
         } catch (Exception first) {
-            if (!retry) throw new Exception(diagnose(first));
+            // A wrong password will not succeed on retry; do not hammer the login.
+            String fm = String.valueOf(first.getMessage()).toLowerCase(java.util.Locale.US);
+            if (!retry || fm.contains("login failed") || fm.contains("logon failed")) {
+                throw new Exception(diagnose(first));
+            }
             Thread.sleep(700);
             try {
                 return validated(DriverManager.getConnection(url, p));
@@ -73,7 +82,7 @@ public final class Atiran {
             st.setQueryTimeout(5);
             st.execute("SELECT 1");
         } catch (Exception e) {
-            try { c.close(); } catch (Exception ignored) { }
+            try { c.close(); } catch (Exception ignored) { Diag.ignored("Atiran:76", ignored); }
             throw e;
         }
         return c;
@@ -85,7 +94,11 @@ public final class Atiran {
         String m = String.valueOf(e.getMessage());
         String l = m.toLowerCase(java.util.Locale.US);
         if (l.contains("timeout") || l.contains("timed out")) return "سرور پاسخ نداد؛ اینترنت و آدرس سرور را بررسی کنید";
-        if (l.contains("refused") || l.contains("unreachable") || l.contains("no route") || l.contains("network"))
+        // TLS first: jTDS reports a failed encrypted handshake as "Network error ... SSL handshake aborted".
+        // That is not a routing problem, so it must not fall into the network branch below.
+        if (l.contains("ssl") || l.contains("tls") || l.contains("handshake") || l.contains("secure connection"))
+            return "اتصال رمزنگاری‌شده (TLS) با سرور برقرار نشد؛ نسخه TLS سرور با درایور برنامه سازگار نیست";
+        if (l.contains("refused") || l.contains("unreachable") || l.contains("no route"))
             return "مسیر شبکه به سرور در دسترس نیست";
         if (l.contains("login failed") || l.contains("logon failed")) return "نام کاربری یا رمز دیتابیس اشتباه است";
         if (l.contains("cannot open database")) return "دیتابیس روی سرور پیدا نشد؛ نام دیتابیس را بررسی کنید";
@@ -99,6 +112,19 @@ public final class Atiran {
             String o = m.replaceAll("(?i).*invalid column name\\s*'?", "").replace("'", "").trim();
             if (o.length() > 40) o = o.substring(0, 40);
             return "ستون «" + o + "» در دیتابیس پیدا نشد";
+        }
+        if (l.contains("failed to connect") || l.contains("connect timed out") || l.contains("etimedout")) {
+            return "اتصال به سرور در مهلت تعیین‌شده برقرار نشد؛ اتصال شبکه، آدرس و پورت سرور را بررسی کنید";
+        }
+        if (l.contains("socket closed") || l.contains("i/o error") || l.contains("connection reset")) {
+            return "ارتباط با سرور قطع شد؛ اتصال شبکه را بررسی و دوباره تلاش کنید";
+        }
+        if (l.contains("incorrect syntax")) {
+            return "ساختار این گزارش با دیتابیس سازگار نیست؛ به پشتیبانی اطلاع دهید";
+        }
+        if (l.contains("aggregate function") || l.contains("group by") || l.contains("subquery")) {
+            // SQL Server rejects this report's calculation shape. Keep the raw text out of the UI.
+            return "این محاسبه روی این دیتابیس اجرا نشد؛ دوباره تلاش کنید یا به پشتیبانی اطلاع دهید";
         }
         if (m.length() > 220) m = m.substring(0, 220) + "…";
         return m.isEmpty() ? "خطای اتصال به دیتابیس" : m;

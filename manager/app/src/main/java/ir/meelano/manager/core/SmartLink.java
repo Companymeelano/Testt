@@ -147,7 +147,7 @@ public final class SmartLink {
     public static List<Cand> allSaved(Settings s) {
         try {
             s.migrateLegacyHost();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("SmartLink:150", ignored); }
         List<Cand> out = new ArrayList<>();
         if (!s.lan().isEmpty()) out.add(new Cand(LAN, s.lan()));
         if (!s.wan().isEmpty() && !sameHost(s.wan(), s.lan())) out.add(new Cand(WAN, s.wan()));
@@ -182,11 +182,13 @@ public final class SmartLink {
         List<String> fails = new ArrayList<>();
         for (Cand k : cands) {
             try {
+                // LAN answers in milliseconds; a public (WAN) address over mobile data needs longer.
+                int tcpMs = LAN.equals(k.kind) ? 1500 : 6000;
                 Connection conn = Atiran.open(k.host, s.effPort(), s.effDb(),
-                        s.effUser(), s.effPass(), 1500, 5, false);
+                        s.effUser(), s.effPass(), tcpMs, 5, false);
                 try {
                     s.setLinkLast(k.kind);
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("SmartLink:189", ignored); }
                 return conn;
             } catch (Exception e) {
                 fails.add(kindShort(k.kind) + ": " + Atiran.diagnose(e));
@@ -274,7 +276,7 @@ public final class SmartLink {
             MAIN.post(() -> {
                 try {
                     cb.done(r);
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("SmartLink:277", ignored); }
             });
         }).start();
     }
@@ -295,7 +297,7 @@ public final class SmartLink {
             MAIN.post(() -> {
                 try {
                     cb.done(r);
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("SmartLink:298", ignored); }
             });
         }).start();
     }
@@ -419,7 +421,7 @@ public final class SmartLink {
         } finally {
             try {
                 conn.close();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("SmartLink:422", ignored); }
         }
         return p;
     }
@@ -485,7 +487,7 @@ public final class SmartLink {
 
     private static String copyFa(Report r, int port, String db) {
         StringBuilder b = new StringBuilder();
-        b.append("گزارش اتصال میلانو\n");
+        b.append("گزارش اتصال میلانو زرین‌فرمان\n");
         b.append("شبکه گوشی: ").append(r.transportFa);
         if (r.vpnOn) b.append(" + فیلترشکن");
         b.append("\nپورت: ").append(port).append(" • دیتابیس: ").append(db).append("\n");

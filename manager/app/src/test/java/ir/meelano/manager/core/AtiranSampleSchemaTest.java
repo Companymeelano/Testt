@@ -24,6 +24,7 @@ import java.util.Set;
 import java.util.HashSet;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
@@ -35,6 +36,23 @@ public class AtiranSampleSchemaTest {
         assertTrue(report.persianSummary(), report.complete());
         assertEquals(12, report.readySections);
         assertEquals(12, report.totalSections);
+    }
+
+    /** Purchase unit price comes from JOZPRICE: subbuyfact has no LINESUM in the sample schema. */
+    @Test public void purchasePriceUsesJozPriceNotLineSum() throws Exception {
+        Meta meta = new Meta(connection(loadManifest()));
+        String sql = Queries.buyPriceTrend(meta, new Filter(), 50).sql.toLowerCase(Locale.ROOT);
+        assertTrue(sql, sql.contains("jozprice"));
+        assertFalse(sql, sql.contains("linesum"));
+    }
+
+    /** Stock value counts loose pieces (mojkajoz) at inventory_price for active items only. */
+    @Test public void stockValueCountsPiecesAtInventoryPrice() throws Exception {
+        Meta meta = new Meta(connection(loadManifest()));
+        String sql = MasterQueries.stockValueByGroup(meta).sql.toLowerCase(Locale.ROOT);
+        assertTrue(sql, sql.contains("mojkajoz"));
+        assertTrue(sql, sql.contains("inventory_price"));
+        assertTrue(sql, sql.contains(" where "));
     }
 
     @Test public void metadataResolverUsesTheActualNonDboSchema() throws Exception {

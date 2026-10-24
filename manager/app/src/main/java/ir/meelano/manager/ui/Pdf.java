@@ -1,5 +1,6 @@
 package ir.meelano.manager.ui;
 
+import ir.meelano.manager.core.Diag;
 import android.content.Context;
 import android.graphics.Paint;
 import android.graphics.pdf.PdfDocument;
@@ -160,7 +161,7 @@ public final class Pdf {
                 doc.writeTo(fos);
             }
         } finally {
-            try { doc.close(); } catch (Exception ignored) { }
+            try { doc.close(); } catch (Exception ignored) { Diag.ignored("Pdf:163", ignored); }
         }
         return out;
     }

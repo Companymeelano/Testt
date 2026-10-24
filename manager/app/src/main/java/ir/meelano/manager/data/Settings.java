@@ -1,16 +1,30 @@
 package ir.meelano.manager.data;
 
+import ir.meelano.manager.core.Diag;
 import android.content.Context;
 import android.content.SharedPreferences;
 
 import ir.meelano.manager.core.Money;
+import ir.meelano.manager.core.SecretBox;
 
 /** App settings: connection + PIN lock + luxury theme + notifications + offline cache. */
 public final class Settings {
     private final SharedPreferences p;
+    private final Context app;
+
+    /** Name of the Keystore-encrypted SQL password inside the SecretBox store. */
+    private static final String PASS_SECRET = "db_pass_enc";
 
     public Settings(Context c) {
+        app = c.getApplicationContext();
         p = c.getSharedPreferences("meelano_manager7", Context.MODE_PRIVATE);
+        // Scrub any plain-text SQL password left by older builds (or by the old fallback).
+        // It is moved into the Keystore store when possible and never kept in plain text.
+        if (p.contains("db_pass")) {
+            String legacy = p.getString("db_pass", "");
+            if (!legacy.isEmpty()) SecretBox.put(app, PASS_SECRET, legacy);
+            p.edit().remove("db_pass").apply();
+        }
     }
 
     public String host() { return p.getString("db_host", "").trim(); }
@@ -55,12 +69,31 @@ public final class Settings {
     public String port() { return p.getString("db_port", "").trim(); }
     public String db() { return p.getString("db_name", "").trim(); }
     public String user() { return p.getString("db_user", "").trim(); }
-    public String pass() { return p.getString("db_pass", ""); }
+    /**
+     * SQL password: read from the Android-Keystore encrypted store. A value saved by
+     * an older build in plain SharedPreferences is moved into the encrypted store once.
+     */
+    public String pass() {
+        return SecretBox.get(app, PASS_SECRET);
+    }
+
+    /**
+     * Stores the SQL password only in the Keystore-encrypted store. If the Keystore cannot
+     * encrypt, the password is NOT written in plain text; the user simply re-enters it.
+     */
+    private void savePass(String pass) {
+        String v = pass == null ? "" : pass;
+        p.edit().remove("db_pass").apply();
+        if (!SecretBox.put(app, PASS_SECRET, v) && !v.isEmpty()) {
+            ir.meelano.manager.core.Diag.ignored("Settings:savePass", new IllegalStateException("keystore unavailable"));
+        }
+    }
 
     public String effHost() { String h = host(); return h.isEmpty() ? Atiran.defaultHost() : h; }
     public String effDb() { String d = db(); return d.isEmpty() ? Atiran.defaultDb() : d; }
-    public String effUser() { String u = user(); return u.isEmpty() ? Atiran.defaultUser() : u; }
-    public String effPass() { String s = pass(); return s.isEmpty() ? Atiran.defaultPass() : s; }
+    // The SQL login is fixed (AdminAn) for every database, so a stale stored login cannot block the connection.
+    public String effUser() { return Atiran.defaultUser(); }
+    public String effPass() { return Atiran.defaultPass(); }
     public int effPort() {
         try {
             int v = Integer.parseInt(Money.en(port()).trim());
@@ -86,7 +119,8 @@ public final class Settings {
                 .putString("db_port", port == null ? "" : port.trim())
                 .putString("db_name", db == null ? "" : db.trim())
                 .putString("db_user", user == null ? "" : user.trim())
-                .putString("db_pass", pass == null ? "" : pass).apply();
+                .apply();
+        savePass(pass);
     }
 
     /** Save both smart-link profiles at once (either address may be empty). */
@@ -96,7 +130,8 @@ public final class Settings {
                 .putString("db_port", port == null ? "" : port.trim())
                 .putString("db_name", db == null ? "" : db.trim())
                 .putString("db_user", user == null ? "" : user.trim())
-                .putString("db_pass", pass == null ? "" : pass).apply();
+                .apply();
+        savePass(pass);
     }
 
     /**
@@ -114,7 +149,8 @@ public final class Settings {
         e.putString("db_port", port == null ? "" : port.trim())
                 .putString("db_name", db == null ? "" : db.trim())
                 .putString("db_user", user == null ? "" : user.trim())
-                .putString("db_pass", pass == null ? "" : pass).apply();
+                .apply();
+        savePass(pass);
     }
 
     /** One-time migration of the legacy single address into lan/wan. */
@@ -124,7 +160,7 @@ public final class Settings {
             String h = host();
             if (h.isEmpty()) return;
             placeHost(h, port(), db(), user(), pass());
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Settings:127", ignored); }
     }
 
     /** Smart-link mode: "auto" (default), "lan" or "wan". */
@@ -181,26 +217,34 @@ public final class Settings {
     // ---------------- luxury theme ----------------
     /** "dark" (Midnight Gold) or "light" (Ivory Royal). */
     public String themeMode() {
-        // v37: light is the default theme. The dark palette stays available and is
-        // switched to from the header toggle or Settings.
-        String m = p.getString("theme_mode", "light");
-        return "light".equals(m) ? "light" : "dark";
+        // Dark («Midnight Gold») is the default. One-time migration: installs that were
+        // still on the old light default switch to dark once; a later manual choice is kept.
+        if (!p.getBoolean("theme_dark_default_v38", false)) {
+            p.edit().putString("theme_mode", "dark").putBoolean("theme_dark_default_v38", true).apply();
+        }
+        // v39: «آجیل و خشکبار» is the default for everyone once; a later manual choice is kept.
+        if (!p.getBoolean("theme_nuts_default_v39", false)) {
+            p.edit().putString("theme_mode", "nuts").putBoolean("theme_nuts_default_v39", true).apply();
+        }
+        String m = p.getString("theme_mode", "nuts");
+        return "light".equals(m) ? "light" : "nuts".equals(m) ? "nuts" : "dark";
     }
 
     public void setThemeMode(String mode) {
-        p.edit().putString("theme_mode", "light".equals(mode) ? "light" : "dark").apply();
+        String v = "light".equals(mode) ? "light" : "nuts".equals(mode) ? "nuts" : "dark";
+        p.edit().putString("theme_mode", v).apply();
     }
 
     /** Accent key: gold / emerald / sapphire / ruby / violet / teal. */
     public String themeAccent() {
-        String k = p.getString("theme_accent", "gold");
-        for (String ok : new String[]{"gold", "emerald", "sapphire", "ruby", "violet", "teal"})
+        String k = p.getString("theme_accent", "platinum");
+        for (String ok : new String[]{"platinum", "gold", "emerald", "sapphire", "ruby", "violet", "teal"})
             if (ok.equals(k)) return k;
-        return "gold";
+        return "platinum";
     }
 
     public void setThemeAccent(String key) {
-        p.edit().putString("theme_accent", key == null ? "gold" : key).apply();
+        p.edit().putString("theme_accent", key == null ? "platinum" : key).apply();
     }
 
     // ---------------- smart notifications ----------------
@@ -282,7 +326,9 @@ public final class Settings {
     public void setWhDirect(boolean on) { p.edit().putBoolean("wh_direct", on).apply(); }
 
     // ---------------- home dashboard order ----------------
-    public static final String HOME_ORDER_DEFAULT = "kpis,alerts,due,invstatus,returns,today_top,trend,debtors,visitors,donut,eod,shortcuts";
+    /** Day KPIs and the sales comparison first (as in the reference design), then trends, then alerts. */
+    public static final String HOME_ORDER_DEFAULT = "kpis,trend,donut,today_top,alerts,invstatus,returns,due,debtors,visitors,eod,shortcuts";
+    private static final String HOME_ORDER_V1_DEFAULT = "kpis,alerts,due,invstatus,returns,today_top,trend,debtors,visitors,donut,eod,shortcuts";
     private static final String HOME_ORDER_PREVIOUS_DEFAULT = "kpis,alerts,trend,donut,debtors,visitors,due,invstatus,returns,shortcuts";
 
     public String homeOrder() {
@@ -290,7 +336,7 @@ public final class Settings {
         if (v == null || v.trim().isEmpty()) return HOME_ORDER_DEFAULT;
         // Move installations still using the untouched old default to the new
         // manager-first order, while preserving any order the user customized.
-        if (HOME_ORDER_PREVIOUS_DEFAULT.equals(v.trim())) {
+        if (HOME_ORDER_V1_DEFAULT.equals(v.trim()) || HOME_ORDER_PREVIOUS_DEFAULT.equals(v.trim())) {
             p.edit().putString("home_order", HOME_ORDER_DEFAULT).apply();
             return HOME_ORDER_DEFAULT;
         }
@@ -316,6 +362,11 @@ public final class Settings {
     public boolean abOn() { return p.getBoolean("ab_on", false); }
 
     public void setAbOn(boolean on) { p.edit().putBoolean("ab_on", on).apply(); }
+
+    /** Offline mode: reports are read from the last nightly copy kept on the phone. */
+    public boolean offlineMode() { return p.getBoolean("offline_mode", false); }
+
+    public void setOfflineMode(boolean on) { p.edit().putBoolean("offline_mode", on).apply(); }
 
     /** Nightly auto-backup hour, 0..23 (default 2 AM). */
     public int abHour() {

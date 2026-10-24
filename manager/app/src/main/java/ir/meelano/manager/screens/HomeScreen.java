@@ -1,5 +1,16 @@
 package ir.meelano.manager.screens;
 
+import android.text.TextUtils;
+import java.util.Locale;
+import ir.meelano.manager.core.MarketWeather;
+import ir.meelano.manager.core.Diag;
+import android.content.Context;
+import android.graphics.Canvas;
+import android.graphics.LinearGradient;
+import android.graphics.Paint;
+import android.graphics.RadialGradient;
+import android.graphics.RectF;
+import android.graphics.Shader;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.FrameLayout;
@@ -20,6 +31,7 @@ import ir.meelano.manager.core.MoneyQueries;
 import ir.meelano.manager.R;
 import ir.meelano.manager.core.Queries;
 import ir.meelano.manager.data.Meta;
+import ir.meelano.manager.data.Company;
 import ir.meelano.manager.data.Repo;
 import ir.meelano.manager.data.Row;
 import ir.meelano.manager.ui.Charts;
@@ -62,6 +74,8 @@ public class HomeScreen extends Screen {
         List<Row> debtors = new ArrayList<>();
         List<Row> overdue = new ArrayList<>();
         List<Row> salesDaily = new ArrayList<>();
+        List<Row> buyDaily = new ArrayList<>();
+        List<Row> outDaily = new ArrayList<>();
         List<Row> inDaily = new ArrayList<>();
         List<Row> topItems = new ArrayList<>();
         List<Row> visitors = new ArrayList<>();
@@ -76,86 +90,421 @@ public class HomeScreen extends Screen {
         Map<String, String> notes = new LinkedHashMap<>();
     }
 
+    /** Runs one dashboard query only while this render is still on screen; once the user has moved on, the rest are skipped. */
+    private <T> T live(final int token, Map<String, String> notes, String key, Soft<T> t) {
+        if (a.renderGen() != token) return null;
+        return soft(notes, key, t);
+    }
+
+    /** Holds the dashboard's live connection; reopens it if the link dropped during the long load. */
+    private static final class Link {
+        java.sql.Connection c;
+        Meta m;
+
+        Link(java.sql.Connection c) {
+            this.c = c;
+            this.m = new Meta(c);
+        }
+
+        /** Probes the link with SELECT 1 (jTDS does not implement Connection.isValid). */
+        void ensure(Repo repo) {
+            boolean alive;
+            try (java.sql.Statement st = c.createStatement()) {
+                st.setQueryTimeout(5);
+                st.execute("SELECT 1");
+                alive = true;
+            } catch (Throwable e) {
+                alive = false;
+            }
+            if (alive) return;
+            try {
+                reopen(repo);
+            } catch (Throwable e) {
+                Diag.ignored("HomeScreen:ensure", e);
+            }
+        }
+
+        void reopen(Repo repo) throws Exception {
+            java.sql.Connection old = c;
+            c = repo.reopen();
+            m = new Meta(c);
+            if (old != null) {
+                try { old.close(); } catch (Exception e) { Diag.ignored("HomeScreen:close", e); }
+            }
+        }
+
+        /** True when the failure came from the connection itself (not from the query). */
+        static boolean dropped(Throwable e) {
+            for (Throwable t = e; t != null; t = t.getCause()) {
+                if (t instanceof java.sql.SQLException) {
+                    String st = ((java.sql.SQLException) t).getSQLState();
+                    if (st != null && (st.startsWith("08") || st.equals("HY010"))) return true;
+                }
+                String msg = String.valueOf(t.getMessage()).toLowerCase(Locale.US);
+                if (msg.contains("connection object is closed") || msg.contains("connection is closed")
+                        || msg.contains("communication link") || msg.contains("connection reset")) return true;
+            }
+            return false;
+        }
+    }
+
+    /** Like live(), but on a dropped link it reopens the connection and runs the section once more. */
+    private <T> T liveL(final int token, final Link L, Map<String, String> notes, String key, Soft<T> t) {
+        if (a.renderGen() != token) return null;
+        L.ensure(a.repo);
+        try {
+            return t.run();
+        } catch (Exception first) {
+            if (!Link.dropped(first)) {
+                notes.put(key, first instanceof Queries.Missing ? first.getMessage() : ir.meelano.manager.data.Atiran.diagnose(first));
+                return null;
+            }
+            try {
+                L.reopen(a.repo);
+                return t.run();
+            } catch (Exception again) {
+                notes.put(key, again instanceof Queries.Missing ? again.getMessage() : ir.meelano.manager.data.Atiran.diagnose(again));
+                return null;
+            }
+        }
+    }
+
+    /**
+     * The gold clock artwork (drawn without hands) with the hour and minute hands drawn live,
+     * set to the phone's current time. Plain View: no drawable layering, so it always paints.
+     */
+    static final class ClockView extends View {
+        private static final float IMG_W = 1104f, IMG_H = 616f;
+        private static final float CX = 317f, CY = 309f;   // clock centre in artwork space
+        private static final float RING = 168f;            // dial radius (vertical) in artwork space
+        private static final float X_SQUASH = 0.79f;       // the dial is seen slightly turned
+        private final android.graphics.Bitmap bmp;
+        private final android.graphics.Paint art = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG | android.graphics.Paint.FILTER_BITMAP_FLAG);
+        private final android.graphics.Paint fade = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        private final android.graphics.Paint hand = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        private final android.graphics.Path path = new android.graphics.Path();
+        private final android.graphics.RectF dst = new android.graphics.RectF();
+        private final android.graphics.Paint rim = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        private final android.graphics.RectF panel = new android.graphics.RectF();
+
+        ClockView(android.content.Context c, android.graphics.Bitmap bmp) {
+            super(c);
+            this.bmp = bmp;
+            hand.setStyle(android.graphics.Paint.Style.FILL);
+            rim.setStyle(android.graphics.Paint.Style.STROKE);
+            rim.setStrokeWidth(Theme.dp(1.6f));
+            rim.setColor(Theme.GOLD);
+            rim.setShadowLayer(Theme.dp(6), 0, 0, Theme.alpha(Theme.GOLD, 150));
+            setLayerType(View.LAYER_TYPE_SOFTWARE, rim); // the glow needs a software layer
+        }
+
+        @Override
+        protected void onDraw(android.graphics.Canvas c) {
+            super.onDraw(c);
+            int h = getHeight();
+            if (bmp == null || h <= 0) return;
+            float s = h / IMG_H;
+            float w = IMG_W * s;
+            dst.set(0, 0, w, h);
+            c.drawBitmap(bmp, null, dst, art);
+            // Dissolve the artwork's right edge into the card colour so no box edge shows.
+            fade.setShader(new android.graphics.LinearGradient(w * 0.6f, 0, w, 0,
+                    0x000A0D13, 0xFF0A0D13, android.graphics.Shader.TileMode.CLAMP));
+            c.drawRect(w * 0.6f, 0, w, h, fade);
+            // Gold frame around the clock picture itself.
+            float inset = Theme.dp(4);
+            panel.set(inset, inset, w * 0.6f - inset / 2f, h - inset);
+            c.drawRoundRect(panel, Theme.dp(14), Theme.dp(14), rim);
+
+            java.util.Calendar now = java.util.Calendar.getInstance();
+            float minute = now.get(java.util.Calendar.MINUTE) + now.get(java.util.Calendar.SECOND) / 60f;
+            float hour = now.get(java.util.Calendar.HOUR) + minute / 60f;
+            float cx = CX * s, cy = CY * s;
+            drawHand(c, cx, cy, hour / 12f, RING * 0.52f * s, 5.2f * s, 0xFFFFE9A8);
+            drawHand(c, cx, cy, minute / 60f, RING * 0.84f * s, 3.4f * s, 0xFFFFD97A);
+            hand.setColor(0xFFFFF3CC);
+            c.drawCircle(cx, cy, 6.5f * s, hand);
+            hand.setColor(0xFF8A6418);
+            c.drawCircle(cx, cy, 3.2f * s, hand);
+        }
+
+        private void drawHand(android.graphics.Canvas c, float cx, float cy, float turn, float len, float wid, int color) {
+            double ang = turn * Math.PI * 2;
+            float dx = (float) Math.sin(ang) * X_SQUASH, dy = (float) -Math.cos(ang);
+            float tipX = cx + dx * len, tipY = cy + dy * len;
+            float tailX = cx - dx * len * 0.18f, tailY = cy - dy * len * 0.18f;
+            float nx = -dy * wid, ny = dx * wid;
+            path.reset();
+            path.moveTo(tipX, tipY);
+            path.lineTo(cx + nx, cy + ny);
+            path.lineTo(tailX, tailY);
+            path.lineTo(cx - nx, cy - ny);
+            path.close();
+            hand.setColor(0x66000000);
+            c.save();
+            c.translate(wid * 0.6f, wid * 0.6f);
+            c.drawPath(path, hand);
+            c.restore();
+            hand.setColor(color);
+            c.drawPath(path, hand);
+        }
+    }
+
+    private static android.graphics.Bitmap clockBitmap;
+
+    /**
+     * «در حال به‌روزرسانی» banner: clock artwork on the left, status text on the right.
+     * Shown on every dashboard load, cached or not.
+     */
+    /** Banner ink: dark-skin colour, or a light ink on the emerald banner in the light skin. */
+    private static int bannerInk(int dark, int light) {
+        return Theme.isLight() ? light : dark;
+    }
+
+    private View updateBanner(String savedTs) {
+        return updateBanner(savedTs, false);
+    }
+
+    private View updateBanner(String savedTs, boolean done) {
+        android.content.Context c = a;
+        if (clockBitmap == null) {
+            try {
+                clockBitmap = android.graphics.BitmapFactory.decodeResource(c.getResources(), R.drawable.home_clock_face);
+            } catch (Exception e) { Diag.ignored("Home:clockArt", e); }
+        }
+        FrameLayout box = new FrameLayout(c);
+        android.graphics.drawable.GradientDrawable base = new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                Theme.isLight() ? new int[]{0xFF17684F, 0xFF0A3B2E} : new int[]{0xFF0E121A, 0xFF07090E});
+        base.setCornerRadius(Theme.dp(22));
+        base.setStroke(Theme.dp(1), Theme.isLight() ? 0xFFC9A24A : Theme.alpha(Theme.GOLD, 120));
+        box.setBackground(base);
+        box.setMinimumHeight(Theme.dp(96));
+        if (Theme.isNuts()) {
+            // Nut theme: the nut-and-gold artwork fills the left side of the banner.
+            android.widget.ImageView nuts = new android.widget.ImageView(c);
+            nuts.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
+            nuts.setImageResource(R.drawable.light_banner_nuts);
+            box.addView(nuts, new FrameLayout.LayoutParams(-1, -1));
+        } else if (!Theme.isLight()) {
+            box.addView(new ClockView(c, clockBitmap), new FrameLayout.LayoutParams(-1, -1));
+        }
+
+        LinearLayout text = new LinearLayout(c);
+        text.setOrientation(LinearLayout.VERTICAL);
+        // Text sits on the right; the end side keeps room for the clock artwork.
+        text.setPaddingRelative(Theme.dp(16), Theme.dp(14), Theme.dp(118), Theme.dp(14));
+        if (done) {
+            text.addView(a.kit.text("✓ داشبورد به‌روز است", 12f, bannerInk(Theme.GOLD_SOFT, 0xFFF3D98C), true), new LinearLayout.LayoutParams(-1, -2));
+            text.addView(a.kit.text("ساعت به‌روزرسانی: " + savedTs, 11f, bannerInk(Theme.MUTED, 0xFFD3E6DD), false), new LinearLayout.LayoutParams(-1, -2));
+        } else {
+            text.addView(a.kit.text("⟳ در حال به‌روزرسانی داشبورد…", 12f, bannerInk(Theme.TEXT, 0xFFFFF4D6), true), new LinearLayout.LayoutParams(-1, -2));
+            if (savedTs != null && !savedTs.isEmpty()) {
+                text.addView(a.kit.text("آخرین داده ذخیره‌شده: " + Money.fa(savedTs), 11f, bannerInk(Theme.MUTED, 0xFFD3E6DD), false), new LinearLayout.LayoutParams(-1, -2));
+            }
+        }
+        box.addView(text, new FrameLayout.LayoutParams(-1, -2));
+        if (!done) addShimmer(box);
+        return box;
+    }
+
+    /** A soft gold band sweeps across the card while it waits for live data (light, one animator). */
+    private void addShimmer(final FrameLayout box) {
+        final View band = new View(a);
+        android.graphics.drawable.GradientDrawable g = new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{Theme.alpha(Theme.GOLD, 0), Theme.alpha(Theme.GOLD, 60), Theme.alpha(Theme.GOLD, 0)});
+        band.setBackground(g);
+        band.setClickable(false);
+        band.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        box.addView(band, new FrameLayout.LayoutParams(Theme.dp(120), -1));
+        final android.animation.ObjectAnimator[] sweepRef = new android.animation.ObjectAnimator[1];
+        box.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, orr, ob) -> {
+            if (r - l <= 0 || sweepRef[0] != null) return;
+            sweepRef[0] = android.animation.ObjectAnimator.ofFloat(band, View.TRANSLATION_X, -Theme.dp(120), r - l);
+            sweepRef[0].setDuration(1600);
+            sweepRef[0].setRepeatCount(android.animation.ObjectAnimator.INFINITE);
+            sweepRef[0].start();
+        });
+        // Stop the repeating animation when the card leaves the screen.
+        box.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
+            @Override public void onViewAttachedToWindow(View v) { }
+            @Override public void onViewDetachedFromWindow(View v) {
+                if (sweepRef[0] != null) sweepRef[0].cancel();
+            }
+        });
+    }
+
     @Override
     public void render(final LinearLayout content) {
-        content.removeAllViews();
-        content.addView(greetingHero(), a.kit.lp(-1, -2));
-        content.addView(a.kit.gap(10));
-        addExecutiveDock(content);
-        content.addView(a.kit.gap(6));
-        content.addView(a.kit.loading("در حال دریافت داشبورد مدیریتی…"), a.kit.lp(-1, -2));
+        // Faint gold dot grid behind the dashboard (both skins; very low contrast, decorative only).
+        if (!(content.getBackground() instanceof DotGrid)) content.setBackground(new DotGrid());
+        final int token = a.renderGen();
+        // Smart first paint: the last saved dashboard appears at once and live data replaces it when ready.
+        final String[] cachedTs = {""};
+        final Data cached = loadCached(cachedTs);
+        if (cached != null) {
+            build(content, cached);
+            // build() already put a banner on top: replace it with the updating state (one banner only).
+            content.removeViewAt(0);
+            // The banner changes state with a short cross-fade instead of a jump.
+            View updating = updateBanner(cachedTs[0]);
+            updating.setAlpha(0f);
+            updating.animate().alpha(1f).setDuration(280).start();
+            content.addView(updating, 0);
+        } else {
+            content.removeAllViews();
+            bannerWasLoading = true;
+            content.addView(updateBanner(""), a.kit.lp(-1, -2));
+            content.addView(a.kit.gap(10));
+            content.addView(greetingHero(), a.kit.lp(-1, -2));
+            content.addView(a.kit.gap(10));
+            content.addView(a.kit.gap(6));
+            content.addView(a.kit.loading("در حال دریافت داشبورد مدیریتی…"), a.kit.lp(-1, -2));
+        }
 
-        a.repo.run(c -> {
-            Meta m = new Meta(c);
-            Data d = new Data();
-            d.salesDay = soft(d.notes, "فروش روز", () -> Repo.one(c, Queries.homeSalesDay(m)));
-            d.buyDay = soft(d.notes, "خرید روز", () -> Repo.one(c, Queries.homeBuyDay(m)));
-            d.inDay = soft(d.notes, "دریافت روز", () -> Repo.one(c, MoneyQueries.darDay(m, 0)));
-            d.outDay = soft(d.notes, "پرداخت روز", () -> Repo.one(c, MoneyQueries.darDay(m, 1)));
-            d.custSum = soft(d.notes, "خلاصه مشتریان", () -> Repo.one(c, MasterQueries.customersSummary(m)));
-            d.debtors = soft(d.notes, "بدهکاران", () -> Repo.exec(c, Queries.topDebtors(m, 5)));
-            d.overdue = soft(d.notes, "معوق‌ها", () -> Repo.exec(c, Queries.overdueInvoices(m, 5)));
-            final String to = Jalali.todayStr();
-            d.snapshotDay = to;
-            // 31 calendar days let the executive overview compare today against
-            // yesterday plus rolling 7- and 30-day baselines; the chart itself stays 14 days.
-            final String from = Jalali.addDays(to, -30);
-            final String inFrom = Jalali.addDays(to, -13);
-            d.salesDaily = soft(d.notes, "روند فروش", () -> Repo.exec(c, Queries.factorDaily(m, true, from, to)));
-            d.inDaily = soft(d.notes, "روند دریافت", () -> Repo.exec(c, MoneyQueries.darDaily(m, 0, inFrom, to)));
-            Filter todayFilter = new Filter();
-            todayFilter.from = to;
-            todayFilter.to = to;
-            todayFilter.top = 5;
-            d.topItems = soft(d.notes, "پرفروش‌ترین کالاهای امروز",
-                    () -> Repo.exec(c, Queries.factorTopProducts(m, true, todayFilter, 5)));
-            Filter vf = new Filter();
-            vf.preset = Filter.P_LAST30;
-            vf.applyPreset();
-            d.visitors = soft(d.notes, "ویزیتورها", () -> Repo.exec(c, MasterQueries.visitorsPerf(m, vf)));
-            d.dueIn = soft(d.notes, "سررسید دریافتی", () -> Repo.exec(c, MoneyQueries.chequeDue(m, true, 3)));
-            d.dueOut = soft(d.notes, "سررسید پرداختی", () -> Repo.exec(c, MoneyQueries.chequeDue(m, false, 3)));
-            String stFrom = Jalali.addDays(to, -29);
-            d.saleState = soft(d.notes, "وضعیت فروش", () -> Repo.exec(c, Queries.factorStatusSummary(m, true, stFrom, to)));
-            d.buyState = soft(d.notes, "وضعیت خرید", () -> Repo.exec(c, Queries.factorStatusSummary(m, false, stFrom, to)));
-            Filter rf = new Filter();
-            rf.from = stFrom;
-            rf.to = to;
-            d.returns = soft(d.notes, "برگشتی", () -> Repo.exec(c, MasterQueries.returnsByKind(m, rf)));
-            if (d.salesDay == null && d.inDay == null && d.custSum == null && d.buyDay == null && d.outDay == null)
-                throw new Exception(firstNote(d.notes));
-            return d;
-        }, new Repo.Cb<Data>() {
+        // Two groups run in parallel on their own connections (the runner has three workers).
+        final Data shared = new Data();
+        final int[] left = {2};
+        final boolean[] kpiOk = {false};
+        final String[] kpiErr = {null};
+        final Runnable settle = () -> {
+            if (a.renderGen() != token) return;
+            if (kpiOk[0]) {
+                saveCache(shared);
+                build(content, shared);
+            } else {
+                showFailure(content, kpiErr[0], cached);
+            }
+        };
+        final Runnable[] done = {null};
+        done[0] = () -> { if (--left[0] == 0) settle.run(); };
+
+        a.repo.run(c0 -> loadKpis(token, c0), new Repo.Cb<Data>() {
             @Override
-            public void ok(Data d) {
-                saveCache(d);
-                build(content, d);
+            public void ok(Data g) {
+                if (a.renderGen() != token) return;
+                mergeKpis(shared, g);
+                kpiOk[0] = true;
+                done[0].run();
             }
 
             @Override
             public void fail(String faError) {
-                String[] ts = {""};
-                Data cached = loadCached(ts);
-                if (cached != null) {
-                    build(content, cached);
-                    LinearLayout bc = a.kit.card(Theme.WARNING);
-                    bc.addView(a.kit.text("📴 حالت آفلاین — آخرین داده ذخیره‌شده", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
-                    if (!ts[0].isEmpty())
-                        bc.addView(a.kit.kv("آخرین به‌روزرسانی", Money.fa(ts[0]), Theme.WARNING), a.kit.lp(-1, -2));
-                    bc.addView(a.kit.kv("خطا", faError == null ? "" : faError, Theme.MUTED), a.kit.lp(-1, -2));
-                    bc.addView(a.kit.btn("تلاش مجدد", v -> render(content)), a.kit.lp(-1, -2));
-                    content.addView(bc, 0);
-                    content.addView(a.kit.gap(10), 1);
-                    return;
-                }
-                content.removeAllViews();
-                content.addView(greetingHero(), a.kit.lp(-1, -2));
-                content.addView(a.kit.gap(10));
-                addExecutiveDock(content);
-                content.addView(a.kit.gap(8));
-                content.addView(a.kit.error(faError, () -> render(content)), a.kit.lp(-1, -2));
+                kpiErr[0] = faError;
+                done[0].run();
             }
         });
+        a.repo.run(c0 -> loadCharts(token, c0), new Repo.Cb<Data>() {
+            @Override
+            public void ok(Data g) {
+                if (a.renderGen() != token) return;
+                mergeCharts(shared, g);
+                done[0].run();
+            }
+
+            @Override
+            public void fail(String faError) {
+                shared.notes.put("نمودارها", faError == null ? "" : faError);
+                done[0].run();
+            }
+        });
+    }
+
+    /** KPI group: day totals, customers, debtors, invoice states and returns. */
+    private Data loadKpis(final int token, java.sql.Connection c0) throws Exception {
+        final Link L = new Link(c0);
+        Data d = new Data();
+        final String to = Jalali.todayStr();
+        d.snapshotDay = to;
+        d.salesDay = liveL(token, L, d.notes, "فروش روز", () -> Repo.one(L.c, Queries.homeSalesDay(L.m)));
+        d.buyDay = liveL(token, L, d.notes, "خرید روز", () -> Repo.one(L.c, Queries.homeBuyDay(L.m)));
+        d.inDay = liveL(token, L, d.notes, "دریافت روز", () -> Repo.one(L.c, MoneyQueries.darDay(L.m, 0)));
+        d.outDay = liveL(token, L, d.notes, "پرداخت روز", () -> Repo.one(L.c, MoneyQueries.darDay(L.m, 1)));
+        d.custSum = liveL(token, L, d.notes, "خلاصه مشتریان", () -> Repo.one(L.c, MasterQueries.customersSummary(L.m)));
+        d.debtors = liveL(token, L, d.notes, "بدهکاران", () -> Repo.exec(L.c, Queries.topDebtors(L.m, 5)));
+        d.overdue = liveL(token, L, d.notes, "معوق‌ها", () -> Repo.exec(L.c, Queries.overdueInvoices(L.m, 5)));
+        String stFrom = Jalali.addDays(to, -29);
+        d.saleState = liveL(token, L, d.notes, "وضعیت فروش", () -> Repo.exec(L.c, Queries.factorStatusSummary(L.m, true, stFrom, to)));
+        d.buyState = liveL(token, L, d.notes, "وضعیت خرید", () -> Repo.exec(L.c, Queries.factorStatusSummary(L.m, false, stFrom, to)));
+        Filter rf = new Filter();
+        rf.from = stFrom;
+        rf.to = to;
+        d.returns = liveL(token, L, d.notes, "برگشتی", () -> Repo.exec(L.c, MasterQueries.returnsByKind(L.m, rf)));
+        if (d.salesDay == null && d.inDay == null && d.custSum == null && d.buyDay == null && d.outDay == null)
+            throw new Exception(firstNote(d.notes));
+        return d;
+    }
+
+    /** Chart group: daily series, top items, visitors and cheque due lists. */
+    private Data loadCharts(final int token, java.sql.Connection c0) throws Exception {
+        final Link L = new Link(c0);
+        Data d = new Data();
+        final String to = Jalali.todayStr();
+        final String from = Jalali.addDays(to, -30);
+        final String inFrom = Jalali.addDays(to, -13);
+        d.salesDaily = liveL(token, L, d.notes, "روند فروش", () -> Repo.exec(L.c, Queries.factorDaily(L.m, true, from, to)));
+        d.inDaily = liveL(token, L, d.notes, "روند دریافت", () -> Repo.exec(L.c, MoneyQueries.darDaily(L.m, 0, inFrom, to)));
+        d.buyDaily = liveL(token, L, d.notes, "روند خرید", () -> Repo.exec(L.c, Queries.factorDaily(L.m, false, from, to)));
+        d.outDaily = liveL(token, L, d.notes, "روند پرداخت", () -> Repo.exec(L.c, MoneyQueries.darDaily(L.m, 1, inFrom, to)));
+        Filter todayFilter = new Filter();
+        todayFilter.from = to;
+        todayFilter.to = to;
+        todayFilter.top = 5;
+        d.topItems = liveL(token, L, d.notes, "پرفروش‌ترین کالاهای امروز",
+                () -> Repo.exec(L.c, Queries.factorTopProducts(L.m, true, todayFilter, 5)));
+        Filter vf = new Filter();
+        vf.preset = Filter.P_LAST30;
+        vf.applyPreset();
+        d.visitors = liveL(token, L, d.notes, "ویزیتورها", () -> Repo.exec(L.c, MasterQueries.visitorsPerf(L.m, vf)));
+        d.dueIn = liveL(token, L, d.notes, "سررسید دریافتی", () -> Repo.exec(L.c, MoneyQueries.chequeDue(L.m, true, 3)));
+        d.dueOut = liveL(token, L, d.notes, "سررسید پرداختی", () -> Repo.exec(L.c, MoneyQueries.chequeDue(L.m, false, 3)));
+        return d;
+    }
+
+    private static void mergeKpis(Data s, Data g) {
+        s.snapshotDay = g.snapshotDay;
+        s.salesDay = g.salesDay;
+        s.buyDay = g.buyDay;
+        s.inDay = g.inDay;
+        s.outDay = g.outDay;
+        s.custSum = g.custSum;
+        s.debtors = g.debtors;
+        s.overdue = g.overdue;
+        s.saleState = g.saleState;
+        s.buyState = g.buyState;
+        s.returns = g.returns;
+        s.notes.putAll(g.notes);
+    }
+
+    private static void mergeCharts(Data s, Data g) {
+        s.salesDaily = g.salesDaily;
+        s.inDaily = g.inDaily;
+        s.buyDaily = g.buyDaily;
+        s.outDaily = g.outDaily;
+        s.topItems = g.topItems;
+        s.visitors = g.visitors;
+        s.dueIn = g.dueIn;
+        s.dueOut = g.dueOut;
+        s.notes.putAll(g.notes);
+    }
+
+    private void showFailure(final LinearLayout content, String faError, Data cached) {
+        if (cached != null) {
+            build(content, cached);
+            LinearLayout bc = a.kit.card(Theme.GOLD);
+            bc.addView(a.kit.text("📴 حالت آفلاین — آخرین داده ذخیره‌شده", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
+            bc.addView(a.kit.kv("خطا", faError == null ? "" : faError, Theme.MUTED), a.kit.lp(-1, -2));
+            bc.addView(a.kit.btn("تلاش مجدد", v -> render(content)), a.kit.lp(-1, -2));
+            content.addView(bc, 0);
+            content.addView(a.kit.gap(10), 1);
+            return;
+        }
+        content.removeAllViews();
+        content.addView(greetingHero(), a.kit.lp(-1, -2));
+        content.addView(a.kit.gap(10));
+        content.addView(a.kit.gap(8));
+        content.addView(a.kit.error(faError, () -> render(content)), a.kit.lp(-1, -2));
     }
 
     // ---------------- offline cache (manager cues, top items, sales history and timestamp) ----------------
@@ -182,7 +531,7 @@ public class HomeScreen extends Screen {
             }
             a.settings.saveHomeCache(s.toString());
             pokeWidget();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("HomeScreen:185", ignored); }
     }
 
     /** Ask the home-screen widget to re-read the fresh cache. */
@@ -199,7 +548,7 @@ public class HomeScreen extends Screen {
                 in.putExtra(android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_IDS, ids);
                 a.sendBroadcast(in);
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("HomeScreen:202", ignored); }
     }
 
     private Data loadCached(String[] tsOut) {
@@ -274,6 +623,63 @@ public class HomeScreen extends Screen {
         return day.equals(Jalali.todayStr()) ? "امروز" : "روز " + Jalali.shortLabel(day);
     }
 
+    /** Depth layer behind the hero: two gold light sources, a glossy top sheen, a thin ring and a rim highlight. */
+    private static final class HeroDecor extends View {
+        private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final RectF box = new RectF();
+        private final float radius;
+
+        HeroDecor(Context c, float radiusPx) {
+            super(c);
+            this.radius = radiusPx;
+        }
+
+        @Override
+        protected void onDraw(Canvas g) {
+            super.onDraw(g);
+            float w = getWidth(), h = getHeight();
+            if (w <= 0 || h <= 0) return;
+            boolean light = Theme.isLight();
+            box.set(0, 0, w, h);
+            g.save();
+            android.graphics.Path clip = new android.graphics.Path();
+            clip.addRoundRect(box, radius, radius, android.graphics.Path.Direction.CW);
+            g.clipPath(clip);
+            p.setStyle(Paint.Style.FILL);
+            p.setShader(new RadialGradient(w * 0.92f, h * 0.02f, w * 0.60f,
+                    Theme.alpha(Theme.GOLD, light ? 70 : 110), Theme.alpha(Theme.GOLD, 0), Shader.TileMode.CLAMP));
+            g.drawRect(box, p);
+            p.setShader(new RadialGradient(w * 0.06f, h * 1.02f, w * 0.45f,
+                    Theme.alpha(Theme.GOLD_SOFT, light ? 40 : 46), Theme.alpha(Theme.GOLD_SOFT, 0), Shader.TileMode.CLAMP));
+            g.drawRect(box, p);
+            p.setShader(new LinearGradient(0, 0, 0, h * 0.5f,
+                    Theme.alpha(0xFFFFFFFF, light ? 110 : 26), 0x00FFFFFF, Shader.TileMode.CLAMP));
+            g.drawRect(box, p);
+            p.setShader(null);
+            g.restore();
+            // Rim: a light top edge makes the card read as a raised, glossy panel.
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(Theme.dp(1));
+            p.setColor(Theme.alpha(0xFFFFFFFF, light ? 150 : 34));
+            box.set(Theme.dp(0.5f), Theme.dp(0.5f), w - Theme.dp(0.5f), h - Theme.dp(0.5f));
+            g.drawRoundRect(box, radius, radius, p);
+        }
+    }
+
+    /** «شنبه، ۲۵ مهر ۱۴۰۵» in Persian digits; falls back to the short line when the date is unusual. */
+    private String dateLine() {
+        String t = Jalali.todayStr();
+        String[] p = t.split("/");
+        if (p.length != 3) return a.kit.todayLine();
+        try {
+            int day = Integer.parseInt(p[2].trim());
+            return Jalali.weekday(t) + "، " + Money.fa(String.valueOf(day)) + " " + Jalali.monthName(t)
+                    + " " + Money.fa(p[0].trim());
+        } catch (NumberFormatException e) {
+            return a.kit.todayLine();
+        }
+    }
+
     private View greetingHero() {
         int hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
         String greeting = hour < 5 ? "شب بخیر" : (hour < 12 ? "صبح بخیر"
@@ -282,28 +688,72 @@ public class HomeScreen extends Screen {
         if (role == null || role.isEmpty()) role = RoleStore.current(a);
         String roleName = RoleStore.faName(role);
 
-        LinearLayout hero = a.kit.v();
-        hero.setBackground(Theme.executiveHero());
+        final LinearLayout hero = a.kit.v();
+        hero.setBackground(heroBackground());
         hero.setPadding(Theme.dp(18), Theme.dp(17), Theme.dp(18), Theme.dp(14));
-        hero.setElevation(Theme.cardElevation() + Theme.dp(1));
+        Theme.lift(hero, Theme.cardElevation() + Theme.dp(2));
+
+        FrameLayout wrap = new FrameLayout(a);
+        wrap.addView(new HeroDecor(a, Theme.dp(28)), new FrameLayout.LayoutParams(-1, -1));
+        wrap.addView(hero, new FrameLayout.LayoutParams(-1, -2));
 
         LinearLayout top = a.kit.h();
+        top.setGravity(Gravity.CENTER_VERTICAL);
+
+        // Crest: the company logo from the local cache (synced from the database), or a fine default mark.
         FrameLayout crest = new FrameLayout(a);
-        crest.setBackground(Theme.bottomNavIconSelected());
+        android.graphics.drawable.GradientDrawable frame = new android.graphics.drawable.GradientDrawable();
+        frame.setCornerRadius(Theme.dp(18));
+        frame.setColor(Theme.BG);
+        frame.setStroke(Theme.dp(2), Theme.GOLD);
+        crest.setBackground(frame);
         crest.setElevation(Theme.dp(3));
-        ImageView mark = a.kit.icon(R.drawable.mi_admin_panel_settings, Theme.selectedNavInk(), 30);
-        FrameLayout.LayoutParams mp = new FrameLayout.LayoutParams(Theme.dp(30), Theme.dp(30), Gravity.CENTER);
-        crest.addView(mark, mp);
-        top.addView(crest, new LinearLayout.LayoutParams(Theme.dp(58), Theme.dp(58)));
+        android.graphics.Bitmap logo = ir.meelano.manager.data.Company.logo(a);
+        if (logo != null) {
+            ImageView li = new ImageView(a);
+            li.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            li.setImageBitmap(logo);
+            li.setClipToOutline(true);
+            li.setOutlineProvider(new android.view.ViewOutlineProvider() {
+                @Override
+                public void getOutline(View v, android.graphics.Outline o) {
+                    o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), Theme.dp(16));
+                }
+            });
+            crest.addView(li, new FrameLayout.LayoutParams(Theme.dp(50), Theme.dp(50), Gravity.CENTER));
+        } else {
+            ImageView mark = new ImageView(a);
+            mark.setImageResource(Theme.logoRes());
+            mark.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            mark.setClipToOutline(true);
+            mark.setOutlineProvider(new android.view.ViewOutlineProvider() {
+                @Override
+                public void getOutline(View v, android.graphics.Outline o) {
+                    o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), Theme.dp(16));
+                }
+            });
+            crest.addView(mark, new FrameLayout.LayoutParams(Theme.dp(50), Theme.dp(50), Gravity.CENTER));
+        }
+        FrameLayout crestWrap = new FrameLayout(a);
+        android.graphics.drawable.GradientDrawable halo = new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                new int[]{Theme.alpha(Theme.GOLD, 90), Theme.alpha(Theme.GOLD, 0)});
+        halo.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        View haloView = new View(a);
+        haloView.setBackground(halo);
+        crestWrap.addView(haloView, new FrameLayout.LayoutParams(-1, -1));
+        crestWrap.addView(crest, new FrameLayout.LayoutParams(Theme.dp(66), Theme.dp(66), Gravity.CENTER));
+        top.addView(crestWrap, new LinearLayout.LayoutParams(Theme.dp(78), Theme.dp(78)));
         top.addView(a.kit.space(12));
 
         LinearLayout copy = a.kit.v();
-        TextView overline = a.kit.text("MEELANO  •  اتاق فرمان", 10.5f, Theme.GOLD_SOFT, true);
+        TextView overline = a.kit.text("میلانو زرین‌فرمان  •  اتاق فرمان", 10.5f, Theme.GOLD_SOFT, true);
         overline.setSingleLine(true);
         copy.addView(overline, a.kit.lp(-1, -2));
-        TextView headline = a.kit.text(greeting + "، " + roleName, 21.5f, Theme.TEXT, true);
+        TextView headline = a.kit.text(greeting + "، " + roleName, 26f, Theme.TEXT, true);
         headline.setMaxLines(1);
-        headline.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        // Long names shrink to fit the line instead of being cut off.
+        headline.setAutoSizeTextTypeUniformWithConfiguration(16, 26, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
         LinearLayout.LayoutParams hp = a.kit.lp(-1, -2);
         hp.setMargins(0, Theme.dp(2), 0, 0);
         copy.addView(headline, hp);
@@ -312,99 +762,250 @@ public class HomeScreen extends Screen {
         description.setEllipsize(android.text.TextUtils.TruncateAt.END);
         copy.addView(description, a.kit.lp(-1, -2));
         top.addView(copy, a.kit.wlp(1f));
+
         hero.addView(top, a.kit.lp(-1, -2));
         hero.addView(a.kit.gap(13));
 
-        View divider = new View(a);
-        divider.setBackgroundColor(Theme.alpha(Theme.GOLD, Theme.isLight() ? 78 : 62));
-        hero.addView(divider, a.kit.lp(-1, Theme.dp(1)));
-        hero.addView(a.kit.gap(9));
+        // No hairline under the greeting: the card's own spacing separates the header from the rates.
+        hero.addView(a.kit.gap(14));
+        // Rates (dollar, gold, coin) and Tehran weather live inside the welcome card.
+        hero.addView(marketCard(), a.kit.lp(-1, -2));
+        hero.addView(a.kit.gap(10));
         LinearLayout footer = a.kit.h();
-        footer.addView(a.kit.icon(R.drawable.mi_calendar_month, Theme.GOLD_SOFT, 16),
-                new LinearLayout.LayoutParams(Theme.dp(16), Theme.dp(16)));
+        footer.setGravity(Gravity.CENTER_VERTICAL);
+        footer.addView(a.kit.icon(R.drawable.mi_calendar_month, Theme.GOLD_SOFT, 18),
+                new LinearLayout.LayoutParams(Theme.dp(18), Theme.dp(18)));
         footer.addView(a.kit.space(6));
-        TextView date = a.kit.text(a.kit.todayLine(), 11.5f, Theme.TEXT, true);
+        TextView date = a.kit.text(dateLine(), 12f, Theme.TEXT, true);
         date.setSingleLine(true);
-        footer.addView(date, a.kit.wlp(1f));
-        TextView edition = a.kit.text(RoleStore.editionFa(role), 10.5f, Theme.GOLD_SOFT, true);
+        date.setPadding(Theme.dp(10), Theme.dp(5), Theme.dp(10), Theme.dp(5));
+        date.setBackground(Theme.ghostButton(Theme.GOLD));
+        footer.addView(date, a.kit.lp(-2, -2));
+        footer.addView(a.kit.space(1), a.kit.wlp(1f));
+        TextView edition = a.kit.text(RoleStore.editionFa(role), 12f, Theme.GOLD_SOFT, true);
         edition.setSingleLine(true);
         edition.setPadding(Theme.dp(10), Theme.dp(5), Theme.dp(10), Theme.dp(5));
         edition.setBackground(Theme.ghostButton(Theme.GOLD));
         footer.addView(edition, a.kit.lp(-2, -2));
         hero.addView(footer, a.kit.lp(-1, -2));
-        return hero;
+
+        // Gentle float, only when the phone allows motion; it stops as soon as the card leaves the screen.
+        if (ir.meelano.manager.ui.Ui.motionOk(a)) {
+            final android.animation.ObjectAnimator float1 = android.animation.ObjectAnimator.ofFloat(
+                    hero, View.TRANSLATION_Y, 0f, -Theme.dp(3));
+            float1.setDuration(3600);
+            float1.setRepeatCount(android.animation.ObjectAnimator.INFINITE);
+            float1.setRepeatMode(android.animation.ObjectAnimator.REVERSE);
+            float1.setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator());
+            float1.start();
+            wrap.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
+                @Override
+                public void onViewAttachedToWindow(View v) { }
+
+                @Override
+                public void onViewDetachedFromWindow(View v) { float1.cancel(); }
+            });
+        }
+        return wrap;
     }
 
     /** A compact luxury launchpad to the five high-frequency management destinations. */
-    private void addExecutiveDock(LinearLayout content) {
-        String[][] suggested = {
-                {"sales", "فاکتورها", "فروش و پیگیری"},
-                {"cash", "خزانه", "نقدینگی و گردش"},
-                {"closeout", "بستن روز", "تطبیق مدیریتی"},
-                {"anbar", "انبار", "موجودی و عملیات"},
-                {"reports", "گزارش‌ها", "تحلیل تصمیم‌ها"},
-        };
-        List<String[]> available = new ArrayList<>();
-        for (String[] item : suggested)
-            if (a.screen(item[0]) != null && RoleStore.allowed(a, item[0])) available.add(item);
-        if (available.isEmpty()) return;
+    /** Compact rates + Tehran weather. Saved values show at once; the refresh runs in the background. */
+    /** Place name shown with the weather: the device's city, or Tehran when no position is available. */
+    private String weatherPlace = MarketWeather.AHVAZ_NAME;
+    /** True when the weather shown comes from the device position (not the Tehran fallback). */
+    private boolean weatherFromDevice = false;
 
-        content.addView(a.kit.sectionHead("دسترسی فوری", "همه بخش‌ها ›", v -> a.nav("more")),
-                a.kit.lp(-1, -2));
-        HorizontalScrollView strip = new HorizontalScrollView(a);
-        strip.setHorizontalScrollBarEnabled(false);
-        strip.setClipToPadding(false);
-        strip.setPadding(Theme.dp(1), Theme.dp(1), Theme.dp(1), Theme.dp(4));
-        LinearLayout row = a.kit.h();
-        for (String[] item : available) {
-            Screen destination = a.screen(item[0]);
-            int accent = destination.accent();
-            LinearLayout tile = a.kit.h();
-            tile.setGravity(Gravity.CENTER_VERTICAL);
-            tile.setPadding(Theme.dp(10), Theme.dp(9), Theme.dp(10), Theme.dp(9));
-            tile.setMinimumHeight(Theme.dp(68));
-            tile.setBackground(Theme.cardAccent(accent));
+    private static final String PLACE_KEY = "weather_place";
+    private static final String DEVICE_KEY = "weather_device";
 
-            FrameLayout iconBadge = new FrameLayout(a);
-            iconBadge.setBackground(Theme.avatar(Theme.alpha(accent, Theme.isLight() ? 34 : 48)));
-            int iconRes = MeelanoIcons.iconFor(destination.glyph());
-            if (iconRes != 0) {
-                ImageView image = a.kit.icon(iconRes, accent, 19);
-                iconBadge.addView(image, new FrameLayout.LayoutParams(Theme.dp(22), Theme.dp(22), Gravity.CENTER));
-            } else {
-                TextView fallback = a.kit.text(destination.glyph(), 19f, accent, true);
-                fallback.setGravity(Gravity.CENTER);
-                iconBadge.addView(fallback, new FrameLayout.LayoutParams(-1, -1));
+    private View marketCard() {
+        final LinearLayout card = a.kit.card(Theme.GOLD);
+        final int gen = a.renderGen();
+        // Show the last saved values and place straight away; the live refresh replaces them below.
+        String savedPlace = MarketWeather.cached(a, PLACE_KEY);
+        if (savedPlace != null && !savedPlace.isEmpty()) weatherPlace = savedPlace;
+        weatherFromDevice = "1".equals(MarketWeather.cached(a, DEVICE_KEY));
+        renderMarket(card, MarketWeather.cached(a, MarketWeather.ratesKey()),
+                MarketWeather.cached(a, MarketWeather.weatherKey()), false, false);
+        new Thread(() -> {
+            // Position: last known or one quick fix (worker thread). Denied or unavailable means Tehran.
+            android.location.Location loc = null;
+            try { loc = ir.meelano.manager.core.DeviceLocation.resolve(a, 6000); } catch (Exception e) { Diag.ignored("Home:location", e); }
+            final boolean fromDevice = loc != null;
+            final double lat = fromDevice ? loc.getLatitude() : MarketWeather.AHVAZ_LAT;
+            final double lon = fromDevice ? loc.getLongitude() : MarketWeather.AHVAZ_LON;
+            String place = fromDevice ? ir.meelano.manager.core.DeviceLocation.placeName(a, lat, lon) : null;
+            if (place == null) place = fromDevice ? "موقعیت شما" : MarketWeather.AHVAZ_NAME + " (پیش‌فرض)";
+
+            String rRaw = null;
+            String wRaw = null;
+            try { rRaw = MarketWeather.get(MarketWeather.RATES_URL); } catch (Exception e) { Diag.ignored("Home:ratesFetch", e); }
+            try { wRaw = MarketWeather.get(MarketWeather.weatherUrl(lat, lon)); } catch (Exception e) { Diag.ignored("Home:weatherFetch", e); }
+            final boolean rLive = rRaw != null;
+            final boolean wLive = wRaw != null;
+            if (rLive) MarketWeather.save(a, MarketWeather.ratesKey(), rRaw);
+            if (wLive) {
+                // Weather is stored with its place, so a saved value is never shown under another city's name.
+                MarketWeather.save(a, MarketWeather.weatherKey(), wRaw);
+                MarketWeather.save(a, PLACE_KEY, place);
+                MarketWeather.save(a, DEVICE_KEY, fromDevice ? "1" : "0");
             }
-            tile.addView(iconBadge, new LinearLayout.LayoutParams(Theme.dp(40), Theme.dp(40)));
-            tile.addView(a.kit.space(8));
+            final String fr = rLive ? rRaw : MarketWeather.cached(a, MarketWeather.ratesKey());
+            final String fw = wLive ? wRaw : MarketWeather.cached(a, MarketWeather.weatherKey());
+            final String fp = wLive ? place : (MarketWeather.cached(a, PLACE_KEY) == null ? place : MarketWeather.cached(a, PLACE_KEY));
+            final boolean fd = wLive ? fromDevice : "1".equals(MarketWeather.cached(a, DEVICE_KEY));
+            a.runOnUiThread(() -> {
+                if (a.renderGen() != gen) return;
+                weatherPlace = fp;
+                weatherFromDevice = fd;
+                renderMarket(card, fr, fw, rLive, wLive);
+            });
+        }, "market-refresh").start();
+        return card;
+    }
 
-            LinearLayout labels = a.kit.v();
-            TextView title = a.kit.text(item[1], 12.5f, Theme.TEXT, true);
-            title.setSingleLine(true);
-            title.setEllipsize(android.text.TextUtils.TruncateAt.END);
-            labels.addView(title, a.kit.lp(-1, -2));
-            TextView sub = a.kit.text(item[2], 10.5f, Theme.MUTED, false);
-            sub.setSingleLine(true);
-            sub.setEllipsize(android.text.TextUtils.TruncateAt.END);
-            labels.addView(sub, a.kit.lp(-1, -2));
-            tile.addView(labels, a.kit.wlp(1f));
-            tile.setContentDescription(item[1] + "؛ " + item[2] + "؛ باز کردن");
-            Theme.pressable(tile);
-            tile.setOnClickListener(v -> a.nav(item[0]));
-            LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(Theme.dp(142), Theme.dp(68));
-            tp.setMarginEnd(Theme.dp(8));
-            row.addView(tile, tp);
+
+    private void renderMarket(LinearLayout card, String rJson, String wJson, boolean rLive, boolean wLive) {
+        card.removeAllViews();
+        List<MarketWeather.Rate> rates = null;
+        MarketWeather.Weather w = null;
+        try { if (rJson != null) rates = MarketWeather.parseRates(rJson); } catch (Exception e) { Diag.warn("Home:parseRates", e); }
+        try { if (wJson != null) w = MarketWeather.parseWeather(wJson); } catch (Exception e) { Diag.warn("Home:parseWeather", e); }
+
+        LinearLayout head = a.kit.h();
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        head.addView(a.kit.text("بازار و هوای امروز", 14f, Theme.GOLD_SOFT, true), a.kit.wlp(1f));
+        boolean live = rLive || wLive;
+        head.addView(a.kit.pill(live ? "به‌روز" : "ذخیره‌شده", live ? Theme.SUCCESS : Theme.MUTED), a.kit.lp(-2, -2));
+        card.addView(head, a.kit.lp(-1, -2));
+        card.addView(a.kit.gap(8));
+
+        if (rates == null || rates.isEmpty()) {
+            card.addView(a.kit.hint("قیمت‌ها در دسترس نیست؛ اتصال اینترنت را بررسی کنید."), a.kit.lp(-1, -2));
+        } else {
+            LinearLayout row = a.kit.h();
+            for (int i = 0; i < rates.size(); i++) {
+                if (i > 0) row.addView(a.kit.space(6));
+                row.addView(rateTile(rates.get(i)), a.kit.wlp(1f));
+            }
+            card.addView(row, a.kit.lp(-1, -2));
         }
-        strip.addView(row, new HorizontalScrollView.LayoutParams(-2, -2));
-        content.addView(strip, a.kit.lp(-1, -2));
+
+        if (w != null) {
+            card.addView(a.kit.gap(8));
+            LinearLayout wr = a.kit.h();
+            wr.setGravity(Gravity.CENTER_VERTICAL);
+            // Gold vector icon instead of a text glyph (visual only; same weather code mapping).
+            android.widget.ImageView wi = new android.widget.ImageView(a);
+            int wRes = w.code <= 1 ? R.drawable.mi_light_mode
+                    : w.code <= 3 ? R.drawable.mi_wb_twilight
+                    : (w.code >= 95 ? R.drawable.mi_bolt
+                    : (w.code >= 51 ? R.drawable.mi_beach_access : R.drawable.mi_wb_twilight));
+            try { wi.setImageResource(wRes); } catch (Exception ignored) { Diag.ignored("HomeScreen:weatherIcon", ignored); }
+            wi.setColorFilter(Theme.GOLD);
+            wr.addView(wi, a.kit.lp(Theme.dp(44), Theme.dp(44)));
+            wr.addView(a.kit.space(8));
+            LinearLayout wc = a.kit.v();
+            TextView line = a.kit.text(weatherPlace + " • " + Money.fa(String.valueOf(Math.round(w.temp))) + "°  "
+                    + MarketWeather.describe(w.code), 12f, Theme.TEXT, true);
+            line.setMaxLines(1);
+            line.setEllipsize(TextUtils.TruncateAt.END);
+            wc.addView(line, a.kit.lp(-1, -2));
+            wc.addView(a.kit.text("رطوبت " + Money.fa(String.valueOf(w.humidity)) + "٪", 10.5f, Theme.MUTED, false),
+                    a.kit.lp(-1, -2));
+            wr.addView(wc, a.kit.wlp(1f));
+            card.addView(wr, a.kit.lp(-1, -2));
+        }
+
+        if (!weatherFromDevice && w != null) {
+            // Without the device position the card says so and offers the permission again.
+            android.widget.Button loc = a.kit.btnGhost("📍 موقعیت من", Theme.GOLD, v -> a.requestLocationAccess());
+            loc.setSingleLine(true);
+            loc.setTextSize(11f * Theme.fontScale());
+            loc.setPadding(Theme.dp(10), Theme.dp(4), Theme.dp(10), Theme.dp(4));
+            loc.setMinHeight(Theme.dp(30));
+            LinearLayout.LayoutParams lp = a.kit.lp(-2, -2);
+            lp.setMargins(0, Theme.dp(6), 0, 0);
+            lp.gravity = Gravity.END;
+            card.addView(loc, lp);
+        }
+
+        String stamp = rates != null && !rates.isEmpty() ? rates.get(0).asOf : "";
+        // Gold hairline above the source line, as in the reference market card.
+        View rule = new View(a);
+        rule.setBackgroundColor(Theme.alpha(Theme.GOLD, 90));
+        card.addView(rule, a.kit.lp(-1, Theme.dp(1)));
+        card.addView(a.kit.gap(6));
+        card.addView(a.kit.hint("به‌روزرسانی: " + Money.fa(stamp == null || stamp.isEmpty() ? "—" : stamp)
+                + " • تومان • TGJU"), a.kit.lp(-1, -2));
+    }
+
+    private View rateTile(MarketWeather.Rate r) {
+        LinearLayout t = a.kit.v();
+        t.setBackground(Theme.kpi(Theme.GOLD));
+        t.setPadding(Theme.dp(8), Theme.dp(8), Theme.dp(8), Theme.dp(8));
+        t.setGravity(Gravity.CENTER_HORIZONTAL);
+        // Gold icon per instrument, as in the reference: coin, gold bar, dollar trend.
+        String lbl = r.label == null ? "" : r.label;
+        int tileIcon = lbl.contains("دلار") ? R.drawable.mi_trending_up
+                : (lbl.contains("طلا") ? R.drawable.mi_diamond
+                : (Theme.isLight() ? R.drawable.icon3d_coin : R.drawable.icon3d_dark_coin));
+        int tile = Theme.isNuts() ? 64 : 42;
+        t.addView(a.kit.icon(tileIcon, Theme.GOLD, tile), new LinearLayout.LayoutParams(Theme.dp(tile), Theme.dp(tile)));
+        TextView label = a.kit.text(r.label, 10.5f, Theme.TEXT, false);
+        label.setGravity(Gravity.CENTER_HORIZONTAL);
+        label.setMinLines(2);
+        label.setMaxLines(2);
+        label.setEllipsize(TextUtils.TruncateAt.END);
+        t.addView(label, a.kit.lp(-1, -2));
+        // Prices are always in toman (the source's unit), whatever unit the rest of the app uses.
+        TextView price = a.kit.text(Money.fa(Money.num(r.toman)), 18f, Theme.TEXT, true);
+        price.setMaxLines(1);
+        price.setGravity(Gravity.CENTER_HORIZONTAL);
+        // Tabular figures: digits keep their width when the price updates.
+        price.setFontFeatureSettings("tnum");
+        price.setAutoSizeTextTypeUniformWithConfiguration(11, 18, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
+        LinearLayout.LayoutParams pp = a.kit.lp(-1, -2);
+        pp.setMargins(0, Theme.dp(6), 0, 0);
+        t.addView(price, pp);
+        // Unit is smaller and quieter than the figure.
+        TextView unit = a.kit.text("تومان", 9f, Theme.MUTED, false);
+        unit.setMaxLines(1);
+        unit.setGravity(Gravity.CENTER_HORIZONTAL);
+        t.addView(unit, a.kit.lp(-1, -2));
+        int color = r.changePct > 0 ? Theme.SUCCESS : (r.changePct < 0 ? Theme.DANGER : Theme.MUTED);
+        String arrow = r.changePct > 0 ? "↗ " : (r.changePct < 0 ? "↘ " : "");
+        TextView ch = a.kit.text(arrow + Money.fa(String.format(Locale.US, "%.1f", Math.abs(r.changePct))) + "٪",
+                10f, color, true);
+        ch.setMaxLines(1);
+        ch.setGravity(Gravity.CENTER_HORIZONTAL);
+        ch.setBackground(Theme.pill(color));
+        ch.setPadding(Theme.dp(8), Theme.dp(2), Theme.dp(8), Theme.dp(2));
+        LinearLayout.LayoutParams cp = a.kit.lp(-2, -2);
+        cp.gravity = Gravity.CENTER_HORIZONTAL;
+        cp.setMargins(0, Theme.dp(6), 0, 0);
+        t.addView(ch, cp);
+        t.setContentDescription(r.label + "، " + Money.fa(Money.num(r.toman)) + " تومان");
+        return t;
     }
 
     private void build(LinearLayout content, Data d) {
         content.removeAllViews();
+        // The clock banner stays on top after live data arrives; it now reports the refresh time.
+        String nowTs = Money.fa(String.format(Locale.US, "%02d:%02d",
+                Calendar.getInstance().get(Calendar.HOUR_OF_DAY), Calendar.getInstance().get(Calendar.MINUTE)));
+        View doneBanner = updateBanner(nowTs, true);
+        // Loading → done: fade the single card into its finished state (only after the first entry).
+        if (bannerWasLoading && entered) {
+            doneBanner.setAlpha(0f);
+            doneBanner.animate().alpha(1f).setDuration(320).start();
+        }
+        bannerWasLoading = false;
+        content.addView(doneBanner, a.kit.lp(-1, -2));
+        content.addView(a.kit.gap(10));
         content.addView(greetingHero(), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
-        addExecutiveDock(content);
         content.addView(a.kit.gap(8));
 
         // Render each dashboard section into its own container so the lower-priority
@@ -434,6 +1035,78 @@ public class HomeScreen extends Screen {
             content.addView(block, a.kit.lp(-1, -2));
         }
         renderNotes(content, d.notes);
+        staggerIn(content);
+    }
+
+    /**
+     * TRIAL (light skin only): a soft gold silk drape in the corner of the welcome card.
+     * Set HERO_SILK_TRIAL to false to return to the plain hero background.
+     */
+    private static final boolean HERO_SILK_TRIAL = false;
+
+    private android.graphics.drawable.Drawable heroBackground() {
+        android.graphics.drawable.Drawable base = Theme.executiveHero();
+        if (!HERO_SILK_TRIAL || !Theme.isLight()) return base;
+        try {
+            android.graphics.drawable.Drawable silk = a.getDrawable(R.drawable.home_hero_light);
+            if (silk == null) return base;
+            android.graphics.drawable.LayerDrawable ld = new android.graphics.drawable.LayerDrawable(
+                    new android.graphics.drawable.Drawable[]{base, silk});
+            ld.setLayerGravity(1, Gravity.END | Gravity.TOP);
+            ld.setLayerWidth(1, Theme.dp(260));
+            ld.setLayerHeight(1, Theme.dp(142));
+            return ld;
+        } catch (Exception e) {
+            Diag.ignored("HomeScreen:heroSilk", e);
+            return base;
+        }
+    }
+
+    /** Decorative dot grid drawn behind the home content. */
+    private static final class DotGrid extends android.graphics.drawable.Drawable {
+        private final android.graphics.Paint dot = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        private final float step = Theme.dp(22);
+
+        DotGrid() {
+            dot.setColor(Theme.alpha(Theme.GOLD, Theme.isLight() ? 26 : 16));
+        }
+
+        @Override
+        public void draw(android.graphics.Canvas c) {
+            android.graphics.Rect b = getBounds();
+            float r = Theme.dp(1f);
+            for (float y = b.top + step; y < b.bottom; y += step)
+                for (float x = b.left + step; x < b.right; x += step)
+                    c.drawCircle(x, y, r, dot);
+        }
+
+        @Override public void setAlpha(int alpha) { }
+        @Override public void setColorFilter(android.graphics.ColorFilter cf) { }
+        @Override public int getOpacity() { return android.graphics.PixelFormat.TRANSLUCENT; }
+    }
+
+    /** True while the clock card shows the loading state (so the finished state can fade in). */
+    private boolean bannerWasLoading;
+
+    /** One-time staggered fade and slide for the first home cards (skipped when animations are off). */
+    private boolean entered;
+
+    private void staggerIn(LinearLayout content) {
+        if (entered) return;
+        entered = true;
+        try {
+            if (android.provider.Settings.Global.getFloat(a.getContentResolver(),
+                    android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f) return;
+        } catch (Exception ignored) { Diag.ignored("HomeScreen:stagger", ignored); }
+        float dy = Theme.dp(14);
+        int n = Math.min(content.getChildCount(), 8);
+        for (int i = 0; i < n; i++) {
+            View v = content.getChildAt(i);
+            if (v.getVisibility() != View.VISIBLE) continue;
+            v.setAlpha(0f);
+            v.setTranslationY(dy);
+            v.animate().alpha(1f).translationY(0f).setStartDelay(i * 45L).setDuration(320).start();
+        }
     }
 
     private void renderHomeSection(LinearLayout content, Data d, String key) {
@@ -464,8 +1137,11 @@ public class HomeScreen extends Screen {
         LinearLayout row = a.kit.h();
         row.setGravity(android.view.Gravity.CENTER_VERTICAL);
 
-        TextView icon = a.kit.text("▦", 21f, Theme.INFO, true);
-        icon.setGravity(android.view.Gravity.CENTER);
+        // Same 3D family as the rest of the dashboard (emerald in the nut theme) instead of a blue text glyph.
+        android.widget.ImageView icon = new android.widget.ImageView(a);
+        icon.setImageResource(Theme.chrome3d(R.drawable.mi_widgets));
+        icon.setScaleType(android.widget.ImageView.ScaleType.CENTER_INSIDE);
+        icon.setPadding(Theme.dp(6), Theme.dp(6), Theme.dp(6), Theme.dp(6));
         icon.setBackground(Theme.avatar(Theme.alpha(Theme.INFO, 50)));
         row.addView(icon, new LinearLayout.LayoutParams(Theme.dp(46), Theme.dp(46)));
         row.addView(a.kit.space(10));
@@ -525,10 +1201,23 @@ public class HomeScreen extends Screen {
         // remaining KPIs visible, but make the missing metric explicit and inert.
         List<Kit.Kpi> kpis = new ArrayList<>();
         kpis.add(dayKpi("فروش", "sales", d.salesDay, "docs", "فاکتور", Theme.GOLD));
-        kpis.add(dayKpi("خرید", "buy", d.buyDay, "docs", "فاکتور", Theme.INFO));
-        kpis.add(dayKpi("دریافت", "dar_in", d.inDay, "count", "قبض", Theme.SUCCESS));
-        kpis.add(dayKpi("پرداخت", "dar_out", d.outDay, "count", "قبض", Theme.WARNING));
-        content.addView(a.kit.kpiGrid(kpis, 2), a.kit.lp(-1, -2));
+        kpis.add(dayKpi("خرید", "buy", d.buyDay, "docs", "فاکتور", Theme.GOLD));
+        kpis.add(dayKpi("دریافت", "dar_in", d.inDay, "count", "قبض", Theme.GOLD));
+        kpis.add(dayKpi("پرداخت", "dar_out", d.outDay, "count", "قبض", Theme.GOLD));
+        // Sparklines: last 14 days per tile (days without a row count as 0). Each tile
+        // draws only from its own daily query; a missing query simply leaves the tile plain.
+        kpis.get(0).icon = R.drawable.mi_point_of_sale;
+        kpis.get(1).icon = R.drawable.mi_shopping_cart;
+        kpis.get(2).icon = R.drawable.mi_receipt_long;
+        kpis.get(3).icon = R.drawable.mi_payments;
+        attachSpark(kpis.get(0), d.salesDaily, d);
+        attachSpark(kpis.get(1), d.buyDaily, d);
+        attachSpark(kpis.get(2), d.inDaily, d);
+        attachSpark(kpis.get(3), d.outDaily, d);
+        // Breathing room under the header toolbar so the first KPI row does not touch it.
+        LinearLayout.LayoutParams kg = a.kit.lp(-1, -2);
+        kg.topMargin = Theme.dp(12);
+        content.addView(a.kit.kpiGrid(kpis, 2), kg);
         content.addView(a.kit.gap(12));
         if (d.salesDaily != null && !d.salesDaily.isEmpty()) {
             String compareDay = snapshotDay(d);
@@ -540,13 +1229,17 @@ public class HomeScreen extends Screen {
             LinearLayout compare = a.kit.card(Theme.GOLD);
             compare.addView(a.kit.sectionHead("فروش " + compareLabel + " در مقایسه", "فروش ›", v -> a.nav("sales")),
                     a.kit.lp(-1, -2));
-            compare.addView(a.kit.kv(compareLabel, Money.compactRial(todaySales), Theme.GOLD), a.kit.lp(-1, -2));
-            compare.addView(a.kit.kv("دیروز", Money.compactRial(yesterday), Theme.TEXT), a.kit.lp(-1, -2));
-            compare.addView(a.kit.kv("میانگین ۷ روز تقویمی قبل", Money.compactRial(avg7), Theme.INFO), a.kit.lp(-1, -2));
-            compare.addView(a.kit.kv("میانگین ۳۰ روز تقویمی قبل", Money.compactRial(avg30), Theme.INFO), a.kit.lp(-1, -2));
             String delta = avg7 > 0 ? Money.pct((todaySales - avg7) * 100.0 / avg7) : "—";
             int deltaColor = avg7 <= 0 ? Theme.MUTED : (todaySales >= avg7 ? Theme.SUCCESS : Theme.WARNING);
-            compare.addView(a.kit.kv("تغییر نسبت به میانگین ۷روزه", delta, deltaColor), a.kit.lp(-1, -2));
+            List<Kit.Kpi> cmp = new ArrayList<>();
+            cmp.add(new Kit.Kpi(compareLabel, Money.compactRial(todaySales), "تغییر ۷ روزه " + delta, Theme.GOLD));
+            cmp.add(new Kit.Kpi("دیروز", Money.compactRial(yesterday), "", Theme.TEXT));
+            cmp.add(new Kit.Kpi("میانگین ۷ روز قبل", Money.compactRial(avg7), "", Theme.GOLD_SOFT));
+            cmp.add(new Kit.Kpi("میانگین ۳۰ روز قبل", Money.compactRial(avg30), "", Theme.GOLD_SOFT));
+            compare.addView(a.kit.kpiGrid(cmp, 2), a.kit.lp(-1, -2));
+            if (todaySales <= 0)
+                compare.addView(a.kit.hint("برای " + compareLabel + " هنوز فروشی ثبت نشده است. اعداد بالا از روزهای قبل محاسبه شده‌اند."),
+                        a.kit.lp(-1, -2));
             a.kit.addCard(content, compare);
         }
     }
@@ -556,7 +1249,8 @@ public class HomeScreen extends Screen {
         String day = dayOf(row);
         String label = day.isEmpty() ? title : title + " " + day;
         if (row == null) {
-            return new Kit.Kpi(label, "—", "داده در دسترس نیست", accent);
+            // No row for this day yet: a neutral dash, never an error-looking placeholder.
+            return new Kit.Kpi(label, "—", "هنوز ثبت نشده", accent);
         }
         return new Kit.Kpi(label, Money.compactRial(row.d("total")),
                 Money.fa(String.valueOf(row.l(countKey))) + " " + countLabel, accent,
@@ -565,7 +1259,7 @@ public class HomeScreen extends Screen {
 
     private void secAlerts(LinearLayout content, Data d) {
         // ---- alerts ----
-        LinearLayout alerts = a.kit.card(Theme.DANGER);
+        LinearLayout alerts = a.kit.card(Theme.GOLD);
         alerts.addView(a.kit.text("هشدار امروز", 14.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
         int n = 0;
         n += alert(alerts, d, n);
@@ -574,7 +1268,7 @@ public class HomeScreen extends Screen {
             final FollowUps.Due fd = dues.get(0);
             String who = dues.size() == 1 ? fd.note.name : Money.fa(String.valueOf(dues.size())) + " یادداشت";
             alerts.addView(a.kit.alertRow("پیگیری مشتری", who + " • سررسید یادداشت",
-                    Theme.VIOLET, v -> gotoCustomer(fd.code)), padTop(n));
+                    Theme.GOLD, v -> gotoCustomer(fd.code)), padTop(n));
             n++;
         }
         if (n == 0) alerts.addView(a.kit.text("فعلاً هشدار مهمی وجود ندارد.", 11.5f, Theme.MUTED, false), a.kit.lp(-1, -2));
@@ -588,7 +1282,7 @@ public class HomeScreen extends Screen {
      * through to the full list is what makes it actionable.
      */
     private void secInvStatus(LinearLayout content, Data d) {
-        LinearLayout c = a.kit.card(Theme.WARNING);
+        LinearLayout c = a.kit.card(Theme.GOLD);
         c.addView(a.kit.sectionHead("وضعیت فاکتورهای ۳۰ روز اخیر", "گزارش ›", v -> a.nav("reports")),
                 a.kit.lp(-1, -2));
         addState(c, "فروش", d.saleState);
@@ -622,7 +1316,7 @@ public class HomeScreen extends Screen {
      * in the profit figures.
      */
     private void secReturns(LinearLayout content, Data d) {
-        LinearLayout c = a.kit.card(Theme.DANGER);
+        LinearLayout c = a.kit.card(Theme.GOLD);
         c.addView(a.kit.sectionHead("برگشتی‌های ۳۰ روز اخیر", "گزارش ›", v -> a.nav("reports")),
                 a.kit.lp(-1, -2));
         long n = 0;
@@ -637,7 +1331,7 @@ public class HomeScreen extends Screen {
             c.addView(a.kit.kv("هیچ سند برگشتی در این بازه ثبت نشده", "✓", Theme.SUCCESS), a.kit.lp(-1, -2));
         } else {
             c.addView(a.kit.kv(Money.fa(String.valueOf(n)) + " سند برگشتی",
-                    Money.compactMoney(sum), Theme.DANGER), a.kit.lp(-1, -2));
+                    Money.compactMoney(sum), Theme.GOLD), a.kit.lp(-1, -2));
             int shown = 0;
             for (Row r : d.returns) {
                 if (shown++ >= 3) break;
@@ -658,7 +1352,7 @@ public class HomeScreen extends Screen {
         c.addView(a.kit.sectionHead("پرفروش‌ترین کالاهای " + period, "گزارش کامل ›", v -> a.nav("reports")),
                 a.kit.lp(-1, -2));
         if (d.topItems == null || d.topItems.isEmpty()) {
-            c.addView(a.kit.text("دادهٔ کالای پرفروش برای " + period + " در دسترس نیست.", 11.5f, Theme.MUTED, false),
+            c.addView(a.kit.text("هنوز کالایی برای " + period + " ثبت نشده است.", 11.5f, Theme.MUTED, false),
                     a.kit.lp(-1, -2));
         } else {
             int show = Math.min(5, d.topItems.size());
@@ -723,7 +1417,7 @@ public class HomeScreen extends Screen {
             List<Charts.Point> pts = new ArrayList<>();
             pts.add(new Charts.Point("نقد", d.inDay.d("cash"), Theme.SUCCESS));
             pts.add(new Charts.Point("کارت", d.inDay.d("pos"), Theme.INFO));
-            pts.add(new Charts.Point("حواله", d.inDay.d("havaleh"), Theme.VIOLET));
+            pts.add(new Charts.Point("حواله", d.inDay.d("havaleh"), Theme.GOLD));
             pts.add(new Charts.Point("چک", d.inDay.d("cheque"), Theme.GOLD));
             dn.setData(pts, "جمع دریافت", Money.compactRial(d.inDay.d("total")));
             c.addView(dn, new LinearLayout.LayoutParams(-1, Theme.dp(300)));
@@ -735,21 +1429,28 @@ public class HomeScreen extends Screen {
         // ---- debtors ----
         if (d.debtors != null && !d.debtors.isEmpty()) {
             content.addView(a.kit.sectionHead("بدهکاران اولویت‌دار", "مشتریان ›", v -> gotoDebtors()), a.kit.lp(-1, -2));
+            final java.util.Map<String, android.widget.ImageView> slots = new java.util.HashMap<>();
+            final List<String> codes = new ArrayList<>();
             for (Row r : d.debtors) {
                 final String code = r.s("code");
-                View row = a.kit.personRow(r.s("party"), "کد " + Money.fa(code), Money.rial(r.d("amount")),
-                        "مانده بدهی", Theme.DANGER, v -> gotoCustomer(code));
+                final String party = r.s("party");
+                codes.add(code);
+                View av = ir.meelano.manager.data.CustomerPhotos.avatar(a, code, a.kit.initials(party), Theme.GOLD, 48, slots);
+                View row = a.kit.personRow(party, "کد " + Money.fa(code), Money.rial(r.d("amount")),
+                        "مانده بدهی", Theme.GOLD, v -> gotoCustomer(code), av);
                 LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
                 p.setMargins(0, 0, 0, Theme.dp(10));
                 content.addView(row, p);
             }
+            ir.meelano.manager.data.CustomerPhotos.refresh(a.repo, a, codes,
+                    () -> ir.meelano.manager.data.CustomerPhotos.fill(slots, a));
         }
     }
 
     private void secVisitors(LinearLayout content, Data d) {
         // ---- visitors ----
         if (d.visitors != null && !d.visitors.isEmpty()) {
-            LinearLayout c = a.kit.card(Theme.WARNING);
+            LinearLayout c = a.kit.card(Theme.GOLD);
             c.addView(a.kit.sectionHead("عملکرد ۳۰ روزه ویزیتورها", "ویزیتورها ›", v -> a.nav("visitors")), a.kit.lp(-1, -2));
             Charts.HBars hb = new Charts.HBars(a);
             List<Charts.Point> pts = new ArrayList<>();
@@ -773,7 +1474,7 @@ public class HomeScreen extends Screen {
             if (d.dueIn != null && !d.dueIn.isEmpty())
                 c.addView(a.kit.kv("دریافتی (" + Money.fa(String.valueOf(d.dueIn.size())) + " فقره)", Money.rial(dueInSum), Theme.SUCCESS), a.kit.lp(-1, -2));
             if (d.dueOut != null && !d.dueOut.isEmpty())
-                c.addView(a.kit.kv("پرداختی (" + Money.fa(String.valueOf(d.dueOut.size())) + " فقره)", Money.rial(dueOutSum), Theme.DANGER), a.kit.lp(-1, -2));
+                c.addView(a.kit.kv("پرداختی (" + Money.fa(String.valueOf(d.dueOut.size())) + " فقره)", Money.rial(dueOutSum), Theme.GOLD), a.kit.lp(-1, -2));
             a.kit.addCard(content, c);
         }
     }
@@ -789,18 +1490,18 @@ public class HomeScreen extends Screen {
             return;
         }
         if (txt == null || txt.isEmpty()) return;
-        LinearLayout c = a.kit.card(Theme.VIOLET);
+        LinearLayout c = a.kit.card(Theme.GOLD);
         String when = "";
         try {
             when = dt == null || dt.isEmpty() ? "" : Jalali.dispFa(dt);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("HomeScreen:800", ignored); }
         c.addView(a.kit.sectionHead("🌙 جمع‌بندی پایان روز" + (when.isEmpty() ? "" : " • " + when),
                 null, null), a.kit.lp(-1, -2));
         c.addView(a.kit.text(txt, 13f, Theme.TEXT, false), a.kit.lp(-1, -2));
         c.addView(a.kit.gap(6));
-        final String share = "🌙 جمع‌بندی پایان روز میلانو" + (when.isEmpty() ? "" : " (" + when + ")")
+        final String share = "🌙 جمع‌بندی پایان روز میلانو زرین‌فرمان" + (when.isEmpty() ? "" : " (" + when + ")")
                 + "\n" + txt;
-        c.addView(a.kit.btnGhost("↗ اشتراک‌گذاری", Theme.VIOLET, v -> {
+        c.addView(a.kit.btnGhost("↗ اشتراک‌گذاری", Theme.GOLD, v -> {
             try {
                 android.content.Intent i = new android.content.Intent(android.content.Intent.ACTION_SEND);
                 i.setType("text/plain");
@@ -843,20 +1544,20 @@ public class HomeScreen extends Screen {
             if (dd < 0) dd = Jalali.diffDays(o.s("dueDate"), Jalali.todayStr());
             String days = dd >= 0 ? " • تأخیر " + Money.fa(String.valueOf(dd)) + " روز" : "";
             box.addView(a.kit.alertRow("فاکتور معوق", o.s("party") + " • " + Money.rial(o.d("amount")) + days,
-                    Theme.DANGER, v -> gotoUnsettled()), padTop(n));
+                    Theme.GOLD, v -> gotoUnsettled()), padTop(n));
             n++;
         }
         // top debtor
         if (d.debtors != null && !d.debtors.isEmpty()) {
             Row r = d.debtors.get(0);
             box.addView(a.kit.alertRow("بدهکار اولویت‌دار", r.s("party") + " • مانده " + Money.rial(r.d("amount")),
-                    Theme.WARNING, v -> gotoCustomer(r.s("code"))), padTop(n));
+                    Theme.GOLD, v -> gotoCustomer(r.s("code"))), padTop(n));
             n++;
         }
         // liquidity
         if (d.salesDay != null && d.buyDay != null && d.salesDay.d("total") > 0 && d.buyDay.d("total") > d.salesDay.d("total") * 1.15) {
             box.addView(a.kit.alertRow("فشار نقدینگی", "خرید روز از فروش جلو زده؛ پرداخت‌ها را کنترل کنید.",
-                    Theme.WARNING, v -> a.nav("buy")), padTop(n));
+                    Theme.GOLD, v -> a.nav("buy")), padTop(n));
             n++;
         }
         // due cheques
@@ -906,12 +1607,26 @@ public class HomeScreen extends Screen {
         return s;
     }
 
+    private void attachSpark(Kit.Kpi tile, List<Row> rows, Data d) {
+        if (rows == null || rows.isEmpty()) return;
+        try {
+            String endDay = snapshotDay(d);
+            double[] series = new double[14];
+            for (int i = 0; i < series.length; i++)
+                series[i] = salesOnDay(rows, Jalali.addDays(endDay, i - (series.length - 1)));
+            tile.spark = series;
+        } catch (Exception e) {
+            Diag.ignored("Home:sparkline", e);
+        }
+    }
+
     private double salesOnDay(List<Row> rows, String day) {
         if (rows == null || day == null || day.isEmpty()) return 0;
         String target = Jalali.disp(day);
+        double total = 0;
         for (Row r : rows)
-            if (target.equals(Jalali.disp(r.s("day")))) return r.d("total");
-        return 0;
+            if (target.equals(Jalali.disp(r.s("day")))) total += r.d("total");
+        return total;
     }
 
     /** Average across calendar days before today, counting days without sales as zero. */
@@ -920,7 +1635,7 @@ public class HomeScreen extends Screen {
         Map<String, Double> byDay = new HashMap<>();
         for (Row r : rows) {
             String d = Jalali.disp(r.s("day"));
-            if (!d.isEmpty()) byDay.put(d, r.d("total"));
+            if (!d.isEmpty()) byDay.merge(d, r.d("total"), Double::sum);
         }
         int first = Jalali.parse(Jalali.addDays(today, -days));
         if (first < 0) return 0;
@@ -937,7 +1652,7 @@ public class HomeScreen extends Screen {
         Map<String, Double> map = new HashMap<>();
         if (rows != null) for (Row r : rows) {
             String k = Jalali.disp(r.s("day"));
-            if (!k.isEmpty()) map.put(k, r.d("total"));
+            if (!k.isEmpty()) map.merge(k, r.d("total"), Double::sum);
         }
         List<Charts.Point> out = new ArrayList<>();
         String to = Jalali.disp(endDay);

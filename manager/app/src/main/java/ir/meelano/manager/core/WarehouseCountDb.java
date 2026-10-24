@@ -37,7 +37,7 @@ public final class WarehouseCountDb {
                     + "[reviewNote] nvarchar(1000) NULL, "
                     + "[createdAt] bigint NOT NULL, "
                     + "[reviewedAt] bigint NULL)");
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("WarehouseCountDb:40", ignored); }
     }
 
     public static boolean available(Connection c) {

@@ -58,7 +58,7 @@ public class RadarView extends View {
         float r = Math.min(w, h) / 2f - 4;
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(2.5f);
-        paint.setColor(Theme.TEAL);
+        paint.setColor(Theme.GOLD);
         paint.setAlpha(220);
         c.drawCircle(cx, cy, r, paint);
         paint.setAlpha(120);

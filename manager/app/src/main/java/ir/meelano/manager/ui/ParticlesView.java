@@ -35,7 +35,12 @@ public class ParticlesView extends View {
 
     private void init() {
         setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
-        n = 10;
+        setCount(10);
+    }
+
+    /** How many drifting specks to draw. Screens that need a quieter look ask for fewer. */
+    public void setCount(int count) {
+        n = Math.max(0, count);
         x = new float[n];
         y = new float[n];
         r = new float[n];

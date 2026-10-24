@@ -51,7 +51,7 @@ public final class LicenseStore {
         String blocked = "";
         try {
             blocked = prefs(c).getString("blocked_reason", "");
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseStore:54", ignored); }
         if (blocked != null && !blocked.isEmpty()) {
             s.reason = "blocked";
             s.fa = blocked;
@@ -104,7 +104,7 @@ public final class LicenseStore {
         }
         try {
             prefs(c).edit().putLong("last_seen", today).apply();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseStore:107", ignored); }
         s.ok = true;
         s.plan = r.plan;
         s.expDay = r.expDay;
@@ -141,7 +141,12 @@ public final class LicenseStore {
         }
         if (today < r.iatDay - 1) {
             s.reason = "clock";
-            s.fa = "ساعت گوشی درست نیست";
+            // Epoch day -> Julian day number, so Jalali can format both dates.
+            String phone = Jalali.format((int) (today + 2440588L));
+            String issued = Jalali.format((int) (r.iatDay + 2440588L));
+            s.fa = "ساعت گوشی عقب است: تاریخ گوشی " + phone
+                    + " و تاریخ صدور کد " + issued + ".\n"
+                    + "تاریخ و ساعت گوشی را روی «خودکار» بگذارید و دوباره تلاش کنید.";
             return s;
         }
         try {
@@ -160,7 +165,7 @@ public final class LicenseStore {
     public static void clear(Context c) {
         try {
             prefs(c).edit().clear().apply();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseStore:163", ignored); }
     }
 
     // ---------------- remote control (seller kill-switch) ----------------
@@ -171,7 +176,7 @@ public final class LicenseStore {
             prefs(c).edit().remove("pack").remove("dev").remove("exp")
                     .remove("last_seen").remove("sms_pack").remove("sms_card")
                     .remove("sms_at").remove("lic_requested").apply();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseStore:174", ignored); }
     }
 
     /** First-entry tour (v33): MainActivity shows the welcome tour once. */
@@ -186,7 +191,7 @@ public final class LicenseStore {
     public static void setTourPending(Context c, boolean v) {
         try {
             prefs(c).edit().putBoolean("tour_pending", v).apply();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseStore:189", ignored); }
     }
 
     public static boolean enteredOnce(Context c) {
@@ -200,7 +205,7 @@ public final class LicenseStore {
     public static void setEnteredOnce(Context c) {
         try {
             prefs(c).edit().putBoolean("entered_once", true).apply();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseStore:203", ignored); }
     }
 
     /** Step memory (v31): request sent, still waiting for the license. */
@@ -215,7 +220,7 @@ public final class LicenseStore {
     public static void setRequested(Context c, boolean v) {
         try {
             prefs(c).edit().putBoolean("lic_requested", v).apply();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseStore:218", ignored); }
     }
 
     public static String blockedReason(Context c) {
@@ -232,13 +237,13 @@ public final class LicenseStore {
             revoke(c);
             prefs(c).edit().putString("blocked_reason",
                     reason == null || reason.isEmpty() ? "تخلف از قوانین استفاده" : reason).apply();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseStore:235", ignored); }
     }
 
     public static void clearBlocked(Context c) {
         try {
             prefs(c).edit().remove("blocked_reason").apply();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseStore:241", ignored); }
     }
 
     // ---------------- distributor identity (report branding) ----------------
@@ -256,7 +261,7 @@ public final class LicenseStore {
     public static void setDistName(Context c, String name) {
         try {
             prefs(c).edit().putString("dist_name", name == null ? "" : name.trim()).apply();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseStore:259", ignored); }
     }
 
     /** Report brand: distributor name → company name → Milano fallback. */
@@ -264,12 +269,12 @@ public final class LicenseStore {
         try {
             String d = distName(c);
             if (!d.isEmpty()) return d;
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseStore:267", ignored); }
         try {
             String n = Company.get(c).name;
             if (n != null && !n.trim().isEmpty()) return n.trim();
-        } catch (Exception ignored) { }
-        return "میلانو";
+        } catch (Exception ignored) { Diag.ignored("LicenseStore:271", ignored); }
+        return "میلانو زرین‌فرمان";
     }
 
     /** Customer contact number, remembered for request resends. */
@@ -285,7 +290,7 @@ public final class LicenseStore {
     public static void setContactPhone(Context c, String phone) {
         try {
             prefs(c).edit().putString("contact_phone", phone == null ? "" : phone.trim()).apply();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseStore:288", ignored); }
     }
 
     /** Remaining seller-contact, remembered across requests. */
@@ -300,7 +305,7 @@ public final class LicenseStore {
     public static void setSellerPhone(Context c, String phone) {
         try {
             prefs(c).edit().putString("seller_phone", phone == null ? "" : phone.trim()).apply();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseStore:303", ignored); }
     }
 
     // ---------------- direct-SMS inbox (pack / connection card staging) ----------------
@@ -320,7 +325,7 @@ public final class LicenseStore {
             p.edit().putString("sms_pack", pack == null ? "" : pack)
                     .putString("sms_card", card == null ? "" : card)
                     .putLong("sms_at", System.currentTimeMillis()).apply();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseStore:323", ignored); }
     }
 
     /** Take + clear the staged SMS payload (empty strings when nothing arrived). */
@@ -335,7 +340,7 @@ public final class LicenseStore {
             if (!s.pack.isEmpty() || !s.card.isEmpty()) {
                 p.edit().remove("sms_pack").remove("sms_card").remove("sms_at").apply();
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("LicenseStore:338", ignored); }
         return s;
     }
 }

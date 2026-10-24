@@ -1,5 +1,6 @@
 package ir.meelano.manager;
 
+import ir.meelano.manager.core.Diag;
 import android.app.Activity;
 import android.graphics.ImageFormat;
 import android.graphics.SurfaceTexture;
@@ -64,7 +65,7 @@ public class ScanActivity extends Activity {
         try {
             String x = getIntent().getStringExtra(EXTRA_TITLE);
             if (x != null && !x.isEmpty()) ttl = x;
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("ScanActivity:67", ignored); }
         TextView t = kit.text(ttl, 17, Theme.TEXT, true);
         t.setGravity(Gravity.CENTER);
         root.addView(t, kit.lp(-1, -2));
@@ -72,7 +73,7 @@ public class ScanActivity extends Activity {
         try {
             String x = getIntent().getStringExtra(EXTRA_HINT);
             if (x != null && !x.isEmpty()) hnt = x;
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("ScanActivity:75", ignored); }
         status = kit.text(hnt, 12f, Theme.MUTED, false);
         status.setGravity(Gravity.CENTER);
         root.addView(status, kit.lp(-1, -2));
@@ -113,7 +114,7 @@ public class ScanActivity extends Activity {
         closeAll();
         try {
             if (thread != null) thread.quitSafely();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("ScanActivity:116", ignored); }
         thread = null;
         super.onPause();
     }
@@ -164,7 +165,7 @@ public class ScanActivity extends Activity {
                 Image img = null;
                 try {
                     img = r.acquireLatestImage();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("ScanActivity:167", ignored); }
                 if (img == null) return;
                 try {
                     long now = System.currentTimeMillis();
@@ -175,7 +176,7 @@ public class ScanActivity extends Activity {
                 } finally {
                     try {
                         img.close();
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("ScanActivity:178", ignored); }
                     decoding.set(false);
                 }
             }, bg);
@@ -229,7 +230,7 @@ public class ScanActivity extends Activity {
             Result res = decoder.decodeWithState(new BinaryBitmap(new HybridBinarizer(src)));
             try {
                 decoder.reset();
-            } catch (Exception ignore) { }
+            } catch (Exception ignore) { Diag.ignored("ScanActivity:232", ignore); }
             if (res != null && res.getText() != null && !res.getText().trim().isEmpty()) {
                 final String code = res.getText().trim();
                 runOnUiThread(() -> finishWith(code));
@@ -237,11 +238,11 @@ public class ScanActivity extends Activity {
         } catch (com.google.zxing.NotFoundException nfe) {
             try {
                 decoder.reset();
-            } catch (Exception ignore) { }
+            } catch (Exception ignore) { Diag.ignored("ScanActivity:240", ignore); }
         } catch (Exception ignored) {
             try {
                 decoder.reset();
-            } catch (Exception ignore) { }
+            } catch (Exception ignore) { Diag.ignored("ScanActivity:244", ignore); }
         }
     }
 
@@ -252,7 +253,7 @@ public class ScanActivity extends Activity {
             android.content.Intent i = new android.content.Intent();
             i.putExtra(EXTRA_CODE, code);
             setResult(RESULT_OK, i);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("ScanActivity:255", ignored); }
         finish();
     }
 
@@ -261,22 +262,22 @@ public class ScanActivity extends Activity {
             try {
                 if (status != null) status.setText(msg);
                 android.widget.Toast.makeText(this, msg, android.widget.Toast.LENGTH_LONG).show();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("ScanActivity:264", ignored); }
         });
     }
 
     private void closeAll() {
         try {
             if (session != null) session.close();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("ScanActivity:271", ignored); }
         session = null;
         try {
             if (camera != null) camera.close();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("ScanActivity:275", ignored); }
         camera = null;
         try {
             if (reader != null) reader.close();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("ScanActivity:279", ignored); }
         reader = null;
     }
 }

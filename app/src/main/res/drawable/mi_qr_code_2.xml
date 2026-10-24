@@ -4,6 +4,9 @@
     android:width="24dp" android:height="24dp"
     android:viewportWidth="24" android:viewportHeight="24">
     <!-- سه نشانگر گوشه‌ای (finder) به‌صورت حلقهٔ توخالی با fillType=evenOdd -->
+    <!-- duotone: soft fill under the outline -->
+    <path android:fillColor="#FF000000" android:fillType="evenOdd"
+        android:pathData="M3,3h7v7h-7zM5,5v3h3v-3z" android:fillAlpha="0.22"/>
     <path android:fillColor="#FF000000" android:fillType="evenOdd"
         android:pathData="M3,3h7v7h-7zM5,5v3h3v-3z" />
     <path android:fillColor="#FF000000" android:fillType="evenOdd"

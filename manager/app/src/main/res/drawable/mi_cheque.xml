@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Cheque (چک) glyph: framed slip, amount lines, round stamp and a signature stroke.
+     Stroke-only so Kit.icon() can tint it to the active theme colour. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- duotone: soft fill under the outline -->
+    <path android:fillColor="#00000000"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="1.8"
+        android:strokeLineJoin="round"
+        android:pathData="M2.5,6.5 H21.5 V17.5 H2.5 Z" android:fillAlpha="0.22"/>
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="1.8"
+        android:strokeLineJoin="round"
+        android:pathData="M2.5,6.5 H21.5 V17.5 H2.5 Z" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:pathData="M5.5,10 H11 M5.5,13 H9" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="1.6"
+        android:pathData="M18.9,13.9 A2.4,2.4 0 1,1 14.1,13.9 A2.4,2.4 0 1,1 18.9,13.9 Z" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="1.4"
+        android:strokeLineCap="round"
+        android:pathData="M4.5,15.5 C6,14 7,16.8 8.5,15.2" />
+</vector>

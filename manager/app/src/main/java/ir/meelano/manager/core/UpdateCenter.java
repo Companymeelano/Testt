@@ -78,23 +78,26 @@ public final class UpdateCenter {
         autoDone = true;
         try {
             if (isDebug(a) || !LicenseStore.unlocked(a)) return;
-            long last = prefs(a).getLong("last_check", 0);
-            if (System.currentTimeMillis() - last < UpdateConfig.AUTO_INTERVAL_MS) return;
+            // Checked on every app open (cold start); the once-per-session guard above prevents repeats.
             if (!online(a)) return;
             final Context app = a.getApplicationContext();
             new Thread(() -> {
                 Info info = fetch(app);
                 if (info == null) return;
                 markChecked(app);
+                rememberLatest(app, info);
                 purgeStale(app, info.code);
                 if (info.code <= currentCode(app)) return;
                 SharedPreferences p = prefs(app);
-                if (info.code == p.getInt("dismissed_code", -1)
-                        && System.currentTimeMillis() - p.getLong("dismissed_at", 0)
-                        < UpdateConfig.AUTO_INTERVAL_MS) return;
-                run(a, () -> showUpdateDialog(a, info));
+                // Automatic: on Wi-Fi / unmetered data the update downloads with a progress screen;
+                // on metered data the user is asked first. Android still shows its own install confirmation.
+                if (metered(app)) {
+                    run(a, () -> showUpdateDialog(a, info));
+                } else {
+                    run(a, () -> startDownload(a, info));
+                }
             }).start();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("UpdateCenter:96", ignored); }
     }
 
     /** Manual check from Settings: always talks to the user. */
@@ -126,13 +129,14 @@ public final class UpdateCenter {
                 run(a, () -> {
                     try {
                         d.dismiss();
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("UpdateCenter:128", ignored); }
                     if (finished(a)) return;
                     if (info == null) {
                         toast(a, "بررسی ممکن نشد؛ کمی بعد دوباره تلاش کنید");
                         return;
                     }
                     markChecked(app);
+                    rememberLatest(app, info);
                     purgeStale(app, info.code);
                     if (info.code <= currentCode(app)) {
                         toast(a, "✦ شما آخرین نسخه را دارید");
@@ -174,6 +178,35 @@ public final class UpdateCenter {
         }
     }
 
+    /** Remember the newest verified release so Settings can show it immediately. */
+    private static void rememberLatest(Context c, Info info) {
+        try {
+            prefs(c).edit().putInt("latest_code", info.code).putString("latest_name", info.name).apply();
+        } catch (Exception e) {
+            Diag.ignored("UpdateCenter:rememberLatest", e);
+        }
+    }
+
+    /** Settings card status: current version, and whether a newer one is known. */
+    public static String statusLine(Context c) {
+        try {
+            String cur = currentName(c);
+            int latest = prefs(c).getInt("latest_code", 0);
+            if (latest > currentCode(c)) {
+                return "نسخه فعلی " + cur + " • نسخه جدید «" + prefs(c).getString("latest_name", "")
+                        + "» آماده دریافت است";
+            }
+            return "نسخه فعلی " + cur + " • شما آخرین نسخه را دارید";
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    /** Public URL of the release list (manual download fallback). */
+    public static String releasesPage() {
+        return "https://github.com/" + UpdateConfig.OWNER + "/" + UpdateConfig.REPO + "/releases/latest";
+    }
+
     // ================= descriptor =================
 
     /** Download + fully verify version.json. Null = nothing to do. Never throws. */
@@ -208,8 +241,8 @@ public final class UpdateCenter {
                 return null;
             }
             if (!host.equals("github.com") && !host.endsWith(".github.com")
-                    && !host.equals("objects.githubusercontent")
-                    && !host.equals("release-assets.githubusercontent")) return null;
+                    && !host.equals("githubusercontent.com")
+                    && !host.endsWith(".githubusercontent.com")) return null;
             if (i.size < 0 || i.size > UpdateConfig.MAX_APK_BYTES) return null;
             if (!License.updateVerify(i.code, i.sha256, m.optString("mac", ""))) return null;
             return i;
@@ -218,7 +251,7 @@ public final class UpdateCenter {
         } finally {
             try {
                 if (con != null) con.disconnect();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("UpdateCenter:220", ignored); }
         }
     }
 
@@ -235,7 +268,7 @@ public final class UpdateCenter {
             }
             try {
                 in.close();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("UpdateCenter:237", ignored); }
             String s = new String(out.toByteArray(), java.nio.charset.StandardCharsets.UTF_8);
             return s.trim().isEmpty() ? null : s;
         } catch (Exception e) {
@@ -267,20 +300,20 @@ public final class UpdateCenter {
             body.addView(kit.btnGold("⬆ دریافت و نصب نسخه جدید", v -> {
                 try {
                     if (box[0] != null) box[0].dismiss();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("UpdateCenter:269", ignored); }
                 startDownload(a, info);
             }), kit.lp(-1, -2));
             body.addView(kit.gap(8));
             body.addView(kit.btnGhost("بعداً", Theme.MUTED, v -> {
                 try {
                     if (box[0] != null) box[0].dismiss();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("UpdateCenter:276", ignored); }
             }), kit.lp(-1, -2));
-            AlertDialog d = kit.dialog("⬆ بروزرسانی میلانو", kit.scrollWrap(body, 440), true);
+            AlertDialog d = kit.dialog("⬆ بروزرسانی میلانو زرین‌فرمان", kit.scrollWrap(body, 440), true);
             box[0] = d;
             d.setOnDismissListener(dd -> recordDismiss(a, info.code));
             d.show();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("UpdateCenter:282", ignored); }
     }
 
     // ================= download =================
@@ -294,6 +327,14 @@ public final class UpdateCenter {
             kit = new Kit(a);
             LinearLayout body = kit.v();
             body.setPadding(Theme.dp(18), Theme.dp(4), Theme.dp(18), Theme.dp(12));
+            if (Theme.isNuts()) {
+                // Nut theme: the artwork sits above the progress, like a branded splash.
+                android.widget.ImageView art = new android.widget.ImageView(a);
+                art.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
+                art.setImageResource(ir.meelano.manager.R.drawable.light_banner_nuts);
+                body.addView(art, new LinearLayout.LayoutParams(-1, Theme.dp(120)));
+                body.addView(kit.gap(8));
+            }
             stage = kit.text("آماده‌سازی…", 13.5f, Theme.TEXT, true);
             stage.setGravity(Gravity.CENTER);
             body.addView(stage, kit.lp(-1, -2));
@@ -302,7 +343,7 @@ public final class UpdateCenter {
             bar.setMax(100);
             try {
                 bar.setProgressTintList(android.content.res.ColorStateList.valueOf(Theme.GOLD));
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("UpdateCenter:304", ignored); }
             body.addView(bar, new LinearLayout.LayoutParams(-1, Theme.dp(10)));
             pct = kit.text("", 12f, Theme.MUTED, false);
             pct.setGravity(Gravity.CENTER);
@@ -329,7 +370,7 @@ public final class UpdateCenter {
         File dir = new File(app.getCacheDir(), "updates");
         try {
             dir.mkdirs();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("UpdateCenter:331", ignored); }
         File target = new File(dir, "update-" + info.code + ".apk");
         // A previously downloaded file that still verifies is reused as-is.
         boolean have = target.exists() && target.length() > 1024
@@ -344,7 +385,7 @@ public final class UpdateCenter {
                         stage.setText(at > 1
                                 ? ("تلاش مجدد (" + Money.fa(String.valueOf(at)) + " از ۳)…")
                                 : "در حال دریافت نسخه جدید…");
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("UpdateCenter:346", ignored); }
                 });
                 ok = downloadFile(info.url, info.size, target, a, bar, pct);
             }
@@ -362,7 +403,7 @@ public final class UpdateCenter {
             if (!info.sha256.equalsIgnoreCase(sha256Of(target))) {
                 try {
                     target.delete();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("UpdateCenter:364", ignored); }
                 closeQuiet(a, d);
                 toast(app, "فایل دریافتی خراب است؛ دوباره تلاش کنید");
                 return;
@@ -380,7 +421,7 @@ public final class UpdateCenter {
         if (v != APK_OK) {
             try {
                 target.delete();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("UpdateCenter:382", ignored); }
             closeQuiet(a, d);
             toast(app, "فایل نسخه جدید معتبر نیست؛ دوباره تلاش کنید");
             return;
@@ -396,7 +437,7 @@ public final class UpdateCenter {
         try {
             try {
                 part.delete();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("UpdateCenter:398", ignored); }
             con = (HttpURLConnection) new URL(url).openConnection();
             con.setConnectTimeout(UpdateConfig.CONNECT_TIMEOUT_MS);
             con.setReadTimeout(UpdateConfig.READ_TIMEOUT_MS);
@@ -434,47 +475,47 @@ public final class UpdateCenter {
                                     int p = (int) Math.min(100, fDone * 100 / fTotal);
                                     try {
                                         bar.setIndeterminate(false);
-                                    } catch (Exception ignored) { }
+                                    } catch (Exception ignored) { Diag.ignored("UpdateCenter:436", ignored); }
                                     bar.setProgress(p);
                                     pct.setText(Money.fa(String.valueOf(p)) + "٪ • "
                                             + faSize(fDone) + " از " + faSize(fTotal));
                                 } else {
                                     try {
                                         bar.setIndeterminate(true);
-                                    } catch (Exception ignored) { }
+                                    } catch (Exception ignored) { Diag.ignored("UpdateCenter:443", ignored); }
                                     pct.setText(faSize(fDone));
                                 }
-                            } catch (Exception ignored) { }
+                            } catch (Exception ignored) { Diag.ignored("UpdateCenter:446", ignored); }
                         });
                     }
                 }
                 try {
                     out.flush();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("UpdateCenter:452", ignored); }
                 if (expectSize > 0 && done != expectSize) return false;
                 if (done < 1024) return false;
             } finally {
                 try {
                     if (in != null) in.close();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("UpdateCenter:458", ignored); }
                 try {
                     if (out != null) out.close();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("UpdateCenter:461", ignored); }
                 if (cancelled) {
                     try {
                         part.delete();
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("UpdateCenter:465", ignored); }
                 }
             }
             if (cancelled) return false;
             try {
                 target.delete();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("UpdateCenter:471", ignored); }
             if (!part.renameTo(target)) {
                 if (!copy(part, target)) return false;
                 try {
                     part.delete();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("UpdateCenter:476", ignored); }
             }
             return target.exists() && target.length() > 1024;
         } catch (Exception e) {
@@ -482,10 +523,10 @@ public final class UpdateCenter {
         } finally {
             try {
                 if (con != null) con.disconnect();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("UpdateCenter:484", ignored); }
             try {
                 if (part.exists() && (!target.exists() || target.length() <= 1024)) part.delete();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("UpdateCenter:487", ignored); }
         }
     }
 
@@ -579,21 +620,21 @@ public final class UpdateCenter {
                 LinearLayout body = kit.v();
                 body.setPadding(Theme.dp(18), Theme.dp(4), Theme.dp(18), Theme.dp(12));
                 body.addView(kit.text(
-                        "برای نصب نسخه جدید، در صفحه بعد گزینه «اجازه نصب از این منبع» را برای «میلانو» روشن کنید و برگردید؛ نصب خودکار ادامه پیدا می‌کند.",
+                        "برای نصب نسخه جدید، در صفحه بعد گزینه «اجازه نصب از این منبع» را برای «میلانو زرین‌فرمان» روشن کنید و برگردید؛ نصب خودکار ادامه پیدا می‌کند.",
                         13.5f, Theme.TEXT, false), kit.lp(-1, -2));
                 body.addView(kit.gap(10));
                 final AlertDialog[] box = new AlertDialog[1];
                 body.addView(kit.btnGold("باز کردن تنظیمات", v -> {
                     try {
                         if (box[0] != null) box[0].dismiss();
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("UpdateCenter:588", ignored); }
                     openUnknownSettings(a);
                 }), kit.lp(-1, -2));
                 body.addView(kit.gap(8));
                 body.addView(kit.btnGhost("انصراف", Theme.MUTED, v -> {
                     try {
                         if (box[0] != null) box[0].dismiss();
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("UpdateCenter:595", ignored); }
                 }), kit.lp(-1, -2));
                 AlertDialog d = kit.dialog("⬆ یک اجازه لازم است", body, true);
                 box[0] = d;
@@ -638,7 +679,7 @@ public final class UpdateCenter {
             LinearLayout body = kit.v();
             body.setPadding(Theme.dp(18), Theme.dp(4), Theme.dp(18), Theme.dp(12));
             body.addView(kit.text(
-                    "نسخه " + Money.fa(info.name) + " با امضای رسمی و امن میلانو منتشر شده، ولی نصب فعلی شما آزمایشی است و اندروید اجازه جایگزینی مستقیم نمی‌دهد. فقط همین یک‌بار این سه قدم را انجام دهید؛ از این به بعد همه بروزرسانی‌ها با یک لمس نصب می‌شوند:",
+                    "نسخه " + Money.fa(info.name) + " با امضای رسمی و امن میلانو زرین‌فرمان منتشر شده، ولی نصب فعلی شما آزمایشی است و اندروید اجازه جایگزینی مستقیم نمی‌دهد. فقط همین یک‌بار این سه قدم را انجام دهید؛ از این به بعد همه بروزرسانی‌ها با یک لمس نصب می‌شوند:",
                     13.5f, Theme.TEXT, false), kit.lp(-1, -2));
             body.addView(kit.gap(8));
             LinearLayout card = kit.card(Theme.GOLD);
@@ -654,19 +695,19 @@ public final class UpdateCenter {
             body.addView(kit.btnGold("اشتراک فایل نصب جدید", v -> {
                 try {
                     if (box[0] != null) box[0].dismiss();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("UpdateCenter:656", ignored); }
                 shareApk(a, apk, info);
             }), kit.lp(-1, -2));
             body.addView(kit.gap(8));
             body.addView(kit.btnGhost("فهمیدم", Theme.MUTED, v -> {
                 try {
                     if (box[0] != null) box[0].dismiss();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("UpdateCenter:663", ignored); }
             }), kit.lp(-1, -2));
             AlertDialog d = kit.dialog("⬆ نصب یک‌باره نسخه رسمی", kit.scrollWrap(body, 440), true);
             box[0] = d;
             d.show();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("UpdateCenter:668", ignored); }
     }
 
     private static void shareApk(Activity a, File apk, Info info) {
@@ -677,7 +718,7 @@ public final class UpdateCenter {
                 return;
             }
             ShareProvider.share(a, pub, "application/vnd.android.package-archive",
-                    "فایل نصب میلانو " + info.name);
+                    "فایل نصب میلانو زرین‌فرمان " + info.name);
         } catch (Exception e) {
             toast(a, "اشتراک ممکن نشد؛ دوباره تلاش کنید");
         }
@@ -692,14 +733,14 @@ public final class UpdateCenter {
     private static void markChecked(Context c) {
         try {
             prefs(c).edit().putLong("last_check", System.currentTimeMillis()).apply();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("UpdateCenter:694", ignored); }
     }
 
     private static void recordDismiss(Context c, int code) {
         try {
             prefs(c).edit().putInt("dismissed_code", code)
                     .putLong("dismissed_at", System.currentTimeMillis()).apply();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("UpdateCenter:701", ignored); }
     }
 
     /** Drop downloaded files from older checks; keep the current one for reuse. */
@@ -714,16 +755,16 @@ public final class UpdateCenter {
                         && !n.equals("update-" + keepCode + ".apk")) {
                     try {
                         f.delete();
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("UpdateCenter:716", ignored); }
                 }
             }
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("UpdateCenter:719", ignored); }
     }
 
     private static void run(Activity a, Runnable r) {
         try {
             a.runOnUiThread(r);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("UpdateCenter:725", ignored); }
     }
 
     private static boolean finished(Activity a) {
@@ -738,7 +779,7 @@ public final class UpdateCenter {
         run(a, () -> {
             try {
                 d.dismiss();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("UpdateCenter:740", ignored); }
         });
     }
 
@@ -746,7 +787,7 @@ public final class UpdateCenter {
         run(a, () -> {
             try {
                 stage.setText(s);
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("UpdateCenter:748", ignored); }
         });
     }
 
@@ -756,9 +797,9 @@ public final class UpdateCenter {
             new Handler(Looper.getMainLooper()).post(() -> {
                 try {
                     Toast.makeText(app, m, Toast.LENGTH_LONG).show();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("UpdateCenter:758", ignored); }
             });
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("UpdateCenter:760", ignored); }
     }
 
     @SuppressWarnings("deprecation")
@@ -787,6 +828,15 @@ public final class UpdateCenter {
             return c.getPackageName().endsWith(".debug");
         } catch (Exception e) {
             return false;
+        }
+    }
+
+    private static boolean metered(Context c) {
+        try {
+            ConnectivityManager cm = (ConnectivityManager) c.getSystemService(Context.CONNECTIVITY_SERVICE);
+            return cm == null || cm.isActiveNetworkMetered();
+        } catch (Exception e) {
+            return true;
         }
     }
 
@@ -827,7 +877,7 @@ public final class UpdateCenter {
         } finally {
             try {
                 if (in != null) in.close();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("UpdateCenter:829", ignored); }
         }
     }
 
@@ -847,10 +897,10 @@ public final class UpdateCenter {
         } finally {
             try {
                 if (in != null) in.close();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("UpdateCenter:849", ignored); }
             try {
                 if (out != null) out.close();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("UpdateCenter:852", ignored); }
         }
     }
 }

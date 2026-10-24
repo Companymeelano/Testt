@@ -46,7 +46,7 @@ public final class AutoBackup {
             if (cal.getTimeInMillis() <= System.currentTimeMillis()) cal.add(Calendar.DAY_OF_YEAR, 1);
             am.setInexactRepeating(AlarmManager.RTC_WAKEUP, cal.getTimeInMillis(),
                     AlarmManager.INTERVAL_DAY, pi);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("AutoBackup:49", ignored); }
     }
 
     public static void cancel(Context c) {
@@ -57,14 +57,14 @@ public final class AutoBackup {
             PendingIntent pi = PendingIntent.getBroadcast(c, REQ, i,
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             if (am != null) am.cancel(pi);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("AutoBackup:60", ignored); }
     }
 
     /** Re-arm after boot (alarms never survive a reboot). */
     public static void reschedule(Context c) {
         try {
             if (new Settings(c).abOn()) schedule(c);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("AutoBackup:67", ignored); }
     }
 
     static void notifyResult(Context c, boolean ok, String detail) {
@@ -80,7 +80,7 @@ public final class AutoBackup {
             String msg = ok ? ("بکاپ خودکار ساخته شد (" + detail + ") و در Downloads ذخیره شد.")
                     : ("بکاپ خودکار ناموفق بود (" + detail + ")؛ امشب دوباره تلاش می‌شود.");
             Notification n = new Notification.Builder(c, CH)
-                    .setContentTitle(ok ? "⛁ بکاپ خودکار میلانو ✓" : "⛁ بکاپ خودکار میلانو ✕")
+                    .setContentTitle(ok ? "⛁ بکاپ خودکار میلانو زرین‌فرمان ✓" : "⛁ بکاپ خودکار میلانو زرین‌فرمان ✕")
                     .setContentText(msg)
                     .setStyle(new Notification.BigTextStyle().bigText(msg))
                     .setSmallIcon(R.mipmap.ic_launcher)
@@ -90,7 +90,7 @@ public final class AutoBackup {
                     .build();
             NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
             if (nm != null) nm.notify(NOTIF_ID, n);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("AutoBackup:93", ignored); }
     }
 }
 
@@ -125,7 +125,10 @@ final class AutoBackupReceiver extends BroadcastReceiver {
                     try {
                         fs.saveBackupInfo(Jalali.faDate(Jalali.todayStr()), Backup.sizeFa(bytes));
                         AutoBackup.notifyResult(app, true, Backup.sizeFa(bytes));
-                    } catch (Exception ignored) { } finally {
+                        new Thread(() -> {
+                            try { OfflineReports.refresh(app); } catch (Exception ignored) { Diag.ignored("AutoBackup:offline", ignored); }
+                        }, "offline-copy").start();
+                    } catch (Exception ignored) { Diag.ignored("AutoBackup:128", ignored); } finally {
                         finishPr(pr);
                     }
                 }
@@ -135,7 +138,7 @@ final class AutoBackupReceiver extends BroadcastReceiver {
                     try {
                         AutoBackup.notifyResult(app, false,
                                 faError == null || faError.isEmpty() ? "خطای اتصال" : faError);
-                    } catch (Exception ignored) { } finally {
+                    } catch (Exception ignored) { Diag.ignored("AutoBackup:138", ignored); } finally {
                         finishPr(pr);
                     }
                 }
@@ -148,6 +151,6 @@ final class AutoBackupReceiver extends BroadcastReceiver {
     private void finishPr(PendingResult pr) {
         try {
             pr.finish();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("AutoBackup:151", ignored); }
     }
 }

@@ -1,6 +1,6 @@
 package ir.meelano.manager.screens;
 
-import android.speech.tts.TextToSpeech;
+import ir.meelano.manager.core.Diag;
 import android.widget.LinearLayout;
 
 import ir.meelano.manager.MainActivity;
@@ -22,7 +22,6 @@ import java.util.Locale;
 public class VoiceScreen extends Screen {
     private String lastQ = "";
     private String lastA = "";
-    private static TextToSpeech tts;
 
     public VoiceScreen(MainActivity a) {
         super(a);
@@ -38,7 +37,7 @@ public class VoiceScreen extends Screen {
     public String glyph() { return "🎙"; }
 
     @Override
-    public int accent() { return Theme.TEAL; }
+    public int accent() { return Theme.GOLD; }
 
     @Override
     public void render(final LinearLayout content) {
@@ -57,7 +56,7 @@ public class VoiceScreen extends Screen {
                 c.addView(a.kit.text("«" + lastQ + "»", 12.5f, Theme.MUTED, false), a.kit.lp(-1, -2));
             c.addView(a.kit.text(lastA, 15f, Theme.TEXT, true), a.kit.lp(-1, -2));
             c.addView(a.kit.gap(6));
-            c.addView(a.kit.btnGhost("🔊 پخش دوباره", Theme.TEAL, v -> speak(lastA)), a.kit.lp(-1, -2));
+            c.addView(a.kit.btnGhost("🔊 پخش دوباره", Theme.GOLD, v -> speak(lastA)), a.kit.lp(-1, -2));
             a.kit.addCard(content, c);
         }
     }
@@ -144,10 +143,10 @@ public class VoiceScreen extends Screen {
             int n = 0;
             try {
                 n += Repo.exec(c, MoneyQueries.chequeDue(m, true, 3)).size();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("VoiceScreen:147", ignored); }
             try {
                 n += Repo.exec(c, MoneyQueries.chequeDue(m, false, 3)).size();
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) { Diag.ignored("VoiceScreen:150", ignored); }
             return n;
         }, new Repo.Cb<Integer>() {
             @Override
@@ -203,23 +202,11 @@ public class VoiceScreen extends Screen {
         }
     }
 
-    /** Speak Persian (graceful when the phone has no Persian voice). */
+    /** Speak Persian through the shared speaker (guides the voice install when missing). */
     private void speak(final String text) {
         try {
             if (text == null || text.isEmpty()) return;
-            if (tts == null) {
-                tts = new TextToSpeech(a.getApplicationContext(), status -> {
-                    try {
-                        if (status != TextToSpeech.SUCCESS) return;
-                        int fa = tts.isLanguageAvailable(new Locale("fa"));
-                        if (fa >= TextToSpeech.LANG_AVAILABLE) tts.setLanguage(new Locale("fa"));
-                        else a.kit.toast("صدای فارسی روی این گوشی نیست؛ پاسخ نمایش داده شد");
-                    } catch (Exception ignored) { }
-                });
-            }
-            try {
-                tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "meelano-voice");
-            } catch (Exception ignored) { }
-        } catch (Exception ignored) { }
+            ir.meelano.manager.core.Speaker.speak(a, text, null);
+        } catch (Exception ignored) { Diag.ignored("VoiceScreen:speak", ignored); }
     }
 }

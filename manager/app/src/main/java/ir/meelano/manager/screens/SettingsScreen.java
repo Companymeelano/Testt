@@ -1,8 +1,14 @@
 package ir.meelano.manager.screens;
 
+import ir.meelano.manager.core.Diag;
 import android.app.AlertDialog;
+import android.view.Gravity;
+import android.view.View;
+import ir.meelano.manager.R;
 import android.widget.EditText;
+import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
+import android.widget.TextView;
 
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.ShareProvider;
@@ -15,8 +21,32 @@ import ir.meelano.manager.data.NetRoute;
 import ir.meelano.manager.data.Repo;
 import ir.meelano.manager.ui.Theme;
 
-/** Connection settings, PIN lock and about. */
+/**
+ * Settings, grouped into nine sections. Only one section is on screen at a time, so
+ * the page no longer stacks every option into one long scroll. Each switch is a row
+ * with a title, a one-line explanation and a coloured on/off badge.
+ */
 public class SettingsScreen extends Screen {
+
+    /** Section keys, Persian labels and glyphs, in display order. */
+    private static final String[][] SECTIONS = {
+            {"connection", "اتصال", "🔌"},
+            {"theme", "ظاهر", "🎨"},
+            {"ai", "هوش مصنوعی", "✦"},
+            {"alerts", "هشدارها", "🔔"},
+            {"shop", "فروشگاه", "🏪"},
+            {"backup", "پشتیبان", "💾"},
+            {"security", "امنیت", "🔐"},
+            {"roles", "انبار و نقش‌ها", "👥"},
+            {"dashboard", "داشبورد", "🧭"},
+            {"about", "درباره", "ℹ"},
+    };
+
+    /** Currently open section (the screen instance is kept for the app's lifetime). */
+    private String section = "connection";
+    /** Set by other screens to open a section directly (read once on the next render). */
+    public static String pendingSection = null;
+
     public SettingsScreen(MainActivity a) {
         super(a);
     }
@@ -31,41 +61,196 @@ public class SettingsScreen extends Screen {
     public String glyph() { return "⚙"; }
 
     @Override
-    public int accent() { return Theme.TEAL; }
+    public int accent() { return Theme.GOLD; }
 
     @Override
     public void render(final LinearLayout content) {
+        if (warehouseRole()) section = "alerts";
         content.removeAllViews();
+        if (pendingSection != null) {
+            section = pendingSection;
+            pendingSection = null;
+        }
         content.addView(heroCard(), a.kit.lp(-1, -2));
-        content.addView(a.kit.gap(12));
+        content.addView(a.kit.gap(10));
+        content.addView(sectionNav(content), a.kit.lp(-1, -2));
+        content.addView(a.kit.gap(10));
+        switch (section) {
+            case "theme": buildTheme(content); break;
+            case "ai": AiSettings.build(a, content, () -> render(content)); break;
+            case "alerts": buildAlerts(content); break;
+            case "shop": buildShop(content); break;
+            case "backup": buildBackup(content); break;
+            case "security": buildSecurity(content); break;
+            case "roles": buildRoles(content); break;
+            case "dashboard": buildDashboard(content); break;
+            case "about": buildAbout(content); break;
+            default: buildConnection(content); break;
+        }
+    }
 
-        // ---- connection ----
+    // ================= navigation =================
+
+    /** Horizontal strip of section pills; the open one is filled with the accent colour. */
+    private View sectionNav(final LinearLayout content) {
+        HorizontalScrollView sv = new HorizontalScrollView(a);
+        sv.setHorizontalScrollBarEnabled(false);
+        LinearLayout row = a.kit.h();
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(Theme.dp(2), Theme.dp(2), Theme.dp(2), Theme.dp(2));
+        for (String[] s : visibleSections()) {
+            final String key = s[0];
+            final boolean on = key.equals(section);
+            TextView pill = a.kit.text(s[2] + "  " + s[1], 12f, on ? Theme.onAccent() : Theme.TEXT, on);
+            pill.setSingleLine(true);
+            pill.setGravity(Gravity.CENTER);
+            pill.setPadding(Theme.dp(14), Theme.dp(9), Theme.dp(14), Theme.dp(9));
+            pill.setBackground(on ? Theme.accentAvatar(Theme.GOLD) : Theme.ghostButton(Theme.MUTED));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
+            lp.setMargins(0, 0, Theme.dp(8), 0);
+            Theme.pressable(pill);
+            pill.setOnClickListener(v -> {
+                section = key;
+                render(content);
+            });
+            row.addView(pill, lp);
+        }
+        sv.addView(row, new HorizontalScrollView.LayoutParams(-2, -2));
+        return sv;
+    }
+
+    private static String roleNow(MainActivity a) {
+        String role = ir.meelano.manager.core.AtiranAuth.sessionRole(a);
+        if (role == null || role.isEmpty()) role = ir.meelano.manager.core.RoleStore.current(a);
+        return role == null ? "" : role;
+    }
+
+    private boolean warehouseRole() {
+        return ir.meelano.manager.core.RoleStore.WAREHOUSE.equals(roleNow(a));
+    }
+
+    /** The warehouse keeper only sees the alerts section; everything else stays with the manager. */
+    private String[][] visibleSections() {
+        if (!warehouseRole()) return SECTIONS;
+        java.util.List<String[]> out = new java.util.ArrayList<>();
+        for (String[] s : SECTIONS) if ("alerts".equals(s[0])) out.add(s);
+        return out.toArray(new String[0][]);
+    }
+
+    /** Section header inside the open section: a title and one line of guidance. */
+    /** 3D dark-skin icon for a settings section title that starts with its emoji (0 = none). */
+    private static int sectionIcon3d(String title) {
+        if (title == null) return 0;
+        if (title.startsWith("🔌")) return R.drawable.icon3d_dark_plug;
+        if (title.startsWith("🎨")) return R.drawable.icon3d_dark_palette;
+        if (title.startsWith("🔔")) return R.drawable.icon3d_dark_bell;
+        if (title.startsWith("🏪")) return R.drawable.icon3d_dark_shop;
+        if (title.startsWith("💾")) return R.drawable.icon3d_dark_backup;
+        if (title.startsWith("🔐")) return R.drawable.icon3d_dark_lock;
+        if (title.startsWith("👥")) return R.drawable.icon3d_dark_roles;
+        if (title.startsWith("🧭")) return R.drawable.icon3d_dark_compass;
+        if (title.startsWith("ℹ")) return R.drawable.icon3d_dark_info;
+        return 0;
+    }
+
+    private LinearLayout sectionHead(String title, String subtitle, int accent) {
+        LinearLayout h = a.kit.card(accent);
+        int ic = Theme.isLight() ? 0 : sectionIcon3d(title);
+        if (ic != 0) {
+            // Dark skin: the emoji becomes a 3D gold icon; the title keeps its words.
+            LinearLayout hr = a.kit.h();
+            hr.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            android.widget.ImageView iv = new android.widget.ImageView(a);
+            iv.setImageResource(ic);
+            iv.setScaleType(android.widget.ImageView.ScaleType.CENTER_INSIDE);
+            iv.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+            hr.addView(iv, new LinearLayout.LayoutParams(Theme.dp(34), Theme.dp(34)));
+            hr.addView(a.kit.space(10));
+            int sp = title.indexOf(' ');
+            String words = sp > 0 ? title.substring(sp + 1) : title;
+            hr.addView(a.kit.text(words, 15f, Theme.TEXT, true), a.kit.wlp(1f));
+            h.addView(hr, a.kit.lp(-1, -2));
+        } else {
+            h.addView(a.kit.text(title, 15f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        }
+        if (subtitle != null && !subtitle.isEmpty())
+            h.addView(a.kit.hint(subtitle), a.kit.lp(-1, -2));
+        return h;
+    }
+
+    // ================= reusable rows =================
+
+    /**
+     * One switch as a row: title + one-line explanation on the right, coloured
+     * «روشن/خاموش» badge on the left. Tapping anywhere on the row toggles it.
+     */
+    private View toggleRow(String title, String desc, boolean on, int accent, View.OnClickListener onTap) {
+        LinearLayout row = a.kit.h();
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setBackground(Theme.ghostButton(on ? accent : Theme.MUTED));
+        row.setPadding(Theme.dp(12), Theme.dp(10), Theme.dp(12), Theme.dp(10));
+        LinearLayout col = a.kit.v();
+        col.addView(a.kit.text(title, 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        if (desc != null && !desc.isEmpty()) {
+            TextView d = a.kit.text(desc, 10.5f, Theme.MUTED, false);
+            col.addView(d, a.kit.lp(-1, -2));
+        }
+        row.addView(col, a.kit.wlp(1f));
+        TextView badge = a.kit.text(on ? "روشن" : "خاموش", 11f,
+                on ? Theme.onAccent() : Theme.MUTED, true);
+        badge.setGravity(Gravity.CENTER);
+        badge.setSingleLine(true);
+        badge.setPadding(Theme.dp(10), Theme.dp(5), Theme.dp(10), Theme.dp(5));
+        badge.setBackground(on ? Theme.accentAvatar(accent) : Theme.ghostButton(Theme.MUTED));
+        row.addView(a.kit.space(8));
+        row.addView(badge, a.kit.lp(-2, -2));
+        Theme.pressable(row);
+        row.setOnClickListener(onTap);
+        return row;
+    }
+
+    /** Adds a row with a small gap beneath it. */
+    private void addRow(LinearLayout parent, View row) {
+        LinearLayout.LayoutParams lp = a.kit.lp(-1, -2);
+        lp.setMargins(0, 0, 0, Theme.dp(8));
+        parent.addView(row, lp);
+    }
+
+    // ================= sections =================
+
+    private void buildConnection(final LinearLayout content) {
+        content.addView(sectionHead("🔌 اتصال به آتیران",
+                "وضعیت شبکه، آدرس سرور و حالت اتصال. آدرس‌ها را فروشنده تنظیم می‌کند؛ همین‌جا فقط نمایش و تست می‌شود.",
+                Theme.GOLD), a.kit.lp(-1, -2));
         LinearLayout c = a.kit.card(Theme.GOLD);
-        c.addView(a.kit.text("🔒 اتصال به آتیران", 14.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
-        // Only a masked address is shown here. Server/IP edits happen in the
-        // license connection flow; the existing direct SQL login is unchanged.
         final boolean cfg = a.settings.connConfigured();
         c.addView(a.kit.kv("وضعیت", cfg ? "✓ تنظیم‌شده توسط فروشنده" : "✕ هنوز تنظیم نشده",
                 cfg ? Theme.SUCCESS : Theme.DANGER), a.kit.lp(-1, -2));
-        if (cfg) {
-            c.addView(a.kit.kv("سرور", a.settings.maskedHost(), Theme.MUTED), a.kit.lp(-1, -2));
-        }
+        if (cfg) c.addView(a.kit.kv("سرور", a.settings.maskedHost(), Theme.MUTED), a.kit.lp(-1, -2));
         String lanM = a.settings.maskedLan();
         String wanM = a.settings.maskedWan();
         c.addView(a.kit.kv("داخل شبکه", lanM.isEmpty() ? "✕ ثبت نشده" : "✓ " + lanM,
                 lanM.isEmpty() ? Theme.DANGER : Theme.SUCCESS), a.kit.lp(-1, -2));
         c.addView(a.kit.kv("خارج شبکه", wanM.isEmpty() ? "✕ ثبت نشده" : "✓ " + wanM,
                 wanM.isEmpty() ? Theme.DANGER : Theme.SUCCESS), a.kit.lp(-1, -2));
+        boolean vpn = NetRoute.isVpnActive(a);
+        c.addView(a.kit.kv("فیلترشکن", vpn ? "فعال" : "غیرفعال", vpn ? Theme.WARNING : Theme.SUCCESS),
+                a.kit.lp(-1, -2));
+        c.addView(a.kit.gap(6));
+
+        c.addView(a.kit.text("حالت مسیر اتصال", 12f, Theme.MUTED, true), a.kit.lp(-1, -2));
         String lm = a.settings.linkMode();
         c.addView(a.kit.chips(new String[]{"خودکار ✦", "فقط داخل شبکه", "فقط خارج شبکه"},
                 "lan".equals(lm) ? 1 : ("wan".equals(lm) ? 2 : 0), idx -> {
-            a.settings.setLinkMode(idx == 1 ? "lan" : (idx == 2 ? "wan" : "auto"));
-            a.kit.toast(idx == 0 ? "حالت خودکار فعال شد" : "حالت دستی فعال شد");
-            try {
-                a.checkConn();
-            } catch (Exception ignored) { }
-            render(content);
-        }), a.kit.lp(-1, -2));
+                    a.settings.setLinkMode(idx == 1 ? "lan" : (idx == 2 ? "wan" : "auto"));
+                    a.kit.toast(idx == 0 ? "حالت خودکار فعال شد" : "حالت دستی فعال شد");
+                    try {
+                        a.checkConn();
+                    } catch (Exception ignored) { Diag.ignored("SettingsScreen:188", ignored); }
+                    render(content);
+                }), a.kit.lp(-1, -2));
+        c.addView(a.kit.gap(6));
+
         c.addView(a.kit.btn("تست اتصال", v -> {
             a.kit.toast("در حال تست اتصال…");
             a.testConnection(new Repo.Cb<String>() {
@@ -82,8 +267,25 @@ public class SettingsScreen extends Screen {
         }), a.kit.lp(-1, -2));
         c.addView(a.kit.btnGhost(cfg ? "✦ تغییر IP / دیتابیس" : "✦ تنظیم IP / دیتابیس",
                 Theme.GOLD, v -> a.openConnectionSetup()), a.kit.lp(-1, -2));
+        c.addView(a.kit.btnGhost("🛠 عیب‌یابی هوشمند اتصال", Theme.GOLD, v -> {
+            try {
+                ir.meelano.manager.ui.LinkPanel.showDiagnose(a, a.settings);
+            } catch (Exception e) {
+                a.kit.toast("ممکن نشد");
+            }
+        }), a.kit.lp(-1, -2));
+        a.kit.addCard(content, c);
+
+        LinearLayout adv = a.kit.card(Theme.INFO);
+        adv.addView(a.kit.text("گزینه‌های پیشرفته", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        final boolean direct = a.settings.directConn();
+        addRow(adv, toggleRow("اتصال مستقیم", "اگر فیلترشکن مسیر سرور را می‌بندد، روشن کنید", direct, Theme.INFO, v -> {
+            a.settings.setDirectConn(!direct);
+            a.kit.toast(direct ? "اتصال مستقیم خاموش شد" : "اتصال مستقیم روشن شد");
+            render(content);
+        }));
         if (cfg) {
-            c.addView(a.kit.btnGhost("⨯ قطع اتصال و پاک‌کردن IP ذخیره‌شده", Theme.DANGER, v -> {
+            adv.addView(a.kit.btnGhost("⨯ قطع اتصال و پاک‌کردن IP ذخیره‌شده", Theme.DANGER, v -> {
                 new AlertDialog.Builder(a)
                         .setTitle("پاک‌کردن اتصال ذخیره‌شده؟")
                         .setMessage("IPهای سرور و دیتابیس انتخاب‌شده پاک می‌شوند. لایسنس، حساب محلی و اطلاعات ورود SQL حفظ خواهند شد.")
@@ -92,117 +294,50 @@ public class SettingsScreen extends Screen {
                         .show();
             }), a.kit.lp(-1, -2));
         }
-        c.addView(a.kit.btnGhost("🛠 عیب‌یابی هوشمند اتصال", Theme.TEAL, v -> {
-            try {
-                ir.meelano.manager.ui.LinkPanel.showDiagnose(a, a.settings);
-            } catch (Exception e) {
-                a.kit.toast("ممکن نشد");
-            }
-        }), a.kit.lp(-1, -2));
-        boolean vpn = NetRoute.isVpnActive(a);
-        c.addView(a.kit.kv("فیلترشکن", vpn ? "فعال" : "غیرفعال", vpn ? Theme.WARNING : Theme.SUCCESS), a.kit.lp(-1, -2));
-        final boolean direct = a.settings.directConn();
-        c.addView(a.kit.btnGhost("◉ اتصال مستقیم: " + (direct ? "روشن" : "خاموش"), Theme.INFO, v -> {
-            a.settings.setDirectConn(!direct);
-            a.kit.toast(direct ? "اتصال مستقیم خاموش شد" : "اتصال مستقیم روشن شد");
-            render(content);
-        }), a.kit.lp(-1, -2));
-        c.addView(a.kit.hint("اگر فیلترشکن مسیر سرور را می‌بندد، «اتصال مستقیم» را روشن کنید تا برنامه از شبکه عادی عبور کند."), a.kit.lp(-1, -2));
-        a.kit.addCard(content, c);
+        a.kit.addCard(content, adv);
+    }
 
-        // Local-only crash breadcrumb; users copy it deliberately when support asks.
-        if (ir.meelano.manager.core.CrashReporter.hasReport(a)) {
-            LinearLayout crash = a.kit.card(Theme.DANGER);
-            crash.addView(a.kit.text("گزارش خطای اخیر", 14.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
-            crash.addView(a.kit.hint("گزارش فقط شامل نوع خطا، نسخه و محل کد است؛ پیام استثنا، IP، رمزها و اطلاعات فروش ذخیره نمی‌شوند. کپی به‌صورت دستی انجام می‌شود و چیزی خودکار ارسال نمی‌شود."), a.kit.lp(-1, -2));
-            crash.addView(a.kit.btnGhost("کپی گزارش فنی برای پشتیبانی", Theme.INFO, v -> {
-                String report = ir.meelano.manager.core.CrashReporter.readReport(a);
-                try {
-                    android.content.ClipboardManager cm = (android.content.ClipboardManager)
-                            a.getSystemService(android.content.Context.CLIPBOARD_SERVICE);
-                    if (cm == null || report.isEmpty()) {
-                        a.kit.toast("گزارش فنی در دسترس نیست");
-                        return;
-                    }
-                    cm.setPrimaryClip(android.content.ClipData.newPlainText("گزارش خطای میلانو", report));
-                    a.kit.toast("گزارش کپی شد؛ آن را برای پشتیبانی بفرستید");
-                } catch (Exception e) {
-                    a.kit.toast("کپی گزارش ممکن نشد");
-                }
-            }), a.kit.lp(-1, -2));
-            crash.addView(a.kit.btnGhost("پاک‌کردن گزارش ذخیره‌شده", Theme.DANGER, v -> {
-                ir.meelano.manager.core.CrashReporter.clearReport(a);
-                a.kit.toast("گزارش پاک شد");
-                render(content);
-            }), a.kit.lp(-1, -2));
-            a.kit.addCard(content, crash);
-        }
-
-        // ---- luxury theme ----
+    private void buildTheme(final LinearLayout content) {
+        content.addView(sectionHead("🎨 ظاهر لاکچری",
+                "سه قالب طراحی‌شده و واحد نمایش. تغییرات فوراً روی همهٔ بخش‌ها اعمال می‌شود.",
+                Theme.GOLD), a.kit.lp(-1, -2));
         LinearLayout th = a.kit.card(Theme.GOLD);
-        th.addView(a.kit.text("✦ ظاهر لاکچری", 14.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
         th.addView(a.kit.text("قالب", 12f, Theme.MUTED, true), a.kit.lp(-1, -2));
         final boolean isLight = "light".equals(a.settings.themeMode());
-        th.addView(a.kit.chips(new String[]{"◐ تیره • طلای نیمه‌شب", "◑ روشن • عاج سلطنتی"}, isLight ? 1 : 0, idx -> {
-            a.settings.setThemeMode(idx == 1 ? "light" : "dark");
+        final boolean isNuts = "nuts".equals(a.settings.themeMode());
+        final int themeIdx = isNuts ? 2 : isLight ? 1 : 0;
+        th.addView(a.kit.chips(new String[]{"◐ تیره • ابسیدین طلایی", "◑ روشن • عاج سلطنتی", "🥜 آجیل و خشکبار"}, themeIdx, idx -> {
+            a.settings.setThemeMode(idx == 2 ? "nuts" : idx == 1 ? "light" : "dark");
             a.refreshTheme();
         }), a.kit.lp(-1, -2));
         th.addView(a.kit.gap(8));
-        th.addView(a.kit.text("رنگ اصلی برنامه", 12f, Theme.MUTED, true), a.kit.lp(-1, -2));
-        LinearLayout sw = a.kit.h();
-        sw.setGravity(android.view.Gravity.CENTER);
-        final String cur = a.settings.themeAccent();
-        for (String[] acc : Theme.accents()) {
-            final String key = acc[0];
-            android.widget.TextView dot = new android.widget.TextView(a);
-            boolean on = key.equals(cur);
-            dot.setBackground(Theme.swatch(Theme.accentPreview(key), on));
-            int sz = Theme.dp(on ? 46 : 38);
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(sz, sz);
-            lp.setMargins(Theme.dp(5), Theme.dp(4), Theme.dp(5), Theme.dp(4));
-            dot.setLayoutParams(lp);
-            android.widget.LinearLayout cell = a.kit.v();
-            cell.setGravity(android.view.Gravity.CENTER);
-            cell.addView(dot, lp);
-            android.widget.TextView lb = a.kit.text(acc[1], 9.5f, on ? Theme.TEXT : Theme.MUTED, on);
-            lb.setGravity(android.view.Gravity.CENTER);
-            cell.addView(lb, a.kit.lp(-2, -2));
-            cell.setPadding(Theme.dp(2), 0, Theme.dp(2), 0);
-            Theme.pressable(cell);
-            cell.setOnClickListener(v -> {
-                a.settings.setThemeAccent(key);
-                a.refreshTheme();
-            });
-            sw.addView(cell, a.kit.wlp(1f));
-        }
-        th.addView(sw, a.kit.lp(-1, -2));
-        th.addView(a.kit.btnGhost("🔍 بزرگ‌نمایی متن: " + MainActivity.zoomLabel(a.settings.zoomIdx()) + " (برای تغییر بزنید)", Theme.GOLD, v -> {
+        th.addView(a.kit.text("نمایش", 12f, Theme.MUTED, true), a.kit.lp(-1, -2));
+        th.addView(a.kit.btnGhost("🔍 بزرگ‌نمایی متن: " + MainActivity.zoomLabel(a.settings.zoomIdx()), Theme.GOLD, v -> {
             a.cycleZoom();
             render(content);
         }), a.kit.lp(-1, -2));
-        final boolean toman = ir.meelano.manager.core.Money.isToman();
-        th.addView(a.kit.btnGhost("💰 واحد نمایش مبالغ: " + (toman ? "تومان" : "ریال") + " (برای تغییر بزنید)", Theme.SUCCESS, v -> {
-            int next = toman ? ir.meelano.manager.core.Money.UNIT_RIAL
-                    : ir.meelano.manager.core.Money.UNIT_TOMAN;
+        final boolean toman = Money.isToman();
+        th.addView(a.kit.btnGhost("💰 واحد نمایش مبالغ: " + (toman ? "تومان" : "ریال"), Theme.SUCCESS, v -> {
+            int next = toman ? Money.UNIT_RIAL : Money.UNIT_TOMAN;
             a.settings.setMoneyUnit(next);
-            ir.meelano.manager.core.Money.setUnit(next);
-            a.kit.toast(next == ir.meelano.manager.core.Money.UNIT_TOMAN ? "مبالغ به تومان نمایش داده می‌شود" : "مبالغ به ریال نمایش داده می‌شود");
+            Money.setUnit(next);
+            a.kit.toast(next == Money.UNIT_TOMAN ? "مبالغ به تومان نمایش داده می‌شود" : "مبالغ به ریال نمایش داده می‌شود");
             a.refreshTheme();
         }), a.kit.lp(-1, -2));
-        final boolean sn = a.settings.seasonalOn();
-        th.addView(a.kit.btnGhost("🌸 تم مناسبتی خودکار: " + (sn ? "روشن" : "خاموش"), Theme.TEAL, v -> {
-            a.settings.setSeasonalOn(!sn);
-            a.kit.toast(!sn ? "تم مناسبتی روشن شد" : "تم مناسبتی خاموش شد");
-            a.refreshTheme();
-        }), a.kit.lp(-1, -2));
-        th.addView(a.kit.hint("قالب و رنگ انتخابی فوراً روی همه بخش‌ها، جدول‌ها، نمودارها و آیکن‌ها اعمال می‌شود."), a.kit.lp(-1, -2));
+        th.addView(a.kit.gap(6));
+        th.addView(a.kit.hint("قالب انتخابی فوراً روی همه بخش‌ها، جدول‌ها، نمودارها و آیکن‌ها اعمال می‌شود."),
+                a.kit.lp(-1, -2));
         a.kit.addCard(content, th);
+    }
 
-        // ---- notifications + shop ----
+    private void buildAlerts(final LinearLayout content) {
+        content.addView(sectionHead("🔔 هشدارها و گزارش‌ها",
+                "اعلان‌های خودکار. هر گزینه زمان بررسی خودش را نشان می‌دهد.",
+                Theme.INFO), a.kit.lp(-1, -2));
         LinearLayout nt = a.kit.card(Theme.INFO);
-        nt.addView(a.kit.text("هشدارها و فروشگاه", 14.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
+
         final boolean non = a.settings.notifOn();
-        nt.addView(a.kit.btnGhost("🔊 هشدار هوشمند سررسید: " + (non ? "روشن" : "خاموش"), Theme.INFO, v -> {
+        addRow(nt, toggleRow("هشدار هوشمند سررسید", "هر روز ساعت ۸: سررسیدها، معوق‌ها، چک‌های برگشتی", non, Theme.INFO, v -> {
             a.settings.setNotifOn(!non);
             if (!non) {
                 ir.meelano.manager.core.Notify.boot(a);
@@ -212,107 +347,146 @@ public class SettingsScreen extends Screen {
                 a.kit.toast("هشدار هوشمند خاموش شد");
             }
             render(content);
-        }), a.kit.lp(-1, -2));
+        }));
         final boolean mon = a.settings.morningOn();
-        nt.addView(a.kit.btnGhost("☀ گزارش صبحگاهی: " + (mon ? "روشن" : "خاموش"), Theme.GOLD, v -> {
+        addRow(nt, toggleRow("گزارش صبحگاهی", "خلاصهٔ فروش و دریافت دیروز به همراه هشدار ۸ صبح", mon, Theme.GOLD, v -> {
             a.settings.setMorningOn(!mon);
             a.kit.toast(!mon ? "گزارش صبحگاهی روشن شد" : "گزارش صبحگاهی خاموش شد");
             render(content);
-        }), a.kit.lp(-1, -2));
+        }));
         final boolean bkp = a.settings.backupOn();
-        nt.addView(a.kit.btnGhost("⛁ یادآوری پشتیبان‌گیری هفتگی: " + (bkp ? "روشن" : "خاموش"), Theme.TEAL, v -> {
+        addRow(nt, toggleRow("یادآوری پشتیبان‌گیری هفتگی", "جمعه‌ها ساعت ۹", bkp, Theme.GOLD, v -> {
             a.settings.setBackupOn(!bkp);
             if (!bkp) ir.meelano.manager.core.Notify.scheduleWeekly(a);
             else ir.meelano.manager.core.Notify.cancelWeekly(a);
             a.kit.toast(!bkp ? "یادآوری هفتگی روشن شد (جمعه‌ها ساعت ۹)" : "یادآوری هفتگی خاموش شد");
             render(content);
-        }), a.kit.lp(-1, -2));
+        }));
         final boolean wk = a.settings.weeklyOn();
-        nt.addView(a.kit.btnGhost("📊 گزارش هفتگی (پنجشنبه‌ها ساعت ۲۰): " + (wk ? "روشن" : "خاموش"), Theme.VIOLET, v -> {
+        addRow(nt, toggleRow("گزارش هفتگی", "پنجشنبه‌ها ساعت ۲۰", wk, Theme.VIOLET, v -> {
             a.settings.setWeeklyOn(!wk);
             if (!wk) ir.meelano.manager.core.Notify.scheduleWeeklyReport(a);
             else ir.meelano.manager.core.Notify.cancelWeeklyReport(a);
             a.kit.toast(!wk ? "گزارش هفتگی روشن شد" : "گزارش هفتگی خاموش شد");
             render(content);
-        }), a.kit.lp(-1, -2));
+        }));
         final boolean stk = a.settings.stockOn();
-        nt.addView(a.kit.btnGhost("\uD83D\uDCE6 هشدار کالای کم‌موجود: " + (stk ? "روشن" : "خاموش"), Theme.WARNING, v -> {
+        addRow(nt, toggleRow("هشدار کالای کم‌موجود", "وقتی موجودی از نقطهٔ سفارش پایین‌تر رفت", stk, Theme.WARNING, v -> {
             a.settings.setStockOn(!stk);
             a.kit.toast(!stk ? "هشدار کم‌موجودی روشن شد" : "هشدار کم‌موجودی خاموش شد");
             render(content);
-        }), a.kit.lp(-1, -2));
+        }));
         final boolean eod = a.settings.eodOn();
-        nt.addView(a.kit.btnGhost("🌙 جمع‌بندی پایان روز (هر شب ساعت ۲۱): " + (eod ? "روشن" : "خاموش"), Theme.VIOLET, v -> {
+        addRow(nt, toggleRow("جمع‌بندی پایان روز", "هر شب ساعت ۲۱", eod, Theme.VIOLET, v -> {
             a.settings.setEodOn(!eod);
             if (!eod) ir.meelano.manager.core.Notify.scheduleEod(a);
             else ir.meelano.manager.core.Notify.cancelEod(a);
             a.kit.toast(!eod ? "جمع‌بندی پایان روز روشن شد" : "جمع‌بندی پایان روز خاموش شد");
             render(content);
-        }), a.kit.lp(-1, -2));
+        }));
         final boolean grd = a.settings.guardOn();
-        nt.addView(a.kit.btnGhost("🛡 نگهبان فروش لحظه‌ای: " + (grd ? "روشن" : "خاموش"), Theme.DANGER, v -> {
+        addRow(nt, toggleRow("نگهبان فروش لحظه‌ای", "هر ۳۰ دقیقه بررسی می‌شود", grd, Theme.DANGER, v -> {
             a.settings.setGuardOn(!grd);
             if (!grd) ir.meelano.manager.core.Notify.scheduleGuard(a);
             else ir.meelano.manager.core.Notify.cancelGuard(a);
             a.kit.toast(!grd ? "نگهبان فروش روشن شد؛ هر ۳۰ دقیقه بررسی می‌شود" : "نگهبان فروش خاموش شد");
             render(content);
-        }), a.kit.lp(-1, -2));
+        }));
         final boolean whn = a.settings.whNewOn();
-        nt.addView(a.kit.btnGhost("🧾 اعلان فاکتور فروش جدید (انبار): " + (whn ? "روشن" : "خاموش"), Theme.SUCCESS, v -> {
+        addRow(nt, toggleRow("اعلان فاکتور فروش جدید", "انبار: هر ۱۵ دقیقه بررسی می‌شود", whn, Theme.SUCCESS, v -> {
             a.settings.setWhNewOn(!whn);
             if (!whn) ir.meelano.manager.core.Notify.scheduleNewInv(a);
             else ir.meelano.manager.core.Notify.cancelNewInv(a);
             a.kit.toast(!whn ? "اعلان فاکتور جدید روشن شد؛ هر ۱۵ دقیقه بررسی می‌شود" : "اعلان فاکتور جدید خاموش شد");
             render(content);
-        }), a.kit.lp(-1, -2));
-        companyInfo(nt, content);
-        nt.addView(a.kit.btnGhost("🪪 ساخت کارت ویزیت دیجیتال", Theme.VIOLET, v -> ShopCard.show(a)), a.kit.lp(-1, -2));
-        nt.addView(a.kit.btnGhost("📺 حالت تلویزیون فروشگاه", Theme.SUCCESS, v -> a.startTv()), a.kit.lp(-1, -2));
-        nt.addView(a.kit.hint("هشدار هوشمند هر روز ساعت ۸ سررسیدها، معوق‌ها، چک‌های برگشتی تازه و کالاهای کم‌موجود را اعلان می‌کند؛ گزارش صبحگاهی خلاصه فروش و دریافت دیروز را اضافه می‌کند."), a.kit.lp(-1, -2));
+        }));
+        if (warehouseRole()) {
+            addRow(nt, toggleRow("🔔 نمایش نمونهٔ اعلان بار", "یک اعلان نمونه با صدای آلارم نشان داده می‌شود", true,
+                    Theme.GOLD, v -> {
+                        ir.meelano.manager.core.InvoiceWatch.preview(a);
+                        a.kit.toast("نمونهٔ اعلان ارسال شد");
+                    }));
+        }
         a.kit.addCard(content, nt);
+    }
 
-        // ---- smart backup ----
-        LinearLayout bk = a.kit.card(Theme.TEAL);
-        bk.addView(a.kit.text("پشتیبان‌گیری هوشمند", 14.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
+    private void buildShop(final LinearLayout content) {
+        content.addView(sectionHead("🏪 فروشگاه و نمایش",
+                "مشخصات شرکت از آتیران خوانده می‌شود. کارت ویزیت و حالت تلویزیون را از همین‌جا باز کنید.",
+                Theme.SUCCESS), a.kit.lp(-1, -2));
+        LinearLayout co = a.kit.card(Theme.GOLD);
+        companyInfo(co, content);
+        a.kit.addCard(content, co);
+
+        LinearLayout sh = a.kit.card(Theme.SUCCESS);
+        sh.addView(a.kit.btnGhost("🪪 ساخت کارت ویزیت دیجیتال", Theme.VIOLET, v -> ShopCard.show(a)), a.kit.lp(-1, -2));
+        sh.addView(a.kit.btnGhost("📺 حالت تلویزیون فروشگاه", Theme.SUCCESS, v -> a.startTv()), a.kit.lp(-1, -2));
+        a.kit.addCard(content, sh);
+    }
+
+    private void buildBackup(final LinearLayout content) {
+        content.addView(sectionHead("💾 پشتیبان‌گیری هوشمند",
+                "بکاپ کامل جداول آتیران در یک فایل ZIP داخل Downloads ذخیره می‌شود.",
+                Theme.GOLD), a.kit.lp(-1, -2));
+        LinearLayout bk = a.kit.card(Theme.GOLD);
         String bl = a.settings.backupLast();
         if (!bl.isEmpty())
-            bk.addView(a.kit.kv("آخرین بکاپ", bl + (a.settings.backupSize().isEmpty() ? "" : " • " + a.settings.backupSize()), Theme.TEXT), a.kit.lp(-1, -2));
+            bk.addView(a.kit.kv("آخرین بکاپ", bl + (a.settings.backupSize().isEmpty() ? "" : " • " + a.settings.backupSize()), Theme.TEXT),
+                    a.kit.lp(-1, -2));
         bk.addView(a.kit.btn("⛁ بکاپ هوشمند روی گوشی", v -> runBackup(content)), a.kit.lp(-1, -2));
+        bk.addView(a.kit.hint("۷۸ جدول آتیران (همه جداول به‌جز تصاویر حجیم کالا و مشتری) به‌صورت CSV داخل یک فایل ZIP ذخیره و برای اشتراک آماده می‌شود."),
+                a.kit.lp(-1, -2));
+        a.kit.addCard(content, bk);
+
+        LinearLayout auto = a.kit.card(Theme.GOLD);
         final boolean abo = a.settings.abOn();
-        bk.addView(a.kit.btnGhost("⛁ بکاپ خودکار شبانه: " + (abo ? "روشن" : "خاموش"), Theme.TEAL, v -> {
+        addRow(auto, toggleRow("بکاپ خودکار شبانه", "هر شب سر ساعت، بی‌نیاز از اقدام دستی", abo, Theme.GOLD, v -> {
             a.settings.setAbOn(!abo);
             if (!abo) ir.meelano.manager.core.AutoBackup.schedule(a);
             else ir.meelano.manager.core.AutoBackup.cancel(a);
             a.kit.toast(!abo ? "بکاپ خودکار روشن شد (هر شب ساعت " + Money.fa(String.valueOf(a.settings.abHour())) + ")"
                     : "بکاپ خودکار خاموش شد");
             render(content);
-        }), a.kit.lp(-1, -2));
+        }));
         if (abo) {
             LinearLayout hrow = a.kit.h();
-            hrow.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            hrow.setGravity(Gravity.CENTER_VERTICAL);
             hrow.addView(a.kit.btnGhost("−", Theme.GOLD, v -> {
                 a.settings.setAbHour(a.settings.abHour() - 1);
                 ir.meelano.manager.core.AutoBackup.schedule(a);
                 render(content);
             }), a.kit.lp(Theme.dp(56), -2));
-            android.widget.TextView ht = a.kit.text("ساعت " + Money.fa(String.valueOf(a.settings.abHour())), 15f, Theme.TEXT, true);
-            ht.setGravity(android.view.Gravity.CENTER);
+            TextView ht = a.kit.text("ساعت " + Money.fa(String.valueOf(a.settings.abHour())), 15f, Theme.TEXT, true);
+            ht.setGravity(Gravity.CENTER);
             hrow.addView(ht, a.kit.wlp(1f));
             hrow.addView(a.kit.btnGhost("＋", Theme.GOLD, v -> {
                 a.settings.setAbHour(a.settings.abHour() + 1);
                 ir.meelano.manager.core.AutoBackup.schedule(a);
                 render(content);
             }), a.kit.lp(Theme.dp(56), -2));
-            bk.addView(hrow, a.kit.lp(-1, -2));
-            bk.addView(a.kit.hint("هر شب سر ساعت، بکاپ کامل در Downloads ذخیره و نتیجه اعلان می‌شود؛ با وای‌فای یا اینترنت گوشی کار می‌کند."), a.kit.lp(-1, -2));
+            auto.addView(hrow, a.kit.lp(-1, -2));
+            auto.addView(a.kit.hint("ساعت اجرا را با + و − تنظیم کنید. بکاپ با وای‌فای یا اینترنت گوشی انجام می‌شود."),
+                    a.kit.lp(-1, -2));
         }
-        bk.addView(a.kit.hint("۷۸ جدول آتیران (همه جداول به‌جز تصاویر حجیم کالا و مشتری) به‌صورت CSV داخل یک فایل ZIP در پوشه Downloads ذخیره و برای اشتراک آماده می‌شود."), a.kit.lp(-1, -2));
-        a.kit.addCard(content, bk);
+        a.kit.addCard(content, auto);
 
-        // ---- PIN ----
+        LinearLayout off = a.kit.card(Theme.GOLD);
+        final boolean offm = a.settings.offlineMode();
+        addRow(off, toggleRow("حالت آفلاین (حافظه گوشی)", "گزارش‌ها از آخرین بکاپ شبانه روی گوشی خوانده می‌شوند", offm, Theme.GOLD, v -> {
+            a.settings.setOfflineMode(!offm);
+            a.kit.toast(!offm ? "حالت آفلاین روشن شد" : "حالت آفلاین خاموش شد");
+            render(content);
+        }));
+        a.kit.addCard(content, off);
+    }
+
+    private void buildSecurity(final LinearLayout content) {
+        content.addView(sectionHead("🔐 امنیت و ورود",
+                "قفل مدیریتی و ورود با حساب محلی. رمزها روی همین گوشی ذخیره می‌شوند.",
+                Theme.INFO), a.kit.lp(-1, -2));
+
         LinearLayout p = a.kit.card(Theme.INFO);
-        p.addView(a.kit.text("قفل مدیریتی", 14.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
-        p.addView(a.kit.kv("وضعیت", a.settings.pinEnabled() ? "فعال" : "غیرفعال",
+        p.addView(a.kit.kv("قفل ۴ رقمی", a.settings.pinEnabled() ? "فعال" : "غیرفعال",
                 a.settings.pinEnabled() ? Theme.SUCCESS : Theme.MUTED), a.kit.lp(-1, -2));
         LinearLayout prow = a.kit.h();
         prow.addView(a.kit.btn(a.settings.pinEnabled() ? "تغییر رمز" : "فعال‌سازی", v -> pinDialog()), a.kit.wlp(1f));
@@ -327,26 +501,45 @@ public class SettingsScreen extends Screen {
         p.addView(prow, a.kit.lp(-1, -2));
         if (ir.meelano.manager.core.Finger.supported(a)) {
             final boolean fp = a.settings.fpOn();
-            p.addView(a.kit.btnGhost("◉ ورود با اثر انگشت: " + (fp ? "روشن" : "خاموش"), Theme.GOLD, v -> {
+            p.addView(a.kit.gap(6));
+            addRow(p, toggleRow("ورود با اثر انگشت", "فقط وقتی قفل ۴ رقمی فعال باشد", fp, Theme.GOLD, v -> {
                 a.settings.setFpOn(!fp);
                 a.kit.toast(!fp ? "ورود با اثر انگشت روشن شد" : "ورود با اثر انگشت خاموش شد");
                 render(content);
-            }), a.kit.lp(-1, -2));
-            p.addView(a.kit.hint("اثر انگشت فقط وقتی کار می‌کند که قفل ۴ رقمی هم فعال باشد"), a.kit.lp(-1, -2));
+            }));
         }
         a.kit.addCard(content, p);
 
-        // ---- roles ----
+        LinearLayout lg = a.kit.card(Theme.GOLD);
+        lg.addView(a.kit.text("حساب ورود", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        lg.addView(a.kit.kv("وضعیت", "ورود با حساب محلی الزامی است", Theme.SUCCESS), a.kit.lp(-1, -2));
+        if (ir.meelano.manager.core.AtiranAuth.hasSession(a)) {
+            lg.addView(a.kit.kv("کاربر فعلی",
+                    ir.meelano.manager.core.AtiranAuth.sessionName(a) + " («"
+                            + ir.meelano.manager.core.RoleStore.faName(
+                                    ir.meelano.manager.core.AtiranAuth.sessionRole(a))
+                            + "»)", Theme.TEXT), a.kit.lp(-1, -2));
+            lg.addView(a.kit.btnGhost("خروج از حساب فعلی", Theme.DANGER, v -> a.logout()), a.kit.lp(-1, -2));
+        }
+        lg.addView(a.kit.hint("پس از فعال‌سازی لایسنس و انتخاب دیتابیس، برای ورود به نسخه مدیریت یا انبارداری باید با حساب محلی همین اپ وارد شوید."),
+                a.kit.lp(-1, -2));
+        a.kit.addCard(content, lg);
+    }
+
+    private void buildRoles(final LinearLayout content) {
+        content.addView(sectionHead("👥 انبار و نقش‌های کاربری",
+                "نقش‌ها، رمز هر نقش و ثبت مستقیم انبار در آتیران.",
+                Theme.VIOLET), a.kit.lp(-1, -2));
+
         LinearLayout r = a.kit.card(Theme.VIOLET);
-        r.addView(a.kit.text("نقش‌های کاربری", 14.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
         final boolean ren = ir.meelano.manager.core.RoleStore.enabled(a);
         r.addView(a.kit.kv("نقش فعلی", "«" + ir.meelano.manager.core.RoleStore.faName(
                 ir.meelano.manager.core.RoleStore.current(a)) + "»", Theme.TEXT), a.kit.lp(-1, -2));
-        r.addView(a.kit.btnGhost("◉ نقش‌ها: " + (ren ? "روشن" : "خاموش"), Theme.VIOLET, v -> {
+        addRow(r, toggleRow("نقش‌های کاربری", "روشن: ورود بعدی با انتخاب نقش است", ren, Theme.VIOLET, v -> {
             ir.meelano.manager.core.RoleStore.setEnabled(a, !ren);
             a.kit.toast(!ren ? "نقش‌ها روشن شد؛ ورود بعدی با انتخاب نقش است" : "نقش‌ها خاموش شد");
             render(content);
-        }), a.kit.lp(-1, -2));
+        }));
         if (ren) {
             String[][] rr = {{"admin", "مدیر"}, {"seller", "فروشنده"}, {"accountant", "حسابدار"}, {"visitor", "ویزیتور"}, {"distributor", "موزع"}, {"warehouse", "انباردار"}, {"moadian", "مودیان"}};
             for (String[] role : rr) {
@@ -354,7 +547,8 @@ public class SettingsScreen extends Screen {
                 final String rn = role[1];
                 boolean locked = ir.meelano.manager.core.RoleStore.pinSet(a, rk);
                 LinearLayout rrow = a.kit.h();
-                rrow.setGravity(android.view.Gravity.CENTER_VERTICAL);
+                rrow.setGravity(Gravity.CENTER_VERTICAL);
+                rrow.setPadding(0, Theme.dp(4), 0, Theme.dp(4));
                 rrow.addView(a.kit.text(rn + " • " + (locked ? "رمزدار \uD83D\uDD12" : "بدون رمز"),
                         13f, Theme.TEXT, true), a.kit.wlp(1f));
                 rrow.addView(a.kit.btnGhost("تعیین رمز", Theme.GOLD,
@@ -362,46 +556,30 @@ public class SettingsScreen extends Screen {
                 r.addView(rrow, a.kit.lp(-1, -2));
             }
             r.addView(a.kit.btnGhost("تعویض نقش", Theme.TEXT, v -> a.openRoleGate()), a.kit.lp(-1, -2));
-            r.addView(a.kit.hint("بخش‌های حساس (تنظیمات، کاربران و سود) فقط برای مدیر است. نقش مدیریت یا انبارداری از حساب محلی ورود تعیین می‌شود؛ رمزهای این بخش، PIN داخلیِ جداگانه هستند."),
+            r.addView(a.kit.hint("بخش‌های حساس (تنظیمات، کاربران و سود) فقط برای مدیر است. رمزهای نقش PIN داخلیِ جداگانه‌اند."),
                     a.kit.lp(-1, -2));
         }
         a.kit.addCard(content, r);
 
-        // ---- standalone local account gate ----
-        LinearLayout lg = a.kit.card(Theme.GOLD);
-        lg.addView(a.kit.text("حساب ورود", 14.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
-        lg.addView(a.kit.kv("وضعیت", "ورود با حساب محلی الزامی است", Theme.SUCCESS),
-                a.kit.lp(-1, -2));
-        if (ir.meelano.manager.core.AtiranAuth.hasSession(a)) {
-            lg.addView(a.kit.kv("کاربر فعلی",
-                    ir.meelano.manager.core.AtiranAuth.sessionName(a) + " («"
-                            + ir.meelano.manager.core.RoleStore.faName(
-                                    ir.meelano.manager.core.AtiranAuth.sessionRole(a))
-                            + "»)", Theme.TEXT), a.kit.lp(-1, -2));
-            lg.addView(a.kit.btnGhost("خروج از حساب فعلی", Theme.DANGER, v -> a.logout()),
-                    a.kit.lp(-1, -2));
-        }
-        lg.addView(a.kit.hint("پس از فعال‌سازی لایسنس و انتخاب دیتابیس، برای ورود به نسخه مدیریت یا انبارداری باید با حساب محلی همین اپ وارد شوید."),
-                a.kit.lp(-1, -2));
-        a.kit.addCard(content, lg);
-
-        // ---- warehouse direct posting (v28) ----
         LinearLayout wh = a.kit.card(Theme.SUCCESS);
-        wh.addView(a.kit.text("انبار", 14.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        wh.addView(a.kit.text("انبار", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
         final boolean wdir = a.settings.whDirect();
-        wh.addView(a.kit.btnGhost("◉ ثبت مستقیم در آتیران: " + (wdir ? "روشن" : "خاموش"),
-                Theme.SUCCESS, v -> {
-                    a.settings.setWhDirect(!wdir);
-                    a.kit.toast(!wdir ? "ثبت مستقیم روشن شد" : "ثبت مستقیم خاموش شد؛ فقط پیش‌نویس");
-                    render(content);
-                }), a.kit.lp(-1, -2));
-        wh.addView(a.kit.hint("خاموش = اسناد انبار فقط پیش‌نویس محلی می‌مانند (امن). روشن = ثبت مستقیم در پیش‌فاکتورهای آتیران؛ اول با «پیش‌نمایش SQL» در صفحه رسید کالا بررسی کنید."),
+        addRow(wh, toggleRow("ثبت مستقیم در آتیران", wdir ? "اسناد مستقیم در پیش‌فاکتورهای آتیران ثبت می‌شوند"
+                : "خاموش: اسناد فقط پیش‌نویس محلی می‌مانند (امن)", wdir, Theme.SUCCESS, v -> {
+            a.settings.setWhDirect(!wdir);
+            a.kit.toast(!wdir ? "ثبت مستقیم روشن شد" : "ثبت مستقیم خاموش شد؛ فقط پیش‌نویس");
+            render(content);
+        }));
+        wh.addView(a.kit.hint("پیش از روشن‌کردن، با «پیش‌نمایش SQL» در صفحه رسید کالا بررسی کنید."),
                 a.kit.lp(-1, -2));
         a.kit.addCard(content, wh);
+    }
 
-        // ---- home dashboard order ----
+    private void buildDashboard(final LinearLayout content) {
+        content.addView(sectionHead("🧭 ترتیب داشبورد خانه",
+                "بخش‌های صفحهٔ خانه را با ↑ و ↓ جابه‌جا کنید.",
+                Theme.GOLD), a.kit.lp(-1, -2));
         LinearLayout ho = a.kit.card(Theme.GOLD);
-        ho.addView(a.kit.text("ترتیب داشبورد خانه", 14.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
         final String[][] secs = {
                 {"kpis", "شاخص‌های روز"},
                 {"alerts", "هشدار امروز"},
@@ -425,6 +603,8 @@ public class SettingsScreen extends Screen {
             String ot = order.get(i);
             for (String[] s2 : secs) if (s2[0].equals(ot)) ot = s2[1];
             LinearLayout orow = a.kit.h();
+            orow.setGravity(Gravity.CENTER_VERTICAL);
+            orow.setPadding(0, Theme.dp(3), 0, Theme.dp(3));
             orow.addView(a.kit.text(Money.fa(String.valueOf(i + 1)) + " • " + ot, 12.5f, Theme.TEXT, true), a.kit.wlp(1f));
             orow.addView(a.kit.btnGhost("↑", Theme.GOLD, v -> moveHome(order, idx, -1, content)), a.kit.lp(Theme.dp(52), -2));
             orow.addView(a.kit.btnGhost("↓", Theme.GOLD, v -> moveHome(order, idx, 1, content)), a.kit.lp(Theme.dp(52), -2));
@@ -435,38 +615,121 @@ public class SettingsScreen extends Screen {
             render(content);
         }), a.kit.lp(-1, -2));
         a.kit.addCard(content, ho);
+    }
 
-        // ---- about + developer signature ----
+    private void buildAbout(final LinearLayout content) {
+        content.addView(sectionHead("ℹ درباره و پشتیبانی", null, Theme.VIOLET), a.kit.lp(-1, -2));
+
+        // Local-only crash breadcrumb; users copy it deliberately when support asks.
+        if (ir.meelano.manager.core.CrashReporter.hasReport(a)) {
+            LinearLayout crash = a.kit.card(Theme.DANGER);
+            crash.addView(a.kit.text("گزارش خطای اخیر", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
+            crash.addView(a.kit.hint("گزارش فقط شامل نوع خطا، نسخه و محل کد است؛ پیام استثنا، IP، رمزها و اطلاعات فروش ذخیره نمی‌شوند. کپی به‌صورت دستی انجام می‌شود."),
+                    a.kit.lp(-1, -2));
+            crash.addView(a.kit.btnGhost("کپی گزارش فنی برای پشتیبانی", Theme.INFO, v -> {
+                String report = ir.meelano.manager.core.CrashReporter.readReport(a);
+                String diag = ir.meelano.manager.core.Diag.readRecent(a);
+                if (!diag.isEmpty()) report = (report.isEmpty() ? "" : report + "\n\n") + "--- رویدادهای بازیابی‌شده ---\n" + diag;
+                try {
+                    android.content.ClipboardManager cm = (android.content.ClipboardManager)
+                            a.getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+                    if (cm == null || report.isEmpty()) {
+                        a.kit.toast("گزارش فنی در دسترس نیست");
+                        return;
+                    }
+                    cm.setPrimaryClip(android.content.ClipData.newPlainText("گزارش خطای میلانو زرین‌فرمان", report));
+                    a.kit.toast("گزارش کپی شد؛ آن را برای پشتیبانی بفرستید");
+                } catch (Exception e) {
+                    a.kit.toast("کپی گزارش ممکن نشد");
+                }
+            }), a.kit.lp(-1, -2));
+            crash.addView(a.kit.btnGhost("پاک‌کردن گزارش ذخیره‌شده", Theme.DANGER, v -> {
+                ir.meelano.manager.core.CrashReporter.clearReport(a);
+                a.kit.toast("گزارش پاک شد");
+                render(content);
+            }), a.kit.lp(-1, -2));
+            a.kit.addCard(content, crash);
+        }
+
         LinearLayout ab = a.kit.card(Theme.VIOLET);
-        ab.setGravity(android.view.Gravity.CENTER);
+        ab.setGravity(Gravity.CENTER);
         ab.addView(a.kit.logo(84), new LinearLayout.LayoutParams(Theme.dp(84), Theme.dp(84)));
-        android.widget.TextView dn = a.kit.text("Milad Yaghoobi", 23, Theme.GOLD, true);
-        dn.setGravity(android.view.Gravity.CENTER);
+        TextView dn = a.kit.text("Milad Yaghoobi", 23, Theme.GOLD, true);
+        dn.setGravity(Gravity.CENTER);
         ab.addView(dn, a.kit.lp(-1, -2));
-        android.widget.TextView dr = a.kit.text("✦ طراح و توسعه‌دهنده ✦", 13f, Theme.TEXT, true);
-        dr.setGravity(android.view.Gravity.CENTER);
+        TextView dr = a.kit.text("✦ طراح و توسعه‌دهنده ✦", 13f, Theme.TEXT, true);
+        dr.setGravity(Gravity.CENTER);
         ab.addView(dr, a.kit.lp(-1, -2));
-        android.widget.TextView tag = a.kit.text("میلانو • داشبورد مدیریتی آتیران", 11f, Theme.MUTED, false);
-        tag.setGravity(android.view.Gravity.CENTER);
+        TextView tag = a.kit.text("میلانو زرین‌فرمان • داشبورد مدیریتی آتیران", 11f, Theme.MUTED, false);
+        tag.setGravity(Gravity.CENTER);
         ab.addView(tag, a.kit.lp(-1, -2));
         ab.addView(a.kit.gap(4));
         ab.addView(a.kit.kv("نسخه", appVersion() + " • " + editionNow(), Theme.TEXT), a.kit.lp(-1, -2));
-        ab.addView(a.kit.btnGhost("✦  تازه‌های نسخه", Theme.GOLD, v ->
-                ir.meelano.manager.ui.WhatsNew.showCurrent(a)), a.kit.lp(-1, -2));
-        ab.addView(a.kit.btnGhost("⬆  بررسی بروزرسانی", Theme.TEAL, v ->
-                ir.meelano.manager.core.UpdateCenter.manualCheck(a)), a.kit.lp(-1, -2));
-        ab.addView(a.kit.hint(ir.meelano.manager.core.UpdateCenter.lastCheckLine(a)), a.kit.lp(-1, -2));
+        addUpdateCard(ab);
         ab.addView(a.kit.kv("منبع داده", "SQL Server آتیران (اتصال مستقیم)", Theme.TEXT), a.kit.lp(-1, -2));
-        ab.addView(a.kit.text("✦ پشتیبانی میلانو", 13f, Theme.GOLD_SOFT, true), a.kit.lp(-1, -2));
+        ab.addView(a.kit.text("✦ پشتیبانی میلانو زرین‌فرمان", 13f, Theme.GOLD_SOFT, true), a.kit.lp(-1, -2));
         ab.addView(a.kit.btnGhost("🌐  " + ir.meelano.manager.core.Brand.SITE_LABEL, Theme.GOLD, v ->
                 ir.meelano.manager.core.Brand.openSite(a)), a.kit.lp(-1, -2));
         for (String ph : ir.meelano.manager.core.Brand.PHONES) {
             final String fph = ph;
-            ab.addView(a.kit.btnGhost("📞  " + Money.fa(ph), Theme.TEAL, v ->
+            ab.addView(a.kit.btnGhost("📞  " + Money.fa(ph), Theme.GOLD, v ->
                     ir.meelano.manager.core.Brand.dial(a, fph)), a.kit.lp(-1, -2));
         }
         ab.addView(a.kit.hint("همه بخش‌ها داده زنده نمایش می‌دهند؛ بدون اتصال، اطلاع‌رسانی می‌شود."), a.kit.lp(-1, -2));
         a.kit.addCard(content, ab);
+    }
+
+    /** Themed update card: manual check, status, and a manual release-page fallback. */
+    private void addUpdateCard(LinearLayout ab) {
+        ab.addView(a.kit.gap(6), a.kit.lp(-1, -2));
+        ab.addView(a.kit.text("⟳ بروزرسانی برنامه", 14f, Theme.GOLD, true), a.kit.lp(-1, -2));
+        ab.addView(a.kit.hint(ir.meelano.manager.core.UpdateCenter.statusLine(a)), a.kit.lp(-1, -2));
+        ab.addView(a.kit.hint(ir.meelano.manager.core.UpdateCenter.lastCheckLine(a)), a.kit.lp(-1, -2));
+        ab.addView(a.kit.btnGold("⟳  بررسی و دریافت نسخه جدید", v ->
+                ir.meelano.manager.core.UpdateCenter.manualCheck(a)), a.kit.lp(-1, -2));
+        ab.addView(a.kit.btnGhost("📦  صفحه نسخه‌های منتشرشده", Theme.GOLD, v -> openReleasesPage()),
+                a.kit.lp(-1, -2));
+        ab.addView(a.kit.hint("دانلود امن، بررسی امضا و نصب روی همین گوشی انجام می‌شود؛ داده‌ها حفظ می‌شوند. "
+                + "اگر اینترنت قطع بود، از صفحه نسخه‌ها دستی هم می‌توانید دریافت کنید."), a.kit.lp(-1, -2));
+    }
+
+    private void openReleasesPage() {
+        try {
+            a.startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW,
+                    android.net.Uri.parse(ir.meelano.manager.core.UpdateCenter.releasesPage())));
+        } catch (Exception e) {
+            Diag.ignored("SettingsScreen:openReleases", e);
+            a.kit.toast("مرورگری برای باز کردن صفحه پیدا نشد");
+        }
+    }
+
+    /** Full version history from the bundled changelog; the newest versions open by default. */
+    private void buildChangelog(LinearLayout content) {
+        ir.meelano.manager.ui.Changelog.Ver[] all = ir.meelano.manager.ui.Changelog.ALL;
+        LinearLayout box = a.kit.card(Theme.GOLD);
+        box.addView(a.kit.text("تاریخچهٔ نسخه‌ها", 15f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        box.addView(a.kit.hint("هر نسخه را لمس کنید تا تغییرات آن باز شود. نسخهٔ فعلی: " + appVersion()),
+                a.kit.lp(-1, -2));
+        for (int i = 0; i < all.length; i++) {
+            final ir.meelano.manager.ui.Changelog.Ver v = all[i];
+            final boolean open = i < 3;
+            final LinearLayout body = a.kit.v();
+            body.setVisibility(open ? View.VISIBLE : View.GONE);
+            for (ir.meelano.manager.ui.Changelog.Item it : v.items) {
+                LinearLayout row = a.kit.v();
+                row.setPadding(0, Theme.dp(6), 0, Theme.dp(6));
+                row.addView(a.kit.text(it.glyph + "  " + it.title, 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
+                row.addView(a.kit.hint(it.brief), a.kit.lp(-1, -2));
+                body.addView(row, a.kit.lp(-1, -2));
+            }
+            String head = v.name + "  •  " + v.dateFa + "  •  " + v.headline;
+            TextView hd = a.kit.text(head, 13f, Theme.GOLD_SOFT, true);
+            hd.setPadding(0, Theme.dp(12), 0, Theme.dp(4));
+            hd.setOnClickListener(x -> body.setVisibility(body.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE));
+            box.addView(hd, a.kit.lp(-1, -2));
+            box.addView(body, a.kit.lp(-1, -2));
+        }
+        a.kit.addCard(content, box);
     }
 
     /** Company profile auto-loaded from Atiran (no manual entry needed). */
@@ -486,15 +749,15 @@ public class SettingsScreen extends Screen {
             nt.addView(a.kit.kv("کد اقتصادی", Money.fa(co.egh.trim()), Theme.MUTED), a.kit.lp(-1, -2));
         if (co.pos != null && !co.pos.trim().isEmpty())
             nt.addView(a.kit.kv("کد پستی", Money.fa(co.pos.trim()), Theme.MUTED), a.kit.lp(-1, -2));
-        nt.addView(a.kit.btnGhost("⟳ به‌روزرسانی از آتیران", Theme.TEAL, v -> {
+        nt.addView(a.kit.btnGhost("⟳ به‌روزرسانی از آتیران", Theme.GOLD, v -> {
             a.kit.toast("در حال به‌روزرسانی مشخصات…");
             a.refreshCompany(() -> render(content));
         }), a.kit.lp(-1, -2));
     }
 
     private void runBackup(LinearLayout content) {
-        final android.widget.TextView st = a.kit.text("آماده‌سازی…", 13f, Theme.TEXT, false);
-        st.setGravity(android.view.Gravity.CENTER);
+        final TextView st = a.kit.text("آماده‌سازی…", 13f, Theme.TEXT, false);
+        st.setGravity(Gravity.CENTER);
         LinearLayout body = a.kit.v();
         body.setPadding(Theme.dp(20), Theme.dp(20), Theme.dp(20), Theme.dp(20));
         body.addView(st, a.kit.lp(-1, -2));
@@ -506,13 +769,13 @@ public class SettingsScreen extends Screen {
             public void onDone(java.io.File zip, long bytes, String notes) {
                 try {
                     dlg.dismiss();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("SettingsScreen:715", ignored); }
                 a.settings.saveBackupInfo(Jalali.faDate(Jalali.todayStr()), Backup.sizeFa(bytes));
                 a.kit.toast("بکاپ ساخته شد (" + Backup.sizeFa(bytes) + ") • " + notes);
                 render(content);
                 try {
                     java.io.File shared = Backup.toShareDir(a, zip);
-                    if (shared != null) ShareProvider.share(a, shared, "application/zip", "بکاپ هوشمند میلانو");
+                    if (shared != null) ShareProvider.share(a, shared, "application/zip", "بکاپ هوشمند میلانو زرین‌فرمان");
                     else a.kit.toast("فایل در پوشه Downloads ذخیره شد");
                 } catch (Exception e) {
                     a.kit.toast("فایل در پوشه Downloads ذخیره شد");
@@ -523,7 +786,7 @@ public class SettingsScreen extends Screen {
             public void onFail(String faError) {
                 try {
                     dlg.dismiss();
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("SettingsScreen:732", ignored); }
                 a.kit.toast(faError == null ? "بکاپ ممکن نشد" : faError);
             }
         });

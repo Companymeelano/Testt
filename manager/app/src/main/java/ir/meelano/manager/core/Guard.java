@@ -47,7 +47,7 @@ public final class Guard {
                 Found f = new Found();
                 try {
                     f.bounced = Repo.one(conn, MoneyQueries.bouncedTotal(m)).l("count");
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("Guard:50", ignored); }
                 String today = Jalali.todayStr();
                 for (boolean sales : new boolean[]{true, false}) {
                     try {
@@ -64,7 +64,7 @@ public final class Guard {
                                         + r.s("customer") + "|" + ((long) r.d("total")));
                             }
                         }
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("Guard:67", ignored); }
                 }
                 return f;
             }, new Repo.Cb<Found>() {
@@ -72,7 +72,7 @@ public final class Guard {
                 public void ok(Found v) {
                     try {
                         repo.close();
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("Guard:75", ignored); }
                     finishCb(onDone);
                     if (v == null) return;
                     try {
@@ -100,14 +100,14 @@ public final class Guard {
                         s2.setGuardSeen(sb.toString());
                         if (fresh == 0 && freshBig.isEmpty()) return;
                         notifyGuard(c, fresh, freshBig);
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("Guard:103", ignored); }
                 }
 
                 @Override
                 public void fail(String faError) {
                     try {
                         repo.close();
-                    } catch (Exception ignored) { }
+                    } catch (Exception ignored) { Diag.ignored("Guard:110", ignored); }
                     finishCb(onDone);
                 }
             });
@@ -125,7 +125,7 @@ public final class Guard {
     private static void finishCb(Runnable r) {
         try {
             if (r != null) r.run();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Guard:128", ignored); }
     }
 
     private static void notifyGuard(Context c, long freshBounced, List<String> freshBig) {
@@ -142,7 +142,7 @@ public final class Guard {
                 long amt = 0;
                 try {
                     amt = Long.parseLong(p[3]);
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) { Diag.ignored("Guard:145", ignored); }
                 parts.add("فاکتور " + kind + " " + Money.fa(no)
                         + (cust.isEmpty() ? "" : " («" + cust + "»)")
                         + " — " + Money.compactRial(amt));
@@ -158,7 +158,7 @@ public final class Guard {
             PendingIntent pi = PendingIntent.getActivity(c, Notify.GUARD_NOTIF_ID, open,
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             Notification n = new Notification.Builder(c, Notify.CH)
-                    .setContentTitle("🛡 نگهبان فروش میلانو")
+                    .setContentTitle("🛡 نگهبان فروش میلانو زرین‌فرمان")
                     .setContentText(b.toString())
                     .setStyle(new Notification.BigTextStyle().bigText(b.toString()))
                     .setSmallIcon(R.mipmap.ic_launcher)
@@ -168,6 +168,6 @@ public final class Guard {
                     .build();
             NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
             if (nm != null) nm.notify(Notify.GUARD_NOTIF_ID, n);
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) { Diag.ignored("Guard:171", ignored); }
     }
 }

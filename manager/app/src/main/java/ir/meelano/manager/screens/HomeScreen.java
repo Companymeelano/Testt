@@ -965,6 +965,8 @@ public class HomeScreen extends Screen {
         int tileIcon = lbl.contains("دلار") ? Theme.icon3d(R.drawable.mi_trending_up)
                 : (lbl.contains("طلا") ? Theme.icon3d(R.drawable.mi_diamond)
                 : (Theme.isLight() ? R.drawable.icon3d_coin : R.drawable.icon3d_dark_coin));
+        // Cups skin: the coin goes through the cups mapping like every other icon (no gold artwork).
+        if (Theme.isCups() && tileIcon == R.drawable.icon3d_coin) tileIcon = Theme.icon3d(tileIcon);
         int tile = Theme.isNuts() ? 64 : 42;
         t.addView(a.kit.icon(tileIcon, Theme.GOLD, tile), new LinearLayout.LayoutParams(Theme.dp(tile), Theme.dp(tile)));
         TextView label = a.kit.text(r.label, 10.5f, Theme.TEXT, false);
@@ -1181,7 +1183,11 @@ public class HomeScreen extends Screen {
                     Calendar.getInstance().get(Calendar.HOUR_OF_DAY), Calendar.getInstance().get(Calendar.MINUTE)));
             String sub = partialDay ? "تا " + nowFa + " • ناقص" : "تغییر ۷ روزه " + delta;
             cmp.add(new Kit.Kpi(compareLabel, Money.compactRial(todaySales), sub, Theme.GOLD));
-            cmp.add(new Kit.Kpi("دیروز", Money.compactRial(yesterday), "", Theme.isCups() ? Theme.INFO : Theme.TEXT));
+            // No rows for that day is not the same as a zero day: say so instead of showing 0.
+            String yesterdayDay = Jalali.addDays(compareDay, -1);
+            boolean yesterdayKnown = hasSalesOn(d.salesDaily, yesterdayDay);
+            cmp.add(new Kit.Kpi("دیروز", yesterdayKnown ? Money.compactRial(yesterday) : "—",
+                    yesterdayKnown ? "" : "ثبت نشده", Theme.isCups() ? Theme.INFO : Theme.TEXT));
             cmp.add(new Kit.Kpi("میانگین ۷ روز قبل", Money.compactRial(avg7), "", Theme.GOLD_SOFT));
             cmp.add(new Kit.Kpi("میانگین ۳۰ روز قبل", Money.compactRial(avg30), "", Theme.GOLD_SOFT));
             // Emerald 3D icon per tile, the same family as the KPI row.
@@ -1535,6 +1541,14 @@ public class HomeScreen extends Screen {
         } catch (Exception e) {
             Diag.ignored("Home:sparkline", e);
         }
+    }
+
+    private boolean hasSalesOn(List<Row> rows, String day) {
+        if (rows == null || day == null || day.isEmpty()) return false;
+        String target = Jalali.disp(day);
+        for (Row r : rows)
+            if (target.equals(Jalali.disp(r.s("day")))) return true;
+        return false;
     }
 
     private double salesOnDay(List<Row> rows, String day) {

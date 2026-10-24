@@ -3,6 +3,13 @@ package ir.meelano.manager.core;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
+import android.content.Intent;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
+import android.net.Uri;
+import android.view.Gravity;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
@@ -24,9 +31,12 @@ import java.net.URL;
 import java.security.MessageDigest;
 import java.util.Arrays;
 import java.util.Locale;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import ir.meelano.manager.BuildConfig;
 import ir.meelano.manager.ShareProvider;
+import ir.meelano.manager.ui.DownloadRing;
+import ir.meelano.manager.ui.Theme;
 
 /**
  * Update channel for the debug edition (the one installed from the session branch).
@@ -140,7 +150,11 @@ public final class DebugUpdate {
 
     private static void download(final Activity a, final Manifest m) {
         final Context app = a.getApplicationContext();
-        toast(app, "دریافت نسخه جدید از گیت‌هاب شروع شد…");
+        final AtomicBoolean cancel = new AtomicBoolean(false);
+        final DownloadRing ring = new DownloadRing(a);
+        final TextView sub = new TextView(a);
+        final AlertDialog dlg = progressDialog(a, ring, sub, cancel);
+        dlg.show();
         new Thread(() -> {
             File apk = null;
             try {
@@ -149,13 +163,23 @@ public final class DebugUpdate {
                 dir.mkdirs();
                 String tag = m.build.substring(0, Math.min(8, m.build.length()));
                 apk = new File(dir, "update-" + tag + ".apk");
-                String got = downloadTo(m.url, apk);
+                String got = downloadTo(m.url, apk, cancel, (done, total) -> UI.post(() -> {
+                    ring.setProgress(total > 0 ? done / (float) total : -1f);
+                    sub.setText(progressLine(done, total));
+                }));
+                if (cancel.get()) return;
+                UI.post(() -> sub.setText("در حال بررسی فایل…"));
                 if (m.size > 0 && apk.length() != m.size) throw new IOException("size mismatch");
                 if (!got.equalsIgnoreCase(m.sha256)) throw new IOException("sha256 mismatch");
                 final File ready = apk;
-                UI.post(() -> install(a, ready));
+                UI.post(() -> {
+                    dismiss(dlg);
+                    install(a, ready);
+                });
             } catch (Exception e) {
+                if (cancel.get()) return;
                 Diag.ignored("DebugUpdate:download", e);
+                UI.post(() -> dismiss(dlg));
                 toast(app, "دریافت کامل نشد یا فایل معتبر نیست؛ دوباره تلاش کنید");
                 if (apk != null) {
                     //noinspection ResultOfMethodCallIgnored
@@ -163,6 +187,93 @@ public final class DebugUpdate {
                 }
             }
         }, "debug-update-download").start();
+    }
+
+    /** Themed progress dialog: the ring and the card read the live theme colours. */
+    private static AlertDialog progressDialog(final Activity a, DownloadRing ring, TextView sub, final AtomicBoolean cancel) {
+        LinearLayout box = new LinearLayout(a);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setGravity(Gravity.CENTER_HORIZONTAL);
+        int pad = Theme.dp(22);
+        box.setPadding(pad, pad, pad, Theme.dp(12));
+        box.setBackground(Theme.card());
+
+        TextView title = new TextView(a);
+        title.setText("در حال دریافت نسخه جدید");
+        title.setTextColor(Theme.TEXT);
+        title.setTypeface(Theme.face(true));
+        title.setTextSize(16f);
+        title.setGravity(Gravity.CENTER);
+        box.addView(title);
+
+        box.addView(ring, new LinearLayout.LayoutParams(Theme.dp(180), Theme.dp(180)));
+
+        sub.setText("از گیت‌هاب • در حال آماده‌سازی…");
+        sub.setTextColor(Theme.MUTED);
+        sub.setTypeface(Theme.face(false));
+        sub.setTextSize(12f);
+        sub.setGravity(Gravity.CENTER);
+        box.addView(sub);
+
+        final AlertDialog[] holder = new AlertDialog[1];
+        TextView cancelBtn = new TextView(a);
+        cancelBtn.setText("انصراف");
+        cancelBtn.setTextColor(Theme.GOLD);
+        cancelBtn.setTypeface(Theme.face(true));
+        cancelBtn.setTextSize(14f);
+        cancelBtn.setGravity(Gravity.CENTER);
+        cancelBtn.setPadding(Theme.dp(24), Theme.dp(10), Theme.dp(24), Theme.dp(10));
+        cancelBtn.setBackground(Theme.glass(Theme.alpha(Theme.GOLD, 40), Theme.alpha(Theme.GOLD, 18), 14, 90));
+        cancelBtn.setOnClickListener(v -> {
+            cancel.set(true);
+            dismiss(holder[0]);
+        });
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
+        lp.topMargin = Theme.dp(10);
+        box.addView(cancelBtn, lp);
+
+        AlertDialog d = new AlertDialog.Builder(a).setView(box).setCancelable(false).create();
+        if (d.getWindow() != null) d.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        holder[0] = d;
+        return d;
+    }
+
+    private static String progressLine(long done, long total) {
+        if (total <= 0) return DownloadRing.fa(String.format(Locale.US, "%.1f", done / 1048576.0)) + " مگابایت دریافت شد";
+        int pct = (int) Math.min(100, done * 100 / total);
+        return DownloadRing.fa(String.valueOf(pct)) + "٪ • "
+                + DownloadRing.fa(String.format(Locale.US, "%.1f", done / 1048576.0)) + " از "
+                + DownloadRing.fa(String.format(Locale.US, "%.1f", total / 1048576.0)) + " مگابایت";
+    }
+
+    private static void dismiss(AlertDialog d) {
+        try {
+            if (d != null && d.isShowing()) d.dismiss();
+        } catch (Exception ignored) {
+            // Activity already gone: nothing to close.
+        }
+    }
+
+    /** Signer differs from the installed app: Android cannot update it in place. Explain it honestly. */
+    private static void signerDialog(final Activity a, final File apk) {
+        String msg = "این نسخه با امضای نسخه‌ی نصب‌شده روی این گوشی یکی نیست، پس اندروید اجازه‌ی به‌روزرسانی مستقیم نمی‌دهد.\n\n"
+                + "برای یک‌بار باید نسخه‌ی قبلی حذف شود و بعد این نسخه نصب شود. با حذف، اطلاعات محلی برنامه ممکن است پاک شود (از جمله ورود و فعال‌سازی).\n\n"
+                + "اول فایل را با «اشتراک فایل» ذخیره کنید، بعد نسخه‌ی قبلی را حذف کنید.";
+        new AlertDialog.Builder(a)
+                .setTitle("نصب مستقیم ممکن نیست")
+                .setMessage(msg)
+                .setPositiveButton("اشتراک فایل", (d, w) ->
+                        ShareProvider.share(a, apk, "application/vnd.android.package-archive", "MEELANO Manager"))
+                .setNeutralButton("حذف نسخه قبلی", (d, w) -> {
+                    try {
+                        a.startActivity(new Intent(Intent.ACTION_DELETE,
+                                Uri.parse("package:" + a.getPackageName())));
+                    } catch (Exception e) {
+                        Diag.ignored("DebugUpdate:delete", e);
+                    }
+                })
+                .setNegativeButton("بعداً", null)
+                .show();
     }
 
     /** Runs on the UI thread. Installs only a package that matches this app's name and signer. */
@@ -177,10 +288,7 @@ public final class DebugUpdate {
                 return;
             }
             if (!sameSigner(archive, cur)) {
-                // Different signing key: Android cannot replace the app in place. Hand the file
-                // to the share sheet so the user can install it once (the same path as before).
-                toast(a, "امضای این نسخه با نسخه نصب‌شده فرق دارد؛ فایل را برای نصب یک‌باره می‌فرستم");
-                ShareProvider.share(a, apk, "application/vnd.android.package-archive", "MEELANO Manager");
+                signerDialog(a, apk);
                 return;
             }
             ShareProvider.install(a, apk);
@@ -197,7 +305,12 @@ public final class DebugUpdate {
     }
 
     /** Streams the file, hashing as it goes. Returns the SHA-256 in hex. */
-    private static String downloadTo(String url, File out) throws IOException {
+    /** Receives (bytes done, total bytes or -1). */
+    private interface Progress {
+        void on(long done, long total);
+    }
+
+    private static String downloadTo(String url, File out, AtomicBoolean cancel, Progress progress) throws IOException {
         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
         try {
             c.setConnectTimeout(CONNECT_MS);
@@ -212,16 +325,24 @@ public final class DebugUpdate {
                 throw new IOException("no sha256");
             }
             long total = 0;
+            long length = c.getContentLengthLong();
+            long lastPost = 0;
             try (InputStream in = c.getInputStream(); OutputStream os = new FileOutputStream(out)) {
                 byte[] buf = new byte[64 * 1024];
                 int n;
                 while ((n = in.read(buf)) > 0) {
+                    if (cancel.get()) throw new IOException("cancelled");
                     total += n;
                     if (total > MAX_BYTES) throw new IOException("too large");
                     os.write(buf, 0, n);
                     md.update(buf, 0, n);
+                    if (progress != null && total - lastPost >= 256 * 1024) {
+                        lastPost = total;
+                        progress.on(total, length);
+                    }
                 }
             }
+            if (progress != null) progress.on(total, length);
             StringBuilder hex = new StringBuilder();
             for (byte b : md.digest()) hex.append(String.format(Locale.US, "%02x", b));
             return hex.toString();

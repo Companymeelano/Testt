@@ -859,7 +859,7 @@ public final class UpdateCenter {
         if (bytes < 1048576) return Money.fa(String.valueOf(bytes / 1024)) + " کیلوبایت";
         String s = String.format(Locale.US, "%.1f", bytes / 1048576.0);
         if (s.endsWith(".0")) s = s.substring(0, s.length() - 2);
-        return Money.fa(s).replace('.', '٫') + " مگابایت";
+        return Money.fa(s) + " مگابایت";
     }
 
     private static String sha256Of(File f) {

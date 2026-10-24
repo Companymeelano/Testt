@@ -1175,7 +1175,7 @@ public class HomeScreen extends Screen {
                     a.kit.lp(-1, -2));
             double deltaPct = avg7 > 0 ? (todaySales - avg7) * 100.0 / avg7 : 0;
             String delta = avg7 > 0 ? (deltaPct > 0 ? "+" : deltaPct < 0 ? "−" : "")
-                    + Money.fa(String.format(Locale.US, "%.1f", Math.abs(deltaPct)).replace('.', '٫')) + "٪" : "—";
+                    + Money.fa(String.format(Locale.US, "%.1f", Math.abs(deltaPct))) + "٪" : "—";
             int deltaColor = avg7 <= 0 ? Theme.MUTED : (todaySales >= avg7 ? Theme.SUCCESS : Theme.WARNING);
             List<Kit.Kpi> cmp = new ArrayList<>();
             // A day that is still running is not comparable yet: show the time instead of a false drop.
@@ -1187,7 +1187,7 @@ public class HomeScreen extends Screen {
             String yesterdayDay = Jalali.addDays(compareDay, -1);
             boolean yesterdayKnown = hasSalesOn(d.salesDaily, yesterdayDay);
             cmp.add(new Kit.Kpi("دیروز", yesterdayKnown ? Money.compactRial(yesterday) : "—",
-                    yesterdayKnown ? "" : "ثبت نشده", Theme.isCups() ? Theme.INFO : Theme.TEXT));
+                    yesterdayKnown ? "" : "ثبت نشده", Theme.isCups() ? Theme.GOLD : Theme.TEXT));
             cmp.add(new Kit.Kpi("میانگین ۷ روز قبل", Money.compactRial(avg7), "", Theme.GOLD_SOFT));
             cmp.add(new Kit.Kpi("میانگین ۳۰ روز قبل", Money.compactRial(avg30), "", Theme.GOLD_SOFT));
             // Emerald 3D icon per tile, the same family as the KPI row.

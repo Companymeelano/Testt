@@ -85,7 +85,7 @@ public final class Money {
         int dot = s.indexOf('.');
         String ip = dot < 0 ? s : s.substring(0, dot);
         String fp = dot < 0 ? "" : s.substring(dot);
-        return fa(groupStr(ip) + fp.replace('.', '٫'));
+        return fa(groupStr(ip) + fp);
     }
 
     private static String groupStr(String ip) {
@@ -120,14 +120,14 @@ public final class Money {
     private static String trim(double v) {
         String s = String.format(Locale.US, Math.abs(v) >= 100 ? "%.0f" : "%.1f", v);
         if (s.endsWith(".0")) s = s.substring(0, s.length() - 2);
-        return s.replace('.', '٫').replace('-', '−');
+        return s.replace('-', '−');
     }
 
     /** «٪۱۲٫۵» */
     public static String pct(double v) {
         String s = String.format(Locale.US, "%.1f", v);
         if (s.endsWith(".0")) s = s.substring(0, s.length() - 2);
-        return "٪" + fa(s.replace('.', '٫').replace('-', '−'));
+        return "٪" + fa(s.replace('-', '−'));
     }
 
     // ---------------- amount in words ----------------

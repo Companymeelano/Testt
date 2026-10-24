@@ -165,7 +165,7 @@ public final class TableShot {
         if (col.type == ReportCatalog.T_NUM) {
             double v = r.d(col.key);
             if (Math.abs(v - Math.round(v)) < 0.001) return Money.num(Math.round(v));
-            return Money.fa(String.format(java.util.Locale.US, "%.1f", v).replace('.', '٫').replace('-', '−'));
+            return Money.fa(String.format(java.util.Locale.US, "%.1f", v).replace('-', '−'));
         }
         if (col.type == ReportCatalog.T_DATE) return Jalali.dispFa(r.s(col.key));
         String t = r.s(col.key, "—");

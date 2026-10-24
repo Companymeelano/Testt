@@ -274,7 +274,7 @@ public final class Kit {
             // Optional gold glyph above the label (dashboard tiles).
             android.widget.ImageView ic = new android.widget.ImageView(a);
             try {
-                ic.setImageResource(Theme.icon3d(k.icon));
+                ic.setImageResource(Theme.chrome3d(k.icon));
                 if (!Theme.isIcon3d(Theme.icon3d(k.icon))) ic.setColorFilter(Theme.GOLD);
             } catch (Exception ignored) { Diag.ignored("Kit:kpiIcon", ignored); }
             int isz = Theme.isIcon3d(Theme.icon3d(k.icon)) ? (Theme.isNuts() ? 60 : 30) : 24;
@@ -1337,7 +1337,7 @@ public final class Kit {
     public ImageView icon(int res, int color, int dp) {
         ImageView v = new ImageView(a);
         // Light skin: rendered 3D gold icon instead of the flat glyph; it keeps its own colours.
-        int res3 = Theme.icon3d(res);
+        int res3 = Theme.chrome3d(res);
         if (Theme.isIcon3d(res3)) {
             v.setImageResource(res3);
             v.setScaleType(ImageView.ScaleType.CENTER_INSIDE);

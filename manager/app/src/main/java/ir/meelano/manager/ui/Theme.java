@@ -155,10 +155,10 @@ public final class Theme {
         if (vector == R.drawable.mi_calendar_month) return R.drawable.icon3d_dues;
         if (vector == R.drawable.mi_zoom) return R.drawable.icon3d_zoom;
         if (vector == R.drawable.mi_sell) return light ? R.drawable.icon3d_light_tag : R.drawable.icon3d_dark_tag;
-        if (vector == R.drawable.mi_point_of_sale) return nuts ? R.drawable.icon3d_medal_sales : R.drawable.icon3d_sales;
-        if (vector == R.drawable.mi_shopping_cart) return nuts ? R.drawable.icon3d_medal_purchase : R.drawable.icon3d_purchase;
-        if (vector == R.drawable.mi_receipt_long) return nuts ? R.drawable.icon3d_medal_cash_in : R.drawable.icon3d_cash_in;
-        if (vector == R.drawable.mi_payments) return nuts ? R.drawable.icon3d_medal_cash_out : R.drawable.icon3d_cash_out;
+        if (vector == R.drawable.mi_point_of_sale) return NUT_MEDALLIONS && nuts ? R.drawable.icon3d_medal_sales : R.drawable.icon3d_sales;
+        if (vector == R.drawable.mi_shopping_cart) return NUT_MEDALLIONS && nuts ? R.drawable.icon3d_medal_purchase : R.drawable.icon3d_purchase;
+        if (vector == R.drawable.mi_receipt_long) return NUT_MEDALLIONS && nuts ? R.drawable.icon3d_medal_cash_in : R.drawable.icon3d_cash_in;
+        if (vector == R.drawable.mi_payments) return NUT_MEDALLIONS && nuts ? R.drawable.icon3d_medal_cash_out : R.drawable.icon3d_cash_out;
         if (vector == R.drawable.mi_cheque) return R.drawable.icon3d_cheque;
         if (vector == R.drawable.mi_inventory_2) return R.drawable.icon3d_inventory;
         if (vector == R.drawable.mi_group) return R.drawable.icon3d_customers;
@@ -255,7 +255,8 @@ public final class Theme {
             SURFACE = 0xFFFFFFFF;
             SURFACE2 = 0xFFF4ECD6;
             GOLD = 0xFF0F5B45;
-            GOLD_SOFT = 0xFF8A6418;
+            // Nut theme: accent text is emerald (was brown-gold), matching the chrome and buttons.
+            GOLD_SOFT = nuts ? 0xFF176A50 : 0xFF8A6418;
             TEXT = 0xFF0E1F1A;
             MUTED = 0xFF5B6B66;
             SUCCESS = 0xFF15803D;

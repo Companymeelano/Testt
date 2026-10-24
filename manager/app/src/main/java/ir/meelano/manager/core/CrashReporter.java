@@ -75,7 +75,7 @@ public final class CrashReporter {
 
     private static String format(Context context, Thread thread, Throwable error) {
         StringBuilder b = new StringBuilder(2048);
-        b.append("MEELANO Manager crash diagnostics\n");
+        b.append("میلانو crash diagnostics\n");
         b.append("time: ").append(new SimpleDateFormat(
                 "yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US).format(new Date())).append('\n');
         b.append("sdk: ").append(Build.VERSION.SDK_INT).append('\n');

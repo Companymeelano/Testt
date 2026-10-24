@@ -79,7 +79,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * MEELANO Manager v7 — management-only shell.
+ * میلانو v7 — management-only shell.
  * Bottom nav (5 hubs) + header (filter / refresh / connection dot) + content.
  */
 public class MainActivity extends Activity {
@@ -242,7 +242,7 @@ public class MainActivity extends Activity {
         root.setPadding(Theme.dp(28), Theme.dp(28), Theme.dp(28), Theme.dp(28));
         android.widget.ImageView logoV = kit.logo(110);
         root.addView(logoV, new LinearLayout.LayoutParams(Theme.dp(110), Theme.dp(110)));
-        TextView t = kit.text("میلانو زرین‌فرمان", 26, Theme.TEXT, true);
+        TextView t = kit.text("میلانو", 26, Theme.TEXT, true);
         t.setGravity(Gravity.CENTER);
         root.addView(t, kit.lp(-1, -2));
         String splashSub = "داشبورد مدیریتی آتیران";
@@ -393,7 +393,7 @@ public class MainActivity extends Activity {
         root.setBackgroundColor(Theme.BG);
         root.setPadding(Theme.dp(28), Theme.dp(28), Theme.dp(28), Theme.dp(28));
         root.addView(kit.logo(120), new LinearLayout.LayoutParams(Theme.dp(120), Theme.dp(120)));
-        TextView t = kit.text("میلانو زرین‌فرمان", 22, Theme.TEXT, true);
+        TextView t = kit.text("میلانو", 22, Theme.TEXT, true);
         t.setGravity(Gravity.CENTER);
         root.addView(t, kit.lp(-1, -2));
         TextView s = kit.text("رمز عبور مدیریتی را وارد کنید", 12.5f, Theme.MUTED, false);
@@ -1080,7 +1080,7 @@ public class MainActivity extends Activity {
         try {
             nm = Company.get(this).displayName(this);
         } catch (Exception e) {
-            nm = "میلانو زرین‌فرمان";
+            nm = "میلانو";
         }
         String g = Theme.seasonGlyph(this);
         return g.isEmpty() ? nm : nm + " " + g;

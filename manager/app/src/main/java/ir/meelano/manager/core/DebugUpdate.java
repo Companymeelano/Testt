@@ -263,7 +263,7 @@ public final class DebugUpdate {
                 .setTitle("نصب مستقیم ممکن نیست")
                 .setMessage(msg)
                 .setPositiveButton("اشتراک فایل", (d, w) ->
-                        ShareProvider.share(a, apk, "application/vnd.android.package-archive", "MEELANO Manager"))
+                        ShareProvider.share(a, apk, "application/vnd.android.package-archive", "میلانو"))
                 .setNeutralButton("حذف نسخه قبلی", (d, w) -> {
                     try {
                         a.startActivity(new Intent(Intent.ACTION_DELETE,

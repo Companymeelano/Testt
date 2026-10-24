@@ -159,7 +159,7 @@ public class SmsReceiver extends BroadcastReceiver {
             if (android.os.Build.VERSION.SDK_INT >= 26) {
                 try {
                     nm.createNotificationChannel(new NotificationChannel("milano_sms",
-                            "پیامک میلانو زرین‌فرمان", NotificationManager.IMPORTANCE_HIGH));
+                            "پیامک میلانو", NotificationManager.IMPORTANCE_HIGH));
                 } catch (Exception ignored) { Diag.ignored("SmsReceiver:163", ignored); }
             }
             Intent i = new Intent(app, LicenseActivity.class);
@@ -170,7 +170,7 @@ public class SmsReceiver extends BroadcastReceiver {
                     ? new android.app.Notification.Builder(app, "milano_sms")
                     : new android.app.Notification.Builder(app);
             nb.setSmallIcon(R.mipmap.ic_launcher)
-                    .setContentTitle("⛔ پیام مدیریتی میلانو زرین‌فرمان")
+                    .setContentTitle("⛔ پیام مدیریتی میلانو")
                     .setContentText(text)
                     .setStyle(new android.app.Notification.BigTextStyle().bigText(text))
                     .setAutoCancel(true)

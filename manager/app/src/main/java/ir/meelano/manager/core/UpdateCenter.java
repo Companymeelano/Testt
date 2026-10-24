@@ -309,7 +309,7 @@ public final class UpdateCenter {
                     if (box[0] != null) box[0].dismiss();
                 } catch (Exception ignored) { Diag.ignored("UpdateCenter:276", ignored); }
             }), kit.lp(-1, -2));
-            AlertDialog d = kit.dialog("⬆ بروزرسانی میلانو زرین‌فرمان", kit.scrollWrap(body, 440), true);
+            AlertDialog d = kit.dialog("⬆ بروزرسانی میلانو", kit.scrollWrap(body, 440), true);
             box[0] = d;
             d.setOnDismissListener(dd -> recordDismiss(a, info.code));
             d.show();
@@ -620,7 +620,7 @@ public final class UpdateCenter {
                 LinearLayout body = kit.v();
                 body.setPadding(Theme.dp(18), Theme.dp(4), Theme.dp(18), Theme.dp(12));
                 body.addView(kit.text(
-                        "برای نصب نسخه جدید، در صفحه بعد گزینه «اجازه نصب از این منبع» را برای «میلانو زرین‌فرمان» روشن کنید و برگردید؛ نصب خودکار ادامه پیدا می‌کند.",
+                        "برای نصب نسخه جدید، در صفحه بعد گزینه «اجازه نصب از این منبع» را برای «میلانو» روشن کنید و برگردید؛ نصب خودکار ادامه پیدا می‌کند.",
                         13.5f, Theme.TEXT, false), kit.lp(-1, -2));
                 body.addView(kit.gap(10));
                 final AlertDialog[] box = new AlertDialog[1];
@@ -679,7 +679,7 @@ public final class UpdateCenter {
             LinearLayout body = kit.v();
             body.setPadding(Theme.dp(18), Theme.dp(4), Theme.dp(18), Theme.dp(12));
             body.addView(kit.text(
-                    "نسخه " + Money.fa(info.name) + " با امضای رسمی و امن میلانو زرین‌فرمان منتشر شده، ولی نصب فعلی شما آزمایشی است و اندروید اجازه جایگزینی مستقیم نمی‌دهد. فقط همین یک‌بار این سه قدم را انجام دهید؛ از این به بعد همه بروزرسانی‌ها با یک لمس نصب می‌شوند:",
+                    "نسخه " + Money.fa(info.name) + " با امضای رسمی و امن میلانو منتشر شده، ولی نصب فعلی شما آزمایشی است و اندروید اجازه جایگزینی مستقیم نمی‌دهد. فقط همین یک‌بار این سه قدم را انجام دهید؛ از این به بعد همه بروزرسانی‌ها با یک لمس نصب می‌شوند:",
                     13.5f, Theme.TEXT, false), kit.lp(-1, -2));
             body.addView(kit.gap(8));
             LinearLayout card = kit.card(Theme.GOLD);
@@ -718,7 +718,7 @@ public final class UpdateCenter {
                 return;
             }
             ShareProvider.share(a, pub, "application/vnd.android.package-archive",
-                    "فایل نصب میلانو زرین‌فرمان " + info.name);
+                    "فایل نصب میلانو " + info.name);
         } catch (Exception e) {
             toast(a, "اشتراک ممکن نشد؛ دوباره تلاش کنید");
         }

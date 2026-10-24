@@ -42,7 +42,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * «دستیار میلانو زرین‌فرمان»: a Persian manager chat over the live store data.
+ * «دستیار میلانو»: a Persian manager chat over the live store data.
  * Uses the configured generative model (set in Settings → هوش مصنوعی) when it is
  * enabled; otherwise the built-in data engine answers. Supports typed questions,
  * voice input, read-aloud replies, and a live voice conversation mode.
@@ -55,7 +55,7 @@ public final class AssistantScreen extends Screen {
     private static final String PREFS = "meelano_assistant";
 
     static final String SYSTEM_PROMPT =
-            "تو «میلانو زرین‌فرمان» هستی، دستیار هوشمند و خونگرم این فروشگاه، و مثل یک گفتگوی دوستانه با یک آدم فارسی حرف می‌زنی، "
+            "تو «میلانو» هستی، دستیار هوشمند و خونگرم این فروشگاه، و مثل یک گفتگوی دوستانه با یک آدم فارسی حرف می‌زنی، "
             + "مشابه Gemini و ChatGPT: طبیعی، روان، دقیق و محاوره‌ای. "
             + "پاسخ‌ها برای خواندن با صدای بلند نوشته می‌شوند، پس: بدون Markdown، بدون علامت ستاره و "
             + "خط تیره و بدون فهرست شماره‌دار؛ جملات کوتاه و روان. "
@@ -105,7 +105,7 @@ public final class AssistantScreen extends Screen {
     }
 
     @Override public String id() { return "assistant"; }
-    @Override public String title() { return "دستیار میلانو زرین‌فرمان"; }
+    @Override public String title() { return "دستیار میلانو"; }
     @Override public String glyph() { return "✦"; }
     @Override public int accent() { return Theme.GOLD; }
 
@@ -533,7 +533,7 @@ public final class AssistantScreen extends Screen {
             status = "داده‌های زنده • آخرین خواندن ساعت " + Money.fa(time)
                     + (lastError != null ? " • اتصال موقتاً قطع است" : " • نوسازی هر دقیقه");
         }
-        return a.kit.hero("✦", "دستیار هوشمند میلانو زرین‌فرمان", status, Theme.GOLD);
+        return a.kit.hero("✦", "دستیار هوشمند میلانو", status, Theme.GOLD);
     }
 
     /** Quick questions as a 2×2 grid: every label is fully visible, no horizontal cut-off. */

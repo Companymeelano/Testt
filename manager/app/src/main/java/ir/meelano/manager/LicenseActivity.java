@@ -74,7 +74,7 @@ public class LicenseActivity extends Activity {
             "کلید طلایی‌تان در راه است؛ کمی صبر کنید ✦",
             "داریم کلید را تراش می‌دهیم…",
             "کمی مانده — همین‌جا منتظر بمانید…",
-            "به‌زودی وارد دنیای میلانو زرین‌فرمان می‌شوید…",
+            "به‌زودی وارد دنیای میلانو می‌شوید…",
     };
     private String pendingSmsPhone = "";
     private String pendingSmsText = "";
@@ -750,7 +750,7 @@ public class LicenseActivity extends Activity {
         final TextView copyNote = kit.text("", 12f, Theme.SUCCESS, true);
         copyNote.setVisibility(View.GONE);
         copyBtn.setOnClickListener(v -> {
-            boolean ok = copyText("کد دستگاه میلانو زرین‌فرمان", device);
+            boolean ok = copyText("کد دستگاه میلانو", device);
             copyNote.setTextColor(ok ? Theme.SUCCESS : Theme.DANGER);
             copyNote.setText(ok ? "کد دستگاه کپی شد" : "کپی نشد؛ دوباره تلاش کنید");
             copyNote.setVisibility(View.VISIBLE);
@@ -1096,7 +1096,7 @@ public class LicenseActivity extends Activity {
         reportNote.setVisibility(View.GONE);
         c.addView(kit.btnGhost("کپی گزارش فنی", Theme.INFO, v -> {
             String report = CrashReporter.readReport(this);
-            boolean ok = !report.isEmpty() && copyText("گزارش خطای میلانو زرین‌فرمان", report);
+            boolean ok = !report.isEmpty() && copyText("گزارش خطای میلانو", report);
             reportNote.setTextColor(ok ? Theme.SUCCESS : Theme.DANGER);
             reportNote.setText(report.isEmpty() ? "گزارش فنی در دسترس نیست"
                     : (ok ? "گزارش کپی شد؛ برای پشتیبانی بفرستید" : "کپی گزارش ممکن نشد"));
@@ -1580,7 +1580,7 @@ public class LicenseActivity extends Activity {
         TextView t = kit.text("همه‌چیز آماده است", 21f, Theme.TEXT, true);
         t.setGravity(Gravity.CENTER);
         hero.addView(t, kit.lp(-1, -2));
-        TextView sub = kit.text("لایسنس فعال است؛ با یک لمس وارد میلانو زرین‌فرمان شوید.", 12.5f, Theme.MUTED, false);
+        TextView sub = kit.text("لایسنس فعال است؛ با یک لمس وارد میلانو شوید.", 12.5f, Theme.MUTED, false);
         sub.setGravity(Gravity.CENTER);
         hero.addView(sub, kit.lp(-1, -2));
         box.addView(kit.gap(18));
@@ -1675,7 +1675,7 @@ public class LicenseActivity extends Activity {
     private String buildRequestMsg(String dist, String phone) {
         String line = License.requestLine(device, dist, "", dist, phone, "");
         String use = Usage.reportLine(this, device);
-        StringBuilder b = new StringBuilder("درخواست فعال‌سازی میلانو زرین‌فرمان\n").append(line);
+        StringBuilder b = new StringBuilder("درخواست فعال‌سازی میلانو\n").append(line);
         if (!use.isEmpty()) b.append('\n').append(use);
         b.append("\nنام: ").append(dist.trim());
         b.append("\nتماس: ").append(phone.trim());
@@ -1695,7 +1695,7 @@ public class LicenseActivity extends Activity {
             kit.toast("گزارشی برای ارسال نیست");
             return;
         }
-        String msg = "گزارش مصرف میلانو زرین‌فرمان\n" + use
+        String msg = "گزارش مصرف میلانو\n" + use
                 + "\nکارکرد: " + Usage.faSummary(this);
         copyText("گزارش مصرف", msg);
         try {
@@ -2021,7 +2021,7 @@ public class LicenseActivity extends Activity {
         body.addView(kit.btn("بستن", v -> {
             if (dlgH[0] != null) dlgH[0].dismiss();
         }), kit.lp(-1, -2));
-        dlgH[0] = kit.dialog("پشتیبانی میلانو زرین‌فرمان", body, true);
+        dlgH[0] = kit.dialog("پشتیبانی میلانو", body, true);
         dlgH[0].show();
     }
 
@@ -2099,7 +2099,7 @@ public class LicenseActivity extends Activity {
             TextView t = kit.text("در حال چیدن میز کار شما…", 14f, Theme.GOLD_SOFT, true);
             t.setGravity(Gravity.CENTER);
             box.addView(t, kit.lp(-1, -2));
-            final AlertDialog d = kit.dialog("میلانو زرین‌فرمان", box, false);
+            final AlertDialog d = kit.dialog("میلانو", box, false);
             try {
                 d.setCancelable(false);
                 d.setCanceledOnTouchOutside(false);

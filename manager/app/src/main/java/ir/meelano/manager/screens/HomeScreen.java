@@ -1008,32 +1008,8 @@ public class HomeScreen extends Screen {
         content.addView(a.kit.gap(10));
         content.addView(a.kit.gap(8));
 
-        // Render each dashboard section into its own container so the lower-priority
-        // analysis panels can collapse without changing the user's saved order.
-        List<LinearLayout> blocks = new ArrayList<>();
-        List<Boolean> essential = new ArrayList<>();
-        int detailCount = 0;
-        for (String key : orderedKeys()) {
-            LinearLayout block = a.kit.v();
-            renderHomeSection(block, d, key);
-            if (block.getChildCount() == 0) continue;
-            boolean keepVisible = isEssentialHomeSection(key);
-            blocks.add(block);
-            essential.add(keepVisible);
-            if (!keepVisible) detailCount++;
-        }
-
-        boolean expanded = a.settings.homeDetailsExpanded();
-        boolean toggleAdded = false;
-        for (int i = 0; i < blocks.size(); i++) {
-            if (!essential.get(i) && !toggleAdded && detailCount > 0) {
-                content.addView(homeDetailsToggle(blocks, essential, detailCount, expanded), a.kit.lp(-1, -2));
-                toggleAdded = true;
-            }
-            LinearLayout block = blocks.get(i);
-            if (!essential.get(i) && !expanded) block.setVisibility(View.GONE);
-            content.addView(block, a.kit.lp(-1, -2));
-        }
+        // Every section is shown directly, in the saved (or default) priority order.
+        for (String key : orderedKeys()) renderHomeSection(content, d, key);
         renderNotes(content, d.notes);
         staggerIn(content);
     }
@@ -1113,7 +1089,7 @@ public class HomeScreen extends Screen {
         if ("kpis".equals(key)) secKpis(content, d);
         else if ("alerts".equals(key)) secAlerts(content, d);
         else if ("trend".equals(key)) secTrend(content, d);
-        else if ("debtors".equals(key)) secDebtors(content, d);
+        else if ("compare".equals(key)) secCompare(content, d);
         else if ("visitors".equals(key)) secVisitors(content, d);
         else if ("due".equals(key)) secDue(content, d);
         else if ("returns".equals(key)) secReturns(content, d);
@@ -1121,66 +1097,10 @@ public class HomeScreen extends Screen {
         else if ("shortcuts".equals(key)) secShortcuts(content, d);
     }
 
-    private boolean isEssentialHomeSection(String key) {
-        return "kpis".equals(key) || "alerts".equals(key) || "due".equals(key) || "returns".equals(key);
-    }
-
-    private View homeDetailsToggle(final List<LinearLayout> blocks, final List<Boolean> essential,
-                                  final int detailCount, boolean expandedInitially) {
-        final boolean[] expanded = {expandedInitially};
-        final LinearLayout card = a.kit.card(Theme.INFO);
-        card.setPadding(Theme.dp(14), Theme.dp(11), Theme.dp(14), Theme.dp(11));
-        LinearLayout row = a.kit.h();
-        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
-
-        // Same 3D family as the rest of the dashboard (emerald in the nut theme) instead of a blue text glyph.
-        android.widget.ImageView icon = new android.widget.ImageView(a);
-        icon.setImageResource(Theme.chrome3d(R.drawable.mi_widgets));
-        icon.setScaleType(android.widget.ImageView.ScaleType.CENTER_INSIDE);
-        icon.setPadding(Theme.dp(6), Theme.dp(6), Theme.dp(6), Theme.dp(6));
-        icon.setBackground(Theme.avatar(Theme.alpha(Theme.INFO, 50)));
-        row.addView(icon, new LinearLayout.LayoutParams(Theme.dp(46), Theme.dp(46)));
-        row.addView(a.kit.space(10));
-
-        LinearLayout copy = a.kit.v();
-        TextView title = a.kit.text("جزئیات تکمیلی داشبورد", 13.5f, Theme.TEXT, true);
-        TextView subtitle = a.kit.text("", 10.5f, Theme.MUTED, false);
-        subtitle.setMaxLines(2);
-        copy.addView(title, a.kit.lp(-1, -2));
-        copy.addView(subtitle, a.kit.lp(-1, -2));
-        row.addView(copy, a.kit.wlp(1f));
-        row.addView(a.kit.space(8));
-
-        android.widget.ImageView action = new android.widget.ImageView(a);
-        action.setColorFilter(Theme.INFO);
-        action.setScaleType(android.widget.ImageView.ScaleType.CENTER_INSIDE);
-        row.addView(action, new LinearLayout.LayoutParams(Theme.dp(28), Theme.dp(36)));
-        card.addView(row, a.kit.lp(-1, -2));
-
-        final Runnable refresh = () -> {
-            subtitle.setText(expanded[0]
-                    ? "نمایش داده می‌شود؛ برای جمع‌کردن لمس کنید"
-                    : Money.fa(String.valueOf(detailCount)) + " بخش تحلیلی و میان‌بر • برای نمایش لمس کنید");
-            action.setImageResource(expanded[0] ? R.drawable.mi_remove : R.drawable.mi_add);
-            card.setContentDescription(expanded[0] ? "جمع‌کردن جزئیات داشبورد" : "نمایش جزئیات داشبورد");
-        };
-        refresh.run();
-        Theme.pressable(card);
-        card.setOnClickListener(v -> {
-            expanded[0] = !expanded[0];
-            a.settings.setHomeDetailsExpanded(expanded[0]);
-            for (int i = 0; i < blocks.size(); i++) {
-                if (!essential.get(i)) blocks.get(i).setVisibility(expanded[0] ? View.VISIBLE : View.GONE);
-            }
-            refresh.run();
-        });
-        return card;
-    }
-
     /** Dashboard order from settings; unknown keys dropped, missing sections appended. */
     private List<String> orderedKeys() {
         List<String> out = new ArrayList<>();
-        String[] known = {"kpis", "alerts", "due", "returns", "trend", "debtors", "visitors", "eod", "shortcuts"};
+        String[] known = {"kpis", "compare", "alerts", "due", "returns", "trend", "visitors", "eod", "shortcuts"};
         for (String k : a.settings.homeOrder().split(",")) {
             String t = k == null ? "" : k.trim();
             if (!t.isEmpty() && !out.contains(t)) {
@@ -1188,6 +1108,9 @@ public class HomeScreen extends Screen {
             }
         }
         for (String k2 : known) if (!out.contains(k2)) out.add(k2);
+        // Older saved orders have no "compare": keep it right after the KPI row.
+        out.remove("compare");
+        out.add(out.indexOf("kpis") + 1, "compare");
         return out;
     }
 
@@ -1215,6 +1138,10 @@ public class HomeScreen extends Screen {
         kg.topMargin = Theme.dp(12);
         content.addView(a.kit.kpiGrid(kpis, 2), kg);
         content.addView(a.kit.gap(12));
+    }
+
+    /** Average-sales comparison: its own card, so the manager can open it directly. */
+    private void secCompare(LinearLayout content, Data d) {
         if (d.salesDaily != null && !d.salesDaily.isEmpty()) {
             String compareDay = snapshotDay(d);
             String compareLabel = snapshotLabel(d);
@@ -1223,7 +1150,7 @@ public class HomeScreen extends Screen {
             double avg7 = averageSalesBefore(d.salesDaily, compareDay, 7);
             double avg30 = averageSalesBefore(d.salesDaily, compareDay, 30);
             LinearLayout compare = a.kit.card(Theme.GOLD);
-            compare.addView(a.kit.sectionHead("فروش " + compareLabel + " در مقایسه", "فروش ›", v -> a.nav("sales")),
+            compare.addView(sectionBanner(R.drawable.mi_bar_chart, "فروش " + compareLabel + " در مقایسه", "میانگین و مقایسه با روزهای قبل", v -> a.nav("sales")),
                     a.kit.lp(-1, -2));
             String delta = avg7 > 0 ? Money.pct((todaySales - avg7) * 100.0 / avg7) : "—";
             int deltaColor = avg7 <= 0 ? Theme.MUTED : (todaySales >= avg7 ? Theme.SUCCESS : Theme.WARNING);
@@ -1284,6 +1211,31 @@ public class HomeScreen extends Screen {
         return t;
     }
 
+    /** Section header with a 3D icon, a title, a short subtitle and a tap-through chevron. */
+    private View sectionBanner(int vector, String title, String sub, View.OnClickListener onClick) {
+        LinearLayout row = a.kit.h();
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        ImageView iv = new ImageView(a);
+        iv.setImageResource(Theme.chrome3d(vector));
+        iv.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        iv.setPadding(Theme.dp(4), Theme.dp(4), Theme.dp(4), Theme.dp(4));
+        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+        bg.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        bg.setColor(Theme.alpha(Theme.GOLD, 34));
+        iv.setBackground(bg);
+        row.addView(iv, new LinearLayout.LayoutParams(Theme.dp(42), Theme.dp(42)));
+        row.addView(a.kit.space(10));
+        LinearLayout col = a.kit.v();
+        col.addView(a.kit.text(title, 14.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        col.addView(a.kit.text(sub, 11f, Theme.MUTED, false), a.kit.lp(-1, -2));
+        row.addView(col, a.kit.wlp(1f));
+        TextView chev = a.kit.text("›", 20f, Theme.GOLD, true);
+        chev.setGravity(Gravity.CENTER);
+        row.addView(chev, a.kit.lp(Theme.dp(18), -2));
+        if (onClick != null) row.setOnClickListener(onClick);
+        return row;
+    }
+
     /** Compact tile for a breakdown item: icon above, label and value below, centred. */
     private View miniTile(int vector, String label, String value) {
         LinearLayout t = new LinearLayout(a);
@@ -1316,6 +1268,12 @@ public class HomeScreen extends Screen {
         LinearLayout alerts = a.kit.card(Theme.GOLD);
         LinearLayout head = a.kit.h();
         head.setGravity(Gravity.CENTER_VERTICAL);
+        android.widget.ImageView alertIcon = new android.widget.ImageView(a);
+        alertIcon.setImageResource(Theme.chrome3d(R.drawable.mi_zoom));
+        alertIcon.setScaleType(android.widget.ImageView.ScaleType.CENTER_INSIDE);
+        alertIcon.setPadding(Theme.dp(4), Theme.dp(4), Theme.dp(4), Theme.dp(4));
+        head.addView(alertIcon, new LinearLayout.LayoutParams(Theme.dp(40), Theme.dp(40)));
+        head.addView(a.kit.space(10));
         head.addView(a.kit.text("هشدار امروز", 14.5f, Theme.TEXT, true), a.kit.wlp(1f));
         final TextView badge = a.kit.text("", 11f, Theme.GOLD, true);
         badge.setPadding(Theme.dp(9), Theme.dp(3), Theme.dp(9), Theme.dp(3));
@@ -1385,7 +1343,7 @@ public class HomeScreen extends Screen {
             String endDay = snapshotDay(d);
             String period = snapshotLabel(d);
             LinearLayout c = a.kit.card(Theme.GOLD);
-            c.addView(a.kit.sectionHead("روند ۱۴ روزه فروش تا " + period, "فروش ›", v -> a.nav("sales")), a.kit.lp(-1, -2));
+            c.addView(sectionBanner(R.drawable.mi_trending_up, "روند ۱۴ روزه فروش تا " + period, "فروش روزانه، ۱۴ روز اخیر", v -> a.nav("sales")), a.kit.lp(-1, -2));
             Charts.Area ch = new Charts.Area(a);
             List<Charts.Point> pts = filled(d.salesDaily, endDay);
             final TextView cap = a.kit.text(pts.isEmpty() ? "" : lastCap(pts), 11f, Theme.MUTED, false);
@@ -1394,28 +1352,6 @@ public class HomeScreen extends Screen {
             c.addView(ch, new LinearLayout.LayoutParams(-1, Theme.dp(190)));
             c.addView(cap, a.kit.lp(-1, -2));
             a.kit.addCard(content, c);
-        }
-    }
-
-    private void secDebtors(LinearLayout content, Data d) {
-        // ---- debtors ----
-        if (d.debtors != null && !d.debtors.isEmpty()) {
-            content.addView(a.kit.sectionHead("بدهکاران اولویت‌دار", "مشتریان ›", v -> gotoDebtors()), a.kit.lp(-1, -2));
-            final java.util.Map<String, android.widget.ImageView> slots = new java.util.HashMap<>();
-            final List<String> codes = new ArrayList<>();
-            for (Row r : d.debtors) {
-                final String code = r.s("code");
-                final String party = r.s("party");
-                codes.add(code);
-                View av = ir.meelano.manager.data.CustomerPhotos.avatar(a, code, a.kit.initials(party), Theme.GOLD, 48, slots);
-                View row = a.kit.personRow(party, "کد " + Money.fa(code), Money.rial(r.d("amount")),
-                        "مانده بدهی", Theme.GOLD, v -> gotoCustomer(code), av);
-                LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
-                p.setMargins(0, 0, 0, Theme.dp(10));
-                content.addView(row, p);
-            }
-            ir.meelano.manager.data.CustomerPhotos.refresh(a.repo, a, codes,
-                    () -> ir.meelano.manager.data.CustomerPhotos.fill(slots, a));
         }
     }
 
@@ -1442,7 +1378,7 @@ public class HomeScreen extends Screen {
         double dueOutSum = sum(d.dueOut);
         if ((d.dueIn != null && !d.dueIn.isEmpty()) || (d.dueOut != null && !d.dueOut.isEmpty())) {
             LinearLayout c = a.kit.card(Theme.INFO);
-            c.addView(a.kit.sectionHead("سررسید ۳ روز آینده", "چک‌ها ›", v -> a.nav("cheques")), a.kit.lp(-1, -2));
+            c.addView(sectionBanner(R.drawable.mi_cheque, "سررسید ۳ روز آینده", "چک‌های دریافتی و پرداختی", v -> a.nav("cheques")), a.kit.lp(-1, -2));
             LinearLayout row = a.kit.h();
             boolean hasIn = d.dueIn != null && !d.dueIn.isEmpty();
             boolean hasOut = d.dueOut != null && !d.dueOut.isEmpty();
@@ -1636,18 +1572,6 @@ public class HomeScreen extends Screen {
     private String lastCap(List<Charts.Point> pts) {
         Charts.Point p = pts.get(pts.size() - 1);
         return Money.fa(p.label) + " • " + Money.rial(p.value);
-    }
-
-    private void gotoDebtors() {
-        Screen s = a.screen("customers");
-        if (s != null && s.filter() != null) {
-            Filter nf = s.filter().copy();
-            nf.status = "debt";
-            nf.sort = "debt";
-            nf.page = 0;
-            s.applyFilter(nf);
-        }
-        a.nav("customers");
     }
 
     private void gotoUnsettled() {

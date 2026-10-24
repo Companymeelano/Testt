@@ -586,7 +586,7 @@ public class SettingsScreen extends Screen {
                 {"due", "سررسید چک‌ها"},
                 {"returns", "برگشتی‌ها"},
                 {"trend", "روند ۱۴ روزه فروش"},
-                {"debtors", "بدهکاران اولویت‌دار"},
+                {"compare", "مقایسه فروش"},
                 {"visitors", "عملکرد ویزیتورها"},
                 {"eod", "جمع‌بندی پایان روز"},
                 {"shortcuts", "دسترسی سریع"},

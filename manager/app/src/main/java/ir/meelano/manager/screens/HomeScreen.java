@@ -1123,10 +1123,14 @@ public class HomeScreen extends Screen {
         // soft() deliberately returns null when one optional query fails. Keep the
         // remaining KPIs visible, but make the missing metric explicit and inert.
         List<Kit.Kpi> kpis = new ArrayList<>();
-        kpis.add(dayKpi("فروش", "sales", d.salesDay, "docs", "فاکتور", Theme.GOLD));
-        kpis.add(dayKpi("خرید", "buy", d.buyDay, "docs", "فاکتور", Theme.GOLD));
-        kpis.add(dayKpi("دریافت", "dar_in", d.inDay, "count", "قبض", Theme.GOLD));
-        kpis.add(dayKpi("پرداخت", "dar_out", d.outDay, "count", "قبض", Theme.GOLD));
+        // All four tiles read the same day (the snapshot day) from their daily series,
+        // so sales, purchases, receipts and payments never show different dates.
+        String anchor = snapshotDay(d);
+        String anchorLbl = anchorLabel(anchor);
+        kpis.add(dayKpiAt("فروش", "sales", dayRowAt(d.salesDaily, anchor), "docs", "فاکتور", Theme.GOLD, anchorLbl));
+        kpis.add(dayKpiAt("خرید", "buy", dayRowAt(d.buyDaily, anchor), "docs", "فاکتور", Theme.GOLD, anchorLbl));
+        kpis.add(dayKpiAt("دریافت", "dar_in", dayRowAt(d.inDaily, anchor), "count", "قبض", Theme.GOLD, anchorLbl));
+        kpis.add(dayKpiAt("پرداخت", "dar_out", dayRowAt(d.outDaily, anchor), "count", "قبض", Theme.GOLD, anchorLbl));
         // Sparklines: last 14 days per tile (days without a row count as 0). Each tile
         // draws only from its own daily query; a missing query simply leaves the tile plain.
         kpis.get(0).icon = R.drawable.mi_point_of_sale;
@@ -1148,9 +1152,9 @@ public class HomeScreen extends Screen {
     private void secCompare(LinearLayout content, Data d) {
         if (d.salesDaily != null && !d.salesDaily.isEmpty()) {
             // Same day as the KPI tiles (the latest day with sales), so the two never disagree.
-            String kpiDay = d.salesDay == null ? "" : Jalali.disp(d.salesDay.s("d"));
-            String compareDay = kpiDay.isEmpty() ? snapshotDay(d) : kpiDay;
-            String compareLabel = kpiDay.isEmpty() ? snapshotLabel(d) : dayOf(d.salesDay);
+            String compareDay = snapshotDay(d);
+            String compareLabel = anchorLabel(compareDay);
+            boolean partialDay = compareDay.equals(Jalali.todayStr());
             double todaySales = salesOnDay(d.salesDaily, compareDay);
             double yesterday = salesOnDay(d.salesDaily, Jalali.addDays(compareDay, -1));
             double avg7 = averageSalesBefore(d.salesDaily, compareDay, 7);
@@ -1163,7 +1167,11 @@ public class HomeScreen extends Screen {
                     + Money.fa(String.format(Locale.US, "%.1f", Math.abs(deltaPct)).replace('.', '٫')) + "٪" : "—";
             int deltaColor = avg7 <= 0 ? Theme.MUTED : (todaySales >= avg7 ? Theme.SUCCESS : Theme.WARNING);
             List<Kit.Kpi> cmp = new ArrayList<>();
-            cmp.add(new Kit.Kpi(compareLabel, Money.compactRial(todaySales), "تغییر ۷ روزه " + delta, Theme.GOLD));
+            // A day that is still running is not comparable yet: show the time instead of a false drop.
+            String nowFa = Money.fa(String.format(Locale.US, "%02d:%02d",
+                    Calendar.getInstance().get(Calendar.HOUR_OF_DAY), Calendar.getInstance().get(Calendar.MINUTE)));
+            String sub = partialDay ? "تا ساعت " + nowFa + " • هنوز کامل نشده" : "تغییر ۷ روزه " + delta;
+            cmp.add(new Kit.Kpi(compareLabel, Money.compactRial(todaySales), sub, Theme.GOLD));
             cmp.add(new Kit.Kpi("دیروز", Money.compactRial(yesterday), "", Theme.TEXT));
             cmp.add(new Kit.Kpi("میانگین ۷ روز قبل", Money.compactRial(avg7), "", Theme.GOLD_SOFT));
             cmp.add(new Kit.Kpi("میانگین ۳۰ روز قبل", Money.compactRial(avg30), "", Theme.GOLD_SOFT));
@@ -1178,6 +1186,39 @@ public class HomeScreen extends Screen {
                         a.kit.lp(-1, -2));
             a.kit.addCard(content, compare);
         }
+    }
+
+    /** The row for one day of a daily series; a day without data is an explicit zero row. */
+    private Row dayRowAt(List<Row> rows, String day) {
+        String target = Jalali.disp(day);
+        if (rows != null) {
+            for (Row r : rows) {
+                if (target.equals(Jalali.disp(r.s("day")))) {
+                    Row x = new Row();
+                    x.putAll(r);
+                    x.put("d", target);
+                    return x;
+                }
+            }
+        }
+        Row empty = new Row();
+        empty.put("d", target);
+        empty.put("total", 0.0);
+        empty.put("docs", 0L);
+        empty.put("count", 0L);
+        return empty;
+    }
+
+    /** "امروز" for the current day, otherwise the short Jalali label. */
+    private String anchorLabel(String day) {
+        return day.equals(Jalali.todayStr()) ? "امروز" : Jalali.shortLabel(day);
+    }
+
+    Kit.Kpi dayKpiAt(String title, String target, Row row, String countKey,
+                     String countLabel, int accent, String dayLabel) {
+        return new Kit.Kpi(title + " " + dayLabel, Money.compactRial(row.d("total")),
+                Money.fa(String.valueOf(row.l(countKey))) + " " + countLabel, accent,
+                () -> gotoDay(target, row));
     }
 
     Kit.Kpi dayKpi(String title, String target, Row row, String countKey,

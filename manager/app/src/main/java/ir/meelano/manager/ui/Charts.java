@@ -60,6 +60,12 @@ public final class Charts {
             0xFFD92D20, 0xFF0E9384, 0xFFD6508B, 0xFF669F2A, 0xFF667085
     };
 
+    /** Nut theme: emerald and antique gold alternating, so neighbouring series stay distinct. */
+    private static final int[] PALETTE_NUT = {
+            0xFF0B5C44, 0xFFC9A24A, 0xFF1F8A66, 0xFF9C7A1A, 0xFF176A50,
+            0xFFD9B865, 0xFF5FB48C, 0xFF7A5C14, 0xFF0F4A38, 0xFF8FD0AE
+    };
+
     /** Gold tones for accounting/chart-of-accounts charts: deep gold, light gold, bronze, champagne. */
     public static int goldTone(int i) {
         int[] t = {Theme.GOLD, Theme.GOLD_SOFT, mix(Theme.GOLD, 0xFF000000, 0.28f), mix(Theme.GOLD, 0xFFFFFFFF, 0.30f)};
@@ -79,7 +85,7 @@ public final class Charts {
     }
 
     public static int palette(int i) {
-        int[] p = Theme.DARK ? PALETTE : PALETTE_LIGHT;
+        int[] p = Theme.isNuts() ? PALETTE_NUT : Theme.DARK ? PALETTE : PALETTE_LIGHT;
         return p[Math.abs(i) % p.length];
     }
 

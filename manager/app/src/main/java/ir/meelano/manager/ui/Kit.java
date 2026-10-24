@@ -218,6 +218,8 @@ public final class Kit {
     private int sectionAccent(String title) {
         String s = title == null ? "" : title.replace('ي', 'ی').replace('ك', 'ک');
         if (s.contains("هشدار") || s.contains("برگشت") || s.contains("معوق")) return Theme.DANGER;
+        // Nut theme: one emerald family for every section (gold only as the shared accent).
+        if (Theme.isNuts()) return Theme.GOLD;
         if (s.contains("دریافت") || s.contains("وصول")) return Theme.SUCCESS;
         if (s.contains("پرداخت") || s.contains("نقدینگی")) return Theme.INFO;
         if (s.contains("خرید")) return Theme.VIOLET;
@@ -509,10 +511,21 @@ public final class Kit {
         c.setBackground(Theme.card());
         c.setPadding(Theme.dp(13), Theme.dp(12), Theme.dp(13), Theme.dp(12));
         Theme.lift(c, Theme.cardElevation());
-        TextView g = text(glyph, 22, accent, true);
-        g.setGravity(Gravity.CENTER);
-        g.setBackground(Theme.avatar(Theme.alpha(accent, 52)));
-        c.addView(g, new LinearLayout.LayoutParams(Theme.dp(48), Theme.dp(48)));
+        int icon3 = Theme.isNuts() ? MeelanoIcons.iconFor(glyph) : 0;
+        if (icon3 != 0) {
+            // Nut theme: the emerald 3D icon for the centre, on a soft emerald disc (no flat glyph).
+            ImageView iv = new ImageView(a);
+            iv.setImageResource(Theme.chrome3d(icon3));
+            iv.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+            iv.setPadding(Theme.dp(4), Theme.dp(4), Theme.dp(4), Theme.dp(4));
+            iv.setBackground(Theme.avatar(Theme.alpha(Theme.GOLD, 38)));
+            c.addView(iv, new LinearLayout.LayoutParams(Theme.dp(50), Theme.dp(50)));
+        } else {
+            TextView g = text(glyph, 22, accent, true);
+            g.setGravity(Gravity.CENTER);
+            g.setBackground(Theme.avatar(Theme.alpha(accent, 52)));
+            c.addView(g, new LinearLayout.LayoutParams(Theme.dp(48), Theme.dp(48)));
+        }
         c.addView(space(10));
         LinearLayout copy = v();
         copy.addView(text(title, 14f, Theme.TEXT, true), lp(-1, -2));

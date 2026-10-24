@@ -7,6 +7,7 @@ import ir.meelano.manager.core.CacheStore;
 import android.widget.ScrollView;
 
 import ir.meelano.manager.MainActivity;
+import ir.meelano.manager.R;
 import ir.meelano.manager.core.Filter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.MasterQueries;
@@ -46,7 +47,20 @@ public class ProductsScreen extends Screen {
     public String glyph() { return "▦"; }
 
     @Override
-    public int accent() { return Theme.VIOLET; }
+    public int accent() { return Theme.pAccent(); }
+
+    /** Nut and cups skins get a 3D icon hero instead of the text glyph. */
+    @Override
+    protected View heroCard() {
+        if (!Theme.isNuts() && !Theme.isCups()) return super.heroCard();
+        LinearLayout w = a.kit.v();
+        w.addView(a.kit.heroIcon(R.drawable.mi_grid_view, title(), subtitle(), accent()), a.kit.lp(-1, -2));
+        if (filterConfig() != null && filter() != null) {
+            w.addView(a.kit.gap(8));
+            w.addView(a.kit.filterBar(filter().describeFa(), !filter().isDefault(), v -> a.openFilter()), a.kit.lp(-1, -2));
+        }
+        return w;
+    }
 
     @Override
     public Filter filter() { return filter; }
@@ -93,7 +107,7 @@ public class ProductsScreen extends Screen {
         content.removeAllViews();
         content.addView(heroCard(), a.kit.lp(-1, -2));
         content.addView(a.kit.hint("آستانه کم‌موجودی: ۵ واحد • گردش کالا بر اساس بازه فیلتر"), a.kit.lp(-1, -2));
-        content.addView(a.kit.btnGhost("▦ اسکن بارکد کالا", Theme.VIOLET, v -> a.startScan(code -> {
+        content.addView(a.kit.btnGhost("▦ اسکن بارکد کالا", Theme.pAccent(), v -> a.startScan(code -> {
             filter.search = code;
             filter.page = 0;
             a.refreshChrome();
@@ -185,7 +199,7 @@ public class ProductsScreen extends Screen {
         content.removeAllViews();
         content.addView(heroCard(), a.kit.lp(-1, -2));
         content.addView(a.kit.hint("آستانه کم‌موجودی: ۵ واحد • گردش کالا بر اساس بازه فیلتر"), a.kit.lp(-1, -2));
-        content.addView(a.kit.btnGhost("▦ اسکن بارکد کالا", Theme.VIOLET, v -> a.startScan(code -> {
+        content.addView(a.kit.btnGhost("▦ اسکن بارکد کالا", Theme.pAccent(), v -> a.startScan(code -> {
             filter.search = code;
             filter.page = 0;
             a.refreshChrome();
@@ -200,6 +214,12 @@ public class ProductsScreen extends Screen {
         kpis.add(new Kit.Kpi("ارزش موجودی", Money.compactRial(s.d("value")), "به قیمت خرید", Theme.GOLD));
         kpis.add(new Kit.Kpi("ناموجود", Money.fa(String.valueOf(s.l("out"))), "قلم", Theme.DANGER));
         kpis.add(new Kit.Kpi("کم‌موجودی", Money.fa(String.valueOf(s.l("low"))), "قلم", Theme.WARNING));
+        if (Theme.isNuts() || Theme.isCups()) {
+            kpis.get(0).icon = R.drawable.mi_inventory_2;
+            kpis.get(1).icon = R.drawable.mi_diamond;
+            kpis.get(2).icon = R.drawable.icon3d_cancel;
+            kpis.get(3).icon = R.drawable.icon3d_zoom;
+        }
         content.addView(a.kit.kpiGrid(kpis, 2), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(12));
 

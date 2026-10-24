@@ -84,8 +84,14 @@ public final class Charts {
         return ellipsize(s == null ? "" : s.trim(), n);
     }
 
+    /** Cups skin: tomato, teal, kraft and warm grey, so charts match the tableware theme. */
+    private static final int[] PALETTE_CUPS = {
+            0xFFD6402B, 0xFF0F766E, 0xFFB7793B, 0xFFF08A4B, 0xFF2F9E8F,
+            0xFF8C5A2B, 0xFFE8A33D, 0xFF6B5B55, 0xFFC2410C, 0xFF5FB7A9
+    };
+
     public static int palette(int i) {
-        int[] p = Theme.isNuts() ? PALETTE_NUT : Theme.DARK ? PALETTE : PALETTE_LIGHT;
+        int[] p = Theme.isNuts() ? PALETTE_NUT : Theme.isCups() ? PALETTE_CUPS : Theme.DARK ? PALETTE : PALETTE_LIGHT;
         return p[Math.abs(i) % p.length];
     }
 

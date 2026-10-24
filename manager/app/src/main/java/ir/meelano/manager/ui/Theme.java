@@ -63,7 +63,22 @@ public final class Theme {
         if (vector == R.drawable.mi_calendar_month) return R.drawable.icon3d_cup_dues;
         if (vector == R.drawable.mi_point_of_sale) return R.drawable.icon3d_cup_sales;
         if (vector == R.drawable.mi_shopping_cart) return R.drawable.icon3d_cup_purchase;
+        if (vector == R.drawable.mi_diamond) return R.drawable.icon3d_cup_value;
+        if (vector == R.drawable.mi_trending_up) return R.drawable.icon3d_cup_dollar;
+        if (vector == R.drawable.icon3d_cancel) return R.drawable.icon3d_cup_out;
+        if (vector == R.drawable.icon3d_zoom) return R.drawable.icon3d_cup_low;
+        if (vector == R.drawable.icon3d_refresh) return R.drawable.icon3d_cup_dead;
+        if (vector == R.drawable.mi_receipt_long) return R.drawable.icon3d_cup_cash_in;
+        if (vector == R.drawable.mi_payments) return R.drawable.icon3d_cup_cash_out;
+        if (vector == R.drawable.mi_person) return R.drawable.icon3d_cup_account;
+        if (vector == R.drawable.mi_search) return R.drawable.icon3d_cup_search;
+        if (vector == R.drawable.mi_widgets) return R.drawable.icon3d_cup_more;
         return 0;
+    }
+
+    /** Accent for the product screens: emerald in the nut skin, tomato in the cups skin, violet otherwise. */
+    public static int pAccent() {
+        return nuts || cups ? GOLD : VIOLET;
     }
 
     private static boolean isCupIcon(int res) {
@@ -71,7 +86,12 @@ public final class Theme {
                 || res == R.drawable.icon3d_cup_inventory || res == R.drawable.icon3d_cup_products
                 || res == R.drawable.icon3d_cup_reports || res == R.drawable.icon3d_cup_settings
                 || res == R.drawable.icon3d_cup_cheque || res == R.drawable.icon3d_cup_dues
-                || res == R.drawable.icon3d_cup_sales || res == R.drawable.icon3d_cup_purchase;
+                || res == R.drawable.icon3d_cup_sales || res == R.drawable.icon3d_cup_purchase
+                || res == R.drawable.icon3d_cup_value || res == R.drawable.icon3d_cup_dollar
+                || res == R.drawable.icon3d_cup_out || res == R.drawable.icon3d_cup_low
+                || res == R.drawable.icon3d_cup_dead || res == R.drawable.icon3d_cup_cash_in
+                || res == R.drawable.icon3d_cup_cash_out || res == R.drawable.icon3d_cup_account
+                || res == R.drawable.icon3d_cup_search || res == R.drawable.icon3d_cup_more;
     }
 
     /** MEELANO crest: gold on emerald in the nut theme, the classic black-and-gold badge otherwise. */

@@ -4,6 +4,7 @@ import android.view.View;
 import android.widget.LinearLayout;
 
 import ir.meelano.manager.MainActivity;
+import ir.meelano.manager.R;
 import ir.meelano.manager.core.AtiranSchema;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.MasterQueries;
@@ -47,7 +48,7 @@ public class ProductFileScreen extends Screen {
     public String glyph() { return "▦"; }
 
     @Override
-    public int accent() { return Theme.VIOLET; }
+    public int accent() { return Theme.pAccent(); }
 
     private static final class Data {
         Row head;
@@ -57,7 +58,7 @@ public class ProductFileScreen extends Screen {
 
     /** Visible way back to the screen the file was opened from (no hidden gesture needed). */
     private void addBack(LinearLayout content) {
-        content.addView(a.kit.btnGhost("‹ بازگشت", Theme.VIOLET, v -> a.onBackPressed()), a.kit.lp(-2, -2));
+        content.addView(a.kit.btnGhost("‹ بازگشت", Theme.pAccent(), v -> a.onBackPressed()), a.kit.lp(-2, -2));
         content.addView(a.kit.gap(6));
     }
 
@@ -100,8 +101,10 @@ public class ProductFileScreen extends Screen {
         Row h = d.head;
         String name = h.s("naka");
         String group = h.s("groupName");
-        content.addView(a.kit.hero(glyph(), name.isEmpty() ? "کالا" : name,
-                (group.isEmpty() ? "" : group + "  •  ") + "شِکالا " + Money.fa(h.s("shka")), accent()), a.kit.lp(-1, -2));
+        String heroSub = (group.isEmpty() ? "" : group + "  •  ") + "شِکالا " + Money.fa(h.s("shka"));
+        content.addView(Theme.isNuts() || Theme.isCups()
+                ? a.kit.heroIcon(R.drawable.mi_grid_view, name.isEmpty() ? "کالا" : name, heroSub, accent())
+                : a.kit.hero(glyph(), name.isEmpty() ? "کالا" : name, heroSub, accent()), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
 
         // ---- movement totals (counting units) ----
@@ -112,15 +115,21 @@ public class ProductFileScreen extends Screen {
         }
         double stock = h.d("mojkavah");
         List<Kit.Kpi> kpis = new ArrayList<>();
-        kpis.add(new Kit.Kpi("موجودی کنونی", Money.qty(stock), h.s("vahsanj"), Theme.VIOLET));
+        kpis.add(new Kit.Kpi("موجودی کنونی", Money.qty(stock), h.s("vahsanj"), Theme.pAccent()));
         kpis.add(new Kit.Kpi("ورود (کل ثبت‌شده)", Money.qty(in), "", Theme.SUCCESS));
         kpis.add(new Kit.Kpi("خروج (کل ثبت‌شده)", Money.qty(out), "", Theme.DANGER));
         kpis.add(new Kit.Kpi("تعداد حرکت", Money.fa(String.valueOf(d.kardex.size())), "سند", Theme.INFO));
+        if (Theme.isNuts() || Theme.isCups()) {
+            kpis.get(0).icon = R.drawable.mi_inventory_2;
+            kpis.get(1).icon = R.drawable.mi_shopping_cart;
+            kpis.get(2).icon = R.drawable.mi_point_of_sale;
+            kpis.get(3).icon = R.drawable.mi_bar_chart;
+        }
         content.addView(a.kit.kpiGrid(kpis, 2), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
 
         // ---- specification card ----
-        LinearLayout spec = a.kit.card(Theme.VIOLET);
+        LinearLayout spec = a.kit.card(Theme.pAccent());
         spec.addView(a.kit.text("مشخصات کالا", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
         String code = h.has("StuffCode") ? h.s("StuffCode") : h.s("coka");
         if (!code.isEmpty()) spec.addView(a.kit.kv("کد", Money.fa(code), Theme.TEXT), a.kit.lp(-1, -2));
@@ -154,11 +163,11 @@ public class ProductFileScreen extends Screen {
             acc += r.l("outFlag") == 1 ? -q : q;
             run.add(new Charts.Point(Jalali.shortLabel(r.s("date")), acc));
         }
-        LinearLayout ch = a.kit.card(Theme.VIOLET);
+        LinearLayout ch = a.kit.card(Theme.pAccent());
         ch.addView(a.kit.text("روند تجمعی موجودی در دفتر گردش", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
         ch.addView(a.kit.hint("نمودار مقدار خالص ورود منهای خروج از اولین حرکت ثبت‌شدهٔ این کالا"), a.kit.lp(-1, -2));
         Charts.Area area = new Charts.Area(a);
-        area.setData(run, Theme.VIOLET, Charts.COMPACT);
+        area.setData(run, Theme.pAccent(), Charts.COMPACT);
         ch.addView(area, a.kit.lp(-1, Theme.dp(190)));
         a.kit.addCard(content, ch);
 

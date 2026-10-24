@@ -163,6 +163,28 @@ public final class Kit {
         return c;
     }
 
+    /** Same card as {@link #hero}, with a 3D icon in place of the text glyph. */
+    public View heroIcon(int vector, String title, String subtitle, int accent) {
+        LinearLayout c = v();
+        c.setBackground(Theme.hero(accent));
+        c.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(15));
+        LinearLayout head = h();
+        ImageView iv = new ImageView(a);
+        iv.setImageResource(Theme.icon3d(vector));
+        iv.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        iv.setPadding(Theme.dp(5), Theme.dp(5), Theme.dp(5), Theme.dp(5));
+        iv.setBackground(Theme.avatar(Theme.alpha(accent, 60)));
+        head.addView(iv, new LinearLayout.LayoutParams(Theme.dp(64), Theme.dp(64)));
+        head.addView(space(10));
+        LinearLayout copy = v();
+        copy.setPadding(Theme.dp(2), 0, 0, 0);
+        copy.addView(title(title), lp(-1, -2));
+        if (subtitle != null && !subtitle.isEmpty()) copy.addView(sub(subtitle), lp(-1, -2));
+        head.addView(copy, wlp(1f));
+        c.addView(head, lp(-1, -2));
+        return c;
+    }
+
     public View sectionHead(String title, String actionLabel, View.OnClickListener action) {
         final int accent = sectionAccent(title);
         LinearLayout r = h();

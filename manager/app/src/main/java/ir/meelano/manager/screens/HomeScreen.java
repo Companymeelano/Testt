@@ -286,6 +286,11 @@ public class HomeScreen extends Screen {
             nuts.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
             nuts.setImageResource(R.drawable.light_banner_nuts);
             box.addView(nuts, new FrameLayout.LayoutParams(-1, -1));
+            View scrim = new View(c);
+            scrim.setBackground(new android.graphics.drawable.GradientDrawable(
+                    android.graphics.drawable.GradientDrawable.Orientation.RIGHT_LEFT,
+                    new int[]{0xE60A3B2E, 0xA60A3B2E, 0x000A3B2E}));
+            box.addView(scrim, new FrameLayout.LayoutParams(-1, -1));
         } else if (!Theme.isLight()) {
             box.addView(new ClockView(c, clockBitmap), new FrameLayout.LayoutParams(-1, -1));
         }
@@ -948,8 +953,8 @@ public class HomeScreen extends Screen {
         t.setGravity(Gravity.CENTER_HORIZONTAL);
         // Gold icon per instrument, as in the reference: coin, gold bar, dollar trend.
         String lbl = r.label == null ? "" : r.label;
-        int tileIcon = lbl.contains("دلار") ? R.drawable.mi_trending_up
-                : (lbl.contains("طلا") ? R.drawable.mi_diamond
+        int tileIcon = lbl.contains("دلار") ? Theme.icon3d(R.drawable.mi_trending_up)
+                : (lbl.contains("طلا") ? Theme.icon3d(R.drawable.mi_diamond)
                 : (Theme.isLight() ? R.drawable.icon3d_coin : R.drawable.icon3d_dark_coin));
         int tile = Theme.isNuts() ? 64 : 42;
         t.addView(a.kit.icon(tileIcon, Theme.GOLD, tile), new LinearLayout.LayoutParams(Theme.dp(tile), Theme.dp(tile)));
@@ -965,7 +970,7 @@ public class HomeScreen extends Screen {
         price.setGravity(Gravity.CENTER_HORIZONTAL);
         // Tabular figures: digits keep their width when the price updates.
         price.setFontFeatureSettings("tnum");
-        price.setAutoSizeTextTypeUniformWithConfiguration(11, 18, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
+        price.setAutoSizeTextTypeUniformWithConfiguration(10, 16, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
         LinearLayout.LayoutParams pp = a.kit.lp(-1, -2);
         pp.setMargins(0, Theme.dp(6), 0, 0);
         t.addView(price, pp);
@@ -1090,17 +1095,15 @@ public class HomeScreen extends Screen {
         else if ("alerts".equals(key)) secAlerts(content, d);
         else if ("trend".equals(key)) secTrend(content, d);
         else if ("compare".equals(key)) secCompare(content, d);
-        else if ("visitors".equals(key)) secVisitors(content, d);
         else if ("due".equals(key)) secDue(content, d);
         else if ("returns".equals(key)) secReturns(content, d);
         else if ("eod".equals(key)) secEod(content);
-        else if ("shortcuts".equals(key)) secShortcuts(content, d);
     }
 
     /** Dashboard order from settings; unknown keys dropped, missing sections appended. */
     private List<String> orderedKeys() {
         List<String> out = new ArrayList<>();
-        String[] known = {"kpis", "compare", "alerts", "due", "returns", "trend", "visitors", "eod", "shortcuts"};
+        String[] known = {"kpis", "compare", "alerts", "due", "returns", "trend", "eod"};
         for (String k : a.settings.homeOrder().split(",")) {
             String t = k == null ? "" : k.trim();
             if (!t.isEmpty() && !out.contains(t)) {
@@ -1143,8 +1146,10 @@ public class HomeScreen extends Screen {
     /** Average-sales comparison: its own card, so the manager can open it directly. */
     private void secCompare(LinearLayout content, Data d) {
         if (d.salesDaily != null && !d.salesDaily.isEmpty()) {
-            String compareDay = snapshotDay(d);
-            String compareLabel = snapshotLabel(d);
+            // Same day as the KPI tiles (the latest day with sales), so the two never disagree.
+            String kpiDay = d.salesDay == null ? "" : Jalali.disp(d.salesDay.s("d"));
+            String compareDay = kpiDay.isEmpty() ? snapshotDay(d) : kpiDay;
+            String compareLabel = kpiDay.isEmpty() ? snapshotLabel(d) : dayOf(d.salesDay);
             double todaySales = salesOnDay(d.salesDaily, compareDay);
             double yesterday = salesOnDay(d.salesDaily, Jalali.addDays(compareDay, -1));
             double avg7 = averageSalesBefore(d.salesDaily, compareDay, 7);
@@ -1231,6 +1236,7 @@ public class HomeScreen extends Screen {
         row.addView(col, a.kit.wlp(1f));
         TextView chev = a.kit.text("›", 20f, Theme.GOLD, true);
         chev.setGravity(Gravity.CENTER);
+        chev.setVisibility(onClick == null ? View.GONE : View.VISIBLE);
         row.addView(chev, a.kit.lp(Theme.dp(18), -2));
         if (onClick != null) row.setOnClickListener(onClick);
         return row;
@@ -1306,7 +1312,7 @@ public class HomeScreen extends Screen {
      */
     private void secReturns(LinearLayout content, Data d) {
         LinearLayout c = a.kit.card(Theme.GOLD);
-        c.addView(a.kit.sectionHead("برگشتی‌های ۳۰ روز اخیر", "گزارش ›", v -> a.nav("reports")),
+        c.addView(sectionBanner(R.drawable.mi_refresh, "برگشتی‌های ۳۰ روز اخیر", "ابطال و برگشت، ۳۰ روز گذشته", v -> a.nav("reports")),
                 a.kit.lp(-1, -2));
         long n = 0;
         double sum = 0;
@@ -1327,7 +1333,8 @@ public class HomeScreen extends Screen {
                 if (shown >= 3) break;
                 String label = r.s("label");
                 if (label == null || label.trim().isEmpty()) continue;
-                int retIcon = label.contains("فروش") ? R.drawable.mi_payments
+                int retIcon = label.contains("ابطال") ? R.drawable.mi_refresh
+                        : label.contains("فروش") ? R.drawable.mi_payments
                         : label.contains("مشتری") ? R.drawable.mi_receipt_long : R.drawable.mi_refresh;
                 if (shown++ > 0) grid.addView(a.kit.space(6));
                 grid.addView(miniTile(retIcon, label, Money.fa(String.valueOf(r.l("docs"))) + " سند"), a.kit.wlp(1f));
@@ -1355,23 +1362,6 @@ public class HomeScreen extends Screen {
         }
     }
 
-    private void secVisitors(LinearLayout content, Data d) {
-        // ---- visitors ----
-        if (d.visitors != null && !d.visitors.isEmpty()) {
-            LinearLayout c = a.kit.card(Theme.GOLD);
-            c.addView(a.kit.sectionHead("عملکرد ۳۰ روزه ویزیتورها", "ویزیتورها ›", v -> a.nav("visitors")), a.kit.lp(-1, -2));
-            Charts.HBars hb = new Charts.HBars(a);
-            List<Charts.Point> pts = new ArrayList<>();
-            for (int i = 0; i < Math.min(6, d.visitors.size()); i++) {
-                Row r = d.visitors.get(i);
-                pts.add(new Charts.Point(r.s("name"), r.d("sales")));
-            }
-            hb.setData(pts, Charts.COMPACT);
-            c.addView(hb, a.kit.lp(-1, -2));
-            a.kit.addCard(content, c);
-        }
-    }
-
     private void secDue(LinearLayout content, Data d) {
         // ---- due cheques ----
         double dueInSum = sum(d.dueIn);
@@ -1383,10 +1373,10 @@ public class HomeScreen extends Screen {
             boolean hasIn = d.dueIn != null && !d.dueIn.isEmpty();
             boolean hasOut = d.dueOut != null && !d.dueOut.isEmpty();
             if (hasIn) row.addView(summaryTile(R.drawable.mi_cheque, "دریافتی • " + Money.fa(String.valueOf(d.dueIn.size())) + " فقره",
-                    Money.rial(dueInSum), Theme.SUCCESS), a.kit.wlp(1f));
+                    Money.compactRial(dueInSum), Theme.SUCCESS), a.kit.wlp(1f));
             if (hasIn && hasOut) row.addView(a.kit.space(8));
             if (hasOut) row.addView(summaryTile(R.drawable.mi_cheque, "پرداختی • " + Money.fa(String.valueOf(d.dueOut.size())) + " فقره",
-                    Money.rial(dueOutSum), Theme.GOLD), a.kit.wlp(1f));
+                    Money.compactRial(dueOutSum), Theme.GOLD), a.kit.wlp(1f));
             c.addView(row, a.kit.lp(-1, -2));
             a.kit.addCard(content, c);
         }
@@ -1408,8 +1398,8 @@ public class HomeScreen extends Screen {
         try {
             when = dt == null || dt.isEmpty() ? "" : Jalali.dispFa(dt);
         } catch (Exception ignored) { Diag.ignored("HomeScreen:800", ignored); }
-        c.addView(a.kit.sectionHead("🌙 جمع‌بندی پایان روز" + (when.isEmpty() ? "" : " • " + when),
-                null, null), a.kit.lp(-1, -2));
+        c.addView(sectionBanner(R.drawable.mi_calendar_month, "جمع‌بندی پایان روز",
+                when.isEmpty() ? "خلاصه روز جاری" : when, null), a.kit.lp(-1, -2));
         c.addView(a.kit.text(txt, 13f, Theme.TEXT, false), a.kit.lp(-1, -2));
         c.addView(a.kit.gap(6));
         final String share = "🌙 جمع‌بندی پایان روز میلانو زرین‌فرمان" + (when.isEmpty() ? "" : " (" + when + ")")
@@ -1427,35 +1417,7 @@ public class HomeScreen extends Screen {
         a.kit.addCard(content, c);
     }
 
-    private void secShortcuts(LinearLayout content, Data d) {
-        // ---- secondary management centers (daily destinations live in the top launchpad) ----
-        content.addView(a.kit.sectionHead("مراکز تخصصی", null, null), a.kit.lp(-1, -2));
-        String[][] links = {
-                {"customers", "پرونده، مانده و گردش حساب"},
-                {"cheques", "دریافتی، پرداختی و سررسیدها"},
-                {"profit", "حاشیه سود و هزینه‌ها"},
-                {"visitors", "عملکرد و وصول ویزیتورها"},
-                {"users", "کاربران و فعالیت‌های سیستم"},
-        };
-        for (int i = 0; i < links.length; i++) {
-            final String id = links[i][0];
-            Screen s = a.screen(id);
-            if (s == null || !RoleStore.allowed(a, id)) continue;
-            View r = a.kit.navRow(s.glyph(), s.title(), links[i][1], s.accent(), v -> a.nav(id));
-            LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
-            p.setMargins(0, 0, 0, Theme.dp(10));
-            content.addView(r, p);
-        }
-    }
-
     private int alert(LinearLayout box, Data d, int n) {
-        // top debtor
-        if (d.debtors != null && !d.debtors.isEmpty()) {
-            Row r = d.debtors.get(0);
-            box.addView(a.kit.alertRow("بدهکار اولویت‌دار", r.s("party") + " • مانده " + Money.rial(r.d("amount")),
-                    Theme.GOLD, v -> gotoCustomer(r.s("code"))), padTop(n));
-            n++;
-        }
         // liquidity
         if (d.salesDay != null && d.buyDay != null && d.salesDay.d("total") > 0 && d.buyDay.d("total") > d.salesDay.d("total") * 1.15) {
             box.addView(a.kit.alertRow("فشار نقدینگی", "خرید روز از فروش جلو زده؛ پرداخت‌ها را کنترل کنید.",

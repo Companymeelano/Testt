@@ -587,9 +587,7 @@ public class SettingsScreen extends Screen {
                 {"returns", "برگشتی‌ها"},
                 {"trend", "روند ۱۴ روزه فروش"},
                 {"compare", "مقایسه فروش"},
-                {"visitors", "عملکرد ویزیتورها"},
                 {"eod", "جمع‌بندی پایان روز"},
-                {"shortcuts", "دسترسی سریع"},
         };
         final java.util.List<String> order = new java.util.ArrayList<>();
         for (String k : a.settings.homeOrder().split(","))

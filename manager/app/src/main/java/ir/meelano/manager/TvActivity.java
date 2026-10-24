@@ -270,7 +270,7 @@ public class TvActivity extends Activity {
             List<Charts.Point> pts = new ArrayList<>();
             for (Row r : data.daily)
                 pts.add(new Charts.Point(Jalali.shortLabel(r.s("day")), r.d("total")));
-            ch.setData(pts, Theme.GOLD, Charts.COMPACT);
+            ch.setData(pts, Theme.GOLD, Charts.MONEY);
             c.addView(ch, new LinearLayout.LayoutParams(-1, Theme.dp(220)));
             slideBox.addView(c, kit.lp(-1, -2));
         }
@@ -287,7 +287,7 @@ public class TvActivity extends Activity {
         Charts.HBars hb = new Charts.HBars(this);
         List<Charts.Point> pts = new ArrayList<>();
         for (Row r : data.top) pts.add(new Charts.Point(r.s("label"), r.d("total")));
-        hb.setData(pts, Charts.COMPACT);
+        hb.setData(pts, Charts.MONEY);
         c.addView(hb, kit.lp(-1, -2));
         slideBox.addView(c, kit.lp(-1, -2));
     }

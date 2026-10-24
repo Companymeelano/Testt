@@ -1407,7 +1407,7 @@ public class HomeScreen extends Screen {
             Charts.Area ch = new Charts.Area(a);
             List<Charts.Point> pts = filled(d.salesDaily, endDay);
             final TextView cap = a.kit.text(pts.isEmpty() ? "" : lastCap(pts), 11f, Theme.MUTED, false);
-            ch.setData(pts, Theme.GOLD, Charts.COMPACT);
+            ch.setData(pts, Theme.GOLD, Charts.MONEY);
             ch.setListener((idx, p) -> cap.setText(Money.fa(p.label) + " • " + Money.compactRial(p.value)));
             c.addView(ch, new LinearLayout.LayoutParams(-1, Theme.dp(190)));
             c.addView(cap, a.kit.lp(-1, -2));

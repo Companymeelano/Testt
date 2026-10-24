@@ -175,7 +175,7 @@ public class AnalyticsScreen extends Screen {
                 Row r = d.visitors.get(i);
                 pts.add(new Charts.Point(r.s("label"), r.d("total")));
             }
-            bars.setData(pts, Charts.COMPACT);
+            bars.setData(pts, Charts.MONEY);
             vc.addView(bars, a.kit.lp(-1, Theme.dp(220)));
             a.kit.addCard(content, vc);
         }
@@ -219,7 +219,7 @@ public class AnalyticsScreen extends Screen {
                 Row r = d.returns.get(i);
                 pts.add(new Charts.Point(r.s("label"), r.d("total")));
             }
-            hb.setData(pts, Charts.COMPACT);
+            hb.setData(pts, Charts.MONEY);
             rc.addView(hb, a.kit.lp(-1, -2));
             a.kit.addCard(content, rc);
         }
@@ -231,7 +231,7 @@ public class AnalyticsScreen extends Screen {
             Charts.Bars ab = new Charts.Bars(a);
             List<Charts.Point> pts = new ArrayList<>();
             for (Row r : d.aging) pts.add(new Charts.Point(r.s("bucket"), r.d("amount")));
-            ab.setData(pts, Charts.COMPACT);
+            ab.setData(pts, Charts.MONEY);
             ac.addView(ab, a.kit.lp(-1, Theme.dp(200)));
             a.kit.addCard(content, ac);
         }

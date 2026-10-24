@@ -183,13 +183,13 @@ public class CashScreen extends Screen {
         LinearLayout chart = a.kit.card(accent());
         chart.addView(a.kit.chartHead("خالص روزانه (ورودی − خروجی)", () -> {
             Charts.Bars b = new Charts.Bars(a);
-            b.setData(pts, Charts.COMPACT);
+            b.setData(pts, Charts.MONEY);
             return b;
         }), a.kit.lp(-1, -2));
         Charts.Bars bars = new Charts.Bars(a);
         bars.setMinimumHeight(Theme.dp(200));
         bars.setLayoutParams(new LinearLayout.LayoutParams(-1, Theme.dp(200)));
-        bars.setData(pts, Charts.COMPACT);
+        bars.setData(pts, Charts.MONEY);
         chart.addView(bars, a.kit.lp(-1, Theme.dp(200)));
         a.kit.addCard(content, chart);
         content.addView(a.kit.gap(12));

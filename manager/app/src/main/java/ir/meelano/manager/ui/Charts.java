@@ -48,6 +48,8 @@ public final class Charts {
     }
 
     public static final Formatter COMPACT = Money::compact;
+    /** Money axis: rial values shown in the selected unit (toman when toman is on), like the captions. */
+    public static final Formatter MONEY = Money::axis;
     public static final Formatter FULL = Money::rial;
 
     private static final int[] PALETTE = {

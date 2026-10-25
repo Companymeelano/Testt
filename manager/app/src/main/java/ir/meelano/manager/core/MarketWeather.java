@@ -14,7 +14,7 @@ import org.json.JSONObject;
 /**
  * Public market and weather data for the home card. No API key, no writes.
  * Rates: iran-market «popular.json» (TGJU prices, toman, refreshed every 30 min).
- * Weather: Open-Meteo current conditions for Tehran.
+ * Weather: Open-Meteo current conditions for the device location, falling back to the store in Ahvaz.
  * The last good response of each is cached so the card still shows values offline.
  */
 public final class MarketWeather {
@@ -149,13 +149,21 @@ public final class MarketWeather {
     // ------------------------------------------------------------------ cache
 
     public static void save(Context c, String key, String raw) {
-        c.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(key, raw).apply();
+        c.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                .putString(key, raw)
+                .putLong(key + "_saved_at", System.currentTimeMillis())
+                .apply();
     }
 
     /** Last saved raw response for key, or null. */
     public static String cached(Context c, String key) {
         SharedPreferences p = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         return p.getString(key, null);
+    }
+
+    /** Local wall-clock time of the last successful response save; zero means an old cache without a timestamp. */
+    public static long savedAt(Context c, String key) {
+        return c.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getLong(key + "_saved_at", 0L);
     }
 
     public static String ratesKey() { return KEY_RATES; }

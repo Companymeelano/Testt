@@ -261,78 +261,70 @@ public class HomeScreen extends Screen {
         return Theme.isLight() ? light : dark;
     }
 
-    private View updateBanner(String savedTs) {
-        return updateBanner(savedTs, false);
-    }
+    private enum BannerState { LOADING, UPDATED, OFFLINE }
 
-    private View updateBanner(String savedTs, boolean done) {
-        android.content.Context c = a;
-        if (clockBitmap == null) {
-            try {
-                clockBitmap = android.graphics.BitmapFactory.decodeResource(c.getResources(), R.drawable.home_clock_face);
-            } catch (Exception e) { Diag.ignored("Home:clockArt", e); }
-        }
-        FrameLayout box = new FrameLayout(c);
-        android.graphics.drawable.GradientDrawable base = new android.graphics.drawable.GradientDrawable(
+    /** Compact, truthful sync status; cached data is never presented as freshly updated. */
+    private View updateBanner(String savedTs, BannerState state) {
+        LinearLayout box = a.kit.h();
+        box.setGravity(Gravity.CENTER_VERTICAL);
+        box.setPadding(Theme.dp(13), Theme.dp(9), Theme.dp(13), Theme.dp(9));
+        box.setMinimumHeight(Theme.dp(64));
+        int accent = state == BannerState.OFFLINE ? Theme.WARNING
+                : state == BannerState.UPDATED ? Theme.SUCCESS : Theme.GOLD;
+        android.graphics.drawable.GradientDrawable surface = new android.graphics.drawable.GradientDrawable(
                 android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
-                Theme.isLight() ? new int[]{0xFF17684F, 0xFF0A3B2E} : new int[]{0xFF0E121A, 0xFF07090E});
-        base.setCornerRadius(Theme.dp(22));
-        base.setStroke(Theme.dp(1), Theme.isLight() ? 0xFFC9A24A : Theme.alpha(Theme.GOLD, 120));
-        box.setBackground(base);
-        box.setMinimumHeight(Theme.dp(96));
-        if (Theme.isNuts()) {
-            // Nut theme: the nut-and-gold artwork fills the left side of the banner.
-            android.widget.ImageView nuts = new android.widget.ImageView(c);
-            nuts.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
-            nuts.setImageResource(R.drawable.light_banner_nuts);
-            box.addView(nuts, new FrameLayout.LayoutParams(-1, -1));
-        } else if (!Theme.isLight()) {
-            box.addView(new ClockView(c, clockBitmap), new FrameLayout.LayoutParams(-1, -1));
-        }
+                Theme.isLight() ? new int[]{0xFFF8F5EA, 0xFFF1EBDD} : new int[]{0xFF11151D, 0xFF0B0E14});
+        surface.setCornerRadius(Theme.dp(18));
+        surface.setStroke(Theme.dp(1), Theme.alpha(accent, Theme.isLight() ? 110 : 90));
+        box.setBackground(surface);
 
-        LinearLayout text = new LinearLayout(c);
-        text.setOrientation(LinearLayout.VERTICAL);
-        // Text sits on the right; the end side keeps room for the clock artwork.
-        text.setPaddingRelative(Theme.dp(16), Theme.dp(14), Theme.dp(118), Theme.dp(14));
-        if (done) {
-            text.addView(a.kit.text("✓ داشبورد به‌روز است", 12f, bannerInk(Theme.GOLD_SOFT, 0xFFF3D98C), true), new LinearLayout.LayoutParams(-1, -2));
-            text.addView(a.kit.text("ساعت به‌روزرسانی: " + savedTs, 11f, bannerInk(Theme.MUTED, 0xFFD3E6DD), false), new LinearLayout.LayoutParams(-1, -2));
+        FrameLayout badge = new FrameLayout(a);
+        badge.setBackground(Theme.avatar(Theme.alpha(accent, Theme.isLight() ? 25 : 34)));
+        if (state == BannerState.LOADING) {
+            android.widget.ProgressBar spinner = new android.widget.ProgressBar(a, null,
+                    android.R.attr.progressBarStyleSmall);
+            spinner.setIndeterminate(true);
+            if (android.os.Build.VERSION.SDK_INT >= 21) spinner.setIndeterminateTintList(
+                    android.content.res.ColorStateList.valueOf(accent));
+            badge.addView(spinner, new FrameLayout.LayoutParams(Theme.dp(26), Theme.dp(26), Gravity.CENTER));
         } else {
-            text.addView(a.kit.text("⟳ در حال به‌روزرسانی داشبورد…", 12f, bannerInk(Theme.TEXT, 0xFFFFF4D6), true), new LinearLayout.LayoutParams(-1, -2));
-            if (savedTs != null && !savedTs.isEmpty()) {
-                text.addView(a.kit.text("آخرین داده ذخیره‌شده: " + Money.fa(savedTs), 11f, bannerInk(Theme.MUTED, 0xFFD3E6DD), false), new LinearLayout.LayoutParams(-1, -2));
-            }
+            android.widget.ImageView icon = new android.widget.ImageView(a);
+            icon.setImageResource(state == BannerState.UPDATED ? R.drawable.mi_check_circle : R.drawable.mi_wifi_off);
+            icon.setColorFilter(accent);
+            icon.setContentDescription(null);
+            badge.addView(icon, new FrameLayout.LayoutParams(Theme.dp(24), Theme.dp(24), Gravity.CENTER));
         }
-        box.addView(text, new FrameLayout.LayoutParams(-1, -2));
-        if (!done) addShimmer(box);
-        return box;
-    }
+        box.addView(badge, new LinearLayout.LayoutParams(Theme.dp(38), Theme.dp(38)));
+        box.addView(a.kit.space(11));
 
-    /** A soft gold band sweeps across the card while it waits for live data (light, one animator). */
-    private void addShimmer(final FrameLayout box) {
-        final View band = new View(a);
-        android.graphics.drawable.GradientDrawable g = new android.graphics.drawable.GradientDrawable(
-                android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
-                new int[]{Theme.alpha(Theme.GOLD, 0), Theme.alpha(Theme.GOLD, 60), Theme.alpha(Theme.GOLD, 0)});
-        band.setBackground(g);
-        band.setClickable(false);
-        band.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-        box.addView(band, new FrameLayout.LayoutParams(Theme.dp(120), -1));
-        final android.animation.ObjectAnimator[] sweepRef = new android.animation.ObjectAnimator[1];
-        box.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, orr, ob) -> {
-            if (r - l <= 0 || sweepRef[0] != null) return;
-            sweepRef[0] = android.animation.ObjectAnimator.ofFloat(band, View.TRANSLATION_X, -Theme.dp(120), r - l);
-            sweepRef[0].setDuration(1600);
-            sweepRef[0].setRepeatCount(android.animation.ObjectAnimator.INFINITE);
-            sweepRef[0].start();
-        });
-        // Stop the repeating animation when the card leaves the screen.
-        box.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
-            @Override public void onViewAttachedToWindow(View v) { }
-            @Override public void onViewDetachedFromWindow(View v) {
-                if (sweepRef[0] != null) sweepRef[0].cancel();
-            }
-        });
+        LinearLayout copy = a.kit.v();
+        String title;
+        String detail;
+        if (state == BannerState.LOADING) {
+            title = "در حال همگام‌سازی داشبورد";
+            detail = savedTs == null || savedTs.isEmpty()
+                    ? "دریافت آخرین اطلاعات فروشگاه…"
+                    : "نمایش دادهٔ ذخیره‌شده · آخرین دریافت: " + Money.fa(savedTs);
+        } else if (state == BannerState.UPDATED) {
+            title = "داشبورد به‌روز شد";
+            detail = "آخرین دریافت زنده: " + Money.fa(savedTs == null || savedTs.isEmpty() ? "—" : savedTs);
+        } else {
+            title = "اتصال برقرار نشد؛ دادهٔ ذخیره‌شده نمایش داده می‌شود";
+            detail = savedTs == null || savedTs.isEmpty()
+                    ? "برای دریافت اطلاعات تازه، اتصال را بررسی کنید."
+                    : "آخرین دریافت موفق: " + Money.fa(savedTs);
+        }
+        TextView heading = a.kit.text(title, 12.5f, Theme.TEXT, true);
+        heading.setMaxLines(1);
+        heading.setEllipsize(TextUtils.TruncateAt.END);
+        copy.addView(heading, a.kit.lp(-1, -2));
+        TextView subtitle = a.kit.text(detail, 10.5f, Theme.MUTED, false);
+        subtitle.setMaxLines(1);
+        subtitle.setEllipsize(TextUtils.TruncateAt.END);
+        copy.addView(subtitle, a.kit.lp(-1, -2));
+        box.addView(copy, a.kit.wlp(1f));
+        box.setContentDescription(title + ". " + detail);
+        return box;
     }
 
     @Override
@@ -344,22 +336,18 @@ public class HomeScreen extends Screen {
         final String[] cachedTs = {""};
         final Data cached = loadCached(cachedTs);
         if (cached != null) {
-            build(content, cached);
-            // build() already put a banner on top: replace it with the updating state (one banner only).
-            content.removeViewAt(0);
-            // The banner changes state with a short cross-fade instead of a jump.
-            View updating = updateBanner(cachedTs[0]);
-            updating.setAlpha(0f);
-            updating.animate().alpha(1f).setDuration(280).start();
-            content.addView(updating, 0);
+            bannerWasLoading = true;
+            build(content, cached, BannerState.LOADING, cachedTs[0]);
         } else {
             content.removeAllViews();
             bannerWasLoading = true;
-            content.addView(updateBanner(""), a.kit.lp(-1, -2));
-            content.addView(a.kit.gap(10));
+            content.addView(updateBanner("", BannerState.LOADING), a.kit.lp(-1, -2));
+            content.addView(a.kit.gap(8));
             content.addView(greetingHero(), a.kit.lp(-1, -2));
-            content.addView(a.kit.gap(10));
-            content.addView(a.kit.gap(6));
+            content.addView(a.kit.gap(8));
+            // Market data is independent of the Atiran dashboard query and can render immediately.
+            content.addView(marketCard(), a.kit.lp(-1, -2));
+            content.addView(a.kit.gap(8));
             content.addView(a.kit.loading("در حال دریافت داشبورد مدیریتی…"), a.kit.lp(-1, -2));
         }
 
@@ -372,9 +360,9 @@ public class HomeScreen extends Screen {
             if (a.renderGen() != token) return;
             if (kpiOk[0]) {
                 saveCache(shared);
-                build(content, shared);
+                build(content, shared, BannerState.UPDATED, currentTimeLabel());
             } else {
-                showFailure(content, kpiErr[0], cached);
+                showFailure(content, kpiErr[0], cached, cachedTs[0]);
             }
         };
         final Runnable[] done = {null};
@@ -489,20 +477,23 @@ public class HomeScreen extends Screen {
         s.notes.putAll(g.notes);
     }
 
-    private void showFailure(final LinearLayout content, String faError, Data cached) {
+    private void showFailure(final LinearLayout content, String faError, Data cached, String cachedTs) {
         if (cached != null) {
-            build(content, cached);
+            build(content, cached, BannerState.OFFLINE, cachedTs);
             LinearLayout bc = a.kit.card(Theme.GOLD);
-            bc.addView(a.kit.text("📴 حالت آفلاین — آخرین داده ذخیره‌شده", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
+            bc.addView(a.kit.text("جزئیات اتصال", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
             bc.addView(a.kit.kv("خطا", faError == null ? "" : faError, Theme.MUTED), a.kit.lp(-1, -2));
             bc.addView(a.kit.btn("تلاش مجدد", v -> render(content)), a.kit.lp(-1, -2));
-            content.addView(bc, 0);
-            content.addView(a.kit.gap(10), 1);
+            content.addView(bc, 2);
+            content.addView(a.kit.gap(8), 3);
             return;
         }
         content.removeAllViews();
+        content.addView(updateBanner("", BannerState.OFFLINE), a.kit.lp(-1, -2));
+        content.addView(a.kit.gap(8));
         content.addView(greetingHero(), a.kit.lp(-1, -2));
-        content.addView(a.kit.gap(10));
+        content.addView(a.kit.gap(8));
+        content.addView(marketCard(), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(8));
         content.addView(a.kit.error(faError, () -> render(content)), a.kit.lp(-1, -2));
     }
@@ -690,7 +681,7 @@ public class HomeScreen extends Screen {
 
         final LinearLayout hero = a.kit.v();
         hero.setBackground(heroBackground());
-        hero.setPadding(Theme.dp(18), Theme.dp(17), Theme.dp(18), Theme.dp(14));
+        hero.setPadding(Theme.dp(16), Theme.dp(12), Theme.dp(16), Theme.dp(11));
         Theme.lift(hero, Theme.cardElevation() + Theme.dp(2));
 
         FrameLayout wrap = new FrameLayout(a);
@@ -720,7 +711,7 @@ public class HomeScreen extends Screen {
                     o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), Theme.dp(16));
                 }
             });
-            crest.addView(li, new FrameLayout.LayoutParams(Theme.dp(50), Theme.dp(50), Gravity.CENTER));
+            crest.addView(li, new FrameLayout.LayoutParams(Theme.dp(44), Theme.dp(44), Gravity.CENTER));
         } else {
             ImageView mark = new ImageView(a);
             mark.setImageResource(Theme.logoRes());
@@ -732,7 +723,7 @@ public class HomeScreen extends Screen {
                     o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), Theme.dp(16));
                 }
             });
-            crest.addView(mark, new FrameLayout.LayoutParams(Theme.dp(50), Theme.dp(50), Gravity.CENTER));
+            crest.addView(mark, new FrameLayout.LayoutParams(Theme.dp(44), Theme.dp(44), Gravity.CENTER));
         }
         FrameLayout crestWrap = new FrameLayout(a);
         android.graphics.drawable.GradientDrawable halo = new android.graphics.drawable.GradientDrawable(
@@ -742,18 +733,18 @@ public class HomeScreen extends Screen {
         View haloView = new View(a);
         haloView.setBackground(halo);
         crestWrap.addView(haloView, new FrameLayout.LayoutParams(-1, -1));
-        crestWrap.addView(crest, new FrameLayout.LayoutParams(Theme.dp(66), Theme.dp(66), Gravity.CENTER));
-        top.addView(crestWrap, new LinearLayout.LayoutParams(Theme.dp(78), Theme.dp(78)));
-        top.addView(a.kit.space(12));
+        crestWrap.addView(crest, new FrameLayout.LayoutParams(Theme.dp(56), Theme.dp(56), Gravity.CENTER));
+        top.addView(crestWrap, new LinearLayout.LayoutParams(Theme.dp(64), Theme.dp(64)));
+        top.addView(a.kit.space(9));
 
         LinearLayout copy = a.kit.v();
         TextView overline = a.kit.text("میلانو زرین‌فرمان  •  اتاق فرمان", 10.5f, Theme.GOLD_SOFT, true);
         overline.setSingleLine(true);
         copy.addView(overline, a.kit.lp(-1, -2));
-        TextView headline = a.kit.text(greeting + "، " + roleName, 26f, Theme.TEXT, true);
+        TextView headline = a.kit.text(greeting + "، " + roleName, 23f, Theme.TEXT, true);
         headline.setMaxLines(1);
         // Long names shrink to fit the line instead of being cut off.
-        headline.setAutoSizeTextTypeUniformWithConfiguration(16, 26, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
+        headline.setAutoSizeTextTypeUniformWithConfiguration(16, 23, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
         LinearLayout.LayoutParams hp = a.kit.lp(-1, -2);
         hp.setMargins(0, Theme.dp(2), 0, 0);
         copy.addView(headline, hp);
@@ -764,13 +755,7 @@ public class HomeScreen extends Screen {
         top.addView(copy, a.kit.wlp(1f));
 
         hero.addView(top, a.kit.lp(-1, -2));
-        hero.addView(a.kit.gap(13));
-
-        // No hairline under the greeting: the card's own spacing separates the header from the rates.
-        hero.addView(a.kit.gap(14));
-        // Rates (dollar, gold, coin) and Tehran weather live inside the welcome card.
-        hero.addView(marketCard(), a.kit.lp(-1, -2));
-        hero.addView(a.kit.gap(10));
+        hero.addView(a.kit.gap(9));
         LinearLayout footer = a.kit.h();
         footer.setGravity(Gravity.CENTER_VERTICAL);
         footer.addView(a.kit.icon(R.drawable.mi_calendar_month, Theme.GOLD_SOFT, 18),
@@ -818,10 +803,16 @@ public class HomeScreen extends Screen {
 
     private static final String PLACE_KEY = "weather_place";
     private static final String DEVICE_KEY = "weather_device";
+    private LinearLayout marketView;
+    private int marketViewGeneration = Integer.MIN_VALUE;
 
     private View marketCard() {
-        final LinearLayout card = a.kit.card(Theme.GOLD);
         final int gen = a.renderGen();
+        // A cache paint and its later database paint belong to one render; keep one ticker request/view.
+        if (marketView != null && marketViewGeneration == gen) return marketView;
+        final LinearLayout card = a.kit.card(Theme.GOLD);
+        marketView = card;
+        marketViewGeneration = gen;
         // Show the last saved values and place straight away; the live refresh replaces them below.
         String savedPlace = MarketWeather.cached(a, PLACE_KEY);
         if (savedPlace != null && !savedPlace.isEmpty()) weatherPlace = savedPlace;
@@ -829,19 +820,27 @@ public class HomeScreen extends Screen {
         renderMarket(card, MarketWeather.cached(a, MarketWeather.ratesKey()),
                 MarketWeather.cached(a, MarketWeather.weatherKey()), false, false);
         new Thread(() -> {
-            // Position: last known or one quick fix (worker thread). Denied or unavailable means Tehran.
+            // Position: last known or one quick fix (worker thread). Denied/unavailable falls back to the store city.
             android.location.Location loc = null;
             try { loc = ir.meelano.manager.core.DeviceLocation.resolve(a, 6000); } catch (Exception e) { Diag.ignored("Home:location", e); }
             final boolean fromDevice = loc != null;
             final double lat = fromDevice ? loc.getLatitude() : MarketWeather.AHVAZ_LAT;
             final double lon = fromDevice ? loc.getLongitude() : MarketWeather.AHVAZ_LON;
             String place = fromDevice ? ir.meelano.manager.core.DeviceLocation.placeName(a, lat, lon) : null;
-            if (place == null) place = fromDevice ? "موقعیت شما" : MarketWeather.AHVAZ_NAME + " (پیش‌فرض)";
+            if (place == null) place = fromDevice ? "موقعیت شما" : MarketWeather.AHVAZ_NAME + " · موقعیت فروشگاه";
 
             String rRaw = null;
             String wRaw = null;
-            try { rRaw = MarketWeather.get(MarketWeather.RATES_URL); } catch (Exception e) { Diag.ignored("Home:ratesFetch", e); }
-            try { wRaw = MarketWeather.get(MarketWeather.weatherUrl(lat, lon)); } catch (Exception e) { Diag.ignored("Home:weatherFetch", e); }
+            try {
+                String candidate = MarketWeather.get(MarketWeather.RATES_URL);
+                MarketWeather.parseRates(candidate); // never replace a known-good cache with malformed JSON
+                rRaw = candidate;
+            } catch (Exception e) { Diag.ignored("Home:ratesFetch", e); }
+            try {
+                String candidate = MarketWeather.get(MarketWeather.weatherUrl(lat, lon));
+                MarketWeather.parseWeather(candidate);
+                wRaw = candidate;
+            } catch (Exception e) { Diag.ignored("Home:weatherFetch", e); }
             final boolean rLive = rRaw != null;
             final boolean wLive = wRaw != null;
             if (rLive) MarketWeather.save(a, MarketWeather.ratesKey(), rRaw);
@@ -876,20 +875,32 @@ public class HomeScreen extends Screen {
         LinearLayout head = a.kit.h();
         head.setGravity(Gravity.CENTER_VERTICAL);
         head.addView(a.kit.text("بازار و هوای امروز", 14f, Theme.GOLD_SOFT, true), a.kit.wlp(1f));
-        boolean live = rLive || wLive;
-        head.addView(a.kit.pill(live ? "به‌روز" : "ذخیره‌شده", live ? Theme.SUCCESS : Theme.MUTED), a.kit.lp(-2, -2));
+        String marketState = rates == null || rates.isEmpty() ? "قیمت ناموجود"
+                : rLive ? "قیمت آنلاین" : "قیمت ذخیره‌شده";
+        int marketStateColor = rates == null || rates.isEmpty() ? Theme.WARNING : rLive ? Theme.SUCCESS : Theme.MUTED;
+        head.addView(a.kit.pill(marketState, marketStateColor), a.kit.lp(-2, -2));
         card.addView(head, a.kit.lp(-1, -2));
         card.addView(a.kit.gap(8));
 
         if (rates == null || rates.isEmpty()) {
             card.addView(a.kit.hint("قیمت‌ها در دسترس نیست؛ اتصال اینترنت را بررسی کنید."), a.kit.lp(-1, -2));
         } else {
+            HorizontalScrollView ticker = new HorizontalScrollView(a);
+            ticker.setHorizontalScrollBarEnabled(false);
+            ticker.setFillViewport(false);
+            ticker.setClipToPadding(false);
+            ticker.setContentDescription("قیمت‌های بازار؛ برای دیدن همهٔ کالاها افقی پیمایش کنید");
             LinearLayout row = a.kit.h();
+            row.setGravity(Gravity.CENTER_VERTICAL);
             for (int i = 0; i < rates.size(); i++) {
-                if (i > 0) row.addView(a.kit.space(6));
-                row.addView(rateTile(rates.get(i)), a.kit.wlp(1f));
+                if (i > 0) row.addView(a.kit.space(8));
+                int screenDp = Math.round(a.getResources().getDisplayMetrics().widthPixels
+                        / a.getResources().getDisplayMetrics().density);
+                int tileWidth = Math.max(138, Math.min(176, (screenDp - 66) / 2));
+                row.addView(rateTile(rates.get(i)), new LinearLayout.LayoutParams(Theme.dp(tileWidth), -2));
             }
-            card.addView(row, a.kit.lp(-1, -2));
+            ticker.addView(row, new android.view.ViewGroup.LayoutParams(-2, -2));
+            card.addView(ticker, a.kit.lp(-1, -2));
         }
 
         if (w != null) {
@@ -912,10 +923,17 @@ public class HomeScreen extends Screen {
             line.setMaxLines(1);
             line.setEllipsize(TextUtils.TruncateAt.END);
             wc.addView(line, a.kit.lp(-1, -2));
-            wc.addView(a.kit.text("رطوبت " + Money.fa(String.valueOf(w.humidity)) + "٪", 10.5f, Theme.MUTED, false),
-                    a.kit.lp(-1, -2));
+            LinearLayout weatherMeta = a.kit.h();
+            weatherMeta.setGravity(Gravity.CENTER_VERTICAL);
+            weatherMeta.addView(a.kit.text("رطوبت " + Money.fa(String.valueOf(w.humidity)) + "٪", 10.5f, Theme.MUTED, false),
+                    a.kit.wlp(1f));
+            weatherMeta.addView(a.kit.pill(wLive ? "آب‌وهوا زنده" : "آب‌وهوا ذخیره‌شده",
+                    wLive ? Theme.SUCCESS : Theme.MUTED), a.kit.lp(-2, -2));
+            wc.addView(weatherMeta, a.kit.lp(-1, -2));
             wr.addView(wc, a.kit.wlp(1f));
             card.addView(wr, a.kit.lp(-1, -2));
+        } else {
+            card.addView(a.kit.hint("اطلاعات آب‌وهوا فعلاً در دسترس نیست."), a.kit.lp(-1, -2));
         }
 
         if (!weatherFromDevice && w != null) {
@@ -932,13 +950,29 @@ public class HomeScreen extends Screen {
         }
 
         String stamp = rates != null && !rates.isEmpty() ? rates.get(0).asOf : "";
-        // Gold hairline above the source line, as in the reference market card.
         View rule = new View(a);
-        rule.setBackgroundColor(Theme.alpha(Theme.GOLD, 90));
+        rule.setBackgroundColor(Theme.alpha(Theme.GOLD, 48));
         card.addView(rule, a.kit.lp(-1, Theme.dp(1)));
         card.addView(a.kit.gap(6));
-        card.addView(a.kit.hint("به‌روزرسانی: " + Money.fa(stamp == null || stamp.isEmpty() ? "—" : stamp)
-                + " • تومان • TGJU"), a.kit.lp(-1, -2));
+        card.addView(a.kit.hint("منبع قیمت: TGJU · واحد: تومان\nزمان منبع: "
+                + Money.fa(stamp == null || stamp.isEmpty() ? "نامشخص" : stamp)
+                + " · دریافت برنامه: " + marketFreshness(MarketWeather.ratesKey(), rLive)), a.kit.lp(-1, -2));
+    }
+
+    /** A truthful local cache timestamp, separately reported from the source's own timestamp. */
+    private String marketFreshness(String key, boolean live) {
+        long savedAt = MarketWeather.savedAt(a, key);
+        if (savedAt <= 0) return live ? "تازه دریافت شد" : "زمان دریافت ثبت نشده";
+        Calendar saved = Calendar.getInstance();
+        saved.setTimeInMillis(savedAt);
+        int[] jalali = Jalali.fromDay(Jalali.gregorianDay(saved.get(Calendar.YEAR), saved.get(Calendar.MONTH) + 1,
+                saved.get(Calendar.DAY_OF_MONTH)));
+        String date = String.format(Locale.US, "%04d/%02d/%02d", jalali[0], jalali[1], jalali[2]);
+        String today = Jalali.todayStr();
+        String day = date.equals(today) ? "امروز" : date.equals(Jalali.addDays(today, -1))
+                ? "دیروز" : Jalali.shortLabel(date);
+        String time = String.format(Locale.US, "%02d:%02d", saved.get(Calendar.HOUR_OF_DAY), saved.get(Calendar.MINUTE));
+        return (live ? "هم‌اکنون · " : "ذخیره‌شده · ") + day + " " + Money.fa(time);
     }
 
     private View rateTile(MarketWeather.Rate r) {
@@ -975,9 +1009,10 @@ public class HomeScreen extends Screen {
         unit.setGravity(Gravity.CENTER_HORIZONTAL);
         t.addView(unit, a.kit.lp(-1, -2));
         int color = r.changePct > 0 ? Theme.SUCCESS : (r.changePct < 0 ? Theme.DANGER : Theme.MUTED);
-        String arrow = r.changePct > 0 ? "↗ " : (r.changePct < 0 ? "↘ " : "");
-        TextView ch = a.kit.text(arrow + Money.fa(String.format(Locale.US, "%.1f", Math.abs(r.changePct))) + "٪",
-                10f, color, true);
+        String arrow = r.changePct > 0 ? "↗ +" : (r.changePct < 0 ? "↘ −" : "");
+        String changeText = Math.abs(r.changePct) < 0.05 ? "بدون تغییر"
+                : arrow + Money.fa(String.format(Locale.US, "%.1f", Math.abs(r.changePct))) + "٪";
+        TextView ch = a.kit.text(changeText, 10f, color, true);
         ch.setMaxLines(1);
         ch.setGravity(Gravity.CENTER_HORIZONTAL);
         ch.setBackground(Theme.pill(color));
@@ -986,32 +1021,38 @@ public class HomeScreen extends Screen {
         cp.gravity = Gravity.CENTER_HORIZONTAL;
         cp.setMargins(0, Theme.dp(6), 0, 0);
         t.addView(ch, cp);
-        t.setContentDescription(r.label + "، " + Money.fa(Money.num(r.toman)) + " تومان");
+        String trendDescription = Math.abs(r.changePct) < 0.05 ? "بدون تغییر"
+                : (r.changePct > 0 ? "افزایش " : "کاهش ")
+                + Money.fa(String.format(Locale.US, "%.1f", Math.abs(r.changePct))) + " درصد";
+        t.setContentDescription(r.label + "، " + Money.fa(Money.num(r.toman)) + " تومان، " + trendDescription);
         return t;
     }
 
-    private void build(LinearLayout content, Data d) {
+    private String currentTimeLabel() {
+        Calendar now = Calendar.getInstance();
+        return a.kit.todayLine() + " ساعت " + Money.fa(String.format(Locale.US, "%02d:%02d",
+                now.get(Calendar.HOUR_OF_DAY), now.get(Calendar.MINUTE)));
+    }
+
+    private void build(LinearLayout content, Data d, BannerState bannerState, String bannerTime) {
         content.removeAllViews();
-        // The clock banner stays on top after live data arrives; it now reports the refresh time.
-        String nowTs = Money.fa(String.format(Locale.US, "%02d:%02d",
-                Calendar.getInstance().get(Calendar.HOUR_OF_DAY), Calendar.getInstance().get(Calendar.MINUTE)));
-        View doneBanner = updateBanner(nowTs, true);
-        // Loading → done: fade the single card into its finished state (only after the first entry).
+        View status = updateBanner(bannerTime, bannerState);
+        // The compact status changes state in place after the first cache/live transition.
         if (bannerWasLoading && entered) {
-            doneBanner.setAlpha(0f);
-            doneBanner.animate().alpha(1f).setDuration(320).start();
+            status.setAlpha(0f);
+            status.animate().alpha(1f).setDuration(220).start();
         }
         bannerWasLoading = false;
-        content.addView(doneBanner, a.kit.lp(-1, -2));
-        content.addView(a.kit.gap(10));
+        content.addView(status, a.kit.lp(-1, -2));
+        content.addView(a.kit.gap(8));
         content.addView(greetingHero(), a.kit.lp(-1, -2));
-        content.addView(a.kit.gap(10));
         content.addView(a.kit.gap(8));
 
         // Render each dashboard section into its own container so the lower-priority
         // analysis panels can collapse without changing the user's saved order.
         List<LinearLayout> blocks = new ArrayList<>();
         List<Boolean> essential = new ArrayList<>();
+        List<String> keys = new ArrayList<>();
         int detailCount = 0;
         for (String key : orderedKeys()) {
             LinearLayout block = a.kit.v();
@@ -1020,11 +1061,13 @@ public class HomeScreen extends Screen {
             boolean keepVisible = isEssentialHomeSection(key);
             blocks.add(block);
             essential.add(keepVisible);
+            keys.add(key);
             if (!keepVisible) detailCount++;
         }
 
         boolean expanded = a.settings.homeDetailsExpanded();
         boolean toggleAdded = false;
+        boolean marketAdded = false;
         for (int i = 0; i < blocks.size(); i++) {
             if (!essential.get(i) && !toggleAdded && detailCount > 0) {
                 content.addView(homeDetailsToggle(blocks, essential, detailCount, expanded), a.kit.lp(-1, -2));
@@ -1033,6 +1076,17 @@ public class HomeScreen extends Screen {
             LinearLayout block = blocks.get(i);
             if (!essential.get(i) && !expanded) block.setVisibility(View.GONE);
             content.addView(block, a.kit.lp(-1, -2));
+            // Let the operational KPIs lead; market and weather remain visible but secondary.
+            if ("kpis".equals(keys.get(i))) {
+                content.addView(a.kit.gap(6));
+                content.addView(marketCard(), a.kit.lp(-1, -2));
+                content.addView(a.kit.gap(8));
+                marketAdded = true;
+            }
+        }
+        if (!marketAdded) {
+            content.addView(marketCard(), a.kit.lp(-1, -2));
+            content.addView(a.kit.gap(8));
         }
         renderNotes(content, d.notes);
         staggerIn(content);

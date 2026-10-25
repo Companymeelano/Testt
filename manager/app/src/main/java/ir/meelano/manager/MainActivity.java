@@ -508,7 +508,7 @@ public class MainActivity extends Activity {
         final boolean tiny = widthDp < 360;
         final boolean compact = widthDp < 520;
         LinearLayout header = kit.v();
-        header.setPadding(Theme.dp(12), Theme.dp(10), Theme.dp(12), Theme.dp(8));
+        header.setPadding(Theme.dp(12), Theme.dp(compact ? 6 : 9), Theme.dp(12), Theme.dp(5));
 
         // ---- row 1: brand ----
         LinearLayout brand = kit.h();
@@ -533,7 +533,8 @@ public class MainActivity extends Activity {
         logoImg.setPadding(lpad, lpad, lpad, lpad);
         logoImg.setVisibility(View.GONE);
         logoBox.addView(logoImg, new android.widget.FrameLayout.LayoutParams(-1, -1));
-        brand.addView(logoBox, new LinearLayout.LayoutParams(Theme.dp(80), Theme.dp(80)));
+        int brandMarkSize = compact ? 66 : 76;
+        brand.addView(logoBox, new LinearLayout.LayoutParams(Theme.dp(brandMarkSize), Theme.dp(brandMarkSize)));
         brand.addView(kit.space(10));
 
         LinearLayout titleCol = kit.v();
@@ -603,7 +604,7 @@ public class MainActivity extends Activity {
         brand.addView(titleCol, kit.wlp(1f));
         header.addView(brand, kit.lp(-1, -2));
         refreshUserChip();
-        header.addView(kit.space(8));
+        header.addView(kit.space(compact ? 5 : 8));
 
         // ---- row 2: toolbar (equal-width cells with Persian labels) ----
         LinearLayout tools = kit.h();
@@ -750,15 +751,15 @@ public class MainActivity extends Activity {
         cell.setOrientation(LinearLayout.VERTICAL);
         cell.setGravity(Gravity.CENTER);
         cell.setContentDescription(desc);
-        cell.setMinimumHeight(Theme.dp(Theme.isNuts() ? 80 : 62));
+        cell.setMinimumHeight(Theme.dp(Theme.isNuts() ? 64 : 54));
         Theme.pressable(cell);
         cell.setOnClickListener(v -> onTap.run());
         icon.setClickable(false);
-        int ic = Theme.isNuts() ? 50 : 28;
+        int ic = Theme.isNuts() ? 38 : 24;
         cell.addView(icon, new LinearLayout.LayoutParams(Theme.dp(ic), Theme.dp(ic)));
         TextView t = new TextView(this);
         t.setText(label);
-        t.setTextSize(11 * Theme.fontScale());
+        t.setTextSize((Theme.isNuts() ? 10.5f : 10f) * Theme.fontScale());
         t.setTextColor(Theme.DARK ? Theme.GOLD_SOFT : Theme.TEXT);
         t.setGravity(Gravity.CENTER);
         t.setSingleLine(true);
@@ -767,7 +768,7 @@ public class MainActivity extends Activity {
     }
 
     private LinearLayout.LayoutParams toolLp() {
-        return new LinearLayout.LayoutParams(0, Theme.dp(Theme.isNuts() ? 80 : 62), 1f);
+        return new LinearLayout.LayoutParams(0, Theme.dp(Theme.isNuts() ? 64 : 54), 1f);
     }
 
     /** Hairline divider between header tool buttons. */

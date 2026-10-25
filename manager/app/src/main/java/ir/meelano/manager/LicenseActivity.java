@@ -269,7 +269,6 @@ public class LicenseActivity extends Activity {
         else if (editingConnection || !conn) buildConnPage(box, s);
         else buildDonePage(box, s);
 
-        addCrashReportCard(box);
         if (Tamper.isRooted()) {
             box.addView(kit.hint("⚠ گوشی روت شده است؛ در صورت مشکل با پشتیبانی در میان بگذارید."),
                     kit.lp(-1, -2));
@@ -1085,31 +1084,93 @@ public class LicenseActivity extends Activity {
         return v;
     }
 
-    /** Crash diagnostics are available from the launch/license screen as well as Settings. */
+    /** Local crash diagnostics are tucked into the support footer and collapsed by default. */
     private void addCrashReportCard(LinearLayout box) {
         if (!CrashReporter.hasReport(this)) return;
-        LinearLayout c = Card3D.card(this, Theme.DANGER);
-        c.addView(kit.text("گزارش خطای اخیر", 14f, Theme.TEXT, true), kit.lp(-1, -2));
-        c.addView(kit.hint("برای هنگ‌های بدون گزارش Java همچنان Logcat لازم است. این گزارش محلی است و پیام خطا، IP، رمز یا اطلاعات فروش را شامل نمی‌شود."),
-                kit.lp(-1, -2));
-        final TextView reportNote = kit.text("", 12f, Theme.INFO, true);
+
+        LinearLayout card = kit.v();
+        card.setPadding(Theme.dp(12), Theme.dp(6), Theme.dp(12), Theme.dp(8));
+        android.graphics.drawable.GradientDrawable surface = new android.graphics.drawable.GradientDrawable();
+        surface.setColor(Theme.SURFACE2);
+        surface.setCornerRadius(Theme.dp(16));
+        surface.setStroke(Theme.dp(1), Theme.alpha(Theme.MUTED, Theme.isLight() ? 60 : 42));
+        card.setBackground(surface);
+
+        LinearLayout head = kit.h();
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        head.setMinimumHeight(Theme.dp(48));
+        head.addView(kit.icon(R.drawable.mi_history, Theme.MUTED, 20),
+                new LinearLayout.LayoutParams(Theme.dp(24), Theme.dp(24)));
+        head.addView(kit.space(8));
+        LinearLayout titleCol = kit.v();
+        titleCol.addView(kit.text("گزارش فنی ذخیره‌شده", 12.5f, Theme.TEXT, true), kit.lp(-1, -2));
+        titleCol.addView(kit.text("محلی است و خودکار ارسال نمی‌شود", 10.5f, Theme.MUTED, false), kit.lp(-1, -2));
+        head.addView(titleCol, kit.wlp(1f));
+        TextView disclosure = kit.text("نمایش جزئیات", 10.5f, Theme.INFO, true);
+        disclosure.setGravity(Gravity.CENTER);
+        disclosure.setMinHeight(Theme.dp(44));
+        head.addView(disclosure, kit.lp(-2, -2));
+        head.setContentDescription("گزارش فنی ذخیره‌شده؛ برای نمایش جزئیات لمس کنید");
+        head.setFocusable(true);
+        Theme.pressable(head);
+
+        LinearLayout details = kit.v();
+        details.setVisibility(View.GONE);
+        TextView explanation = kit.text(
+                "این گزارش فقط نوع خطا و مسیر کد را ثبت می‌کند؛ پیام خطا، اطلاعات اتصال، حساب و فروش در آن نیست. برای پشتیبانی می‌توانید آن را کپی کنید.",
+                10.5f, Theme.MUTED, false);
+        details.addView(explanation, kit.lp(-1, -2));
+        final TextView reportNote = kit.text("", 11.5f, Theme.INFO, true);
         reportNote.setVisibility(View.GONE);
-        c.addView(kit.btnGhost("کپی گزارش فنی", Theme.INFO, v -> {
+        details.addView(kit.btnGhost("کپی گزارش برای پشتیبانی", Theme.INFO, v -> {
             String report = CrashReporter.readReport(this);
-            boolean ok = !report.isEmpty() && copyText("گزارش خطای میلانو زرین‌فرمان", report);
+            boolean ok = !report.isEmpty() && copyText("گزارش فنی میلانو زرین‌فرمان", report);
             reportNote.setTextColor(ok ? Theme.SUCCESS : Theme.DANGER);
             reportNote.setText(report.isEmpty() ? "گزارش فنی در دسترس نیست"
                     : (ok ? "گزارش کپی شد؛ برای پشتیبانی بفرستید" : "کپی گزارش ممکن نشد"));
             reportNote.setVisibility(View.VISIBLE);
             reportNote.postDelayed(() -> reportNote.setVisibility(View.GONE), 2500);
         }), kit.lp(-1, -2));
-        c.addView(reportNote, kit.lp(-1, -2));
-        c.addView(kit.btnGhost("پاک‌کردن گزارش", Theme.DANGER, v -> {
+        details.addView(reportNote, kit.lp(-1, -2));
+        details.addView(kit.btnGhost("حذف گزارش ذخیره‌شده", Theme.MUTED,
+                v -> confirmClearCrashReport()), kit.lp(-1, -2));
+        card.addView(head, kit.lp(-1, -2));
+        card.addView(details, kit.lp(-1, -2));
+
+        head.setOnClickListener(v -> {
+            boolean expanded = details.getVisibility() != View.VISIBLE;
+            details.setVisibility(expanded ? View.VISIBLE : View.GONE);
+            disclosure.setText(expanded ? "بستن جزئیات" : "نمایش جزئیات");
+            head.setContentDescription(expanded
+                    ? "گزارش فنی ذخیره‌شده؛ برای بستن جزئیات لمس کنید"
+                    : "گزارش فنی ذخیره‌شده؛ برای نمایش جزئیات لمس کنید");
+        });
+        LinearLayout.LayoutParams cardLp = kit.lp(-1, -2);
+        cardLp.topMargin = Theme.dp(8);
+        box.addView(card, cardLp);
+    }
+
+    private void confirmClearCrashReport() {
+        LinearLayout body = kit.v();
+        body.setPadding(Theme.dp(16), Theme.dp(8), Theme.dp(16), Theme.dp(8));
+        body.addView(kit.text("این گزارش محلی برای عیب‌یابی است. پس از حذف، برای ارسال به پشتیبانی در دسترس نخواهد بود.",
+                12f, Theme.MUTED, false), kit.lp(-1, -2));
+        final AlertDialog[] dialog = new AlertDialog[1];
+        LinearLayout actions = kit.h();
+        actions.setGravity(Gravity.CENTER);
+        actions.addView(kit.btnGhost("انصراف", Theme.MUTED, v -> {
+            if (dialog[0] != null) dialog[0].dismiss();
+        }), new LinearLayout.LayoutParams(0, -2, 1f));
+        actions.addView(kit.space(8));
+        actions.addView(kit.btnGhost("حذف گزارش", Theme.DANGER, v -> {
             CrashReporter.clearReport(this);
+            if (dialog[0] != null) dialog[0].dismiss();
             kit.toast("گزارش پاک شد");
             buildUi();
-        }), kit.lp(-1, -2));
-        Card3D.mount(box, c);
+        }), new LinearLayout.LayoutParams(0, -2, 1f));
+        body.addView(actions, kit.lp(-1, -2));
+        dialog[0] = kit.dialog("حذف گزارش فنی؟", body, true);
+        dialog[0].show();
     }
 
     private void buildConnPage(LinearLayout box, LicenseStore.Status s) {
@@ -1560,7 +1621,8 @@ public class LicenseActivity extends Activity {
     // ================= done =================
 
     private void buildDonePage(LinearLayout box, LicenseStore.Status s) {
-        // Relaunch page: licence details live in the app header now; this page only confirms and enters.
+        // The license is valid and the connection profile is saved; do not imply the server
+        // has just been reached because this welcome page performs no live database probe.
         LinearLayout hero = kit.v();
         hero.setGravity(Gravity.CENTER_HORIZONTAL);
         android.widget.FrameLayout ring = new android.widget.FrameLayout(this);
@@ -1572,33 +1634,60 @@ public class LicenseActivity extends Activity {
         mark.setOutlineProvider(new android.view.ViewOutlineProvider() {
             @Override
             public void getOutline(View v, android.graphics.Outline o) {
-                o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), Theme.dp(26));
+                o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), Theme.dp(22));
             }
         });
-        ring.addView(mark, new android.widget.FrameLayout.LayoutParams(Theme.dp(104), Theme.dp(104), Gravity.CENTER));
-        hero.addView(ring, new LinearLayout.LayoutParams(Theme.dp(112), Theme.dp(112)));
-        TextView t = kit.text("همه‌چیز آماده است", 21f, Theme.TEXT, true);
+        ring.addView(mark, new android.widget.FrameLayout.LayoutParams(Theme.dp(80), Theme.dp(80), Gravity.CENTER));
+        LinearLayout.LayoutParams logoLp = new LinearLayout.LayoutParams(Theme.dp(88), Theme.dp(88));
+        logoLp.bottomMargin = Theme.dp(8);
+        hero.addView(ring, logoLp);
+
+        TextView t = kit.text("خوش آمدید", 20f, Theme.TEXT, true);
         t.setGravity(Gravity.CENTER);
         hero.addView(t, kit.lp(-1, -2));
-        TextView sub = kit.text("لایسنس فعال است؛ با یک لمس وارد میلانو زرین‌فرمان شوید.", 12.5f, Theme.MUTED, false);
+        LinearLayout licenseState = kit.h();
+        licenseState.setGravity(Gravity.CENTER);
+        licenseState.setBackground(Theme.pill(Theme.alpha(Theme.SUCCESS, Theme.isLight() ? 26 : 34)));
+        licenseState.setPadding(Theme.dp(11), Theme.dp(5), Theme.dp(11), Theme.dp(5));
+        TextView stateText = kit.text("✓ مجوز معتبر است", 11.5f, Theme.SUCCESS, true);
+        licenseState.addView(stateText, kit.lp(-2, -2));
+        LinearLayout.LayoutParams stateLp = kit.lp(-2, -2);
+        stateLp.topMargin = Theme.dp(6);
+        hero.addView(licenseState, stateLp);
+        TextView sub = kit.text("تنظیمات اتصال سرور ذخیره شده است.", 11.5f, Theme.MUTED, false);
         sub.setGravity(Gravity.CENTER);
-        hero.addView(sub, kit.lp(-1, -2));
-        box.addView(kit.gap(18));
-        box.addView(hero, kit.lp(-1, -2));
-        box.addView(kit.gap(18));
+        LinearLayout.LayoutParams subLp = kit.lp(-1, -2);
+        subLp.topMargin = Theme.dp(5);
+        hero.addView(sub, subLp);
 
-        LinearLayout c = Card3D.card(this, Theme.GOLD);
-        c.addView(goldAction("ورود به برنامه", R.drawable.mi_login, v -> enterApp()), kit.lp(-1, -2));
-        c.addView(kit.gap(8));
-        c.addView(ghostAction("تغییر سرور یا دیتابیس", Theme.GOLD, R.drawable.mi_swap_horiz, v -> {
-            editingConnection = true;
-            try {
-                getIntent().putExtra(EXTRA_EDIT_CONNECTION, true);
-            } catch (Exception ignored) { Diag.ignored("LicenseActivity:1345", ignored); }
-            buildUi();
-        }), kit.lp(-1, -2));
-        Card3D.mount(box, c);
+        box.addView(kit.gap(8));
+        box.addView(hero, kit.lp(-1, -2));
+        box.addView(kit.gap(12));
+        box.addView(goldAction("ورود به برنامه", R.drawable.mi_login, v -> enterApp()), kit.lp(-1, -2));
+
+        LinearLayout setup = kit.h();
+        setup.setGravity(Gravity.CENTER);
+        setup.setMinimumHeight(Theme.dp(48));
+        setup.setPadding(Theme.dp(12), 0, Theme.dp(12), 0);
+        setup.addView(kit.icon(R.drawable.mi_swap_horiz, Theme.GOLD_SOFT, 20),
+                new LinearLayout.LayoutParams(Theme.dp(22), Theme.dp(22)));
+        setup.addView(kit.space(7));
+        setup.addView(kit.text("تنظیم اتصال فروشگاه", 12f, Theme.GOLD_SOFT, true), kit.lp(-2, -2));
+        setup.setContentDescription("تنظیم اتصال سرور یا دیتابیس فروشگاه");
+        setup.setFocusable(true);
+        Theme.pressable(setup);
+        setup.setOnClickListener(v -> openConnectionSettings());
+        box.addView(setup, kit.lp(-1, Theme.dp(48)));
+
         buildDevFooter(box);
+    }
+
+    private void openConnectionSettings() {
+        editingConnection = true;
+        try {
+            getIntent().putExtra(EXTRA_EDIT_CONNECTION, true);
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:connectionEdit", ignored); }
+        buildUi();
     }
 
     private boolean connConfigured() {
@@ -1952,12 +2041,14 @@ public class LicenseActivity extends Activity {
         }
         box.addView(div, new LinearLayout.LayoutParams(-1, Theme.dp(2)));
         box.addView(kit.gap(8));
-        TextView tag = kit.text(Brand.TAGLINE, 11.5f, Theme.MUTED, false);
+        TextView tag = kit.text(Brand.TAGLINE, 10.5f, Theme.MUTED, false);
         tag.setGravity(Gravity.CENTER);
+        tag.setMaxLines(2);
         box.addView(tag, kit.lp(-1, -2));
         box.addView(kit.gap(4));
         box.addView(kit.btnGhost("پشتیبانی", Theme.GOLD, v -> supportDialog()), kit.lp(-1, -2));
-        TextView ver = kit.text(appVer(), 11f, Theme.MUTED, false);
+        addCrashReportCard(box);
+        TextView ver = kit.text(appVer(), 10.5f, Theme.MUTED, false);
         ver.setGravity(Gravity.CENTER);
         box.addView(ver, kit.lp(-1, -2));
         luxurySig(box);
@@ -1966,11 +2057,11 @@ public class LicenseActivity extends Activity {
     /** Metallic-gold English designer signature with a soft 3D shadow. */
     private void luxurySig(LinearLayout c) {
         try {
-            c.addView(kit.gap(6));
-            TextView over = kit.text("D E S I G N E D   B Y", 10f, Theme.MUTED, true);
+            c.addView(kit.gap(4));
+            TextView over = kit.text("D E S I G N E D   B Y", 8.5f, Theme.MUTED, true);
             over.setGravity(Gravity.CENTER);
             c.addView(over, kit.lp(-1, -2));
-            final TextView name = kit.text("Milad Yaghoubi", 20, Theme.GOLD_SOFT, true);
+            final TextView name = kit.text("Milad Yaghoubi", 14.5f, Theme.GOLD_SOFT, true);
             name.setGravity(Gravity.CENTER);
             try {
                 name.setTypeface(Theme.face(true));

@@ -2,7 +2,7 @@ name: MEELANO Manager v36.27.0 debug APK
 
 on:
   push:
-    branches: ["arena/eec375ea-testt"]
+    branches: ["arena/29e01a09-testt"]
     paths:
       - "manager/**"
       - "tools/audit_manager_schema.py"
@@ -168,7 +168,7 @@ jobs:
           git config user.email "arena-ci@local"
           git add -f dist/meelano-manager-v36-debug-9.apk dist/manager-v36-build-info.txt
           git commit -m "dist: MEELANO Manager v36.27.0 debug APK"
-          git push origin HEAD:arena/eec375ea-testt
+          git push origin HEAD:arena/29e01a09-testt
 
   buy-formula-counts:
     if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[buy-check]')
@@ -243,7 +243,7 @@ jobs:
           git add -f dist/buy-formula-counts.json dist/money-structure-counts.json 2>/dev/null || git add -f dist/buy-formula-counts.json
           git commit -m "dist: purchase formula counts (counts only, no rows)"
           for i in 1 2 3 4 5; do
-            git pull -q --rebase origin arena/eec375ea-testt && git push -q origin HEAD:arena/eec375ea-testt && break
+            git pull -q --rebase origin arena/29e01a09-testt && git push -q origin HEAD:arena/29e01a09-testt && break
             sleep 5
           done
 

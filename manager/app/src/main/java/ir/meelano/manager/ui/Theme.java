@@ -127,6 +127,7 @@ public final class Theme {
         }
         if (!light) {
             // Dark skin: icons rendered on black, with a brighter gold glow.
+            if (vector == R.drawable.mi_warning) return R.drawable.icon3d_dark_bell;
             if (vector == R.drawable.mi_trending_up) return R.drawable.icon3d_dark_dollar;
             if (vector == R.drawable.mi_diamond) return R.drawable.icon3d_dark_gold;
             if (vector == R.drawable.mi_search) return R.drawable.icon3d_dark_search;
@@ -177,6 +178,7 @@ public final class Theme {
 
     /** True for bitmap 3D icons, which must not be tinted. */
     public static boolean isIcon3d(int res) {
+        if (res == R.drawable.icon3d_dark_bell) return true;
         if (res == R.drawable.icon3d_medal_account || res == R.drawable.icon3d_medal_refresh || res == R.drawable.icon3d_medal_theme || res == R.drawable.icon3d_medal_zoom || res == R.drawable.icon3d_medal_assistant || res == R.drawable.icon3d_medal_more || res == R.drawable.icon3d_medal_goldbar || res == R.drawable.icon3d_medal_dollar || res == R.drawable.icon3d_medal_coin) return true;
         if (res == R.drawable.icon3d_medal_home || res == R.drawable.icon3d_medal_customers
                 || res == R.drawable.icon3d_medal_inventory || res == R.drawable.icon3d_medal_products

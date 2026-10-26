@@ -169,12 +169,18 @@ public final class Kit {
         r.setGravity(Gravity.CENTER_VERTICAL);
         r.setPadding(Theme.dp(3), Theme.dp(4), Theme.dp(3), Theme.dp(7));
 
+        int sectionGlyph = sectionIcon(title);
+        boolean useLargeGold3d = !Theme.isLight()
+                && Theme.isIcon3d(Theme.icon3d(sectionGlyph));
         FrameLayout badge = new FrameLayout(a);
         badge.setBackground(Theme.avatar(Theme.alpha(accent, Theme.isLight() ? 38 : 48)));
-        ImageView symbol = icon(sectionIcon(title), accent, 17);
-        FrameLayout.LayoutParams sp = new FrameLayout.LayoutParams(Theme.dp(20), Theme.dp(20), Gravity.CENTER);
+        ImageView symbol = icon(sectionGlyph, accent, useLargeGold3d ? 28 : 17);
+        int symbolSize = useLargeGold3d ? 30 : 20;
+        FrameLayout.LayoutParams sp = new FrameLayout.LayoutParams(
+                Theme.dp(symbolSize), Theme.dp(symbolSize), Gravity.CENTER);
         badge.addView(symbol, sp);
-        r.addView(badge, new LinearLayout.LayoutParams(Theme.dp(34), Theme.dp(34)));
+        int badgeSize = useLargeGold3d ? 42 : 34;
+        r.addView(badge, new LinearLayout.LayoutParams(Theme.dp(badgeSize), Theme.dp(badgeSize)));
         r.addView(space(8));
 
         TextView t = text(title, 14f, accent, true);
@@ -197,12 +203,14 @@ public final class Kit {
     private int sectionIcon(String title) {
         String s = title == null ? "" : title.replace('ي', 'ی').replace('ك', 'ک');
         if (s.contains("هشدار")) return R.drawable.mi_warning;
-        if (s.contains("برگشت")) return R.drawable.mi_assignment_return;
-        if (s.contains("ویزیتور")) return R.drawable.mi_person_search;
+        // Use mapped 3D concepts for section-specific glyphs that have no dedicated gold artwork.
+        if (s.contains("برگشت")) return R.drawable.mi_refresh;
+        if (s.contains("ویزیتور")) return R.drawable.mi_group;
         if (s.contains("مشتری") || s.contains("بدهکار") || s.contains("طرف‌حساب")) return R.drawable.mi_group;
         if (s.contains("انبار") || s.contains("موجودی") || s.contains("کالا")) return R.drawable.mi_inventory_2;
-        if (s.contains("دریافت")) return R.drawable.mi_payments;
-        if (s.contains("پرداخت") || s.contains("نقدینگی")) return R.drawable.mi_account_balance_wallet;
+        if (s.contains("دریافت")) return R.drawable.mi_receipt_long;
+        if (s.contains("پرداخت")) return R.drawable.mi_payments;
+        if (s.contains("نقدینگی")) return R.drawable.mi_trending_up;
         if (s.contains("چک") || s.contains("سررسید")) return R.drawable.mi_receipt_long;
         if (s.contains("خرید")) return R.drawable.mi_shopping_cart;
         if (s.contains("فروش")) return R.drawable.mi_sell;
@@ -210,7 +218,7 @@ public final class Kit {
         if (s.contains("کاربر")) return R.drawable.mi_person;
         if (s.contains("گزارش") || s.contains("تحلیل") || s.contains("روند") || s.contains("عملکرد")) return R.drawable.mi_bar_chart;
         if (s.contains("تنظیم")) return R.drawable.mi_settings;
-        if (s.contains("پیگیری")) return R.drawable.mi_schedule;
+        if (s.contains("پیگیری")) return R.drawable.mi_calendar_month;
         if (s.contains("روز")) return R.drawable.mi_calendar_month;
         return R.drawable.mi_star_shine;
     }

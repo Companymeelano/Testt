@@ -120782,6 +120782,24 @@
       ]
     }
   ],
+  "expectedExternalDboReferences": [
+    {
+      "name": "UpdateMojodiInventory",
+      "reason": "Procedure is defined in the tracked mili.sql dump; the sanitized sample manifest omits stored-procedure definitions. ProductionWriter preflight checks it at runtime."
+    },
+    {
+      "name": "UpdateMojodiInventoryAnbars",
+      "reason": "Procedure is defined in the tracked mili.sql dump; the sanitized sample manifest omits stored-procedure definitions. ProductionWriter preflight checks it at runtime."
+    },
+    {
+      "name": "UpdateMojodiInventoryAnbarVariety",
+      "reason": "Procedure is defined in the tracked mili.sql dump; the sanitized sample manifest omits stored-procedure definitions. ProductionWriter preflight checks it at runtime."
+    },
+    {
+      "name": "meelano_production_profile",
+      "reason": "App-managed recipe-yield extension created by ProductionWriter.ensureProfileTable; runtime preflight verifies its columns."
+    }
+  ],
   "appProbeChecks": [
     {
       "table": "sailfact",

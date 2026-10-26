@@ -105,6 +105,17 @@ def main() -> int:
         functions_by_name.setdefault(function["name"].casefold(), []).append(function)
 
     errors: list[str] = []
+    expected_dbo: dict[str, str] = {}
+    for entry in manifest.get("expectedExternalDboReferences", []):
+        name = str(entry.get("name", "")).casefold()
+        reason = str(entry.get("reason", "")).strip()
+        if not name or not reason:
+            errors.append("expectedExternalDboReferences entries require a name and non-empty reason")
+        elif name in expected_dbo:
+            errors.append(f"duplicate expected external dbo reference: {name}")
+        else:
+            expected_dbo[name] = reason
+    used_expected_dbo: set[str] = set()
     skipped = 0
     checked = 0
     function_checked = 0
@@ -120,6 +131,9 @@ def main() -> int:
             hits = [obj for obj in by_name.get(name.casefold(), [])
                     if obj["schema"].casefold() == "dbo"]
             if not hits:
+                if name.casefold() in expected_dbo:
+                    used_expected_dbo.add(name.casefold())
+                    continue
                 schemas = sorted({obj["schema"] for obj in by_name.get(name.casefold(), [])})
                 detail = ", ".join(schemas) if schemas else "absent"
                 direct_errors.add(
@@ -179,6 +193,8 @@ def main() -> int:
         if check.get("status") != "ok":
             errors.append(f"sample function probe {check.get('function')}: {check.get('status')}")
 
+    for unused in sorted(set(expected_dbo) - used_expected_dbo):
+        errors.append(f"expected external dbo reference {unused!r} is not used by manager source")
     errors.extend(sorted(direct_errors))
     print(f"Atiran sample-schema audit: {checked} literal Meta.must mappings checked; "
           f"{skipped} dynamic/unsupported calls skipped; {function_checked} literal scalar-function calls "

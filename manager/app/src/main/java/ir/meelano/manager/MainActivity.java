@@ -178,6 +178,9 @@ public class MainActivity extends Activity {
         if (!isFinishing() && !LicenseStore.unlocked(this)) toLicense();
         if (!isFinishing() && LicenseStore.unlocked(this)
                 && !new Settings(this).connConfigured()) toLicense();
+        // Secure updater: release builds check for a verified update after license validation;
+        // UpdateCenter intentionally no-ops for .debug packages.
+        if (!isFinishing() && LicenseStore.unlocked(this)) UpdateCenter.autoCheck(this);
         // Persian voice is a prerequisite: guide the install before the app is used.
         if (!isFinishing() && LicenseStore.unlocked(this) && new Settings(this).connConfigured()) {
             ir.meelano.manager.core.Speaker.onResume(this);

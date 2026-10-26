@@ -683,6 +683,12 @@ public class SettingsScreen extends Screen {
     private void addUpdateCard(LinearLayout ab) {
         ab.addView(a.kit.gap(6), a.kit.lp(-1, -2));
         ab.addView(a.kit.text("⟳ بروزرسانی برنامه", 14f, Theme.GOLD, true), a.kit.lp(-1, -2));
+        if (!ir.meelano.manager.core.UpdateCenter.releaseUpdateSupported(a)) {
+            ab.addView(a.kit.hint("این نسخهٔ آزمایشی است؛ نصب مستقیم درون‌برنامه‌ای فقط در نسخهٔ انتشارِ رسمی با امضای پایدار فعال می‌شود."), a.kit.lp(-1, -2));
+            ab.addView(a.kit.btnGhost("📦  صفحه نسخه‌های منتشرشده", Theme.GOLD, v -> openReleasesPage()),
+                    a.kit.lp(-1, -2));
+            return;
+        }
         ab.addView(a.kit.hint(ir.meelano.manager.core.UpdateCenter.statusLine(a)), a.kit.lp(-1, -2));
         ab.addView(a.kit.hint(ir.meelano.manager.core.UpdateCenter.lastCheckLine(a)), a.kit.lp(-1, -2));
         ab.addView(a.kit.btnGold("⟳  بررسی و دریافت نسخه جدید", v ->

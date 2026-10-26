@@ -54,6 +54,9 @@ public final class UpdateCenter {
     /** startActivityForResult code for the unknown-sources settings screen. */
     public static final int REQ_UNKNOWN = 907;
 
+    /** Whether this installed package can participate in the signed release update channel. */
+    public static boolean releaseUpdateSupported(Context c) { return !isDebug(c); }
+
     private static final String PREFS = "meelano_update";
     private static boolean autoDone = false;
     private static volatile boolean cancelled = false;

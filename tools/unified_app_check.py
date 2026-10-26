@@ -20,8 +20,8 @@ workflow = (ROOT / '.github/workflows/build-apk.yml').read_text(encoding='utf-8'
 
 need("unified {" in build and "applicationId 'ir.meelano.visitor'" in build,
      'Gradle flavor unified باید شناسهٔ اصلی ir.meelano.visitor را نگه دارد')
-need("versionCode 200" in build and "versionName '7.0.0'" in build,
-     'کد/نام نسخهٔ تازه از نسخهٔ نصب‌شدهٔ 6.0.1 بالاتر باشد')
+need("versionCode 201" in build and "versionName '7.0.1'" in build,
+     'کد/نام نسخهٔ انتشار باید پس از نسخهٔ نصب‌شده افزایش یابد')
 need('meelano_unified_edition">false' in base_edition,
      'مقدار پیش‌فرض edition یکپارچه باید برای flavorهای دیگر خاموش بماند')
 need(unified_edition_path.exists(), 'منابع اختصاصی flavor یکپارچه موجود نیست')
@@ -55,22 +55,36 @@ need('MANAGER_EDITION && !UNIFIED_EDITION && ("visitor_dashboard"' in main,
      'مسیرهای فروش/ویزیت در برنامهٔ یکپارچه به خانهٔ مدیر بازنویسی می‌شوند')
 need('"فروش و ویزیت"' in main and '"امور سازمانی و ابزارها"' in main,
      'خانهٔ «بیشتر» نسخهٔ یکپارچه لینک‌های فروش و ماژول‌های سازمانی را ندارد')
-need('UNIFIED_UPDATE_MANIFEST_URL' in main and 'dist/latest-unified.json' in main,
-     'برنامهٔ یکپارچه به فید به‌روزرسانی مخصوص خودش وصل نیست')
+updater = (ROOT / 'app/src/main/java/ir/meelano/android/MeelanoAppUpdater.java').read_text(encoding='utf-8')
+manifest = (ROOT / 'app/src/main/java/ir/meelano/android/MeelanoUpdateManifest.java').read_text(encoding='utf-8')
+need('MeelanoAppUpdater.check(this, manual' in main and 'MeelanoAppUpdater.pending(this)' in main,
+     'برنامهٔ یکپارچه به بررسی و وضعیت به‌روزرسانی متصل نیست')
+need('raw.githubusercontent.com/Companymeelano/Testt/main/dist/latest-unified.json' in manifest,
+     'فید نسخهٔ پایدار برنامهٔ یکپارچه تعریف نشده است')
+need('MessageDigest.getInstance("SHA-256")' in updater and 'getPackageArchiveInfo' in updater,
+     'تمامیت فایل APK و مشخصات بسته پیش از نصب بررسی نمی‌شود')
+need('signerDigests' in updater and 'RELEASE_SIGNER_SHA256' in updater,
+     'گواهی امضای APK با گواهی نصب فعلی/مورد انتظار تطبیق داده نمی‌شود')
+need('ACTION_MANAGE_UNKNOWN_APP_SOURCES' in updater and 'ACTION_VIEW' in updater,
+     'جریان مجوز نصب و تحویل امن APK به Android وجود ندارد')
+need('REQUEST_INSTALL_PACKAGES' in (ROOT / 'app/src/main/AndroidManifest.xml').read_text(encoding='utf-8'),
+     'مجوز درخواست نصب APK در Manifest تعریف نشده است')
+need((ROOT / 'app/src/test/java/ir/meelano/android/MeelanoUpdateManifestTest.java').exists(),
+     'تست‌های واحد اعتبارسنجی فید به‌روزرسانی موجود نیست')
 
 need('assembleUnifiedRelease' in workflow, 'CI نسخهٔ Release برنامهٔ اصلی را نمی‌سازد')
 need('unzip -p Test.zip Test/signing/meelano-install.p12' in workflow,
      'CI گواهی کلید نصب کاربر را از بستهٔ منبع نمی‌خواند')
 need('MEELANO_INSTALL_PASSWORD' in workflow and 'secrets.MEELANO_INSTALL_PASSWORD' in workflow,
      'گذرواژهٔ کلید فقط از Secret امن Actions خوانده نمی‌شود')
-need("ir.meelano.visitor' versionCode='200' versionName='7.0.0'" in workflow,
+need("ir.meelano.visitor' versionCode='201' versionName='7.0.1'" in workflow,
      'CI هویت package/version فایل نهایی را کنترل نمی‌کند')
 need('apksigner" verify --verbose --print-certs' in workflow,
      'CI امضای APK تحویلی را راستی‌آزمایی نمی‌کند')
 need('1a2ed0dd70759d6e10c77a4641eeeb8f15972b76d99af351470216955b46d616' in workflow,
      'CI اثرانگشت گواهی نسخهٔ نصب‌شده را با خروجی جدید تطبیق نمی‌دهد')
-need('MEELANO-v7.0.0-release.apk' in workflow,
-     'نام فایل اصلیِ ارتقای درجا در workflow تعریف نشده است')
+need('MEELANO-v7.0.1-release.apk' in workflow and 'signerSha256' in workflow and 'latest-unified.json' in workflow,
+     'CI فایل APK و فیدِ دارای digest و گواهی امضای آن را منتشر نمی‌کند')
 
 # The uploaded project archive is the authority for the user's original installation key.
 archive = ROOT / 'Test.zip'

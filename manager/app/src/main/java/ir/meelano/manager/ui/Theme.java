@@ -127,6 +127,20 @@ public final class Theme {
         }
         if (!light) {
             // Dark skin: icons rendered on black, with a brighter gold glow.
+            if (vector == R.drawable.mi_warehouse) return R.drawable.icon3d_production;
+            if (vector == R.drawable.mi_task_alt) return R.drawable.icon3d_closeout;
+            if (vector == R.drawable.mi_military_tech) return R.drawable.icon3d_score;
+            if (vector == R.drawable.mi_profit) return R.drawable.icon3d_profit;
+            if (vector == R.drawable.mi_account_balance || vector == R.drawable.mi_account_balance_wallet) return R.drawable.icon3d_treasury;
+            if (vector == R.drawable.mi_directions_car) return R.drawable.icon3d_logistics;
+            if (vector == R.drawable.mi_lightbulb) return R.drawable.icon3d_dark_assistant;
+            if (vector == R.drawable.mi_trending_down) return R.drawable.icon3d_dark_cash_out;
+            if (vector == R.drawable.mi_assignment_return) return R.drawable.icon3d_dark_refresh;
+            if (vector == R.drawable.mi_local_shipping) return R.drawable.icon3d_logistics;
+            if (vector == R.drawable.mi_mic) return R.drawable.icon3d_voice;
+            if (vector == R.drawable.mi_admin_panel_settings) return R.drawable.icon3d_dark_roles;
+            if (vector == R.drawable.mi_request_quote) return R.drawable.icon3d_dark_sales;
+            if (vector == R.drawable.mi_add_shopping_cart) return R.drawable.icon3d_dark_purchase;
             if (vector == R.drawable.mi_warning) return R.drawable.icon3d_dark_bell;
             if (vector == R.drawable.mi_trending_up) return R.drawable.icon3d_dark_dollar;
             if (vector == R.drawable.mi_diamond) return R.drawable.icon3d_dark_gold;
@@ -185,7 +199,11 @@ public final class Theme {
                 || res == R.drawable.icon3d_medal_reports || res == R.drawable.icon3d_medal_settings
                 || res == R.drawable.icon3d_medal_search || res == R.drawable.icon3d_medal_cheque
                 || res == R.drawable.icon3d_medal_dues) return true;
-        return res == R.drawable.icon3d_medal_sales || res == R.drawable.icon3d_medal_purchase
+        return res == R.drawable.icon3d_production || res == R.drawable.icon3d_closeout
+                || res == R.drawable.icon3d_treasury || res == R.drawable.icon3d_logistics
+                || res == R.drawable.icon3d_voice || res == R.drawable.icon3d_dark_roles
+                || res == R.drawable.icon3d_score || res == R.drawable.icon3d_profit
+                || res == R.drawable.icon3d_medal_sales || res == R.drawable.icon3d_medal_purchase
                 || res == R.drawable.icon3d_medal_cash_in || res == R.drawable.icon3d_medal_cash_out
                 || res == R.drawable.icon3d_sales || res == R.drawable.icon3d_purchase
                 || res == R.drawable.icon3d_cash_in || res == R.drawable.icon3d_cash_out

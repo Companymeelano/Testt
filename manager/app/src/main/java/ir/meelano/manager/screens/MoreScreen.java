@@ -185,7 +185,7 @@ public class MoreScreen extends Screen {
         tile.setGravity(Gravity.CENTER_VERTICAL);
         tile.setMinimumHeight(Theme.dp(60));
         tile.setPadding(Theme.dp(10), Theme.dp(10), Theme.dp(10), Theme.dp(10));
-        tile.addView(iconBadge(group[1], accent, 36), new LinearLayout.LayoutParams(Theme.dp(36), Theme.dp(36)));
+        tile.addView(iconBadge(goldReportGlyph(group[0], group[1]), accent, 36), new LinearLayout.LayoutParams(Theme.dp(36), Theme.dp(36)));
         tile.addView(a.kit.space(8));
         TextView label = a.kit.text(group[0], 12.5f, Theme.TEXT, true);
         label.setMaxLines(2);
@@ -198,6 +198,20 @@ public class MoreScreen extends Screen {
             a.nav("reports");
         });
         return tile;
+    }
+
+    /** Dedicated report-family symbols in the dark/gold theme; other skins keep their original glyphs. */
+    private static String goldReportGlyph(String title, String fallback) {
+        if (Theme.isLight()) return fallback;
+        if ("ویژه مدیر".equals(title)) return "🏅";
+        if ("فروش".equals(title)) return "🛍";
+        if ("خرید".equals(title)) return "🛒";
+        if ("خزانه‌داری".equals(title)) return "🏦";
+        if ("تحلیل ویزیتور و مسیر".equals(title)) return "🚚";
+        if ("سود و زیان".equals(title)) return "💹";
+        if ("برگشتی و ابطالی".equals(title)) return "⟳";
+        if ("کاربران و نظارت".equals(title)) return "♛";
+        return fallback;
     }
 
     /** Fixed colours for report groups: sales and purchases stand out from the theme gold. */
@@ -339,7 +353,7 @@ public class MoreScreen extends Screen {
         tile.setMinimumHeight(Theme.dp(122));
         tile.setPadding(Theme.dp(10), Theme.dp(12), Theme.dp(10), Theme.dp(10));
 
-        tile.addView(iconBadge(glyph, accent, 44),
+        tile.addView(iconBadge(goldReportGlyph(title, glyph), accent, 44),
                 new LinearLayout.LayoutParams(Theme.dp(44), Theme.dp(44)));
         tile.addView(a.kit.gap(5));
 

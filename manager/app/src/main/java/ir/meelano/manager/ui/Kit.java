@@ -149,10 +149,21 @@ public final class Kit {
         c.setBackground(Theme.hero(accent));
         c.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(15));
         LinearLayout head = h();
-        TextView g = text(glyph, 30, accent, true);
-        g.setGravity(Gravity.CENTER);
-        g.setBackground(Theme.avatar(Theme.alpha(accent, 60)));
-        head.addView(g, new LinearLayout.LayoutParams(Theme.dp(58), Theme.dp(58)));
+        int heroVector = MeelanoIcons.iconFor(glyph);
+        int hero3d = heroVector == 0 ? 0 : Theme.icon3d(heroVector);
+        boolean gold3dHero = !Theme.isLight() && heroVector != 0 && Theme.isIcon3d(hero3d);
+        if (gold3dHero) {
+            ImageView emblem = new ImageView(a);
+            emblem.setImageResource(hero3d);
+            emblem.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            emblem.setContentDescription(null);
+            head.addView(emblem, new LinearLayout.LayoutParams(Theme.dp(58), Theme.dp(58)));
+        } else {
+            TextView g = text(glyph, 30, accent, true);
+            g.setGravity(Gravity.CENTER);
+            g.setBackground(Theme.avatar(Theme.alpha(accent, 60)));
+            head.addView(g, new LinearLayout.LayoutParams(Theme.dp(58), Theme.dp(58)));
+        }
         head.addView(space(10));
         LinearLayout copy = v();
         copy.setPadding(Theme.dp(2), 0, 0, 0);
@@ -203,6 +214,8 @@ public final class Kit {
     private int sectionIcon(String title) {
         String s = title == null ? "" : title.replace('ي', 'ی').replace('ك', 'ک');
         if (s.contains("هشدار")) return R.drawable.mi_warning;
+        // Dashboard comparisons and trends are analytics sections, not sale-category labels.
+        if (s.contains("روند") || s.contains("مقایسه")) return R.drawable.mi_bar_chart;
         // Use mapped 3D concepts for section-specific glyphs that have no dedicated gold artwork.
         if (s.contains("برگشت")) return R.drawable.mi_refresh;
         if (s.contains("ویزیتور")) return R.drawable.mi_group;
@@ -211,7 +224,8 @@ public final class Kit {
         if (s.contains("دریافت")) return R.drawable.mi_receipt_long;
         if (s.contains("پرداخت")) return R.drawable.mi_payments;
         if (s.contains("نقدینگی")) return R.drawable.mi_trending_up;
-        if (s.contains("چک") || s.contains("سررسید")) return R.drawable.mi_receipt_long;
+        if (s.contains("چک")) return R.drawable.mi_cheque;
+        if (s.contains("سررسید")) return R.drawable.mi_calendar_month;
         if (s.contains("خرید")) return R.drawable.mi_shopping_cart;
         if (s.contains("فروش")) return R.drawable.mi_sell;
         if (s.contains("فاکتور")) return R.drawable.mi_receipt_long;

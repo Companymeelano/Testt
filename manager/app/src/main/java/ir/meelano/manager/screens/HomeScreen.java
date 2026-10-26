@@ -264,7 +264,7 @@ public class HomeScreen extends Screen {
     private enum BannerState { LOADING, UPDATED, OFFLINE }
 
     /** Compact, truthful sync status; cached data is never presented as freshly updated. */
-    private View updateBanner(String savedTs, BannerState state) {
+    private View updateBanner(String savedTs, BannerState state, View.OnClickListener retry) {
         LinearLayout box = a.kit.h();
         box.setGravity(Gravity.CENTER_VERTICAL);
         box.setPadding(Theme.dp(13), Theme.dp(9), Theme.dp(13), Theme.dp(9));
@@ -301,10 +301,10 @@ public class HomeScreen extends Screen {
         String title;
         String detail;
         if (state == BannerState.LOADING) {
-            title = "در حال همگام‌سازی داشبورد";
+            title = "در حال تازه‌سازی اطلاعات";
             detail = savedTs == null || savedTs.isEmpty()
-                    ? "دریافت آخرین اطلاعات فروشگاه…"
-                    : "نمایش دادهٔ ذخیره‌شده · آخرین دریافت: " + Money.fa(savedTs);
+                    ? "آخرین اطلاعات فروشگاه در حال دریافت است…"
+                    : "دادهٔ ذخیره‌شده نمایش داده می‌شود · آخرین دریافت: " + Money.fa(savedTs);
         } else if (state == BannerState.UPDATED) {
             title = "داشبورد به‌روز شد";
             detail = "آخرین دریافت زنده: " + Money.fa(savedTs == null || savedTs.isEmpty() ? "—" : savedTs);
@@ -323,7 +323,13 @@ public class HomeScreen extends Screen {
         subtitle.setEllipsize(TextUtils.TruncateAt.END);
         copy.addView(subtitle, a.kit.lp(-1, -2));
         box.addView(copy, a.kit.wlp(1f));
-        box.setContentDescription(title + ". " + detail);
+        box.setContentDescription(title + ". " + detail
+                + (retry == null ? "" : " برای تلاش دوباره لمس کنید."));
+        if (retry != null) {
+            box.setFocusable(true);
+            Theme.pressable(box);
+            box.setOnClickListener(retry);
+        }
         return box;
     }
 
@@ -341,7 +347,7 @@ public class HomeScreen extends Screen {
         } else {
             content.removeAllViews();
             bannerWasLoading = true;
-            content.addView(updateBanner("", BannerState.LOADING), a.kit.lp(-1, -2));
+            content.addView(updateBanner("", BannerState.LOADING, null), a.kit.lp(-1, -2));
             content.addView(a.kit.gap(8));
             content.addView(greetingHero(), a.kit.lp(-1, -2));
             content.addView(a.kit.gap(8));
@@ -489,7 +495,7 @@ public class HomeScreen extends Screen {
             return;
         }
         content.removeAllViews();
-        content.addView(updateBanner("", BannerState.OFFLINE), a.kit.lp(-1, -2));
+        content.addView(updateBanner("", BannerState.OFFLINE, v -> render(content)), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(8));
         content.addView(greetingHero(), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(8));
@@ -913,8 +919,16 @@ public class HomeScreen extends Screen {
                     : w.code <= 3 ? R.drawable.mi_wb_twilight
                     : (w.code >= 95 ? R.drawable.mi_bolt
                     : (w.code >= 51 ? R.drawable.mi_beach_access : R.drawable.mi_wb_twilight));
-            try { wi.setImageResource(wRes); } catch (Exception ignored) { Diag.ignored("HomeScreen:weatherIcon", ignored); }
-            wi.setColorFilter(Theme.GOLD);
+            try {
+                if (!Theme.isLight()) {
+                    // A single 3D weather emblem identifies the section; the text below carries
+                    // the actual changing condition, so the icon never misstates the forecast.
+                    wi.setImageResource(R.drawable.icon3d_weather);
+                } else {
+                    wi.setImageResource(wRes);
+                    wi.setColorFilter(Theme.GOLD);
+                }
+            } catch (Exception ignored) { Diag.ignored("HomeScreen:weatherIcon", ignored); }
             wr.addView(wi, a.kit.lp(Theme.dp(44), Theme.dp(44)));
             wr.addView(a.kit.space(8));
             LinearLayout wc = a.kit.v();
@@ -1036,7 +1050,8 @@ public class HomeScreen extends Screen {
 
     private void build(LinearLayout content, Data d, BannerState bannerState, String bannerTime) {
         content.removeAllViews();
-        View status = updateBanner(bannerTime, bannerState);
+        View status = updateBanner(bannerTime, bannerState,
+                bannerState == BannerState.OFFLINE ? v -> render(content) : null);
         // The compact status changes state in place after the first cache/live transition.
         if (bannerWasLoading && entered) {
             status.setAlpha(0f);

@@ -58,7 +58,7 @@ public class PickWaveScreen extends Screen {
     public PickWaveScreen(MainActivity a) { super(a); }
     @Override public String id() { return "pick_wave"; }
     @Override public String title() { return "برداشت دسته‌ای"; }
-    @Override public String glyph() { return "▣"; }
+    @Override public String glyph() { return Theme.isLight() ? "▣" : "📦"; }
     @Override public int accent() { return Theme.SUCCESS; }
 
     @Override public void render(LinearLayout content) {

@@ -39,7 +39,7 @@ public class ProfitScreen extends Screen {
     public String title() { return "سود و زیان"; }
 
     @Override
-    public String glyph() { return "↗"; }
+    public String glyph() { return Theme.isLight() ? "↗" : "💹"; }
 
     @Override
     public int accent() { return Theme.GOLD; }

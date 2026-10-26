@@ -48,17 +48,25 @@ def java_files():
     return sorted(glob.glob(os.path.join(ROOT, 'app/src/**/*.java'), recursive=True))
 
 
+def project_java_files():
+    """Every application, test and licensing Java source in both Gradle projects."""
+    paths = glob.glob(os.path.join(ROOT, 'app/src/**/*.java'), recursive=True)
+    paths += glob.glob(os.path.join(ROOT, 'manager/**/*.java'), recursive=True)
+    return sorted(set(paths))
+
+
 # ---------------------------------------------------------------- ۱) نحو
 def check_syntax():
     bad = []
-    for f in java_files():
+    files = project_java_files()
+    for f in files:
         src = open(f, encoding='utf-8').read()
         try:
             javalang.parse.parse(src)
         except Exception as e:
             bad.append((f, src, e))
     if not bad:
-        report('نحو همهٔ فایل‌های جاوا', True, f'{len(java_files())} فایل بدون خطا')
+        report('نحو همهٔ فایل‌های جاوا (هر دو پروژه و تست‌ها)', True, f'{len(files)} فایل بدون خطا')
         return
     # تلاش برای اثبات «محدودیت ابزار»: آرایه‌های تودرتوی چندبعدی را ساده می‌کنیم و دوباره می‌خوانیم
     real = []
@@ -75,7 +83,7 @@ def check_syntax():
         for f, msg in real:
             report('نحو ' + os.path.basename(f), False, msg)
     else:
-        report('نحو بقیهٔ فایل‌ها', True, f'{len(java_files()) - len(bad)} فایل سالم')
+        report('نحو بقیهٔ فایل‌ها', True, f'{len(files) - len(bad)} فایل سالم')
 
 
 def strip_nested_array_initialisers(src: str) -> str:

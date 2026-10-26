@@ -1,0 +1,4 @@
+# Pinned dependencies for tools/verify_all.py and its QR/barcode reference tests.
+javalang==0.13.0
+qrcode==8.2
+python-barcode==0.16.1

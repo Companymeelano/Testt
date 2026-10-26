@@ -47,7 +47,7 @@ public class ReportsScreen extends Screen {
     public String title() { return "گزارشات"; }
 
     @Override
-    public String glyph() { return "▤"; }
+    public String glyph() { return Theme.isLight() ? "▤" : "📊"; }
 
     @Override
     public int accent() { return Theme.GOLD; }
@@ -108,13 +108,13 @@ public class ReportsScreen extends Screen {
         if ("فروش".equals(section)) return R.drawable.mi_point_of_sale;
         if ("خرید".equals(section)) return R.drawable.mi_shopping_cart;
         if ("دریافتی‌ها و پرداخت".equals(section)) return R.drawable.mi_payments;
-        if ("چک‌ها".equals(section)) return R.drawable.mi_receipt_long;
+        if ("چک‌ها".equals(section)) return R.drawable.mi_cheque;
         if ("عملکرد صندوق".equals(section)) return R.drawable.mi_account_balance_wallet;
         if ("خزانه‌داری".equals(section)) return R.drawable.mi_account_balance;
         if ("کالا و انبار".equals(section)) return R.drawable.mi_inventory_2;
         if ("مشتریان".equals(section)) return R.drawable.mi_group;
         if ("ویزیتورها".equals(section)) return R.drawable.mi_directions_car;
-        if ("سود و زیان".equals(section)) return R.drawable.mi_diamond;
+        if ("سود و زیان".equals(section)) return R.drawable.mi_profit;
         if ("بانک و صندوق".equals(section)) return R.drawable.mi_account_balance;
         if ("کاربران و نظارت".equals(section)) return R.drawable.mi_admin_panel_settings;
         if ("هوشمند".equals(section)) return R.drawable.mi_lightbulb;

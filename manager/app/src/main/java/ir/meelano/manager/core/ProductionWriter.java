@@ -10,6 +10,8 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * Production posting for the Atiran schema in Mili.sql.
@@ -74,15 +76,21 @@ public final class ProductionWriter {
         public final String name;
         public final long productId;
         public final String productName;
+        public final String description;
         public final BigDecimal baseOutputQty;
         public final BigDecimal baseWeightKg;
-        public Recipe(long id, String name, long productId, String productName,
+        public Recipe(long id, String name, long productId, String productName, String description,
                       BigDecimal baseOutputQty, BigDecimal baseWeightKg) {
             this.id = id; this.name = name == null ? "" : name; this.productId = productId;
             this.productName = productName == null ? "" : productName;
+            this.description = description == null ? "" : description;
             this.baseOutputQty = nz(baseOutputQty); this.baseWeightKg = nz(baseWeightKg);
         }
-        @Override public String toString() { return name + " • " + productName; }
+        @Override public String toString() {
+            String n=name.trim(), p=productName.trim();
+            if(n.isEmpty())return p;
+            return n.equalsIgnoreCase(p)?n:n+" • "+p;
+        }
     }
 
     public static final class Ingredient {
@@ -189,6 +197,18 @@ public final class ProductionWriter {
         }
     }
 
+    /** Keeps the app-owned yield basis alongside Atiran's native recipe revision snapshot. */
+    private static void ensureProfileHistoryTable(Connection c) throws Exception {
+        try (Statement st = c.createStatement()) {
+            st.execute("IF OBJECT_ID(N'dbo.meelano_production_profile_history',N'U') IS NULL " +
+                    "CREATE TABLE dbo.meelano_production_profile_history(" +
+                    "FormulID bigint NOT NULL,Rdf_ int NOT NULL," +
+                    "BaseOutputQty decimal(18,3) NOT NULL,BaseWeightKg decimal(18,3) NOT NULL," +
+                    "UpdatedAt datetime2 NOT NULL,UpdatedBy int NOT NULL," +
+                    "CONSTRAINT PK_meelano_prod_profile_history PRIMARY KEY(FormulID,Rdf_))");
+        }
+    }
+
     /** Resolve a real sys_users identity without changing the app's local role/authentication model. */
     public static int resolveAtiranUserId(Connection c, int sessionUid, String username) throws Exception {
         if (sessionUid > 0 && userExists(c, sessionUid)) return sessionUid;
@@ -265,12 +285,12 @@ public final class ProductionWriter {
     public static List<Recipe> recipes(Connection c) throws Exception {
         ensureProfileTable(c);
         List<Recipe> out = new ArrayList<>();
-        String q = "SELECT f.ID,f.Name,f.shka,i.naka,ISNULL(p.BaseOutputQty,1),ISNULL(p.BaseWeightKg,0) " +
+        String q = "SELECT f.ID,f.Name,f.shka,i.naka,f.Description,ISNULL(p.BaseOutputQty,1),ISNULL(p.BaseWeightKg,0) " +
                 "FROM produce.Formulation f JOIN dbo.inventory i ON i.shka=f.shka " +
                 "LEFT JOIN dbo.meelano_production_profile p ON p.FormulID=f.ID " +
-                "WHERE f.Active=1 ORDER BY f.Name,f.ID";
+                "WHERE f.Active=1 AND i.active='t' ORDER BY f.Name,f.ID";
         try (PreparedStatement ps = c.prepareStatement(q); ResultSet r = ps.executeQuery()) {
-            while (r.next()) out.add(new Recipe(r.getLong(1), r.getString(2), r.getLong(3), r.getString(4), r.getBigDecimal(5), r.getBigDecimal(6)));
+            while (r.next()) out.add(new Recipe(r.getLong(1), r.getString(2), r.getLong(3), r.getString(4), r.getString(5), r.getBigDecimal(6), r.getBigDecimal(7)));
         }
         return out;
     }
@@ -315,9 +335,25 @@ public final class ProductionWriter {
         if (userId <= 0) throw new Exception("برای ثبت فرمول، شناسهٔ واقعی کاربر آتیران لازم است.");
         if (d.ingredients.isEmpty()) throw new Exception("فرمول دست‌کم باید یک مادهٔ اولیه داشته باشد.");
         if (nz(d.baseOutputQty).signum() <= 0) throw new Exception("مقدار خروجی پایه باید بیشتر از صفر باشد.");
+        if (nz(d.baseWeightKg).signum() < 0) throw new Exception("وزن پایه نمی‌تواند منفی باشد.");
+        for (RecipeIngredient line : d.ingredients) {
+            if (line == null || line.product == null || line.product.id <= 0 || nz(line.baseQtyPieces).signum() <= 0)
+                throw new Exception("هر مادهٔ فرمول باید کالا و مقدار پایهٔ مثبت داشته باشد.");
+        }
+        for (RecipeCost cost : d.costs) {
+            if (cost == null || cost.costId <= 0 || nz(cost.amount).signum() < 0)
+                throw new Exception("هر سربار فرمول باید نوع معتبر و مبلغ غیرمنفی داشته باشد.");
+        }
+        if (!c.getAutoCommit()) throw new Exception("ذخیرهٔ فرمول باید روی اتصال مستقل با autoCommit فعال آغاز شود.");
         ensureProfileTable(c);
-        boolean auto = c.getAutoCommit();
-        if (auto) c.setAutoCommit(false);
+        if (d.id > 0) {
+            ensureProfileHistoryTable(c);
+            requireColumns(c, "produce", "HistoryFormulation", new String[]{"FormulID", "Rdf_", "Name", "shka", "Description", "UserId", "DoneDate", "DoneTime"});
+            requireColumns(c, "produce", "HistoryFormulationItems", new String[]{"FormulID", "Rdf_", "shka", "TedadVahed", "TedadJoz"});
+            requireColumns(c, "produce", "HistoryFormulationCost", new String[]{"FormulID", "Rdf_", "Price", "CostID"});
+        }
+        boolean auto = true;
+        c.setAutoCommit(false);
         try {
             lock(c, "meelano-production-recipes");
             String day = Jalali.todayStr();
@@ -342,7 +378,6 @@ public final class ProductionWriter {
             }
             try (PreparedStatement ps = c.prepareStatement("INSERT INTO produce.FormulationItems(FormulID,shka,TedadVahed,TedadJoz,Active) VALUES(?,?,?,?,1)")) {
                 for (RecipeIngredient line : d.ingredients) {
-                    if (line == null || line.product == null || line.product.id <= 0 || nz(line.baseQtyPieces).signum() <= 0) continue;
                     long pack = Math.max(1, line.product.packSize);
                     BigDecimal[] split = splitQty(line.baseQtyPieces, pack);
                     ps.setLong(1, id); ps.setLong(2, line.product.id); ps.setBigDecimal(3, split[0]);
@@ -353,7 +388,7 @@ public final class ProductionWriter {
             }
             try (PreparedStatement ps = c.prepareStatement("INSERT INTO produce.FormulationCost(FormulID,CostID,Price,Active) VALUES(?,?,?,1)")) {
                 for (RecipeCost cost : d.costs) {
-                    if (cost == null || cost.costId <= 0 || nz(cost.amount).signum() <= 0) continue;
+                    if (nz(cost.amount).signum() == 0) continue;
                     requireActiveCost(c, cost.costId);
                     ps.setLong(1, id); ps.setInt(2, cost.costId); ps.setBigDecimal(3, money4(cost.amount)); ps.addBatch();
                 }
@@ -386,9 +421,10 @@ public final class ProductionWriter {
         if (nz(req.outputQty).signum() <= 0 || nz(req.actualWeightKg).signum() <= 0) throw new Exception("مقدار و وزن خالص خروجی باید بیشتر از صفر باشند.");
         if (req.ingredients.isEmpty()) throw new Exception("مواد اولیهٔ مصرفی ثبت نشده است.");
         if (req.idempotencyKey == null || req.idempotencyKey.trim().length() < 12) throw new Exception("شناسهٔ یکتای عملیات تولید معتبر نیست.");
+        if (!c.getAutoCommit()) throw new Exception("ثبت قطعی تولید باید روی اتصال مستقل با autoCommit فعال آغاز شود.");
         preflight(c);
-        boolean auto = c.getAutoCommit();
-        if (auto) c.setAutoCommit(false);
+        boolean auto = true;
+        c.setAutoCommit(false);
         try {
             lock(c, "meelano-production-post");
             String stamp = "[MEELANO-PROD:" + safe(req.idempotencyKey, 64) + "]";
@@ -408,19 +444,20 @@ public final class ProductionWriter {
             if (outputPieces.signum() <= 0) throw new Exception("مقدار خروجی با واحد کالای آتیران سازگار نیست.");
             Costing costing = new Costing();
             List<Move> moves = new ArrayList<>();
-            for (Ingredient ing : req.ingredients) {
-                if (ing == null || ing.productId <= 0 || nz(ing.qtyPieces).signum() <= 0) throw new Exception("مقدار یکی از مواد اولیه معتبر نیست.");
-                if (ing.productId == req.finishedProductId) throw new Exception("کالای نهایی نمی‌تواند مادهٔ اولیهٔ خودش باشد.");
-                Product raw = product(c, ing.productId, req.warehouseId, true);
+            Map<Long, BigDecimal> requiredByProduct = sumIngredientQuantities(req.ingredients);
+            for (Map.Entry<Long, BigDecimal> required : requiredByProduct.entrySet()) {
+                if (required.getKey() == req.finishedProductId) throw new Exception("کالای نهایی نمی‌تواند مادهٔ اولیهٔ خودش باشد.");
+                Product raw = product(c, required.getKey(), req.warehouseId, true);
                 if (raw == null) throw new Exception("یکی از مواد اولیه غیرفعال یا در آتیران ناموجود است.");
                 requireSingleVariety(raw);
                 if (raw.withProductionSerial) throw new Exception("مادهٔ اولیهٔ «" + raw.name + "» ردیابی سری دارد؛ برای جلوگیری از مغایرت، تا انتخاب سری واقعی مصرف آن را ثبت نمی‌کنم.");
-                if (raw.stockPieces.compareTo(ing.qtyPieces) < 0) throw new Exception("موجودی «" + raw.name + "» در انبار انتخاب‌شده کافی نیست.");
+                BigDecimal totalQty = required.getValue();
+                if (raw.stockPieces.compareTo(totalQty) < 0) throw new Exception("موجودی «" + raw.name + "» در انبار انتخاب‌شده برای مجموع مصرف " + totalQty.toPlainString() + " کافی نیست.");
                 BigDecimal unitCost = latestAllInPurchaseUnitCost(c, raw.id, raw.varietyId);
                 if (unitCost.signum() <= 0) throw new Exception("بهای خرید معتبر برای «" + raw.name + "» پیدا نشد؛ تولید ثبت نشد.");
-                BigDecimal lineCost = unitCost.multiply(ing.qtyPieces).setScale(4, RoundingMode.HALF_UP);
+                BigDecimal lineCost = unitCost.multiply(totalQty).setScale(4, RoundingMode.HALF_UP);
                 costing.materialCost = costing.materialCost.add(lineCost);
-                moves.add(new Move(raw, ACT_RAW_CONSUMED, ing.qtyPieces, unitCost));
+                moves.add(new Move(raw, ACT_RAW_CONSUMED, totalQty, unitCost));
             }
             for (ExtraCost extra : req.costs) {
                 if (extra == null || extra.costId <= 0 || nz(extra.amount).signum() < 0) throw new Exception("یکی از هزینه‌های سربار معتبر نیست.");
@@ -466,18 +503,22 @@ public final class ProductionWriter {
             throw new Exception("اطلاعات پیش‌نمایش تولید کامل نیست.");
         if (nz(req.outputQty).signum() <= 0 || nz(req.actualWeightKg).signum() <= 0)
             throw new Exception("مقدار و وزن خالص خروجی باید بیشتر از صفر باشند.");
+        if (req.recipeId <= 0) throw new Exception("فرمول تولید معتبر انتخاب نشده است.");
+        requireActiveRecipe(c, req.recipeId, req.finishedProductId);
         Product output = product(c, req.finishedProductId, req.warehouseId, false);
         if (output == null) throw new Exception("کالای نهایی در آتیران پیدا نشد.");
         requireSingleVariety(output);
         Costing result = new Costing();
-        for (Ingredient ing : req.ingredients) {
-            if (ing == null || ing.productId <= 0 || nz(ing.qtyPieces).signum() <= 0)
-                throw new Exception("مقدار یکی از مواد اولیه معتبر نیست.");
-            Product raw = product(c, ing.productId, req.warehouseId, false);
+        for (Map.Entry<Long, BigDecimal> required : sumIngredientQuantities(req.ingredients).entrySet()) {
+            if (required.getKey() == req.finishedProductId) throw new Exception("کالای نهایی نمی‌تواند مادهٔ اولیهٔ خودش باشد.");
+            Product raw = product(c, required.getKey(), req.warehouseId, false);
             if (raw == null) throw new Exception("مادهٔ اولیه در آتیران پیدا نشد.");
             requireSingleVariety(raw);
+            if (raw.withProductionSerial) throw new Exception("مادهٔ اولیهٔ «" + raw.name + "» ردیابی سری دارد و قابل پیش‌نمایش برای ثبت نیست.");
+            if (raw.stockPieces.compareTo(required.getValue()) < 0) throw new Exception("موجودی «" + raw.name + "» برای مجموع مصرف کافی نیست.");
             BigDecimal unit = latestAllInPurchaseUnitCost(c, raw.id, raw.varietyId);
-            result.materialCost = result.materialCost.add(unit.multiply(ing.qtyPieces));
+            if (unit.signum() <= 0) throw new Exception("بهای خرید معتبر برای «" + raw.name + "» پیدا نشد.");
+            result.materialCost = result.materialCost.add(unit.multiply(required.getValue()));
         }
         for (ExtraCost cost : req.costs) {
             if (cost == null || cost.costId <= 0 || nz(cost.amount).signum() < 0)
@@ -492,6 +533,18 @@ public final class ProductionWriter {
         if (pieces.signum() <= 0) throw new Exception("واحد کالای نهایی معتبر نیست.");
         result.finishedUnitPrice = result.totalCost.divide(pieces, 4, RoundingMode.HALF_UP);
         return result;
+    }
+
+    /** Combine repeated rows for the same raw item before stock checks and ledger posting. */
+    public static Map<Long, BigDecimal> sumIngredientQuantities(List<Ingredient> ingredients) throws Exception {
+        if (ingredients == null || ingredients.isEmpty()) throw new Exception("مواد اولیهٔ مصرفی ثبت نشده است.");
+        Map<Long, BigDecimal> totals = new LinkedHashMap<>();
+        for (Ingredient ingredient : ingredients) {
+            if (ingredient == null || ingredient.productId <= 0 || nz(ingredient.qtyPieces).signum() <= 0)
+                throw new Exception("مقدار یکی از مواد اولیه معتبر نیست.");
+            totals.merge(ingredient.productId, ingredient.qtyPieces, BigDecimal::add);
+        }
+        return totals;
     }
 
     /** Formula line quantities are multiplied by output/base-output; costs likewise. */
@@ -658,6 +711,12 @@ public final class ProductionWriter {
         try (PreparedStatement ps=c.prepareStatement("INSERT INTO produce.HistoryFormulation(FormulID,Rdf_,Name,shka,Description,UserId,DoneDate,DoneTime) SELECT ID,?,Name,shka,Description,UserId,DoneDate,DoneTime FROM produce.Formulation WHERE ID=?")) {ps.setInt(1,rev);ps.setLong(2,id);ps.executeUpdate();}
         try (PreparedStatement ps=c.prepareStatement("INSERT INTO produce.HistoryFormulationItems(FormulID,Rdf_,shka,TedadVahed,TedadJoz) SELECT FormulID,?,shka,TedadVahed,TedadJoz FROM produce.FormulationItems WHERE FormulID=? AND Active=1")) {ps.setInt(1,rev);ps.setLong(2,id);ps.executeUpdate();}
         try (PreparedStatement ps=c.prepareStatement("INSERT INTO produce.HistoryFormulationCost(FormulID,Rdf_,Price,CostID) SELECT FormulID,?,Price,CostID FROM produce.FormulationCost WHERE FormulID=? AND Active=1")) {ps.setInt(1,rev);ps.setLong(2,id);ps.executeUpdate();}
+        try (PreparedStatement ps=c.prepareStatement("INSERT INTO dbo.meelano_production_profile_history(FormulID,Rdf_,BaseOutputQty,BaseWeightKg,UpdatedAt,UpdatedBy) " +
+                "SELECT f.ID,?,ISNULL(p.BaseOutputQty,1),ISNULL(p.BaseWeightKg,0),ISNULL(p.UpdatedAt,SYSDATETIME()),ISNULL(p.UpdatedBy,f.UserId) " +
+                "FROM produce.Formulation f LEFT JOIN dbo.meelano_production_profile p ON p.FormulID=f.ID WHERE f.ID=?")) {
+            ps.setInt(1,rev);ps.setLong(2,id);
+            if(ps.executeUpdate()!=1)throw new Exception("نسخهٔ پایهٔ بازدهٔ فرمول ذخیره نشد.");
+        }
     }
 
     private static int nextRevision(Connection c, long id) throws Exception {

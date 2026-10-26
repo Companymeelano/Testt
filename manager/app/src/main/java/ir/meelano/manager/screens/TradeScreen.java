@@ -49,7 +49,7 @@ public class TradeScreen extends Screen {
     public String title() { return sales ? "فروش" : "خرید"; }
 
     @Override
-    public String glyph() { return sales ? "🧾" : "🧺"; }
+    public String glyph() { return Theme.isLight() ? (sales ? "🧾" : "🧺") : (sales ? "🛍" : "🛒"); }
 
     @Override
     public int accent() { return sales ? Theme.GOLD : Theme.INFO; }

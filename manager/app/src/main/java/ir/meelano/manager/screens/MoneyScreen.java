@@ -48,7 +48,7 @@ public class MoneyScreen extends Screen {
     public String title() { return p == 0 ? "دریافت‌ها" : "پرداخت‌ها"; }
 
     @Override
-    public String glyph() { return p == 0 ? "↓" : "↑"; }
+    public String glyph() { return Theme.isLight() ? (p == 0 ? "↓" : "↑") : (p == 0 ? "🪙" : "💸"); }
 
     @Override
     public int accent() { return p == 0 ? Theme.SUCCESS : Theme.WARNING; }

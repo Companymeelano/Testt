@@ -28,8 +28,8 @@ android {
     defaultConfig {
         minSdk 24
         targetSdk meelanoSdk
-        versionCode 200
-        versionName '7.0.0'
+        versionCode 201
+        versionName '7.0.1'
         resourceConfigurations += ['fa', 'en']
         vectorDrawables.useSupportLibrary = false
     }

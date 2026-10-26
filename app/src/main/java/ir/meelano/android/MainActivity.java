@@ -17675,7 +17675,6 @@ public class MainActivity extends Activity {
     // "New version available" check. CI writes apk/latest.json next to each APK.
     // ---------------------------------------------------------------------------------------------
     private static final String UPDATE_MANIFEST_URL = "https://github.com/Companymeelano/Newhamrah/raw/arena/01a0e474-newhamrah/apk/latest.json";
-    private static final String UNIFIED_UPDATE_MANIFEST_URL = "https://github.com/Companymeelano/Testt/raw/arena/c192ed08-testt/dist/latest-unified.json";
     private static final String KEY_UPDATE_CHECKED_AT = "update_checked_at";
     private static final String KEY_UPDATE_LATEST = "update_latest_json";
     private static final long UPDATE_CHECK_INTERVAL_MS = 12L * 60 * 60 * 1000;
@@ -17689,6 +17688,7 @@ public class MainActivity extends Activity {
 
     /** Latest version seen on the server, or null when unknown / not newer than this install. */
     private JSONObject pendingAppUpdate() {
+        if (UNIFIED_EDITION) return MeelanoAppUpdater.pending(this);
         try {
             String raw = prefs == null ? "" : prefs.getString(KEY_UPDATE_LATEST, "");
             if (raw == null || raw.isEmpty()) return null;
@@ -17699,6 +17699,12 @@ public class MainActivity extends Activity {
 
     private void maybeCheckForAppUpdate(boolean manual) {
         if (prefs == null || designPreview) return;
+        if (UNIFIED_EDITION) {
+            MeelanoAppUpdater.check(this, manual, () -> {
+                if ("settings".equals(activePage)) renderVisitorEditionSettings();
+            });
+            return;
+        }
         long last = prefs.getLong(KEY_UPDATE_CHECKED_AT, 0);
         if (!manual && System.currentTimeMillis() - last < UPDATE_CHECK_INTERVAL_MS) return;
         prefs.edit().putLong(KEY_UPDATE_CHECKED_AT, System.currentTimeMillis()).apply();
@@ -17707,7 +17713,7 @@ public class MainActivity extends Activity {
             String body = null;
             java.net.HttpURLConnection conn = null;
             try {
-                String manifestUrl = UNIFIED_EDITION ? UNIFIED_UPDATE_MANIFEST_URL : MANAGER_EDITION ? MANAGER_UPDATE_MANIFEST_URL : STAFF_EDITION ? STAFF_UPDATE_MANIFEST_URL : STORE_EDITION ? STORE_UPDATE_MANIFEST_URL : UPDATE_MANIFEST_URL;
+                String manifestUrl = MANAGER_EDITION ? MANAGER_UPDATE_MANIFEST_URL : STAFF_EDITION ? STAFF_UPDATE_MANIFEST_URL : STORE_EDITION ? STORE_UPDATE_MANIFEST_URL : UPDATE_MANIFEST_URL;
                 conn = (java.net.HttpURLConnection) new java.net.URL(manifestUrl).openConnection();
                 conn.setConnectTimeout(8000); conn.setReadTimeout(8000); conn.setInstanceFollowRedirects(true);
                 if (conn.getResponseCode() == 200) {
@@ -17733,6 +17739,10 @@ public class MainActivity extends Activity {
     }
 
     private void openAppUpdate(JSONObject up) {
+        if (UNIFIED_EDITION) {
+            MeelanoAppUpdater.open(this, up);
+            return;
+        }
         try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(up.optString("url", "")))); }
         catch (Exception ex) { showNotice("باز کردن لینک دانلود ممکن نشد.", false); }
     }
@@ -29595,6 +29605,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (MeelanoAppUpdater.handleActivityResult(this, requestCode)) return;
         if (requestCode == REQ_CONFIRM_IDENTITY) {
             IdentityCallback cb = pendingIdentity; pendingIdentity = null;
             if (cb != null) { if (resultCode == RESULT_OK) cb.done(true); else showNotice("تأیید هویت لغو شد؛ چیزی ثبت نشد.", true); }

@@ -120798,6 +120798,10 @@
     {
       "name": "meelano_production_profile",
       "reason": "App-managed recipe-yield extension created by ProductionWriter.ensureProfileTable; runtime preflight verifies its columns."
+    },
+    {
+      "name": "meelano_production_profile_history",
+      "reason": "App-managed recipe-yield revision history created transactionally by ProductionWriter when editing an existing formula."
     }
   ],
   "appProbeChecks": [

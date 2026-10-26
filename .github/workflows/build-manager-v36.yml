@@ -51,7 +51,22 @@ jobs:
         working-directory: manager
         run: |
           set -o pipefail
-          gradle :app:testDebugUnitTest :app:assembleDebug --stacktrace --no-daemon 2>&1 | tee ../manager-build.log | tail -80
+          gradle clean :app:testDebugUnitTest :app:assembleDebug --stacktrace --no-daemon 2>&1 | tee ../manager-build.log | tail -80
+
+      - name: Verify the production screen is packaged in the APK
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          apk = Path("manager/app/build/outputs/apk/debug/app-debug.apk")
+          descriptor = b"Lir/meelano/manager/screens/ProductionScreen;"
+          with ZipFile(apk) as archive:
+              dex_files = [name for name in archive.namelist() if name == "classes.dex" or (name.startswith("classes") and name.endswith(".dex"))]
+              if not any(descriptor in archive.read(name) for name in dex_files):
+                  raise SystemExit("ProductionScreen is not present in the built APK dex files")
+          print("ProductionScreen is packaged in the APK.")
+          PY
 
       - name: Include Gradle diagnostics in job summary
         if: failure()

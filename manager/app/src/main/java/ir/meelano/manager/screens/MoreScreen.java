@@ -170,6 +170,10 @@ public class MoreScreen extends Screen {
             c.addView(a.kit.gap(8));
         }
         c.addView(a.kit.btnGold("▤ همهٔ گزارش‌ها", v -> a.nav("reports")), a.kit.lp(-1, -2));
+        if (ProductionScreen.managerAllowed(a)) {
+            c.addView(a.kit.gap(8));
+            c.addView(a.kit.btnGold("⚙ تولید محصول", v -> a.nav("production")), a.kit.lp(-1, -2));
+        }
     }
 
     /** Two-line card tile: long section names wrap instead of being cut off. */

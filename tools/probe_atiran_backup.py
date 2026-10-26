@@ -288,6 +288,19 @@ ORDER BY s.name,o.name,p.parameter_id;
             "kind": found["kind"] if found else None,
         })
 
+    # Preserve repository-maintained references that are intentionally absent from
+    # the sanitized SQL Server snapshot (for example app-owned extension tables and
+    # stored procedures whose definitions are not included in the metadata export).
+    expected_external_dbo = []
+    if output.is_file():
+        try:
+            previous_manifest = json.loads(output.read_text(encoding="utf-8"))
+            previous = previous_manifest.get("expectedExternalDboReferences", [])
+            if isinstance(previous, list):
+                expected_external_dbo = [row for row in previous if isinstance(row, dict)]
+        except Exception:
+            expected_external_dbo = []
+
     manifest = {
         "formatVersion": 1,
         "source": {
@@ -305,6 +318,7 @@ ORDER BY s.name,o.name,p.parameter_id;
         "functions": sorted(functions.values(), key=lambda x: (x["schema"].lower(), x["name"].lower())),
         "appProbeChecks": known_checks,
         "appFunctionChecks": app_function_checks,
+        "expectedExternalDboReferences": expected_external_dbo,
     }
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

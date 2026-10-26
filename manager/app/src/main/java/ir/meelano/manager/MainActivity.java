@@ -49,6 +49,7 @@ import ir.meelano.manager.screens.MoneyScreen;
 import ir.meelano.manager.screens.MoreScreen;
 import ir.meelano.manager.screens.ProductsScreen;
 import ir.meelano.manager.screens.ProfitScreen;
+import ir.meelano.manager.screens.ProductionScreen;
 import ir.meelano.manager.screens.ReportsScreen;
 import ir.meelano.manager.screens.Screen;
 import ir.meelano.manager.screens.ResidScreen;
@@ -692,6 +693,7 @@ public class MainActivity extends Activity {
         reg(new VisitorsScreen(this));
         reg(new UsersScreen(this));
         reg(new ProfitScreen(this));
+        reg(new ProductionScreen(this));
         reg(new DuesScreen(this));
         reg(new ReportsScreen(this));
         reg(new AnalyticsScreen(this));

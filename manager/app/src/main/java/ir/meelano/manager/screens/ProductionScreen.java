@@ -433,7 +433,7 @@ public final class ProductionScreen extends Screen {
     private ProductionWriter.Product findProduct(long id){for(ProductionWriter.Product p:catalog.products)if(p.id==id)return p;return null;}
     private ProductionWriter.CostType findCost(int id){for(ProductionWriter.CostType c:catalog.costs)if(c.id==id)return c;return null;}
     private BigDecimal defaultWeight(){if(recipe!=null&&recipe.baseWeightKg.signum()>0)return recipe.baseWeightKg;if(output!=null&&output.weightPerUnit.signum()>0)return output.weightPerUnit.multiply(recipe==null?BigDecimal.ONE:recipe.baseOutputQty);return BigDecimal.ZERO;}
-    private static BigDecimal parse(String s)throws Exception{String en=Money.en(s==null?"":s).replace(",","").replace('٬','').replace('٫','.').trim();if(en.isEmpty())throw new Exception();return new BigDecimal(en);}
+    private static BigDecimal parse(String s)throws Exception{String en=Money.en(s==null?"":s).replace(",","").replace("٬","").replace('٫','.').trim();if(en.isEmpty())throw new Exception();return new BigDecimal(en);}
     private static String qty(BigDecimal n){return Money.fa(qtyText(n));}
     private static String money(BigDecimal n){return Money.rial(n==null?0d:n.doubleValue());}
     private static String qtyText(BigDecimal n){return n==null?"0":n.stripTrailingZeros().toPlainString();}

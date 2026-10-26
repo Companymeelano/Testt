@@ -10,6 +10,7 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 
 import ir.meelano.manager.MainActivity;
+import ir.meelano.manager.R;
 import ir.meelano.manager.core.AtiranAuth;
 import ir.meelano.manager.core.Diag;
 import ir.meelano.manager.core.Jalali;

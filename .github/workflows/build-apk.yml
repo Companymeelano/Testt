@@ -77,7 +77,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          rm -f dist/*.apk dist/latest-unified.json
+          rm -f dist/app-*-debug.apk dist/MEELANO-v*-release.apk dist/latest-unified.json
           find app/build/outputs/apk -path '*/debug/*.apk' -type f -print -exec cp -t dist/ {} +
           cp app/build/outputs/apk/unified/release/app-unified-release.apk dist/MEELANO-v7.0.2-release.apk
           APK=dist/MEELANO-v7.0.2-release.apk

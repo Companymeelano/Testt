@@ -577,22 +577,19 @@ public class SettingsScreen extends Screen {
 
     private void buildDashboard(final LinearLayout content) {
         content.addView(sectionHead("🧭 ترتیب داشبورد خانه",
-                "بخش‌های صفحهٔ خانه را با ↑ و ↓ جابه‌جا کنید.",
+                "بخش‌های فعال را با ↑ و ↓ بر اساس اولویت روزانه مرتب کنید.",
                 Theme.GOLD), a.kit.lp(-1, -2));
         LinearLayout ho = a.kit.card(Theme.GOLD);
         final String[][] secs = {
-                {"kpis", "شاخص‌های روز"},
+                {"kpis", "گردش امروز"},
                 {"alerts", "هشدار امروز"},
                 {"due", "سررسید چک‌ها"},
-                {"invstatus", "وضعیت فاکتورها"},
-                {"returns", "برگشتی‌ها"},
+                {"returns", "برگشتی‌های فعال"},
+                {"trend", "روند روزانهٔ فروش"},
+                {"monthly", "فروش ماهانه"},
                 {"today_top", "پرفروش‌ترین کالاهای امروز"},
-                {"trend", "روند ۱۴ روزه فروش"},
-                {"debtors", "بدهکاران اولویت‌دار"},
-                {"visitors", "عملکرد ویزیتورها"},
                 {"donut", "ترکیب دریافت"},
                 {"eod", "جمع‌بندی پایان روز"},
-                {"shortcuts", "دسترسی سریع"},
         };
         final java.util.List<String> order = new java.util.ArrayList<>();
         for (String k : a.settings.homeOrder().split(","))

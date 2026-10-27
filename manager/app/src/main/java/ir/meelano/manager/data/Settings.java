@@ -326,21 +326,39 @@ public final class Settings {
     public void setWhDirect(boolean on) { p.edit().putBoolean("wh_direct", on).apply(); }
 
     // ---------------- home dashboard order ----------------
-    /** Day KPIs and the sales comparison first (as in the reference design), then trends, then alerts. */
-    public static final String HOME_ORDER_DEFAULT = "kpis,trend,donut,today_top,alerts,invstatus,returns,due,debtors,visitors,eod,shortcuts";
-    private static final String HOME_ORDER_V1_DEFAULT = "kpis,alerts,due,invstatus,returns,today_top,trend,debtors,visitors,donut,eod,shortcuts";
-    private static final String HOME_ORDER_PREVIOUS_DEFAULT = "kpis,alerts,trend,donut,debtors,visitors,due,invstatus,returns,shortcuts";
+    /** Manager-first order: daily flow and actions, then trends and product analysis. */
+    public static final String HOME_ORDER_DEFAULT = "kpis,alerts,due,returns,trend,monthly,today_top,donut,eod";
 
     public String homeOrder() {
-        String v = p.getString("home_order", null);
-        if (v == null || v.trim().isEmpty()) return HOME_ORDER_DEFAULT;
-        // Move installations still using the untouched old default to the new
-        // manager-first order, while preserving any order the user customized.
-        if (HOME_ORDER_V1_DEFAULT.equals(v.trim()) || HOME_ORDER_PREVIOUS_DEFAULT.equals(v.trim())) {
+        String stored = p.getString("home_order", null);
+        if (stored == null || stored.trim().isEmpty()) return HOME_ORDER_DEFAULT;
+        if ("kpis,alerts,due,invstatus,returns,today_top,trend,debtors,visitors,donut,eod,shortcuts".equals(stored.trim())
+                || "kpis,alerts,trend,donut,debtors,visitors,due,invstatus,returns,shortcuts".equals(stored.trim())
+                || "kpis,trend,donut,today_top,alerts,invstatus,returns,due,debtors,visitors,eod,shortcuts".equals(stored.trim())) {
             p.edit().putString("home_order", HOME_ORDER_DEFAULT).apply();
             return HOME_ORDER_DEFAULT;
         }
-        return v;
+        StringBuilder clean = new StringBuilder();
+        java.util.HashSet<String> seen = new java.util.HashSet<>();
+        String[] active = HOME_ORDER_DEFAULT.split(",");
+        for (String key : stored.split(",")) {
+            String candidate = key == null ? "" : key.trim();
+            boolean known = false;
+            for (String valid : active) if (valid.equals(candidate)) { known = true; break; }
+            if (known && seen.add(candidate)) {
+                if (clean.length() > 0) clean.append(',');
+                clean.append(candidate);
+            }
+        }
+        for (String valid : active) {
+            if (seen.add(valid)) {
+                if (clean.length() > 0) clean.append(',');
+                clean.append(valid);
+            }
+        }
+        String normalized = clean.toString();
+        if (!normalized.equals(stored)) p.edit().putString("home_order", normalized).apply();
+        return normalized;
     }
 
     public void setHomeOrder(String csv) {

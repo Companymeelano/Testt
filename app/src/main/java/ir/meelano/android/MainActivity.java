@@ -14022,6 +14022,17 @@ public class MainActivity extends Activity {
     private void decideIncomplete(long id, boolean fix) { runDb(() -> { try (Connection c = openConnection()) { ensureMeelanoHrTables(c); try (PreparedStatement ps = c.prepareStatement("UPDATE dbo.meelano_hr_incomplete SET status=?, fixed_by=?, fixed_at=SYSDATETIME(), manager_note=? WHERE id=? AND status=N'open'")) { ps.setString(1, fix ? "fixed" : "dismissed"); ps.setString(2, currentAccountName()); ps.setString(3, fix ? "اصلاح مدیر" : "چشم‌پوشی مدیر"); ps.setLong(4, id); ps.executeUpdate(); } } return "ok"; }, new DbCallback() { @Override public void ok(String b) { showNotice(fix ? "تردد اصلاح شد." : "تردد بسته شد.", false); loadManagerApprovals(); } @Override public void fail(Exception e) { showPageError("تردد", e, () -> loadManagerApprovals()); } }); }
 
     /** Manager app, «بیشتر»: every management tool in one place, filtered by the signed-in role. */
+    private void openManagerProduction() {
+        if ((!UNIFIED_EDITION && !MANAGER_EDITION) || !isFullAccessUser()) {
+            showNotice("تولید فقط برای حساب مدیر در دسترس است.", true);
+            return;
+        }
+        Intent intent = new Intent(this, ProductionActivity.class);
+        intent.putExtra("atiran_uid", session == null || session.userId == null ? 0 : session.userId);
+        intent.putExtra("atiran_username", currentAccountName());
+        startActivity(intent);
+    }
+
     private void renderManagerMorePage() {
         content.removeAllViews();
         int accent = navAccent("manager_more");
@@ -14059,6 +14070,7 @@ public class MainActivity extends Activity {
         });
         addVisitorMoreGroup("انبار و مالی", "تحلیل موجودی، برچسب بارکد، مطالبات و نقدینگی", new VisitorToolSpec[]{
                 new VisitorToolSpec("انبار هوشمند", "ABC، نقطهٔ سفارش، کالای راکد، کارت کالا", "◈", GOLD, () -> showApp("warehouse"), canOpenPage("warehouse")),
+                new VisitorToolSpec("تولید محصول", "فرمول، مصرف مواد و ثبت رسمی تولید در آتیران", "⚙", GOLD, this::openManagerProduction, (UNIFIED_EDITION || MANAGER_EDITION) && isFullAccessUser()),
                 new VisitorToolSpec("اتاق فرمان مالی", "وصول، چک، قیمت‌گذاری، جریان نقدی", "☷", SUCCESS, () -> showApp("finance"), canOpenPage("finance")),
                 new VisitorToolSpec("چاپ برچسب کالا", "برگهٔ A4 بارکد و QR (PDF)", "🏷", INFO, () -> { MeelanoWarehouseUi.tab = "labels"; showApp("warehouse"); }, canOpenPage("warehouse"))
         });

@@ -211,23 +211,42 @@ public final class ProductionWriter {
         }
     }
 
-    /** Resolve a real sys_users identity without changing the app's local role/authentication model. */
-    public static int resolveAtiranUserId(Connection c, int sessionUid, String username) throws Exception {
-        if (sessionUid > 0 && userExists(c, sessionUid)) return sessionUid;
-        String name = username == null ? "" : username.trim();
-        if (!name.isEmpty()) {
-            try (PreparedStatement ps = c.prepareStatement("SELECT TOP (1) user_id FROM dbo.sys_users WHERE ISNULL(active,1)=1 AND LOWER(LTRIM(RTRIM(CAST(user_name AS nvarchar(100)))))=LOWER(?) ORDER BY user_id DESC")) {
-                ps.setString(1,name);
-                try (ResultSet r=ps.executeQuery()) { if (r.next()) return r.getInt(1); }
-            }
+    /** Resolve only an active, unlocked Atiran manager; synthetic local IDs are never posted. */
+    public static int resolveAtiranUserId(Connection c, int sessionUid) throws Exception {
+        if (sessionUid <= 0)
+            throw new Exception("حساب محلی شناسهٔ حسابرسی آتیران ندارد؛ برای این عملیات با حساب مدیر آتیران دوباره احراز هویت کنید.");
+        Meta meta=new Meta(c);
+        if(!meta.table("sys_users"))throw new Exception("جدول کاربران آتیران (sys_users) پیدا نشد.");
+        String idCol=meta.col("sys_users","user_id"),nameCol=meta.col("sys_users","user_name");
+        if(idCol==null||nameCol==null)throw new Exception("شناسه یا نام کاربری در sys_users آتیران پیدا نشد.");
+        String username=null;
+        try(PreparedStatement ps=c.prepareStatement("SELECT TOP 1 "+Sql.q(nameCol)+" FROM "+meta.qTable("sys_users")+" WHERE "+Sql.q(idCol)+"=?")){
+            ps.setInt(1,sessionUid);try(ResultSet rs=ps.executeQuery()){if(rs.next())username=rs.getString(1);}
         }
-        throw new Exception("برای ثبت تولید، نام کاربر مدیر باید به یک کاربر فعال واقعی در sys_users آتیران وصل باشد؛ حساب محلی به‌تنهایی شناسهٔ سندداری ندارد.");
+        if(username==null||username.trim().isEmpty())throw new Exception("کاربر نشست دیگر در sys_users آتیران پیدا نشد.");
+        AtiranAuth.AuthUser user=AtiranAuth.fetchUser(c,username);
+        if(user==null||user.uid!=sessionUid||!user.active||user.locked)
+            throw new Exception("کاربر نشست دیگر فعال و قابل استفاده در آتیران نیست؛ دوباره وارد شوید.");
+        if(!RoleStore.ADMIN.equals(user.appRole))
+            throw new Exception("ثبت تولید فقط با حساب دارای نقش مدیر آتیران مجاز است.");
+        return user.uid;
     }
 
-    private static boolean userExists(Connection c, int id) throws Exception {
-        try (PreparedStatement ps = c.prepareStatement("SELECT 1 FROM dbo.sys_users WHERE user_id=? AND ISNULL(active,1)=1")) {
-            ps.setInt(1,id); try(ResultSet r=ps.executeQuery()){return r.next();}
-        }
+    /** One-operation reauthentication for local-admin sessions; credentials are never stored. */
+    public static int authenticateAtiranManager(Connection c, String username, String password) throws Exception {
+        String name=username==null?"":username.trim();
+        if(name.isEmpty()||password==null||password.isEmpty())
+            throw new Exception("نام کاربری و رمز عبور مدیر آتیران را وارد کنید.");
+        AtiranAuth.AuthUser user=AtiranAuth.fetchUser(c,name);
+        if(user==null)throw new Exception("این نام کاربری در sys_users آتیران پیدا نشد.");
+        if(!user.active||user.locked)throw new Exception("حساب آتیران غیرفعال یا قفل است.");
+        if(!RoleStore.ADMIN.equals(user.appRole))
+            throw new Exception("برای ثبت تولید، احراز هویت با حساب دارای نقش مدیر آتیران لازم است.");
+        boolean passwordOk=AtiranAuth.verifyPasswordServer(c,user.userName,password)
+                ||AtiranAuth.verifyPassword(user.pw,password,user.userName);
+        if(!passwordOk)throw new Exception("رمز عبور حساب مدیر آتیران تأیید نشد.");
+        if(user.uid<=0)throw new Exception("شناسهٔ کاربر مدیر آتیران معتبر نیست.");
+        return user.uid;
     }
 
     /** Refuse to write unless the actual DB exposes the exact Mili production ledger contract. */

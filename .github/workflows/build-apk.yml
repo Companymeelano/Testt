@@ -79,15 +79,26 @@ jobs:
           mkdir -p dist
           rm -f dist/*.apk dist/latest-unified.json
           find app/build/outputs/apk -path '*/debug/*.apk' -type f -print -exec cp -t dist/ {} +
-          cp app/build/outputs/apk/unified/release/app-unified-release.apk dist/MEELANO-v7.0.1-release.apk
-          APK=dist/MEELANO-v7.0.1-release.apk
+          cp app/build/outputs/apk/unified/release/app-unified-release.apk dist/MEELANO-v7.0.2-release.apk
+          APK=dist/MEELANO-v7.0.2-release.apk
+          python3 - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          apk=Path('dist/MEELANO-v7.0.2-release.apk')
+          descriptor=b'Lir/meelano/android/ProductionActivity;'
+          with ZipFile(apk) as archive:
+              dex=[name for name in archive.namelist() if name == 'classes.dex' or (name.startswith('classes') and name.endswith('.dex'))]
+              if not any(descriptor in archive.read(name) for name in dex):
+                  raise SystemExit('Manager-only production activity is missing from the final unified APK')
+          print('Manager-only production activity is packaged in the final unified APK.')
+          PY
           BT="$ANDROID_HOME/build-tools/36.0.0"
-          "$BT/aapt" dump badging "$APK" | grep -F "package: name='ir.meelano.visitor' versionCode='201' versionName='7.0.1'"
+          "$BT/aapt" dump badging "$APK" | grep -F "package: name='ir.meelano.visitor' versionCode='202' versionName='7.0.2'"
           "$BT/apksigner" verify --verbose --print-certs "$APK" > signing-check.txt
           grep -F "Signer #1 certificate SHA-256 digest: 1a2ed0dd70759d6e10c77a4641eeeb8f15972b76d99af351470216955b46d616" signing-check.txt
           SHA256=$(sha256sum "$APK" | cut -d' ' -f1)
           SIZE=$(stat -c %s "$APK")
-          printf '{"versionCode":201,"versionName":"7.0.1","packageName":"ir.meelano.visitor","url":"https://github.com/Companymeelano/Testt/releases/download/apk-v7-c192ed08/MEELANO-v7.0.1-release.apk","sha256":"%s","signerSha256":"1a2ed0dd70759d6e10c77a4641eeeb8f15972b76d99af351470216955b46d616","size":%s}\n' "$SHA256" "$SIZE" > dist/latest-unified.json
+          printf '{"versionCode":202,"versionName":"7.0.2","packageName":"ir.meelano.visitor","url":"https://github.com/Companymeelano/Testt/releases/download/apk-v7-0-2/MEELANO-v7.0.2-release.apk","sha256":"%s","signerSha256":"1a2ed0dd70759d6e10c77a4641eeeb8f15972b76d99af351470216955b46d616","size":%s}\n' "$SHA256" "$SIZE" > dist/latest-unified.json
           python3 -m json.tool dist/latest-unified.json >/dev/null
           ls -la dist/
 
@@ -104,14 +115,14 @@ jobs:
         if: success()
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: apk-v7-c192ed08
+          tag_name: apk-v7-0-2
           prerelease: true
-          name: MEELANO v7.0.1 — برنامهٔ یکپارچهٔ امضاشده + نسخه‌های تخصصی
+          name: MEELANO v7.0.2 — برنامهٔ یکپارچهٔ امضاشده + نسخه‌های تخصصی
           body: |
             ## نسخهٔ اصلاح‌شدهٔ برنامهٔ اصلیِ یکپارچه و لایسنس‌دار
-            **`MEELANO-v7.0.1-release.apk` — فایل اصلی برای به‌روزرسانی نصب فعلی**
+            **`MEELANO-v7.0.2-release.apk` — فایل اصلی برای به‌روزرسانی نصب فعلی**
 
-            این APK با همان شناسهٔ بستهٔ نسخهٔ یکپارچهٔ قبلی (`ir.meelano.visitor`) و همان گواهی امضای نصب قبلی ساخته شده است؛ آیکون اصلی حرف طلایی D حفظ می‌شود و نصب روی نسخهٔ قبلی باید بدون حذف برنامه/پاک‌شدن داده‌ها انجام شود. صفحهٔ مدیریت، فروش، انبار و مالی داخل همین برنامه است.
+            این APK با همان شناسهٔ بستهٔ نسخهٔ یکپارچهٔ قبلی (`ir.meelano.visitor`) و همان گواهی امضای نصب قبلی ساخته شده است؛ آیکون اصلی حرف طلایی D حفظ می‌شود و نصب روی نسخهٔ قبلی باید بدون حذف برنامه/پاک‌شدن داده‌ها انجام شود. صفحهٔ تولیدِ محدود به مدیر، مدیریت، فروش، انبار و مالی داخل همین APK است.
 
             `app-manager-debug.apk` یک برنامهٔ مدیرِ جداگانه با شناسه و آیکون متفاوت است؛ **برای ارتقای نصب اصلی از آن استفاده نکنید**. نسخه‌های پرسنل/فروشگاه/مودیان هم همچنان جداگانه‌اند.
           files: |
@@ -124,9 +135,9 @@ jobs:
           git config user.name "arena-ci"
           git config user.email "arena-ci@local"
           {
-            echo "نسخهٔ برنامهٔ یکپارچه: 7.0.1 (versionCode 201; package ir.meelano.visitor)"
+            echo "نسخهٔ برنامهٔ یکپارچه: 7.0.2 (versionCode 202; package ir.meelano.visitor)"
             echo "گواهی امضا: نسخهٔ نصب فعلی / Pakhsh Derakhshan (fingerprint را CI بررسی می‌کند)"
-            echo "APK اصلی: MEELANO-v7.0.1-release.apk"
+            echo "APK اصلی: MEELANO-v7.0.2-release.apk"
             echo "کامیت: $(git rev-parse --short HEAD)"
             echo "تاریخ build: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
             echo "Gradle: $(gradle --version | grep Gradle | head -1)"

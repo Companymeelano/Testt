@@ -44,6 +44,8 @@
                 android:resource="@xml/meelano_widget_info" />
         </receiver>
 
+        <activity android:name=".ProductionActivity" android:exported="false" />
+
         <activity
             android:name=".MainActivity"
             android:configChanges="keyboard|keyboardHidden|screenSize|uiMode"

@@ -9,7 +9,7 @@ import java.util.regex.Pattern;
 /** Strict parser and policy for the signed all-in-one app's update feed. */
 final class MeelanoUpdateManifest {
     static final String PACKAGE_NAME = "ir.meelano.visitor";
-    static final String META_URL = "https://raw.githubusercontent.com/Companymeelano/Testt/main/dist/latest-unified.json";
+    static final String META_URL = "https://raw.githubusercontent.com/Companymeelano/Testt/arena/29e01a09-testt/dist/latest-unified.json";
     static final String RELEASE_SIGNER_SHA256 = "1a2ed0dd70759d6e10c77a4641eeeb8f15972b76d99af351470216955b46d616";
     static final long MAX_APK_BYTES = 200L * 1024L * 1024L;
     private static final Pattern SHA256 = Pattern.compile("[0-9a-fA-F]{64}");

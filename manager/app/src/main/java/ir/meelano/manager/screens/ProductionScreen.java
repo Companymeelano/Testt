@@ -327,7 +327,7 @@ public final class ProductionScreen extends Screen {
         card.addView(a.kit.btnGhost("پیش‌نمایش بهای تمام‌شده",Theme.INFO,v->preview()),a.kit.lp(-1,-2));
         card.addView(a.kit.gap(6));
         card.addView(a.kit.btnGold(busy?"در حال ثبت…":"ثبت قطعی تولید و به‌روزرسانی موجودی",v->post()),a.kit.lp(-1,-2));
-        card.addView(a.kit.hint("ثبت قطعی فقط با کاربر فعال واقعی آتیران انجام می‌شود؛ حساب محلی بدون user_id آتیران مجوز سندداری ندارد."),a.kit.lp(-1,-2));
+        card.addView(a.kit.hint("اگر با حساب محلی وارد شده‌اید، پیش از ثبت نام کاربری و رمز مدیر آتیران برای انتساب سند به user_id واقعی یک‌بار پرسیده می‌شود؛ رمز ذخیره نمی‌شود."),a.kit.lp(-1,-2));
         return card;
     }
 
@@ -567,7 +567,7 @@ public final class ProductionScreen extends Screen {
                 ProductionWriter.RecipeDraft draft=new ProductionWriter.RecipeDraft();draft.id=ed.id;draft.name=ed.name;draft.productId=ed.output.id;draft.description=ed.desc;draft.baseOutputQty=ed.baseQty;draft.baseWeightKg=ed.baseWeight;
                 for(Line l:ed.lines)draft.ingredients.add(new ProductionWriter.RecipeIngredient(l.product,l.baseQty));
                 for(CostLine x:ed.costs)draft.costs.add(new ProductionWriter.RecipeCost(x.type.id,x.type.name,x.baseAmount));
-                dlg.dismiss();saveRecipe(draft);
+                saveRecipe(draft,dlg);
             }catch(Exception ex){a.kit.toast("اطلاعات فرمول معتبر نیست: "+ex.getMessage());}
         });});dlg.show();
     }
@@ -577,8 +577,11 @@ public final class ProductionScreen extends Screen {
     }
     private void pickCostForRecipe(RecipeEditor ed){pickCostType(t->inputDecimal("هزینهٔ پایهٔ "+t.name,BigDecimal.ZERO,n->{ed.costs.add(new CostLine(t,n,n));showRecipeEditor(ed);}));}
 
-    private void saveRecipe(ProductionWriter.RecipeDraft draft){
-        runWriter("در حال ذخیرهٔ فرمول…",c->{int uid=ProductionWriter.resolveAtiranUserId(c,AtiranAuth.sessionUid(a),AtiranAuth.sessionUser(a));return ProductionWriter.saveRecipe(c,draft,uid);},id->{catalog=null;recipe=null;ingredients.clear();costs.clear();loadCatalog();a.kit.toast("فرمول «"+draft.name+"» ذخیره شد.");});
+    private void saveRecipe(ProductionWriter.RecipeDraft draft,AlertDialog editorDialog){
+        withAtiranManagerId(userId->{
+            editorDialog.dismiss();
+            runWriter("در حال ذخیرهٔ فرمول…","ذخیرهٔ فرمول انجام نشد",c->ProductionWriter.saveRecipe(c,draft,userId),id->{busy=false;catalog=null;recipe=null;ingredients.clear();costs.clear();loadCatalog();a.kit.toast("فرمول «"+draft.name+"» ذخیره شد.");});
+        });
     }
 
     private void editIngredient(int index){
@@ -661,18 +664,61 @@ public final class ProductionScreen extends Screen {
     private void post(){
         if(busy||!managerAllowed(a))return;
         ProductionWriter.Request req=buildRequest();if(req==null)return;
+        withAtiranManagerId(userId->confirmPost(req,userId));
+    }
+
+    private void confirmPost(ProductionWriter.Request req,int atiranUserId){
         if(idempotencyKey.isEmpty())idempotencyKey=UUID.randomUUID().toString();
         req.idempotencyKey=idempotencyKey;
         new AlertDialog.Builder(a).setTitle("ثبت قطعی تولید؟").setMessage("مواد اولیه از موجودی همین انبار کسر می‌شود و محصول نهایی به آن افزوده خواهد شد. سری جدید ساخته نمی‌شود، سری‌های قبلی حذف نمی‌شوند و الزام تولید سری برای کالای نهایی خاموش خواهد شد. گردش‌ها و سند حسابداری (اگر تنظیم رسمی آتیران فعال باشد) در تراکنش ثبت می‌شوند.")
                 .setNegativeButton("بازگشت",null).setPositiveButton("ثبت قطعی",(d,w)->{
                     busy=true;render(content);
-                    runWriter("در حال ثبت تولید و محاسبهٔ موجودی…",c->{int uid=ProductionWriter.resolveAtiranUserId(c,AtiranAuth.sessionUid(a),AtiranAuth.sessionUser(a));return ProductionWriter.post(c,req,uid);},posted->{
+                    runWriter("در حال ثبت تولید و محاسبهٔ موجودی…","ثبت تولید انجام نشد",c->ProductionWriter.post(c,req,atiranUserId),posted->{
                         busy=false;idempotencyKey="";
                         if(posted.duplicate)a.kit.toast("این تولید قبلاً ثبت شده است؛ شمارهٔ "+Money.fa(String.valueOf(posted.productionId)));
                         else a.kit.toast("تولید در آتیران ثبت شد؛ شمارهٔ "+Money.fa(String.valueOf(posted.productionId))+" • بهای هر واحد "+money(posted.costing.finishedUnitPrice));
                         catalog=null;recipe=null;output=null;ingredients.clear();costs.clear();loadCatalog();
                     });
                 }).show();
+    }
+
+    /** Resolve an existing Atiran session or request one-operation manager reauthentication. */
+    private void withAtiranManagerId(Consumer<Integer> continuation){
+        if(busy)return;
+        int sessionUid=AtiranAuth.sessionUid(a);
+        if(sessionUid>0){
+            busy=true;render(content);
+            runWriter("در حال بررسی حساب آتیران…","بررسی حساب آتیران انجام نشد",c->ProductionWriter.resolveAtiranUserId(c,sessionUid),uid->{
+                busy=false;render(content);continuation.accept(uid);
+            });
+            return;
+        }
+
+        LinearLayout fields=a.kit.v();
+        fields.setPadding(a.kit.dp(20),a.kit.dp(8),a.kit.dp(20),a.kit.dp(8));
+        fields.addView(a.kit.hint("برای این عملیات، مدیر فعال آتیران را تأیید کنید. رمز فقط برای همین اتصال استفاده می‌شود و ذخیره نخواهد شد."),a.kit.lp(-1,-2));
+        EditText username=a.kit.edit("نام کاربری مدیر آتیران","");
+        EditText password=a.kit.edit("رمز عبور مدیر آتیران","");
+        password.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        password.setSaveEnabled(false);
+        fields.addView(username,a.kit.lp(-1,-2));fields.addView(password,a.kit.lp(-1,-2));
+        AlertDialog dlg=new AlertDialog.Builder(a).setCustomTitle(dialogTitle("تأیید هویت مدیر آتیران"))
+                .setView(fields).setNegativeButton("انصراف",null).setPositiveButton("تأیید برای این عملیات",null).create();
+        dlg.setOnDismissListener(x->password.setText(""));
+        dlg.setOnShowListener(x->{
+            styleDialog(dlg);
+            dlg.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+                String name=username.getText().toString().trim();
+                String secret=password.getText().toString();
+                if(name.isEmpty()){username.setError("نام کاربری لازم است");return;}
+                if(secret.isEmpty()){password.setError("رمز عبور لازم است");return;}
+                password.setText("");dlg.dismiss();busy=true;render(content);
+                runWriter("در حال تأیید مدیر آتیران…","احراز هویت مدیر آتیران انجام نشد",c->ProductionWriter.authenticateAtiranManager(c,name,secret),uid->{
+                    busy=false;render(content);continuation.accept(uid);
+                });
+            });
+        });
+        dlg.show();
     }
 
     private ProductionWriter.Request buildRequest(){
@@ -699,6 +745,9 @@ public final class ProductionScreen extends Screen {
     private interface SqlRun<T>{T run(Connection c)throws Exception;}
     private interface Done<T>{void ok(T value);}
     private <T> void runWriter(String wait,SqlRun<T> work,Done<T> done){
+        runWriter(wait,"ثبت عملیات انجام نشد",work,done);
+    }
+    private <T> void runWriter(String wait,String failurePrefix,SqlRun<T> work,Done<T> done){
         a.kit.toast(wait);
         writer.execute(()->{
             T result=null;String error=null;boolean direct=false;
@@ -709,7 +758,7 @@ public final class ProductionScreen extends Screen {
             finally{if(direct)try{ir.meelano.manager.data.NetRoute.unbind(a);}catch(Exception ignored){Diag.ignored("ProductionScreen:writer",ignored);}}
             T val=result;String err=error;
             a.runOnUiThread(()->{
-                if(err!=null){busy=false;render(content);a.kit.toast("ثبت تولید انجام نشد: "+err);}
+                if(err!=null){busy=false;render(content);a.kit.toast(failurePrefix+": "+err);}
                 else done.ok(val);
             });
         });

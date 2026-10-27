@@ -1,29 +1,9 @@
-نسخهٔ برنامهٔ یکپارچه: 7.0.1 (versionCode 201; package ir.meelano.visitor)
-گواهی امضا: نسخهٔ نصب فعلی / Pakhsh Derakhshan (fingerprint را CI بررسی می‌کند)
-APK اصلی: MEELANO-v7.0.1-release.apk
-کامیت: 3b01d5b
-تاریخ build: 2026-10-26T22:13:02Z
-Gradle: Gradle 8.13
-فایل‌ها:
-drwxr-xr-x  2 runner runner    4096 Oct 26 22:12 .
-drwxr-xr-x 14 runner runner    4096 Oct 26 22:12 ..
--rw-r--r--  1 runner runner     346 Oct 26 22:13 BUILD-INFO.txt
--rw-r--r--  1 runner runner 2699204 Oct 26 22:12 MEELANO-v7.0.1-release.apk
--rw-r--r--  1 runner runner 3388629 Oct 26 22:12 app-manager-debug.apk
--rw-r--r--  1 runner runner 3042941 Oct 26 22:12 app-staff-debug.apk
--rw-r--r--  1 runner runner 3052717 Oct 26 22:12 app-store-debug.apk
--rw-r--r--  1 runner runner 3095401 Oct 26 22:12 app-tax-debug.apk
--rw-r--r--  1 runner runner 3080649 Oct 26 22:12 app-unified-debug.apk
--rw-r--r--  1 runner runner 3080733 Oct 26 22:12 app-visitor-debug.apk
--rw-r--r--  1 runner runner     491 Oct 26 22:08 buy-formula-counts.json
--rw-r--r--  1 runner runner     359 Oct 26 22:12 latest-unified.json
--rw-r--r--  1 runner runner     189 Oct 26 22:08 manager-v36-build-info.txt
--rw-r--r--  1 runner runner    1422 Oct 26 22:08 money-structure-counts.json
---- sha256 ---
-97ae33d0259e5eae2346707df6ac54fc70f9cd16a9930ff7fb5abd4caca3471b  MEELANO-v7.0.1-release.apk
-4e3494210168aaf7c188714740d86d164b877f2b3a17b6175eecf85a06bb54cf  app-manager-debug.apk
-9bfa3315a6ea5ea5daae9e5cc9577cdb21ae80d3b44ea23e9d1be6f716f36e1d  app-staff-debug.apk
-1f7fc37cb54d4c8df2a3dcf6143c2bd158aeaf611f2a3ba6869ba86a08272c6d  app-store-debug.apk
-b3c5163dafe359cf43e53017d6106a60a81f016d562c5abb937f0010bce2fcf7  app-tax-debug.apk
-170f3950c26c5cc93acb5bd73987a772a09ba08e9170b5be6fbebf4ee3c895ec  app-unified-debug.apk
-232fccf25b1d7b823c1cf8e170ce48d25cd0e47d5f651f1fb2cb7c6b50ad015e  app-visitor-debug.apk
+نسخهٔ برنامهٔ یکپارچه: 7.0.2 (versionCode 202; package ir.meelano.visitor)
+گواهی امضا: نسخهٔ نصب فعلی / Pakhsh Derakhshan — SHA-256: 1a2ed0dd70759d6e10c77a4641eeeb8f15972b76d99af351470216955b46d616
+APK اصلی: MEELANO-v7.0.2-release.apk
+لینک انتشار: https://github.com/Companymeelano/Testt/releases/download/apk-v7-0-2/MEELANO-v7.0.2-release.apk
+SHA-256 APK: 641b29f33a3ca177dd631202eee399c5e11824532ff6d04780382921ebf13839
+حجم: 2736912 بایت
+ساخت CI: https://github.com/Companymeelano/Testt/actions/runs/40512093490
+کامیت منبع: 1568beff95c25d3da635e94a47d367c2eb3997a7
+زمان ساخت (UTC): 2026-10-27T13:31:09Z

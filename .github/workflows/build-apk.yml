@@ -149,9 +149,18 @@ jobs:
           git rm -q --cached build-error-tail.txt 2>/dev/null || true
           rm -f build-error-tail.txt
           git add -A -f dist/
-          git commit -m "dist: APKهای نسخهٔ ۷.۰.۱ با به‌روزرسان امن (ساخت خودکار CI)" || true
-          git pull --rebase --strategy-option=ours origin arena/29e01a09-testt || true
-          git push origin HEAD:arena/29e01a09-testt || true
+          git commit -m "dist: publish verified unified APKs from CI"
+          for attempt in 1 2 3 4 5; do
+            git fetch origin arena/29e01a09-testt
+            git rebase origin/arena/29e01a09-testt
+            if git push origin HEAD:arena/29e01a09-testt; then
+              exit 0
+            fi
+            echo "Push attempt ${attempt} failed; retrying after syncing with the session branch."
+            sleep $((attempt * 2))
+          done
+          echo "Could not publish verified APKs to the session branch after five attempts." >&2
+          exit 1
 
       - name: Save diagnostics on failure (so the agent can read the real error)
         if: failure()

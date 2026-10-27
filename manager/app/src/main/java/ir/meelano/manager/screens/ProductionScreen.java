@@ -36,6 +36,8 @@ import java.util.concurrent.Executors;
 
 /** Manager-only production desk. Inventory posting is delegated to ProductionWriter. */
 public final class ProductionScreen extends Screen {
+    private static final int MAX_PICKER_ROWS = 60;
+
     private static final class Catalog {
         final List<ProductionWriter.Product> products;
         final List<ProductionWriter.Warehouse> warehouses;
@@ -66,6 +68,7 @@ public final class ProductionScreen extends Screen {
     }
 
     private final ExecutorService writer = Executors.newSingleThreadExecutor();
+    private final ExecutorService pickerFilter = Executors.newSingleThreadExecutor();
     private LinearLayout content;
     private Catalog catalog;
     private ProductionWriter.Product output;
@@ -386,36 +389,71 @@ public final class ProductionScreen extends Screen {
         root.addView(a.kit.gap(5));
         LinearLayout rows=a.kit.v();
         final AlertDialog[] dialogRef=new AlertDialog[1];
-        Runnable refresh=()->{
-            String key=Sql.searchKey(search.getText()==null?"":search.getText().toString());
-            rows.removeAllViews();
-            int shown=0;
-            for(T item:items){
-                if(item==null)continue;
-                if(!key.isEmpty()&&!Sql.searchKey(contentFactory.searchText(item)).contains(key))continue;
-                shown++;
-                View row=contentFactory.row(item,v->{
-                    if(dialogRef[0]!=null)dialogRef[0].dismiss();
-                    onPick.accept(item);
+        final int[] generation={0};
+        final android.os.Handler handler=new android.os.Handler(android.os.Looper.getMainLooper());
+        final Runnable[] pending={null};
+
+        java.util.function.IntConsumer refresh=token->{
+            final String key=Sql.searchKey(search.getText()==null?"":search.getText().toString());
+            pickerFilter.execute(()->{
+                List<T> matches=new ArrayList<>();
+                int totalMatches=0;
+                if(key.isEmpty()){
+                    totalMatches=items.size();
+                    for(T item:items){
+                        if(item==null)continue;
+                        if(matches.size()>=MAX_PICKER_ROWS)break;
+                        matches.add(item);
+                    }
+                }else{
+                    for(T item:items){
+                        if(item==null||!Sql.searchKey(contentFactory.searchText(item)).contains(key))continue;
+                        totalMatches++;
+                        if(matches.size()<MAX_PICKER_ROWS)matches.add(item);
+                    }
+                }
+                final int resultCount=totalMatches;
+                a.runOnUiThread(()->{
+                    if(token!=generation[0]||dialogRef[0]==null||!dialogRef[0].isShowing())return;
+                    rows.removeAllViews();
+                    for(T item:matches){
+                        try{
+                            View row=contentFactory.row(item,v->{
+                                if(dialogRef[0]!=null)dialogRef[0].dismiss();
+                                onPick.accept(item);
+                            });
+                            LinearLayout.LayoutParams lp=a.kit.lp(-1,-2);
+                            lp.bottomMargin=Theme.dp(5);
+                            rows.addView(row,lp);
+                        }catch(RuntimeException e){Diag.ignored("ProductionScreen:pickerRow",e);}
+                    }
+                    if(resultCount==0)rows.addView(a.kit.empty(key.isEmpty()?"فهرست کالا خالی است":"موردی با این عبارت پیدا نشد",null),a.kit.lp(-1,-2));
+                    if(resultCount>matches.size())
+                        count.setText("نمایش "+Money.fa(String.valueOf(matches.size()))+" مورد از "+Money.fa(String.valueOf(resultCount))+" نتیجه؛ برای محدودکردن فهرست جست‌وجو کنید.");
+                    else count.setText(Money.fa(String.valueOf(resultCount))+" مورد");
                 });
-                LinearLayout.LayoutParams lp=a.kit.lp(-1,-2);
-                lp.bottomMargin=Theme.dp(5);
-                rows.addView(row,lp);
-            }
-            count.setText(Money.fa(String.valueOf(shown))+" از "+Money.fa(String.valueOf(items.size()))+" مورد");
-            if(shown==0)rows.addView(a.kit.empty("موردی با این عبارت پیدا نشد",null),a.kit.lp(-1,-2));
+            });
         };
         search.addTextChangedListener(new android.text.TextWatcher(){
             @Override public void beforeTextChanged(CharSequence s,int start,int count,int after){}
-            @Override public void onTextChanged(CharSequence s,int start,int before,int count){refresh.run();}
+            @Override public void onTextChanged(CharSequence s,int start,int before,int count){
+                if(pending[0]!=null)handler.removeCallbacks(pending[0]);
+                int token=++generation[0];
+                pending[0]=()->refresh.accept(token);
+                handler.postDelayed(pending[0],180);
+            }
             @Override public void afterTextChanged(android.text.Editable e){}
         });
-        refresh.run();
         root.addView(a.kit.scrollWrap(rows,430),a.kit.lp(-1,-2));
         root.addView(a.kit.gap(4));
         root.addView(a.kit.btnGhost("بستن",Theme.MUTED,v->{if(dialogRef[0]!=null)dialogRef[0].dismiss();}),a.kit.lp(-1,-2));
         dialogRef[0]=a.kit.dialog(title,root,true);
+        dialogRef[0].setOnDismissListener(d->{
+            generation[0]++;
+            if(pending[0]!=null)handler.removeCallbacks(pending[0]);
+        });
         dialogRef[0].show();
+        refresh.accept(++generation[0]);
     }
 
     private TextView dialogTitle(String title){

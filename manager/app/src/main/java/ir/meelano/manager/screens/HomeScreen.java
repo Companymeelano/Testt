@@ -1240,7 +1240,8 @@ public class HomeScreen extends Screen {
 
     private void secKpis(LinearLayout content, Data d) {
         LinearLayout card = a.kit.card(Theme.GOLD);
-        card.addView(a.kit.sectionHead("گردش امروز", "فروش ›", v -> a.nav("sales")), a.kit.lp(-1, -2));
+        card.addView(dashboardSectionHead("گردش امروز", R.drawable.mi_account_balance_wallet,
+                Theme.GOLD, "فروش ›", v -> a.nav("sales")), a.kit.lp(-1, -2));
         card.addView(a.kit.text("چهار شاخص اصلی؛ لمس هر کارت، ریز همان روز را باز می‌کند.",
                 10.5f, Theme.MUTED, false), a.kit.lp(-1, -2));
         card.addView(a.kit.gap(8));
@@ -1315,6 +1316,73 @@ public class HomeScreen extends Screen {
         return tile;
     }
 
+    /** Dashboard-only art mapping keeps gold and nut identities distinct without changing other screens. */
+    private int dashboardIcon(int vector) {
+        if (Theme.isNuts()) {
+            if (vector == R.drawable.mi_warning) return R.drawable.icon3d_medal_alert;
+            if (vector == R.drawable.mi_account_balance_wallet) return R.drawable.icon3d_medal_coin;
+            if (vector == R.drawable.mi_assignment_return) return R.drawable.icon3d_medal_refresh;
+            if (vector == R.drawable.mi_sell) return R.drawable.icon3d_medal_dollar;
+            if (vector == R.drawable.mi_grid_view) return R.drawable.icon3d_medal_products;
+            if (vector == R.drawable.mi_bar_chart) return R.drawable.icon3d_medal_reports;
+            if (vector == R.drawable.mi_receipt_long) return R.drawable.icon3d_medal_cash_in;
+            if (vector == R.drawable.mi_calendar_month) return R.drawable.icon3d_medal_dues;
+        }
+        if (Theme.DARK) {
+            if (vector == R.drawable.mi_account_balance_wallet) return R.drawable.icon3d_treasury;
+            if (vector == R.drawable.mi_warning) return R.drawable.icon3d_dark_bell;
+            if (vector == R.drawable.mi_assignment_return) return R.drawable.icon3d_dark_refresh;
+            if (vector == R.drawable.mi_sell) return R.drawable.icon3d_dark_tag;
+            if (vector == R.drawable.mi_grid_view) return R.drawable.icon3d_dark_products;
+            if (vector == R.drawable.mi_bar_chart) return R.drawable.icon3d_dark_reports;
+            if (vector == R.drawable.mi_receipt_long) return R.drawable.icon3d_dark_cash_in;
+            if (vector == R.drawable.mi_calendar_month) return R.drawable.icon3d_dark_dues;
+        }
+        int themed = Theme.icon3d(vector);
+        if (Theme.isIcon3d(themed)) return themed;
+        if (vector == R.drawable.mi_warning) return R.drawable.icon3d_dark_bell;
+        if (vector == R.drawable.mi_account_balance_wallet) return R.drawable.icon3d_coin;
+        if (vector == R.drawable.mi_assignment_return) return R.drawable.icon3d_refresh;
+        return R.drawable.icon3d_gold;
+    }
+
+    private ImageView dashboardArt(int iconVector) {
+        ImageView image = new ImageView(a);
+        image.setImageResource(dashboardIcon(iconVector));
+        image.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        image.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        return image;
+    }
+
+    /** Explicitly sized, untinted 3D header icon for each dashboard card. */
+    private View dashboardSectionHead(String title, int iconVector, int accent,
+                                      String actionLabel, View.OnClickListener action) {
+        LinearLayout row = a.kit.h();
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(Theme.dp(3), Theme.dp(4), Theme.dp(3), Theme.dp(7));
+        FrameLayout badge = new FrameLayout(a);
+        badge.setBackground(Theme.avatar(Theme.alpha(accent, Theme.isLight() ? 38 : 48)));
+        badge.addView(dashboardArt(iconVector),
+                new FrameLayout.LayoutParams(Theme.dp(30), Theme.dp(30), Gravity.CENTER));
+        row.addView(badge, new LinearLayout.LayoutParams(Theme.dp(38), Theme.dp(38)));
+        row.addView(a.kit.space(8));
+        TextView label = a.kit.text(title, 14f, accent, true);
+        label.setMaxLines(2);
+        label.setEllipsize(TextUtils.TruncateAt.END);
+        row.addView(label, a.kit.wlp(1f));
+        if (actionLabel != null && action != null) {
+            TextView button = a.kit.text(actionLabel, 10.5f, accent, true);
+            button.setPadding(Theme.dp(9), Theme.dp(6), Theme.dp(9), Theme.dp(6));
+            button.setBackground(Theme.ghostButton(accent));
+            button.setContentDescription(actionLabel.replace("›", "") + "؛ باز کردن");
+            Theme.pressable(button);
+            button.setOnClickListener(action);
+            row.addView(a.kit.space(6));
+            row.addView(button, a.kit.lp(-2, -2));
+        }
+        return row;
+    }
+
     Kit.Kpi dayKpi(String title, String target, Row row, String countKey,
                    String countLabel, int accent) {
         String day = dayOf(row);
@@ -1331,7 +1399,8 @@ public class HomeScreen extends Screen {
     private void secAlerts(LinearLayout content, Data d) {
         // ---- alerts ----
         LinearLayout alerts = a.kit.card(Theme.GOLD);
-        alerts.addView(a.kit.sectionHead("هشدار امروز", null, null), a.kit.lp(-1, -2));
+        alerts.addView(dashboardSectionHead("هشدار امروز", R.drawable.mi_warning,
+                Theme.DANGER, null, null), a.kit.lp(-1, -2));
         int n = 0;
         n += alert(alerts, d, n);
         List<FollowUps.Due> dues = FollowUps.dueToday(a);
@@ -1354,7 +1423,8 @@ public class HomeScreen extends Screen {
      */
     private void secReturns(LinearLayout content, Data d) {
         LinearLayout card = a.kit.card(Theme.DANGER);
-        card.addView(a.kit.sectionHead("برگشتی‌های فعال • ۳۰ روز", "گزارش ›", v -> a.nav("reports")),
+        card.addView(dashboardSectionHead("برگشتی‌های فعال • ۳۰ روز", R.drawable.mi_assignment_return,
+                Theme.DANGER, "گزارش ›", v -> a.nav("reports")),
                 a.kit.lp(-1, -2));
         long docs = 0;
         double total = 0;
@@ -1369,7 +1439,7 @@ public class HomeScreen extends Screen {
         } else {
             LinearLayout summary = a.kit.h();
             summary.setGravity(Gravity.CENTER_VERTICAL);
-            summary.addView(a.kit.icon(R.drawable.mi_assignment_return, Theme.DANGER, 25),
+            summary.addView(dashboardArt(R.drawable.mi_assignment_return),
                     a.kit.lp(Theme.dp(30), Theme.dp(30)));
             summary.addView(a.kit.space(7));
             summary.addView(a.kit.text(Money.fa(String.valueOf(docs)) + " سند برگشتی",
@@ -1395,7 +1465,8 @@ public class HomeScreen extends Screen {
     private void secTopItems(LinearLayout content, Data d) {
         String period = snapshotLabel(d);
         LinearLayout c = a.kit.card(Theme.GOLD);
-        c.addView(a.kit.sectionHead("پرفروش‌ترین کالاهای " + period, "گزارش کامل ›", v -> a.nav("reports")),
+        c.addView(dashboardSectionHead("پرفروش‌ترین کالاهای " + period, R.drawable.mi_grid_view,
+                Theme.GOLD, "گزارش کامل ›", v -> a.nav("reports")),
                 a.kit.lp(-1, -2));
         if (d.topItems == null || d.topItems.isEmpty()) {
             c.addView(a.kit.text("هنوز کالایی برای " + period + " ثبت نشده است.", 11.5f, Theme.MUTED, false),
@@ -1441,7 +1512,8 @@ public class HomeScreen extends Screen {
             String endDay = snapshotDay(d);
             String period = snapshotLabel(d);
             LinearLayout c = a.kit.card(Theme.GOLD);
-            c.addView(a.kit.sectionHead("روند روزانهٔ فروش • تا " + period, "فروش ›", v -> a.nav("sales")), a.kit.lp(-1, -2));
+            c.addView(dashboardSectionHead("روند روزانهٔ فروش • تا " + period, R.drawable.mi_bar_chart,
+                    Theme.GOLD, "فروش ›", v -> a.nav("sales")), a.kit.lp(-1, -2));
             Charts.Area ch = new Charts.Area(a);
             List<Charts.Point> pts = filled(d.salesDaily, endDay);
             final TextView cap = a.kit.text(pts.isEmpty() ? "" : lastCap(pts), 11f, Theme.MUTED, false);
@@ -1456,7 +1528,8 @@ public class HomeScreen extends Screen {
     private void secMonthlySales(LinearLayout content, Data d) {
         if (d.monthlySales == null || d.monthlySales.isEmpty()) return;
         LinearLayout card = a.kit.card(Theme.GOLD);
-        card.addView(a.kit.sectionHead("فروش ماهانه • ۱۲ ماه اخیر", "فروش ›", v -> a.nav("sales")),
+        card.addView(dashboardSectionHead("فروش ماهانه • ۱۲ ماه اخیر", R.drawable.mi_sell,
+                Theme.GOLD, "فروش ›", v -> a.nav("sales")),
                 a.kit.lp(-1, -2));
         Charts.Bars chart = new Charts.Bars(a);
         List<Charts.Point> points = new ArrayList<>();
@@ -1479,7 +1552,8 @@ public class HomeScreen extends Screen {
         // ---- receipts mix donut ----
         if (d.inDay != null && d.inDay.d("total") > 0) {
             LinearLayout c = a.kit.card(Theme.SUCCESS);
-            c.addView(a.kit.sectionHead("ترکیب دریافت " + dayOf(d.inDay), "دریافت‌ها ›", v -> a.nav("dar_in")), a.kit.lp(-1, -2));
+            c.addView(dashboardSectionHead("ترکیب دریافت " + dayOf(d.inDay), R.drawable.mi_receipt_long,
+                    Theme.SUCCESS, "دریافت‌ها ›", v -> a.nav("dar_in")), a.kit.lp(-1, -2));
             Charts.Donut dn = new Charts.Donut(a);
             List<Charts.Point> pts = new ArrayList<>();
             pts.add(new Charts.Point("نقد", d.inDay.d("cash"), Theme.SUCCESS));
@@ -1498,7 +1572,8 @@ public class HomeScreen extends Screen {
         double dueOutSum = sum(d.dueOut);
         if ((d.dueIn != null && !d.dueIn.isEmpty()) || (d.dueOut != null && !d.dueOut.isEmpty())) {
             LinearLayout c = a.kit.card(Theme.INFO);
-            c.addView(a.kit.sectionHead("سررسید ۳ روز آینده", "چک‌ها ›", v -> a.nav("cheques")), a.kit.lp(-1, -2));
+            c.addView(dashboardSectionHead("سررسید ۳ روز آینده", R.drawable.mi_calendar_month,
+                    Theme.INFO, "چک‌ها ›", v -> a.nav("cheques")), a.kit.lp(-1, -2));
             if (d.dueIn != null && !d.dueIn.isEmpty())
                 c.addView(a.kit.kv("دریافتی (" + Money.fa(String.valueOf(d.dueIn.size())) + " فقره)", Money.rial(dueInSum), Theme.SUCCESS), a.kit.lp(-1, -2));
             if (d.dueOut != null && !d.dueOut.isEmpty())

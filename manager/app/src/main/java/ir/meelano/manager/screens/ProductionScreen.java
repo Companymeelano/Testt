@@ -695,7 +695,7 @@ public final class ProductionScreen extends Screen {
         }
 
         LinearLayout fields=a.kit.v();
-        fields.setPadding(a.kit.dp(20),a.kit.dp(8),a.kit.dp(20),a.kit.dp(8));
+        fields.setPadding(Theme.dp(20),Theme.dp(8),Theme.dp(20),Theme.dp(8));
         fields.addView(a.kit.hint("برای این عملیات، مدیر فعال آتیران را تأیید کنید. رمز فقط برای همین اتصال استفاده می‌شود و ذخیره نخواهد شد."),a.kit.lp(-1,-2));
         EditText username=a.kit.edit("نام کاربری مدیر آتیران","");
         EditText password=a.kit.edit("رمز عبور مدیر آتیران","");

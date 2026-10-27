@@ -164,8 +164,8 @@ public final class ProductionActivity extends Activity {
         long rid=selected.id;int wid=warehouse.id;
         runSql("در حال بارگذاری مواد و هزینه‌ها…",c->new Object[]{ProductionWriter.recipeIngredients(c,rid,wid),ProductionWriter.recipeCosts(c,rid)},v->{
             recipe=selected;output=findProduct(selected.productId);materials.clear();costs.clear();
-            for(ProductionWriter.RecipeIngredient x:castList(v[0]))materials.add(new MaterialLine(x.product,x.baseQtyPieces,x.baseQtyPieces,x.available));
-            for(ProductionWriter.RecipeCost x:castList(v[1])){ProductionWriter.CostType t=findCost(x.costId);if(t!=null)costs.add(new CostLine(t,x.amount,x.amount));}
+            for(ProductionWriter.RecipeIngredient x:this.<ProductionWriter.RecipeIngredient>castList(v[0]))materials.add(new MaterialLine(x.product,x.baseQtyPieces,x.baseQtyPieces,x.available));
+            for(ProductionWriter.RecipeCost x:this.<ProductionWriter.RecipeCost>castList(v[1])){ProductionWriter.CostType t=findCost(x.costId);if(t!=null)costs.add(new CostLine(t,x.amount,x.amount));}
             qtyText=qty(selected.baseOutputQty);weightText=qty(selected.baseWeightKg);descriptionText=selected.description;render();
         });
     }
@@ -177,8 +177,8 @@ public final class ProductionActivity extends Activity {
         if(existing==null){if(products.isEmpty()){toast("کالای فعال برای فرمول پیدا نشد.");return;}showRecipeEditor(ed);return;}
         ed.id=existing.id;ed.name=existing.name;ed.note=existing.description;ed.baseQty=existing.baseOutputQty;ed.baseWeight=existing.baseWeightKg;ed.output=findProduct(existing.productId);
         runSql("در حال دریافت جزئیات فرمول…",c->new Object[]{ProductionWriter.recipeIngredients(c,existing.id,warehouse==null?0:warehouse.id),ProductionWriter.recipeCosts(c,existing.id)},v->{
-            for(ProductionWriter.RecipeIngredient x:castList(v[0]))ed.materials.add(new MaterialLine(x.product,x.baseQtyPieces,x.baseQtyPieces,x.available));
-            for(ProductionWriter.RecipeCost x:castList(v[1])){ProductionWriter.CostType t=findCost(x.costId);if(t!=null)ed.costs.add(new CostLine(t,x.amount,x.amount));}
+            for(ProductionWriter.RecipeIngredient x:this.<ProductionWriter.RecipeIngredient>castList(v[0]))ed.materials.add(new MaterialLine(x.product,x.baseQtyPieces,x.baseQtyPieces,x.available));
+            for(ProductionWriter.RecipeCost x:this.<ProductionWriter.RecipeCost>castList(v[1])){ProductionWriter.CostType t=findCost(x.costId);if(t!=null)ed.costs.add(new CostLine(t,x.amount,x.amount));}
             showRecipeEditor(ed);
         });
     }

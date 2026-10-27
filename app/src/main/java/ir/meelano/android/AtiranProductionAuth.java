@@ -69,7 +69,7 @@ final class AtiranProductionAuth {
         if (user == null) throw new Exception("این نام کاربری در sys_users آتیران پیدا نشد.");
         if (!user.active || user.locked) throw new Exception("حساب آتیران غیرفعال یا قفل است.");
         if (!ADMIN.equals(mapRole(user.roleName))) throw new Exception("برای ثبت تولید، حساب فعال دارای نقش مدیر آتیران لازم است.");
-        if (!verifyPasswordServer(c, user.userName, typedPassword) && !verifyPassword(user.password, typedPassword, user.userName))
+        if (!verifyPasswordServer(c, user.userName, typedPassword) && !verifyPassword(user.pw, typedPassword, user.userName))
             throw new Exception("رمز عبور حساب مدیر آتیران تأیید نشد.");
         if (user.uid <= 0) throw new Exception("شناسهٔ کاربر مدیر آتیران معتبر نیست.");
         return user.uid;

@@ -1,5 +1,7 @@
 package ir.meelano.manager.core;
 
+import ir.meelano.manager.data.Meta;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.sql.Connection;

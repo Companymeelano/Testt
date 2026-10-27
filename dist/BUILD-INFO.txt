@@ -1,9 +1,29 @@
 نسخهٔ برنامهٔ یکپارچه: 7.0.2 (versionCode 202; package ir.meelano.visitor)
-گواهی امضا: نسخهٔ نصب فعلی / Pakhsh Derakhshan — SHA-256: 1a2ed0dd70759d6e10c77a4641eeeb8f15972b76d99af351470216955b46d616
+گواهی امضا: نسخهٔ نصب فعلی / Pakhsh Derakhshan (fingerprint را CI بررسی می‌کند)
 APK اصلی: MEELANO-v7.0.2-release.apk
-لینک انتشار: https://github.com/Companymeelano/Testt/releases/download/apk-v7-0-2/MEELANO-v7.0.2-release.apk
-SHA-256 APK: 641b29f33a3ca177dd631202eee399c5e11824532ff6d04780382921ebf13839
-حجم: 2736912 بایت
-ساخت CI: https://github.com/Companymeelano/Testt/actions/runs/40512093490
-کامیت منبع: 1568beff95c25d3da635e94a47d367c2eb3997a7
-زمان ساخت (UTC): 2026-10-27T13:31:09Z
+کامیت: f6c3e19
+تاریخ build: 2026-10-27T13:40:58Z
+Gradle: Gradle 8.13
+فایل‌ها:
+drwxr-xr-x  2 runner runner    4096 Oct 27 13:40 .
+drwxr-xr-x 14 runner runner    4096 Oct 27 13:40 ..
+-rw-r--r--  1 runner runner     346 Oct 27 13:40 BUILD-INFO.txt
+-rw-r--r--  1 runner runner 2736908 Oct 27 13:40 MEELANO-v7.0.2-release.apk
+-rw-r--r--  1 runner runner 3441069 Oct 27 13:40 app-manager-debug.apk
+-rw-r--r--  1 runner runner 3095341 Oct 27 13:40 app-staff-debug.apk
+-rw-r--r--  1 runner runner 3105117 Oct 27 13:40 app-store-debug.apk
+-rw-r--r--  1 runner runner 3147829 Oct 27 13:40 app-tax-debug.apk
+-rw-r--r--  1 runner runner 3133157 Oct 27 13:40 app-unified-debug.apk
+-rw-r--r--  1 runner runner 3133165 Oct 27 13:40 app-visitor-debug.apk
+-rw-r--r--  1 runner runner     491 Oct 27 13:36 buy-formula-counts.json
+-rw-r--r--  1 runner runner     354 Oct 27 13:40 latest-unified.json
+-rw-r--r--  1 runner runner     189 Oct 27 13:36 manager-v36-build-info.txt
+-rw-r--r--  1 runner runner    1422 Oct 27 13:36 money-structure-counts.json
+--- sha256 ---
+c92068d7fe7235631e51f92e219691d8abeb7dc5e5f130bcbed207c902444da4  MEELANO-v7.0.2-release.apk
+9f9c821920d1b5918a4e240ff9ea1afb29fc506dbfc5ead618da41e1e275fec1  app-manager-debug.apk
+533f6c6f2d757ca1fb975b19b7a67ec60e54400258c559f4d4467ff2dd14be15  app-staff-debug.apk
+5fc05cdf5469877c87e31ac5bd357a6e59b043d5b0a7d6dc40562b126346984e  app-store-debug.apk
+36b3f1a45bf71600d3700026f49d6ef9ba0670ca9319277d05dae19c7685a3bc  app-tax-debug.apk
+e04eb1ced19484077197e62aae8d422d0024d145c8f12133f495144e140c6525  app-unified-debug.apk
+8d81497b1332dabbdf031be6a96b2d331dcd24c085dc042b7da1cdd369e7006a  app-visitor-debug.apk

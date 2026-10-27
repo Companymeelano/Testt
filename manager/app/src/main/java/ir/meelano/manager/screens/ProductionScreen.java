@@ -26,7 +26,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.sql.Connection;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.concurrent.ExecutorService;
@@ -39,15 +41,21 @@ public final class ProductionScreen extends Screen {
         final List<ProductionWriter.Warehouse> warehouses;
         final List<ProductionWriter.Recipe> recipes;
         final List<ProductionWriter.CostType> costs;
+        final ProductionWriter.Warehouse selectedWarehouse;
+        final Map<Long, ProductionWriter.Product> selectedWarehouseProducts;
         Catalog(List<ProductionWriter.Product> p, List<ProductionWriter.Warehouse> w,
-                List<ProductionWriter.Recipe> r, List<ProductionWriter.CostType> c) {
-            products=p; warehouses=w; recipes=r; costs=c;
+                List<ProductionWriter.Recipe> r, List<ProductionWriter.CostType> c,
+                ProductionWriter.Warehouse selected, Map<Long, ProductionWriter.Product> refreshed) {
+            products=p; warehouses=w; recipes=r; costs=c; selectedWarehouse=selected;
+            selectedWarehouseProducts=refreshed;
         }
     }
     private static final class Line {
-        final ProductionWriter.Product product;
+        ProductionWriter.Product product;
         BigDecimal baseQty;
         BigDecimal qty;
+        boolean available = true;
+        boolean requiredByRecipe;
         Line(ProductionWriter.Product p, BigDecimal base, BigDecimal actual) { product=p; baseQty=base; qty=actual; }
     }
     private static final class CostLine {
@@ -66,14 +74,45 @@ public final class ProductionScreen extends Screen {
     private final List<Line> ingredients = new ArrayList<>();
     private final List<CostLine> costs = new ArrayList<>();
     private EditText qtyEdit, weightEdit, descriptionEdit;
+    // Preserve raw editor text across re-renders so edited ingredients stay in sync with the yield.
+    private String outputQtyDraft;
+    private String actualWeightDraft;
+    private String descriptionDraft = "";
     private String idempotencyKey = "";
     private boolean busy;
+    private int catalogLoadToken;
 
     public ProductionScreen(MainActivity a) { super(a); }
     @Override public String id() { return "production"; }
     @Override public String title() { return "تولید محصول"; }
     @Override public String glyph() { return Theme.isLight() ? "⚙" : "🏭"; }
     @Override public int accent() { return Theme.GOLD; }
+
+    /** The approved 3D production emblem is exclusive to the dark gold skin. */
+    private View productionHero(String subtitle) {
+        LinearLayout card = a.kit.v();
+        card.setBackground(Theme.hero(accent()));
+        card.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(15));
+        LinearLayout head = a.kit.h();
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        if (!Theme.isLight() && !Theme.isNuts()) {
+            android.widget.ImageView emblem = new android.widget.ImageView(a);
+            emblem.setImageResource(R.drawable.icon3d_production);
+            emblem.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+            emblem.setContentDescription(null);
+            head.addView(emblem, new LinearLayout.LayoutParams(Theme.dp(58), Theme.dp(58)));
+        } else {
+            head.addView(a.kit.icon(R.drawable.mi_warehouse, accent(), 30),
+                    new LinearLayout.LayoutParams(Theme.dp(58), Theme.dp(58)));
+        }
+        head.addView(a.kit.space(10));
+        LinearLayout copy = a.kit.v();
+        copy.addView(a.kit.title(title()), a.kit.lp(-1, -2));
+        if (subtitle != null && !subtitle.isEmpty()) copy.addView(a.kit.sub(subtitle), a.kit.lp(-1, -2));
+        head.addView(copy, a.kit.wlp(1f));
+        card.addView(head, a.kit.lp(-1, -2));
+        return card;
+    }
 
     /** Fail closed: the central nav gate and the screen itself both enforce manager-only access. */
     public static boolean managerAllowed(MainActivity a) {
@@ -84,6 +123,7 @@ public final class ProductionScreen extends Screen {
     }
 
     @Override public void render(LinearLayout content) {
+        captureFormDrafts();
         this.content=content;
         content.removeAllViews();
         if (!managerAllowed(a)) {
@@ -91,19 +131,19 @@ public final class ProductionScreen extends Screen {
             return;
         }
         if (catalog == null) {
-            content.addView(a.kit.hero(glyph(), title(), "فرمول، مواد اولیه، سربار و بهای تمام‌شده", accent()), a.kit.lp(-1,-2));
+            content.addView(productionHero("فرمول، مواد اولیه، سربار و بهای تمام‌شده"), a.kit.lp(-1,-2));
             content.addView(a.kit.gap(10));
             content.addView(a.kit.loading("در حال بررسی ساختار تولید آتیران و دریافت اطلاعات…"), a.kit.lp(-1,-2));
             loadCatalog();
             return;
         }
-        content.addView(a.kit.hero(glyph(), title(), "فقط مدیر • سری جدید ساخته نمی‌شود • ثبت با گردش رسمی انبار آتیران", accent()), a.kit.lp(-1,-2));
+        content.addView(productionHero("فقط مدیر • سری جدید ساخته نمی‌شود • ثبت با گردش رسمی انبار آتیران"), a.kit.lp(-1,-2));
         content.addView(a.kit.gap(10));
         content.addView(statusCard(), a.kit.lp(-1,-2));
         content.addView(a.kit.gap(8));
         content.addView(selectionCard(), a.kit.lp(-1,-2));
         content.addView(a.kit.gap(8));
-        if (recipe != null) {
+        if (recipe != null && output != null) {
             content.addView(outputCard(), a.kit.lp(-1,-2));
             content.addView(a.kit.gap(8));
             content.addView(ingredientsCard(), a.kit.lp(-1,-2));
@@ -113,7 +153,12 @@ public final class ProductionScreen extends Screen {
             content.addView(actionCard(), a.kit.lp(-1,-2));
         } else {
             content.addView(a.kit.gap(4));
-            content.addView(emptySelectionCard(),a.kit.lp(-1,-2));
+            if (recipe != null) {
+                content.addView(a.kit.empty("کالای نهایی در انبار/فهرست فعال پیدا نشد",
+                        "فرمول انتخاب‌شده را بررسی کنید؛ تا تأیید کالای واقعی، ثبت تولید غیرفعال است."), a.kit.lp(-1,-2));
+            } else {
+                content.addView(emptySelectionCard(),a.kit.lp(-1,-2));
+            }
         }
         content.addView(a.kit.gap(12));
     }
@@ -121,22 +166,55 @@ public final class ProductionScreen extends Screen {
     @Override public void onShown() { if (catalog == null && managerAllowed(a)) loadCatalog(); }
     @Override public void onHidden() { /* No background refresh or writer survives navigation. */ }
 
+    private void captureFormDrafts() {
+        if (qtyEdit != null && qtyEdit.getText() != null) outputQtyDraft = qtyEdit.getText().toString();
+        if (weightEdit != null && weightEdit.getText() != null) actualWeightDraft = weightEdit.getText().toString();
+        if (descriptionEdit != null && descriptionEdit.getText() != null) descriptionDraft = descriptionEdit.getText().toString();
+    }
+
     private void loadCatalog() {
         if (a.repo == null || !managerAllowed(a)) return;
+        final int token = ++catalogLoadToken;
+        final int requestedWarehouseId = warehouse == null ? 0 : warehouse.id;
+        final List<Long> refreshIds = new ArrayList<>();
+        if (output != null) refreshIds.add(output.id);
+        else if (recipe != null) refreshIds.add(recipe.productId);
+        for (Line line : ingredients) if (!refreshIds.contains(line.product.id)) refreshIds.add(line.product.id);
         a.repo.run(c -> {
             ProductionWriter.preflight(c);
             ProductionWriter.ensureProfileTable(c);
-            return new Catalog(ProductionWriter.products(c), ProductionWriter.warehouses(c),
-                    ProductionWriter.recipes(c), ProductionWriter.costTypes(c));
+            List<ProductionWriter.Warehouse> warehouses = ProductionWriter.warehouses(c);
+            ProductionWriter.Warehouse selected = null;
+            for (ProductionWriter.Warehouse candidate : warehouses)
+                if (candidate.id == requestedWarehouseId) { selected = candidate; break; }
+            if (selected == null && !warehouses.isEmpty()) selected = warehouses.get(0);
+            List<ProductionWriter.Product> products = selected == null
+                    ? new ArrayList<>() : ProductionWriter.products(c, selected.id);
+            Map<Long, ProductionWriter.Product> refreshed = new HashMap<>();
+            if (selected != null) for (Long id : refreshIds) {
+                ProductionWriter.Product product = ProductionWriter.productAtWarehouse(c, id, selected.id);
+                if (product != null) refreshed.put(id, product);
+            }
+            return new Catalog(products, warehouses, ProductionWriter.recipes(c), ProductionWriter.costTypes(c),
+                    selected, refreshed);
         }, new Repo.Cb<Catalog>() {
             @Override public void ok(Catalog value) {
+                if (token != catalogLoadToken) return;
                 catalog=value;
-                if (warehouse==null && !value.warehouses.isEmpty()) warehouse=value.warehouses.get(0);
+                warehouse=value.selectedWarehouse;
+                if (output != null) output=value.selectedWarehouseProducts.get(output.id);
+                else if (recipe != null) output=value.selectedWarehouseProducts.get(recipe.productId);
+                for (Line line : ingredients) {
+                    ProductionWriter.Product current=value.selectedWarehouseProducts.get(line.product.id);
+                    line.available=current!=null;
+                    if (current!=null) line.product=current;
+                }
                 render(content);
             }
             @Override public void fail(String error) {
+                if (token != catalogLoadToken) return;
                 content.removeAllViews();
-                content.addView(a.kit.hero(glyph(), title(), "ساختار دیتابیس باید با پایگاه آتیران بررسی شود", Theme.WARNING), a.kit.lp(-1,-2));
+                content.addView(productionHero("ساختار دیتابیس باید با پایگاه آتیران بررسی شود"), a.kit.lp(-1,-2));
                 content.addView(a.kit.gap(8));
                 LinearLayout errorCard=a.kit.card(Theme.WARNING);
                 errorCard.addView(a.kit.text("تولید فعلاً متوقف است",14f,Theme.TEXT,true),a.kit.lp(-1,-2));
@@ -149,9 +227,9 @@ public final class ProductionScreen extends Screen {
 
     private View statusCard() {
         LinearLayout card=a.kit.card(Theme.SUCCESS);
-        card.addView(a.kit.text("گردش تولید از فایل Mili.sql",14f,Theme.TEXT,true),a.kit.lp(-1,-2));
-        card.addView(a.kit.hint("مصرف مواد با گردش ۸۵، محصول نهایی با گردش ۸۶ و بازگشت مواد با گردش ۸۷ ثبت می‌شود. موجودی فقط از روی ka_act و رویه‌های رسمی آتیران دوباره محاسبه می‌شود."),a.kit.lp(-1,-2));
-        card.addView(a.kit.hint("سری برای محصول خروجی ساخته نمی‌شود و الزام WithProductionSerial همان کالا در همین تراکنش خاموش می‌شود. مواد اولیهٔ سری‌دار یا کالاهای دارای چند تنوع، برای جلوگیری از مغایرت تا انتخاب دقیق متوقف می‌شوند."),a.kit.lp(-1,-2));
+        card.addView(a.kit.text("گردش تولید آتیران • مطابق Mili.sql",14f,Theme.TEXT,true),a.kit.lp(-1,-2));
+        card.addView(a.kit.hint("در این فرم، مصرف مواد با گردش ۸۵ و ورود محصول نهایی با گردش ۸۶ ثبت می‌شود؛ بازگشت مواد با گردش ۸۷ فعلاً در فرم پشتیبانی نمی‌شود. موجودی از روی ka_act و رویه‌های رسمی آتیران بازسازی می‌شود."),a.kit.lp(-1,-2));
+        card.addView(a.kit.hint("برای حسابداری، پس از ثبت گردش‌ها رویهٔ رسمی سندداری آتیران فراخوانی می‌شود (در صورت فعال‌بودن تنظیم سند خودکار). سری جدید ساخته نمی‌شود؛ مواد سری‌دار و کالاهایی که دقیقاً یک تنوع ثبت‌شده ندارند، تا انتخاب قطعی متوقف می‌شوند."),a.kit.lp(-1,-2));
         return card;
     }
 
@@ -190,10 +268,10 @@ public final class ProductionScreen extends Screen {
     private View outputCard() {
         LinearLayout card=a.kit.card(Theme.GOLD);
         card.addView(a.kit.text("محصول و خروجی",14f,Theme.TEXT,true),a.kit.lp(-1,-2));
-        card.addView(a.kit.text("کالای نهایی: "+output.name+" • واحد: "+output.unit+" • موجودی فعلی: "+qty(output.stockPieces)+" قطعه پایه",12f,Theme.TEXT,true),a.kit.lp(-1,-2));
-        qtyEdit=a.kit.edit("مقدار خروجی در واحد بسته‌بندی",qtyText(recipe.baseOutputQty));
+        card.addView(a.kit.text("کالای نهایی: "+output.name+" • واحد: "+output.unit+" • موجودی انبار «"+warehouse.name+"»: "+qty(output.stockPieces)+" قطعهٔ پایه",12f,Theme.TEXT,true),a.kit.lp(-1,-2));
+        qtyEdit=a.kit.edit("مقدار خروجی در واحد بسته‌بندی",outputQtyDraft==null?qtyText(recipe.baseOutputQty):outputQtyDraft);
         qtyEdit.setInputType(InputType.TYPE_CLASS_NUMBER|InputType.TYPE_NUMBER_FLAG_DECIMAL|InputType.TYPE_NUMBER_FLAG_SIGNED);
-        weightEdit=a.kit.edit("وزن خالص تولیدشده (کیلوگرم)",qtyText(defaultWeight()));
+        weightEdit=a.kit.edit("وزن خالص تولیدشده (کیلوگرم)",actualWeightDraft==null?qtyText(defaultWeight()):actualWeightDraft);
         weightEdit.setInputType(InputType.TYPE_CLASS_NUMBER|InputType.TYPE_NUMBER_FLAG_DECIMAL|InputType.TYPE_NUMBER_FLAG_SIGNED);
         card.addView(qtyEdit,a.kit.lp(-1,-2)); card.addView(a.kit.gap(6)); card.addView(weightEdit,a.kit.lp(-1,-2));
         card.addView(a.kit.hint("مقادیر فرمول برای خروجی پایه ذخیره می‌شوند. مقدار و وزن واقعی هر نوبت قابل اصلاح است؛ هزینهٔ هر واحد و هر کیلو از خروجی واقعی محاسبه می‌شود."),a.kit.lp(-1,-2));
@@ -203,11 +281,18 @@ public final class ProductionScreen extends Screen {
     private View ingredientsCard() {
         LinearLayout card=a.kit.card(Theme.INFO);
         card.addView(a.kit.text("مواد اولیهٔ مصرفی • "+Money.fa(String.valueOf(ingredients.size())),14f,Theme.TEXT,true),a.kit.lp(-1,-2));
+        card.addView(a.kit.hint("مواد اصلی فرمول حذف‌پذیر نیستند؛ مقدار مصرف واقعی قابل ویرایش است. مواد اضافه فقط با انتخاب صریح ثبت می‌شوند."),a.kit.lp(-1,-2));
         if(ingredients.isEmpty()) card.addView(a.kit.hint("برای این فرمول ماده‌ای ثبت نشده است."),a.kit.lp(-1,-2));
         for(int i=0;i<ingredients.size();i++){
             final int index=i; Line line=ingredients.get(i);
-            View row=a.kit.personRow(line.product.name,"موجودی: "+qty(line.product.stockPieces)+" قطعه پایه • "+line.product.unit,
-                    qty(line.qty)+" قطعه پایه","ویرایش",Theme.INFO,v->editIngredient(index));
+            boolean supported=line.available&&!line.product.withProductionSerial&&line.product.varietyCount==1;
+            String stockLabel;
+            if(!line.available) stockLabel="این ماده در فهرست فعال آتیران پیدا نشد؛ ثبت متوقف است";
+            else if(line.product.withProductionSerial) stockLabel="ماده سری‌دار است؛ انتخاب سری واقعی در این فرم انجام نمی‌شود";
+            else if(line.product.varietyCount!=1) stockLabel="تعداد تنوع آتیران دقیقاً یک نیست؛ ثبت متوقف است";
+            else stockLabel="موجودی انبار «"+(warehouse==null?"—":warehouse.name)+"»: "+qty(line.product.stockPieces)+" قطعهٔ پایه • "+line.product.unit;
+            View row=a.kit.personRow(line.product.name,stockLabel,
+                    qty(line.qty)+" قطعهٔ پایه","ویرایش",supported?Theme.INFO:Theme.DANGER,v->editIngredient(index));
             LinearLayout.LayoutParams lp=a.kit.lp(-1,-2); lp.setMargins(0,0,0,Theme.dp(6)); card.addView(row,lp);
         }
         LinearLayout row=a.kit.h();
@@ -233,7 +318,7 @@ public final class ProductionScreen extends Screen {
 
     private View actionCard() {
         LinearLayout card=a.kit.card(Theme.SUCCESS);
-        descriptionEdit=a.kit.edit("شرح تولید (اختیاری)","");
+        descriptionEdit=a.kit.edit("شرح تولید (اختیاری)",descriptionDraft==null?"":descriptionDraft);
         card.addView(descriptionEdit,a.kit.lp(-1,-2));
         card.addView(a.kit.gap(6));
         card.addView(a.kit.btnGhost("پیش‌نمایش بهای تمام‌شده",Theme.INFO,v->preview()),a.kit.lp(-1,-2));
@@ -252,12 +337,18 @@ public final class ProductionScreen extends Screen {
                 row.setContentDescription("انبار "+w.name+"، شناسه "+Money.fa(String.valueOf(w.id)));
                 return row;
             }
-        },w->{warehouse=w;render(content);});
+        },w->{warehouse=w;catalog=null;render(content);});
     }
 
     private void pickRecipe(){
         if(catalog.recipes.isEmpty()){a.kit.toast("فرمول فعالی ثبت نشده است؛ ابتدا فرمول بسازید");return;}
-        showSearchPicker("انتخاب فرمول تولید",catalog.recipes,new PickerContent<ProductionWriter.Recipe>(){
+        List<ProductionWriter.Recipe> supported = new ArrayList<>();
+        for (ProductionWriter.Recipe candidate : catalog.recipes) {
+            ProductionWriter.Product product = findProduct(candidate.productId);
+            if (product != null && product.varietyCount == 1) supported.add(candidate);
+        }
+        if (supported.isEmpty()) { a.kit.toast("فرمولی با کالای نهاییِ دارای دقیقاً یک تنوع ثبت‌شده پیدا نشد."); return; }
+        showSearchPicker("انتخاب فرمول تولید",supported,new PickerContent<ProductionWriter.Recipe>(){
             @Override public String searchText(ProductionWriter.Recipe r){return r.name+" "+r.productName+" "+r.id;}
             @Override public View row(ProductionWriter.Recipe r,View.OnClickListener click){
                 String detail=r.name.trim().equalsIgnoreCase(r.productName.trim())
@@ -356,26 +447,32 @@ public final class ProductionScreen extends Screen {
 
     private void selectRecipe(ProductionWriter.Recipe chosen){
         if(warehouse==null){a.kit.toast("ابتدا انبار را انتخاب کنید");return;}
+        final int selectedWarehouseId=warehouse.id;
         recipe=chosen; output=findProduct(chosen.productId); ingredients.clear(); costs.clear();
         if(output==null){recipe=null;a.kit.toast("کالای نهایی این فرمول فعال یا در فهرست کالاها موجود نیست");render(content);return;}
+        if(output.varietyCount!=1){recipe=null;output=null;a.kit.toast("کالای نهایی باید دقیقاً یک تنوع واقعی در آتیران داشته باشد؛ تنوعی حدس زده نمی‌شود.");render(content);return;}
+        outputQtyDraft=qtyText(chosen.baseOutputQty);
+        actualWeightDraft=qtyText(defaultWeight());
+        descriptionDraft="";
         a.repo.run(c->{
-            List<ProductionWriter.RecipeIngredient> src=ProductionWriter.recipeIngredients(c,chosen.id);
+            List<ProductionWriter.RecipeIngredient> src=ProductionWriter.recipeIngredients(c,chosen.id,selectedWarehouseId);
             List<ProductionWriter.RecipeCost> cs=ProductionWriter.recipeCosts(c,chosen.id);
             return new Object[]{src,cs};
         },new Repo.Cb<Object[]>(){
             @SuppressWarnings("unchecked") @Override public void ok(Object[] data){
-                if(recipe==null||recipe.id!=chosen.id)return;
+                if(recipe==null||recipe.id!=chosen.id||warehouse==null||warehouse.id!=selectedWarehouseId)return;
                 List<ProductionWriter.RecipeIngredient> src=(List<ProductionWriter.RecipeIngredient>)data[0];
-                for(ProductionWriter.RecipeIngredient x:src) ingredients.add(new Line(x.product,x.baseQtyPieces,x.baseQtyPieces));
+                for(ProductionWriter.RecipeIngredient x:src){Line line=new Line(x.product,x.baseQtyPieces,x.baseQtyPieces);line.available=x.available;line.requiredByRecipe=true;ingredients.add(line);}
                 List<ProductionWriter.RecipeCost> cs=(List<ProductionWriter.RecipeCost>)data[1];
                 for(ProductionWriter.RecipeCost x:cs){ProductionWriter.CostType type=findCost(x.costId);if(type!=null)costs.add(new CostLine(type,x.amount,x.amount));}
                 // Rebase the existing form widgets to this recipe before calculating any scaled values.
-                if(qtyEdit!=null)qtyEdit.setText(qtyText(chosen.baseOutputQty));
-                if(weightEdit!=null)weightEdit.setText(qtyText(defaultWeight()));
+                if(qtyEdit!=null)qtyEdit.setText(outputQtyDraft);
+                if(weightEdit!=null)weightEdit.setText(actualWeightDraft);
+                if(descriptionEdit!=null)descriptionEdit.setText(descriptionDraft);
                 if(qtyEdit!=null)rescale();else render(content);
             }
             @Override public void fail(String err){
-                if(recipe!=null&&recipe.id==chosen.id){render(content);a.kit.toast("خواندن فرمول انجام نشد: "+err);}
+                if(recipe!=null&&recipe.id==chosen.id&&warehouse!=null&&warehouse.id==selectedWarehouseId){render(content);a.kit.toast("خواندن فرمول انجام نشد: "+err);}
             }
         });
     }
@@ -418,7 +515,7 @@ public final class ProductionScreen extends Screen {
         LinearLayout rows=a.kit.v();box.addView(rows,a.kit.lp(-1,-2));
         Runnable redraw=()->{
             rows.removeAllViews();
-            for(int i=0;i<ed.lines.size();i++){final int ix=i;Line l=ed.lines.get(i);rows.addView(a.kit.personRow(l.product.name,"مقدار پایه، قطعهٔ پایه",qty(l.baseQty),"ویرایش",Theme.INFO,v->inputDecimal("مقدار پایه برای "+l.product.name,l.baseQty,n->{l.baseQty=n;showRecipeEditor(ed);})),a.kit.lp(-1,-2));}
+            for(int i=0;i<ed.lines.size();i++){final int ix=i;Line l=ed.lines.get(i);rows.addView(a.kit.personRow(l.product.name,"مقدار پایه، قطعهٔ پایه",qty(l.baseQty),"ویرایش/حذف",Theme.INFO,v->new AlertDialog.Builder(a).setTitle(l.product.name).setItems(new String[]{"ویرایش مقدار پایه","حذف ماده از فرمول"},(dialog,action)->{if(action==0)inputDecimal("مقدار پایه برای "+l.product.name,l.baseQty,n->{l.baseQty=n;showRecipeEditor(ed);});else{ed.lines.remove(ix);showRecipeEditor(ed);}}).setNegativeButton("بستن",null).show()),a.kit.lp(-1,-2));}
             for(int i=0;i<ed.costs.size();i++){final int ix=i;CostLine cost=ed.costs.get(i);rows.addView(a.kit.personRow(cost.type.name,"سربار پایه",money(cost.baseAmount),"ویرایش",Theme.WARNING,v->inputDecimal("سربار پایه",cost.baseAmount,n->{cost.baseAmount=n;showRecipeEditor(ed);})),a.kit.lp(-1,-2));}
         };
         redraw.run();
@@ -448,7 +545,9 @@ public final class ProductionScreen extends Screen {
 
     private void editIngredient(int index){
         if(index<0||index>=ingredients.size())return;Line l=ingredients.get(index);
-        new AlertDialog.Builder(a).setTitle(l.product.name).setItems(new String[]{"ویرایش مقدار","حذف از این تولید"},(d,w)->{
+        String[] actions=l.requiredByRecipe?new String[]{"ویرایش مقدار مصرف"}
+                :new String[]{"ویرایش مقدار مصرف","حذف مادهٔ اضافه از این تولید"};
+        new AlertDialog.Builder(a).setTitle(l.product.name).setItems(actions,(d,w)->{
             if(w==0)inputDecimal("مصرف واقعی (قطعهٔ پایه)",l.qty,n->{l.qty=n;render(content);});
             else {ingredients.remove(index);render(content);}
         }).setNegativeButton("بستن",null).show();
@@ -461,18 +560,18 @@ public final class ProductionScreen extends Screen {
     private void pickProduct(String title,Consumer<ProductionWriter.Product> chosen){
         List<ProductionWriter.Product> candidates=new ArrayList<>();
         for(ProductionWriter.Product p:catalog.products)
-            if(p.varietyCount<=1&&!p.withProductionSerial)candidates.add(p);
-        if(candidates.isEmpty()){a.kit.toast("کالای خامِ بدون ردیابی سری و با تنوع قابل‌پشتیبانی پیدا نشد");return;}
+            if(p.varietyCount==1&&!p.withProductionSerial)candidates.add(p);
+        if(candidates.isEmpty()){a.kit.toast("مادهٔ خامِ بدون سری و با دقیقاً یک تنوع واقعی در آتیران پیدا نشد");return;}
         showSearchPicker(title,candidates,new PickerContent<ProductionWriter.Product>(){
             @Override public String searchText(ProductionWriter.Product p){return p.name+" "+p.id+" "+p.unit+" "+p.stockPieces;}
             @Override public View row(ProductionWriter.Product p,View.OnClickListener click){
-                String subtitle="موجودی: "+qty(p.stockPieces)+" قطعهٔ پایه • "+p.unit;
+                String subtitle="موجودی انبار «"+(warehouse==null?"—":warehouse.name)+"»: "+qty(p.stockPieces)+" قطعهٔ پایه • "+p.unit;
                 View row=a.kit.personRow(bidi(p.name),bidi(subtitle),isolateLtr(Money.fa(String.valueOf(p.id))),"انتخاب",Theme.INFO,click);
                 row.setContentDescription(p.name+"، شناسه "+Money.fa(String.valueOf(p.id))
-                        +"، موجودی "+qty(p.stockPieces)+" قطعهٔ پایه، واحد "+p.unit);
+                        +"، موجودی انبار "+(warehouse==null?"نامشخص":warehouse.name)+" "+qty(p.stockPieces)+" قطعهٔ پایه، واحد "+p.unit);
                 return row;
             }
-        },"مواد دارای ردیابی سری یا تنوع چندگانه برای مصرف قابل انتخاب نیستند.",chosen);
+        },"مواد سری‌دار یا کالاهایی که دقیقاً یک تنوع ثبت‌شده ندارند، تا انتخاب قطعی قابل ثبت نیستند.",chosen);
     }
 
     private void editCost(int index){if(index<0||index>=costs.size())return;CostLine c=costs.get(index);new AlertDialog.Builder(a).setTitle(c.type.name).setItems(new String[]{"ویرایش مبلغ","حذف"},(d,w)->{if(w==0)inputDecimal("مبلغ سربار این نوبت",c.amount,n->{c.amount=n;render(content);});else{costs.remove(index);render(content);}}).setNegativeButton("بستن",null).show();}
@@ -526,7 +625,7 @@ public final class ProductionScreen extends Screen {
         ProductionWriter.Request req=buildRequest();if(req==null)return;
         if(idempotencyKey.isEmpty())idempotencyKey=UUID.randomUUID().toString();
         req.idempotencyKey=idempotencyKey;
-        new AlertDialog.Builder(a).setTitle("ثبت قطعی تولید؟").setMessage("مواد اولیه از موجودی انبار کسر می‌شود، محصول نهایی اضافه می‌شود، سری آن حذف/ساخته نمی‌شود و الزام سری همان کالا خاموش خواهد شد. این عملیات مستقیم در آتیران ثبت می‌شود.")
+        new AlertDialog.Builder(a).setTitle("ثبت قطعی تولید؟").setMessage("مواد اولیه از موجودی همین انبار کسر می‌شود و محصول نهایی به آن افزوده خواهد شد. سری جدید ساخته نمی‌شود، سری‌های قبلی حذف نمی‌شوند و الزام تولید سری برای کالای نهایی خاموش خواهد شد. گردش‌ها و سند حسابداری (اگر تنظیم رسمی آتیران فعال باشد) در تراکنش ثبت می‌شوند.")
                 .setNegativeButton("بازگشت",null).setPositiveButton("ثبت قطعی",(d,w)->{
                     busy=true;render(content);
                     runWriter("در حال ثبت تولید و محاسبهٔ موجودی…",c->{int uid=ProductionWriter.resolveAtiranUserId(c,AtiranAuth.sessionUid(a),AtiranAuth.sessionUser(a));return ProductionWriter.post(c,req,uid);},posted->{
@@ -547,7 +646,13 @@ public final class ProductionScreen extends Screen {
             r.description=descriptionEdit==null?"":descriptionEdit.getText().toString();
             if(r.outputQty.signum()<=0||r.actualWeightKg.signum()<=0)throw new Exception("مقدار و وزن باید بیشتر از صفر باشند");
             if(ingredients.isEmpty())throw new Exception("مادهٔ اولیه ثبت نشده است");
-            for(Line line:ingredients){if(line.qty.signum()<=0)throw new Exception("مقدار مصرف «"+line.product.name+"» باید بیشتر از صفر باشد");r.ingredients.add(new ProductionWriter.Ingredient(line.product.id,line.product.name,line.product.unit,line.product.packSize,line.qty));}
+            for(Line line:ingredients){
+                if(!line.available)throw new Exception("مادهٔ «"+line.product.name+"» در فهرست فعال آتیران پیدا نشد.");
+                if(line.product.withProductionSerial)throw new Exception("مادهٔ «"+line.product.name+"» ردیابی سری دارد؛ سری واقعی در این فرم انتخاب نمی‌شود.");
+                if(line.product.varietyCount!=1)throw new Exception("مادهٔ «"+line.product.name+"» باید دقیقاً یک تنوع ثبت‌شده داشته باشد؛ حدس‌زدن تنوع مجاز نیست.");
+                if(line.qty.signum()<=0)throw new Exception("مقدار مصرف «"+line.product.name+"» باید بیشتر از صفر باشد");
+                r.ingredients.add(new ProductionWriter.Ingredient(line.product.id,line.product.name,line.product.unit,line.product.packSize,line.qty));
+            }
             for(CostLine line:costs){if(line.amount.signum()<0)throw new Exception("هزینهٔ سربار منفی است");r.costs.add(new ProductionWriter.ExtraCost(line.type.id,line.amount));}
             return r;
         }catch(Exception e){a.kit.toast("فرم تولید کامل نیست: "+e.getMessage());return null;}
@@ -574,8 +679,8 @@ public final class ProductionScreen extends Screen {
 
     private void pickOutputForRecipe(RecipeEditor ed){
         List<ProductionWriter.Product> candidates=new ArrayList<>();
-        for(ProductionWriter.Product p:catalog.products)if(p.varietyCount<=1)candidates.add(p);
-        if(candidates.isEmpty()){a.kit.toast("کالای نهاییِ تک‌تنوع در آتیران پیدا نشد");return;}
+        for(ProductionWriter.Product p:catalog.products)if(p.varietyCount==1)candidates.add(p);
+        if(candidates.isEmpty()){a.kit.toast("کالای نهایی با دقیقاً یک تنوع ثبت‌شده در آتیران پیدا نشد");return;}
         showSearchPicker("کالای نهایی فرمول",candidates,new PickerContent<ProductionWriter.Product>(){
             @Override public String searchText(ProductionWriter.Product p){return p.name+" "+p.id+" "+p.unit;}
             @Override public View row(ProductionWriter.Product p,View.OnClickListener click){

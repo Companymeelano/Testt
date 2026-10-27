@@ -8,8 +8,21 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 public class ProductionWriterTest {
+    @Test public void movementInsertHasOneBoundValuePerColumnAndExplicitStockDimensions() {
+        String sql = ProductionWriter.movementInsertSql();
+        String columns = sql.substring(sql.indexOf('(') + 1, sql.indexOf(')'));
+        String values = sql.substring(sql.lastIndexOf('(') + 1, sql.lastIndexOf(')'));
+
+        assertEquals(columns.split(",").length, values.split(",").length);
+        assertEquals(21, columns.split(",").length);
+        assertTrue(columns.contains("RdfAnbar"));
+        assertTrue(columns.contains("ProductionSeriesID"));
+        assertTrue(columns.contains("VarietyID"));
+    }
+
     @Test public void repeatedIngredientRowsAreSummedBeforeStockValidation() throws Exception {
         List<ProductionWriter.Ingredient> rows = new ArrayList<>();
         rows.add(new ProductionWriter.Ingredient(17, "مادهٔ خام", "گرم", 1, new BigDecimal("3.250")));
@@ -30,6 +43,13 @@ public class ProductionWriterTest {
         ProductionWriter.sumIngredientQuantities(rows);
     }
 
+    @Test(expected = Exception.class)
+    public void rejectsIngredientPrecisionBeyondAtiranStockColumns() throws Exception {
+        List<ProductionWriter.Ingredient> rows = new ArrayList<>();
+        rows.add(new ProductionWriter.Ingredient(17, "مادهٔ خام", "گرم", 1, new BigDecimal("0.0001")));
+        ProductionWriter.sumIngredientQuantities(rows);
+    }
+
     @Test public void recipeLabelDoesNotRepeatIdenticalNameAndProduct() {
         ProductionWriter.Recipe duplicate = new ProductionWriter.Recipe(4,"مغز کازو زرد",530,
                 "مغز کازو زرد","شرح",BigDecimal.ONE,BigDecimal.ZERO);
@@ -38,6 +58,19 @@ public class ProductionWriterTest {
 
         assertEquals("مغز کازو زرد",duplicate.toString());
         assertEquals("بادام ممتاز • بادام خام",distinct.toString());
+    }
+
+    @Test public void requiresExactlyOneAtiranVariety() throws Exception {
+        ProductionWriter.Product product = new ProductionWriter.Product(17,"ماده", "کیلو", 1,
+                BigDecimal.TEN, BigDecimal.ONE, false, 9, 1);
+        ProductionWriter.requireSingleVariety(product);
+    }
+
+    @Test(expected = Exception.class)
+    public void rejectsProductWithoutAnAtiranVariety() throws Exception {
+        ProductionWriter.Product product = new ProductionWriter.Product(17,"ماده", "کیلو", 1,
+                BigDecimal.TEN, BigDecimal.ONE, false, 0, 0);
+        ProductionWriter.requireSingleVariety(product);
     }
 
     @Test public void recipeScalingUsesBaseOutputRatio() throws Exception {

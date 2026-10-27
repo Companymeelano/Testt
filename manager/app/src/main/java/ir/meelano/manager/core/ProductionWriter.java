@@ -5,10 +5,8 @@ import java.math.RoundingMode;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -16,12 +14,14 @@ import java.util.Map;
 /**
  * Production posting for the Atiran schema in Mili.sql.
  *
- * The dump contains no Atiran production-save procedure or Production trigger.
- * It does, however, define the stock ledger contract used by
- * SabtSanadHesabdariProduction: act 85 consumes raw material, act 86 adds the
- * finished product, and act 87 returns raw material. UpdateMojodiInventory*
- * rebuilds balances from ka_act. The ka_Ghno_HactID trigger is scalar over
- * inserted, so every movement is deliberately inserted as a separate row.
+ * Mili.sql contains no production-entry procedure or Production trigger; its
+ * stock contract is the produce.Production / ka_act tables plus the inventory
+ * rebuild procedures. It does contain the official accounting wrapper
+ * SabtSanadHesabdariFromAtiran, which must be called after the ledger rows so
+ * act 85/86 are reflected in accounting when Atiran's setting enables it.
+ * UpdateMojodiInventory* rebuilds balances from ka_act. The
+ * ka_Ghno_HactID trigger is scalar over inserted, so each movement is inserted
+ * as a separate row.
  *
  * All writes are one SQL transaction and are guarded by strict live-shape
  * checks. This class never creates or deletes a ProductionSeries row. The
@@ -33,8 +33,6 @@ public final class ProductionWriter {
 
     public static final int ACT_RAW_CONSUMED = 85;
     public static final int ACT_FINISHED_OUTPUT = 86;
-    public static final int ACT_RAW_RETURNED = 87;
-    private static final String PROFILE_TABLE = "dbo.meelano_production_profile";
 
     public static final class Product {
         public final long id;
@@ -124,8 +122,12 @@ public final class ProductionWriter {
         public final Product product;
         /** Formula quantity in base pieces for the recipe's base output. */
         public final BigDecimal baseQtyPieces;
+        public final boolean available;
         public RecipeIngredient(Product product, BigDecimal baseQtyPieces) {
-            this.product = product; this.baseQtyPieces = nz(baseQtyPieces);
+            this(product, baseQtyPieces, true);
+        }
+        public RecipeIngredient(Product product, BigDecimal baseQtyPieces, boolean available) {
+            this.product = product; this.baseQtyPieces = nz(baseQtyPieces); this.available = available;
         }
     }
 
@@ -235,16 +237,19 @@ public final class ProductionWriter {
         requireColumns(c, "produce", "Formulation", new String[]{"ID", "Name", "shka", "Description", "UserId", "Active", "DoneDate", "DoneTime"});
         requireColumns(c, "produce", "FormulationItems", new String[]{"ID", "FormulID", "shka", "TedadVahed", "TedadJoz", "Active"});
         requireColumns(c, "produce", "FormulationCost", new String[]{"ID", "FormulID", "CostID", "Price", "Active"});
-        requireColumns(c, "produce", "IndirectCost", new String[]{"RowId", "CostName", "Active"});
+        requireColumns(c, "produce", "IndirectCost", new String[]{"RowId", "CostName", "Active", "MoeinID", "TafsilID"});
         requireColumns(c, "dbo", "inventory", new String[]{"shka", "naka", "vahsanj", "mohvah", "mojkavah", "mojkajoz", "vahwe", "active", "WithProductionSerial", "ProductionPrice"});
-        requireColumns(c, "dbo", "inventory_anbars", new String[]{"rdf_anbars", "shka", "mojkavah", "mojkajoz"});
-        requireColumns(c, "dbo", "anbars", new String[]{"rdf_anbar", "name", "Active", "Base"});
+        requireColumns(c, "dbo", "inventory_anbars", new String[]{"rdf_anbars", "shka", "mojkavah", "mojkajoz", "name", "tedbastebandi"});
+        requireColumns(c, "dbo", "anbars", new String[]{"rdf_anbar", "name", "Active", "Base", "MoeinId"});
         requireColumns(c, "dbo", "Variety", new String[]{"VarietyID", "Shka", "Show"});
         requireColumns(c, "dbo", "Inventory_Anbars_Variety", new String[]{"Shka", "AnbarID", "VarietyID", "Mojkavah", "Mojkajoz"});
         requireColumns(c, "dbo", "ka_act", new String[]{"shka", "act_id", "shfac", "rdf__", "act_date", "done_date", "UserID", "tedvah", "tedjoz", "tedbastebandi", "active", "price", "invepgh", "invep", "gain", "rdf_kh", "ptax", "tax", "vis_rdf", "pertaf", "pervis", "litakhma", "HAct_id", "ghno", "sysid", "pavarez", "avarez", "Gift", "RdfAnbar", "shmo", "PerPromotion", "TafifHajmi1", "ProductionSeriesID", "PriceFinished", "TamamJoz", "ShSanadAnbar", "VarietyID"});
         requireProcedure(c, "UpdateMojodiInventory");
         requireProcedure(c, "UpdateMojodiInventoryAnbars");
         requireProcedure(c, "UpdateMojodiInventoryAnbarVariety");
+        requireProcedure(c, "SabtSanadHesabdariFromAtiran");
+        requireProcedure(c, "SabtSanadHesabdariProduction");
+        requireColumns(c, "dbo", "overal_setting", new String[]{"id", "value"});
         requireColumns(c, "dbo", "subbuyfact", new String[]{"shfackh", "rdf", "shka", "TEDVAH", "TEDJOZ", "rdf__", "active", "tamam_joz", "tamam_joz_tax", "VarietyID"});
         requireColumns(c, "dbo", "buyfact", new String[]{"shfackh", "rdf__", "DATE", "all", "active"});
         // The source DB has no production write trigger/SP, but the movement trigger is essential.
@@ -252,16 +257,21 @@ public final class ProductionWriter {
             throw new Exception("تریگر ثبت گردش انبار ka_Ghno_HactID در دیتابیس پیدا نشد؛ ثبت تولید متوقف شد.");
     }
 
-    public static List<Product> products(Connection c) throws Exception {
+    /** Active products with stock from the selected warehouse, never the company-wide balance. */
+    public static List<Product> products(Connection c, int warehouseId) throws Exception {
         List<Product> out = new ArrayList<>();
         String q = "SELECT i.shka,i.naka,i.vahsanj,ISNULL(NULLIF(i.mohvah,0),1)," +
-                "CAST(ISNULL(i.mojkavah,0)*ISNULL(NULLIF(i.mohvah,0),1)+ISNULL(i.mojkajoz,0) AS decimal(18,3))," +
+                "CAST(ISNULL(ia.mojkavah,0)*ISNULL(NULLIF(i.mohvah,0),1)+ISNULL(ia.mojkajoz,0) AS decimal(18,3))," +
                 "ISNULL(i.vahwe,0),ISNULL(i.WithProductionSerial,0),ISNULL(v.varietyId,0),ISNULL(v.varietyCount,0) " +
-                "FROM dbo.inventory i OUTER APPLY (SELECT MIN(VarietyID) AS varietyId,COUNT(*) AS varietyCount FROM dbo.Variety WHERE Shka=i.shka) v " +
+                "FROM dbo.inventory i LEFT JOIN dbo.inventory_anbars ia ON ia.shka=i.shka AND ia.rdf_anbars=? " +
+                "OUTER APPLY (SELECT MIN(VarietyID) AS varietyId,COUNT(*) AS varietyCount FROM dbo.Variety WHERE Shka=i.shka) v " +
                 "WHERE i.active='t' ORDER BY i.naka";
-        try (PreparedStatement ps = c.prepareStatement(q); ResultSet r = ps.executeQuery()) {
-            while (r.next()) out.add(new Product(r.getLong(1), r.getString(2), r.getString(3), r.getLong(4),
-                    r.getBigDecimal(5), r.getBigDecimal(6), r.getBoolean(7), r.getInt(8), r.getInt(9)));
+        try (PreparedStatement ps = c.prepareStatement(q)) {
+            ps.setInt(1, warehouseId);
+            try (ResultSet r = ps.executeQuery()) {
+                while (r.next()) out.add(new Product(r.getLong(1), r.getString(2), r.getString(3), r.getLong(4),
+                        r.getBigDecimal(5), r.getBigDecimal(6), r.getBoolean(7), r.getInt(8), r.getInt(9)));
+            }
         }
         return out;
     }
@@ -296,21 +306,30 @@ public final class ProductionWriter {
     }
 
     public static List<RecipeIngredient> recipeIngredients(Connection c, long recipeId) throws Exception {
+        return recipeIngredients(c, recipeId, 0);
+    }
+
+    /** Recipe rows carry real serial/variety metadata and stock for the chosen warehouse. */
+    public static List<RecipeIngredient> recipeIngredients(Connection c, long recipeId, int warehouseId) throws Exception {
         List<RecipeIngredient> out = new ArrayList<>();
-        String q = "SELECT f.shka,i.naka,i.vahsanj,ISNULL(NULLIF(i.mohvah,0),1)," +
+        String q = "SELECT fi.shka,ISNULL(i.naka,N'[کالای غیرفعال یا ناموجود]'),ISNULL(i.vahsanj,N'—'),ISNULL(NULLIF(i.mohvah,0),1)," +
+                "CAST(ISNULL(ia.mojkavah,0)*ISNULL(NULLIF(i.mohvah,0),1)+ISNULL(ia.mojkajoz,0) AS decimal(18,3))," +
+                "ISNULL(i.vahwe,0),ISNULL(i.WithProductionSerial,0),ISNULL(v.varietyId,0),ISNULL(v.varietyCount,0)," +
                 "CAST(fi.TedadVahed*ISNULL(NULLIF(i.mohvah,0),1)+fi.TedadJoz AS decimal(18,3))," +
-                "ISNULL(v.varietyId,0),ISNULL(v.varietyCount,0) " +
-                "FROM produce.FormulationItems fi JOIN dbo.inventory i ON i.shka=fi.shka " +
-                "OUTER APPLY (SELECT MIN(VarietyID) AS varietyId,COUNT(*) AS varietyCount FROM dbo.Variety WHERE Shka=i.shka) v " +
+                "CASE WHEN i.shka IS NOT NULL AND i.active='t' THEN 1 ELSE 0 END " +
+                "FROM produce.FormulationItems fi LEFT JOIN dbo.inventory i ON i.shka=fi.shka " +
+                "LEFT JOIN dbo.inventory_anbars ia ON ia.shka=i.shka AND ia.rdf_anbars=? " +
+                "OUTER APPLY (SELECT MIN(VarietyID) AS varietyId,COUNT(*) AS varietyCount FROM dbo.Variety WHERE Shka=fi.shka) v " +
                 "JOIN produce.Formulation f ON f.ID=fi.FormulID " +
                 "WHERE fi.FormulID=? AND fi.Active=1 AND f.Active=1 ORDER BY fi.ID";
         try (PreparedStatement ps = c.prepareStatement(q)) {
-            ps.setLong(1, recipeId);
+            ps.setInt(1, warehouseId);
+            ps.setLong(2, recipeId);
             try (ResultSet r = ps.executeQuery()) {
                 while (r.next()) {
                     Product p = new Product(r.getLong(1), r.getString(2), r.getString(3), r.getLong(4),
-                            BigDecimal.ZERO, BigDecimal.ZERO, false, r.getInt(6), r.getInt(7));
-                    out.add(new RecipeIngredient(p, r.getBigDecimal(5)));
+                            r.getBigDecimal(5), r.getBigDecimal(6), r.getBoolean(7), r.getInt(8), r.getInt(9));
+                    out.add(new RecipeIngredient(p, r.getBigDecimal(10), r.getBoolean(11)));
                 }
             }
         }
@@ -336,13 +355,17 @@ public final class ProductionWriter {
         if (d.ingredients.isEmpty()) throw new Exception("فرمول دست‌کم باید یک مادهٔ اولیه داشته باشد.");
         if (nz(d.baseOutputQty).signum() <= 0) throw new Exception("مقدار خروجی پایه باید بیشتر از صفر باشد.");
         if (nz(d.baseWeightKg).signum() < 0) throw new Exception("وزن پایه نمی‌تواند منفی باشد.");
+        requirePrecision(d.baseOutputQty,3,"مقدار خروجی پایه");
+        requirePrecision(d.baseWeightKg,3,"وزن پایه");
         for (RecipeIngredient line : d.ingredients) {
             if (line == null || line.product == null || line.product.id <= 0 || nz(line.baseQtyPieces).signum() <= 0)
                 throw new Exception("هر مادهٔ فرمول باید کالا و مقدار پایهٔ مثبت داشته باشد.");
+            requirePrecision(line.baseQtyPieces,3,"مقدار پایهٔ مادهٔ فرمول");
         }
         for (RecipeCost cost : d.costs) {
             if (cost == null || cost.costId <= 0 || nz(cost.amount).signum() < 0)
                 throw new Exception("هر سربار فرمول باید نوع معتبر و مبلغ غیرمنفی داشته باشد.");
+            requirePrecision(cost.amount,4,"مبلغ سربار");
         }
         if (!c.getAutoCommit()) throw new Exception("ذخیرهٔ فرمول باید روی اتصال مستقل با autoCommit فعال آغاز شود.");
         ensureProfileTable(c);
@@ -356,6 +379,16 @@ public final class ProductionWriter {
         c.setAutoCommit(false);
         try {
             lock(c, "meelano-production-recipes");
+            Product output = product(c,d.productId,0,true);
+            if (output == null) throw new Exception("کالای نهایی فرمول در آتیران فعال نیست.");
+            requireSingleVariety(output);
+            for (RecipeIngredient line : d.ingredients) {
+                if (line.product.id == d.productId) throw new Exception("کالای نهایی نمی‌تواند مادهٔ اولیهٔ فرمول خودش باشد.");
+                Product raw = product(c,line.product.id,0,true);
+                if (raw == null) throw new Exception("مادهٔ فرمول در فهرست فعال آتیران نیست.");
+                requireSingleVariety(raw);
+                if (raw.withProductionSerial) throw new Exception("مادهٔ «"+raw.name+"» سری‌دار است و تا انتخاب سری واقعی نمی‌تواند وارد فرمول تولید شود.");
+            }
             String day = Jalali.todayStr();
             String time = nowTime();
             long id = d.id;
@@ -419,6 +452,8 @@ public final class ProductionWriter {
         if (userId <= 0) throw new Exception("ثبت قطعی تولید فقط با شناسهٔ واقعی مدیر آتیران مجاز است.");
         if (req.finishedProductId <= 0 || req.warehouseId <= 0) throw new Exception("کالای نهایی و انبار را انتخاب کنید.");
         if (nz(req.outputQty).signum() <= 0 || nz(req.actualWeightKg).signum() <= 0) throw new Exception("مقدار و وزن خالص خروجی باید بیشتر از صفر باشند.");
+        requirePrecision(req.outputQty,3,"مقدار خروجی");
+        requirePrecision(req.actualWeightKg,3,"وزن خالص خروجی");
         if (req.ingredients.isEmpty()) throw new Exception("مواد اولیهٔ مصرفی ثبت نشده است.");
         if (req.idempotencyKey == null || req.idempotencyKey.trim().length() < 12) throw new Exception("شناسهٔ یکتای عملیات تولید معتبر نیست.");
         if (!c.getAutoCommit()) throw new Exception("ثبت قطعی تولید باید روی اتصال مستقل با autoCommit فعال آغاز شود.");
@@ -440,6 +475,7 @@ public final class ProductionWriter {
 
             if (req.recipeId <= 0) throw new Exception("فرمول تولید معتبر انتخاب نشده است.");
             requireActiveRecipe(c, req.recipeId, req.finishedProductId);
+            requireRecipeIngredientsPresent(c, req.recipeId, req.ingredients);
             BigDecimal outputPieces = outputQtyPieces(output, req.outputQty);
             if (outputPieces.signum() <= 0) throw new Exception("مقدار خروجی با واحد کالای آتیران سازگار نیست.");
             Costing costing = new Costing();
@@ -461,6 +497,7 @@ public final class ProductionWriter {
             }
             for (ExtraCost extra : req.costs) {
                 if (extra == null || extra.costId <= 0 || nz(extra.amount).signum() < 0) throw new Exception("یکی از هزینه‌های سربار معتبر نیست.");
+                requirePrecision(extra.amount,4,"مبلغ سربار");
                 if (extra.amount.signum() == 0) continue;
                 requireActiveCost(c, extra.costId);
                 costing.overheadCost = costing.overheadCost.add(extra.amount);
@@ -486,6 +523,9 @@ public final class ProductionWriter {
             for (Move m : moves) insertMovement(c, m.product, req.warehouseId, id, revision, userId, day, time, m.actId, m.qtyPieces, m.unitCost);
             insertMovement(c, output, req.warehouseId, id, revision, userId, day, time, ACT_FINISHED_OUTPUT, outputPieces, costing.finishedUnitPrice);
 
+            // Use Atiran's own accounting entry point; it posts only when setting 67 enables it.
+            postAtiranAccounting(c, id, userId, req.warehouseId, req.costs);
+
             // These native procedures are the source of truth for aggregate inventory balances.
             for (Move m : moves) refreshStock(c, m.product);
             refreshStock(c, output);
@@ -503,8 +543,11 @@ public final class ProductionWriter {
             throw new Exception("اطلاعات پیش‌نمایش تولید کامل نیست.");
         if (nz(req.outputQty).signum() <= 0 || nz(req.actualWeightKg).signum() <= 0)
             throw new Exception("مقدار و وزن خالص خروجی باید بیشتر از صفر باشند.");
+        requirePrecision(req.outputQty,3,"مقدار خروجی");
+        requirePrecision(req.actualWeightKg,3,"وزن خالص خروجی");
         if (req.recipeId <= 0) throw new Exception("فرمول تولید معتبر انتخاب نشده است.");
         requireActiveRecipe(c, req.recipeId, req.finishedProductId);
+        requireRecipeIngredientsPresent(c, req.recipeId, req.ingredients);
         Product output = product(c, req.finishedProductId, req.warehouseId, false);
         if (output == null) throw new Exception("کالای نهایی در آتیران پیدا نشد.");
         requireSingleVariety(output);
@@ -523,6 +566,7 @@ public final class ProductionWriter {
         for (ExtraCost cost : req.costs) {
             if (cost == null || cost.costId <= 0 || nz(cost.amount).signum() < 0)
                 throw new Exception("یکی از هزینه‌های سربار معتبر نیست.");
+            requirePrecision(cost.amount,4,"مبلغ سربار");
             if (cost.amount.signum() > 0) requireActiveCost(c, cost.costId);
             result.overheadCost = result.overheadCost.add(nz(cost.amount));
         }
@@ -542,6 +586,7 @@ public final class ProductionWriter {
         for (Ingredient ingredient : ingredients) {
             if (ingredient == null || ingredient.productId <= 0 || nz(ingredient.qtyPieces).signum() <= 0)
                 throw new Exception("مقدار یکی از مواد اولیه معتبر نیست.");
+            requirePrecision(ingredient.qtyPieces,3,"مقدار مصرف مادهٔ اولیه");
             totals.merge(ingredient.productId, ingredient.qtyPieces, BigDecimal::add);
         }
         return totals;
@@ -558,6 +603,11 @@ public final class ProductionWriter {
         Move(Product product, int actId, BigDecimal qtyPieces, BigDecimal unitCost) {
             this.product = product; this.actId = actId; this.qtyPieces = qtyPieces; this.unitCost = unitCost;
         }
+    }
+
+    /** Live item + selected-warehouse balance, used to refresh an in-progress UI draft. */
+    public static Product productAtWarehouse(Connection c, long id, int warehouseId) throws Exception {
+        return product(c, id, warehouseId, false);
     }
 
     private static Product product(Connection c, long id, int warehouseId, boolean lock) throws Exception {
@@ -644,21 +694,90 @@ public final class ProductionWriter {
         }
     }
 
+    /** Keep this column/value contract centralized; ka_act has non-null location, user, price and variety fields. */
+    static String movementInsertSql() {
+        return "INSERT INTO dbo.ka_act(shka,act_id,shfac,rdf__,act_dis,act_date,done_date,UserID,tedvah,tedjoz,"
+                + "tedbastebandi,active,price,invepgh,invep,gain,RdfAnbar,ProductionSeriesID,PriceFinished,TamamJoz,VarietyID) "
+                + "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+    }
+
     private static void insertMovement(Connection c, Product p, int warehouse, long productionId, int revision,
                                        int uid, String day, String time, int actId, BigDecimal pieces,
                                        BigDecimal unitCost) throws Exception {
         BigDecimal[] split = splitQty(pieces, p.packSize);
-        String q = "INSERT INTO dbo.ka_act(shka,act_id,shfac,rdf__,act_dis,act_date,done_date,UserID,tedvah,tedjoz,tedbastebandi,active,price,invepgh,invep,gain,rdf_kh,ptax,tax,vis_rdf,pertaf,pervis,litakhma,HAct_id,ghno,sysid,pavarez,avarez,Gift,RdfAnbar,shmo,PerPromotion,TafifHajmi1,ProductionSeriesID,PriceFinished,TamamJoz,ShSanadAnbar,VarietyID) " +
-                "VALUES(?,?,?,?,?,?,?,?,?,?,0,'t',?,?,?,0,0,0,0,0,0,0,NULL,?,1,0,0,0,?,NULL,0,0,NULL,?,?,NULL,?)";
+        String q = movementInsertSql();
         try (PreparedStatement ps = c.prepareStatement(q)) {
-            int i=1; ps.setLong(i++,p.id); ps.setInt(i++,actId); ps.setLong(i++,productionId); ps.setInt(i++,revision);
-            ps.setString(i++,"تولید میلانو"); ps.setString(i++,day); ps.setString(i++,day); ps.setInt(i++,uid);
-            ps.setBigDecimal(i++,split[0]); ps.setInt(i++,split[1].setScale(0,RoundingMode.HALF_UP).intValueExact());
-            ps.setBigDecimal(i++,money4(unitCost)); ps.setBigDecimal(i++,money4(unitCost)); ps.setBigDecimal(i++,money4(unitCost));
-            ps.setLong(i++,productionId); ps.setInt(i++,warehouse);
-            ps.setBigDecimal(i++,money4(unitCost)); ps.setBigDecimal(i++,money4(unitCost)); ps.setInt(i++,p.varietyId);
-            if (i != 19) throw new SQLException("ka_act bind count mismatch: " + (i - 1));
+            ps.setLong(1, p.id);
+            ps.setInt(2, actId);
+            ps.setLong(3, productionId);
+            ps.setInt(4, revision);
+            ps.setString(5, "تولید میلانو");
+            ps.setString(6, day);
+            ps.setString(7, day);
+            ps.setInt(8, uid);
+            ps.setBigDecimal(9, split[0]);
+            ps.setInt(10, split[1].setScale(0, RoundingMode.HALF_UP).intValueExact());
+            ps.setBigDecimal(11, BigDecimal.ZERO);
+            ps.setString(12, "t");
+            ps.setBigDecimal(13, money4(unitCost));
+            ps.setBigDecimal(14, money4(unitCost));
+            ps.setBigDecimal(15, money4(unitCost));
+            ps.setBigDecimal(16, BigDecimal.ZERO);
+            ps.setInt(17, warehouse);
+            ps.setNull(18, java.sql.Types.BIGINT); // ProductionSeriesID is deliberately not generated.
+            ps.setBigDecimal(19, money4(unitCost));
+            ps.setBigDecimal(20, money4(unitCost));
+            ps.setInt(21, p.varietyId);
             ps.executeUpdate();
+        }
+    }
+
+    /**
+     * Invoke Atiran's actual accounting posting path after all production ledger rows exist.
+     * Setting 67 is the same switch used by SabtSanadHesabdariFromAtiran; when disabled,
+     * Atiran intentionally leaves the document unposted. The whole call remains in our
+     * outer transaction so a failed accounting entry cannot leave half a production.
+     */
+    private static void postAtiranAccounting(Connection c, long productionId, int userId,
+                                                int warehouseId, List<ExtraCost> costs) throws Exception {
+        long enabled;
+        try (PreparedStatement ps = c.prepareStatement("SELECT [value] FROM dbo.overal_setting WHERE id=67");
+             ResultSet r = ps.executeQuery()) {
+            if (!r.next()) throw new Exception("تنظیم حسابداری تولید آتیران (overal_setting.id=67) پیدا نشد؛ وضعیت سندداری نامشخص است.");
+            enabled = r.getLong(1);
+        }
+        if (enabled != 1) return; // Match the official wrapper: no automatic document when disabled.
+        try (PreparedStatement ps = c.prepareStatement("SELECT MoeinId FROM dbo.anbars WHERE rdf_anbar=? AND ISNULL(Active,1)=1")) {
+            ps.setInt(1, warehouseId);
+            try (ResultSet r = ps.executeQuery()) {
+                if (!r.next() || r.getObject(1) == null)
+                    throw new Exception("برای انبار انتخاب‌شده حساب معین آتیران تعریف نشده؛ سند تولید ساخته نشد.");
+            }
+        }
+        if (costs != null) for (ExtraCost cost : costs) {
+            if (cost == null || nz(cost.amount).signum() <= 0) continue;
+            try (PreparedStatement ps = c.prepareStatement("SELECT MoeinID FROM produce.IndirectCost WHERE RowId=? AND Active=1")) {
+                ps.setInt(1, cost.costId);
+                try (ResultSet r = ps.executeQuery()) {
+                    if (!r.next() || r.getObject(1) == null)
+                        throw new Exception("برای سربار «"+cost.costId+"» معین حسابداری آتیران تعریف نشده؛ سند تولید ساخته نشد.");
+                }
+            }
+        }
+        if (productionId > Integer.MAX_VALUE) throw new Exception("شمارهٔ تولید برای سندداری آتیران خارج از محدوده است.");
+        try (PreparedStatement ps = c.prepareStatement("EXEC dbo.SabtSanadHesabdariFromAtiran ?,?,?,?")) {
+            ps.setInt(1, 54);
+            ps.setInt(2, (int) productionId);
+            ps.setInt(3, userId);
+            ps.setInt(4, 1);
+            ps.execute();
+        }
+        try (PreparedStatement ps = c.prepareStatement(
+                "SELECT TOP (1) 1 FROM accounting.Document WHERE Kind=54 AND Shfac=? AND Active=1")) {
+            ps.setLong(1, productionId);
+            try (ResultSet r = ps.executeQuery()) {
+                if (!r.next()) throw new Exception("رویهٔ رسمی آتیران اجرا شد اما سند حسابداری تولید ایجاد نشد؛ تراکنش برگشت خورد.");
+            }
         }
     }
 
@@ -670,7 +789,7 @@ public final class ProductionWriter {
         }
     }
 
-    private static void requireSingleVariety(Product p) throws Exception {
+    static void requireSingleVariety(Product p) throws Exception {
         if (p.varietyCount != 1 || p.varietyId <= 0)
             throw new Exception("کالای «" + p.name + "» در آتیران " + p.varietyCount + " تنوع ثبت‌شده دارد؛ برای جلوگیری از مغایرت باید تنوع دقیق آن انتخاب شود.");
     }
@@ -680,6 +799,31 @@ public final class ProductionWriter {
             ps.setLong(1,recipeId); ps.setLong(2,outputProductId);
             try (ResultSet r=ps.executeQuery()) { if (!r.next()) throw new Exception("فرمول فعال با کالای نهایی انتخاب‌شده هم‌خوان نیست."); }
         }
+    }
+
+    /** An inactive/missing formula item must not silently disappear from the ledger request. */
+    private static void requireRecipeIngredientsPresent(Connection c, long recipeId, List<Ingredient> requested) throws Exception {
+        Map<Long, BigDecimal> included = sumIngredientQuantities(requested);
+        int found = 0;
+        String q = "SELECT fi.shka,i.active,i.naka FROM produce.FormulationItems fi WITH (UPDLOCK,HOLDLOCK) " +
+                "LEFT JOIN dbo.inventory i ON i.shka=fi.shka " +
+                "WHERE fi.FormulID=? AND fi.Active=1";
+        try (PreparedStatement ps = c.prepareStatement(q)) {
+            ps.setLong(1, recipeId);
+            try (ResultSet r = ps.executeQuery()) {
+                while (r.next()) {
+                    found++;
+                    long productId = r.getLong(1);
+                    String active = r.getString(2);
+                    String name = r.getString(3);
+                    if (active == null || !"t".equalsIgnoreCase(active.trim()))
+                        throw new Exception("مادهٔ فرمول «"+(name==null?productId:name)+"» در فهرست فعال آتیران نیست؛ فرمول را اصلاح کنید.");
+                    if (!included.containsKey(productId))
+                        throw new Exception("مادهٔ فرمول «"+(name==null?productId:name)+"» در درخواست مصرف جا افتاده است.");
+                }
+            }
+        }
+        if (found == 0) throw new Exception("فرمول فعال هیچ مادهٔ اولیه‌ای ندارد؛ ثبت تولید متوقف شد.");
     }
 
     private static void requireActiveCost(Connection c, int id) throws Exception {
@@ -735,6 +879,9 @@ public final class ProductionWriter {
     private static boolean triggerExists(Connection c,String schema,String trigger,String table)throws Exception{try(PreparedStatement ps=c.prepareStatement("SELECT 1 FROM sys.triggers t JOIN sys.objects o ON o.object_id=t.parent_id JOIN sys.schemas s ON s.schema_id=o.schema_id WHERE t.name=? AND s.name=? AND o.name=? AND t.is_disabled=0")){ps.setString(1,trigger);ps.setString(2,schema);ps.setString(3,table);try(ResultSet r=ps.executeQuery()){return r.next();}}}
     private static BigDecimal[] splitQty(BigDecimal pieces,long pack){BigDecimal p=nz(pieces);long m=Math.max(1,pack);if(m==1)return new BigDecimal[]{p.setScale(3,RoundingMode.HALF_UP),BigDecimal.ZERO};BigDecimal[] dr=p.divideAndRemainder(BigDecimal.valueOf(m));if(dr[1].scale()>0&&dr[1].stripTrailingZeros().scale()>0)return new BigDecimal[]{p.divide(BigDecimal.valueOf(m),3,RoundingMode.HALF_UP),BigDecimal.ZERO};return new BigDecimal[]{dr[0].setScale(3,RoundingMode.HALF_UP),dr[1].setScale(0,RoundingMode.HALF_UP)};}
     private static BigDecimal nz(BigDecimal v){return v==null?BigDecimal.ZERO:v;}
+    private static void requirePrecision(BigDecimal value,int scale,String label)throws Exception{
+        if(nz(value).stripTrailingZeros().scale()>scale)throw new Exception(label+" بیش از "+scale+" رقم اعشار دارد؛ ثبت بدون گردکردن انجام می‌شود.");
+    }
     private static BigDecimal qty3(BigDecimal v){return nz(v).setScale(3,RoundingMode.HALF_UP);}
     private static BigDecimal money4(BigDecimal v){return nz(v).setScale(4,RoundingMode.HALF_UP);}
     private static String safe(String s,int max){String v=s==null?"":s.replace('\u0000',' ').trim();return v.length()>max?v.substring(0,max):v;}

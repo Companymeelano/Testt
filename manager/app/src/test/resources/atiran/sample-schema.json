@@ -121011,6 +121011,10 @@
     {
       "name": "meelano_production_profile_history",
       "reason": "App-managed recipe-yield revision history created by ProductionWriter when editing an existing formula."
+    },
+    {
+      "name": "SabtSanadHesabdariFromAtiran",
+      "reason": "Official accounting wrapper is defined in the tracked mili.sql dump; the sanitized sample manifest omits stored-procedure definitions. ProductionWriter preflight checks it at runtime."
     }
   ]
 }

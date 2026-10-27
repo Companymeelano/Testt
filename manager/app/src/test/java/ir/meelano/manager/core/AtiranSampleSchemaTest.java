@@ -55,6 +55,43 @@ public class AtiranSampleSchemaTest {
         assertTrue(sql, sql.contains(" where "));
     }
 
+    @Test public void visitorScorecardUsesOnlyActiveOverlappingGenericGoals() throws Exception {
+        Meta meta = new Meta(connection(loadManifest()));
+        Queries.Q q = VisitorScorecard.query(meta, new Filter());
+        String sql = q.sql.toLowerCase(Locale.ROOT);
+        assertTrue(sql, sql.contains("join dbo.baze"));
+        assertTrue(sql, sql.contains("from dbo.vis_goals g"));
+        assertTrue(sql, sql.contains("customergrouprdf"));
+        assertTrue(sql, sql.contains("quarterid"));
+        assertTrue(sql, sql.contains("group by b.[rdf]"));
+        assertTrue(sql, sql.contains("goalfrom"));
+        assertTrue(sql, sql.contains("previoussales"));
+    }
+
+    @Test public void expiryReportValuesRecordedInventoryShelfExposure() throws Exception {
+        Meta meta = new Meta(connection(loadManifest()));
+        String sql = AtiranSpecialReports.expiryWatch(meta, new Filter()).sql.toLowerCase(Locale.ROOT);
+        assertTrue(sql, sql.contains("expirationdate"));
+        assertTrue(sql, sql.contains("inventory_price"));
+        assertTrue(sql, sql.contains("mojkavah"));
+        assertTrue(sql, sql.contains("mojkajoz"));
+    }
+
+    @Test public void attendanceReportConvertsJalaliBoundsAndIncludesAuditSignals() throws Exception {
+        Meta meta = new Meta(connection(loadManifest()));
+        Filter filter = new Filter();
+        filter.from = "1405/01/01";
+        filter.to = "1405/01/30";
+        Queries.Q q = AtiranSpecialReports.attendanceAudit(meta, filter);
+        String sql = q.sql.toLowerCase(Locale.ROOT);
+        assertTrue(sql, sql.contains("a.[event_time]>=?"));
+        assertTrue(sql, sql.contains("a.[event_time]<dateadd(day,1,?)"));
+        assertTrue(sql, sql.contains("edited_by"));
+        assertTrue(sql, sql.contains("voided"));
+        assertEquals(Jalali.toGregorian(filter.from), q.binds.get(0));
+        assertEquals(Jalali.toGregorian(filter.to), q.binds.get(1));
+    }
+
     @Test public void metadataResolverUsesTheActualNonDboSchema() throws Exception {
         JSONObject manifest = loadManifest();
         Meta meta = new Meta(connection(manifest));

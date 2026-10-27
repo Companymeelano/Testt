@@ -34,7 +34,7 @@ public final class OfflineReports {
                     boolean daily = "returns_by_kind".equals(sp.id) || "returns_list".equals(sp.id);
                     Filter f = daily ? Filter.daily() : new Filter();
                     List<Row> rows = ReportsScreen.applyMaps(m, sp.id,
-                            Repo.exec(c, ReportCatalog.query(m, sp.id, f)));
+                            Repo.exec(c, ReportCatalog.query(m, sp.id, f)), f);
                     Map<String, Object> parts = new LinkedHashMap<>();
                     parts.put("rows", rows);
                     CacheStore.saveData(app, ReportsScreen.cacheKey(sp.id, f), label, parts);

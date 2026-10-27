@@ -109,6 +109,14 @@ public final class ReportCatalog {
                             c("churned", "ریزش", T_NUM), c("invoices", "فاکتور", T_NUM), c("sales", "فروش", T_MONEY),
                             c("perCust", "فاکتور/مشتری", T_NUM)},
                     C_BARS, "name", "sales"),
+            s("visitor_scorecard", "امتیاز و اقدام ویزیتورها", "تحلیل ویزیتور و مسیر",
+                    "هدف ریالی عمومیِ فعال متناسب با روزهای هم‌پوشان محاسبه می‌شود؛ امتیاز تحقق فروش نسبت به هدف (سقف ۱۰۰): ۱۰۰٪ به بالا پیشتاز، ۸۰–۹۹ نزدیک هدف، ۶۰–۷۹ جبرانی، کمتر از ۶۰ مداخله فوری. اهداف تفکیکی جمع نمی‌شوند؛ پوشش و رشد فروش مکمل‌اند، وصول/سود در امتیاز نیست.", true,
+                    new Col[]{c("name", "ویزیتور", T_TEXT), c("action", "گروه اقدام", T_TEXT),
+                            c("score", "امتیاز /۱۰۰", T_TEXT), c("attainment", "تحقق هدف", T_TEXT),
+                            c("sales", "فروش", T_MONEY), c("target", "هدف متناسب", T_MONEY),
+                            c("portfolio", "خریدار/منتسب • پوشش", T_TEXT), c("invoices", "فاکتور", T_NUM),
+                            c("growth", "تغییر با دوره قبل", T_TEXT)},
+                    C_NONE, "", ""),
             s("golden_hours", "ساعت طلایی فروش", "هوشمند", "پرفروش‌ترین ساعت‌ها (یا روزهای هفته، اگر ساعت ثبت نشده باشد)", true,
                     new Col[]{c("slot", "بازه", T_TEXT), c("total", "جمع فروش", T_MONEY), c("docs", "اسناد", T_NUM)},
                     C_BARS, "slot", "total"),
@@ -242,8 +250,14 @@ public final class ReportCatalog {
             s("stock_value", "ارزش موجودی گروه‌ها", "کالا و انبار", "ارزش ریالی موجودی به تفکیک گروه کالا", false,
                     new Col[]{c("label", "گروه", T_TEXT), c("value", "ارزش", T_MONEY), c("count", "اقلام", T_NUM)},
                     C_DONUT, "label", "value"),
+            s("expiry_watch", "هشدار انقضای موجودی", "کالا و انبار",
+                    "موجودی دارای تاریخ انقضای ثبت‌شده در پرونده کالا؛ کالاهای منقضی و حداکثر ۹۰ روز آینده به‌ترتیب فوریت. تاریخ در سطح کالا است، نه بچ/لات.", false,
+                    new Col[]{c("name", "کالا", T_TEXT), c("code", "کد", T_TEXT), c("expiry", "تاریخ انقضا", T_DATE),
+                            c("daysLeft", "روز مانده", T_NUM), c("qty", "موجودی قطعه‌ای", T_NUM),
+                            c("exposureValue", "ارزش بهای در معرض", T_MONEY), c("status", "اقدام", T_TEXT)},
+                    C_NONE, "", ""),
             // ---- مشتریان ----
-            s("debtors", "بدهکاران", "تحلیل ویزیتور و مسیر", "مشتریان دارای مانده بدهی، مرتب‌شده", false,
+            s("debtors", "بدهکاران", "مشتریان", "مشتریان دارای مانده بدهی، مرتب‌شده", false,
                     new Col[]{c("name", "مشتری", T_TEXT), c("cell", "همراه", T_TEXT), c("balance", "مانده", T_MONEY),
                             c("salesTotal", "جمع فروش", T_MONEY), c("lastSale", "آخرین خرید", T_DATE)},
                     C_NONE, "", ""),
@@ -254,7 +268,7 @@ public final class ReportCatalog {
             s("new_customers", "مشتریان جدید", "مشتریان", "مشتریان ثبت‌شده در بازه", true,
                     new Col[]{c("code", "کد", T_TEXT), c("name", "مشتری", T_TEXT), c("date", "تاریخ ثبت", T_DATE), c("visitor", "ویزیتور", T_TEXT)},
                     C_NONE, "", ""),
-            s("inactive_customers", "مشتریان بدون خرید", "تحلیل ویزیتور و مسیر", "مشتریان بدون هیچ فاکتور فروش", false,
+            s("inactive_customers", "مشتریان بدون خرید", "مشتریان", "مشتریان بدون هیچ فاکتور فروش", false,
                     new Col[]{c("code", "کد", T_TEXT), c("party", "مشتری", T_TEXT)},
                     C_NONE, "", ""),
             // ---- ویزیتور ----
@@ -271,12 +285,18 @@ public final class ReportCatalog {
                             c("invoices", "فاکتور", T_NUM), c("customers", "مشتری فعال", T_NUM), c("goals", "هدف", T_MONEY)},
                     C_BARS, "name", "sales"),
             // ---- کاربران ----
-            s("users", "کاربران و آخرین ورود", "کاربران و نظارت", "کاربران سیستم، نقش و آخرین ورود", false,
+            s("users", "کاربران و آخرین ورود", "پرسنل و نظارت", "کاربران سیستم، نقش و آخرین ورود", false,
                     new Col[]{c("name", "کاربر", T_TEXT), c("role", "نقش", T_TEXT), c("active", "فعال", T_TEXT),
                             c("lastLogin", "آخرین ورود", T_TEXT), c("todayN", "امروز", T_NUM)},
                     C_NONE, "", ""),
-            s("changes", "تغییرات ثبت‌شده", "کاربران و نظارت", "آخرین تغییرات ثبت‌شده در سیستم", true,
+            s("changes", "تغییرات ثبت‌شده", "پرسنل و نظارت", "آخرین تغییرات ثبت‌شده در سیستم", true,
                     new Col[]{c("at", "زمان", T_TEXT), c("tableName", "جدول", T_TEXT), c("username", "کاربر", T_TEXT), c("descrip", "شرح", T_TEXT)},
+                    C_NONE, "", ""),
+            s("staff_attendance", "ممیزی حضور و تردد پرسنل", "پرسنل و نظارت",
+                    "رویدادهای ورود/خروج، منبع ثبت، تأیید زیستی، فاصله و اصلاح/ابطال‌های مدیر؛ تأخیر یا غیبت بدون برنامه شیفت اعلام نمی‌شود.", true,
+                    new Col[]{c("person", "پرسنل", T_TEXT), c("username", "شناسه", T_TEXT), c("event", "رویداد", T_TEXT),
+                            c("eventTime", "زمان شمسی", T_TEXT), c("source", "منبع", T_TEXT), c("distance", "فاصله متر", T_NUM),
+                            c("accuracy", "دقت متر", T_NUM), c("bio", "تأیید", T_TEXT), c("audit", "ممیزی/یادداشت", T_TEXT)},
                     C_NONE, "", ""),
             // ---- سود ----
             s("profit_daily", "سود روزانه", "سود و زیان", "فروش و بهای تمام‌شده هر روز (مبنای قیمت خرید)", true,
@@ -617,6 +637,9 @@ public final class ReportCatalog {
         if ("lost_basket".equals(id)) return MasterQueries.lostBasket(m, ff);
         if ("cheque_reliability".equals(id)) return MasterQueries.chequeReliability(m, ff);
         if ("visitor_yield".equals(id)) return MasterQueries.visitorYield(m, ff);
+        if ("visitor_scorecard".equals(id)) return VisitorScorecard.query(m, ff);
+        if ("expiry_watch".equals(id)) return AtiranSpecialReports.expiryWatch(m, ff);
+        if ("staff_attendance".equals(id)) return AtiranSpecialReports.attendanceAudit(m, ff);
         if ("golden_hours".equals(id)) return MasterQueries.goldenHours(m, ff);
         if ("sleeping_capital".equals(id)) return MasterQueries.deadStock(m, 90, 200);
         if ("stock_forecast".equals(id)) return MasterQueries.stockForecast(m, ff);

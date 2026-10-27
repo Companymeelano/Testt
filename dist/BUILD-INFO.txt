@@ -1,29 +1,31 @@
 نسخهٔ برنامهٔ یکپارچه: 7.0.2 (versionCode 202; package ir.meelano.visitor)
 گواهی امضا: نسخهٔ نصب فعلی / Pakhsh Derakhshan (fingerprint را CI بررسی می‌کند)
 APK اصلی: MEELANO-v7.0.2-release.apk
-کامیت: f6c3e19
-تاریخ build: 2026-10-27T13:40:58Z
+کامیت: 762779e
+تاریخ build: 2026-10-27T13:46:35Z
 Gradle: Gradle 8.13
 فایل‌ها:
-drwxr-xr-x  2 runner runner    4096 Oct 27 13:40 .
-drwxr-xr-x 14 runner runner    4096 Oct 27 13:40 ..
--rw-r--r--  1 runner runner     346 Oct 27 13:40 BUILD-INFO.txt
--rw-r--r--  1 runner runner 2736908 Oct 27 13:40 MEELANO-v7.0.2-release.apk
--rw-r--r--  1 runner runner 3441069 Oct 27 13:40 app-manager-debug.apk
--rw-r--r--  1 runner runner 3095341 Oct 27 13:40 app-staff-debug.apk
--rw-r--r--  1 runner runner 3105117 Oct 27 13:40 app-store-debug.apk
--rw-r--r--  1 runner runner 3147829 Oct 27 13:40 app-tax-debug.apk
--rw-r--r--  1 runner runner 3133157 Oct 27 13:40 app-unified-debug.apk
--rw-r--r--  1 runner runner 3133165 Oct 27 13:40 app-visitor-debug.apk
--rw-r--r--  1 runner runner     491 Oct 27 13:36 buy-formula-counts.json
--rw-r--r--  1 runner runner     354 Oct 27 13:40 latest-unified.json
--rw-r--r--  1 runner runner     189 Oct 27 13:36 manager-v36-build-info.txt
--rw-r--r--  1 runner runner    1422 Oct 27 13:36 money-structure-counts.json
+drwxr-xr-x  2 runner runner     4096 Oct 27 13:46 .
+drwxr-xr-x 14 runner runner     4096 Oct 27 13:46 ..
+-rw-r--r--  1 runner runner      346 Oct 27 13:46 BUILD-INFO.txt
+-rw-r--r--  1 runner runner  2736912 Oct 27 13:46 MEELANO-v7.0.2-release.apk
+-rw-r--r--  1 runner runner  3441069 Oct 27 13:46 app-manager-debug.apk
+-rw-r--r--  1 runner runner  3095341 Oct 27 13:46 app-staff-debug.apk
+-rw-r--r--  1 runner runner  3105117 Oct 27 13:46 app-store-debug.apk
+-rw-r--r--  1 runner runner  3147829 Oct 27 13:46 app-tax-debug.apk
+-rw-r--r--  1 runner runner  3133157 Oct 27 13:46 app-unified-debug.apk
+-rw-r--r--  1 runner runner  3133165 Oct 27 13:46 app-visitor-debug.apk
+-rw-r--r--  1 runner runner      491 Oct 27 13:42 buy-formula-counts.json
+-rw-r--r--  1 runner runner      354 Oct 27 13:46 latest-unified.json
+-rw-r--r--  1 runner runner      189 Oct 27 13:42 manager-v36-build-info.txt
+-rw-r--r--  1 runner runner 68649701 Oct 27 13:42 meelano-manager-v36-debug-9.apk
+-rw-r--r--  1 runner runner     1422 Oct 27 13:42 money-structure-counts.json
 --- sha256 ---
-c92068d7fe7235631e51f92e219691d8abeb7dc5e5f130bcbed207c902444da4  MEELANO-v7.0.2-release.apk
-9f9c821920d1b5918a4e240ff9ea1afb29fc506dbfc5ead618da41e1e275fec1  app-manager-debug.apk
-533f6c6f2d757ca1fb975b19b7a67ec60e54400258c559f4d4467ff2dd14be15  app-staff-debug.apk
-5fc05cdf5469877c87e31ac5bd357a6e59b043d5b0a7d6dc40562b126346984e  app-store-debug.apk
-36b3f1a45bf71600d3700026f49d6ef9ba0670ca9319277d05dae19c7685a3bc  app-tax-debug.apk
-e04eb1ced19484077197e62aae8d422d0024d145c8f12133f495144e140c6525  app-unified-debug.apk
-8d81497b1332dabbdf031be6a96b2d331dcd24c085dc042b7da1cdd369e7006a  app-visitor-debug.apk
+882ef1424c21421bed84239aeeb086e62807cc293ffb9a447112162a43453029  MEELANO-v7.0.2-release.apk
+ade17efbde8016e5581b9052bd5763fc4ef75fcd247cca8b96f4b437f2021665  app-manager-debug.apk
+2e194e3e8b86110eb8844c3d8ee8c73ed74c986e8476d306e9277c3bb009b080  app-staff-debug.apk
+a6904b0676c7c99d0e91b2bf069a9750fea54595fb06d53d1650642ed51eb580  app-store-debug.apk
+6e59cadf992e85edc860cae5d9fbb9365e96fd0905a8e031c4c1d6614a47429d  app-tax-debug.apk
+bfe7eea1780a01dda9594f4c17aeb1693a8435b7ce36c500484a518378908328  app-unified-debug.apk
+c19e8c6e5b812025d9df4878231a792a19a3b539362ba22aa4ef012eb32f7487  app-visitor-debug.apk
+5e7a90077f4c5edb13936ba236f1b085ebfdf3cb9426d52985b2a8bc80080ecd  meelano-manager-v36-debug-9.apk

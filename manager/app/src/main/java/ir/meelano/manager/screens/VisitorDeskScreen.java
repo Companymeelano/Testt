@@ -15,6 +15,7 @@ import ir.meelano.manager.core.AiRouter;
 import ir.meelano.manager.core.AtiranAuth;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.Money;
+import ir.meelano.manager.core.VisitorData;
 import ir.meelano.manager.core.VisitorIdentity;
 import ir.meelano.manager.core.VisitorPrefactorWriter;
 import ir.meelano.manager.core.VisitorPricePolicy;
@@ -38,6 +39,11 @@ public final class VisitorDeskScreen extends Screen {
             ORDER = 4, MY_ORDERS = 5, RECEIPT = 6, REPORTS = 7;
     private final ExecutorService aiExecutor = Executors.newSingleThreadExecutor();
     private int page = HOME;
+    /**
+     * Page the command room wants to open inside the visitor workspace
+     * (for example «مشتریان من» from «همهٔ بخش‌ها»). Set before nav("visitor_work").
+     */
+    public static String pendingPage;
     private Customer selectedCustomer;
     private Customer receiptCustomer;
     private final List<CartLine> cart = new ArrayList<>();
@@ -65,6 +71,18 @@ public final class VisitorDeskScreen extends Screen {
         Customer(long code, String name, String phone, String address, BigDecimal balance) {
             this.code=code; this.name=name==null?"":name; this.phone=phone==null?"":phone;
             this.address=address==null?"":address; this.balance=balance;
+        }
+    }
+
+    /** The customers of the signed-in visitor plus the counts that explain an empty list. */
+    private static final class CustomerList {
+        final List<Customer> rows;
+        /** Rows linked to this account, active or not. */
+        final long linked;
+        /** Rows linked to this account and switched on. */
+        final long live;
+        CustomerList(List<Customer> rows, long linked, long live) {
+            this.rows=rows; this.linked=linked; this.live=live;
         }
     }
 
@@ -100,15 +118,34 @@ public final class VisitorDeskScreen extends Screen {
         return false;
     }
 
+    /** The workspace page a command-room entry asks for. */
+    static int pageFor(String key){
+        if(key==null)return -1;
+        if("home".equals(key))return HOME;
+        if("customers".equals(key))return CUSTOMERS;
+        if("products".equals(key))return PRODUCTS;
+        if("route".equals(key)||"visit".equals(key))return ROUTE;
+        if("order".equals(key)||"prefactor".equals(key))return ORDER;
+        if("my_orders".equals(key)||"orders".equals(key))return MY_ORDERS;
+        if("receipt".equals(key))return RECEIPT;
+        if("reports".equals(key))return REPORTS;
+        return -1;
+    }
+
     @Override public void render(LinearLayout content) {
         contentRef=content;
         content.removeAllViews();
         a.scrollToTop();
+        if(pendingPage!=null&&!pendingPage.isEmpty()){
+            int wanted=pageFor(pendingPage);
+            pendingPage=null;
+            if(wanted>=0)page=wanted;
+        }
         LinearLayout hero=a.kit.h();
         hero.setGravity(Gravity.CENTER_VERTICAL);
         hero.setBackground(Theme.hero(Theme.GOLD));
         hero.setPadding(Theme.dp(13),Theme.dp(9),Theme.dp(13),Theme.dp(9));
-        ImageView heroArt=new ImageView(a);heroArt.setImageResource(R.drawable.visitor3d_assistant);
+        ImageView heroArt=new ImageView(a);heroArt.setImageResource(Theme.chrome3d(R.drawable.mi_star_shine));
         heroArt.setScaleType(ImageView.ScaleType.FIT_CENTER);
         hero.addView(heroArt,new LinearLayout.LayoutParams(Theme.dp(46),Theme.dp(46)));
         hero.addView(a.kit.space(9));
@@ -119,7 +156,10 @@ public final class VisitorDeskScreen extends Screen {
         content.addView(hero,a.kit.lp(-1,-2));
         content.addView(a.kit.gap(7));
         String[] labels={"خانه","مشتریان","کالاها","ویزیت"};
-        int[] icons={R.drawable.mi_home,R.drawable.visitor3d_customers,R.drawable.visitor3d_products,R.drawable.icon3d_logistics};
+        // Section art follows the chosen theme: the nut look uses the emerald set, the dark
+        // look its own, the ivory look the gold set - one family, never a fixed picture.
+        int[] icons={Theme.chrome3d(R.drawable.mi_home),Theme.chrome3d(R.drawable.mi_group),
+                Theme.chrome3d(R.drawable.mi_grid_view),Theme.chrome3d(R.drawable.mi_task_alt)};
         int selected=page<=ROUTE?page:-1;
         content.addView(a.kit.chipsWithIcons(labels,selected,icons,Theme.GOLD,i->{page=i;render(content);}),a.kit.lp(-1,-2));
         content.addView(a.kit.gap(7));
@@ -141,15 +181,15 @@ public final class VisitorDeskScreen extends Screen {
     private void renderHome(LinearLayout c) {
         c.addView(sectionTitle("شروع سریع", "کارهای پرکاربرد امروز"),a.kit.lp(-1,-2));
         addHomeRow(c,
-                homeTile("مشتریان", "مانده و تماس", R.drawable.visitor3d_customers, CUSTOMERS),
-                homeTile("کالا و موجودی", "جستجوی کالا و نرخ", R.drawable.visitor3d_products, PRODUCTS));
+                homeTile("مشتریان", "مانده و تماس", R.drawable.mi_group, CUSTOMERS),
+                homeTile("کالا و موجودی", "جستجوی کالا و نرخ", R.drawable.mi_grid_view, PRODUCTS));
         addHomeRow(c,
-                homeTile("ثبت ویزیت", "نتیجه و یادداشت", R.drawable.icon3d_logistics, ROUTE),
-                homeTile("پیش‌فاکتور هوشمند", "کالا با صدا یا متن", R.drawable.visitor3d_prefactor, ORDER));
+                homeTile("ثبت ویزیت", "نتیجه و یادداشت", R.drawable.mi_task_alt, ROUTE),
+                homeTile("پیش‌فاکتور هوشمند", "کالا با صدا یا متن", R.drawable.mi_add_shopping_cart, ORDER));
         addHomeRow(c,
-                homeTile("سفارش‌های من", "پیگیری وضعیت", R.drawable.icon3d_sales, MY_ORDERS),
-                homeTile("دریافت وجه", "پیش‌دریافت و رسید", R.drawable.visitor3d_receipt, RECEIPT));
-        LinearLayout reports=homeTile("گزارش روزانه", "بازدیدها و عملکرد خودتان", R.drawable.icon3d_reports, REPORTS);
+                homeTile("سفارش‌های من", "پیگیری وضعیت", R.drawable.mi_point_of_sale, MY_ORDERS),
+                homeTile("دریافت وجه", "پیش‌دریافت و رسید", R.drawable.mi_receipt_long, RECEIPT));
+        LinearLayout reports=homeTile("گزارش روزانه", "بازدیدها و عملکرد خودتان", R.drawable.mi_bar_chart, REPORTS);
         c.addView(reports,a.kit.lp(-1,-2));
         c.addView(a.kit.gap(8));
         c.addView(a.kit.hint("مشتریان و گزارش‌ها فقط برای حساب ویزیتور واردشده نمایش داده می‌شوند. نرخ کالا بر اساس تنظیم آتیران است؛ قلمِ بدون نرخ یکتا قابل ثبت نیست."),a.kit.lp(-1,-2));
@@ -169,7 +209,11 @@ public final class VisitorDeskScreen extends Screen {
         tile.setPadding(Theme.dp(8),Theme.dp(7),Theme.dp(8),Theme.dp(7));
         tile.setMinimumHeight(Theme.dp(108));
         ImageView art=new ImageView(a);
-        art.setImageResource(icon);
+        // The artwork of a section follows the skin the user chose: emerald in the nut look,
+        // its own set in the dark look, gold in the ivory look. A flat glyph is the last resort.
+        int artRes=Theme.chrome3d(icon);
+        art.setImageResource(artRes);
+        if(!Theme.isIcon3d(artRes))art.setColorFilter(Theme.GOLD);
         art.setScaleType(ImageView.ScaleType.FIT_CENTER);
         LinearLayout.LayoutParams ip=new LinearLayout.LayoutParams(Theme.dp(48),Theme.dp(48));
         ip.gravity=Gravity.CENTER;
@@ -227,6 +271,7 @@ public final class VisitorDeskScreen extends Screen {
     private void loadCustomers(LinearLayout c, boolean forPicker) {
         if(!forPicker){c.removeAllViews();c.addView(a.kit.loading("در حال دریافت مشتریان مسیر شما…"),a.kit.lp(-1,-2));}
         a.repo.run(db->{
+            VisitorData.beginRead(db);
             VisitorIdentity.Identity identity=identity(db);
             Meta m=new Meta(db);
             if(!m.table("CUSTOMERS")) throw new Exception("جدول مشتریان آتیران پیدا نشد.");
@@ -238,17 +283,36 @@ public final class VisitorDeskScreen extends Screen {
             String address=m.col("CUSTOMERS","address","addre","Address");
             String balance=m.col("CUSTOMERS","man","Balance","Mandeh");
             if(key==null||name==null||vis==null||active==null) throw new Exception("شناسهٔ مشتری، نام، پیوند ویزیتور یا وضعیت فعال‌بودن در جدول مشتریان موجود نیست.");
-            String sql="SELECT TOP (300) TRY_CONVERT(bigint,"+q(key)+"),TRY_CONVERT(nvarchar(250),"+q(name)+")"
-                    +(phone==null?",CAST(N'' AS nvarchar(80))":",TRY_CONVERT(nvarchar(80),"+q(phone)+")")
-                    +(address==null?",CAST(N'' AS nvarchar(300))":",TRY_CONVERT(nvarchar(300),"+q(address)+")")
-                    +(balance==null?",CAST(NULL AS decimal(19,2))":",TRY_CONVERT(decimal(19,2),"+q(balance)+")")
-                    +" FROM "+m.qTable("CUSTOMERS")+" WHERE TRY_CONVERT(int,"+q(vis)+")=? AND TRY_CONVERT(nvarchar(10),"+q(active)+") IN (N't',N'T',N'1',N'true',N'TRUE) ORDER BY "+q(name);
+            // Owner scope: every visitor the signed-in account owns (sys_vis grant + login name).
+            // The column is compared the way Atiran stores it, so the database can use an index
+            // instead of reading the whole customer table over a slow link.
+            VisitorData.Owner owner=VisitorData.owner("c",vis,m.columnType("CUSTOMERS",vis),VisitorData.ids(identity));
+            String sql="SELECT TOP (300) TRY_CONVERT(bigint,c."+q(key)+"),TRY_CONVERT(nvarchar(250),c."+q(name)+")"
+                    +(phone==null?",CAST(N'' AS nvarchar(80))":",TRY_CONVERT(nvarchar(80),c."+q(phone)+")")
+                    +(address==null?",CAST(N'' AS nvarchar(300))":",TRY_CONVERT(nvarchar(300),c."+q(address)+")")
+                    +(balance==null?",CAST(NULL AS decimal(19,2))":",TRY_CONVERT(decimal(19,2),c."+q(balance)+")")
+                    +" FROM "+m.qTable("CUSTOMERS")+" c WHERE "+owner.predicate
+                    +" AND "+VisitorData.activePredicate("c",active)+" ORDER BY c."+q(name);
             List<Customer> out=new ArrayList<>();
-            try(java.sql.PreparedStatement ps=db.prepareStatement(sql)){ps.setInt(1,identity.visitorId);try(java.sql.ResultSet rs=ps.executeQuery()){while(rs.next())out.add(new Customer(rs.getLong(1),rs.getString(2),rs.getString(3),rs.getString(4),rs.getBigDecimal(5)));}}
-            return out;
-        },new Repo.Cb<List<Customer>>(){
-            @Override public void ok(List<Customer> rows){
-                if(forPicker){showCustomerPicker(rows);return;}
+            try(java.sql.PreparedStatement ps=VisitorData.read(db,sql)){
+                owner.bind(ps,1);
+                try(java.sql.ResultSet rs=ps.executeQuery()){while(rs.next())out.add(new Customer(rs.getLong(1),rs.getString(2),rs.getString(3),rs.getString(4),rs.getBigDecimal(5)));}
+            }
+            // Why is the list empty? Count the rows of this account with and without the active marker.
+            String countSql="SELECT COUNT_BIG(1),SUM(CASE WHEN "+VisitorData.activePredicate("c",active)
+                    +" THEN 1 ELSE 0 END) FROM "+m.qTable("CUSTOMERS")+" c WHERE "+owner.predicate;
+            long linked=0,live=0;
+            try(java.sql.PreparedStatement ps=VisitorData.read(db,countSql)){
+                owner.bind(ps,1);
+                try(java.sql.ResultSet rs=ps.executeQuery()){
+                    if(rs.next()){linked=rs.getLong(1);live=rs.getLong(2);if(rs.wasNull())live=0;}
+                }
+            }
+            return new CustomerList(out,linked,live);
+        },new Repo.Cb<CustomerList>(){
+            @Override public void ok(CustomerList list){
+                if(forPicker){showCustomerPicker(list.rows);return;}
+                List<Customer> rows=list.rows;
                 c.removeAllViews();
                 if(page==ROUTE){
                     c.addView(sectionTitle("ثبت ویزیت","مشتری را انتخاب کنید و نتیجه را یادداشت کنید."),a.kit.lp(-1,-2));
@@ -256,7 +320,7 @@ public final class VisitorDeskScreen extends Screen {
                         View v=a.kit.personRow(x.name,"کد "+Money.fa(String.valueOf(x.code))+ (x.phone.isEmpty()?"":" • "+x.phone),"", "ثبت",Theme.GOLD,z->recordVisit(x));
                         c.addView(v,a.kit.lp(-1,-2));c.addView(a.kit.gap(6));
                     }
-                    if(rows.isEmpty())c.addView(a.kit.empty("مشتری تخصیص‌یافته پیدا نشد","فهرست بر اساس مسیر همین حساب آتیران است."),a.kit.lp(-1,-2));
+                    if(rows.isEmpty())c.addView(a.kit.empty("مشتری تخصیص‌یافته پیدا نشد",emptyReason(list)),a.kit.lp(-1,-2));
                 } else if(page==CUSTOMERS){
                     c.addView(sectionTitle("مشتریان و حساب","مشتریان تخصیص‌یافته و ماندهٔ ثبت‌شده در آتیران."),a.kit.lp(-1,-2));
                     for(Customer x:rows){
@@ -265,7 +329,7 @@ public final class VisitorDeskScreen extends Screen {
                                 x.balance==null?"مانده نامشخص":money(x.balance),"پرونده",tint,z->showCustomerDetail(x));
                         c.addView(v,a.kit.lp(-1,-2));c.addView(a.kit.gap(6));
                     }
-                    if(rows.isEmpty())c.addView(a.kit.empty("مشتری تخصیص‌یافته پیدا نشد",null),a.kit.lp(-1,-2));
+                    if(rows.isEmpty())c.addView(a.kit.empty("مشتری تخصیص‌یافته پیدا نشد",emptyReason(list)),a.kit.lp(-1,-2));
                 } else showCustomerPicker(rows);
             }
             @Override public void fail(String error){
@@ -273,6 +337,35 @@ public final class VisitorDeskScreen extends Screen {
                 c.removeAllViews();c.addView(visitorErrorCard("مشتریان دریافت نشدند",error,()->loadCustomers(c,false)),a.kit.lp(-1,-2));
             }
         });
+    }
+
+    /** Explains an empty customer list with the numbers Atiran actually holds. */
+    private String emptyReason(CustomerList list){
+        if(list==null)return null;
+        if(list.linked>0&&list.live<=0)
+            return "همهٔ "+Money.fa(String.valueOf(list.linked))+" مشتری تخصیص‌یافته در آتیران غیرفعال‌اند؛ مدیر آتیران باید آن‌ها را فعال کند.";
+        if(list.linked<=0)
+            return "هیچ مشتری‌ای به این حساب ویزیتور تخصیص نیافته است؛ تخصیص مشتری باید در آتیران انجام شود.";
+        return null;
+    }
+
+    /** The visitor ids of the signed-in account, as text for the app's own tables. */
+    private static List<String> ownerIds(VisitorIdentity.Identity identity){
+        List<String> out=new ArrayList<>();
+        for(int v:VisitorData.ids(identity))out.add(String.valueOf(v));
+        return out;
+    }
+
+    /** The placeholders of an IN clause. */
+    private static String placeholders(int n){
+        StringBuilder b=new StringBuilder();
+        for(int i=0;i<n;i++){if(i>0)b.append(',');b.append('?');}
+        return b.toString();
+    }
+
+    /** Binds the owner ids of the signed-in account into an IN clause. */
+    private static void bindOwner(java.sql.PreparedStatement ps,List<String> ids,int first)throws Exception{
+        for(int i=0;i<ids.size();i++)ps.setString(first+i,ids.get(i));
     }
 
     private void showCustomerDetail(Customer customer){
@@ -311,8 +404,8 @@ public final class VisitorDeskScreen extends Screen {
         new AlertDialog.Builder(a).setTitle("گزارش پایان روز").setMessage("گزارش تعداد و مبلغ پیش‌فاکتورهای امروز و بازدیدهای ثبت‌شده را می‌سازد.").setView(note).setNegativeButton("لغو",null).setPositiveButton("ثبت گزارش",(d,w)->{
             final String extra=note.getText().toString().trim();
             a.repo.run(db->{VisitorIdentity.Identity id=identity(db);VisitorPrefactorWriter.ensureTables(db);ensureVisitTable(db);long count=0,visits=0;double amount=0;
-                try(java.sql.PreparedStatement ps=db.prepareStatement("SELECT COUNT_BIG(1),ISNULL(SUM(ISNULL(grand_total,total_amount)),0) FROM dbo.meelano_prefactors WHERE CONVERT(date,created_at)=CONVERT(date,SYSDATETIME()) AND visitor_id=?")){ps.setString(1,String.valueOf(id.visitorId));try(java.sql.ResultSet rs=ps.executeQuery()){if(rs.next()){count=rs.getLong(1);amount=rs.getDouble(2);}}}
-                try(java.sql.PreparedStatement ps=db.prepareStatement("SELECT COUNT_BIG(1) FROM dbo.meelano_visit_results WHERE CONVERT(date,created_at)=CONVERT(date,SYSDATETIME()) AND visitor_id=?")){ps.setString(1,String.valueOf(id.visitorId));try(java.sql.ResultSet rs=ps.executeQuery()){if(rs.next())visits=rs.getLong(1);}}
+                try(java.sql.PreparedStatement ps=db.prepareStatement("SELECT COUNT_BIG(1),ISNULL(SUM(ISNULL(grand_total,total_amount)),0) FROM dbo.meelano_prefactors WHERE CONVERT(date,created_at)=CONVERT(date,SYSDATETIME()) AND visitor_id IN ("+placeholders(ownerIds(id).size())+")")){bindOwner(ps,ownerIds(id),1);try(java.sql.ResultSet rs=ps.executeQuery()){if(rs.next()){count=rs.getLong(1);amount=rs.getDouble(2);}}}
+                try(java.sql.PreparedStatement ps=db.prepareStatement("SELECT COUNT_BIG(1) FROM dbo.meelano_visit_results WHERE CONVERT(date,created_at)=CONVERT(date,SYSDATETIME()) AND visitor_id IN ("+placeholders(ownerIds(id).size())+")")){bindOwner(ps,ownerIds(id),1);try(java.sql.ResultSet rs=ps.executeQuery()){if(rs.next())visits=rs.getLong(1);}}
                 String report="گزارش پایان روز ویزیتور «"+id.displayName+"» • "+Jalali.todayStr()+"\nبازدید ثبت‌شده: "+visits+"\nپیش‌فاکتور امروز: "+count+"\nجمع پیش‌فاکتورها: "+Money.rial(amount)+(extra.isEmpty()?"":"\nیادداشت: "+extra);
                 try(java.sql.Statement st=db.createStatement()){st.execute("IF OBJECT_ID(N'dbo.meelano_day_reports',N'U') IS NULL CREATE TABLE dbo.meelano_day_reports(id bigint IDENTITY(1,1) PRIMARY KEY,visitor_username nvarchar(160) NULL,visitor_id nvarchar(80) NULL,report_text nvarchar(max) NULL,created_at datetime2 NOT NULL DEFAULT SYSDATETIME())");}
                 try(java.sql.PreparedStatement ps=db.prepareStatement("INSERT INTO dbo.meelano_day_reports(visitor_username,visitor_id,report_text,created_at) VALUES(?,?,?,SYSDATETIME())")){ps.setString(1,id.username);ps.setString(2,String.valueOf(id.visitorId));ps.setString(3,report);ps.executeUpdate();}
@@ -352,7 +445,7 @@ public final class VisitorDeskScreen extends Screen {
     }
 
     private void renderProducts(LinearLayout c,String initialQuery){
-        c.addView(sectionTitle("کالا و موجودی","جستجوی کالا با نرخ معتبر و موجودی آتیران."),a.kit.lp(-1,-2));
+        c.addView(sectionTitle("کالا و موجودی","فهرست فروش میدانی با نرخ معتبر و موجودی آتیران."),a.kit.lp(-1,-2));
         EditText search=a.kit.edit("نام، کد یا بارکد کالا",initialQuery);
         LinearLayout actions=a.kit.h();
         actions.addView(a.kit.btnGold("جستجو",v->{String term=search.getText().toString().trim();if(term.length()<2){a.kit.toast("نام یا دست‌کم دو رقم از کد کالا را وارد کنید.");return;}loadProductList(c,term);}),new LinearLayout.LayoutParams(0,-2,1f));
@@ -361,15 +454,8 @@ public final class VisitorDeskScreen extends Screen {
         c.addView(search,a.kit.lp(-1,-2));
         c.addView(actions,a.kit.lp(-1,-2));
         c.addView(a.kit.gap(8));
-        if(initialQuery==null||initialQuery.trim().isEmpty()){
-            LinearLayout start=a.kit.card(Theme.GOLD);start.setGravity(Gravity.CENTER_HORIZONTAL);
-            ImageView art=new ImageView(a);art.setImageResource(R.drawable.visitor3d_products);art.setScaleType(ImageView.ScaleType.FIT_CENTER);
-            start.addView(art,new LinearLayout.LayoutParams(Theme.dp(72),Theme.dp(72)));
-            TextView title=a.kit.text("جستجو یا مرور کالاها",14,Theme.TEXT,true);title.setGravity(Gravity.CENTER);start.addView(title,a.kit.lp(-1,-2));
-            TextView body=a.kit.text("نام، کد یا بارکد را وارد کنید؛ یا فهرست فروش میدانی را باز کنید.",11.5f,Theme.MUTED,false);body.setGravity(Gravity.CENTER);start.addView(body,a.kit.lp(-1,-2));
-            start.addView(a.kit.btnGhost("نمایش فهرست کالاها",Theme.GOLD,v->loadProductList(c,"")),a.kit.lp(-1,-2));
-            c.addView(start,a.kit.lp(-1,-2));
-        }else loadProductList(c,initialQuery);
+        // The shelf loads on its own: an empty list must never look like a broken section.
+        loadProductList(c,initialQuery);
     }
 
     private void loadProductList(LinearLayout c,String query){
@@ -416,6 +502,7 @@ public final class VisitorDeskScreen extends Screen {
     }
 
     private List<Product> loadCatalog(java.sql.Connection db,String search)throws Exception{
+        VisitorData.beginRead(db);
         VisitorIdentity.Identity id=identity(db);Meta m=new Meta(db);
         String invName=m.col("inventory","naka","Name","ProductName");
         String invBarcode=m.col("inventory","coka","Barcode","bar_code","ProductCode");
@@ -423,9 +510,8 @@ public final class VisitorDeskScreen extends Screen {
         String unit=m.col("inventory","vahsanj","unit","UnitName");
         String stock=m.col("inventory","mojkavah","stock","Stock");
         String active=m.col("inventory","active","Active");
-        String online=m.col("inventory","ActiveCapillarySales","active_capillary_sales");
-        if(invId==null||invName==null||active==null||online==null)throw new Exception("شناسه/نام کالا یا وضعیت فعال‌بودن فروش میدانی در inventory آتیران پیدا نشد.");
-        int group=defaultPriceGroup(db,m,id.visitorId);
+        if(invId==null||invName==null||active==null)throw new Exception("شناسه/نام کالا یا وضعیت فعال‌بودن کالا در inventory آتیران پیدا نشد.");
+        int group=VisitorData.defaultPriceGroup(db,VisitorData.ids(id));
         String priceCol=VisitorPricePolicy.column(group);
         if(priceCol==null)throw new Exception("DefaultPriceGrp ویزیتور معتبر نیست؛ قیمت انتخاب نشد.");
         if(!m.table("forosh_price"))throw new Exception("جدول forosh_price آتیران پیدا نشد.");
@@ -433,29 +519,27 @@ public final class VisitorDeskScreen extends Screen {
         String pVal=m.col("forosh_price",priceCol);
         String pActive=m.col("forosh_price","active","Active");
         if(pKey==null||pVal==null||pActive==null)throw new Exception("ستون نرخ یا وضعیت فعال‌بودن آن در forosh_price پیدا نشد.");
-        String activeP=pActive==null?"":" AND (TRY_CONVERT(nvarchar(10),p."+q(pActive)+") IN (N't',N'T',N'1',N'true',N'TRUE'))";
+        // The price row of a product is found by its key. When both keys are numbers the
+        // comparison stays index-friendly, so a big price table is not read row by row.
+        String keyMatch=VisitorData.idEquals("p."+q(pKey),m.columnType("forosh_price",pKey),
+                "i."+q(invId),m.columnType("inventory",invId));
+        String activeP=" AND "+VisitorData.activePredicate("p",pActive);
+        // A product may be switched on for field (capillary) sales, for online sales, or both.
+        String[] flags=VisitorData.fieldSalesColumns(m);
         List<Object> binds=new ArrayList<>();String where="1=1";
-        if(active!=null)where+=" AND (TRY_CONVERT(nvarchar(10),i."+q(active)+") IN (N't',N'T',N'1',N'true',N'TRUE'))";
-        if(online!=null)where+=" AND ISNULL(TRY_CONVERT(int,i."+q(online)+"),1)=1";
-        if(search!=null&&!search.trim().isEmpty()){where+=" AND (TRY_CONVERT(nvarchar(500),i."+q(invName)+") LIKE N'%'+?+N'%'";binds.add(search.trim());if(invBarcode!=null){where+=" OR TRY_CONVERT(nvarchar(100),i."+q(invBarcode)+") LIKE N'%'+?+N'%'";binds.add(search.trim());}where+=")";}
+        where+=" AND "+VisitorData.activePredicate("i",active);
+        if(flags.length>0)where+=" AND "+VisitorData.fieldSalesPredicate("i",flags);
+        if(search!=null&&!search.trim().isEmpty()){where+=" AND ("+VisitorData.textExpr("i",invName,m.columnType("inventory",invName))+" LIKE N'%'+?+N'%'";binds.add(search.trim());if(invBarcode!=null){where+=" OR TRY_CONVERT(nvarchar(100),i."+q(invBarcode)+") LIKE N'%'+?+N'%'";binds.add(search.trim());}where+=")";}
         String sql="SELECT TOP (250) TRY_CONVERT(nvarchar(100),i."+q(invId)+"),TRY_CONVERT(nvarchar(500),i."+q(invName)+")"
                 +(unit==null?",CAST(N'عدد' AS nvarchar(80))":",TRY_CONVERT(nvarchar(80),i."+q(unit)+")")
                 +",ISNULL(TRY_CONVERT(decimal(19,2),px.price),0),"+(stock==null?"CAST(NULL AS decimal(19,3))":"TRY_CONVERT(decimal(19,3),i."+q(stock)+")")+",ISNULL(px.price_rows,0)"
-                +" FROM "+m.qTable("inventory")+" i OUTER APPLY (SELECT CASE WHEN COUNT_BIG(1)=1 THEN MAX(TRY_CONVERT(decimal(19,2),p."+q(pVal)+")) ELSE 0 END price,COUNT_BIG(1) price_rows FROM "+m.qTable("forosh_price")+" p WHERE TRY_CONVERT(nvarchar(100),p."+q(pKey)+")=TRY_CONVERT(nvarchar(100),i."+q(invId)+")"+activeP+") px WHERE "+where+" ORDER BY TRY_CONVERT(nvarchar(500),i."+q(invName)+")";
+                +" FROM "+m.qTable("inventory")+" i OUTER APPLY (SELECT CASE WHEN COUNT_BIG(1)=1 THEN MAX(TRY_CONVERT(decimal(19,2),p."+q(pVal)+")) ELSE 0 END price,COUNT_BIG(1) price_rows FROM "+m.qTable("forosh_price")+" p WHERE "+keyMatch+activeP+") px WHERE "+where+" ORDER BY "+VisitorData.orderText("i",invName,m.columnType("inventory",invName));
         List<Product> out=new ArrayList<>();
-        try(java.sql.PreparedStatement ps=db.prepareStatement(sql)){int n=1;for(Object b:binds)ps.setObject(n++,b);try(java.sql.ResultSet rs=ps.executeQuery()){while(rs.next()){
+        try(java.sql.PreparedStatement ps=VisitorData.read(db,sql)){int n=1;for(Object b:binds)ps.setObject(n++,b);try(java.sql.ResultSet rs=ps.executeQuery()){while(rs.next()){
             BigDecimal p=rs.getBigDecimal(4), st=rs.getBigDecimal(5);long rows=rs.getLong(6);
             out.add(new Product(rs.getString(1),rs.getString(2),rs.getString(3),p==null?BigDecimal.ZERO:p,st,group,rows));
         }}}
         return out;
-    }
-
-    private int defaultPriceGroup(java.sql.Connection db,Meta m,int visitorId)throws Exception{
-        if(!m.table("DeviceSettings"))throw new Exception("DeviceSettings آتیران برای دریافت قیمت پیش‌فرض پیدا نشد.");
-        String v=m.col("DeviceSettings","VisitorId","VisitorID","vis_rdf");String g=m.col("DeviceSettings","DefaultPriceGrp","DefaultPriceGroup");
-        if(v==null||g==null)throw new Exception("ستون‌های VisitorId/DefaultPriceGrp در DeviceSettings پیدا نشد.");
-        String sql="SELECT CASE WHEN COUNT_BIG(1)=1 AND COUNT_BIG(1)=COUNT_BIG(TRY_CONVERT(int,"+q(g)+")) AND MIN(TRY_CONVERT(int,"+q(g)+"))=MAX(TRY_CONVERT(int,"+q(g)+")) THEN MIN(TRY_CONVERT(int,"+q(g)+")) ELSE 0 END FROM "+m.qTable("DeviceSettings")+" WHERE TRY_CONVERT(int,"+q(v)+")=?";
-        try(java.sql.PreparedStatement ps=db.prepareStatement(sql)){ps.setInt(1,visitorId);try(java.sql.ResultSet rs=ps.executeQuery()){return rs.next()?rs.getInt(1):0;}}
     }
 
     private void showProductPicker(List<Product> rows){
@@ -549,17 +633,17 @@ public final class VisitorDeskScreen extends Screen {
             VisitorIdentity.Identity id=identity(db);
             try(java.sql.Statement st=db.createStatement()){st.execute("IF OBJECT_ID(N'dbo.meelano_day_reports',N'U') IS NULL CREATE TABLE dbo.meelano_day_reports(id bigint IDENTITY(1,1) PRIMARY KEY,visitor_username nvarchar(160) NULL,visitor_id nvarchar(80) NULL,report_text nvarchar(max) NULL,created_at datetime2 NOT NULL DEFAULT SYSDATETIME())");}
             List<String[]> out=new ArrayList<>();
-            try(java.sql.PreparedStatement ps=db.prepareStatement("SELECT TOP (50) id,ISNULL(report_text,N''),CONVERT(nvarchar(19),created_at,120) FROM dbo.meelano_day_reports WHERE visitor_id=? ORDER BY id DESC")){
-                ps.setString(1,String.valueOf(id.visitorId));try(java.sql.ResultSet rs=ps.executeQuery()){while(rs.next())out.add(new String[]{rs.getString(1),rs.getString(2),rs.getString(3)});}
+            try(java.sql.PreparedStatement ps=db.prepareStatement("SELECT TOP (50) id,ISNULL(report_text,N''),CONVERT(nvarchar(19),created_at,120) FROM dbo.meelano_day_reports WHERE visitor_id IN ("+placeholders(ownerIds(id).size())+") ORDER BY id DESC")){
+                bindOwner(ps,ownerIds(id),1);try(java.sql.ResultSet rs=ps.executeQuery()){while(rs.next())out.add(new String[]{rs.getString(1),rs.getString(2),rs.getString(3)});}
             }return out;
         },new Repo.Cb<List<String[]>>(){
             @Override public void ok(List<String[]> rows){daily.removeAllViews();if(rows.isEmpty()){daily.addView(a.kit.empty("گزارشی ثبت نشده است","برای ساخت گزارش، دکمهٔ بالا را بزنید."),a.kit.lp(-1,-2));return;}
                 for(String[] r:rows)daily.addView(a.kit.personRow("گزارش روزانهٔ "+r[0],r[2],"","نمایش",Theme.INFO,v->new AlertDialog.Builder(a).setTitle("گزارش روزانهٔ "+r[0]).setMessage(r[1]).setPositiveButton("بستن",null).show()),a.kit.lp(-1,-2));}
             @Override public void fail(String e){daily.removeAllViews();daily.addView(visitorErrorCard("گزارش روزانه دریافت نشد",e,()->loadReports(c)),a.kit.lp(-1,-2));}
         });
-        a.repo.run(db->{VisitorIdentity.Identity id=identity(db);ensureVisitTable(db);List<String[]> out=new ArrayList<>();
-            try(java.sql.PreparedStatement ps=db.prepareStatement("SELECT TOP (100) customer_name,result,ISNULL(notes,N''),CONVERT(nvarchar(19),created_at,120) FROM dbo.meelano_visit_results WHERE visitor_id=? ORDER BY id DESC")){
-                ps.setString(1,String.valueOf(id.visitorId));try(java.sql.ResultSet rs=ps.executeQuery()){while(rs.next())out.add(new String[]{rs.getString(1),rs.getString(2),rs.getString(3),rs.getString(4)});}
+        a.repo.run(db->{VisitorData.beginRead(db);VisitorIdentity.Identity id=identity(db);ensureVisitTable(db);List<String[]> out=new ArrayList<>();
+            try(java.sql.PreparedStatement ps=db.prepareStatement("SELECT TOP (100) customer_name,result,ISNULL(notes,N''),CONVERT(nvarchar(19),created_at,120) FROM dbo.meelano_visit_results WHERE visitor_id IN ("+placeholders(ownerIds(id).size())+") ORDER BY id DESC")){
+                bindOwner(ps,ownerIds(id),1);try(java.sql.ResultSet rs=ps.executeQuery()){while(rs.next())out.add(new String[]{rs.getString(1),rs.getString(2),rs.getString(3),rs.getString(4)});}
             }return out;
         },new Repo.Cb<List<String[]>>(){
             @Override public void ok(List<String[]> rows){visits.removeAllViews();if(rows.isEmpty()){visits.addView(a.kit.empty("هنوز ویزیتی ثبت نشده است",null),a.kit.lp(-1,-2));return;}
@@ -571,16 +655,16 @@ public final class VisitorDeskScreen extends Screen {
     private void loadMyOrders(LinearLayout c){
         c.removeAllViews();
         c.addView(a.kit.loading("در حال دریافت پیش‌فاکتورهای همین حساب…"),a.kit.lp(-1,-2));
-        a.repo.run(db->{VisitorIdentity.Identity id=identity(db);VisitorPrefactorWriter.ensureTables(db);List<Row> rows=new ArrayList<>();
-            try(java.sql.PreparedStatement ps=db.prepareStatement("SELECT TOP (100) id,ISNULL(customer_name,N''),ISNULL(grand_total,0),status,CONVERT(nvarchar(19),created_at,120) FROM dbo.meelano_prefactors WHERE visitor_id=? ORDER BY id DESC")){
-                ps.setString(1,String.valueOf(id.visitorId));try(java.sql.ResultSet rs=ps.executeQuery()){while(rs.next()){Row r=new Row();r.put("id",rs.getString(1));r.put("customer",rs.getString(2));r.put("total",rs.getString(3));r.put("status",rs.getString(4));r.put("created",rs.getString(5));rows.add(r);}}
+        a.repo.run(db->{VisitorData.beginRead(db);VisitorIdentity.Identity id=identity(db);VisitorPrefactorWriter.ensureTables(db);List<Row> rows=new ArrayList<>();
+            try(java.sql.PreparedStatement ps=db.prepareStatement("SELECT TOP (100) id,ISNULL(customer_name,N''),ISNULL(grand_total,0),status,CONVERT(nvarchar(19),created_at,120) FROM dbo.meelano_prefactors WHERE visitor_id IN ("+placeholders(ownerIds(id).size())+") ORDER BY id DESC")){
+                bindOwner(ps,ownerIds(id),1);try(java.sql.ResultSet rs=ps.executeQuery()){while(rs.next()){Row r=new Row();r.put("id",rs.getString(1));r.put("customer",rs.getString(2));r.put("total",rs.getString(3));r.put("status",rs.getString(4));r.put("created",rs.getString(5));rows.add(r);}}
             }return rows;
         },new Repo.Cb<List<Row>>(){@Override public void ok(List<Row> rows){c.removeAllViews();c.addView(a.kit.text("پیش‌فاکتورهای من",16,Theme.TEXT,true),a.kit.lp(-1,-2));for(Row r:rows)c.addView(a.kit.personRow("شماره "+r.s("id")+" • "+r.s("customer"),r.s("created"),Money.rial(r.d("total")),statusFa(r.s("status")),Theme.INFO,v->showOrderDetails(r)),a.kit.lp(-1,-2));if(rows.isEmpty())c.addView(a.kit.empty("هنوز پیش‌فاکتوری ثبت نشده است",null),a.kit.lp(-1,-2));}
             @Override public void fail(String e){c.removeAllViews();c.addView(visitorErrorCard("سفارش‌ها دریافت نشدند",e,()->loadMyOrders(c)),a.kit.lp(-1,-2));}});
     }
 
     private void showOrderDetails(Row row){
-        a.repo.run(db->{VisitorIdentity.Identity id=identity(db);List<String> items=new ArrayList<>();try(java.sql.PreparedStatement ps=db.prepareStatement("SELECT i.product_name,i.qty,i.unit,i.amount FROM dbo.meelano_prefactor_items i JOIN dbo.meelano_prefactors p ON p.id=i.prefactor_id WHERE p.id=? AND p.visitor_id=? ORDER BY i.id")){ps.setLong(1,Long.parseLong(row.s("id")));ps.setString(2,String.valueOf(id.visitorId));try(java.sql.ResultSet rs=ps.executeQuery()){while(rs.next())items.add(rs.getString(1)+" • "+qty(rs.getBigDecimal(2))+" "+rs.getString(3)+" • "+money(rs.getBigDecimal(4)));}}return items;},new Repo.Cb<List<String>>(){@Override public void ok(List<String> v){StringBuilder b=new StringBuilder("وضعیت: ").append(statusFa(row.s("status"))).append("\nجمع: ").append(Money.rial(row.d("total")));for(String x:v)b.append("\n\n").append(x);new AlertDialog.Builder(a).setTitle("پیش‌فاکتور "+row.s("id")).setMessage(b.toString()).setPositiveButton("بستن",null).show();}@Override public void fail(String e){a.kit.toast(e);}});
+        a.repo.run(db->{VisitorIdentity.Identity id=identity(db);List<String> items=new ArrayList<>();try(java.sql.PreparedStatement ps=db.prepareStatement("SELECT i.product_name,i.qty,i.unit,i.amount FROM dbo.meelano_prefactor_items i JOIN dbo.meelano_prefactors p ON p.id=i.prefactor_id WHERE p.id=? AND p.visitor_id IN ("+placeholders(ownerIds(id).size())+") ORDER BY i.id")){ps.setLong(1,Long.parseLong(row.s("id")));bindOwner(ps,ownerIds(id),2);try(java.sql.ResultSet rs=ps.executeQuery()){while(rs.next())items.add(rs.getString(1)+" • "+qty(rs.getBigDecimal(2))+" "+rs.getString(3)+" • "+money(rs.getBigDecimal(4)));}}return items;},new Repo.Cb<List<String>>(){@Override public void ok(List<String> v){StringBuilder b=new StringBuilder("وضعیت: ").append(statusFa(row.s("status"))).append("\nجمع: ").append(Money.rial(row.d("total")));for(String x:v)b.append("\n\n").append(x);new AlertDialog.Builder(a).setTitle("پیش‌فاکتور "+row.s("id")).setMessage(b.toString()).setPositiveButton("بستن",null).show();}@Override public void fail(String e){a.kit.toast(e);}});
     }
 
     private void chooseCustomerForOrder(){customerPickerReturnPage=ORDER;loadCustomers(pageBodyRef,true);}

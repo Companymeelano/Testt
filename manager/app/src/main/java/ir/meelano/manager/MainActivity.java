@@ -801,6 +801,11 @@ public class MainActivity extends Activity {
         return screens.get(id);
     }
 
+    /** The ids of every registered screen, so the command room can list them all. */
+    public List<String> screenIds() {
+        return new ArrayList<>(screens.keySet());
+    }
+
     // ================= navigation =================
     /** Bottom tabs of the current edition (v30: per role, single app). */
     private String[] tabs = RoleStore.tabsFor(RoleStore.ADMIN);

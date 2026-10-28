@@ -9,6 +9,7 @@ import android.widget.TextView;
 
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.core.AtiranAuth;
+import ir.meelano.manager.core.CommandRoom;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.RoleStore;
 import ir.meelano.manager.ui.Card3D;
@@ -16,6 +17,7 @@ import ir.meelano.manager.ui.MeelanoIcons;
 import ir.meelano.manager.ui.Theme;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 
@@ -24,84 +26,6 @@ public class MoreScreen extends Screen {
     private LinearLayout contentRef;
     private String searchText = "";
     private String expandedGroup;
-
-    private static final class Entry {
-        final String id;
-        final String description;
-        Entry(String id, String description) {
-            this.id = id;
-            this.description = description;
-        }
-    }
-
-    private static final class Group {
-        final String id;
-        final String title;
-        final String subtitle;
-        final String glyph;
-        final String accent;
-        final Entry[] entries;
-        Group(String id, String title, String subtitle, String glyph, String accent, Entry[] entries) {
-            this.id = id;
-            this.title = title;
-            this.subtitle = subtitle;
-            this.glyph = glyph;
-            this.accent = accent;
-            this.entries = entries;
-        }
-    }
-
-    private static Entry e(String id, String description) { return new Entry(id, description); }
-
-    /** One source of truth for the manager and role-specific section index. */
-    private static final Group[] GROUPS = {
-            new Group("operations", "مدیریت روزانه و فروش", "فاکتورها، مشتریان و پیگیری روزانه", "♛", "gold",
-                    new Entry[]{
-                            e("home", "شاخص‌ها و هشدارهای امروز"),
-                            e("closeout", "تطبیق روزانهٔ فروش، دریافت، پرداخت، چک، برگشتی و تحویل باز"),
-                            e("manager_alerts", "آستانه‌های هشدار قابل تنظیم با دسترسی مستقیم به اقدام"),
-                            e("production", "فرمول، تولید مدیرمحور و بهای تمام‌شده در انبار آتیران"),
-                            e("sales", "فاکتورهای فروش و پیگیری‌ها"),
-                            e("buy", "فاکتورهای خرید و طرف‌حساب‌ها"),
-                            e("customers", "پرونده و گردش حساب مشتریان"),
-                            e("visitors", "عملکرد ویزیتورها و وصول"),
-                            e("visitor_work", "مسیر و بازدید، پیش‌فاکتور، گفتگوی ثبت کالا و دریافت وجه"),
-                            e("visitor_orders", "بازبینی و تأیید پیش‌فاکتورهای ارسالی ویزیتورها"),
-                    }),
-            new Group("finance", "مالی و خزانه", "دریافت، پرداخت و کنترل نقدینگی", "💳", "success",
-                    new Entry[]{
-                            e("dar_in", "قبوض دریافت و روش‌های تسویه"),
-                            e("dar_out", "قبوض پرداخت و گردش کارت"),
-                            e("cheques", "چک‌ها و وضعیت وصول"),
-                            e("dues", "سررسید چک‌ها و فاکتورها"),
-                            e("cash", "پیش‌بینی نقدینگی و خالص روزانه"),
-                    }),
-            new Group("stock", "کالا و عملیات انبار", "موجودی، رسید، تحویل و شمارش", "📦", "info",
-                    new Entry[]{
-                            e("products", "موجودی، کم‌موجودی و گردش کالا"),
-                            e("anbar", "میزکار و هشدارهای انبار"),
-                            e("tahvil", "تحویل فاکتور و ثبت گیرنده"),
-                            e("pick_wave", "برداشت چند فاکتور، جمع کالا و اسکن بارگیری"),
-                            e("sync_queue", "تحویل و شمارش‌های منتظر همگام‌سازی"),
-                            e("resid", "رسید کالا و پیش‌نویس‌های انبار"),
-                            e("takmil", "تکمیل پیش‌فاکتور"),
-                            e("shomarsh", "شمارش انبار و مغایرت‌گیری"),
-                            e("score", "ارزیابی تأمین‌کنندگان"),
-                    }),
-            new Group("insights", "تحلیل و گزارش", "گزارش‌های مدیریتی و بینش کسب‌وکار", "📊", "teal",
-                    new Entry[]{
-                            e("reports", "مرکز گزارش‌های مدیریتی"),
-                            e("profit", "سود، هزینه و حاشیه سود"),
-                            e("voice", "گزارش صوتی فارسی"),
-                    }),
-            new Group("system", "مدیریت سیستم و ابزارها", "کاربران، تنظیمات و ابزارهای کمکی", "⚙", "steel",
-                    new Entry[]{
-                            e("users", "کاربران و فعالیت‌های سیستم"),
-                            e("settings", "اتصال، ظاهر، اعلان، پشتیبان‌گیری و بروزرسانی"),
-                            e("search", "جست‌وجو در بخش‌های برنامه"),
-                            e("tv", "نمایش تمام‌صفحه برای فروشگاه"),
-                    }),
-    };
 
     public MoreScreen(MainActivity a) {
         super(a);
@@ -125,7 +49,9 @@ public class MoreScreen extends Screen {
             String role = AtiranAuth.sessionRole(a);
             if (role == null || role.isEmpty()) role = RoleStore.current(a);
             expandedGroup = RoleStore.WAREHOUSE.equals(role) ? "stock" : "operations";
-            if (RoleStore.VISITOR.equals(role)) seg = SEG_ALL;
+            // The manager and the visitor come for the sections, not for a report hub: both
+            // roles land directly on the index that holds every section they may open.
+            if (RoleStore.VISITOR.equals(role) || RoleStore.ADMIN.equals(role)) seg = SEG_ALL;
         }
         content.removeAllViews();
         content.addView(a.kit.hero("▣", "اتاق فرمان",
@@ -146,7 +72,7 @@ public class MoreScreen extends Screen {
 
         LinearLayout inner = a.kit.v();
         content.addView(inner, a.kit.lp(-1, -2));
-        if (seg == SEG_REPORTS) {
+        if (seg == SEG_REPORTS && !isVisitorRole()) {
             renderReportsHub(inner);
         } else {
             renderAll(inner);
@@ -247,20 +173,46 @@ public class MoreScreen extends Screen {
         content.addView(a.kit.gap(10));
 
         int shown = 0;
-        for (Group group : GROUPS) shown += addGroup(content, group);
+        for (CommandRoom.Group group : index()) shown += addGroup(content, group);
         if (shown == 0) {
             content.addView(a.kit.empty("بخشی با این عبارت پیدا نشد", "نام کوتاه‌تری جست‌وجو کنید."),
                     a.kit.lp(-1, -2));
         }
     }
 
-    private int addGroup(LinearLayout content, final Group group) {
-        final List<Entry> visible = new ArrayList<>();
+    /** The index the signed-in role sees. */
+    private CommandRoom.Group[] index() {
+        if (isVisitorRole()) return CommandRoom.visitorGroups();
+        List<CommandRoom.Group> groups = new ArrayList<>(Arrays.asList(CommandRoom.groups()));
+        CommandRoom.Group extra = extraGroup();
+        if (extra != null) groups.add(extra);
+        return groups.toArray(new CommandRoom.Group[0]);
+    }
+
+    /**
+     * Sections that exist but are not in the index yet. They are listed as well, so a newly
+     * registered screen can never stay unreachable for the manager.
+     */
+    private CommandRoom.Group extraGroup() {
+        List<CommandRoom.Entry> extra = new ArrayList<>();
+        for (String id : a.screenIds()) {
+            if ("more".equals(id) || CommandRoom.find(id) != null) continue;
+            Screen s = a.screen(id);
+            if (s == null) continue;
+            extra.add(new CommandRoom.Entry(id, s.title(), "بخش برنامه", false));
+        }
+        if (extra.isEmpty()) return null;
+        return new CommandRoom.Group("other", "سایر بخش‌ها", "بخش‌هایی که هنوز در گروه‌ها جا نگرفته‌اند",
+                "◈", "steel", extra.toArray(new CommandRoom.Entry[0]));
+    }
+
+    private int addGroup(LinearLayout content, final CommandRoom.Group group) {
+        final List<CommandRoom.Entry> visible = new ArrayList<>();
         String q = normalize(searchText);
         boolean groupMatch = !q.isEmpty()
                 && (normalize(group.title).contains(q) || normalize(group.subtitle).contains(q));
-        for (Entry entry : group.entries) {
-            if (!isAllowed(entry.id)) continue;
+        for (CommandRoom.Entry entry : group.entries) {
+            if (!isAllowed(entry)) continue;
             if (q.isEmpty() || groupMatch || entryMatches(entry, q)) visible.add(entry);
         }
         if (visible.isEmpty()) return 0;
@@ -318,7 +270,7 @@ public class MoreScreen extends Screen {
         return visible.size();
     }
 
-    private void addTiles(LinearLayout parent, List<Entry> entries) {
+    private void addTiles(LinearLayout parent, List<CommandRoom.Entry> entries) {
         int cols = a.kit.isWide() ? 3 : 2;
         LinearLayout row = null;
         for (int i = 0; i < entries.size(); i++) {
@@ -329,34 +281,42 @@ public class MoreScreen extends Screen {
                 parent.addView(row, rp);
             }
             if (i % cols > 0) row.addView(a.kit.space(8));
-            final Entry entry = entries.get(i);
+            final CommandRoom.Entry entry = entries.get(i);
             row.addView(menuTile(entry), a.kit.wlp(1f));
         }
         if (entries.size() % cols != 0 && row != null)
             row.addView(a.kit.space(8), a.kit.wlp(1f));
     }
 
-    private View menuTile(final Entry entry) {
+    private View menuTile(final CommandRoom.Entry entry) {
         final String title;
         final String glyph;
         final int accent;
+        int art = 0;
         if ("tv".equals(entry.id)) {
             title = "تلویزیون فروشگاه";
             glyph = "📺";
             accent = Theme.GOLD;
+        } else if (entry.visitor) {
+            // A page of the visitor workspace: it opens inside «فروش میدانی».
+            title = entry.title;
+            glyph = "";
+            accent = Theme.GOLD;
+            art = artRes(entry.art);
         } else {
             Screen destination = a.screen(entry.id);
             if (destination == null) return a.kit.space(1);
             title = destination.title();
             glyph = destination.glyph();
             accent = destination.accent();
+            art = artRes(entry.art);
         }
         LinearLayout tile = a.kit.card(accent);
         tile.setGravity(Gravity.CENTER);
         tile.setMinimumHeight(Theme.dp(122));
         tile.setPadding(Theme.dp(10), Theme.dp(12), Theme.dp(10), Theme.dp(10));
 
-        tile.addView(iconBadge(goldReportGlyph(title, glyph), accent, 44),
+        tile.addView(art > 0 ? artBadge(art, accent, 44) : iconBadge(goldReportGlyph(title, glyph), accent, 44),
                 new LinearLayout.LayoutParams(Theme.dp(44), Theme.dp(44)));
         tile.addView(a.kit.gap(5));
 
@@ -380,9 +340,39 @@ public class MoreScreen extends Screen {
         Theme.pressable(tile);
         tile.setOnClickListener(v -> {
             if ("tv".equals(entry.id)) a.startTv();
-            else a.nav(entry.id);
+            else if (entry.visitor) {
+                VisitorDeskScreen.pendingPage = entry.id;
+                a.nav("visitor_work");
+            } else a.nav(entry.id);
         });
         return tile;
+    }
+
+    /** The themed 3D artwork of a section (the name comes from the shared index). */
+    private int artRes(String name) {
+        if (name == null || name.trim().isEmpty()) return 0;
+        try {
+            return a.getResources().getIdentifier(name.trim(), "drawable", a.getPackageName());
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    /** A badge that shows the section's own 3D artwork in the skin the user chose. */
+    private View artBadge(int vector, int accent, int sizeDp) {
+        android.widget.FrameLayout badge = new android.widget.FrameLayout(a);
+        badge.setBackground(Theme.avatar(Theme.alpha(accent, Theme.isLight() ? 34 : 46)));
+        badge.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        int res3 = Theme.chrome3d(vector);
+        ImageView image = new ImageView(a);
+        image.setImageResource(res3);
+        if (!Theme.isIcon3d(res3)) image.setColorFilter(accent);
+        image.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        int inside = Math.max(18, Math.round(sizeDp * 0.52f));
+        android.widget.FrameLayout.LayoutParams ip = new android.widget.FrameLayout.LayoutParams(
+                Theme.dp(inside), Theme.dp(inside), Gravity.CENTER);
+        badge.addView(image, ip);
+        return badge;
     }
 
     private View iconBadge(String glyph, int accent, int sizeDp) {
@@ -392,7 +382,7 @@ public class MoreScreen extends Screen {
         int iconRes = MeelanoIcons.iconFor(glyph);
         if (iconRes != 0) {
             ImageView image = new ImageView(a);
-            int res3 = Theme.icon3d(iconRes);
+            int res3 = Theme.chrome3d(iconRes);
             image.setImageResource(res3);
             if (!Theme.isIcon3d(res3)) image.setColorFilter(accent);
             image.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
@@ -408,13 +398,24 @@ public class MoreScreen extends Screen {
         return badge;
     }
 
-    private boolean isAllowed(String id) {
-        return "tv".equals(id) || (a.screen(id) != null && RoleStore.allowed(a, id));
+    /** True when the signed-in role is the field visitor. */
+    private boolean isVisitorRole() {
+        String role = AtiranAuth.sessionRole(a);
+        if (role == null || role.isEmpty()) role = RoleStore.current(a);
+        return RoleStore.VISITOR.equals(role);
     }
 
-    private boolean entryMatches(Entry entry, String q) {
+    private boolean isAllowed(CommandRoom.Entry entry) {
+        if (entry.visitor) return true;                 // pages of the visitor's own workspace
+        if ("tv".equals(entry.id)) return true;
+        return a.screen(entry.id) != null && RoleStore.allowed(a, entry.id);
+    }
+
+    private boolean entryMatches(CommandRoom.Entry entry, String q) {
         if ("tv".equals(entry.id))
             return normalize("تلویزیون فروشگاه نمایش تمام‌صفحه").contains(q);
+        if (entry.visitor)
+            return normalize(entry.title + " " + entry.description).contains(q);
         Screen screen = a.screen(entry.id);
         return screen != null && (normalize(screen.title()).contains(q)
                 || normalize(entry.description).contains(q));
@@ -430,6 +431,7 @@ public class MoreScreen extends Screen {
         if ("success".equals(accent)) return Theme.SUCCESS;
         if ("info".equals(accent)) return Theme.INFO;
         if ("teal".equals(accent)) return Theme.GOLD;
+        if ("violet".equals(accent)) return Theme.VIOLET;
         if ("steel".equals(accent)) return Theme.STEEL;
         return Theme.GOLD;
     }

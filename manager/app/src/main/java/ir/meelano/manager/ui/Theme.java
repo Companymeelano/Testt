@@ -196,6 +196,21 @@ public final class Theme {
         if (res == R.drawable.visitor3d_assistant || res == R.drawable.visitor3d_customers
                 || res == R.drawable.visitor3d_prefactor || res == R.drawable.visitor3d_products
                 || res == R.drawable.visitor3d_receipt) return true;
+        // The emerald set is the nut theme's own 3D artwork. It is produced by chrome3d(),
+        // so it must be recognised as 3D as well - otherwise it would be tinted like a flat
+        // glyph and lose the colour of the skin it belongs to.
+        if (res == R.drawable.icon3d_emerald_account || res == R.drawable.icon3d_emerald_assistant
+                || res == R.drawable.icon3d_emerald_cash_in || res == R.drawable.icon3d_emerald_cash_out
+                || res == R.drawable.icon3d_emerald_cheque || res == R.drawable.icon3d_emerald_coin
+                || res == R.drawable.icon3d_emerald_customers || res == R.drawable.icon3d_emerald_dollar
+                || res == R.drawable.icon3d_emerald_dues || res == R.drawable.icon3d_emerald_gold
+                || res == R.drawable.icon3d_emerald_home || res == R.drawable.icon3d_emerald_inventory
+                || res == R.drawable.icon3d_emerald_light_tag || res == R.drawable.icon3d_emerald_more
+                || res == R.drawable.icon3d_emerald_products || res == R.drawable.icon3d_emerald_purchase
+                || res == R.drawable.icon3d_emerald_refresh || res == R.drawable.icon3d_emerald_reports
+                || res == R.drawable.icon3d_emerald_sales || res == R.drawable.icon3d_emerald_search
+                || res == R.drawable.icon3d_emerald_settings || res == R.drawable.icon3d_emerald_theme
+                || res == R.drawable.icon3d_emerald_zoom) return true;
         if (res == R.drawable.icon3d_dark_bell || res == R.drawable.icon3d_medal_alert) return true;
         if (res == R.drawable.icon3d_medal_account || res == R.drawable.icon3d_medal_refresh || res == R.drawable.icon3d_medal_theme || res == R.drawable.icon3d_medal_zoom || res == R.drawable.icon3d_medal_assistant || res == R.drawable.icon3d_medal_more || res == R.drawable.icon3d_medal_goldbar || res == R.drawable.icon3d_medal_dollar || res == R.drawable.icon3d_medal_coin) return true;
         if (res == R.drawable.icon3d_medal_home || res == R.drawable.icon3d_medal_customers

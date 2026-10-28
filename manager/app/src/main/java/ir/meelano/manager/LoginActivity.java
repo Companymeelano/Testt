@@ -16,7 +16,6 @@ import java.sql.Connection;
 
 import ir.meelano.manager.core.AtiranAuth;
 import ir.meelano.manager.core.LicenseStore;
-import ir.meelano.manager.core.LocalAccounts;
 import ir.meelano.manager.core.RoleStore;
 import ir.meelano.manager.data.Settings;
 import ir.meelano.manager.core.SmartLink;
@@ -24,11 +23,10 @@ import ir.meelano.manager.ui.Kit;
 import ir.meelano.manager.ui.Theme;
 
 /**
- * Manager-app account gate (metallic title and premium start button since v36.26). Shown only after a valid license and an explicitly
- * selected server/database. The fixed local accounts are the only route into
- * the manager and warehouse editions; those reserved names and roles are never
- * authenticated through Atiran's user table. A missing Atiran login table never
- * opens the shell without authentication.
+ * Manager-app account gate, shown only after a valid license and an explicitly
+ * selected server/database. Every role, including manager and warehouse, is
+ * authenticated against Atiran's own user table; synthetic app-local IDs are
+ * never accepted as a substitute for an Atiran login.
  */
 public class LoginActivity extends Activity {
 
@@ -210,7 +208,7 @@ public class LoginActivity extends Activity {
         } catch (Exception ignored) { Diag.ignored("LoginActivity:btn", ignored); }
         root.addView(loginBtn, kit.lp(-1, -2));
         root.addView(kit.gap(10));
-        root.addView(kit.hint("با حساب محلی مدیریت یا انبارداری وارد شوید؛ محیط متناسب با نقش شما باز می‌شود."),
+        root.addView(kit.hint("با نام کاربری و رمز آتیران وارد شوید؛ محیط متناسب با نقش فعال حساب شما باز می‌شود."),
                 kit.lp(-1, -2));
         root.addView(kit.gap(6));
         TextView verLine = kit.text("میلانو • " + appVer(), 10.5f, Theme.MUTED, false);
@@ -338,11 +336,6 @@ public class LoginActivity extends Activity {
 
     // ================= login flow =================
 
-    /** Management and warehouse editions are reserved for the fixed local app accounts. */
-    private boolean requiresLocalAccount(String role) {
-        return RoleStore.ADMIN.equals(role) || RoleStore.WAREHOUSE.equals(role);
-    }
-
     private void doLogin() {
         if (busy) return;
         final String user = eUser.getText().toString().trim();
@@ -357,77 +350,66 @@ public class LoginActivity extends Activity {
         }
         showErr(null);
         final boolean rem = remember;
-        // Fixed local accounts are checked only after the license and database gates;
-        // they do not query Atiran's sys_users table.
-        LocalAccounts.Acc la = LocalAccounts.match(user, pass);
-        if (la != null) {
-            uiSuccess(la.uid, la.user, la.name, la.role, rem, false,
-                    "خوش آمدید " + la.name);
-            return;
-        }
-        // These two reserved account names are app-local only; never pass them
-        // through to the Atiran user-table verifier when their local secret is wrong.
-        if (LocalAccounts.isLocal(user)) {
-            showErr("رمز حساب محلی نادرست است");
-            return;
-        }
         setBusy(true);
         new Thread(() -> {
-            // ---- online attempt ----
+            // Use cached Atiran credentials only when opening the SQL connection itself fails.
+            // Query/schema/permission errors must not be disguised as an offline login failure.
+            final Connection connection;
             try {
-                Connection c = SmartLink.open(getApplicationContext(), settings);
-                AtiranAuth.AuthUser u = null;
-                boolean serverOk = false;
-                try {
-                    u = AtiranAuth.fetchUser(c, user);
-                    // Server check while the connection is still open.
-                    if (u != null) {
-                        serverOk = AtiranAuth.verifyPasswordServer(c, u.userName, pass);
-                        u.serverCompared = serverOk;
-                    }
-                } finally {
-                    try {
-                        c.close();
-                    } catch (Exception ignored) { Diag.ignored("LoginActivity:202", ignored); }
-                }
+                connection = SmartLink.open(getApplicationContext(), settings);
+            } catch (Exception connectionError) {
+                offlineTry(user, pass, rem);
+                return;
+            }
+            try (Connection c = connection) {
+                AtiranAuth.AuthUser u = AtiranAuth.fetchUser(c, user);
                 if (u == null) {
-                    uiFail("کاربری با این نام در آتیران یافت نشد");
+                    uiFail("این نام کاربری در جدول کاربران آتیران پیدا نشد.");
+                    return;
+                }
+                if (u.uid <= 0) {
+                    uiFail("شناسهٔ حساب آتیران معتبر نیست؛ ورود بدون شناسهٔ واقعی مجاز نیست.");
                     return;
                 }
                 if (u.locked) {
-                    uiFail("این حساب در آتیران قفل شده است");
+                    uiFail("این حساب در آتیران قفل شده است.");
                     return;
                 }
                 if (!u.active) {
-                    uiFail("این حساب در آتیران غیرفعال است");
+                    uiFail("این حساب در آتیران غیرفعال است.");
                     return;
                 }
                 // STRICT: the real Atiran password, and nothing else.
+                boolean serverOk = AtiranAuth.verifyPasswordServer(c, u.userName, pass);
+                u.serverCompared = serverOk;
                 if (!serverOk && !AtiranAuth.verifyPassword(u.pw, pass, u.userName)) {
                     uiPwFail(u, false);
                     return;
                 }
                 String role = AtiranAuth.effectiveRole(LoginActivity.this, u.uid, u.appRole);
-                if (requiresLocalAccount(role)) {
-                    uiFail("برای بخش مدیریت و انبارداری از حساب محلی همین اپ استفاده کنید.");
-                    return;
+                if (u.roleName == null || u.roleName.trim().isEmpty()) {
+                    if (AtiranAuth.overrideRole(LoginActivity.this, u.uid).isEmpty()) {
+                        uiFail("ورود رمز تأیید شد، اما عنوان نقش از جدول Roles/role قابل خواندن نیست (role_id="
+                                + u.roleId + "). ساختار یا مجوز خواندن جدول نقش‌های آتیران را بررسی کنید.");
+                        return;
+                    }
                 }
                 if (!AtiranAuth.phaseOpen(LoginActivity.this, role)) {
-                    uiFail("نسخه «" + RoleStore.faName(role)
-                            + "» به‌زودی به همین برنامه اضافه می‌شود 🌱");
+                    uiFail("نقش آتیران «" + (u.roleName == null || u.roleName.trim().isEmpty()
+                            ? RoleStore.faName(role) : u.roleName.trim())
+                            + "» هنوز در این نسخه فعال نشده است.");
                     return;
                 }
-                // Cache a verified Atiran credential only for roles that use this path.
                 AtiranAuth.putPwCache(LoginActivity.this, u.uid, u.pw);
                 uiSuccess(u.uid, u.userName, u.displayName, role, rem, false,
                         "خوش آمدید " + u.displayName);
             } catch (AtiranAuth.NoTable nt) {
-                // Local accounts were checked first; never let a missing Atiran
-                // user table bypass the selected-account gate.
-                uiFail("جدول کاربران در این دیتابیس یافت نشد؛ حساب محلی مدیریت یا انبارداری را وارد کنید.");
-            } catch (Exception connErr) {
-                // ---- offline fallback: cached user + app PIN ----
-                offlineTry(user, pass, rem);
+                uiFail("جدول یا ستون نام کاربری آتیران پیدا نشد؛ دیتابیس انتخاب‌شده را بررسی کنید.");
+            } catch (Exception authError) {
+                Diag.ignored("LoginActivity:AtiranAuth", authError);
+                String detail = authError.getMessage();
+                uiFail("خواندن حساب/نقش از آتیران انجام نشد"
+                        + (detail == null || detail.trim().isEmpty() ? "." : ": " + detail));
             }
         }).start();
     }
@@ -437,13 +419,12 @@ public class LoginActivity extends Activity {
             int uid = AtiranAuth.cachedUid(LoginActivity.this, user);
             if (uid != -999) {
                 String role = AtiranAuth.cachedRole(LoginActivity.this, uid);
-                if (role.isEmpty()) role = RoleStore.ADMIN;
+                if (role.isEmpty()) {
+                    uiFail("نقش ذخیره‌شدهٔ این حساب معتبر نیست؛ برای بازبینی نقش، آنلاین وارد شوید.");
+                    return;
+                }
                 byte[] cached = AtiranAuth.cachedPw(LoginActivity.this, uid);
                 if (cached != null && AtiranAuth.verifyPassword(cached, pass, user)) {
-                    if (requiresLocalAccount(role)) {
-                        uiFail("برای بخش مدیریت و انبارداری از حساب محلی همین اپ استفاده کنید.");
-                        return;
-                    }
                     if (!AtiranAuth.phaseOpen(LoginActivity.this, role)) {
                         uiFail("نسخه «" + RoleStore.faName(role)
                                 + "» به‌زودی به همین برنامه اضافه می‌شود 🌱");
@@ -497,28 +478,18 @@ public class LoginActivity extends Activity {
         StringBuilder b = new StringBuilder();
         b.append("Meelano login diagnostics\n");
         if (u == null) {
-            b.append("user: <null>\n");
+            b.append("user_row: missing\n");
             return b.toString();
         }
-        b.append("user: ").append(u.userName == null ? "" : u.userName).append('\n');
-        b.append("uid: ").append(u.uid).append('\n');
+        b.append("uid_valid: ").append(u.uid > 0).append('\n');
         b.append("pw_column_found: ").append(u.pwColFound).append('\n');
-        b.append("stored_len: ").append(u.pw == null ? -1 : u.pw.length).append('\n');
-        b.append("stored_hex: ").append(u.pw == null ? "" : toHex(u.pw)).append('\n');
-        b.append("pwdcompare_ok: ").append(serverOk).append('\n');
-        b.append("role: ").append(u.roleName).append(" -> ").append(u.appRole).append('\n');
+        b.append("stored_length: ").append(u.pw == null ? -1 : u.pw.length).append('\n');
+        b.append("password_server_check: ").append(serverOk).append('\n');
+        b.append("active: ").append(u.active).append("; locked: ").append(u.locked).append('\n');
+        b.append("role_id: ").append(u.roleId).append('\n');
+        b.append("role_name: ").append(u.roleName == null ? "" : u.roleName).append('\n');
+        b.append("mapped_role: ").append(u.appRole == null ? "" : u.appRole).append('\n');
         return b.toString();
-    }
-
-    private static String toHex(byte[] a) {
-        if (a == null) return "";
-        StringBuilder s = new StringBuilder(a.length * 2);
-        for (byte v : a) {
-            String h = Integer.toHexString(v & 0xFF);
-            if (h.length() == 1) s.append('0');
-            s.append(h);
-        }
-        return s.toString();
     }
 
     private boolean copyText(String label, String text) {

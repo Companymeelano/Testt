@@ -668,7 +668,10 @@ public class MainActivity extends Activity {
         bottomBar = new LinearLayout(this);
         bottomBar.setOrientation(LinearLayout.HORIZONTAL);
         bottomBar.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        bottomBar.setPadding(Theme.dp(6), Theme.dp(8), Theme.dp(6), Theme.dp(10));
+        // Keep the nut-theme dock tactile, but reclaim about 14dp of dashboard height on phones.
+        int dockVPad = Theme.isNuts() ? 4 : 8;
+        bottomBar.setPadding(Theme.dp(6), Theme.dp(dockVPad), Theme.dp(6),
+                Theme.dp(Theme.isNuts() ? 4 : 10));
         bottomHost = new android.widget.FrameLayout(this);
         bottomHost.setBackground(Theme.isNuts() ? Theme.navDock() : Theme.bottomBar());
         navCapsule = new View(this);
@@ -678,7 +681,7 @@ public class MainActivity extends Activity {
                 Gravity.TOP | Gravity.LEFT));
         bottomHost.addView(bottomBar, new android.widget.FrameLayout.LayoutParams(-1, -2));
         LinearLayout.LayoutParams hostLp = kit.lp(-1, -2);
-        if (Theme.isNuts()) hostLp.setMargins(Theme.dp(12), 0, Theme.dp(12), Theme.dp(10));
+        if (Theme.isNuts()) hostLp.setMargins(Theme.dp(12), 0, Theme.dp(12), Theme.dp(6));
         root.addView(bottomHost, hostLp);
 
         setContentView(root);
@@ -820,8 +823,9 @@ public class MainActivity extends Activity {
             if (s == null) continue;
             LinearLayout b = kit.v();
             b.setGravity(Gravity.CENTER);
-            b.setMinimumHeight(Theme.dp(64));
-            b.setPadding(Theme.dp(2), Theme.dp(4), Theme.dp(2), Theme.dp(2));
+            b.setMinimumHeight(Theme.dp(64)); // Preserve a comfortable tap target in every skin.
+            b.setPadding(Theme.dp(2), Theme.dp(Theme.isNuts() ? 2 : 4),
+                    Theme.dp(2), Theme.dp(2));
             LinearLayout badge = new LinearLayout(this);
             badge.setGravity(Gravity.CENTER);
             int iconRes = MeelanoIcons.iconFor(s.glyph());
@@ -831,16 +835,16 @@ public class MainActivity extends Activity {
                 android.widget.ImageView symbol = kit.icon(iconRes, Theme.MUTED, Theme.isNuts() ? 46 : 22);
                 if (Theme.isNuts() && is3d) symbol.setImageResource(Theme.chrome3d(iconRes));
                 symbol.setTag(is3d ? Boolean.TRUE : Boolean.FALSE);
-                int sz = Theme.isNuts() ? 44 : 24;
+                int sz = Theme.isNuts() ? 40 : 24;
                 badge.addView(symbol, new LinearLayout.LayoutParams(Theme.dp(sz), Theme.dp(sz)));
             } else {
                 TextView symbol = kit.text(s.glyph(), 20, Theme.MUTED, true);
                 symbol.setGravity(Gravity.CENTER);
                 badge.addView(symbol, kit.lp(-2, -2));
             }
-            b.addView(badge, new LinearLayout.LayoutParams(Theme.dp(Theme.isNuts() ? 54 : 46), Theme.dp(Theme.isNuts() ? 46 : 36)));
+            b.addView(badge, new LinearLayout.LayoutParams(Theme.dp(46), Theme.dp(Theme.isNuts() ? 44 : 36)));
             String tl = RoleStore.tabLabel(id);
-            TextView l = kit.text(tl != null ? tl : s.title(), Theme.isNuts() ? 11.5f : 10.5f, Theme.MUTED, true);
+            TextView l = kit.text(tl != null ? tl : s.title(), Theme.isNuts() ? 11f : 10.5f, Theme.MUTED, true);
             l.setGravity(Gravity.CENTER);
             l.setSingleLine(true);
             l.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -849,7 +853,7 @@ public class MainActivity extends Activity {
             marker.setVisibility(View.INVISIBLE);
             marker.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
             LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(Theme.dp(18), Theme.dp(2));
-            mp.setMargins(0, Theme.dp(3), 0, 0);
+            mp.setMargins(0, Theme.dp(Theme.isNuts() ? 2 : 3), 0, 0);
             b.addView(marker, mp);
             b.setTag(id);
             b.setContentDescription((tl != null ? tl : s.title()) + "، رفتن به بخش");

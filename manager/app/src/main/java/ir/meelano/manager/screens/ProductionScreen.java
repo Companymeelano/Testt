@@ -117,11 +117,11 @@ public final class ProductionScreen extends Screen {
         return card;
     }
 
-    /** Fail closed: the central nav gate and the screen itself both enforce manager-only access. */
+    /** Fail closed: production requires a real, positive-ID Atiran manager session. */
     public static boolean managerAllowed(MainActivity a) {
         try {
             String session = AtiranAuth.sessionRole(a);
-            return RoleStore.ADMIN.equals(session == null || session.isEmpty() ? RoleStore.current(a) : session);
+            return AtiranAuth.sessionUid(a) > 0 && RoleStore.ADMIN.equals(session);
         } catch (Exception e) { return false; }
     }
 
@@ -327,7 +327,7 @@ public final class ProductionScreen extends Screen {
         card.addView(a.kit.btnGhost("پیش‌نمایش بهای تمام‌شده",Theme.INFO,v->preview()),a.kit.lp(-1,-2));
         card.addView(a.kit.gap(6));
         card.addView(a.kit.btnGold(busy?"در حال ثبت…":"ثبت قطعی تولید و به‌روزرسانی موجودی",v->post()),a.kit.lp(-1,-2));
-        card.addView(a.kit.hint("اگر با حساب محلی وارد شده‌اید، پیش از ثبت نام کاربری و رمز مدیر آتیران برای انتساب سند به user_id واقعی یک‌بار پرسیده می‌شود؛ رمز ذخیره نمی‌شود."),a.kit.lp(-1,-2));
+        card.addView(a.kit.hint("ثبت تولید فقط با نشست واقعیِ مدیر آتیران انجام می‌شود؛ user_id همان نشست برای حسابرسی ثبت و وضعیت فعال‌بودن دوباره بررسی می‌شود."),a.kit.lp(-1,-2));
         return card;
     }
 
@@ -686,9 +686,7 @@ public final class ProductionScreen extends Screen {
     private void withAtiranManagerId(Consumer<Integer> continuation){
         if(busy)return;
         int sessionUid=AtiranAuth.sessionUid(a);
-        boolean localModir = ProductionWriter.isLocalModirProductionIdentity(
-                AtiranAuth.sessionUser(a), sessionUid, AtiranAuth.sessionRole(a));
-        if(sessionUid>0 || localModir){
+        if(sessionUid>0){
             busy=true;render(content);
             runWriter("در حال بررسی حساب آتیران…","بررسی حساب آتیران انجام نشد",c->ProductionWriter.resolveAtiranUserId(c,sessionUid,
                     AtiranAuth.sessionUser(a), AtiranAuth.sessionRole(a)),uid->{

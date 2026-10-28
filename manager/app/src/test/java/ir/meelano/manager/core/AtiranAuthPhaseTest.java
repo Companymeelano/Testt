@@ -19,6 +19,12 @@ public class AtiranAuthPhaseTest {
         org.junit.Assert.assertEquals(RoleStore.SELLER, AtiranAuth.mapRole(0, "فروشنده"));
     }
 
+    @Test public void mapsPersianAndArabicLetterVariantsInAtiranRoleNames() {
+        org.junit.Assert.assertEquals(RoleStore.ADMIN, AtiranAuth.mapRole(0, "مدير مجموعه"));
+        org.junit.Assert.assertEquals(RoleStore.VISITOR, AtiranAuth.mapRole(0, "ويزيتور"));
+        org.junit.Assert.assertEquals(RoleStore.SALES_MANAGER, AtiranAuth.mapRole(0, "مدير فروش"));
+    }
+
     @Test public void unfinishedRolesRemainExplicitlyGated() {
         assertFalse(AtiranAuth.phaseOpen(null, RoleStore.SELLER));
         assertFalse(AtiranAuth.phaseOpen(null, RoleStore.ACCOUNTANT));

@@ -221,19 +221,10 @@ public final class ProductionWriter {
     /** Resolve the signed-in identity to a real Atiran audit id. */
     public static int resolveAtiranUserId(Connection c, int sessionUid, String sessionUser,
             String sessionRole) throws Exception {
-        // The explicitly provisioned local Modir account may post production without
-        // a second credential dialog. Resolve a real active sys_users row so the
-        // Atiran production ledger still records a genuine user_id, never a synthetic id.
-        if (sessionUid <= 0) {
-            if (!isLocalModirProductionIdentity(sessionUser, sessionUid, sessionRole))
-                throw new Exception("حساب محلی برای ثبت تولید مجاز نیست؛ با حساب مدیر آتیران وارد شوید.");
-            AtiranAuth.AuthUser localManager = AtiranAuth.fetchUser(c, "modir");
-            if (localManager == null || localManager.uid <= 0)
-                throw new Exception("کاربر فعال modir در جدول sys_users آتیران پیدا نشد.");
-            if (!localManager.active || localManager.locked)
-                throw new Exception("حساب modir در آتیران غیرفعال یا قفل است.");
-            return localManager.uid;
-        }
+        // Never map a synthetic local session to a real audit identity. The caller
+        // must have authenticated the Atiran account and supply its positive user_id.
+        if (sessionUid <= 0)
+            throw new Exception("نشست معتبر آتیران لازم است؛ با حساب مدیر آتیران وارد شوید.");
         Meta meta=new Meta(c);
         if(!meta.table("sys_users"))throw new Exception("جدول کاربران آتیران (sys_users) پیدا نشد.");
         String idCol=meta.col("sys_users","user_id"),nameCol=meta.col("sys_users","user_name");
@@ -266,13 +257,6 @@ public final class ProductionWriter {
         if(!passwordOk)throw new Exception("رمز عبور حساب مدیر آتیران تأیید نشد.");
         if(user.uid<=0)throw new Exception("شناسهٔ کاربر مدیر آتیران معتبر نیست.");
         return user.uid;
-    }
-
-    /** Exact allowlist for the explicitly configured local Modir identity. */
-    public static boolean isLocalModirProductionIdentity(String user, int uid, String role) {
-        return LocalAccounts.isLocalSession(user, uid, role)
-                && RoleStore.ADMIN.equals(role)
-                && user != null && "modir".equalsIgnoreCase(Money.en(user).trim());
     }
 
     /** Refuse to write unless the actual DB exposes the exact Mili production ledger contract. */

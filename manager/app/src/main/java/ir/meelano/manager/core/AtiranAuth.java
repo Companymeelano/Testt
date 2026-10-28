@@ -116,7 +116,8 @@ public final class AtiranAuth {
             if (actCol != null) {
                 try {
                     Object o = rs.getObject("a_act");
-                    u.active = flagOn(o);
+                    // Match Atiran clients' convention: a NULL active flag is not an explicit disable.
+                    u.active = o == null || flagOn(o);
                 } catch (Exception ignored) { Diag.ignored("AtiranAuth:120", ignored); }
             }
             if (lockCol != null) {
@@ -191,7 +192,7 @@ public final class AtiranAuth {
         if (stored == null || stored.length == 0 || typed == null) return false;
         String[] texts = {typed, typed.trim()};
         String[] charsets = {"UTF-8", "UTF-16LE", "UTF-16BE", "windows-1256"};
-        String[] algs = {"MD5", "SHA-1", "SHA-224", "SHA-256", "SHA-384"};
+        String[] algs = {"MD5", "SHA-1", "SHA-224", "SHA-256", "SHA-384", "SHA-512"};
         try {
             for (String t : texts) {
                 for (String cs : charsets) {
@@ -209,7 +210,7 @@ public final class AtiranAuth {
             }
             // Username-salted variants: salt+pw and pw+salt.
             String[] salts = saltVariants(userName);
-            String[] sAlgs = {"MD5", "SHA-1", "SHA-256"};
+            String[] sAlgs = {"MD5", "SHA-1", "SHA-256", "SHA-512"};
             String[] sCs = {"UTF-8", "UTF-16LE"};
             for (String t : texts) {
                 for (String salt : salts) {
@@ -327,7 +328,7 @@ public final class AtiranAuth {
             s.append(ch);
         }
         int n = s.length();
-        if (n == 32 || n == 40 || n == 56 || n == 64 || n == 96) return s.toString();
+        if (n == 32 || n == 40 || n == 56 || n == 64 || n == 96 || n == 128) return s.toString();
         return null;
     }
 
@@ -346,7 +347,7 @@ public final class AtiranAuth {
      * Unknown or empty names still fall back to SELLER; an admin may override per user.
      */
     public static String mapRole(int roleId, String roleName) {
-        String n = roleName == null ? "" : roleName.trim();
+        String n = normalizeRoleText(roleName);
         String l = n.toLowerCase(Locale.US);
         boolean salesLead = (has(n, "مدیر") || has(n, "سرپرست") || has(n, "رئیس")
                 || l.contains("manager") || l.contains("lead"))
@@ -371,6 +372,14 @@ public final class AtiranAuth {
         return RoleStore.SELLER;
     }
 
+    /** Canonicalize the Arabic/Persian code points often mixed in Atiran role labels. */
+    private static String normalizeRoleText(String value) {
+        if (value == null) return "";
+        return value.replace('\u064A', '\u06CC').replace('\u0643', '\u06A9')
+                .replace('\u200C', ' ').replace('\u200E', ' ').replace('\u200F', ' ')
+                .trim().replaceAll("\\s+", " ");
+    }
+
     private static boolean has(String s, String sub) {
         return s != null && s.contains(sub);
     }
@@ -390,7 +399,7 @@ public final class AtiranAuth {
         return c.getSharedPreferences("meelano_login", Context.MODE_PRIVATE);
     }
 
-    /** Legacy preference retained for migration; it cannot bypass the local account gate. */
+    /** Legacy preference retained for migration; it cannot bypass Atiran authentication. */
     public static boolean enabled(Context c) {
         try {
             return prefs(c).getBoolean("login_on", true);
@@ -426,12 +435,10 @@ public final class AtiranAuth {
         } catch (Exception ignored) { Diag.ignored("AtiranAuth:421", ignored); }
     }
 
-    /** Require a valid local manager/warehouse account session in this standalone build. */
+    /** Require a live Atiran-backed session; synthetic/local user IDs cannot open the shell. */
     public static boolean gate(Context c) {
         try {
-            if (!validSession(c)) return true;
-            return !LocalAccounts.isLocalSession(
-                    sessionUser(c), sessionUid(c), sessionRole(c));
+            return !validSession(c) || sessionUid(c) <= 0;
         } catch (Exception e) {
             return true;
         }

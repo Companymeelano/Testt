@@ -890,6 +890,14 @@ public class HomeScreen extends Screen {
         head.addView(a.kit.pill(marketState, marketStateColor), a.kit.lp(-2, -2));
         card.addView(head, a.kit.lp(-1, -2));
         card.addView(a.kit.gap(8));
+        if (rates != null && rates.size() > 2) {
+            TextView tickerHint = a.kit.text("برای دیدن نرخ سکه، افقی به چپ بکشید ←", 10f, Theme.MUTED, false);
+            tickerHint.setSingleLine(true);
+            tickerHint.setEllipsize(TextUtils.TruncateAt.END);
+            tickerHint.setGravity(Gravity.END);
+            card.addView(tickerHint, a.kit.lp(-1, -2));
+            card.addView(a.kit.gap(4));
+        }
 
         if (rates == null || rates.isEmpty()) {
             card.addView(a.kit.hint("قیمت‌ها در دسترس نیست؛ اتصال اینترنت را بررسی کنید."), a.kit.lp(-1, -2));
@@ -905,7 +913,8 @@ public class HomeScreen extends Screen {
                 if (i > 0) row.addView(a.kit.space(8));
                 int screenDp = Math.round(a.getResources().getDisplayMetrics().widthPixels
                         / a.getResources().getDisplayMetrics().density);
-                int tileWidth = Math.max(138, Math.min(176, (screenDp - 66) / 2));
+                // Show a slim edge of the third tile so horizontal scrolling is discoverable.
+                int tileWidth = Math.max(116, Math.min(156, (screenDp - 96) / 2));
                 row.addView(rateTile(rates.get(i)), new LinearLayout.LayoutParams(Theme.dp(tileWidth), -2));
             }
             ticker.addView(row, new android.view.ViewGroup.LayoutParams(-2, -2));

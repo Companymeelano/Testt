@@ -487,7 +487,7 @@ public class SettingsScreen extends Screen {
 
     private void buildSecurity(final LinearLayout content) {
         content.addView(sectionHead("🔐 امنیت و ورود",
-                "قفل مدیریتی و ورود با حساب محلی. رمزها روی همین گوشی ذخیره می‌شوند.",
+                "قفل محلی برنامه و ورود نقش‌محور با حساب واقعی آتیران.",
                 Theme.INFO), a.kit.lp(-1, -2));
 
         LinearLayout p = a.kit.card(Theme.INFO);
@@ -517,7 +517,7 @@ public class SettingsScreen extends Screen {
 
         LinearLayout lg = a.kit.card(Theme.GOLD);
         lg.addView(a.kit.text("حساب ورود", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
-        lg.addView(a.kit.kv("وضعیت", "ورود با حساب محلی الزامی است", Theme.SUCCESS), a.kit.lp(-1, -2));
+        lg.addView(a.kit.kv("وضعیت", "ورود با حساب آتیران الزامی است", Theme.SUCCESS), a.kit.lp(-1, -2));
         if (ir.meelano.manager.core.AtiranAuth.hasSession(a)) {
             lg.addView(a.kit.kv("کاربر فعلی",
                     ir.meelano.manager.core.AtiranAuth.sessionName(a) + " («"
@@ -526,7 +526,7 @@ public class SettingsScreen extends Screen {
                             + "»)", Theme.TEXT), a.kit.lp(-1, -2));
             lg.addView(a.kit.btnGhost("خروج از حساب فعلی", Theme.DANGER, v -> a.logout()), a.kit.lp(-1, -2));
         }
-        lg.addView(a.kit.hint("پس از فعال‌سازی لایسنس و انتخاب دیتابیس، برای ورود به نسخه مدیریت یا انبارداری باید با حساب محلی همین اپ وارد شوید."),
+        lg.addView(a.kit.hint("پس از فعال‌سازی لایسنس و انتخاب دیتابیس، همهٔ نقش‌ها از جمله مدیریت و انبارداری باید با حساب فعال خود در آتیران وارد شوند."),
                 a.kit.lp(-1, -2));
         a.kit.addCard(content, lg);
     }

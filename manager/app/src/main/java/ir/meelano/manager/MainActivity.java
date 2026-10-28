@@ -64,6 +64,8 @@ import ir.meelano.manager.screens.TahvilScreen;
 import ir.meelano.manager.screens.TakmilScreen;
 import ir.meelano.manager.screens.UsersScreen;
 import ir.meelano.manager.screens.VisitorsScreen;
+import ir.meelano.manager.screens.VisitorDeskScreen;
+import ir.meelano.manager.screens.VisitorOrdersScreen;
 import ir.meelano.manager.screens.VoiceScreen;
 import ir.meelano.manager.ui.FilterSheet;
 import ir.meelano.manager.ui.Kit;

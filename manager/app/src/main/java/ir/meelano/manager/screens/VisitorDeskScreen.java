@@ -111,8 +111,11 @@ public final class VisitorDeskScreen extends Screen {
         c.addView(a.kit.hint("قیمت سفارش از DefaultPriceGrp و نرخ forosh1 تا forosh5 آتیران می‌آید؛ اگر نرخ مبهم یا ناموجود باشد ثبت آن قلم مسدود می‌شود."),a.kit.lp(-1,-2));
     }
 
-    private void action(LinearLayout c,String title,int target){
-        c.addView(a.kit.btnGold(title,v->{page=target;render(contentRef);}),a.kit.lp(-1,-2));
+    private void action(LinearLayout c,String title,String subtitle,int target){
+        LinearLayout tile=a.kit.card(Theme.GOLD);
+        tile.addView(a.kit.btnGold(title,v->{page=target;render(contentRef);}),a.kit.lp(-1,-2));
+        tile.addView(a.kit.hint(subtitle),a.kit.lp(-1,-2));
+        c.addView(tile,a.kit.lp(-1,-2));
         c.addView(a.kit.gap(7));
     }
 

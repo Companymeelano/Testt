@@ -65,6 +65,8 @@ public class MoreScreen extends Screen {
                             e("buy", "فاکتورهای خرید و طرف‌حساب‌ها"),
                             e("customers", "پرونده و گردش حساب مشتریان"),
                             e("visitors", "عملکرد ویزیتورها و وصول"),
+                            e("visitor_work", "مسیر و بازدید، پیش‌فاکتور، گفتگوی ثبت کالا و دریافت وجه"),
+                            e("visitor_orders", "بازبینی و تأیید پیش‌فاکتورهای ارسالی ویزیتورها"),
                     }),
             new Group("finance", "مالی و خزانه", "دریافت، پرداخت و کنترل نقدینگی", "💳", "success",
                     new Entry[]{
@@ -123,6 +125,7 @@ public class MoreScreen extends Screen {
             String role = AtiranAuth.sessionRole(a);
             if (role == null || role.isEmpty()) role = RoleStore.current(a);
             expandedGroup = RoleStore.WAREHOUSE.equals(role) ? "stock" : "operations";
+            if (RoleStore.VISITOR.equals(role)) seg = SEG_ALL;
         }
         content.removeAllViews();
         content.addView(a.kit.hero("▣", "اتاق فرمان",

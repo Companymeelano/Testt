@@ -43,8 +43,8 @@ public final class RoleStore {
             "home", "customers", "cheques", "dues", "cash", "dar_in", "dar_out",
             "reports", "takmil", "search", "voice", "more"};
     /** Visitor side: showcase + his trade world. */
-    private static final String[] VISITOR_OK = {
-            "home", "customers", "products", "sales", "dues", "search", "voice", "more"};
+    /** Visitor edition is intentionally scoped to its own Atiran identity, assigned customers and orders. */
+    private static final String[] VISITOR_OK = {"visitor_work", "more"};
     /** Distributor side: delivery + collection on the road. */
     private static final String[] DISTRIBUTOR_OK = {
             "home", "sales", "customers", "products", "cheques", "dues", "cash",
@@ -137,7 +137,7 @@ public final class RoleStore {
         if (ACCOUNTANT.equals(role))
             return new String[]{"home", "customers", "cheques", "dues", "reports", "more"};
         if (VISITOR.equals(role))
-            return new String[]{"customers", "products", "sales", "dues", "more"};
+            return new String[]{"visitor_work", "more"};
         if (DISTRIBUTOR.equals(role))
             return new String[]{"sales", "customers", "cheques", "dues", "more"};
         if (MOADIAN.equals(role))
@@ -165,7 +165,7 @@ public final class RoleStore {
 
     /** Landing screen per role (fresh launch with an Atiran session). */
     public static String homeFor(String role) {
-        if (VISITOR.equals(role)) return "customers";
+        if (VISITOR.equals(role)) return "visitor_work";
         if (DISTRIBUTOR.equals(role)) return "sales";
         if (WAREHOUSE.equals(role)) return "anbar";
         if (MOADIAN.equals(role)) return "sales";
@@ -227,10 +227,15 @@ public final class RoleStore {
     }
 
     private static boolean inList(String role, String screenId) {
+        return allowedForRole(role,screenId);
+    }
+
+    /** Pure role policy, shared by navigation and unit tests. */
+    public static boolean allowedForRole(String role,String screenId) {
         if (ADMIN.equals(role)) return true;
-        String[] ok = listFor(role);
-        if (ok == null) return true;
-        for (String s : ok) if (s.equals(screenId)) return true;
+        String[] ok=listFor(role);
+        if(ok==null)return true;
+        for(String s:ok)if(s.equals(screenId))return true;
         return false;
     }
 

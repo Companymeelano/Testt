@@ -11,6 +11,14 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 public class ProductionWriterTest {
+    @Test public void onlyTheExplicitLocalModirSessionCanUseProductionAuditResolution() {
+        assertTrue(ProductionWriter.isLocalModirProductionIdentity("Modir", -9001, RoleStore.ADMIN));
+        assertTrue(ProductionWriter.isLocalModirProductionIdentity("modir", -9001, RoleStore.ADMIN));
+        assertTrue(!ProductionWriter.isLocalModirProductionIdentity("anbar", -9002, RoleStore.WAREHOUSE));
+        assertTrue(!ProductionWriter.isLocalModirProductionIdentity("modir", 42, RoleStore.ADMIN));
+        assertTrue(!ProductionWriter.isLocalModirProductionIdentity("modir", -9001, RoleStore.SELLER));
+    }
+
     @Test public void movementInsertHasOneBoundValuePerColumnAndExplicitStockDimensions() {
         String sql = ProductionWriter.movementInsertSql();
         String columns = sql.substring(sql.indexOf('(') + 1, sql.indexOf(')'));

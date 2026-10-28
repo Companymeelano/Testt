@@ -686,9 +686,12 @@ public final class ProductionScreen extends Screen {
     private void withAtiranManagerId(Consumer<Integer> continuation){
         if(busy)return;
         int sessionUid=AtiranAuth.sessionUid(a);
-        if(sessionUid>0){
+        boolean localModir = ProductionWriter.isLocalModirProductionIdentity(
+                AtiranAuth.sessionUser(a), sessionUid, AtiranAuth.sessionRole(a));
+        if(sessionUid>0 || localModir){
             busy=true;render(content);
-            runWriter("در حال بررسی حساب آتیران…","بررسی حساب آتیران انجام نشد",c->ProductionWriter.resolveAtiranUserId(c,sessionUid),uid->{
+            runWriter("در حال بررسی حساب آتیران…","بررسی حساب آتیران انجام نشد",c->ProductionWriter.resolveAtiranUserId(c,sessionUid,
+                    AtiranAuth.sessionUser(a), AtiranAuth.sessionRole(a)),uid->{
                 busy=false;render(content);continuation.accept(uid);
             });
             return;

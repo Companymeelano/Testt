@@ -722,7 +722,7 @@ public class HomeScreen extends Screen {
         top.addView(a.kit.space(9));
 
         LinearLayout copy = a.kit.v();
-        TextView overline = a.kit.text("میلانو زرین‌فرمان  •  اتاق فرمان", 10.5f, Theme.GOLD_SOFT, true);
+        TextView overline = a.kit.text("میلانو  •  اتاق فرمان", 10.5f, Theme.GOLD_SOFT, true);
         overline.setSingleLine(true);
         copy.addView(overline, a.kit.lp(-1, -2));
         TextView headline = a.kit.text(greeting + "، " + roleName, 23f, Theme.TEXT, true);
@@ -1579,7 +1579,7 @@ public class HomeScreen extends Screen {
         summary.setEllipsize(TextUtils.TruncateAt.END);
         c.addView(summary, a.kit.lp(-1, -2));
         c.addView(a.kit.gap(6));
-        final String share = "🌙 جمع‌بندی پایان روز میلانو زرین‌فرمان" + (when.isEmpty() ? "" : " (" + when + ")")
+        final String share = "🌙 جمع‌بندی پایان روز میلانو" + (when.isEmpty() ? "" : " (" + when + ")")
                 + "\n" + txt;
         c.addView(a.kit.btnGhost("↗ اشتراک‌گذاری", Theme.GOLD, v -> {
             try {

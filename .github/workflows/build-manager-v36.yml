@@ -185,7 +185,12 @@ jobs:
           git config user.name "arena-ci"
           git config user.email "arena-ci@local"
           git add -f dist/meelano-manager-v36-debug-18.apk dist/manager-v36-build-info.txt
-          git commit -m "dist: MEELANO Manager v36.35.0 debug APK"
+          # A rebuild of the same sources produces the same bytes; committing it again would fail.
+          if git diff --cached --quiet; then
+            echo "APK and build info are unchanged; nothing to commit."
+          else
+            git commit -m "dist: MEELANO Manager v36.35.0 debug APK"
+          fi
           git push origin HEAD:arena/29e01a09-testt
 
   buy-formula-counts:

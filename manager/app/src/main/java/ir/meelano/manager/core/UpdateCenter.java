@@ -58,7 +58,7 @@ public final class UpdateCenter {
     public static boolean releaseUpdateSupported(Context c) { return !isDebug(c); }
 
     private static final String PREFS = "meelano_update";
-    private static boolean autoDone = false;
+    private static volatile boolean autoDone = false;
     private static volatile boolean cancelled = false;
     private static File pendingApk = null;
 
@@ -78,20 +78,23 @@ public final class UpdateCenter {
      */
     public static void autoCheck(Activity a) {
         if (autoDone) return;
-        autoDone = true;
         try {
             if (isDebug(a) || !LicenseStore.unlocked(a)) return;
-            // Checked on every app open (cold start); the once-per-session guard above prevents repeats.
+            // Do not consume the once-per-process attempt while offline; a later foreground
+            // resume may retry after connectivity returns. Manual checks remain available too.
             if (!online(a)) return;
+            autoDone = true;
             final Context app = a.getApplicationContext();
             new Thread(() -> {
                 Info info = fetch(app);
+                // A missing/invalid descriptor and a transient network error both return null;
+                // keep this process's single attempt consumed to avoid retrying on every resume.
+                // Settings still offers an explicit manual check.
                 if (info == null) return;
                 markChecked(app);
                 rememberLatest(app, info);
                 purgeStale(app, info.code);
                 if (info.code <= currentCode(app)) return;
-                SharedPreferences p = prefs(app);
                 // Automatic: on Wi-Fi / unmetered data the update downloads with a progress screen;
                 // on metered data the user is asked first. Android still shows its own install confirmation.
                 if (metered(app)) {
@@ -100,7 +103,10 @@ public final class UpdateCenter {
                     run(a, () -> startDownload(a, info));
                 }
             }).start();
-        } catch (Exception ignored) { Diag.ignored("UpdateCenter:96", ignored); }
+        } catch (Exception ignored) {
+            autoDone = false;
+            Diag.ignored("UpdateCenter:96", ignored);
+        }
     }
 
     /** Manual check from Settings: always talks to the user. */

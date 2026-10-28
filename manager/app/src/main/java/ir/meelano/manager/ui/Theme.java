@@ -199,7 +199,8 @@ public final class Theme {
                 || res == R.drawable.icon3d_medal_reports || res == R.drawable.icon3d_medal_settings
                 || res == R.drawable.icon3d_medal_search || res == R.drawable.icon3d_medal_cheque
                 || res == R.drawable.icon3d_medal_dues) return true;
-        return res == R.drawable.icon3d_production || res == R.drawable.icon3d_closeout
+        return res == R.drawable.icon3d_nut_theme || res == R.drawable.icon3d_production
+                || res == R.drawable.icon3d_closeout
                 || res == R.drawable.icon3d_treasury || res == R.drawable.icon3d_logistics
                 || res == R.drawable.icon3d_voice || res == R.drawable.icon3d_dark_roles
                 || res == R.drawable.icon3d_score || res == R.drawable.icon3d_profit
@@ -233,7 +234,7 @@ public final class Theme {
     /** Screen-aware type multiplier (1.00 on small phones, up to 1.18 on large ones). */
     public static float typeScale() { return typeScale; }
 
-    /** Seasonal themes were removed: the app has exactly two curated themes now. */
+    /** Legacy compatibility hook: seasonal themes are gone; the three permanent looks remain. */
     public static String seasonGlyph(android.content.Context c) { return ""; }
 
     public static void init(Context c) {
@@ -265,11 +266,11 @@ public final class Theme {
             if (s.bigFont()) zi = 3;
         } catch (Exception ignored) { Diag.ignored("Theme:154", ignored); }
         fontScale = zi == 0 ? 0.9f : zi == 2 ? 1.15f : zi == 3 ? 1.3f : 1f;
-        // Exactly two curated themes; the accent is part of each theme, not a user choice.
-        int dark = 0xFFD4AF37, darkSoft = 0xFFF0D98C, lite = 0xFF9C7A1A, liteSoft = 0xFF5C4510;
+        // Three fixed looks share two palette families: obsidian/gold and ivory/emerald;
+        // the nut-shop look adds its own surfaces and artwork to the ivory/emerald palette.
         if (light) {
-            // «ایوری و زمرد»: ivory base, deep emerald accent, antique gold ornaments.
-            // v31 adds nut-themed 3D icons on the light skin (see icon3d_nut_*).
+            // «ایوری و زمرد»: ivory base, deep emerald accent, antique-gold ornaments.
+            // Both light and nut looks use this palette; nuts adds its separate visual treatment.
             // Reference mockup: ivory silk, emerald panels, gold rims. Text pairs stay ≥4.5:1.
             BG = 0xFFFBF6EA;
             SURFACE = 0xFFFFFFFF;

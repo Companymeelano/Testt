@@ -268,9 +268,19 @@ public final class ProductionWriter {
         requireProcedure(c, "UpdateMojodiInventory");
         requireProcedure(c, "UpdateMojodiInventoryAnbars");
         requireProcedure(c, "UpdateMojodiInventoryAnbarVariety");
-        requireProcedure(c, "SabtSanadHesabdariFromAtiran");
-        requireProcedure(c, "SabtSanadHesabdariProduction");
         requireColumns(c, "dbo", "overal_setting", new String[]{"id", "value"});
+        // The accounting document table is required only while Atiran's official posting switch
+        // is enabled. Validate that dependency before the production transaction begins.
+        long accountingEnabled;
+        try (PreparedStatement ps = c.prepareStatement("SELECT [value] FROM dbo.overal_setting WHERE id=67");
+             ResultSet r = ps.executeQuery()) {
+            if (!r.next()) throw new Exception("تنظیم حسابداری تولید آتیران (overal_setting.id=67) پیدا نشد؛ ثبت تولید متوقف شد.");
+            accountingEnabled = r.getLong(1);
+        }
+        if (accountingEnabled == 1) {
+            requireProcedure(c, "SabtSanadHesabdariFromAtiran");
+            requireColumns(c, "accounting", "Document", new String[]{"Kind", "Shfac", "Active"});
+        }
         requireColumns(c, "dbo", "subbuyfact", new String[]{"shfackh", "rdf", "shka", "TEDVAH", "TEDJOZ", "rdf__", "active", "tamam_joz", "tamam_joz_tax", "VarietyID"});
         requireColumns(c, "dbo", "buyfact", new String[]{"shfackh", "rdf__", "DATE", "all", "active"});
         // The source DB has no production write trigger/SP, but the movement trigger is essential.

@@ -46,16 +46,28 @@ production_manifest = (ROOT / 'app/src/main/AndroidManifest.xml').read_text(enco
 need(production.exists(), 'صفحهٔ تولید در سورس اصلی APK یکپارچه موجود نیست')
 need('android:name=".ProductionActivity" android:exported="false"' in production_manifest,
      'صفحهٔ تولید باید در APK یکپارچه باشد اما از برنامه‌های دیگر قابل فراخوانی نباشد')
-need('private void openManagerProduction()' in main and 'ProductionActivity.class' in main and 'isFullAccessUser()' in main,
-     'ورود به تولید باید فقط از مسیر مدیرِ برنامهٔ یکپارچه انجام شود')
+need('private void openManagerProduction()' in main and 'ProductionActivity.class' in main
+     and 'canUsePermission("production")' in main and '{"production", "مشاهده و ثبت تولید"' in main,
+     'تولید باید مجوز مستقل و کنترل‌شده برای حساب مدیر داشته باشد')
 need('private boolean unifiedEditionPermissionAllowed(String key)' in main,
      'فهرست مسیرهای مجاز برنامهٔ یکپارچه وجود ندارد')
-need('if (UNIFIED_EDITION)' in main and 'currentPermissionSet().contains(k)' in main,
-     'دسترسی‌های حساب در نسخهٔ یکپارچه اعمال نمی‌شود')
-need('if (visitorEditionPermissionAllowed(k)) return true;' in main,
-     'سطح دسترسی فروش/ویزیتِ برنامهٔ اصلی به‌اشتباه حذف شده است')
-need('if ("dashboard".equals(k) && !isFullAccessUser()) return false;' in main,
-     'داشبورد مدیریتی در نسخهٔ یکپارچه برای حساب‌های غیرمدیر محدود نشده است')
+need('if (UNIFIED_EDITION)' in main and 'MeelanoAccessPolicy.allows(currentAccessRole(), currentPermissionSet(), permission)' in main,
+     'دسترسی‌های نقش و مجوزهای حساب در نسخهٔ یکپارچه اعمال نمی‌شود')
+need('visitorEditionPermissionAllowed(k)' in main and 'managerEditionPermissionAllowed(k)' in main,
+     'سطح دسترسی فروش/ویزیت و مسیرهای مدیریتیِ برنامهٔ اصلی در flavor یکپارچه به‌درستی ترکیب نشده‌اند')
+need('"dashboard".equals(permission) && !isFullAccessUser()' not in main
+     and 'containsAll(permissionSet(allPermissionString()))' in main
+     and 'MeelanoAccessPolicy.allows(currentAccessRole(), currentPermissionSet(), permission)' in main,
+     'داشبورد مدیریتی باید با مجوز صریح همان حساب کنترل شود و نقش مدیر محدودشده نباید دسترسی کامل بگیرد')
+need('private boolean canAdminChat()' in main and 'canUsePermission("management_access")' in main,
+     'مدیریت گفتگو باید از مجوز مدیریت همان حساب پیروی کند')
+need('private int visitorDefaultPriceGroup(Connection c)' in main
+     and 'DefaultPriceGrp' in main and 'DeviceSettings' in main
+     and 'AtiranVisitorPricePolicy.priceColumn(priceGroup)' in main
+     and 'dbo.[forosh_price]' in main and 'COALESCE(prx.price1,0)' in main,
+     'نرخ ویزیتور باید از گروه واقعی DefaultPriceGrp انتخاب شود و به قیمت عمومی سقوط نکند')
+need((ROOT / 'app/src/test/java/ir/meelano/android/AtiranVisitorPricePolicyTest.java').exists(),
+     'آزمون نگاشت گروه قیمت ویزیتور ۱ تا ۵ موجود نیست')
 need('MANAGER_EDITION && !UNIFIED_EDITION && !profile.explicit' in main,
      'قاعدهٔ provisional مدیر از flavor جداگانه به نسخهٔ لایسنس‌دار نشت کرده است')
 need('MANAGER_EDITION && !UNIFIED_EDITION && ("visitor_dashboard"' in main,

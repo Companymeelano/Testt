@@ -103,8 +103,10 @@ public final class ProductionActivity extends Activity {
         });
     }
 
-    private void render(){
-        if(body==null)return;capture();body.removeAllViews();
+    private void render(){ render(true); }
+    private void renderFromModel(){ render(false); }
+    private void render(boolean captureCurrentFields){
+        if(body==null)return;if(captureCurrentFields)capture();body.removeAllViews();
         if(busy){body.addView(text("در حال انجام عملیات امن آتیران…",14,DARK,true),lp(-1,-2));return;}
         if(warehouses.isEmpty()){
             body.addView(cardText("انبار آتیران پیدا نشد. ابتدا انبار فعال و دسترسی دیتابیس را بررسی کنید."),lp(-1,-2));
@@ -166,7 +168,7 @@ public final class ProductionActivity extends Activity {
             recipe=selected;output=findProduct(selected.productId);materials.clear();costs.clear();
             for(ProductionWriter.RecipeIngredient x:this.<ProductionWriter.RecipeIngredient>castList(v[0]))materials.add(new MaterialLine(x.product,x.baseQtyPieces,x.baseQtyPieces,x.available));
             for(ProductionWriter.RecipeCost x:this.<ProductionWriter.RecipeCost>castList(v[1])){ProductionWriter.CostType t=findCost(x.costId);if(t!=null)costs.add(new CostLine(t,x.amount,x.amount));}
-            qtyText=qty(selected.baseOutputQty);weightText=qty(selected.baseWeightKg);descriptionText=selected.description;render();
+            qtyText=qty(selected.baseOutputQty);weightText=qty(selected.baseWeightKg);descriptionText=selected.description;renderFromModel();
         });
     }
     private ProductionWriter.Product findProduct(long id){for(ProductionWriter.Product p:products)if(p.id==id)return p;return null;}
@@ -238,9 +240,9 @@ public final class ProductionActivity extends Activity {
         new AlertDialog.Builder(this).setTitle(title).setView(input).setNegativeButton("انصراف",null).setPositiveButton("تأیید",(d,w)->{try{done.accept(parse(input.getText().toString()));}catch(Exception e){toast("مقدار معتبر نیست.");}}).show();
     }
     private void rescale(){
-        try{BigDecimal outQty=parse(outputQty==null?qtyText:outputQty.getText().toString());BigDecimal factor=outQty.divide(recipe.baseOutputQty,8,RoundingMode.HALF_UP);
-            for(MaterialLine l:materials)l.actual=l.base.multiply(factor).setScale(3,RoundingMode.HALF_UP);for(CostLine l:costs)l.actual=l.base.multiply(factor).setScale(2,RoundingMode.HALF_UP);qtyText=qty(outQty);render();
-        }catch(Exception e){toast("مقدار خروجی پایهٔ فرمول معتبر نیست.");}
+        try{capture();BigDecimal outQty=parse(qtyText);if(recipe==null||recipe.baseOutputQty.signum()<=0)throw new Exception("مبنای فرمول معتبر نیست.");BigDecimal factor=outQty.divide(recipe.baseOutputQty,8,RoundingMode.HALF_UP);
+            for(MaterialLine l:materials)l.actual=l.base.multiply(factor).setScale(3,RoundingMode.HALF_UP);for(CostLine l:costs)l.actual=l.base.multiply(factor).setScale(2,RoundingMode.HALF_UP);qtyText=qty(outQty);renderFromModel();
+        }catch(Exception e){toast("مقدار خروجی یا مبنای فرمول معتبر نیست.");}
     }
 
     private ProductionWriter.Request buildRequest()throws Exception{

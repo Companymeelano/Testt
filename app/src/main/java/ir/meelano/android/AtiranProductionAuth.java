@@ -111,9 +111,8 @@ final class AtiranProductionAuth {
     }
 
     static String mapRole(String value) {
-        String n = safe(value).toLowerCase(Locale.US);
-        if (n.contains("مدیر") || n.contains("مدير") || n.contains("admin") || n.contains("modir") || n.contains("manage") || n.contains("sysadmin")) return ADMIN;
-        return "user";
+        String role = MeelanoAccessPolicy.canonicalRole(safe(value));
+        return "admin".equals(role) || "manager".equals(role) ? ADMIN : "user";
     }
 
     static boolean verifyPasswordServer(Connection c, String username, String typed) {

@@ -623,6 +623,17 @@ public final class Kit {
     }
 
     public View chipsRow(java.util.List<String> items, int selected, int accent, final ChipsListener l) {
+        return chipsRow(items, selected, accent, null, l);
+    }
+
+    /** Theme choices with matching, untinted 3D icons and a shared touch height. */
+    public View chipsWithIcons(String[] items, int selected, int[] iconRes,
+                               int accent, final ChipsListener l) {
+        return chipsRow(java.util.Arrays.asList(items), selected, accent, iconRes, l);
+    }
+
+    private View chipsRow(java.util.List<String> items, int selected, int accent,
+                          int[] icons, final ChipsListener l) {
         HorizontalScrollView sv = new HorizontalScrollView(a);
         sv.setHorizontalScrollBarEnabled(false);
         sv.setClipToPadding(false);
@@ -631,13 +642,40 @@ public final class Kit {
         r.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         for (int i = 0; i < items.size(); i++) {
             final int idx = i;
-            View ch = chip(items.get(i), i == selected, accent, v -> l.onPick(idx));
+            boolean chosen = i == selected;
+            int iconRes = icons != null && i < icons.length ? icons[i] : 0;
+            View ch = iconRes != 0
+                    ? chipWithIcon(items.get(i), chosen, accent, iconRes, v -> l.onPick(idx))
+                    : chip(items.get(i), chosen, accent, v -> l.onPick(idx));
+            if (icons != null) ch.setMinimumHeight(Theme.dp(48));
             LinearLayout.LayoutParams p = lp(-2, -2);
             p.setMarginEnd(Theme.dp(8));
             r.addView(ch, p);
         }
         sv.addView(r, new HorizontalScrollView.LayoutParams(-2, -2));
         return sv;
+    }
+
+    private View chipWithIcon(String label, boolean selected, int accent, int iconRes,
+                              View.OnClickListener onClick) {
+        int ink = selected ? Theme.onAccent(accent) : accent;
+        LinearLayout c = h();
+        c.setGravity(Gravity.CENTER_VERTICAL);
+        c.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        c.setBackground(Theme.chip(selected, selected ? accent : Theme.alpha(accent, 255)));
+        c.setPadding(Theme.dp(10), Theme.dp(5), Theme.dp(12), Theme.dp(5));
+        ImageView artwork = icon(iconRes, ink, 26);
+        c.addView(artwork, lp(Theme.dp(26), Theme.dp(26)));
+        c.addView(space(5), lp(Theme.dp(5), 1));
+        TextView title = text(label, 11.5f, ink, true);
+        title.setSingleLine(true);
+        c.addView(title, lp(-2, -2));
+        c.setContentDescription(label);
+        c.setSelected(selected);
+        c.setFocusable(true);
+        Theme.pressable(c);
+        c.setOnClickListener(onClick);
+        return c;
     }
 
     public interface ChipsListener {

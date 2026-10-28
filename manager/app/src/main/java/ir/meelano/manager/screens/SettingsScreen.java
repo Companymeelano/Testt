@@ -306,10 +306,14 @@ public class SettingsScreen extends Screen {
         final boolean isLight = "light".equals(a.settings.themeMode());
         final boolean isNuts = "nuts".equals(a.settings.themeMode());
         final int themeIdx = isNuts ? 2 : isLight ? 1 : 0;
-        th.addView(a.kit.chips(new String[]{"◐ تیره • ابسیدین طلایی", "◑ روشن • عاج سلطنتی", "🥜 آجیل و خشکبار"}, themeIdx, idx -> {
-            a.settings.setThemeMode(idx == 2 ? "nuts" : idx == 1 ? "light" : "dark");
-            a.refreshTheme();
-        }), a.kit.lp(-1, -2));
+        th.addView(a.kit.chipsWithIcons(
+                new String[]{"تیره • ابسیدین طلایی", "روشن • عاج سلطنتی", "آجیل و خشکبار"},
+                themeIdx,
+                new int[]{R.drawable.icon3d_dark_theme, R.drawable.icon3d_theme, R.drawable.icon3d_nut_theme},
+                Theme.GOLD, idx -> {
+                    a.settings.setThemeMode(idx == 2 ? "nuts" : idx == 1 ? "light" : "dark");
+                    a.refreshTheme();
+                }), a.kit.lp(-1, -2));
         th.addView(a.kit.gap(8));
         th.addView(a.kit.text("نمایش", 12f, Theme.MUTED, true), a.kit.lp(-1, -2));
         th.addView(a.kit.btnGhost("🔍 بزرگ‌نمایی متن: " + MainActivity.zoomLabel(a.settings.zoomIdx()), Theme.GOLD, v -> {
@@ -325,7 +329,7 @@ public class SettingsScreen extends Screen {
             a.refreshTheme();
         }), a.kit.lp(-1, -2));
         th.addView(a.kit.gap(6));
-        th.addView(a.kit.hint("قالب انتخابی فوراً روی همه بخش‌ها، جدول‌ها، نمودارها و آیکن‌ها اعمال می‌شود."),
+        th.addView(a.kit.hint("برای دیدن همهٔ قالب‌ها ردیف را افقی بکشید. انتخاب قالب فوراً روی همهٔ بخش‌ها، جدول‌ها، نمودارها و آیکن‌ها اعمال می‌شود."),
                 a.kit.lp(-1, -2));
         a.kit.addCard(content, th);
     }

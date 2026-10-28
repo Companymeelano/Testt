@@ -777,6 +777,72 @@ def check_unified_app():
     report('هویت برنامهٔ اصلیِ یکپارچه', ok, tail[0] if ok else '؛ '.join(bad[:4]) or 'ابزار کنترل شکست خورد')
 
 
+def check_nut_visual_assets():
+    """Check the nut-theme selector icon and every bundled product-photo key/file pair."""
+    import struct
+
+    photos_src = os.path.join(ROOT, 'app/src/main/java/ir/meelano/android/MeelanoProductPhotos.java')
+    theme_src = os.path.join(ROOT, 'manager/app/src/main/java/ir/meelano/manager/ui/Theme.java')
+    settings_src = os.path.join(ROOT, 'manager/app/src/main/java/ir/meelano/manager/screens/SettingsScreen.java')
+    kit_src = os.path.join(ROOT, 'manager/app/src/main/java/ir/meelano/manager/ui/Kit.java')
+    assets_dir = os.path.join(ROOT, 'app/src/main/assets/products')
+    drawable_dir = os.path.join(ROOT, 'manager/app/src/main/res/drawable-nodpi')
+    try:
+        photos = open(photos_src, encoding='utf-8').read()
+        theme = open(theme_src, encoding='utf-8').read()
+        settings = open(settings_src, encoding='utf-8').read()
+        kit = open(kit_src, encoding='utf-8').read()
+        keys = set(re.findall(r'return\s+"([a-z_]+)"', photos))
+        files = {os.path.splitext(n)[0] for n in os.listdir(assets_dir) if n.lower().endswith('.jpg')}
+        missing = sorted(keys - files)
+        unreferenced = sorted(files - keys)
+        bad_jpegs = [k for k in sorted(keys & files)
+                     if not open(os.path.join(assets_dir, k + '.jpg'), 'rb').read(3).startswith(b'\xff\xd8\xff')]
+        icon_name = 'icon3d_nut_theme'
+        icon_path = os.path.join(drawable_dir, icon_name + '.png')
+        bad_icons = []
+        if not os.path.isfile(icon_path):
+            bad_icons.append(icon_name + ' missing')
+        else:
+            data = open(icon_path, 'rb').read(29)
+            if len(data) < 29 or data[:8] != b'\x89PNG\r\n\x1a\n' or data[12:16] != b'IHDR':
+                bad_icons.append(icon_name + ' invalid PNG')
+            else:
+                width, height = struct.unpack('>II', data[16:24])
+                if width != 128 or height != 128 or data[25] != 6:
+                    bad_icons.append(icon_name + ' must be 128px RGBA')
+        required_ui = (
+            'chipsWithIcons(' in settings,
+            'R.drawable.icon3d_dark_theme' in settings and 'R.drawable.icon3d_theme' in settings
+            and 'R.drawable.icon3d_nut_theme' in settings,
+            '"آجیل و خشکبار"' in settings,
+            'برای دیدن همهٔ قالب‌ها' in settings,
+            'res == R.drawable.icon3d_nut_theme' in theme
+            and 'res == R.drawable.icon3d_dark_theme' in theme and 'res == R.drawable.icon3d_theme' in theme,
+            'R.drawable.icon3d_nut_products' not in theme and 'R.drawable.icon3d_nut_inventory' not in theme,
+            'if (icons != null) ch.setMinimumHeight(Theme.dp(48));' in kit,
+            'c.setSelected(selected);' in kit,
+            'ImageView artwork = icon(iconRes, ink, 26);' in kit,
+        )
+        absent_ui = [name for name, present in zip(
+            ('theme selector uses matched image chips', 'all three theme choices use their 3D icons',
+             'theme selector labels the nut option', 'horizontal overflow is explained', 'nut icon remains untinted',
+             'nut icon is not mapped to catalog or inventory pages', 'theme choices meet a 48dp touch target',
+             'selected state is exposed for accessibility', 'icons use a consistent 26dp size'), required_ui) if not present]
+        ok = bool(keys) and not missing and not unreferenced and not bad_jpegs and not bad_icons and not absent_ui
+        details = []
+        if missing: details.append('عکس‌های مفقود: ' + ', '.join(missing))
+        if unreferenced: details.append('عکس‌های بدون نگاشت: ' + ', '.join(unreferenced))
+        if bad_jpegs: details.append('JPEG خراب: ' + ', '.join(bad_jpegs))
+        if bad_icons: details.append('آیکن ۳بعدی نامعتبر: ' + ', '.join(bad_icons))
+        if absent_ui: details.append('اتصال چیپ انتخاب تم ناقص است: ' + ', '.join(absent_ui))
+        report('پوشش آیکن‌ها و تصاویر آجیل و خشکبار', ok,
+               ('%d کلید عکس، هرکدام دارای JPEG؛ تصویر آجیل شفاف ۱۲۸×۱۲۸ و سه گزینهٔ انتخاب تم با آیکن‌های ۳بعدی و هدف لمسی ۴۸dp' % len(keys))
+               if ok else '؛ '.join(details))
+    except Exception as e:
+        report('پوشش آیکن‌ها و تصاویر آجیل و خشکبار', False, 'ممیزی ناموفق: %s' % e)
+
+
 def main():
     print('════════ بازبینی جامع پروژهٔ Meelano ════════')
     check_syntax()
@@ -795,6 +861,7 @@ def main():
     check_shadow_and_json()
     check_lux_api()
     check_unified_app()
+    check_nut_visual_assets()
     check_engines()
     check_docs()
     failed = [n for n, ok, _ in RESULTS if not ok]

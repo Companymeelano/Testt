@@ -299,11 +299,12 @@ public class HomeScreen extends Screen {
         } else if (state == BannerState.UPDATED) {
             title = "داشبورد به‌روز شد";
             detail = "آخرین دریافت زنده: " + Money.fa(savedTs == null || savedTs.isEmpty() ? "—" : savedTs);
+        } else if (savedTs == null || savedTs.isEmpty()) {
+            title = "اتصال برقرار نشد؛ دادهٔ ذخیره‌شده‌ای موجود نیست";
+            detail = "برای دریافت اطلاعات، اتصال را بررسی کنید و دوباره تلاش کنید.";
         } else {
             title = "اتصال برقرار نشد؛ دادهٔ ذخیره‌شده نمایش داده می‌شود";
-            detail = savedTs == null || savedTs.isEmpty()
-                    ? "برای دریافت اطلاعات تازه، اتصال را بررسی کنید."
-                    : "آخرین دریافت موفق: " + Money.fa(savedTs);
+            detail = "آخرین دریافت موفق: " + Money.fa(savedTs);
         }
         TextView heading = a.kit.text(title, 12.5f, Theme.TEXT, true);
         heading.setMaxLines(1);

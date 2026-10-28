@@ -215,24 +215,27 @@ public final class Settings {
     }
 
     // ---------------- luxury theme ----------------
-    /** "dark" (Midnight Gold) or "light" (Ivory Royal). */
+    /** "dark" (Midnight Gold), "light" (Ivory Royal), or "nuts" (Nut & Dry Fruit). */
     public String themeMode() {
-        // Dark («Midnight Gold») is the default. One-time migration: installs that were
-        // still on the old light default switch to dark once; a later manual choice is kept.
-        if (!p.getBoolean("theme_dark_default_v38", false)) {
-            p.edit().putString("theme_mode", "dark").putBoolean("theme_dark_default_v38", true).apply();
-        }
-        // v39: «آجیل و خشکبار» is the default for everyone once; a later manual choice is kept.
+        // Mark the older migration as complete without replacing an explicit user selection.
+        // The previous v39 migration wrote "nuts" unconditionally and overwrote a saved dark/light choice.
+        if (!p.getBoolean("theme_dark_default_v38", false))
+            p.edit().putBoolean("theme_dark_default_v38", true).apply();
         if (!p.getBoolean("theme_nuts_default_v39", false)) {
-            p.edit().putString("theme_mode", "nuts").putBoolean("theme_nuts_default_v39", true).apply();
+            android.content.SharedPreferences.Editor edit = p.edit();
+            if (!p.contains("theme_mode")) edit.putString("theme_mode", "nuts");
+            edit.putBoolean("theme_nuts_default_v39", true).apply();
         }
-        String m = p.getString("theme_mode", "nuts");
-        return "light".equals(m) ? "light" : "nuts".equals(m) ? "nuts" : "dark";
+        return normalizeThemeMode(p.getString("theme_mode", "nuts"));
+    }
+
+    /** Pure, fail-safe theme normalization; exposed for regression tests. */
+    public static String normalizeThemeMode(String mode) {
+        return "light".equals(mode) ? "light" : "dark".equals(mode) ? "dark" : "nuts";
     }
 
     public void setThemeMode(String mode) {
-        String v = "light".equals(mode) ? "light" : "nuts".equals(mode) ? "nuts" : "dark";
-        p.edit().putString("theme_mode", v).apply();
+        p.edit().putString("theme_mode", normalizeThemeMode(mode)).apply();
     }
 
     /** Accent key: gold / emerald / sapphire / ruby / violet / teal. */

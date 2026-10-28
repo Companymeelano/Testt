@@ -151,8 +151,8 @@ public final class Kit {
         LinearLayout head = h();
         int heroVector = MeelanoIcons.iconFor(glyph);
         int hero3d = heroVector == 0 ? 0 : Theme.icon3d(heroVector);
-        boolean gold3dHero = !Theme.isLight() && heroVector != 0 && Theme.isIcon3d(hero3d);
-        if (gold3dHero) {
+        boolean use3dHero = heroVector != 0 && Theme.isIcon3d(hero3d);
+        if (use3dHero) {
             ImageView emblem = new ImageView(a);
             emblem.setImageResource(hero3d);
             emblem.setScaleType(ImageView.ScaleType.FIT_CENTER);
@@ -181,16 +181,15 @@ public final class Kit {
         r.setPadding(Theme.dp(3), Theme.dp(4), Theme.dp(3), Theme.dp(7));
 
         int sectionGlyph = sectionIcon(title);
-        boolean useLargeGold3d = !Theme.isLight()
-                && Theme.isIcon3d(Theme.icon3d(sectionGlyph));
+        boolean useLarge3d = Theme.isIcon3d(Theme.icon3d(sectionGlyph));
         FrameLayout badge = new FrameLayout(a);
         badge.setBackground(Theme.avatar(Theme.alpha(accent, Theme.isLight() ? 38 : 48)));
-        ImageView symbol = icon(sectionGlyph, accent, useLargeGold3d ? 28 : 17);
-        int symbolSize = useLargeGold3d ? 30 : 20;
+        ImageView symbol = icon(sectionGlyph, accent, useLarge3d ? 28 : 17);
+        int symbolSize = useLarge3d ? 30 : 20;
         FrameLayout.LayoutParams sp = new FrameLayout.LayoutParams(
                 Theme.dp(symbolSize), Theme.dp(symbolSize), Gravity.CENTER);
         badge.addView(symbol, sp);
-        int badgeSize = useLargeGold3d ? 42 : 34;
+        int badgeSize = useLarge3d ? 42 : 34;
         r.addView(badge, new LinearLayout.LayoutParams(Theme.dp(badgeSize), Theme.dp(badgeSize)));
         r.addView(space(8));
 

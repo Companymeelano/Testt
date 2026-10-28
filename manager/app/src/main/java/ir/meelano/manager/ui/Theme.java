@@ -125,23 +125,24 @@ public final class Theme {
             int m = medal(vector);
             if (m != 0) return m;
         }
+        // A coherent 3D set for the command room and financial sections, shared by all three themes.
+        // The source artwork is a transparent emerald/gold medallion, so it remains legible on ivory and obsidian.
+        if (vector == R.drawable.mi_warehouse) return R.drawable.icon3d_production;
+        if (vector == R.drawable.mi_task_alt) return R.drawable.icon3d_closeout;
+        if (vector == R.drawable.mi_military_tech) return R.drawable.icon3d_score;
+        if (vector == R.drawable.mi_profit) return R.drawable.icon3d_profit;
+        if (vector == R.drawable.mi_account_balance || vector == R.drawable.mi_account_balance_wallet) return R.drawable.icon3d_treasury;
+        if (vector == R.drawable.mi_directions_car || vector == R.drawable.mi_local_shipping) return R.drawable.icon3d_logistics;
+        if (vector == R.drawable.mi_mic) return R.drawable.icon3d_voice;
+        if (vector == R.drawable.mi_admin_panel_settings) return R.drawable.icon3d_dark_roles;
+        if (vector == R.drawable.mi_request_quote) return R.drawable.icon3d_medal_sales;
+        if (vector == R.drawable.mi_add_shopping_cart) return R.drawable.icon3d_medal_purchase;
+        if (vector == R.drawable.mi_warning) return R.drawable.icon3d_medal_alert;
         if (!light) {
             // Dark skin: icons rendered on black, with a brighter gold glow.
-            if (vector == R.drawable.mi_warehouse) return R.drawable.icon3d_production;
-            if (vector == R.drawable.mi_task_alt) return R.drawable.icon3d_closeout;
-            if (vector == R.drawable.mi_military_tech) return R.drawable.icon3d_score;
-            if (vector == R.drawable.mi_profit) return R.drawable.icon3d_profit;
-            if (vector == R.drawable.mi_account_balance || vector == R.drawable.mi_account_balance_wallet) return R.drawable.icon3d_treasury;
-            if (vector == R.drawable.mi_directions_car) return R.drawable.icon3d_logistics;
             if (vector == R.drawable.mi_lightbulb) return R.drawable.icon3d_dark_assistant;
             if (vector == R.drawable.mi_trending_down) return R.drawable.icon3d_dark_cash_out;
             if (vector == R.drawable.mi_assignment_return) return R.drawable.icon3d_dark_refresh;
-            if (vector == R.drawable.mi_local_shipping) return R.drawable.icon3d_logistics;
-            if (vector == R.drawable.mi_mic) return R.drawable.icon3d_voice;
-            if (vector == R.drawable.mi_admin_panel_settings) return R.drawable.icon3d_dark_roles;
-            if (vector == R.drawable.mi_request_quote) return R.drawable.icon3d_dark_sales;
-            if (vector == R.drawable.mi_add_shopping_cart) return R.drawable.icon3d_dark_purchase;
-            if (vector == R.drawable.mi_warning) return R.drawable.icon3d_dark_bell;
             if (vector == R.drawable.mi_trending_up) return R.drawable.icon3d_dark_dollar;
             if (vector == R.drawable.mi_diamond) return R.drawable.icon3d_dark_gold;
             if (vector == R.drawable.mi_search) return R.drawable.icon3d_dark_search;
@@ -192,7 +193,7 @@ public final class Theme {
 
     /** True for bitmap 3D icons, which must not be tinted. */
     public static boolean isIcon3d(int res) {
-        if (res == R.drawable.icon3d_dark_bell) return true;
+        if (res == R.drawable.icon3d_dark_bell || res == R.drawable.icon3d_medal_alert) return true;
         if (res == R.drawable.icon3d_medal_account || res == R.drawable.icon3d_medal_refresh || res == R.drawable.icon3d_medal_theme || res == R.drawable.icon3d_medal_zoom || res == R.drawable.icon3d_medal_assistant || res == R.drawable.icon3d_medal_more || res == R.drawable.icon3d_medal_goldbar || res == R.drawable.icon3d_medal_dollar || res == R.drawable.icon3d_medal_coin) return true;
         if (res == R.drawable.icon3d_medal_home || res == R.drawable.icon3d_medal_customers
                 || res == R.drawable.icon3d_medal_inventory || res == R.drawable.icon3d_medal_products

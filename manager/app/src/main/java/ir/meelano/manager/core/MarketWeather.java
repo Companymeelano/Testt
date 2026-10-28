@@ -13,8 +13,8 @@ import org.json.JSONObject;
 
 /**
  * Public market and weather data for the home card. No API key, no writes.
- * Rates: iran-market «popular.json» (TGJU prices, toman, refreshed every 30 min).
- * Weather: Open-Meteo current conditions for the device location, falling back to the store in Ahvaz.
+ * Rates: iran-market «popular.json» (TGJU quotes, IRT/toman; the provider reports its own timestamp/stale flag).
+ * Weather: Open-Meteo current conditions only for a fresh, permissioned device fix; no city is guessed when permission is absent.
  * The last good response of each is cached so the card still shows values offline.
  */
 public final class MarketWeather {
@@ -22,13 +22,10 @@ public final class MarketWeather {
 
     public static final String RATES_URL =
             "https://raw.githubusercontent.com/iran-market/iran-market.github.io/main/data/popular.json";
-    /** Fallback when the device position is unavailable: Ahvaz (اهواز). */
-    public static final double AHVAZ_LAT = 31.3183;
-    public static final double AHVAZ_LON = 48.6706;
-    public static final String AHVAZ_NAME = "اهواز";
-
     /** Open-Meteo forecast for the given coordinates (current conditions, local timezone). */
     public static String weatherUrl(double lat, double lon) {
+        if (!Double.isFinite(lat) || !Double.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180)
+            throw new IllegalArgumentException("Invalid weather coordinates");
         return String.format(java.util.Locale.US,
                 "https://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f"
                         + "&current=temperature_2m,relative_humidity_2m,weather_code&timezone=auto", lat, lon);
@@ -53,7 +50,7 @@ public final class MarketWeather {
         }
     }
 
-    /** Current Tehran weather. */
+    /** Current weather for a fresh, explicitly permissioned device position. */
     public static final class Weather {
         public final double temp;
         public final int humidity;
@@ -70,20 +67,29 @@ public final class MarketWeather {
 
     // ------------------------------------------------------------------ network
 
-    /** GET a URL as UTF-8 text with short timeouts. Throws on any HTTP or network error. */
+    /** GET a small public JSON document as UTF-8. Response size is bounded before parsing. */
     public static String get(String url) throws Exception {
         HttpURLConnection con = (HttpURLConnection) new URL(url).openConnection();
         con.setConnectTimeout(8000);
         con.setReadTimeout(8000);
+        con.setUseCaches(false);
+        con.setInstanceFollowRedirects(true);
         con.setRequestProperty("Accept", "application/json");
+        con.setRequestProperty("User-Agent", "Meelano-Manager/36 market-card");
         try {
             int code = con.getResponseCode();
-            if (code != 200) throw new IllegalStateException("HTTP " + code);
+            if (code != HttpURLConnection.HTTP_OK) throw new IllegalStateException("HTTP " + code);
+            int declared = con.getContentLength();
+            if (declared > 1024 * 1024) throw new IllegalStateException("Market response is too large");
             try (InputStream in = con.getInputStream()) {
-                java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+                java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream(Math.max(1024, declared));
                 byte[] buf = new byte[4096];
-                int n;
-                while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+                int n, total = 0;
+                while ((n = in.read(buf)) > 0) {
+                    total += n;
+                    if (total > 1024 * 1024) throw new IllegalStateException("Market response is too large");
+                    out.write(buf, 0, n);
+                }
                 return new String(out.toByteArray(), StandardCharsets.UTF_8);
             }
         } finally {
@@ -93,9 +99,10 @@ public final class MarketWeather {
 
     // ------------------------------------------------------------------ parsing
 
-    /** Picks the four cards we show from popular.json. Unknown symbols are ignored. */
+    /** Requires all three requested TGJU instruments; malformed or stale responses never replace cache. */
     public static List<Rate> parseRates(String json) throws Exception {
         JSONArray data = new JSONObject(json).getJSONArray("data");
+        if (data.length() > 500) throw new IllegalStateException("too many market rows");
         List<Rate> out = new ArrayList<>();
         String[][] want = {
                 {"USD_IRR_FREE", "دلار آزاد"},
@@ -103,22 +110,40 @@ public final class MarketWeather {
                 {"COIN_EMAMI_IRR", "سکه امامی"},
         };
         for (String[] w : want) {
+            JSONObject found = null;
             for (int i = 0; i < data.length(); i++) {
-                JSONObject o = data.getJSONObject(i);
-                if (!w[0].equals(o.optString("symbol"))) continue;
-                out.add(new Rate(w[1], Math.round(o.getDouble("price")),
-                        o.optDouble("change_pct", 0), o.optString("timestamp_jalali", "")));
-                break;
+                JSONObject o = data.optJSONObject(i);
+                if (o == null || !w[0].equals(o.optString("symbol"))) continue;
+                if (found != null) throw new IllegalStateException("duplicate market symbol: " + w[0]);
+                found = o;
             }
+            if (found == null) throw new IllegalStateException("missing market symbol: " + w[0]);
+            if (found.optBoolean("stale", false)) throw new IllegalStateException("stale market quote: " + w[0]);
+            if (!"IRT".equalsIgnoreCase(found.optString("currency", "")))
+                throw new IllegalStateException("unexpected market currency: " + w[0]);
+            double rawPrice = found.optDouble("price", Double.NaN);
+            double change = found.optDouble("change_pct", 0d);
+            if (!Double.isFinite(rawPrice) || rawPrice <= 0 || rawPrice >= Long.MAX_VALUE
+                    || !Double.isFinite(change))
+                throw new IllegalStateException("invalid market values: " + w[0]);
+            String source = found.optString("source", "");
+            if (!"tgju".equalsIgnoreCase(source))
+                throw new IllegalStateException("unexpected quote source: " + w[0]);
+            out.add(new Rate(w[1], Math.round(rawPrice), change,
+                    found.optString("timestamp_jalali", "")));
         }
-        if (out.isEmpty()) throw new IllegalStateException("no rates");
         return out;
     }
 
     public static Weather parseWeather(String json) throws Exception {
         JSONObject cur = new JSONObject(json).getJSONObject("current");
-        return new Weather(cur.getDouble("temperature_2m"), cur.optInt("relative_humidity_2m", 0),
-                cur.optInt("weather_code", 0), cur.optString("time", ""));
+        double temp = cur.getDouble("temperature_2m");
+        int humidity = cur.optInt("relative_humidity_2m", -1);
+        int code = cur.optInt("weather_code", -1);
+        if (!Double.isFinite(temp) || temp < -100 || temp > 70 || humidity < 0 || humidity > 100
+                || code < 0 || code > 99)
+            throw new IllegalStateException("invalid current weather values");
+        return new Weather(temp, humidity, code, cur.optString("time", ""));
     }
 
     /** Persian description of a WMO weather code (Open-Meteo). */

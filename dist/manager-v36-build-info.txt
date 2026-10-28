@@ -1,5 +1,5 @@
-MEELANO Manager v36.27.0 (versionCode 59)
+MEELANO Manager v36.28.0 (versionCode 60)
 Package: ir.meelano.manager.debug
-Build run: 40647652219
-Commit: f1f0807
-SHA-256: ca232e5a461fc1922f1d17e03bc8a5eff153ec40841e1133c8cfc5d24ef815fc
+Build run: 40651954994
+Commit: 70be84c
+SHA-256: 91f505b2ffc875a44b073b8c19f7e5f591e98f30d204ce51e7f2643ebfdf091f

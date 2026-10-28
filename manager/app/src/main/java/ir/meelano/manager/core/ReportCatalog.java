@@ -96,8 +96,8 @@ public final class ReportCatalog {
     }
 
     public static final Spec[] ALL = {
-            // ---- ویژه مدیر (v22: the vital few, checked every morning) ----
-            s("today_top", "پرفروش‌ترین‌های امروز", "ویژه مدیر", "کالاهای دارای بیشترین فروش ریالی امروز", false,
+            // ---- company-manager control reports; sales leaders are grouped under Sales below ----
+            s("today_top", "پرفروش‌ترین‌های امروز", "فروش", "کالاهای دارای بیشترین فروش ریالی امروز", false,
                     new Col[]{c("label", "کالا", T_TEXT), c("qty", "مقدار", T_NUM), c("total", "جمع فروش", T_MONEY), c("docs", "ردیف", T_NUM)},
                     C_BARS, "label", "total"),
             s("cheques_today", "سررسیدهای امروز و فردا", "ویژه مدیر", "چک‌های دریافتی با سررسید امروز یا فردا — اقدام فوری", false,
@@ -113,12 +113,12 @@ public final class ReportCatalog {
                             c("lastSale", "آخرین خرید", T_DATE)},
                     C_NONE, "", ""),
             // ---- هوشمند (v13) ----
-            s("fleeing_customers", "مشتریان در حال فرار", "هوشمند", "خریداران منظمی که بیش از ۴۵ روز است نیامده‌اند + زیان تقریبی", false,
+            s("fleeing_customers", "مشتریان در حال فرار", "مشتریان", "خریداران منظمی که بیش از ۴۵ روز است نیامده‌اند + زیان تقریبی", false,
                     new Col[]{c("name", "مشتری", T_TEXT), c("cell", "همراه", T_TEXT), c("balance", "مانده", T_MONEY),
                             c("lastBuy", "آخرین خرید", T_DATE), c("daysAway", "روز غیبت", T_NUM), c("invoices", "فاکتور سال", T_NUM),
                             c("avgBuy", "میانگین سبد", T_MONEY), c("lostEst", "زیان تقریبی", T_MONEY)},
                     C_BARS, "name", "lostEst"),
-            s("lost_basket", "سبد گمشده", "هوشمند", "کالای مکملی که مشتری نخریده ولی مشابه‌خریداران خریده‌اند + ارزش فرصت", false,
+            s("lost_basket", "سبد گمشده", "فروش", "کالای مکملی که مشتری نخریده ولی مشابه‌خریداران خریده‌اند + ارزش فرصت", false,
                     new Col[]{c("customer", "مشتری", T_TEXT), c("bought", "خریده", T_TEXT), c("missed", "نخریده", T_TEXT),
                             c("together", "همراه‌خرید", T_NUM), c("missedValue", "ارزش فرصت", T_MONEY)},
                     C_NONE, "", ""),
@@ -140,7 +140,7 @@ public final class ReportCatalog {
                             c("portfolio", "خریدار/منتسب • پوشش", T_TEXT), c("invoices", "فاکتور", T_NUM),
                             c("growth", "تغییر با دوره قبل", T_TEXT)},
                     C_NONE, "", ""),
-            s("golden_hours", "ساعت طلایی فروش", "هوشمند", "پرفروش‌ترین ساعت‌ها (یا روزهای هفته، اگر ساعت ثبت نشده باشد)", true,
+            s("golden_hours", "ساعت طلایی فروش", "فروش", "پرفروش‌ترین ساعت‌ها (یا روزهای هفته، اگر ساعت ثبت نشده باشد)", true,
                     new Col[]{c("slot", "بازه", T_TEXT), c("total", "جمع فروش", T_MONEY), c("docs", "اسناد", T_NUM)},
                     C_BARS, "slot", "total"),
             s("sleeping_capital", "سرمایه خوابیده", "هوشمند", "کالاهای بدون فروش ۹۰ روزه + سرمایه قفل‌شده (پیشنهاد: تسویه پلکانی)", false,
@@ -423,11 +423,11 @@ public final class ReportCatalog {
                     new Col[]{c("name", "مشتری", T_TEXT), c("docs", "فاکتور", T_NUM), c("avg", "میانگین فاکتور", T_MONEY),
                             c("total", "جمع فروش", T_MONEY)},
                     C_NONE, "", ""),
-            s("uniq_retention", "ماتریس بازگشت مشتری", "گزارش‌های اختصاصی", "درصد مشتریانی که این ماه خرید کرده‌اند و ماه قبل هم خرید داشته‌اند — ماه اول دوره بدون داده ماه قبل است", true,
+            s("uniq_retention", "ماتریس بازگشت مشتری", "مشتریان", "درصد مشتریانی که این ماه خرید کرده‌اند و ماه قبل هم خرید داشته‌اند — ماه اول دوره بدون داده ماه قبل است", true,
                     new Col[]{c("month", "ماه", T_TEXT), c("active", "مشتریان فعال", T_NUM), c("back", "بازگشتی", T_NUM),
                             c("rate", "نرخ بازگشت (٪)", T_NUM)},
                     C_LINE, "month", "rate"),
-            s("uniq_basket", "کالاهایی که با هم خریده می‌شوند", "گزارش‌های اختصاصی", "جفت کالاهایی که در یک فاکتور فروش با هم آمده‌اند؛ درصد، سهم فاکتورهای دارای آن جفت است", true,
+            s("uniq_basket", "کالاهایی که با هم خریده می‌شوند", "فروش", "جفت کالاهایی که در یک فاکتور فروش با هم آمده‌اند؛ درصد، سهم فاکتورهای دارای آن جفت است", true,
                     new Col[]{c("first", "کالای اول", T_TEXT), c("second", "کالای دوم", T_TEXT), c("together", "دفعات", T_NUM),
                             c("pct", "سهم فاکتورها (٪)", T_NUM)},
                     C_NONE, "", ""),
@@ -441,7 +441,7 @@ public final class ReportCatalog {
                             c("gain", "سود", T_MONEY), c("cash", "دریافت نقد", T_MONEY), c("pos", "دریافت پوز", T_MONEY),
                             c("cheque", "دریافت چک", T_MONEY)},
                     C_BARS, "name", "balance"),
-            s("uniq_declining", "افت خرید مشتریان وفادار", "گزارش‌های اختصاصی", "مشتریانی که ۹۰ روز اخیرشان کمتر از نصف ۹۰ روز قبل خرید داشته‌اند — زودتر از ریزش به سراغشان بروید", false,
+            s("uniq_declining", "افت خرید مشتریان وفادار", "مشتریان", "مشتریانی که ۹۰ روز اخیرشان کمتر از نصف ۹۰ روز قبل خرید داشته‌اند — زودتر از ریزش به سراغشان بروید", false,
                     new Col[]{c("name", "مشتری", T_TEXT), c("code", "کد", T_TEXT), c("prevTotal", "۹۰ روز قبل", T_MONEY),
                             c("curTotal", "۹۰ روز اخیر", T_MONEY), c("dropPct", "افت (٪)", T_NUM)},
                     C_NONE, "", ""),

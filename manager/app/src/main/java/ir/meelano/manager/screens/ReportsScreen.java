@@ -333,11 +333,11 @@ public class ReportsScreen extends Screen {
         addReportRows(content, filteredReports("", selCat));
     }
 
-    /** Stable, manager-first order: revenue and supply, liquidity, risk, then diagnostics. */
+    /** Stable manager order: controls, sales/customer growth and field team, then supply and finance. */
     private static void sortSectionsByPriority(List<String> sections, List<Integer> counts) {
-        String[] priority = {"ویژه مدیر", "فروش", "خرید", ReportCatalog.TREASURY,
-                "چک‌ها", "کالا و انبار", "سرفصل‌ها", "سود و زیان", "هزینه‌ها",
-                "تحلیل ویزیتور و مسیر", "مشتریان", "پرسنل و نظارت", "برگشتی و ابطالی",
+        String[] priority = {"ویژه مدیر", "فروش", "مشتریان", "تحلیل ویزیتور و مسیر",
+                "خرید", ReportCatalog.TREASURY, "چک‌ها", "کالا و انبار", "سرفصل‌ها",
+                "سود و زیان", "هزینه‌ها", "پرسنل و نظارت", "برگشتی و ابطالی",
                 "هوشمند", "گزارش‌های اختصاصی"};
         for (int i = 0; i < sections.size(); i++) {
             for (int j = i + 1; j < sections.size(); j++) {

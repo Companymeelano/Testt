@@ -2,6 +2,7 @@ package ir.meelano.manager.core;
 
 import org.junit.Test;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
@@ -20,6 +21,16 @@ public class ReportCatalogRoleTest {
         assertFalse(ReportCatalog.availableToRole(ReportCatalog.byId("sf_entries"), RoleStore.SALES_MANAGER));
         assertFalse(ReportCatalog.availableToRole(ReportCatalog.byId("buy_daily"), RoleStore.SALES_MANAGER));
         assertFalse(ReportCatalog.availableToRole(ReportCatalog.byId("users"), RoleStore.SALES_MANAGER));
+    }
+
+    @Test public void salesReportsAreGroupedIntoTheirManagerSections() {
+        assertEquals("فروش", ReportCatalog.byId("today_top").section);
+        assertEquals("فروش", ReportCatalog.byId("golden_hours").section);
+        assertEquals("فروش", ReportCatalog.byId("uniq_basket").section);
+        assertEquals("مشتریان", ReportCatalog.byId("fleeing_customers").section);
+        assertEquals("مشتریان", ReportCatalog.byId("uniq_retention").section);
+        assertEquals("مشتریان", ReportCatalog.byId("uniq_declining").section);
+        assertEquals("تحلیل ویزیتور و مسیر", ReportCatalog.byId("visitor_scorecard").section);
     }
 
     @Test public void companyManagerRetainsTheEntireReportCatalog() {

@@ -18,6 +18,8 @@ public final class RoleStore {
     private RoleStore() { }
 
     public static final String ADMIN = "admin";
+    /** Sales manager: selling, customer/visitor performance and the curated sales report set. */
+    public static final String SALES_MANAGER = "sales_manager";
     public static final String SELLER = "seller";
     public static final String ACCOUNTANT = "accountant";
     public static final String VISITOR = "visitor";
@@ -26,8 +28,12 @@ public final class RoleStore {
     public static final String MOADIAN = "moadian";
 
     public static final String[] ALL = {
-            ADMIN, SELLER, ACCOUNTANT, VISITOR, DISTRIBUTOR, WAREHOUSE, MOADIAN};
+            ADMIN, SALES_MANAGER, SELLER, ACCOUNTANT, VISITOR, DISTRIBUTOR, WAREHOUSE, MOADIAN};
 
+    /** Sales leadership: sales analytics and curated sales reports; no system, profit or ledger access. */
+    private static final String[] SALES_MANAGER_OK = {
+            "home", "sales", "customers", "products", "visitors", "analytics", "reports",
+            "dues", "search", "voice", "more"};
     /** Seller side: everything except profit / reports / users / settings. */
     private static final String[] SELLER_OK = {
             "home", "sales", "buy", "customers", "products", "visitors",
@@ -91,17 +97,20 @@ public final class RoleStore {
     }
 
     public static String faName(String role) {
+        if (ADMIN.equals(role)) return "مدیر مجموعه";
+        if (SALES_MANAGER.equals(role)) return "مدیر فروش";
         if (SELLER.equals(role)) return "فروشنده";
         if (ACCOUNTANT.equals(role)) return "حسابدار";
         if (VISITOR.equals(role)) return "ویزیتور";
         if (DISTRIBUTOR.equals(role)) return "موزع";
         if (WAREHOUSE.equals(role)) return "انباردار";
         if (MOADIAN.equals(role)) return "مودیان";
-        return "مدیر";
+        return "مدیر مجموعه";
     }
 
     /** Short Persian description of what the role sees. */
     public static String faDesc(String role) {
+        if (SALES_MANAGER.equals(role)) return "داشبورد فروش، عملکرد ویزیتورها و گزارش‌های فروش";
         if (SELLER.equals(role)) return "فروش، مشتریان، کالاها و چک‌ها";
         if (ACCOUNTANT.equals(role)) return "چک‌ها، مطالبات و گزارش‌های مالی";
         if (VISITOR.equals(role)) return "مشتریان، کالاها و فروش";
@@ -121,6 +130,8 @@ public final class RoleStore {
         // counts, supplier score and the rest remain one tap away in «همه بخش‌ها».
         if (WAREHOUSE.equals(role))
             return new String[]{"anbar", "tahvil", "resid", "more"};
+        if (SALES_MANAGER.equals(role))
+            return new String[]{"home", "sales", "customers", "visitors", "reports", "more"};
         if (SELLER.equals(role))
             return new String[]{"home", "sales", "customers", "products", "dues", "more"};
         if (ACCOUNTANT.equals(role))
@@ -224,6 +235,7 @@ public final class RoleStore {
     }
 
     private static String[] listFor(String role) {
+        if (SALES_MANAGER.equals(role)) return SALES_MANAGER_OK;
         if (SELLER.equals(role)) return SELLER_OK;
         if (ACCOUNTANT.equals(role)) return ACCOUNTANT_OK;
         if (VISITOR.equals(role)) return VISITOR_OK;
@@ -234,6 +246,7 @@ public final class RoleStore {
     }
 
     private static String pinKey(String role) {
+        if (SALES_MANAGER.equals(role)) return "pin_sales_manager";
         if (SELLER.equals(role)) return "pin_seller";
         if (ACCOUNTANT.equals(role)) return "pin_accountant";
         if (VISITOR.equals(role)) return "pin_visitor";

@@ -1146,8 +1146,25 @@ public class HomeScreen extends Screen {
         else if ("eod".equals(key)) secEod(content);
     }
 
+    private String currentRole() {
+        String role = AtiranAuth.sessionRole(a);
+        if (role != null && !role.isEmpty()) return role;
+        return RoleStore.enabled(a) ? RoleStore.current(a) : RoleStore.ADMIN;
+    }
+
+    private boolean isSalesManager() {
+        return RoleStore.SALES_MANAGER.equals(currentRole());
+    }
+
     /** Dashboard order from settings; unknown keys dropped, missing sections appended. */
     private List<String> orderedKeys() {
+        if (isSalesManager()) {
+            List<String> salesOrder = new ArrayList<>();
+            salesOrder.add("kpis");
+            salesOrder.add("alerts");
+            salesOrder.add("sales_insight");
+            return salesOrder;
+        }
         List<String> out = new ArrayList<>();
         String[] known = {"kpis", "alerts", "due", "returns", "sales_insight", "cash_mix", "eod"};
         for (String k : a.settings.homeOrder().split(",")) {
@@ -1164,7 +1181,9 @@ public class HomeScreen extends Screen {
         LinearLayout card = a.kit.card(Theme.GOLD);
         card.addView(dashboardSectionHead("گردش امروز", R.drawable.mi_account_balance_wallet,
                 Theme.GOLD, "فروش ›", v -> a.nav("sales")), a.kit.lp(-1, -2));
-        card.addView(a.kit.text("چهار شاخص اصلی؛ لمس هر کارت، ریز همان روز را باز می‌کند.",
+        card.addView(a.kit.text(isSalesManager()
+                        ? "فروش روز و روند آن؛ لمس شاخص، ریز همان روز را باز می‌کند."
+                        : "چهار شاخص اصلی؛ لمس هر کارت، ریز همان روز را باز می‌کند.",
                 10.5f, Theme.MUTED, false), a.kit.lp(-1, -2));
         card.addView(a.kit.gap(8));
 
@@ -1176,14 +1195,18 @@ public class HomeScreen extends Screen {
         };
         int[] icons = {R.drawable.mi_point_of_sale, R.drawable.mi_shopping_cart,
                 R.drawable.mi_receipt_long, R.drawable.mi_payments};
-        for (int i = 0; i < items.length; i += 2) {
-            LinearLayout row = a.kit.h();
-            row.addView(flowTile(items[i], icons[i]), a.kit.wlp(1f));
-            row.addView(a.kit.space(8));
-            row.addView(flowTile(items[i + 1], icons[i + 1]), a.kit.wlp(1f));
-            LinearLayout.LayoutParams rp = a.kit.lp(-1, -2);
-            if (i > 0) rp.topMargin = Theme.dp(8);
-            card.addView(row, rp);
+        if (isSalesManager()) {
+            card.addView(flowTile(items[0], icons[0]), a.kit.lp(-1, -2));
+        } else {
+            for (int i = 0; i < items.length; i += 2) {
+                LinearLayout row = a.kit.h();
+                row.addView(flowTile(items[i], icons[i]), a.kit.wlp(1f));
+                row.addView(a.kit.space(8));
+                row.addView(flowTile(items[i + 1], icons[i + 1]), a.kit.wlp(1f));
+                LinearLayout.LayoutParams rp = a.kit.lp(-1, -2);
+                if (i > 0) rp.topMargin = Theme.dp(8);
+                card.addView(row, rp);
+            }
         }
 
         if (d.salesDaily != null && !d.salesDaily.isEmpty()) {
@@ -1583,15 +1606,16 @@ public class HomeScreen extends Screen {
                     Theme.GOLD, v -> gotoUnsettled()), padTop(n));
             n++;
         }
-        // liquidity
-        if (d.salesDay != null && d.buyDay != null && d.salesDay.d("total") > 0 && d.buyDay.d("total") > d.salesDay.d("total") * 1.15) {
+        // Company liquidity is visible only to the company manager.
+        if (!isSalesManager() && d.salesDay != null && d.buyDay != null
+                && d.salesDay.d("total") > 0 && d.buyDay.d("total") > d.salesDay.d("total") * 1.15) {
             box.addView(a.kit.alertRow("فشار نقدینگی", "خرید روز از فروش جلو زده؛ پرداخت‌ها را کنترل کنید.",
                     Theme.GOLD, v -> a.nav("buy")), padTop(n));
             n++;
         }
         // due cheques
         int dueN = (d.dueIn == null ? 0 : d.dueIn.size()) + (d.dueOut == null ? 0 : d.dueOut.size());
-        if (dueN > 0) {
+        if (!isSalesManager() && dueN > 0) {
             box.addView(a.kit.alertRow("سررسید چک", Money.fa(String.valueOf(dueN)) + " فقره چک در ۳ روز آینده سررسید می‌شود.",
                     Theme.INFO, v -> a.nav("cheques")), padTop(n));
             n++;

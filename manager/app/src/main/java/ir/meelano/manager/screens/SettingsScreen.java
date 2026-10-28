@@ -7,6 +7,7 @@ import android.view.View;
 import ir.meelano.manager.R;
 import android.widget.EditText;
 import android.widget.HorizontalScrollView;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -545,7 +546,9 @@ public class SettingsScreen extends Screen {
             render(content);
         }));
         if (ren) {
-            String[][] rr = {{"admin", "مدیر"}, {"seller", "فروشنده"}, {"accountant", "حسابدار"}, {"visitor", "ویزیتور"}, {"distributor", "موزع"}, {"warehouse", "انباردار"}, {"moadian", "مودیان"}};
+            String[][] rr = {{"admin", "مدیر مجموعه"}, {"sales_manager", "مدیر فروش"},
+                    {"seller", "فروشنده"}, {"accountant", "حسابدار"}, {"visitor", "ویزیتور"},
+                    {"distributor", "موزع"}, {"warehouse", "انباردار"}, {"moadian", "مودیان"}};
             for (String[] role : rr) {
                 final String rk = role[0];
                 final String rn = role[1];
@@ -681,7 +684,16 @@ public class SettingsScreen extends Screen {
     /** Themed update card: manual check, status, and a manual release-page fallback. */
     private void addUpdateCard(LinearLayout ab) {
         ab.addView(a.kit.gap(6), a.kit.lp(-1, -2));
-        ab.addView(a.kit.text("⟳ بروزرسانی برنامه", 14f, Theme.GOLD, true), a.kit.lp(-1, -2));
+        LinearLayout updateHead = a.kit.h();
+        updateHead.setGravity(Gravity.CENTER_VERTICAL);
+        ImageView updateArt = new ImageView(a);
+        int updateIcon = Theme.icon3d(R.drawable.mi_refresh);
+        updateArt.setImageResource(updateIcon);
+        updateArt.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        updateHead.addView(updateArt, a.kit.lp(Theme.dp(34), Theme.dp(34)));
+        updateHead.addView(a.kit.space(8));
+        updateHead.addView(a.kit.text("بروزرسانی برنامه", 14f, Theme.GOLD, true), a.kit.wlp(1f));
+        ab.addView(updateHead, a.kit.lp(-1, -2));
         if (!ir.meelano.manager.core.UpdateCenter.releaseUpdateSupported(a)) {
             ab.addView(a.kit.hint("این نسخهٔ آزمایشی است؛ نصب مستقیم درون‌برنامه‌ای فقط در نسخهٔ انتشارِ رسمی با امضای پایدار فعال می‌شود."), a.kit.lp(-1, -2));
             ab.addView(a.kit.btnGhost("📦  صفحه نسخه‌های منتشرشده", Theme.GOLD, v -> openReleasesPage()),

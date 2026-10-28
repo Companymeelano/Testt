@@ -17,6 +17,8 @@ import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.Queries;
 import ir.meelano.manager.core.ReportCatalog;
 import ir.meelano.manager.core.VisitorScorecard;
+import ir.meelano.manager.core.RoleStore;
+import ir.meelano.manager.core.AtiranAuth;
 import ir.meelano.manager.data.Meta;
 import ir.meelano.manager.data.Repo;
 import ir.meelano.manager.data.Row;
@@ -143,6 +145,9 @@ public class ReportsScreen extends Screen {
             sel = null;
             pendingCategory = null;
         }
+        String role = reportRole();
+        if (sel != null && !ReportCatalog.availableToRole(sel, role)) sel = null;
+        if (selCat != null && !hasVisibleSection(selCat, role)) selCat = null;
         if (sel == null) renderList(content);
         else renderReport(content, sel);
         saveState();
@@ -150,6 +155,31 @@ public class ReportsScreen extends Screen {
 
     private static final String STATE_PREFS = "reports_state";
     private boolean restored = false;
+
+    private String reportRole() {
+        String role = AtiranAuth.sessionRole(a);
+        if (role != null && !role.isEmpty()) return role;
+        return RoleStore.enabled(a) ? RoleStore.current(a) : RoleStore.ADMIN;
+    }
+
+    private List<ReportCatalog.Spec> visibleReports() {
+        List<ReportCatalog.Spec> out = new ArrayList<>();
+        String role = reportRole();
+        for (ReportCatalog.Spec spec : ReportCatalog.ALL)
+            if (ReportCatalog.availableToRole(spec, role)) out.add(spec);
+        return out;
+    }
+
+    private boolean hasVisibleSection(String section, String role) {
+        for (ReportCatalog.Spec spec : ReportCatalog.ALL)
+            if (section.equals(spec.section) && ReportCatalog.availableToRole(spec, role)) return true;
+        if (ReportCatalog.TREASURY.equals(section)) {
+            for (ReportCatalog.Spec spec : ReportCatalog.ALL)
+                if (ReportCatalog.isTreasurySection(spec.section)
+                        && ReportCatalog.availableToRole(spec, role)) return true;
+        }
+        return false;
+    }
 
     /** Restores the last section, report, period and search so returning to Reports picks up where the user left off. */
     private void restoreState() {
@@ -187,15 +217,19 @@ public class ReportsScreen extends Screen {
     private void renderList(final LinearLayout content) {
         content.removeAllViews();
         content.addView(a.kit.hero(glyph(), title(),
-                Money.fa(String.valueOf(ReportCatalog.ALL.length)) + " گزارش مدیریتی • جست‌وجوی سریع و دسته‌بندی‌شده",
+                Money.fa(String.valueOf(visibleReports().size())) + " گزارش در دسترس این نقش • جست‌وجوی سریع و دسته‌بندی‌شده",
                 accent()), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
-        content.addView(a.kit.btnGhost("📈  داشبورد تحلیلی فروش", Theme.VIOLET, v -> a.nav("analytics")), a.kit.lp(-1, -2));
+        if (RoleStore.allowed(a, "analytics"))
+            content.addView(a.kit.btnGhost("📈  داشبورد تحلیلی فروش", Theme.VIOLET,
+                    v -> a.nav("analytics")), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(8));
         LinearLayout tr = a.kit.h();
         tr.addView(a.kit.btnGhost("🧾  فاکتورهای فروش", Theme.SALES_HUE, v -> a.nav("sales")), a.kit.wlp(1f));
-        tr.addView(a.kit.space(8));
-        tr.addView(a.kit.btnGhost("🧺  فاکتورهای خرید", Theme.BUY_HUE, v -> a.nav("buy")), a.kit.wlp(1f));
+        if (RoleStore.allowed(a, "buy")) {
+            tr.addView(a.kit.space(8));
+            tr.addView(a.kit.btnGhost("🧺  فاکتورهای خرید", Theme.BUY_HUE, v -> a.nav("buy")), a.kit.wlp(1f));
+        }
         content.addView(tr, a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
         content.addView(a.kit.searchBar("جست‌وجوی نام، کاربرد یا دستهٔ گزارش…", browseQuery, q -> {
@@ -222,7 +256,7 @@ public class ReportsScreen extends Screen {
         if (selCat == null) {
             java.util.List<String> secs = new java.util.ArrayList<>();
             java.util.List<Integer> counts = new java.util.ArrayList<>();
-            for (ReportCatalog.Spec spec : ReportCatalog.ALL) {
+            for (ReportCatalog.Spec spec : visibleReports()) {
                 if (ReportCatalog.isTreasurySection(spec.section)) {
                     // All treasury sub-sections live behind one «خزانه‌داری» card.
                     if (!secs.contains(ReportCatalog.TREASURY)) { secs.add(ReportCatalog.TREASURY); counts.add(0); }
@@ -265,7 +299,7 @@ public class ReportsScreen extends Screen {
             }), a.kit.lp(-1, -2));
             content.addView(a.kit.gap(10));
             int treasuryTotal = 0;
-            for (ReportCatalog.Spec spec : ReportCatalog.ALL)
+            for (ReportCatalog.Spec spec : visibleReports())
                 if (ReportCatalog.isTreasurySection(spec.section)) treasuryTotal++;
             content.addView(a.kit.hero("▤", ReportCatalog.TREASURY,
                     "بخش‌های مالی و بانکی • " + Money.fa(String.valueOf(treasuryTotal)) + " گزارش",
@@ -273,7 +307,7 @@ public class ReportsScreen extends Screen {
             content.addView(a.kit.gap(12));
             java.util.List<String> subs = new java.util.ArrayList<>();
             java.util.List<Integer> subCounts = new java.util.ArrayList<>();
-            for (ReportCatalog.Spec spec : ReportCatalog.ALL) {
+            for (ReportCatalog.Spec spec : visibleReports()) {
                 if (!ReportCatalog.isTreasurySection(spec.section)) continue;
                 int ix = subs.indexOf(spec.section);
                 if (ix < 0) { subs.add(spec.section); subCounts.add(1); }
@@ -326,7 +360,7 @@ public class ReportsScreen extends Screen {
 
     private int countInSection(String section) {
         int n = 0;
-        for (ReportCatalog.Spec spec : ReportCatalog.ALL)
+        for (ReportCatalog.Spec spec : visibleReports())
             if (section.equals(spec.section)) n++;
         return n;
     }
@@ -334,7 +368,7 @@ public class ReportsScreen extends Screen {
     private List<ReportCatalog.Spec> filteredReports(String query, String section) {
         List<ReportCatalog.Spec> out = new ArrayList<>();
         String q = normalize(query);
-        for (ReportCatalog.Spec spec : ReportCatalog.ALL) {
+        for (ReportCatalog.Spec spec : visibleReports()) {
             if (section != null && !section.equals(spec.section)) continue;
             if (!q.isEmpty() && !normalize(spec.title + " " + spec.desc + " " + spec.section + " " + spec.id).contains(q))
                 continue;
@@ -368,8 +402,15 @@ public class ReportsScreen extends Screen {
         Theme.lift(c, Theme.cardElevation());
 
         ImageView icon = new ImageView(a);
-        icon.setImageResource(reportIcon(spec));
-        icon.setColorFilter(color);
+        int reportVector = reportIcon(spec);
+        int reportArt = Theme.icon3d(reportVector);
+        if (!Theme.isIcon3d(reportArt)) {
+            int categoryArt = Theme.icon3d(sectionIcon(spec.section));
+            if (Theme.isIcon3d(categoryArt)) reportArt = categoryArt;
+        }
+        icon.setImageResource(reportArt);
+        if (Theme.isIcon3d(reportArt)) icon.clearColorFilter();
+        else icon.setColorFilter(color);
         icon.setBackground(Theme.avatar(Theme.alpha(color, 48)));
         icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         c.addView(icon, new LinearLayout.LayoutParams(Theme.dp(48), Theme.dp(48)));
@@ -472,8 +513,10 @@ public class ReportsScreen extends Screen {
         c.setMinimumHeight(Theme.dp(122));
         ImageView iv = new ImageView(a);
         try {
-            iv.setImageResource(sectionIcon(section));
-            iv.setColorFilter(sectionAccent(section));
+            int art = Theme.icon3d(sectionIcon(section));
+            iv.setImageResource(art);
+            if (Theme.isIcon3d(art)) iv.clearColorFilter();
+            else iv.setColorFilter(sectionAccent(section));
         } catch (Exception ignored) { Diag.ignored("ReportsScreen:349", ignored); }
         int sz = Theme.dp(44);
         c.addView(iv, new LinearLayout.LayoutParams(sz, sz));

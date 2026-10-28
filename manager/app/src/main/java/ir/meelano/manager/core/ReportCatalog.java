@@ -2,6 +2,10 @@ package ir.meelano.manager.core;
 
 import ir.meelano.manager.data.Meta;
 
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+
 /** The complete report list: every report the system offers, in one place. */
 public final class ReportCatalog {
     private ReportCatalog() { }
@@ -64,6 +68,25 @@ public final class ReportCatalog {
 
     /** The group that holds the financial sections (treasury). */
     public static final String TREASURY = "خزانه‌داری";
+
+    /**
+     * Sales managers get actionable sales, customer-retention and field-team reports only.
+     * Company managers continue to see the complete catalog; finance, profit, HR and stock
+     * diagnostics are deliberately not exposed through the sales-manager report screen.
+     */
+    private static final Set<String> SALES_MANAGER_REPORTS = new HashSet<>(Arrays.asList(
+            "today_top", "fleeing_customers", "lost_basket", "visitor_yield", "visitor_scorecard",
+            "golden_hours", "sales_daily", "sales_top_products", "sales_by_customer", "sales_monthly",
+            "yoy_sales", "sales_price_spread", "sales_by_visitor", "sales_by_route", "sales_by_group",
+            "sales_by_kala_group", "visitor_perf", "new_customers", "inactive_customers", "cust_by_kind",
+            "cust_by_personality", "cust_no_cell", "cust_no_location", "cust_frequency", "cust_new_monthly",
+            "cust_avg_invoice", "uniq_retention", "uniq_basket", "uniq_declining"));
+
+    /** Report visibility is role-based as well as screen-based; a hidden row cannot be opened by search. */
+    public static boolean availableToRole(Spec spec, String role) {
+        if (spec == null) return false;
+        return !RoleStore.SALES_MANAGER.equals(role) || SALES_MANAGER_REPORTS.contains(spec.id);
+    }
 
     /** Sub-sections shown under «خزانه‌داری». */
     public static boolean isTreasurySection(String section) {

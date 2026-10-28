@@ -31,8 +31,8 @@ import ir.meelano.manager.data.Meta;
  * the same real-password check also works OFFLINE after the first online
  * login. The per-user app PIN (Users section) stays as managed tooling for
  * later phases.
- * Release phases (single app, role editions): admin + warehouse + visitor
- * are live; seller / accountant / distributor / moadian remain gated until
+ * Release phases (single app, role editions): company manager + sales manager
+ * + warehouse + visitor are live; seller / accountant / distributor / moadian remain gated until
  * their phase opens (see phaseOpen).
  *
  * Everything here is READ-ONLY against the server: we never write
@@ -341,12 +341,18 @@ public final class AtiranAuth {
 
     /**
      * Map an Atiran role name to an app role id by Persian/English keywords.
-     * Unknown or empty names fall back to SELLER (a safe middle); the
-     * manager can pin the exact role per user (override) in Users.
+     * Sales-manager phrases are tested before the general manager rule so
+     * «مدیر فروش» receives the narrow sales role, not company-wide access.
+     * Unknown or empty names still fall back to SELLER; an admin may override per user.
      */
     public static String mapRole(int roleId, String roleName) {
         String n = roleName == null ? "" : roleName.trim();
         String l = n.toLowerCase(Locale.US);
+        boolean salesLead = (has(n, "مدیر") || has(n, "سرپرست") || has(n, "رئیس")
+                || l.contains("manager") || l.contains("lead"))
+                && (has(n, "فروش") || l.contains("sales") || l.contains("forosh"));
+        if (salesLead || l.contains("sales_manager") || l.contains("sales-manager"))
+            return RoleStore.SALES_MANAGER;
         if (has(n, "مدیر") || l.contains("admin") || l.contains("modir")
                 || l.contains("manage") || l.contains("sysadmin")) return RoleStore.ADMIN;
         if (has(n, "حساب") || l.contains("account") || l.contains("hesab"))
@@ -678,11 +684,12 @@ public final class AtiranAuth {
     // ================= release phases (v27) =================
 
     /**
-     * ONE app — the Atiran role picks the edition. Manager, warehouse and
-     * visitor are live; unfinished roles remain explicitly gated.
+     * ONE app — the Atiran role picks the edition. Company manager, sales
+     * manager, warehouse and visitor are live; unfinished roles stay gated.
      */
     public static boolean phaseOpen(Context c, String role) {
         if (RoleStore.ADMIN.equals(role)) return true;
+        if (RoleStore.SALES_MANAGER.equals(role)) return true; // PHASE 4 (v36.29)
         if (RoleStore.WAREHOUSE.equals(role)) return true; // PHASE 2 (v28)
         if (RoleStore.VISITOR.equals(role)) return true; // PHASE 3 (v36.28)
         return false;

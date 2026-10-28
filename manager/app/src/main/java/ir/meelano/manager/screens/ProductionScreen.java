@@ -682,44 +682,19 @@ public final class ProductionScreen extends Screen {
                 }).show();
     }
 
-    /** Resolve an existing Atiran session or request one-operation manager reauthentication. */
+    /** Use only the already-authenticated Atiran manager session; never prompt for a second login. */
     private void withAtiranManagerId(Consumer<Integer> continuation){
         if(busy)return;
         int sessionUid=AtiranAuth.sessionUid(a);
-        if(sessionUid>0){
-            busy=true;render(content);
-            runWriter("در حال بررسی حساب آتیران…","بررسی حساب آتیران انجام نشد",c->ProductionWriter.resolveAtiranUserId(c,sessionUid,
-                    AtiranAuth.sessionUser(a), AtiranAuth.sessionRole(a)),uid->{
-                busy=false;render(content);continuation.accept(uid);
-            });
+        if(sessionUid<=0){
+            a.kit.toast("برای ثبت تولید، با حساب مدیر آتیران وارد شوید.");
             return;
         }
-
-        LinearLayout fields=a.kit.v();
-        fields.setPadding(Theme.dp(20),Theme.dp(8),Theme.dp(20),Theme.dp(8));
-        fields.addView(a.kit.hint("برای این عملیات، مدیر فعال آتیران را تأیید کنید. رمز فقط برای همین اتصال استفاده می‌شود و ذخیره نخواهد شد."),a.kit.lp(-1,-2));
-        EditText username=a.kit.edit("نام کاربری مدیر آتیران","");
-        EditText password=a.kit.edit("رمز عبور مدیر آتیران","");
-        password.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        password.setSaveEnabled(false);
-        fields.addView(username,a.kit.lp(-1,-2));fields.addView(password,a.kit.lp(-1,-2));
-        AlertDialog dlg=new AlertDialog.Builder(a).setCustomTitle(dialogTitle("تأیید هویت مدیر آتیران"))
-                .setView(fields).setNegativeButton("انصراف",null).setPositiveButton("تأیید برای این عملیات",null).create();
-        dlg.setOnDismissListener(x->password.setText(""));
-        dlg.setOnShowListener(x->{
-            styleDialog(dlg);
-            dlg.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
-                String name=username.getText().toString().trim();
-                String secret=password.getText().toString();
-                if(name.isEmpty()){username.setError("نام کاربری لازم است");return;}
-                if(secret.isEmpty()){password.setError("رمز عبور لازم است");return;}
-                password.setText("");dlg.dismiss();busy=true;render(content);
-                runWriter("در حال تأیید مدیر آتیران…","احراز هویت مدیر آتیران انجام نشد",c->ProductionWriter.authenticateAtiranManager(c,name,secret),uid->{
-                    busy=false;render(content);continuation.accept(uid);
-                });
-            });
+        busy=true;render(content);
+        runWriter("در حال بررسی حساب آتیران…","بررسی حساب آتیران انجام نشد",c->ProductionWriter.resolveAtiranUserId(c,sessionUid,
+                AtiranAuth.sessionUser(a), AtiranAuth.sessionRole(a)),uid->{
+            busy=false;render(content);continuation.accept(uid);
         });
-        dlg.show();
     }
 
     private ProductionWriter.Request buildRequest(){

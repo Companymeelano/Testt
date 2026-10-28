@@ -242,22 +242,6 @@ public final class ProductionWriter {
         return user.uid;
     }
 
-    /** One-operation reauthentication for local-admin sessions; credentials are never stored. */
-    public static int authenticateAtiranManager(Connection c, String username, String password) throws Exception {
-        String name=username==null?"":username.trim();
-        if(name.isEmpty()||password==null||password.isEmpty())
-            throw new Exception("نام کاربری و رمز عبور مدیر آتیران را وارد کنید.");
-        AtiranAuth.AuthUser user=AtiranAuth.fetchUser(c,name);
-        if(user==null)throw new Exception("این نام کاربری در sys_users آتیران پیدا نشد.");
-        if(!user.active||user.locked)throw new Exception("حساب آتیران غیرفعال یا قفل است.");
-        if(!RoleStore.ADMIN.equals(user.appRole))
-            throw new Exception("برای ثبت تولید، احراز هویت با حساب دارای نقش مدیر آتیران لازم است.");
-        boolean passwordOk=AtiranAuth.verifyPasswordServer(c,user.userName,password)
-                ||AtiranAuth.verifyPassword(user.pw,password,user.userName);
-        if(!passwordOk)throw new Exception("رمز عبور حساب مدیر آتیران تأیید نشد.");
-        if(user.uid<=0)throw new Exception("شناسهٔ کاربر مدیر آتیران معتبر نیست.");
-        return user.uid;
-    }
 
     /** Refuse to write unless the actual DB exposes the exact Mili production ledger contract. */
     public static void preflight(Connection c) throws Exception {

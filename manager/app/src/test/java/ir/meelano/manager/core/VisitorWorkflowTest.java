@@ -8,6 +8,7 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 public class VisitorWorkflowTest {
     @Test public void visitorPriceGroupSelectsTheMatchingForoshColumnOnly() {
@@ -57,8 +58,14 @@ public class VisitorWorkflowTest {
         assertFalse(RoleStore.allowedForRole(RoleStore.VISITOR,"visitor_orders"));
     }
 
-    @Test public void localModirProductionStillRequiresExactLocalSession() {
-        assertTrue(ProductionWriter.isLocalModirProductionIdentity("Modir", -9001, RoleStore.ADMIN));
-        assertFalse(ProductionWriter.isLocalModirProductionIdentity("modir", -9001, RoleStore.SELLER));
+    @Test public void productionRejectsSyntheticLocalIdsBeforeDatabaseAccess() {
+        for (int uid : new int[]{-9001, 0}) {
+            try {
+                ProductionWriter.resolveAtiranUserId(null, uid);
+                fail("Synthetic or missing user IDs must not reach production posting");
+            } catch (Exception expected) {
+                assertTrue(expected.getMessage().contains("نشست معتبر آتیران"));
+            }
+        }
     }
 }

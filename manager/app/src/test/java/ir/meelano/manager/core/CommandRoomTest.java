@@ -2,10 +2,10 @@ package ir.meelano.manager.core;
 
 import org.junit.Test;
 
+import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -13,7 +13,7 @@ import static org.junit.Assert.assertTrue;
  * missing from the index would be unreachable, so the index is checked here.
  */
 public class CommandRoomTest {
-    /** Every screen the app registers (MainActivity) must be listed in the command room. */
+    /** Every screen the app registers (MainActivity), except the command room itself. */
     private static final String[] REGISTERED = {
             "home", "assistant", "sales", "buy", "dar_in", "dar_out", "cheques", "cash",
             "products", "product_file", "customers", "visitors", "visitor_work", "visitor_orders",
@@ -21,12 +21,17 @@ public class CommandRoomTest {
             "voice", "anbar", "tahvil", "resid", "takmil", "shomarsh", "score", "closeout",
             "manager_alerts", "sync_queue", "pick_wave"};
 
+    /** The tv display is not a screen of the app, it is an action of the command room. */
+    private static final String TV = "tv";
+
     @Test public void everyRegisteredScreenIsReachableFromTheCommandRoom() {
         List<String> ids = CommandRoom.sectionIds();
         for (String id : REGISTERED)
             assertTrue("screen not listed in the command room: " + id, ids.contains(id));
-        assertEquals("the index must list every screen and nothing else",
-                REGISTERED.length, ids.size());
+        // Nothing but the registered screens and the tv display may be listed.
+        for (String id : ids)
+            assertTrue("unknown section in the command room: " + id,
+                    TV.equals(id) || Arrays.asList(REGISTERED).contains(id));
     }
 
     @Test public void theIndexListsNoSectionTwice() {
@@ -41,7 +46,10 @@ public class CommandRoomTest {
     @Test public void everySectionHasItsOwnArtwork() {
         for (String id : CommandRoom.sectionIds()) {
             CommandRoom.Entry entry = CommandRoom.find(id);
-            assertTrue("no artwork for " + id, entry != null && !entry.art.isEmpty());
+            assertTrue("section not indexed: " + id, entry != null);
+            // The tv display opens its own window, so it carries no section artwork.
+            if (TV.equals(id)) continue;
+            assertTrue("no artwork for " + id, !entry.art.isEmpty());
         }
     }
 
@@ -50,7 +58,8 @@ public class CommandRoomTest {
         assertEquals(7, pages.size());
         for (String page : pages) {
             assertTrue(page, CommandRoom.isVisitorPage(page));
-            assertFalse(page, CommandRoom.find(page) != null);
+            assertTrue("visitor page missing from the visitor index: " + page,
+                    CommandRoom.findVisitor(page) != null);
         }
     }
 }

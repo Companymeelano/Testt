@@ -121,22 +121,22 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          cp manager/app/build/outputs/apk/debug/app-debug.apk dist/meelano-manager-v36-debug-17.apk
+          cp manager/app/build/outputs/apk/debug/app-debug.apk dist/meelano-manager-v36-debug-18.apk
           BT="$ANDROID_HOME/build-tools/35.0.0"
-          "$BT/aapt" dump badging dist/meelano-manager-v36-debug-17.apk | tee manager-badging.txt
+          "$BT/aapt" dump badging dist/meelano-manager-v36-debug-18.apk | tee manager-badging.txt
           grep -F "package: name='ir.meelano.manager.debug' versionCode='67' versionName='36.35.0'" manager-badging.txt
-          "$BT/apksigner" verify --verbose --print-certs dist/meelano-manager-v36-debug-17.apk | tee manager-signing.txt
-          unzip -t dist/meelano-manager-v36-debug-17.apk | tail -1
-          unzip -l dist/meelano-manager-v36-debug-17.apk | grep -F 'lib/arm64-v8a/libonnxruntime.so'
-          APK_SIZE=$(stat -c %s dist/meelano-manager-v36-debug-17.apk)
+          "$BT/apksigner" verify --verbose --print-certs dist/meelano-manager-v36-debug-18.apk | tee manager-signing.txt
+          unzip -t dist/meelano-manager-v36-debug-18.apk | tail -1
+          unzip -l dist/meelano-manager-v36-debug-18.apk | grep -F 'lib/arm64-v8a/libonnxruntime.so'
+          APK_SIZE=$(stat -c %s dist/meelano-manager-v36-debug-18.apk)
           if [ "$APK_SIZE" -lt 60000000 ]; then echo "Expected the full offline-voice manager APK (~70 MB), got ${APK_SIZE} bytes"; exit 1; fi
-          sha256sum dist/meelano-manager-v36-debug-17.apk
+          sha256sum dist/meelano-manager-v36-debug-18.apk
 
       - name: Upload manager APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: meelano-manager-v36-debug-17
-          path: dist/meelano-manager-v36-debug-17.apk
+          name: meelano-manager-v36-debug-18
+          path: dist/meelano-manager-v36-debug-18.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -180,11 +180,11 @@ jobs:
             echo "Package: ir.meelano.manager.debug"
             echo "Build run: ${GITHUB_RUN_ID}"
             echo "Commit: $(git rev-parse --short HEAD)"
-            echo "SHA-256: $(sha256sum dist/meelano-manager-v36-debug-17.apk | cut -d' ' -f1)"
+            echo "SHA-256: $(sha256sum dist/meelano-manager-v36-debug-18.apk | cut -d' ' -f1)"
           } > dist/manager-v36-build-info.txt
           git config user.name "arena-ci"
           git config user.email "arena-ci@local"
-          git add -f dist/meelano-manager-v36-debug-17.apk dist/manager-v36-build-info.txt
+          git add -f dist/meelano-manager-v36-debug-18.apk dist/manager-v36-build-info.txt
           git commit -m "dist: MEELANO Manager v36.35.0 debug APK"
           git push origin HEAD:arena/29e01a09-testt
 

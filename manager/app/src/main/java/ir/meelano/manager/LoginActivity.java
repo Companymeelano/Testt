@@ -111,7 +111,7 @@ public class LoginActivity extends Activity {
         LinearLayout.LayoutParams sp = kit.lp(-1, -2);
         sp.setMargins(0, Theme.dp(6), 0, Theme.dp(16));
         if (hint == null) {
-            TextView s = kit.text("پس از انتخاب دیتابیس، با حساب آتیران خود وارد شوید؛ ویزیتورها از پیوند دسترسی خود استفاده می‌کنند",
+            TextView s = kit.text("نام کاربری و رمز آتیران را وارد کنید؛ بخش‌های مجاز شما خودکار نمایش داده می‌شوند.",
                     13.5f, Theme.TEXT, false);
             s.setGravity(Gravity.CENTER);
             root.addView(s, sp);

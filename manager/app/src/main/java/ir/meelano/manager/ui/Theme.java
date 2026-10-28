@@ -193,6 +193,9 @@ public final class Theme {
 
     /** True for bitmap 3D icons, which must not be tinted. */
     public static boolean isIcon3d(int res) {
+        if (res == R.drawable.visitor3d_assistant || res == R.drawable.visitor3d_customers
+                || res == R.drawable.visitor3d_prefactor || res == R.drawable.visitor3d_products
+                || res == R.drawable.visitor3d_receipt) return true;
         if (res == R.drawable.icon3d_dark_bell || res == R.drawable.icon3d_medal_alert) return true;
         if (res == R.drawable.icon3d_medal_account || res == R.drawable.icon3d_medal_refresh || res == R.drawable.icon3d_medal_theme || res == R.drawable.icon3d_medal_zoom || res == R.drawable.icon3d_medal_assistant || res == R.drawable.icon3d_medal_more || res == R.drawable.icon3d_medal_goldbar || res == R.drawable.icon3d_medal_dollar || res == R.drawable.icon3d_medal_coin) return true;
         if (res == R.drawable.icon3d_medal_home || res == R.drawable.icon3d_medal_customers

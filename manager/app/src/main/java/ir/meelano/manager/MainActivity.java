@@ -658,6 +658,9 @@ public class MainActivity extends Activity {
 
         // content (centered max-width column on tablets / wide screens)
         scroll = new ScrollView(this);
+        // A small end inset keeps the final action fully scrollable above the fixed navigation dock.
+        scroll.setClipToPadding(false);
+        scroll.setPadding(0, 0, 0, Theme.dp(14));
         contentWrap = kit.h();
         contentWrap.setGravity(Gravity.CENTER_HORIZONTAL);
         scroll.addView(contentWrap, new ScrollView.LayoutParams(-1, -2));
@@ -844,6 +847,7 @@ public class MainActivity extends Activity {
             }
             b.addView(badge, new LinearLayout.LayoutParams(Theme.dp(46), Theme.dp(Theme.isNuts() ? 44 : 36)));
             String tl = RoleStore.tabLabel(id);
+            if ("more".equals(id) && RoleStore.VISITOR.equals(effRole())) tl = "بیشتر";
             TextView l = kit.text(tl != null ? tl : s.title(), Theme.isNuts() ? 11f : 10.5f, Theme.MUTED, true);
             l.setGravity(Gravity.CENTER);
             l.setSingleLine(true);

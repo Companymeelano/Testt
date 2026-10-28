@@ -95,17 +95,38 @@ public final class VisitorDeskScreen extends Screen {
     @Override public String glyph(){return "🧾";}
     @Override public int accent(){return Theme.GOLD;}
 
+    @Override public boolean onBack(){
+        if(page!=HOME){page=HOME;render(contentRef);return true;}
+        return false;
+    }
+
     @Override public void render(LinearLayout content) {
         contentRef=content;
         content.removeAllViews();
-        content.addView(a.kit.hero("🧭","فروش میدانی","کارهای روزانهٔ ویزیت و سفارش",Theme.GOLD),a.kit.lp(-1,-2));
-        content.addView(a.kit.gap(8));
-        String[] labels={"خانه","مشتریان","کالاها","ویزیت","سفارش هوشمند","سفارش‌های من","دریافت","گزارش‌ها"};
-        int[] icons={R.drawable.mi_home,R.drawable.visitor3d_customers,R.drawable.visitor3d_products,
-                R.drawable.icon3d_logistics,R.drawable.visitor3d_assistant,R.drawable.mi_request_quote,
-                R.drawable.visitor3d_receipt,R.drawable.mi_bar_chart};
-        content.addView(a.kit.chipsWithIcons(labels,page,icons,Theme.GOLD,i->{page=i;render(content);}),a.kit.lp(-1,-2));
-        content.addView(a.kit.gap(8));
+        a.scrollToTop();
+        LinearLayout hero=a.kit.h();
+        hero.setGravity(Gravity.CENTER_VERTICAL);
+        hero.setBackground(Theme.hero(Theme.GOLD));
+        hero.setPadding(Theme.dp(13),Theme.dp(9),Theme.dp(13),Theme.dp(9));
+        ImageView heroArt=new ImageView(a);heroArt.setImageResource(R.drawable.visitor3d_assistant);
+        heroArt.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        hero.addView(heroArt,new LinearLayout.LayoutParams(Theme.dp(46),Theme.dp(46)));
+        hero.addView(a.kit.space(9));
+        LinearLayout heroCopy=a.kit.v();
+        heroCopy.addView(a.kit.text("فروش میدانی",18,Theme.TEXT,true),a.kit.lp(-1,-2));
+        heroCopy.addView(a.kit.text("کارهای روزانهٔ ویزیت و سفارش",11.5f,Theme.MUTED,false),a.kit.lp(-1,-2));
+        hero.addView(heroCopy,a.kit.wlp(1f));
+        content.addView(hero,a.kit.lp(-1,-2));
+        content.addView(a.kit.gap(7));
+        String[] labels={"خانه","مشتریان","کالاها","ویزیت"};
+        int[] icons={R.drawable.mi_home,R.drawable.visitor3d_customers,R.drawable.visitor3d_products,R.drawable.icon3d_logistics};
+        int selected=page<=ROUTE?page:-1;
+        content.addView(a.kit.chipsWithIcons(labels,selected,icons,Theme.GOLD,i->{page=i;render(content);}),a.kit.lp(-1,-2));
+        content.addView(a.kit.gap(7));
+        if(page>ROUTE){
+            content.addView(a.kit.btnGhost("‹ بازگشت به میزکار",Theme.GOLD,v->{page=HOME;render(contentRef);}),a.kit.lp(-1,-2));
+            content.addView(a.kit.gap(4));
+        }
         pageBodyRef=a.kit.v();
         content.addView(pageBodyRef,a.kit.lp(-1,-2));
         if(page==HOME) renderHome(pageBodyRef);
@@ -145,12 +166,12 @@ public final class VisitorDeskScreen extends Screen {
         LinearLayout tile=a.kit.v();
         tile.setGravity(Gravity.CENTER);
         tile.setBackground(Theme.cardAccent(Theme.GOLD));
-        tile.setPadding(Theme.dp(10),Theme.dp(10),Theme.dp(10),Theme.dp(10));
-        tile.setMinimumHeight(Theme.dp(122));
+        tile.setPadding(Theme.dp(8),Theme.dp(7),Theme.dp(8),Theme.dp(7));
+        tile.setMinimumHeight(Theme.dp(108));
         ImageView art=new ImageView(a);
         art.setImageResource(icon);
         art.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        LinearLayout.LayoutParams ip=new LinearLayout.LayoutParams(Theme.dp(58),Theme.dp(58));
+        LinearLayout.LayoutParams ip=new LinearLayout.LayoutParams(Theme.dp(48),Theme.dp(48));
         ip.gravity=Gravity.CENTER;
         tile.addView(art,ip);
         TextView name=a.kit.text(title,13.5f,Theme.TEXT,true);name.setGravity(Gravity.CENTER);
@@ -175,8 +196,36 @@ public final class VisitorDeskScreen extends Screen {
         parent.addView(a.kit.gap(8));
     }
 
+    private View visitorErrorCard(String title,String error,Runnable retry){
+        LinearLayout card=a.kit.card(Theme.DANGER);
+        LinearLayout head=a.kit.h();head.setGravity(Gravity.CENTER_VERTICAL);
+        ImageView art=new ImageView(a);art.setImageResource(R.drawable.icon3d_dark_plug);art.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        head.addView(art,new LinearLayout.LayoutParams(Theme.dp(48),Theme.dp(48)));
+        head.addView(a.kit.space(9));
+        LinearLayout copy=a.kit.v();
+        copy.addView(a.kit.text(title,14.5f,Theme.TEXT,true),a.kit.lp(-1,-2));
+        String detail=friendlyError(error);
+        TextView body=a.kit.text(detail,11.5f,Theme.MUTED,false);body.setMaxLines(3);body.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        copy.addView(body,a.kit.lp(-1,-2));head.addView(copy,a.kit.wlp(1f));
+        card.addView(head,a.kit.lp(-1,-2));
+        LinearLayout actions=a.kit.h();actions.setGravity(Gravity.CENTER_VERTICAL);
+        actions.addView(a.kit.btnGold("تلاش دوباره",v->{if(retry!=null)retry.run();}),new LinearLayout.LayoutParams(0,-2,1f));
+        actions.addView(a.kit.space(8));
+        actions.addView(a.kit.btnGhost("تنظیم اتصال",Theme.GOLD,v->a.openConnectionSetup()),new LinearLayout.LayoutParams(0,-2,1f));
+        LinearLayout.LayoutParams ap=a.kit.lp(-1,-2);ap.topMargin=Theme.dp(8);card.addView(actions,ap);
+        return card;
+    }
+
+    private String friendlyError(String error){
+        if(error==null||error.trim().isEmpty())return "بررسی شبکه و تنظیم اتصال آتیران را انجام دهید.";
+        String s=error.trim();String n=s.toLowerCase(java.util.Locale.ROOT);
+        if(n.contains("network")||n.contains("socket")||n.contains("timeout")||n.contains("خارج از شبکه")||n.contains("ارتباط با سرور"))
+            return "ارتباط با سرور برقرار نشد. شبکه و تنظیم اتصال آتیران را بررسی کنید.";
+        return s;
+    }
+
     private void loadCustomers(LinearLayout c, boolean forPicker) {
-        if(!forPicker)c.addView(a.kit.loading("در حال دریافت مشتریان مسیر شما…"),a.kit.lp(-1,-2));
+        if(!forPicker){c.removeAllViews();c.addView(a.kit.loading("در حال دریافت مشتریان مسیر شما…"),a.kit.lp(-1,-2));}
         a.repo.run(db->{
             VisitorIdentity.Identity identity=identity(db);
             Meta m=new Meta(db);
@@ -219,7 +268,10 @@ public final class VisitorDeskScreen extends Screen {
                     if(rows.isEmpty())c.addView(a.kit.empty("مشتری تخصیص‌یافته پیدا نشد",null),a.kit.lp(-1,-2));
                 } else showCustomerPicker(rows);
             }
-            @Override public void fail(String error){showError(c,error,()->render(contentRef));}
+            @Override public void fail(String error){
+                if(forPicker){a.kit.toast("فهرست مشتریان در دسترس نیست؛ اتصال آتیران را بررسی کنید.");return;}
+                c.removeAllViews();c.addView(visitorErrorCard("مشتریان دریافت نشدند",error,()->loadCustomers(c,false)),a.kit.lp(-1,-2));
+            }
         });
     }
 
@@ -300,16 +352,24 @@ public final class VisitorDeskScreen extends Screen {
     }
 
     private void renderProducts(LinearLayout c,String initialQuery){
-        c.addView(sectionTitle("کالا و موجودی","فهرست فروش میدانی با نرخ انتخاب‌شده در آتیران."),a.kit.lp(-1,-2));
+        c.addView(sectionTitle("کالا و موجودی","جستجوی کالا با نرخ معتبر و موجودی آتیران."),a.kit.lp(-1,-2));
         EditText search=a.kit.edit("نام، کد یا بارکد کالا",initialQuery);
         LinearLayout actions=a.kit.h();
-        actions.addView(a.kit.btnGold("جستجو",v->loadProductList(c,search.getText().toString().trim())),new LinearLayout.LayoutParams(0,-2,1f));
+        actions.addView(a.kit.btnGold("جستجو",v->{String term=search.getText().toString().trim();if(term.length()<2){a.kit.toast("نام یا دست‌کم دو رقم از کد کالا را وارد کنید.");return;}loadProductList(c,term);}),new LinearLayout.LayoutParams(0,-2,1f));
         actions.addView(a.kit.space(8));
-        actions.addView(a.kit.btnGhost("اسکن",Theme.INFO,v->a.startScan(code->loadProductList(c,code))),new LinearLayout.LayoutParams(0,-2,1f));
+        actions.addView(a.kit.btnGhost("اسکن بارکد",Theme.INFO,v->a.startScan(code->{search.setText(code);loadProductList(c,code); })),new LinearLayout.LayoutParams(0,-2,1f));
         c.addView(search,a.kit.lp(-1,-2));
         c.addView(actions,a.kit.lp(-1,-2));
         c.addView(a.kit.gap(8));
-        loadProductList(c,initialQuery);
+        if(initialQuery==null||initialQuery.trim().isEmpty()){
+            LinearLayout start=a.kit.card(Theme.GOLD);start.setGravity(Gravity.CENTER_HORIZONTAL);
+            ImageView art=new ImageView(a);art.setImageResource(R.drawable.visitor3d_products);art.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            start.addView(art,new LinearLayout.LayoutParams(Theme.dp(72),Theme.dp(72)));
+            TextView title=a.kit.text("جستجو یا مرور کالاها",14,Theme.TEXT,true);title.setGravity(Gravity.CENTER);start.addView(title,a.kit.lp(-1,-2));
+            TextView body=a.kit.text("نام، کد یا بارکد را وارد کنید؛ یا فهرست فروش میدانی را باز کنید.",11.5f,Theme.MUTED,false);body.setGravity(Gravity.CENTER);start.addView(body,a.kit.lp(-1,-2));
+            start.addView(a.kit.btnGhost("نمایش فهرست کالاها",Theme.GOLD,v->loadProductList(c,"")),a.kit.lp(-1,-2));
+            c.addView(start,a.kit.lp(-1,-2));
+        }else loadProductList(c,initialQuery);
     }
 
     private void loadProductList(LinearLayout c,String query){
@@ -319,8 +379,14 @@ public final class VisitorDeskScreen extends Screen {
         a.repo.run(db->loadCatalog(db,term),new Repo.Cb<List<Product>>(){
             @Override public void ok(List<Product> rows){
                 c.removeViews(3,Math.max(0,c.getChildCount()-3));
-                c.addView(a.kit.hint("موجودی از inventory و نرخ از گروه پیش‌فرض آتیران خوانده شده است. نرخ نامطمئن به‌جای حدس‌زدن مسدود می‌شود."),a.kit.lp(-1,-2));
-                if(rows.isEmpty()){c.addView(a.kit.empty("کالایی پیدا نشد",term.isEmpty()?"برای جستجو نام یا کد کالا را وارد کنید.":null),a.kit.lp(-1,-2));return;}
+                if(rows.isEmpty()){
+                    String title=term.isEmpty()?"فهرست کالای قابل‌نمایش خالی است":"کالایی با این عبارت پیدا نشد";
+                    c.addView(a.kit.empty(title,term.isEmpty()?"فعال‌بودن کالاهای فروش میدانی در آتیران را بررسی کنید.":"نام یا کد دیگری را جستجو کنید یا بارکد را اسکن کنید."),a.kit.lp(-1,-2));
+                    if(!term.isEmpty())c.addView(a.kit.btnGhost("نمایش همهٔ کالاها",Theme.GOLD,v->loadProductList(c,"")),a.kit.lp(-1,-2));
+                    return;
+                }
+                c.addView(a.kit.hint("قیمت‌ها از گروه پیش‌فرض آتیران خوانده شده‌اند؛ نرخ مبهم نمایش داده نمی‌شود."),a.kit.lp(-1,-2));
+                if(rows.size()>=250)c.addView(a.kit.hint("۲۵۰ قلم نخست نمایش داده شده؛ برای یافتن کالای بیشتر جستجو کنید."),a.kit.lp(-1,-2));
                 for(Product p:rows){
                     boolean safe=VisitorPricePolicy.isUnambiguous(p.group,p.activePriceRows,p.price.doubleValue());
                     String detail="کد "+p.code+" • "+p.unit+" • "+(p.stock==null?"موجودی نامشخص":"موجودی "+qty(p.stock));
@@ -331,7 +397,7 @@ public final class VisitorDeskScreen extends Screen {
             }
             @Override public void fail(String error){
                 c.removeViews(3,Math.max(0,c.getChildCount()-3));
-                c.addView(a.kit.error("فهرست کالا/قیمت در دسترس نیست: "+error,()->loadProductList(c,term)),a.kit.lp(-1,-2));
+                c.addView(visitorErrorCard("فهرست کالا دریافت نشد",error,()->loadProductList(c,term)),a.kit.lp(-1,-2));
             }
         });
     }
@@ -489,7 +555,7 @@ public final class VisitorDeskScreen extends Screen {
         },new Repo.Cb<List<String[]>>(){
             @Override public void ok(List<String[]> rows){daily.removeAllViews();if(rows.isEmpty()){daily.addView(a.kit.empty("گزارشی ثبت نشده است","برای ساخت گزارش، دکمهٔ بالا را بزنید."),a.kit.lp(-1,-2));return;}
                 for(String[] r:rows)daily.addView(a.kit.personRow("گزارش روزانهٔ "+r[0],r[2],"","نمایش",Theme.INFO,v->new AlertDialog.Builder(a).setTitle("گزارش روزانهٔ "+r[0]).setMessage(r[1]).setPositiveButton("بستن",null).show()),a.kit.lp(-1,-2));}
-            @Override public void fail(String e){daily.removeAllViews();daily.addView(a.kit.error("گزارش‌ها در دسترس نیستند: "+e,()->loadReports(c)),a.kit.lp(-1,-2));}
+            @Override public void fail(String e){daily.removeAllViews();daily.addView(visitorErrorCard("گزارش روزانه دریافت نشد",e,()->loadReports(c)),a.kit.lp(-1,-2));}
         });
         a.repo.run(db->{VisitorIdentity.Identity id=identity(db);ensureVisitTable(db);List<String[]> out=new ArrayList<>();
             try(java.sql.PreparedStatement ps=db.prepareStatement("SELECT TOP (100) customer_name,result,ISNULL(notes,N''),CONVERT(nvarchar(19),created_at,120) FROM dbo.meelano_visit_results WHERE visitor_id=? ORDER BY id DESC")){
@@ -498,7 +564,7 @@ public final class VisitorDeskScreen extends Screen {
         },new Repo.Cb<List<String[]>>(){
             @Override public void ok(List<String[]> rows){visits.removeAllViews();if(rows.isEmpty()){visits.addView(a.kit.empty("هنوز ویزیتی ثبت نشده است",null),a.kit.lp(-1,-2));return;}
                 for(String[] r:rows){String detail=r[3]+(r[2].isEmpty()?"":" • "+r[2]);visits.addView(a.kit.personRow(r[0],detail,"",r[1],Theme.GOLD,v->new AlertDialog.Builder(a).setTitle(r[0]).setMessage("نتیجه: "+r[1]+(r[2].isEmpty()?"":"\nتوضیحات: "+r[2])+"\nزمان: "+r[3]).setPositiveButton("بستن",null).show()),a.kit.lp(-1,-2));}}
-            @Override public void fail(String e){visits.removeAllViews();visits.addView(a.kit.error("نتیجه‌های ویزیت در دسترس نیستند: "+e,()->loadReports(c)),a.kit.lp(-1,-2));}
+            @Override public void fail(String e){visits.removeAllViews();visits.addView(visitorErrorCard("بازدیدها دریافت نشدند",e,()->loadReports(c)),a.kit.lp(-1,-2));}
         });
     }
 
@@ -510,7 +576,7 @@ public final class VisitorDeskScreen extends Screen {
                 ps.setString(1,String.valueOf(id.visitorId));try(java.sql.ResultSet rs=ps.executeQuery()){while(rs.next()){Row r=new Row();r.put("id",rs.getString(1));r.put("customer",rs.getString(2));r.put("total",rs.getString(3));r.put("status",rs.getString(4));r.put("created",rs.getString(5));rows.add(r);}}
             }return rows;
         },new Repo.Cb<List<Row>>(){@Override public void ok(List<Row> rows){c.removeAllViews();c.addView(a.kit.text("پیش‌فاکتورهای من",16,Theme.TEXT,true),a.kit.lp(-1,-2));for(Row r:rows)c.addView(a.kit.personRow("شماره "+r.s("id")+" • "+r.s("customer"),r.s("created"),Money.rial(r.d("total")),statusFa(r.s("status")),Theme.INFO,v->showOrderDetails(r)),a.kit.lp(-1,-2));if(rows.isEmpty())c.addView(a.kit.empty("هنوز پیش‌فاکتوری ثبت نشده است",null),a.kit.lp(-1,-2));}
-            @Override public void fail(String e){showError(c,e,()->loadMyOrders(c));}});
+            @Override public void fail(String e){c.removeAllViews();c.addView(visitorErrorCard("سفارش‌ها دریافت نشدند",e,()->loadMyOrders(c)),a.kit.lp(-1,-2));}});
     }
 
     private void showOrderDetails(Row row){
@@ -591,7 +657,6 @@ public final class VisitorDeskScreen extends Screen {
     private static String q(String s){return "["+s.replace("]","]]")+ "]";}
     private static String money(BigDecimal value){return Money.rial(value==null?0:value.doubleValue());}
     private static String qty(BigDecimal value){return Money.qty(value==null?0:value.doubleValue());}
-    private void showError(LinearLayout c,String message,Runnable retry){c.removeAllViews();c.addView(a.kit.error(message,retry),a.kit.lp(-1,-2));}
     private String statusFa(String s){if("pending_approval".equals(s))return "در انتظار بررسی";if("approved".equals(s))return "تأییدشده";if("rejected".equals(s))return "ردشده";if("invoiced".equals(s))return "فاکتور شده";if("needs_revision".equals(s))return "نیازمند اصلاح";return s==null||s.isEmpty()?"نامشخص":s;}
 
     { restoreDraft(); }

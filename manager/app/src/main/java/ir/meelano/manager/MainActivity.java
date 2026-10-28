@@ -1546,6 +1546,13 @@ public class MainActivity extends Activity {
         } catch (Exception ignored) { Diag.ignored("MainActivity:1347", ignored); }
     }
 
+    /** Reset the shared content viewport after an in-screen visitor destination changes. */
+    public void scrollToTop() {
+        try {
+            if (scroll != null) scroll.post(() -> scroll.scrollTo(0, 0));
+        } catch (Exception ignored) { Diag.ignored("MainActivity:visitorScrollTop", ignored); }
+    }
+
     /** Open the license connection flow directly in edit mode, preserving the current session. */
     public void openConnectionSetup() {
         openConnectionSetup(false, settings != null && settings.connConfigured());

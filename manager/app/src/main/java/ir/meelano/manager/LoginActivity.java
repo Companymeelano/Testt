@@ -24,9 +24,9 @@ import ir.meelano.manager.ui.Theme;
 
 /**
  * Manager-app account gate, shown only after a valid license and an explicitly
- * selected server/database. Every role, including manager and warehouse, is
- * authenticated against Atiran's own user table; synthetic app-local IDs are
- * never accepted as a substitute for an Atiran login.
+ * selected server/database. Company/system users authenticate through sys_users;
+ * field visitors authenticate through visitors credentials plus a sys_vis access
+ * link. Synthetic app-local IDs are never accepted as Atiran identities.
  */
 public class LoginActivity extends Activity {
 
@@ -111,7 +111,7 @@ public class LoginActivity extends Activity {
         LinearLayout.LayoutParams sp = kit.lp(-1, -2);
         sp.setMargins(0, Theme.dp(6), 0, Theme.dp(16));
         if (hint == null) {
-            TextView s = kit.text("پس از انتخاب دیتابیس، با حساب مدیریت یا انبارداری وارد شوید",
+            TextView s = kit.text("پس از انتخاب دیتابیس، با حساب آتیران خود وارد شوید؛ ویزیتورها از پیوند دسترسی خود استفاده می‌کنند",
                     13.5f, Theme.TEXT, false);
             s.setGravity(Gravity.CENTER);
             root.addView(s, sp);
@@ -362,9 +362,22 @@ public class LoginActivity extends Activity {
                 return;
             }
             try (Connection c = connection) {
+                // Visitor credentials are maintained on visitors; sys_vis links that visitor
+                // to an Atiran system UserID. Keep visitor login out of sys_users lookup.
+                AtiranAuth.AuthUser visitor = AtiranAuth.fetchVisitorUser(c, user, pass);
+                if (visitor != null) {
+                    if (!AtiranAuth.phaseOpen(LoginActivity.this, RoleStore.VISITOR)) {
+                        uiFail("ورود ویزیتور در این نسخه فعال نیست.");
+                        return;
+                    }
+                    AtiranAuth.putPwCache(LoginActivity.this, visitor.uid, visitor.pw);
+                    uiSuccess(visitor.uid, visitor.userName, visitor.displayName, RoleStore.VISITOR, rem, false,
+                            "خوش آمدید " + visitor.displayName);
+                    return;
+                }
                 AtiranAuth.AuthUser u = AtiranAuth.fetchUser(c, user);
                 if (u == null) {
-                    uiFail("این نام کاربری در جدول کاربران آتیران پیدا نشد.");
+                    uiFail("این نام کاربری در جدول کاربران یا ویزیتورهای آتیران (sys_users/visitors) پیدا نشد.");
                     return;
                 }
                 if (u.uid <= 0) {
@@ -403,6 +416,8 @@ public class LoginActivity extends Activity {
                 AtiranAuth.putPwCache(LoginActivity.this, u.uid, u.pw);
                 uiSuccess(u.uid, u.userName, u.displayName, role, rem, false,
                         "خوش آمدید " + u.displayName);
+            } catch (AtiranAuth.VisitorLoginException visitorError) {
+                uiFail(visitorError.getMessage());
             } catch (AtiranAuth.NoTable nt) {
                 uiFail("جدول یا ستون نام کاربری آتیران پیدا نشد؛ دیتابیس انتخاب‌شده را بررسی کنید.");
             } catch (Exception authError) {

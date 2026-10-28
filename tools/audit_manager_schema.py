@@ -186,6 +186,42 @@ def main() -> int:
             else:
                 function_checked += 1
 
+    # Visitor sign-in contract: credentials live on visitors; sys_vis is the
+    # authoritative link to the visitor row and Atiran UserID. Guard this
+    # distinction because treating visitor names as sys_users logins caused
+    # false "username not found" failures.
+    def required_dbo_columns(table_name: str, columns: set[str]) -> None:
+        hits = [obj for obj in by_name.get(table_name.casefold(), [])
+                if obj["schema"].casefold() == "dbo"]
+        if not hits:
+            errors.append(f"visitor auth contract: dbo.{table_name} absent in sample")
+            return
+        actual = {norm(column["name"]) for column in hits[0].get("columns", [])}
+        for column in sorted(columns):
+            if norm(column) not in actual:
+                errors.append(f"visitor auth contract: dbo.{table_name}.{column} absent in sample")
+
+    required_dbo_columns("visitors", {"vis_rdf", "Username", "Password", "active", "vis_name"})
+    required_dbo_columns("sys_vis", {"SysID", "shvis", "UserID"})
+    required_dbo_columns("sys_users", {"user_id"})
+    required_dbo_columns("osystems", {"rdf_system"})
+    expected_visitor_links = {
+        ("sys_vis", "SysID", "osystems", "rdf_system"),
+        ("sys_vis", "shvis", "visitors", "vis_rdf"),
+        ("sys_vis", "UserID", "sys_users", "user_id"),
+    }
+    actual_visitor_links = set()
+    for fk in manifest.get("foreignKeys", []):
+        source = fk.get("from", {})
+        target = fk.get("to", {})
+        if source.get("schema", "").casefold() == "dbo" and target.get("schema", "").casefold() == "dbo":
+            actual_visitor_links.add((source.get("table", ""), source.get("column", ""),
+                                     target.get("table", ""), target.get("column", "")))
+    actual_visitor_links_norm = {tuple(norm(part) for part in link) for link in actual_visitor_links}
+    for link in expected_visitor_links:
+        if tuple(norm(part) for part in link) not in actual_visitor_links_norm:
+            errors.append("visitor auth contract: missing schema link " + ".".join(link))
+
     for check in manifest.get("appProbeChecks", []):
         if check.get("status") != "ok":
             errors.append(f"sample probe {check.get('table')}: {check.get('status')} {check.get('missingColumns', [])}")

@@ -6,17 +6,18 @@ import android.content.SharedPreferences;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 
 import ir.meelano.manager.data.Meta;
 
 /**
- * Atiran user login (v26).
+ * Atiran user login and role session.
  *
- * After license + connection setup, the app asks for the Atiran username and
- * password. The user row comes from Atiran's own `sys_users` table
- * (user_id / user_name / user_password / role_id / active / IsLocked …) and
- * the in-app role is derived from the Atiran role name (Roles/role tables).
+ * System users authenticate through `sys_users` and `Roles`/`role`. Field
+ * visitors use a separate path: credentials and active state come from
+ * `visitors`, while `sys_vis` must link the visitor row to a positive Atiran
+ * UserID. Visitor usernames are never searched in `sys_users`.
  *
  * Password reality: Atiran stores `user_password` as varbinary(50) — a
  * proprietary binary hash whose algorithm is NOT documented. So verification
@@ -47,7 +48,12 @@ public final class AtiranAuth {
         public NoTable(String m) { super(m); }
     }
 
-    /** One Atiran login identity, resolved from sys_users (+ role name). */
+    /** A visitor username was found, but its visitor credentials/access link did not validate. */
+    public static final class VisitorLoginException extends Exception {
+        public VisitorLoginException(String message) { super(message); }
+    }
+
+    /** One authenticated Atiran identity, resolved from sys_users or visitors + sys_vis. */
     public static final class AuthUser {
         public int uid;
         public String userName = "";
@@ -60,7 +66,7 @@ public final class AtiranAuth {
         public boolean active = true;
         public boolean locked;
         public byte[] pw;
-        /** False when sys_users has no user_password column we could recognise. */
+        /** False when the relevant Atiran account table has no recognized credential column. */
         public boolean pwColFound;
         /** Result of the server-side pwdcompare() probe, when it could be run. */
         public boolean serverCompared;
@@ -69,9 +75,9 @@ public final class AtiranAuth {
     // ================= server read (call off the UI thread) =================
 
     /**
-     * Resolve one username to its Atiran identity. Returns null when the
-     * username does not exist. Throws NoTable when sys_users (or its
-     * user_name column) is absent, other Exceptions for connection errors.
+     * Resolve one regular system-user login. Returns null when the username
+     * does not exist. Visitor logins are handled separately by fetchVisitorUser.
+     * Throws NoTable when sys_users (or its user_name column) is absent.
      */
     public static AuthUser fetchUser(Connection c, String username) throws Exception {
         Meta m = new Meta(c);
@@ -140,6 +146,101 @@ public final class AtiranAuth {
         return u;
     }
 
+    /**
+     * Authenticate a field visitor from Atiran's visitor account and access-link tables.
+     * Credential fields live on dbo.visitors; dbo.sys_vis grants the system link and supplies
+     * the positive Atiran UserID used for auditing. Do not look up this login in sys_users.
+     * Returns null only when no visitor row has this username, allowing the caller to try the
+     * regular sys_users flow for non-visitor roles.
+     */
+    public static AuthUser fetchVisitorUser(Connection c, String username, String typedPassword)
+            throws Exception {
+        if (c == null || username == null || username.trim().isEmpty()) return null;
+        Meta meta = new Meta(c);
+        if (!meta.table("visitors")) return null;
+        String visitorIdCol = meta.col("visitors", "vis_rdf", "visitor_id", "VisitorID", "shvis", "rdf");
+        String loginCol = meta.col("visitors", "Username", "UserName", "username", "user_name", "login", "login_name");
+        String passwordCol = meta.col("visitors", "Password", "password", "Pass", "pass", "pwd", "user_password");
+        String activeCol = meta.col("visitors", "active", "Active", "is_active", "enabled");
+        String displayCol = meta.col("visitors", "vis_name", "visitor_name", "Name", "name", "FullName");
+        if (visitorIdCol == null || loginCol == null || passwordCol == null) return null;
+
+        String sql = "SELECT TOP (2) TRY_CONVERT(int," + Sql.q(visitorIdCol) + "), "
+                + "TRY_CONVERT(nvarchar(200)," + Sql.q(loginCol) + "), "
+                + "TRY_CONVERT(nvarchar(4000)," + Sql.q(passwordCol) + "), "
+                + (activeCol == null ? "CAST(NULL AS nvarchar(32))" :
+                        "TRY_CONVERT(nvarchar(32)," + Sql.q(activeCol) + ")") + ", "
+                + (displayCol == null ? "CAST(N'' AS nvarchar(220))" :
+                        "TRY_CONVERT(nvarchar(220)," + Sql.q(displayCol) + ")")
+                + " FROM " + meta.qTable("visitors") + " WHERE LOWER(LTRIM(RTRIM(TRY_CONVERT(nvarchar(200),"
+                + Sql.q(loginCol) + "))))=LOWER(LTRIM(RTRIM(?)))";
+
+        int visitorId;
+        String storedUsername;
+        String storedPassword;
+        Object activeValue;
+        String displayName;
+        try (PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, username.trim());
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) return null;
+                visitorId = rs.getInt(1);
+                storedUsername = rs.getString(2);
+                storedPassword = rs.getString(3);
+                activeValue = rs.getObject(4);
+                displayName = rs.getString(5);
+                if (rs.next())
+                    throw new VisitorLoginException("برای این نام کاربری چند ردیف ویزیتور پیدا شد؛ پیوندها باید یکتا شوند.");
+            }
+        }
+        if (visitorId <= 0)
+            throw new VisitorLoginException("شناسهٔ ویزیتور در آتیران معتبر نیست.");
+        if (activeCol == null || !flagOn(activeValue))
+            throw new VisitorLoginException("حساب ویزیتور در آتیران غیرفعال است یا وضعیت فعال‌بودن آن قابل تأیید نیست.");
+        String loginName = storedUsername == null || storedUsername.trim().isEmpty()
+                ? username.trim() : storedUsername.trim();
+        if (!verifyVisitorPassword(storedPassword, typedPassword, loginName))
+            throw new VisitorLoginException("رمز حساب ویزیتور آتیران تأیید نشد.");
+
+        if (!meta.table("sys_vis"))
+            throw new VisitorLoginException("جدول دسترسی ویزیتور آتیران (sys_vis) پیدا نشد.");
+        String grantVisitorCol = meta.col("sys_vis", "shvis", "vis_rdf", "visitor_id", "visitor");
+        String grantUserCol = meta.col("sys_vis", "UserID", "user_id", "userid");
+        String grantSystemCol = meta.col("sys_vis", "SysID", "sys_id", "system_id");
+        if (grantVisitorCol == null || grantUserCol == null || grantSystemCol == null)
+            throw new VisitorLoginException("ستون‌های پیوند ویزیتور در جدول sys_vis آتیران کامل نیستند.");
+        String grantSql = "SELECT DISTINCT TRY_CONVERT(int," + Sql.q(grantUserCol) + ") FROM "
+                + meta.qTable("sys_vis") + " WHERE TRY_CONVERT(int," + Sql.q(grantVisitorCol)
+                + ")=? AND TRY_CONVERT(int," + Sql.q(grantSystemCol) + ") IS NOT NULL";
+        int atiranUid = -1;
+        try (PreparedStatement ps = c.prepareStatement(grantSql)) {
+            ps.setInt(1, visitorId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    int linkedUid = rs.getInt(1);
+                    if (rs.wasNull() || linkedUid <= 0) continue;
+                    if (atiranUid > 0 && atiranUid != linkedUid)
+                        throw new VisitorLoginException("پیوند این ویزیتور در sys_vis به چند کاربر آتیران می‌رسد؛ دسترسی حدسی داده نشد.");
+                    atiranUid = linkedUid;
+                }
+            }
+        }
+        if (atiranUid <= 0)
+            throw new VisitorLoginException("برای این ویزیتور دسترسی به سیستم در جدول sys_vis آتیران ثبت نشده است.");
+
+        AuthUser visitor = new AuthUser();
+        visitor.uid = atiranUid;
+        visitor.userName = loginName;
+        visitor.displayName = displayName == null || displayName.trim().isEmpty()
+                ? loginName : displayName.trim();
+        visitor.roleName = "ویزیتور";
+        visitor.appRole = RoleStore.VISITOR;
+        visitor.active = true;
+        visitor.pwColFound = true;
+        visitor.pw = storedPassword == null ? null : storedPassword.getBytes(StandardCharsets.UTF_8);
+        return visitor;
+    }
+
     /** Best-effort role-name lookup over the unknown Roles/role schema. */
     public static String roleNameOf(Connection c, Meta m, int roleId) {
         String[] tables = {"Roles", "role"};
@@ -177,6 +278,12 @@ public final class AtiranAuth {
     }
 
     // ================= password verification =================
+
+    /** Visitor credentials are stored as text on Atiran's visitors row; verify locally without logging them. */
+    public static boolean verifyVisitorPassword(String stored, String typed, String userName) {
+        if (stored == null || stored.isEmpty() || typed == null || typed.isEmpty()) return false;
+        return verifyPassword(stored.getBytes(StandardCharsets.UTF_8), typed, userName);
+    }
 
     /**
      * Compare the typed password with Atiran's stored bytes through every

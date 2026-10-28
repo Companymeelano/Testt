@@ -354,7 +354,8 @@ public class MainActivity extends Activity {
         if (STAFF_EDITION) STORE_EDITION = false;
         try { MANAGER_EDITION = getResources().getBoolean(R.bool.meelano_manager_edition); } catch (Exception ignored) { MANAGER_EDITION = false; }
         try { UNIFIED_EDITION = getResources().getBoolean(R.bool.meelano_unified_edition); } catch (Exception ignored) { UNIFIED_EDITION = false; }
-        if (UNIFIED_EDITION) MANAGER_EDITION = true; // the unified home uses the new manager dashboard
+        // Unified is a packaging/authorization mode, not a manager skin. Keep the shared visitor
+        // brand and theme for every account; manager routes are enabled from the signed-in role.
         if (MANAGER_EDITION) { STORE_EDITION = false; STAFF_EDITION = false; }
         prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         managerReportRange = prefs.getInt("mgr_range", 2);
@@ -1184,6 +1185,14 @@ public class MainActivity extends Activity {
         String savedTheme = prefs.getString(KEY_THEME, "");
         SharedPreferences.Editor ed = prefs.edit();
         if (savedTheme == null || savedTheme.trim().isEmpty() || (VISITOR_EDITION && "onyx_gold".equals(savedTheme))) ed.putString(KEY_THEME, defaultThemeId());
+        // v7.0.2 incorrectly forced the manager skin on every unified account. Migrate only
+        // that auto-assigned manager default once; preserve a theme the user actually selected.
+        if (UNIFIED_EDITION && !prefs.getBoolean("unified_shared_shell_v1", false)) {
+            if (prefs.getBoolean("manager_theme_pearl_platinum", false) && "pearl_platinum".equals(savedTheme)) {
+                ed.putString(KEY_THEME, DEFAULT_THEME);
+            }
+            ed.putBoolean("unified_shared_shell_v1", true);
+        }
         // Store app: move once to the emerald theme made from its green launcher icon.
         if (STORE_EDITION && !prefs.getBoolean("store_theme_emerald_royal", false)) {
             ed.putString(KEY_THEME, "emerald_royal").putBoolean("store_theme_emerald_royal", true);
@@ -2408,7 +2417,7 @@ public class MainActivity extends Activity {
                 .setNegativeButton("بستن", null)
                 .create();
         addThemeOption(box, dialog, THEME_AUTO, "خودکار", "روشن در روز، تیره در شب — هماهنگ با گوشی", new int[]{Color.rgb(244, 251, 255), Color.rgb(0, 126, 255), Color.rgb(5, 8, 18)});
-        if (MANAGER_EDITION) addThemeOption(box, dialog, "espresso_gold", "اسپرسو طلایی", "تیرهٔ لوکس هم‌خانواده با آیکون مدیر", new int[]{Color.rgb(23, 16, 9), Color.rgb(200, 154, 63), Color.rgb(228, 197, 124)});
+        if (MANAGER_EDITION || UNIFIED_EDITION) addThemeOption(box, dialog, "espresso_gold", "اسپرسو طلایی", "تم تیرهٔ لوکس", new int[]{Color.rgb(23, 16, 9), Color.rgb(200, 154, 63), Color.rgb(228, 197, 124)});
         if (MANAGER_EDITION) {
             android.widget.CheckBox esp = new android.widget.CheckBox(this);
             esp.setText("اسپرسو طلایی به‌عنوان تم پیش‌فرض مدیر");
@@ -2424,8 +2433,7 @@ public class MainActivity extends Activity {
         addThemeOption(box, dialog, "pearl_platinum", "روشن ۱", "مروارید پلاتینیوم", new int[]{Color.rgb(245, 247, 251), Color.rgb(168, 122, 44), Color.rgb(48, 96, 176)});
         addThemeOption(box, dialog, "rose_quartz_lux", "روشن ۲", "رز کوارتز لاکچری", new int[]{Color.rgb(255, 247, 248), Color.rgb(177, 102, 82), Color.rgb(111, 90, 174)});
         addThemeOption(box, dialog, "emerald_silk", "روشن ۳", "زمرد ابریشمی", new int[]{Color.rgb(241, 249, 245), Color.rgb(16, 132, 91), Color.rgb(160, 128, 55)});
-        if (!VISITOR_EDITION) {
-            addThemeOption(box, dialog, "azure_diamond", "روشن کلاسیک", "الماس آبی", new int[]{Color.rgb(240, 247, 255), Color.rgb(45, 98, 190), Color.rgb(91, 167, 220)});
+        if (!VISITOR_EDITION || UNIFIED_EDITION) {
             addThemeOption(box, dialog, "crystal_lagoon", "روشن کلاسیک", "کریستالی", new int[]{Color.rgb(237, 249, 250), Color.rgb(18, 142, 166), Color.rgb(54, 117, 203)});
             addThemeOption(box, dialog, "ivory_sunrise", "روشن کلاسیک", "عاجی", new int[]{Color.rgb(249, 243, 233), Color.rgb(194, 117, 54), Color.rgb(29, 143, 113)});
         }
@@ -3463,7 +3471,7 @@ public class MainActivity extends Activity {
         // Owner directive: never block entry to the manager app. Access scoping (when configured)
         // still applies per page via permissions; the hard gate only produced support dead-ends.
         String targetPage = (page == null || page.trim().isEmpty()) ? "dashboard" : page.trim();
-        if (VISITOR_EDITION && !MANAGER_EDITION && "dashboard".equals(targetPage)) targetPage = "visitor_dashboard";
+        if (VISITOR_EDITION && !MANAGER_EDITION && !UNIFIED_EDITION && "dashboard".equals(targetPage)) targetPage = "visitor_dashboard";
         if (STORE_EDITION && ("visitor_dashboard".equals(targetPage) || "visit".equals(targetPage) || "visitor_reports".equals(targetPage))) targetPage = "store_home";
         if (STAFF_EDITION && ("visitor_dashboard".equals(targetPage) || "visit".equals(targetPage) || "visitor_reports".equals(targetPage) || "store_home".equals(targetPage) || "dashboard".equals(targetPage))) targetPage = "staff_home";
         if (MANAGER_EDITION && !UNIFIED_EDITION && ("visitor_dashboard".equals(targetPage) || "visit".equals(targetPage) || "visitor_reports".equals(targetPage) || "store_home".equals(targetPage) || "staff_home".equals(targetPage))) targetPage = "dashboard";
@@ -3610,6 +3618,8 @@ public class MainActivity extends Activity {
         String[][] items = UNIFIED_EDITION ? (isFullAccessUser() ? new String[][]{
                 {"dashboard", "مدیریت", "⌂"}, {"showcase", "کالا", "◈"}, {"cart", "فروش", "⊕"},
                 {"warehouse", "انبار", "▧"}, {"finance", "مالی", "↗"}, {"manager_more", "بیشتر", "☰"}
+        } : "warehouse".equals(currentAccessRole()) ? new String[][]{
+                {"warehouse", "انبار", "▧"}, {"products", "کالاها", "◈"}, {"showcase", "موجودی", "▣"}, {"attendance", "حضور", "◷"}
         } : new String[][]{
                 {"visitor_dashboard", "خانه", "⌂"}, {"visit", "ویزیت", "✦"}, {"showcase", "کالا", "◈"},
                 {"cart", "سبد", "⊕"}, {"visitor_more", "بیشتر", "☰"}
@@ -3680,10 +3690,11 @@ public class MainActivity extends Activity {
     /** Which dock tab represents a page. Sub-pages (settings, reports, chat …) belong to «بیشتر» (B8). */
     private String dockKeyFor(String page) {
         if (page == null) return MANAGER_EDITION ? "dashboard" : STAFF_EDITION ? "staff_home" : STORE_EDITION ? "store_home" : "visitor_dashboard";
-        if (MANAGER_EDITION) {
+        if (MANAGER_EDITION || UNIFIED_EDITION) {
             if ("login".equals(page)) return "";
             if (UNIFIED_EDITION) {
                 if ("dashboard".equals(page) || "showcase".equals(page) || "cart".equals(page) || "warehouse".equals(page) || "finance".equals(page) || "manager_more".equals(page)) return page;
+                if ("warehouse".equals(currentAccessRole()) && ("products".equals(page) || "attendance".equals(page))) return page;
                 if ("visitor_dashboard".equals(page) || "visit".equals(page) || "visitor_more".equals(page)) return page;
                 return isFullAccessUser() ? "manager_more" : "visitor_more";
             }
@@ -3878,7 +3889,7 @@ public class MainActivity extends Activity {
             case "products": loadProducts(productsCacheQuery == null ? "" : productsCacheQuery, productsCacheFilter == null ? "all" : productsCacheFilter); break;
             case "sales": loadTable("فروش و اسناد", "نمای مستقیم از جدول فروش", "sailfact", ""); break;
             case "checks": loadTable("چک‌ها و وصول", "نمای مستقیم از چک‌های دریافتی", "getchk", ""); break;
-            case "reports": if (MANAGER_EDITION) loadManagerReports(); else loadReports(); break;
+            case "reports": if (MANAGER_EDITION || (UNIFIED_EDITION && isFullAccessUser())) loadManagerReports(); else loadReports(); break;
             case "diagnostics": loadDiagnosticsPage(); break;
             case "settings": renderSettings(); break;
             case "management": loadAccessManagement(); break;
@@ -3886,7 +3897,7 @@ public class MainActivity extends Activity {
             case "manager_approvals": loadManagerApprovals(); break;
             case "health": renderConnectionHealthPage(); break;
             case "dashboard":
-                if (MANAGER_EDITION) { loadManagerExecutive(); break; }
+                if (MANAGER_EDITION || (UNIFIED_EDITION && isFullAccessUser())) { loadManagerExecutive(); break; }
             case "mgr_drill": loadManagerDrill(); break;
             case "mgr_cockpit": loadManagerCockpit(); break;
             case "mgr_collection": loadManagerCollection(); break;
@@ -7549,8 +7560,12 @@ public class MainActivity extends Activity {
     }
 
     private String firstAllowedPage() {
-        if (MANAGER_EDITION) {
+        if (MANAGER_EDITION || UNIFIED_EDITION) {
             if (UNIFIED_EDITION) {
+                if ("warehouse".equals(currentAccessRole()) && !isFullAccessUser()) {
+                    String[] warehousePages = {"warehouse", "products", "showcase", "attendance"};
+                    for (String p : warehousePages) if (canOpenPage(p)) return p;
+                }
                 String[] allInOnePages = isFullAccessUser()
                         ? new String[]{"dashboard", "showcase", "cart", "warehouse", "finance", "manager_more", "reports", "command", "personnel", "attendance", "customers", "products", "management", "visitor_dashboard", "visit", "visitor_reports", "taxpayers", "cameras", "alarm", "assistant", "chat", "settings", "health"}
                         : new String[]{"visitor_dashboard", "visit", "cart", "visitor_more", "showcase", "customers", "products", "reports", "command", "warehouse", "finance", "personnel", "attendance", "taxpayers", "assistant", "chat", "visitor_reports", "settings", "manager_more"};
@@ -30447,7 +30462,12 @@ public class MainActivity extends Activity {
     }
 
     private String homePage() {
-        String home = MANAGER_EDITION ? "dashboard" : STAFF_EDITION ? "staff_home" : STORE_EDITION ? "store_home" : VISITOR_EDITION ? "visitor_dashboard" : "dashboard";
+        String home;
+        if (UNIFIED_EDITION) {
+            home = MeelanoAccessPolicy.unifiedHomePage(currentAccessRole(), isFullAccessUser());
+        } else {
+            home = MANAGER_EDITION ? "dashboard" : STAFF_EDITION ? "staff_home" : STORE_EDITION ? "store_home" : VISITOR_EDITION ? "visitor_dashboard" : "dashboard";
+        }
         return canOpenPage(home) ? home : firstAllowedPage();
     }
 

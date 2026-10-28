@@ -9,10 +9,10 @@ import static org.junit.Assert.fail;
 public class MeelanoUpdateManifestTest {
     private JSONObject manifest() throws Exception {
         JSONObject json = new JSONObject();
-        json.put("versionCode", 202);
-        json.put("versionName", "7.0.2");
+        json.put("versionCode", 203);
+        json.put("versionName", "7.0.3");
         json.put("packageName", MeelanoUpdateManifest.PACKAGE_NAME);
-        json.put("url", "https://github.com/Companymeelano/Testt/releases/download/apk-v7-0-2/MEELANO-v7.0.2-release.apk");
+        json.put("url", "https://github.com/Companymeelano/Testt/releases/download/apk-v7-0-3/MEELANO-v7.0.3-release.apk");
         json.put("sha256", "a".repeat(64));
         json.put("signerSha256", MeelanoUpdateManifest.RELEASE_SIGNER_SHA256);
         json.put("size", 2_700_000);
@@ -20,15 +20,15 @@ public class MeelanoUpdateManifestTest {
     }
 
     @Test public void acceptsNewerWellFormedRelease() throws Exception {
-        MeelanoUpdateManifest parsed = MeelanoUpdateManifest.parse(manifest().toString(), 201);
-        assertEquals(202, parsed.versionCode);
-        assertEquals("7.0.2", parsed.versionName);
+        MeelanoUpdateManifest parsed = MeelanoUpdateManifest.parse(manifest().toString(), 202);
+        assertEquals(203, parsed.versionCode);
+        assertEquals("7.0.3", parsed.versionName);
         assertEquals(2_700_000, parsed.size);
     }
 
     @Test public void rejectsSameOrOlderVersion() throws Exception {
-        assertRejected(manifest().toString(), 202);
         assertRejected(manifest().toString(), 203);
+        assertRejected(manifest().toString(), 204);
     }
 
     @Test public void rejectsUnexpectedPackageHostAndSigner() throws Exception {

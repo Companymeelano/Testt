@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Main management dashboard is enabled; unified mode extends (does not replace) visitor pages. -->
-    <bool name="meelano_manager_edition">true</bool>
+    <!-- Keep one shared app shell; manager features are enabled by the signed-in account role. -->
+    <bool name="meelano_manager_edition">false</bool>
     <bool name="meelano_unified_edition">true</bool>
 </resources>

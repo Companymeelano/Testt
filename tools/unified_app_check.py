@@ -13,6 +13,7 @@ def need(condition, description):
 
 build = (ROOT / 'app/build.gradle').read_text(encoding='utf-8')
 main = (ROOT / 'app/src/main/java/ir/meelano/android/MainActivity.java').read_text(encoding='utf-8')
+access_policy = (ROOT / 'app/src/main/java/ir/meelano/android/MeelanoAccessPolicy.java').read_text(encoding='utf-8')
 base_edition = (ROOT / 'app/src/main/res/values/edition.xml').read_text(encoding='utf-8')
 unified_edition_path = ROOT / 'app/src/unified/res/values/edition.xml'
 unified_strings_path = ROOT / 'app/src/unified/res/values/strings.xml'
@@ -20,15 +21,15 @@ workflow = (ROOT / '.github/workflows/build-apk.yml').read_text(encoding='utf-8'
 
 need("unified {" in build and "applicationId 'ir.meelano.visitor'" in build,
      'Gradle flavor unified باید شناسهٔ اصلی ir.meelano.visitor را نگه دارد')
-need("versionCode 202" in build and "versionName '7.0.2'" in build,
+need("versionCode 203" in build and "versionName '7.0.3'" in build,
      'کد/نام نسخهٔ انتشار باید پس از نسخهٔ نصب‌شده افزایش یابد')
 need('meelano_unified_edition">false' in base_edition,
      'مقدار پیش‌فرض edition یکپارچه باید برای flavorهای دیگر خاموش بماند')
 need(unified_edition_path.exists(), 'منابع اختصاصی flavor یکپارچه موجود نیست')
 if unified_edition_path.exists():
     text = unified_edition_path.read_text(encoding='utf-8')
-    need('meelano_unified_edition">true' in text and 'meelano_manager_edition">true' in text,
-         'flavor یکپارچه باید هم پرچم دسترسی جامع و هم صفحهٔ مدیریت را روشن کند')
+    need('meelano_unified_edition">true' in text and 'meelano_manager_edition">false' in text,
+         'flavor یکپارچه باید نقش دسترسی جامع را روشن کند اما از skin اجباری مدیر استفاده نکند')
 need(unified_strings_path.exists(), 'برچسب اصلی برنامهٔ یکپارچه موجود نیست')
 if unified_strings_path.exists():
     text = unified_strings_path.read_text(encoding='utf-8')
@@ -41,6 +42,13 @@ if (ROOT / 'app/src/unified/res').exists():
 
 need('private boolean UNIFIED_EDITION' in main and 'R.bool.meelano_unified_edition' in main,
      'پرچم برنامهٔ یکپارچه در MainActivity خوانده نمی‌شود')
+need('if (UNIFIED_EDITION) MANAGER_EDITION = true' not in main,
+     'نسخهٔ یکپارچه نباید skin و صفحهٔ مدیر را برای همهٔ نقش‌ها اجباری کند')
+need('if (MANAGER_EDITION || UNIFIED_EDITION)' in main and 'warehousePages' in main
+     and 'MeelanoAccessPolicy.unifiedHomePage(currentAccessRole(), isFullAccessUser())' in main,
+     'صفحهٔ آغاز و مسیر انبار باید بر اساس نقش داخل همان APK یکپارچه انتخاب شود')
+need('add(p, "warehouse", "products", "product_detail", "showcase")' in access_policy,
+     'نقش انباردار باید دسترسی پیش‌فرض محدود و مشخص به ماژول انبار داشته باشد')
 production = ROOT / 'app/src/main/java/ir/meelano/android/ProductionActivity.java'
 production_manifest = (ROOT / 'app/src/main/AndroidManifest.xml').read_text(encoding='utf-8')
 need(production.exists(), 'صفحهٔ تولید در سورس اصلی APK یکپارچه موجود نیست')
@@ -96,13 +104,13 @@ need('unzip -p Test.zip Test/signing/meelano-install.p12' in workflow,
      'CI گواهی کلید نصب کاربر را از بستهٔ منبع نمی‌خواند')
 need('MEELANO_INSTALL_PASSWORD' in workflow and 'secrets.MEELANO_INSTALL_PASSWORD' in workflow,
      'گذرواژهٔ کلید فقط از Secret امن Actions خوانده نمی‌شود')
-need("ir.meelano.visitor' versionCode='202' versionName='7.0.2'" in workflow,
+need("ir.meelano.visitor' versionCode='203' versionName='7.0.3'" in workflow,
      'CI هویت package/version فایل نهایی را کنترل نمی‌کند')
 need('apksigner" verify --verbose --print-certs' in workflow,
      'CI امضای APK تحویلی را راستی‌آزمایی نمی‌کند')
 need('1a2ed0dd70759d6e10c77a4641eeeb8f15972b76d99af351470216955b46d616' in workflow,
      'CI اثرانگشت گواهی نسخهٔ نصب‌شده را با خروجی جدید تطبیق نمی‌دهد')
-need('MEELANO-v7.0.2-release.apk' in workflow and 'signerSha256' in workflow and 'latest-unified.json' in workflow,
+need('MEELANO-v7.0.3-release.apk' in workflow and 'signerSha256' in workflow and 'latest-unified.json' in workflow,
      'CI فایل APK و فیدِ دارای digest و گواهی امضای آن را منتشر نمی‌کند')
 
 # The uploaded project archive is the authority for the user's original installation key.

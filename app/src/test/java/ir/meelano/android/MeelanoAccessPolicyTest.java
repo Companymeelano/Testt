@@ -20,6 +20,22 @@ public class MeelanoAccessPolicyTest {
         assertFalse(p.contains("tax_send"));
     }
 
+    @Test public void unifiedHomeUsesRoleWithoutChangingTheSharedEdition() {
+        assertTrue("dashboard".equals(MeelanoAccessPolicy.unifiedHomePage("manager", true)));
+        assertTrue("dashboard".equals(MeelanoAccessPolicy.unifiedHomePage("admin", true)));
+        assertTrue("visitor_dashboard".equals(MeelanoAccessPolicy.unifiedHomePage("visitor", false)));
+        assertTrue("warehouse".equals(MeelanoAccessPolicy.unifiedHomePage("warehouse", false)));
+    }
+
+    @Test public void warehouseRoleGetsWarehouseToolsButNotSalesOrManagement() {
+        Set<String> p = MeelanoAccessPolicy.defaultPermissions("warehouse");
+        assertTrue(p.contains("warehouse"));
+        assertTrue(p.contains("products"));
+        assertTrue(p.contains("showcase"));
+        assertFalse(p.contains("cart_submit"));
+        assertFalse(p.contains("management_access"));
+    }
+
     @Test public void nonVisitorRolesDoNotInheritVisitorSalesPermissions() {
         assertFalse(MeelanoAccessPolicy.defaultPermissions("accountant").contains("cart_submit"));
         assertFalse(MeelanoAccessPolicy.defaultPermissions("warehouse").contains("cart_submit"));

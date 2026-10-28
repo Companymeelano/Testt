@@ -42,6 +42,12 @@ final class MeelanoAccessPolicy {
         return hasAtiranVisitorId ? "visitor" : "user";
     }
 
+    /** Shared app shell, role-specific landing page; explicit grants still decide if it can open. */
+    static String unifiedHomePage(String rawRole, boolean fullAccess) {
+        if (fullAccess) return "dashboard";
+        return "warehouse".equals(canonicalRole(rawRole)) ? "warehouse" : "visitor_dashboard";
+    }
+
     static Set<String> defaultPermissions(String rawRole) {
         String role = canonicalRole(rawRole);
         LinkedHashSet<String> p = new LinkedHashSet<>();
@@ -65,7 +71,7 @@ final class MeelanoAccessPolicy {
         } else if ("worker".equals(role)) {
             p.add("products");
         } else if ("warehouse".equals(role)) {
-            add(p, "products", "product_detail", "showcase");
+            add(p, "warehouse", "products", "product_detail", "showcase");
         } else if ("senior_accountant".equals(role)) {
             add(p, "customers", "customer_detail", "reports", "command", "taxpayers", "tax_send", "connection_health");
         } else if ("accountant".equals(role)) {

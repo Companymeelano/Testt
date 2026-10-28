@@ -589,10 +589,8 @@ public class SettingsScreen extends Screen {
                 {"alerts", "هشدار امروز"},
                 {"due", "سررسید چک‌ها"},
                 {"returns", "برگشتی‌های فعال"},
-                {"trend", "روند روزانهٔ فروش"},
-                {"monthly", "فروش ماهانه"},
-                {"today_top", "پرفروش‌ترین کالاهای امروز"},
-                {"donut", "ترکیب دریافت"},
+                {"sales_insight", "نبض فروش (نمودار، کالاها و مقایسه ماهانه)"},
+                {"cash_mix", "ترکیب دریافت"},
                 {"eod", "جمع‌بندی پایان روز"},
         };
         final java.util.List<String> order = new java.util.ArrayList<>();

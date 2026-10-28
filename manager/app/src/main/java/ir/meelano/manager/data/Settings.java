@@ -327,7 +327,7 @@ public final class Settings {
 
     // ---------------- home dashboard order ----------------
     /** Manager-first order: daily flow and actions, then trends and product analysis. */
-    public static final String HOME_ORDER_DEFAULT = "kpis,alerts,due,returns,trend,monthly,today_top,donut,eod";
+    public static final String HOME_ORDER_DEFAULT = "kpis,alerts,due,returns,sales_insight,cash_mix,eod";
 
     public String homeOrder() {
         String stored = p.getString("home_order", null);
@@ -363,13 +363,6 @@ public final class Settings {
 
     public void setHomeOrder(String csv) {
         p.edit().putString("home_order", csv == null ? HOME_ORDER_DEFAULT : csv).apply();
-    }
-
-    /** Whether the manager dashboard's lower-priority analysis cards are expanded. */
-    public boolean homeDetailsExpanded() { return p.getBoolean("home_details_expanded", false); }
-
-    public void setHomeDetailsExpanded(boolean expanded) {
-        p.edit().putBoolean("home_details_expanded", expanded).apply();
     }
 
     // ---------------- stock alerts + auto backup (v18) ----------------

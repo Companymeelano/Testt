@@ -1041,36 +1041,16 @@ public class HomeScreen extends Screen {
         content.addView(greetingHero(), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(8));
 
-        // Render each dashboard section into its own container so the lower-priority
-        // analysis panels can collapse without changing the user's saved order.
-        List<LinearLayout> blocks = new ArrayList<>();
-        List<Boolean> essential = new ArrayList<>();
-        List<String> keys = new ArrayList<>();
-        int detailCount = 0;
+        // The former "dashboard details" accordion is gone. Operational and analytical
+        // sections now have a clear, compact hierarchy and remain directly discoverable.
+        boolean marketAdded = false;
         for (String key : orderedKeys()) {
             LinearLayout block = a.kit.v();
             renderHomeSection(block, d, key);
             if (block.getChildCount() == 0) continue;
-            boolean keepVisible = isEssentialHomeSection(key);
-            blocks.add(block);
-            essential.add(keepVisible);
-            keys.add(key);
-            if (!keepVisible) detailCount++;
-        }
-
-        boolean expanded = a.settings.homeDetailsExpanded();
-        boolean toggleAdded = false;
-        boolean marketAdded = false;
-        for (int i = 0; i < blocks.size(); i++) {
-            if (!essential.get(i) && !toggleAdded && detailCount > 0) {
-                content.addView(homeDetailsToggle(blocks, essential, detailCount, expanded), a.kit.lp(-1, -2));
-                toggleAdded = true;
-            }
-            LinearLayout block = blocks.get(i);
-            if (!essential.get(i) && !expanded) block.setVisibility(View.GONE);
             content.addView(block, a.kit.lp(-1, -2));
             // Let the operational KPIs lead; market and weather remain visible but secondary.
-            if ("kpis".equals(keys.get(i))) {
+            if ("kpis".equals(key)) {
                 content.addView(a.kit.gap(6));
                 content.addView(marketCard(), a.kit.lp(-1, -2));
                 content.addView(a.kit.gap(8));
@@ -1159,76 +1139,17 @@ public class HomeScreen extends Screen {
     private void renderHomeSection(LinearLayout content, Data d, String key) {
         if ("kpis".equals(key)) secKpis(content, d);
         else if ("alerts".equals(key)) secAlerts(content, d);
-        else if ("trend".equals(key)) secTrend(content, d);
-        else if ("donut".equals(key)) secDonut(content, d);
-        else if ("today_top".equals(key)) secTopItems(content, d);
-        else if ("monthly".equals(key)) secMonthlySales(content, d);
+        else if ("sales_insight".equals(key)) secSalesInsight(content, d);
+        else if ("cash_mix".equals(key)) secCashMix(content, d);
         else if ("due".equals(key)) secDue(content, d);
         else if ("returns".equals(key)) secReturns(content, d);
         else if ("eod".equals(key)) secEod(content);
     }
 
-    private boolean isEssentialHomeSection(String key) {
-        return "kpis".equals(key) || "alerts".equals(key) || "due".equals(key)
-                || "returns".equals(key);
-    }
-
-    private View homeDetailsToggle(final List<LinearLayout> blocks, final List<Boolean> essential,
-                                  final int detailCount, boolean expandedInitially) {
-        final boolean[] expanded = {expandedInitially};
-        final LinearLayout card = a.kit.card(Theme.INFO);
-        card.setPadding(Theme.dp(14), Theme.dp(11), Theme.dp(14), Theme.dp(11));
-        LinearLayout row = a.kit.h();
-        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
-
-        // Same 3D family as the rest of the dashboard (emerald in the nut theme) instead of a blue text glyph.
-        android.widget.ImageView icon = new android.widget.ImageView(a);
-        icon.setImageResource(Theme.chrome3d(R.drawable.mi_widgets));
-        icon.setScaleType(android.widget.ImageView.ScaleType.CENTER_INSIDE);
-        icon.setPadding(Theme.dp(6), Theme.dp(6), Theme.dp(6), Theme.dp(6));
-        icon.setBackground(Theme.avatar(Theme.alpha(Theme.INFO, 50)));
-        row.addView(icon, new LinearLayout.LayoutParams(Theme.dp(46), Theme.dp(46)));
-        row.addView(a.kit.space(10));
-
-        LinearLayout copy = a.kit.v();
-        TextView title = a.kit.text("جزئیات تکمیلی داشبورد", 13.5f, Theme.TEXT, true);
-        TextView subtitle = a.kit.text("", 10.5f, Theme.MUTED, false);
-        subtitle.setMaxLines(2);
-        copy.addView(title, a.kit.lp(-1, -2));
-        copy.addView(subtitle, a.kit.lp(-1, -2));
-        row.addView(copy, a.kit.wlp(1f));
-        row.addView(a.kit.space(8));
-
-        android.widget.ImageView action = new android.widget.ImageView(a);
-        action.setColorFilter(Theme.INFO);
-        action.setScaleType(android.widget.ImageView.ScaleType.CENTER_INSIDE);
-        row.addView(action, new LinearLayout.LayoutParams(Theme.dp(28), Theme.dp(36)));
-        card.addView(row, a.kit.lp(-1, -2));
-
-        final Runnable refresh = () -> {
-            subtitle.setText(expanded[0]
-                    ? "نمایش داده می‌شود؛ برای جمع‌کردن لمس کنید"
-                    : Money.fa(String.valueOf(detailCount)) + " بخش تحلیلی • برای نمایش لمس کنید");
-            action.setImageResource(expanded[0] ? R.drawable.mi_remove : R.drawable.mi_add);
-            card.setContentDescription(expanded[0] ? "جمع‌کردن جزئیات داشبورد" : "نمایش جزئیات داشبورد");
-        };
-        refresh.run();
-        Theme.pressable(card);
-        card.setOnClickListener(v -> {
-            expanded[0] = !expanded[0];
-            a.settings.setHomeDetailsExpanded(expanded[0]);
-            for (int i = 0; i < blocks.size(); i++) {
-                if (!essential.get(i)) blocks.get(i).setVisibility(expanded[0] ? View.VISIBLE : View.GONE);
-            }
-            refresh.run();
-        });
-        return card;
-    }
-
     /** Dashboard order from settings; unknown keys dropped, missing sections appended. */
     private List<String> orderedKeys() {
         List<String> out = new ArrayList<>();
-        String[] known = {"kpis", "alerts", "due", "returns", "trend", "monthly", "today_top", "donut", "eod"};
+        String[] known = {"kpis", "alerts", "due", "returns", "sales_insight", "cash_mix", "eod"};
         for (String k : a.settings.homeOrder().split(",")) {
             String t = k == null ? "" : k.trim();
             if (!t.isEmpty() && !out.contains(t)) {
@@ -1462,109 +1383,138 @@ public class HomeScreen extends Screen {
         a.kit.addCard(content, card);
     }
 
-    /** Top five by the snapshot day's invoiced sales, following the dashboard benchmark. */
-    private void secTopItems(LinearLayout content, Data d) {
-        String period = snapshotLabel(d);
-        LinearLayout c = a.kit.card(Theme.GOLD);
-        c.addView(dashboardSectionHead("پرفروش‌ترین کالاهای " + period, R.drawable.mi_grid_view,
-                Theme.GOLD, "گزارش کامل ›", v -> a.nav("reports")),
-                a.kit.lp(-1, -2));
-        if (d.topItems == null || d.topItems.isEmpty()) {
-            c.addView(a.kit.text("هنوز کالایی برای " + period + " ثبت نشده است.", 11.5f, Theme.MUTED, false),
+    /** Compact sales pulse: one useful daily chart, ranked products and month-over-month context. */
+    private void secSalesInsight(LinearLayout content, Data d) {
+        boolean hasDaily = d.salesDaily != null && !d.salesDaily.isEmpty();
+        boolean hasProducts = d.topItems != null && !d.topItems.isEmpty();
+        boolean hasMonths = d.monthlySales != null && !d.monthlySales.isEmpty();
+        if (!hasDaily && !hasProducts && !hasMonths) return;
+
+        LinearLayout card = a.kit.card(Theme.GOLD);
+        card.addView(dashboardSectionHead("نبض فروش", R.drawable.mi_bar_chart,
+                Theme.GOLD, "فروش ›", v -> a.nav("sales")), a.kit.lp(-1, -2));
+
+        if (hasDaily) {
+            String endDay = snapshotDay(d);
+            List<Charts.Point> points = filled(d.salesDaily, endDay);
+            double today = salesOnDay(d.salesDaily, endDay);
+            double avg7 = averageSalesBefore(d.salesDaily, endDay, 7);
+            if (avg7 > 0) {
+                double change = (today - avg7) * 100.0 / avg7;
+                int color = today >= avg7 ? Theme.SUCCESS : Theme.WARNING;
+                String direction = today >= avg7 ? "بالاتر" : "پایین‌تر";
+                LinearLayout pulse = a.kit.h();
+                pulse.setGravity(Gravity.CENTER_VERTICAL);
+                pulse.setPadding(Theme.dp(9), Theme.dp(7), Theme.dp(9), Theme.dp(7));
+                pulse.setBackground(Theme.kpi(color));
+                pulse.addView(a.kit.text("فروش " + snapshotLabel(d), 10.5f, Theme.MUTED, false), a.kit.wlp(1f));
+                pulse.addView(a.kit.text(Money.pct(Math.abs(change)) + " " + direction + " از میانگین ۷ روز",
+                        10.5f, color, true), a.kit.lp(-2, -2));
+                card.addView(pulse, a.kit.lp(-1, -2));
+                card.addView(a.kit.gap(4));
+            }
+            Charts.Area chart = new Charts.Area(a);
+            TextView caption = a.kit.text(points.isEmpty() ? "" : lastCap(points), 10f, Theme.MUTED, false);
+            chart.setData(points, Theme.GOLD, Charts.COMPACT);
+            chart.setListener((idx, point) -> caption.setText(Money.fa(point.label) + " • " + Money.rial(point.value)));
+            card.addView(chart, new LinearLayout.LayoutParams(-1, Theme.dp(126)));
+            card.addView(caption, a.kit.lp(-1, -2));
+        }
+
+        if (hasProducts) {
+            if (hasDaily) card.addView(a.kit.gap(7));
+            card.addView(insightSubhead("پرفروش‌های " + snapshotLabel(d), R.drawable.mi_grid_view, Theme.GOLD),
                     a.kit.lp(-1, -2));
-        } else {
-            int show = Math.min(5, d.topItems.size());
-            for (int i = 0; i < show; i++) {
+            int shown = Math.min(3, d.topItems.size());
+            double max = 0;
+            for (int i = 0; i < shown; i++) max = Math.max(max, d.topItems.get(i).d("total"));
+            for (int i = 0; i < shown; i++) {
                 Row item = d.topItems.get(i);
-                LinearLayout row = a.kit.h();
-                row.setGravity(android.view.Gravity.CENTER_VERTICAL);
-                TextView rank = a.kit.text(Money.fa(String.valueOf(i + 1)), 11f, Theme.GOLD, true);
-                rank.setGravity(android.view.Gravity.CENTER);
-                rank.setBackground(Theme.avatar(Theme.alpha(Theme.GOLD, 44)));
-                row.addView(rank, new LinearLayout.LayoutParams(Theme.dp(28), Theme.dp(28)));
-                row.addView(a.kit.space(6));
-
-                LinearLayout copy = a.kit.v();
-                TextView name = a.kit.text(item.s("label"), 12f, Theme.TEXT, true);
-                name.setSingleLine(true);
-                name.setEllipsize(android.text.TextUtils.TruncateAt.END);
-                copy.addView(name, a.kit.lp(-1, -2));
-                String detail = Money.qty(item.d("qty")) + " واحد • "
-                        + Money.fa(String.valueOf(item.l("docs"))) + " ردیف";
-                copy.addView(a.kit.text(detail, 10f, Theme.MUTED, false), a.kit.lp(-1, -2));
-                row.addView(copy, a.kit.wlp(1f));
-                row.addView(a.kit.space(8));
-
-                TextView total = a.kit.text(Money.compactRial(item.d("total")), 11.5f, Theme.GOLD, true);
-                total.setGravity(android.view.Gravity.END | android.view.Gravity.CENTER_VERTICAL);
-                total.setMaxLines(1);
-                total.setEllipsize(android.text.TextUtils.TruncateAt.END);
-                row.addView(total, a.kit.lp(-2, -2));
-                c.addView(row, a.kit.lp(-1, -2));
-                if (i + 1 < show) c.addView(a.kit.gap(4));
+                String label = item.s("label");
+                if (label == null || label.trim().isEmpty()) label = "کالای بدون نام";
+                card.addView(a.kit.progressLine(Money.fa(String.valueOf(i + 1)) + " • " + label,
+                        Money.compactRial(item.d("total")), max > 0 ? item.d("total") / max : 0, Theme.GOLD),
+                        a.kit.lp(-1, -2));
+                TextView quantity = a.kit.text(Money.qty(item.d("qty")) + " واحد • "
+                        + Money.fa(String.valueOf(item.l("docs"))) + " ردیف", 9.5f, Theme.MUTED, false);
+                quantity.setGravity(Gravity.END);
+                card.addView(quantity, a.kit.lp(-1, -2));
             }
         }
-        a.kit.addCard(content, c);
-    }
 
-    private void secTrend(LinearLayout content, Data d) {
-        // ---- 14-day sales trend ----
-        if (d.salesDaily != null && !d.salesDaily.isEmpty()) {
-            String endDay = snapshotDay(d);
-            String period = snapshotLabel(d);
-            LinearLayout c = a.kit.card(Theme.GOLD);
-            c.addView(dashboardSectionHead("روند روزانهٔ فروش • تا " + period, R.drawable.mi_bar_chart,
-                    Theme.GOLD, "فروش ›", v -> a.nav("sales")), a.kit.lp(-1, -2));
-            Charts.Area ch = new Charts.Area(a);
-            List<Charts.Point> pts = filled(d.salesDaily, endDay);
-            final TextView cap = a.kit.text(pts.isEmpty() ? "" : lastCap(pts), 11f, Theme.MUTED, false);
-            ch.setData(pts, Theme.GOLD, Charts.COMPACT);
-            ch.setListener((idx, p) -> cap.setText(Money.fa(p.label) + " • " + Money.rial(p.value)));
-            c.addView(ch, new LinearLayout.LayoutParams(-1, Theme.dp(152)));
-            c.addView(cap, a.kit.lp(-1, -2));
-            a.kit.addCard(content, c);
+        if (hasMonths) {
+            Row current = d.monthlySales.get(0);
+            Row previous = d.monthlySales.size() > 1 ? d.monthlySales.get(1) : null;
+            String currentMonth = current.s("month");
+            String previousMonth = previous == null ? null : previous.s("month");
+            if (currentMonth != null || previous != null) {
+                card.addView(a.kit.gap(7));
+                card.addView(insightSubhead("مقایسهٔ ماهانه", R.drawable.mi_sell, Theme.GOLD),
+                        a.kit.lp(-1, -2));
+                LinearLayout months = a.kit.h();
+                months.addView(insightMetric(currentMonth == null ? "ماه جاری" : currentMonth.replace('-', '/'),
+                        Money.compactRial(current.d("total")), Theme.GOLD), a.kit.wlp(1f));
+                if (previous != null) {
+                    months.addView(a.kit.space(7));
+                    months.addView(insightMetric(previousMonth == null ? "ماه قبل" : previousMonth.replace('-', '/'),
+                            Money.compactRial(previous.d("total")), Theme.INFO), a.kit.wlp(1f));
+                }
+                card.addView(months, a.kit.lp(-1, -2));
+                if (previous != null && previous.d("total") > 0) {
+                    double change = (current.d("total") - previous.d("total")) * 100.0 / previous.d("total");
+                    int color = current.d("total") >= previous.d("total") ? Theme.SUCCESS : Theme.WARNING;
+                    card.addView(a.kit.text("تغییر نسبت به ماه قبل: " + Money.pct(change),
+                            10f, color, true), a.kit.lp(-1, -2));
+                }
+            }
         }
-    }
-
-    private void secMonthlySales(LinearLayout content, Data d) {
-        if (d.monthlySales == null || d.monthlySales.isEmpty()) return;
-        LinearLayout card = a.kit.card(Theme.GOLD);
-        card.addView(dashboardSectionHead("فروش ماهانه • ۱۲ ماه اخیر", R.drawable.mi_sell,
-                Theme.GOLD, "فروش ›", v -> a.nav("sales")),
-                a.kit.lp(-1, -2));
-        Charts.Bars chart = new Charts.Bars(a);
-        List<Charts.Point> points = new ArrayList<>();
-        for (Row r : d.monthlySales) {
-            String month = r.s("month");
-            if (month == null) continue;
-            points.add(new Charts.Point(month.replace('-', '/'), r.d("total"), Theme.GOLD));
-        }
-        if (points.isEmpty()) return;
-        java.util.Collections.reverse(points); // chronological on the RTL axis: recent months at the left
-        TextView caption = a.kit.text(lastCap(points), 10.5f, Theme.MUTED, false);
-        chart.setData(points, Charts.COMPACT);
-        chart.setListener((idx, point) -> caption.setText(Money.fa(point.label) + " • " + Money.rial(point.value)));
-        card.addView(chart, new LinearLayout.LayoutParams(-1, Theme.dp(158)));
-        card.addView(caption, a.kit.lp(-1, -2));
         a.kit.addCard(content, card);
     }
 
-    private void secDonut(LinearLayout content, Data d) {
-        // ---- receipts mix donut ----
-        if (d.inDay != null && d.inDay.d("total") > 0) {
-            LinearLayout c = a.kit.card(Theme.SUCCESS);
-            c.addView(dashboardSectionHead("ترکیب دریافت " + dayOf(d.inDay), R.drawable.mi_receipt_long,
-                    Theme.SUCCESS, "دریافت‌ها ›", v -> a.nav("dar_in")), a.kit.lp(-1, -2));
-            Charts.Donut dn = new Charts.Donut(a);
-            List<Charts.Point> pts = new ArrayList<>();
-            pts.add(new Charts.Point("نقد", d.inDay.d("cash"), Theme.SUCCESS));
-            pts.add(new Charts.Point("کارت", d.inDay.d("pos"), Theme.INFO));
-            pts.add(new Charts.Point("حواله", d.inDay.d("havaleh"), Theme.GOLD));
-            pts.add(new Charts.Point("چک", d.inDay.d("cheque"), Theme.GOLD));
-            dn.setData(pts, "جمع دریافت", Money.compactRial(d.inDay.d("total")));
-            c.addView(dn, new LinearLayout.LayoutParams(-1, Theme.dp(218)));
-            a.kit.addCard(content, c);
-        }
+    /** Payment mix is easier to scan as four proportional rails than as another large chart. */
+    private void secCashMix(LinearLayout content, Data d) {
+        if (d.inDay == null || d.inDay.d("total") <= 0) return;
+        LinearLayout card = a.kit.card(Theme.SUCCESS);
+        card.addView(dashboardSectionHead("ترکیب دریافت " + dayOf(d.inDay), R.drawable.mi_receipt_long,
+                Theme.SUCCESS, "دریافت‌ها ›", v -> a.nav("dar_in")), a.kit.lp(-1, -2));
+        card.addView(a.kit.text("جمع " + Money.compactRial(d.inDay.d("total")),
+                11f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        addPaymentMix(card, "نقد", d.inDay.d("cash"), d.inDay.d("total"), Theme.SUCCESS);
+        addPaymentMix(card, "کارت", d.inDay.d("pos"), d.inDay.d("total"), Theme.INFO);
+        addPaymentMix(card, "حواله", d.inDay.d("havaleh"), d.inDay.d("total"), Theme.GOLD);
+        addPaymentMix(card, "چک", d.inDay.d("cheque"), d.inDay.d("total"), Theme.VIOLET);
+        a.kit.addCard(content, card);
+    }
+
+    private void addPaymentMix(LinearLayout card, String label, double amount, double total, int color) {
+        if (amount <= 0) return;
+        card.addView(a.kit.progressLine(label, Money.compactRial(amount), amount / total, color),
+                a.kit.lp(-1, -2));
+    }
+
+    private View insightSubhead(String title, int icon, int accent) {
+        LinearLayout row = a.kit.h();
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        ImageView art = dashboardArt(icon);
+        row.addView(art, a.kit.lp(Theme.dp(25), Theme.dp(25)));
+        row.addView(a.kit.space(6));
+        row.addView(a.kit.text(title, 11f, accent, true), a.kit.wlp(1f));
+        return row;
+    }
+
+    private View insightMetric(String label, String value, int accent) {
+        LinearLayout tile = a.kit.v();
+        tile.setPadding(Theme.dp(9), Theme.dp(7), Theme.dp(9), Theme.dp(7));
+        tile.setBackground(Theme.kpi(accent));
+        TextView title = a.kit.text(label, 9.5f, Theme.MUTED, false);
+        title.setSingleLine(true);
+        title.setEllipsize(TextUtils.TruncateAt.END);
+        tile.addView(title, a.kit.lp(-1, -2));
+        TextView amount = a.kit.text(value, 11.5f, accent, true);
+        amount.setSingleLine(true);
+        amount.setEllipsize(TextUtils.TruncateAt.END);
+        tile.addView(amount, a.kit.lp(-1, -2));
+        return tile;
     }
 
     private void secDue(LinearLayout content, Data d) {
@@ -1601,7 +1551,10 @@ public class HomeScreen extends Screen {
         } catch (Exception ignored) { Diag.ignored("HomeScreen:800", ignored); }
         c.addView(a.kit.sectionHead("🌙 جمع‌بندی پایان روز" + (when.isEmpty() ? "" : " • " + when),
                 null, null), a.kit.lp(-1, -2));
-        c.addView(a.kit.text(txt, 13f, Theme.TEXT, false), a.kit.lp(-1, -2));
+        TextView summary = a.kit.text(txt, 12f, Theme.TEXT, false);
+        summary.setMaxLines(3);
+        summary.setEllipsize(TextUtils.TruncateAt.END);
+        c.addView(summary, a.kit.lp(-1, -2));
         c.addView(a.kit.gap(6));
         final String share = "🌙 جمع‌بندی پایان روز میلانو زرین‌فرمان" + (when.isEmpty() ? "" : " (" + when + ")")
                 + "\n" + txt;

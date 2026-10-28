@@ -31,9 +31,9 @@ import ir.meelano.manager.data.Meta;
  * the same real-password check also works OFFLINE after the first online
  * login. The per-user app PIN (Users section) stays as managed tooling for
  * later phases.
- * Release phases (single app, role editions): admin + warehouse are live
- * (phases 1-2); seller / accountant / visitor / distributor / moadian get
- * a «coming soon» gate until their phase opens (see phaseOpen).
+ * Release phases (single app, role editions): admin + warehouse + visitor
+ * are live; seller / accountant / distributor / moadian remain gated until
+ * their phase opens (see phaseOpen).
  *
  * Everything here is READ-ONLY against the server: we never write
  * IsLoggedIn / LoginDetails / PINs back to Atiran. PINs, sessions and the
@@ -678,13 +678,13 @@ public final class AtiranAuth {
     // ================= release phases (v27) =================
 
     /**
-     * ONE app — the Atiran role picks the edition. Admin + warehouse are
-     * live; every other role waits for its phase. Opening a phase is a
-     * deliberate one-line change here, never an accident.
+     * ONE app — the Atiran role picks the edition. Manager, warehouse and
+     * visitor are live; unfinished roles remain explicitly gated.
      */
     public static boolean phaseOpen(Context c, String role) {
         if (RoleStore.ADMIN.equals(role)) return true;
         if (RoleStore.WAREHOUSE.equals(role)) return true; // PHASE 2 (v28)
+        if (RoleStore.VISITOR.equals(role)) return true; // PHASE 3 (v36.28)
         return false;
     }
 

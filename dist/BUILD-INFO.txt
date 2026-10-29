@@ -1,41 +1,41 @@
 نسخهٔ برنامهٔ یکپارچه: 7.0.3 (versionCode 203; package ir.meelano.visitor)
 گواهی امضا: نسخهٔ نصب فعلی / Pakhsh Derakhshan (fingerprint را CI بررسی می‌کند)
 APK اصلی: MEELANO-v7.0.3-release.apk
-کامیت: aab7579
-تاریخ build: 2026-10-29T07:26:05Z
+کامیت: 7b8bdb0
+تاریخ build: 2026-10-29T08:28:03Z
 Gradle: Gradle 8.13
 فایل‌ها:
-drwxr-xr-x  2 runner runner     4096 Oct 29 07:25 .
-drwxr-xr-x 14 runner runner     4096 Oct 29 07:25 ..
--rw-r--r--  1 runner runner      346 Oct 29 07:26 BUILD-INFO.txt
--rw-r--r--  1 runner runner  4215469 Oct 29 07:25 MEELANO-v7.0.3-release.apk
--rw-r--r--  1 runner runner  4926562 Oct 29 07:25 app-manager-debug.apk
--rw-r--r--  1 runner runner  4580854 Oct 29 07:25 app-staff-debug.apk
--rw-r--r--  1 runner runner  4590610 Oct 29 07:25 app-store-debug.apk
--rw-r--r--  1 runner runner  4633342 Oct 29 07:25 app-tax-debug.apk
--rw-r--r--  1 runner runner  4618758 Oct 29 07:25 app-unified-debug.apk
--rw-r--r--  1 runner runner  4618658 Oct 29 07:25 app-visitor-debug.apk
--rw-r--r--  1 runner runner      491 Oct 29 07:21 buy-formula-counts.json
--rw-r--r--  1 runner runner      354 Oct 29 07:25 latest-unified.json
--rw-r--r--  1 runner runner      189 Oct 29 07:21 manager-v36-build-info.txt
--rw-r--r--  1 runner runner 68773191 Oct 29 07:21 meelano-manager-v36-debug-10.apk
--rw-r--r--  1 runner runner 68789575 Oct 29 07:21 meelano-manager-v36-debug-11.apk
--rw-r--r--  1 runner runner 68789571 Oct 29 07:21 meelano-manager-v36-debug-12.apk
--rw-r--r--  1 runner runner 68841935 Oct 29 07:21 meelano-manager-v36-debug-14.apk
--rw-r--r--  1 runner runner 68841935 Oct 29 07:21 meelano-manager-v36-debug-15.apk
--rw-r--r--  1 runner runner 68841935 Oct 29 07:21 meelano-manager-v36-debug-16.apk
--rw-r--r--  1 runner runner 69263415 Oct 29 07:21 meelano-manager-v36-debug-17.apk
--rw-r--r--  1 runner runner 69279799 Oct 29 07:21 meelano-manager-v36-debug-18.apk
--rw-r--r--  1 runner runner 68773191 Oct 29 07:21 meelano-manager-v36-debug-9.apk
--rw-r--r--  1 runner runner     1422 Oct 29 07:21 money-structure-counts.json
+drwxr-xr-x  2 runner runner     4096 Oct 29 08:27 .
+drwxr-xr-x 14 runner runner     4096 Oct 29 08:27 ..
+-rw-r--r--  1 runner runner      346 Oct 29 08:28 BUILD-INFO.txt
+-rw-r--r--  1 runner runner  4215469 Oct 29 08:27 MEELANO-v7.0.3-release.apk
+-rw-r--r--  1 runner runner  4926562 Oct 29 08:27 app-manager-debug.apk
+-rw-r--r--  1 runner runner  4580854 Oct 29 08:27 app-staff-debug.apk
+-rw-r--r--  1 runner runner  4590610 Oct 29 08:27 app-store-debug.apk
+-rw-r--r--  1 runner runner  4633342 Oct 29 08:27 app-tax-debug.apk
+-rw-r--r--  1 runner runner  4618758 Oct 29 08:27 app-unified-debug.apk
+-rw-r--r--  1 runner runner  4618658 Oct 29 08:27 app-visitor-debug.apk
+-rw-r--r--  1 runner runner      491 Oct 29 08:24 buy-formula-counts.json
+-rw-r--r--  1 runner runner      354 Oct 29 08:27 latest-unified.json
+-rw-r--r--  1 runner runner      189 Oct 29 08:24 manager-v36-build-info.txt
+-rw-r--r--  1 runner runner 68773191 Oct 29 08:24 meelano-manager-v36-debug-10.apk
+-rw-r--r--  1 runner runner 68789575 Oct 29 08:24 meelano-manager-v36-debug-11.apk
+-rw-r--r--  1 runner runner 68789571 Oct 29 08:24 meelano-manager-v36-debug-12.apk
+-rw-r--r--  1 runner runner 68841935 Oct 29 08:24 meelano-manager-v36-debug-14.apk
+-rw-r--r--  1 runner runner 68841935 Oct 29 08:24 meelano-manager-v36-debug-15.apk
+-rw-r--r--  1 runner runner 68841935 Oct 29 08:24 meelano-manager-v36-debug-16.apk
+-rw-r--r--  1 runner runner 69263415 Oct 29 08:24 meelano-manager-v36-debug-17.apk
+-rw-r--r--  1 runner runner 69279799 Oct 29 08:24 meelano-manager-v36-debug-18.apk
+-rw-r--r--  1 runner runner 68773191 Oct 29 08:24 meelano-manager-v36-debug-9.apk
+-rw-r--r--  1 runner runner     1422 Oct 29 08:24 money-structure-counts.json
 --- sha256 ---
-d14311d644e337541b5ca8ac5f3928b2a22f50c2d7e738c9e65159c90cd6f3f1  MEELANO-v7.0.3-release.apk
-59b3dd308eb6d19dfa5eb02bbe24c19970f48a8867f5f62f074ced7a8c909033  app-manager-debug.apk
-715b1109c2ff4a2d907f8a33f07bca915d1f9347d50781799cec3f56e44a27dd  app-staff-debug.apk
-da6085d28a39ff6e8769bcd7470d4716d8aff9fb02100d1c9b0c6881cb43f3d1  app-store-debug.apk
-11684cb26be9cc7cf82ce78c7fa2293ab13827fb65f53d685f11e2b545fcf7dc  app-tax-debug.apk
-9c93c901c94dbdd7d0aebf710aeef71ce938fd867b8b4eff430ed5269c9225de  app-unified-debug.apk
-50d60527f04e1aa039357dcd7b61d54b834be5ce214c0144816f1f543092a896  app-visitor-debug.apk
+3d59c8a34eaa87b7842c63db52cea4b8521ae7e1e767e7976bcf0b3cc19291cd  MEELANO-v7.0.3-release.apk
+76134eb13dec1d4376be23ccc6a49b8409e649d347d0bd738dc88ab68c20166b  app-manager-debug.apk
+70449adaea88b0ca458728c11e62fd149e691214262fbdeb20df4f9aae6d3b9d  app-staff-debug.apk
+39d58cd9298cda23c6f22b20b303277d77687114aff728decff7d5ddadbf1737  app-store-debug.apk
+3444a0fcc88ab6a1eb8a03996be6210431c9f4a12c274ddcf0e70cb42288a2cb  app-tax-debug.apk
+2f321d8d7b2464f0092975c7f3c36cbeec3f50bd37f929236d3d3821fedb5efd  app-unified-debug.apk
+81903afc88734a0be72bcb35be039db9961f452f4acbac1366b8d681ab0fa2ae  app-visitor-debug.apk
 3997228337331fea8c6bd8ed9abcdc20636c6fd5137445b748c022f55bee1e76  meelano-manager-v36-debug-10.apk
 0443c81c65e16fb1eaaeb390b4a6aa001749e215cc139c97117cf004ab26a108  meelano-manager-v36-debug-11.apk
 b4c923cc215222cb175c84a9b6f4641b88d4305d082d76ba422bb3bcd7fd76c6  meelano-manager-v36-debug-12.apk
@@ -43,5 +43,5 @@ f9d92b18ceb5a495380394f7142366035ae2cd20abe0a0c5e601e5e2036d95f4  meelano-manage
 7fb1de514c2c087f242d7242617027e0d971be3b1c05050211ceb3a47b83b6f5  meelano-manager-v36-debug-15.apk
 2d1cfbde07fa9af5a506ccf07b414091905dcc509797f2b6ae3a847633dd5b01  meelano-manager-v36-debug-16.apk
 94a3b26ad99ca472a75412fa893214daddcec9079b3190e4dd8c63e0342dcdba  meelano-manager-v36-debug-17.apk
-7eb346e16d1db0dba5ad1a082be75a179037ef12d55013a7e2cd284251473e47  meelano-manager-v36-debug-18.apk
+dbd9fedaa6a5dcf5c72e15d43cbf6f354bab57df334c3a90bef33b68f19983a5  meelano-manager-v36-debug-18.apk
 ca232e5a461fc1922f1d17e03bc8a5eff153ec40841e1133c8cfc5d24ef815fc  meelano-manager-v36-debug-9.apk

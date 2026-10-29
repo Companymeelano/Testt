@@ -906,6 +906,91 @@ def check_section_art():
         report('هنر سه‌بعدی بخش‌های ایندکس', False, 'ممیزی ناموفق: %s' % e)
 
 
+def check_header_room():
+    """The name of the shop and the status chips must stay clear of the brand mark.
+
+    The mark sits at the start of the header row (the right in Persian). When the name
+    column is measured with a weight it can become wider than the row, and a long shop
+    name then runs under the mark and loses its last letters. The column therefore has to
+    get a computed width, the label a maximum width, and the chips a share of that room.
+    """
+    src = os.path.join(ROOT, 'manager/app/src/main/java/ir/meelano/manager/MainActivity.java')
+    try:
+        code = open(src, encoding='utf-8').read()
+        problems = []
+        if 'int nameRoomDp' not in code:
+            problems.append('the header has no computed room for the name column')
+        add = re.search(r'brand\.addView\(titleCol,\s*([^)]*)\)', code)
+        if not add:
+            problems.append('the name column is not added to the brand row')
+        else:
+            params = add.group(1)
+            if 'wlp(' in params:
+                problems.append('the name column is weighted, so it can grow under the brand mark')
+            if 'nameRoomDp' not in params:
+                problems.append('the name column does not use the computed room')
+        if 'companyName.setMaxWidth' not in code:
+            problems.append('the company name has no maximum width')
+        if 'userChip.setMaxWidth' not in code or 'nameRoomDp' not in code:
+            problems.append('the account chip is not bounded by the room of the header')
+        if 'licChip.setMaxWidth' not in code:
+            problems.append('the licence chip has no maximum width')
+        ok = not problems
+        report('جای نام و چیپ‌های سربرگ', ok,
+               'ستون نام با عرض محاسبه‌شده ساخته می‌شود؛ نام و چیپ‌های سربرگ زیر نشان برند نمی‌روند'
+               if ok else '؛ '.join(problems))
+    except Exception as e:
+        report('جای نام و چیپ‌های سربرگ', False, 'ممیزی ناموفق: %s' % e)
+
+
+def check_visitor_art_agrees():
+    """A page of the field-sales workspace must wear the same artwork in the command room
+    and in the workspace itself.
+
+    The two lists are written apart, and a section could end up with one picture in the
+    room (the black clipboard of the daily close) and another one in the workspace (the
+    emerald person). The visitor then saw two different icons for the same job.
+    """
+    room_src = os.path.join(ROOT, 'manager/app/src/main/java/ir/meelano/manager/core/CommandRoom.java')
+    desk_src = os.path.join(ROOT, 'manager/app/src/main/java/ir/meelano/manager/screens/VisitorDeskScreen.java')
+    try:
+        room = open(room_src, encoding='utf-8').read()
+        desk = open(desk_src, encoding='utf-8').read()
+        problems = []
+        # The entries of the visitor group of the index: id -> artwork.
+        group = re.search(r'VISITOR_GROUPS = \{(.*?)\n    \};', room, flags=re.S)
+        if not group:
+            problems.append('the index has no visitor group')
+            index_art = {}
+        else:
+            index_art = {}
+            for m in re.finditer(r'v\("(\w+)",\s*"[^"]*",\s*"[^"]*",\s*"(mi_\w+)"\)', group.group(1)):
+                index_art[m.group(1)] = m.group(2)
+        # The tiles of the workspace: target constant -> artwork.
+        tile_art = {}
+        for m in re.finditer(r'homeTile\("[^"]*",\s*"[^"]*",\s*R\.drawable\.(mi_\w+),\s*(\w+)\)', desk):
+            tile_art[m.group(2)] = m.group(1)
+        # The page each target constant stands for.
+        page_of = {'CUSTOMERS': 'customers', 'PRODUCTS': 'products', 'ROUTE': 'route',
+                   'ORDER': 'order', 'MY_ORDERS': 'my_orders', 'RECEIPT': 'receipt',
+                   'REPORTS': 'reports'}
+        for target, art in sorted(tile_art.items()):
+            page = page_of.get(target)
+            if page is None:
+                continue
+            if page not in index_art:
+                problems.append('%s is not listed in the index of the visitor' % page)
+            elif index_art[page] != art:
+                problems.append('%s: the room shows %s but the workspace shows %s'
+                                % (page, index_art[page], art))
+        ok = bool(index_art) and bool(tile_art) and not problems
+        report('یکسانی آیکن بخش‌های ویزیتور', ok,
+               '%d بخش ویزیتور؛ آیکن اتاق فرمان و آیکن میزکار برای هر بخش یکی است'
+               % len(index_art) if ok else '؛ '.join(problems))
+    except Exception as e:
+        report('یکسانی آیکن بخش‌های ویزیتور', False, 'ممیزی ناموفق: %s' % e)
+
+
 def main():
     print('════════ بازبینی جامع پروژهٔ Meelano ════════')
     check_syntax()
@@ -926,6 +1011,8 @@ def main():
     check_unified_app()
     check_nut_visual_assets()
     check_section_art()
+    check_header_room()
+    check_visitor_art_agrees()
     check_engines()
     check_docs()
     failed = [n for n, ok, _ in RESULTS if not ok]

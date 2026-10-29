@@ -544,10 +544,16 @@ public class MainActivity extends Activity {
         brand.addView(logoBox, new LinearLayout.LayoutParams(Theme.dp(brandMarkSize), Theme.dp(brandMarkSize)));
         brand.addView(kit.space(10));
 
+        // The name column gets exactly the room that is left of the brand mark. A weight is
+        // measured from the row, and a long shop name (or the status chips) then slid under
+        // the mark and lost its last letters; a computed width keeps both clear of it.
+        int nameRoomDp = widthDp - 24 - brandMarkSize - 10 - 6;
+        if (nameRoomDp < 150) nameRoomDp = 150;
         LinearLayout titleCol = kit.v();
         companyName = kit.text(companyTitle(), 22, Theme.TEXT, true);
         companyName.setMaxLines(2);
         companyName.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        companyName.setMaxWidth(Theme.dp(nameRoomDp));
         titleCol.addView(companyName, kit.lp(-1, -2));
         if (Theme.DARK) {
             // Gold-to-champagne gradient across the company name, as in the reference header.
@@ -580,7 +586,7 @@ public class MainActivity extends Activity {
         licChip.setBackground(Theme.pill(Theme.GOLD));
         licChip.setPadding(Theme.dp(8), Theme.dp(3), Theme.dp(8), Theme.dp(3));
         licChip.setSingleLine(true);
-        licChip.setMaxWidth(Theme.dp(96));
+        licChip.setMaxWidth(Theme.dp(64));
         licChip.setEllipsize(android.text.TextUtils.TruncateAt.END);
         Theme.pressable(licChip);
         licChip.setOnClickListener(v -> openLicense());
@@ -590,8 +596,9 @@ public class MainActivity extends Activity {
         userChip.setBackground(Theme.pill(Theme.GOLD));
         userChip.setPadding(Theme.dp(8), Theme.dp(3), Theme.dp(8), Theme.dp(3));
         userChip.setSingleLine(true);
-        // The name of the signed-in account is worth more room than the day counter.
-        userChip.setMaxWidth(Theme.dp(160));
+        // The name of the signed-in account is worth more room than the day counter, but the
+        // whole status line has to stay inside the room that is left of the brand mark.
+        userChip.setMaxWidth(Theme.dp(Math.max(96, Math.min(160, nameRoomDp - 134))));
         userChip.setEllipsize(android.text.TextUtils.TruncateAt.END);
         Theme.pressable(userChip);
         userChip.setOnClickListener(v -> userMenu());
@@ -609,7 +616,7 @@ public class MainActivity extends Activity {
         status.addView(kit.space(8));
         status.addView(tagBadge, new LinearLayout.LayoutParams(Theme.dp(30), Theme.dp(30)));
         titleCol.addView(status, kit.lp(-2, -2));
-        brand.addView(titleCol, kit.wlp(1f));
+        brand.addView(titleCol, new LinearLayout.LayoutParams(Theme.dp(nameRoomDp), -2));
         header.addView(brand, kit.lp(-1, -2));
         refreshUserChip();
         header.addView(kit.space(compact ? 5 : 8));
@@ -1297,9 +1304,12 @@ public class MainActivity extends Activity {
      */
     private void updateBackControl() {
         if (backCell == null) return;
-        boolean can = !"home".equals(currentId) && !history.isEmpty();
-        backCell.setAlpha(can ? 1f : 0.35f);
-        backCell.setContentDescription(can ? "بازگشت به صفحه قبلی" : "بازگشت به خانه");
+        // On the home page there is nothing to go back to. The arrow is hidden there instead of
+        // dimmed: a half-faded disc reads as a broken button, and the cell keeps its place so
+        // the tabs never jump while the user walks through the sections.
+        boolean can = !"home".equals(currentId);
+        backCell.setAlpha(can ? 1f : 0f);
+        backCell.setContentDescription(can ? "بازگشت به صفحه قبلی" : "خانه");
         android.view.View arrow = backCell.getChildCount() > 0 ? backCell.getChildAt(0) : null;
         if (arrow != null) arrow.setContentDescription(backCell.getContentDescription());
     }

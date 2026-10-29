@@ -179,13 +179,14 @@ public final class VisitorDeskScreen extends Screen {
     }
 
     private void renderHome(LinearLayout c) {
-        c.addView(sectionTitle("شروع سریع", "کارهای پرکاربرد امروز"),a.kit.lp(-1,-2));
-        // The numbers of the signed-in account, so the workspace opens with facts, not only
-        // shortcuts. They arrive from the same tables the reports use.
+        // The numbers of the signed-in account come first, so the workspace opens with facts
+        // and not only with shortcuts. They arrive from the same tables the reports use.
         LinearLayout status=a.kit.v();
         c.addView(status,a.kit.lp(-1,-2));
         c.addView(a.kit.gap(8));
         loadDayStatus(status);
+        c.addView(sectionTitle("شروع سریع", "کارهای پرکاربرد امروز"),a.kit.lp(-1,-2));
+        c.addView(a.kit.gap(8));
         addHomeRow(c,
                 homeTile("مشتریان", "مانده و تماس", R.drawable.mi_group, CUSTOMERS),
                 homeTile("کالا و موجودی", "جستجوی کالا و نرخ", R.drawable.mi_grid_view, PRODUCTS));

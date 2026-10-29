@@ -637,6 +637,10 @@ public final class Kit {
         HorizontalScrollView sv = new HorizontalScrollView(a);
         sv.setHorizontalScrollBarEnabled(false);
         sv.setClipToPadding(false);
+        // A chip that is cut off by the edge must read as "there is more", not as a broken
+        // layout, so the content fades out where it leaves the row.
+        sv.setRequiresFadingEdge(View.FADE_EDGE_HORIZONTAL);
+        sv.setFadingEdgeLength(Theme.dp(22));
         sv.setPadding(Theme.dp(2), 0, Theme.dp(2), 0);
         LinearLayout r = h();
         r.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);

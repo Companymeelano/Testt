@@ -123,6 +123,25 @@ public final class Theme {
         } catch (Exception ignored) { return base; }
     }
 
+    /**
+     * The 3D icon of the manager's board in the nut theme: the emerald twin of the
+     * section's icon, so the board, the header and the tab bar read as one family.
+     * The medallion names are folded to their plain twin (medal_sales -> sales).
+     * The other skins keep the gold set, and a section without a twin keeps its icon.
+     */
+    public static int emerald3d(int vector) {
+        int base = icon3d(vector);
+        if (!nuts || NUT_MEDALLIONS || appCtx == null || !isIcon3d(base)) return base;
+        try {
+            String n = appCtx.getResources().getResourceEntryName(base);
+            if (!n.startsWith("icon3d_")) return base;
+            String key = n.substring(7);
+            if (key.startsWith("medal_")) key = key.substring(6);
+            int e = appCtx.getResources().getIdentifier("icon3d_emerald_" + key, "drawable", appCtx.getPackageName());
+            return e != 0 ? e : base;
+        } catch (Exception ignored) { return base; }
+    }
+
     public static int icon3d(int vector) {
         if (NUT_MEDALLIONS && nuts) {
             int m = medal(vector);
@@ -247,7 +266,8 @@ public final class Theme {
                 || res == R.drawable.icon3d_dark_home || res == R.drawable.icon3d_dark_settings
                 || res == R.drawable.icon3d_dark_assistant
                 || res == R.drawable.icon3d_dark_tag || res == R.drawable.icon3d_light_tag
-                || res == R.drawable.icon3d_dark_cash_in || res == R.drawable.icon3d_dark_cash_out || res == R.drawable.icon3d_dark_cheque || res == R.drawable.icon3d_dark_inventory || res == R.drawable.icon3d_dark_reports || res == R.drawable.icon3d_dark_account || res == R.drawable.icon3d_dark_products || res == R.drawable.icon3d_dark_more || res == R.drawable.icon3d_dark_dues;
+                || res == R.drawable.icon3d_dark_cash_in || res == R.drawable.icon3d_dark_cash_out || res == R.drawable.icon3d_dark_cheque || res == R.drawable.icon3d_dark_inventory || res == R.drawable.icon3d_dark_reports || res == R.drawable.icon3d_dark_account || res == R.drawable.icon3d_dark_products || res == R.drawable.icon3d_dark_more || res == R.drawable.icon3d_dark_dues
+                || res == R.drawable.icon3d_alert || res == R.drawable.icon3d_emerald_alert;
     }
 
     /** 1.0 normal, 1.3 large-text mode (applied in Kit.text). */

@@ -262,6 +262,10 @@ public final class Kit {
         public double[] spark;
         /** Optional drawable shown above the label (0 = none). */
         public int icon = 0;
+        /** True when the tile wears the emerald family of the manager's board. Off by default. */
+        public boolean emeraldIcon = false;
+        /** Optional explicit note colour (0 = the accent, or the trend rule below). */
+        public int subColor = 0;
 
         public Kpi(String label, String value, String sub, int accent) {
             this(label, value, sub, accent, null);
@@ -293,13 +297,15 @@ public final class Kit {
         // Centred composition like the reference: icon, label, value and note share one axis.
         t.setGravity(Gravity.CENTER_HORIZONTAL);
         if (k.icon != 0) {
-            // Optional gold glyph above the label (dashboard tiles).
+            // Optional gold glyph above the label (dashboard tiles). The manager's own
+            // board asks for the emerald twin; every other tile keeps the gold set.
+            int ico = k.emeraldIcon ? Theme.emerald3d(k.icon) : Theme.icon3d(k.icon);
             android.widget.ImageView ic = new android.widget.ImageView(a);
             try {
-                ic.setImageResource(Theme.icon3d(k.icon));
-                if (!Theme.isIcon3d(Theme.icon3d(k.icon))) ic.setColorFilter(Theme.GOLD);
+                ic.setImageResource(ico);
+                if (!Theme.isIcon3d(ico)) ic.setColorFilter(Theme.GOLD);
             } catch (Exception ignored) { Diag.ignored("Kit:kpiIcon", ignored); }
-            int isz = Theme.isIcon3d(Theme.icon3d(k.icon)) ? (Theme.isNuts() ? 60 : 30) : 24;
+            int isz = Theme.isIcon3d(ico) ? (Theme.isNuts() ? 60 : 30) : 24;
             LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(Theme.dp(isz), Theme.dp(isz));
             ip.gravity = Gravity.CENTER_HORIZONTAL;
             ip.bottomMargin = Theme.dp(4);
@@ -343,7 +349,8 @@ public final class Kit {
         // Trend notes read green when up and red when down, as in the reference market tiles.
         String sub0 = k.sub == null ? "" : k.sub.trim();
         int subColor = k.accent;
-        if (sub0.startsWith("▲") || sub0.startsWith("↗") || sub0.startsWith("+")) subColor = Theme.SUCCESS;
+        if (k.subColor != 0) subColor = k.subColor;
+        else if (sub0.startsWith("▲") || sub0.startsWith("↗") || sub0.startsWith("+")) subColor = Theme.SUCCESS;
         else if (sub0.startsWith("▼") || sub0.startsWith("↘") || sub0.startsWith("-")) subColor = Theme.DANGER;
         TextView s = text(k.sub == null || k.sub.isEmpty() ? " " : k.sub, 10f, subColor, true);
         s.setGravity(Gravity.CENTER_HORIZONTAL);

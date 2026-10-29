@@ -175,11 +175,19 @@ jobs:
       - name: Commit verified APK to the session branch for direct delivery
         run: |
           set -euo pipefail
+          # Another workflow can publish to this branch while this build runs (the unified app
+          # build does exactly that). Start from the newest head of the branch, so the delivery
+          # commit is a fast-forward and never loses that race.
+          SOURCE_COMMIT=$(git rev-parse --short HEAD)
+          git fetch origin arena/29e01a09-testt
+          git reset --hard origin/arena/29e01a09-testt
+          mkdir -p dist
+          cp manager/app/build/outputs/apk/debug/app-debug.apk dist/meelano-manager-v36-debug-18.apk
           {
             echo "MEELANO Manager v36.35.0 (versionCode 67)"
             echo "Package: ir.meelano.manager.debug"
             echo "Build run: ${GITHUB_RUN_ID}"
-            echo "Commit: $(git rev-parse --short HEAD)"
+            echo "Commit: ${SOURCE_COMMIT}"
             echo "SHA-256: $(sha256sum dist/meelano-manager-v36-debug-18.apk | cut -d' ' -f1)"
           } > dist/manager-v36-build-info.txt
           git config user.name "arena-ci"

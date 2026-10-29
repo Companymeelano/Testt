@@ -118,7 +118,7 @@ public class MainActivity extends Activity {
     private Runnable linkPending = null;
     private TextView licChip;
     /** The back control of the tab bar (a gold disc), not a button floating over the content. */
-    private View backCell;
+    private LinearLayout backCell;
     private TextView backLabel;
     private TextView companyName;
     private android.widget.FrameLayout logoBox;

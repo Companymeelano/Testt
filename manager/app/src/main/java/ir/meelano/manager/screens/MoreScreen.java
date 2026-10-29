@@ -45,6 +45,7 @@ public class MoreScreen extends Screen {
     @Override
     public void render(final LinearLayout content) {
         contentRef = content;
+        boolean visitor = isVisitorRole();
         if (expandedGroup == null) {
             String role = AtiranAuth.sessionRole(a);
             if (role == null || role.isEmpty()) role = RoleStore.current(a);
@@ -52,27 +53,38 @@ public class MoreScreen extends Screen {
             // The manager and the visitor come for the sections, not for a report hub: both
             // roles land directly on the index that holds every section they may open.
             if (RoleStore.VISITOR.equals(role) || RoleStore.ADMIN.equals(role)) seg = SEG_ALL;
+            // The visitor has no report hub, so its group starts open.
+            if (visitor) expandedGroup = "visitor_sales";
         }
         content.removeAllViews();
-        content.addView(a.kit.hero("▣", "اتاق فرمان",
-                "گزارش‌ها و همهٔ بخش‌ها در یک جا", Theme.GOLD), a.kit.lp(-1, -2));
+        // The visitor's room is the field-sales workspace, not the manager's command room.
+        if (visitor) {
+            content.addView(a.kit.hero("🧾", "همهٔ بخش‌ها",
+                    "کارهای روزانهٔ حساب ویزیتور شما", Theme.GOLD), a.kit.lp(-1, -2));
+        } else {
+            content.addView(a.kit.hero("▣", "اتاق فرمان",
+                    "گزارش‌ها و همهٔ بخش‌ها در یک جا", Theme.GOLD), a.kit.lp(-1, -2));
+        }
         content.addView(a.kit.gap(10));
 
-        LinearLayout segRow = a.kit.h();
-        for (int i = 0; i < SEG_LABELS.length; i++) {
-            final int idx = i;
-            boolean on = seg == i;
-            segRow.addView(a.kit.chip(SEG_LABELS[i], on, Theme.GOLD, v -> {
-                seg = idx;
-                render(contentRef);
-            }), a.kit.wlp(1f));
+        // The report hub belongs to the manager; for the visitor this switch would be dead.
+        if (!visitor) {
+            LinearLayout segRow = a.kit.h();
+            for (int i = 0; i < SEG_LABELS.length; i++) {
+                final int idx = i;
+                boolean on = seg == i;
+                segRow.addView(a.kit.chip(SEG_LABELS[i], on, Theme.GOLD, v -> {
+                    seg = idx;
+                    render(contentRef);
+                }), a.kit.wlp(1f));
+            }
+            content.addView(segRow, a.kit.lp(-1, -2));
+            content.addView(a.kit.gap(10));
         }
-        content.addView(segRow, a.kit.lp(-1, -2));
-        content.addView(a.kit.gap(10));
 
         LinearLayout inner = a.kit.v();
         content.addView(inner, a.kit.lp(-1, -2));
-        if (seg == SEG_REPORTS && !isVisitorRole()) {
+        if (seg == SEG_REPORTS && !visitor) {
             renderReportsHub(inner);
         } else {
             renderAll(inner);
@@ -316,8 +328,20 @@ public class MoreScreen extends Screen {
         tile.setMinimumHeight(Theme.dp(122));
         tile.setPadding(Theme.dp(10), Theme.dp(12), Theme.dp(10), Theme.dp(10));
 
-        tile.addView(art > 0 ? artBadge(art, accent, 44) : iconBadge(goldReportGlyph(title, glyph), accent, 44),
-                new LinearLayout.LayoutParams(Theme.dp(44), Theme.dp(44)));
+        // The artwork of a section is shown as large as in the workspace tiles: inside a small
+        // circle it was too small to recognise.
+        if (art > 0) {
+            ImageView picture = new ImageView(a);
+            int res3 = Theme.chrome3d(art);
+            picture.setImageResource(res3);
+            if (!Theme.isIcon3d(res3)) picture.setColorFilter(accent);
+            picture.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            picture.setContentDescription(null);
+            tile.addView(picture, new LinearLayout.LayoutParams(Theme.dp(46), Theme.dp(46)));
+        } else {
+            tile.addView(iconBadge(goldReportGlyph(title, glyph), accent, 46),
+                    new LinearLayout.LayoutParams(Theme.dp(46), Theme.dp(46)));
+        }
         tile.addView(a.kit.gap(5));
 
         TextView label = a.kit.text(title, 12.5f, Theme.TEXT, true);
@@ -368,7 +392,7 @@ public class MoreScreen extends Screen {
         image.setImageResource(res3);
         if (!Theme.isIcon3d(res3)) image.setColorFilter(accent);
         image.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        int inside = Math.max(18, Math.round(sizeDp * 0.52f));
+        int inside = Math.max(20, Math.round(sizeDp * 0.72f));
         android.widget.FrameLayout.LayoutParams ip = new android.widget.FrameLayout.LayoutParams(
                 Theme.dp(inside), Theme.dp(inside), Gravity.CENTER);
         badge.addView(image, ip);
@@ -386,7 +410,7 @@ public class MoreScreen extends Screen {
             image.setImageResource(res3);
             if (!Theme.isIcon3d(res3)) image.setColorFilter(accent);
             image.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-            int inside = Math.max(18, Math.round(sizeDp * 0.52f));
+            int inside = Math.max(20, Math.round(sizeDp * 0.72f));
             android.widget.FrameLayout.LayoutParams ip = new android.widget.FrameLayout.LayoutParams(
                     Theme.dp(inside), Theme.dp(inside), Gravity.CENTER);
             badge.addView(image, ip);

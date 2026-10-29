@@ -843,6 +843,69 @@ def check_nut_visual_assets():
         report('پوشش آیکن‌ها و تصاویر آجیل و خشکبار', False, 'ممیزی ناموفق: %s' % e)
 
 
+def check_section_art():
+    """Every section of the index must have 3D artwork, and the nut theme must be able to
+    show its emerald twin: a section that keeps the small gold medallion looks tiny next to
+    the emerald pictures and breaks the look of the skin the user picked."""
+    theme_src = os.path.join(ROOT, 'manager/app/src/main/java/ir/meelano/manager/ui/Theme.java')
+    room_src = os.path.join(ROOT, 'manager/app/src/main/java/ir/meelano/manager/core/CommandRoom.java')
+    art_src = os.path.join(ROOT, 'manager/app/src/main/java/ir/meelano/manager/core/IconArt.java')
+    desk_src = os.path.join(ROOT, 'manager/app/src/main/java/ir/meelano/manager/screens/VisitorDeskScreen.java')
+    drawable_dir = os.path.join(ROOT, 'manager/app/src/main/res/drawable-nodpi')
+    try:
+        theme = open(theme_src, encoding='utf-8').read()
+        room = open(room_src, encoding='utf-8').read()
+        art = open(art_src, encoding='utf-8').read()
+        desk = open(desk_src, encoding='utf-8').read()
+        files = {os.path.splitext(n)[0] for n in os.listdir(drawable_dir) if n.lower().endswith('.png')}
+        # The mapping of Theme.icon3d(). The dark-skin rules are skipped: the nut look is light.
+        light_theme = re.sub(r'if \(!light\) \{.*?\n        \}', '', theme, flags=re.S)
+        mapping = {}
+        for m in re.finditer(r'if \(([^)]*)\) return ([^;]+);', light_theme):
+            res = re.search(r'R\.drawable\.(\w+)', m.group(2))
+            if not res:
+                continue
+            for vec in re.findall(r'R\.drawable\.(\w+)', m.group(1)):
+                mapping[vec] = res.group(1)
+        problems = []
+        arts = sorted(set(re.findall(r'"(mi_\w+)"', room)))
+        for name in arts:
+            base = mapping.get(name)
+            if base is None:
+                problems.append('%s has no 3D artwork' % name)
+            elif base not in files:
+                problems.append('%s -> %s.png is missing' % (name, base))
+        # The workspace tiles of the visitor use their own artwork; they must be 3D as well.
+        for name in sorted(set(re.findall(r'R\.drawable\.(mi_\w+)', desk))):
+            base = mapping.get(name)
+            if base is None:
+                problems.append('workspace tile %s has no 3D artwork' % name)
+            elif base not in files:
+                problems.append('workspace tile %s -> %s.png is missing' % (name, base))
+        # Every medallion of the gold set needs its emerald twin, or the nut theme keeps the
+        # small gold medallion. icon3d_medal_alert has no emerald picture (the alert keeps the
+        # gold medallion on purpose) and icon3d_medal_goldbar is unused (mi_diamond maps to
+        # icon3d_gold, which has an emerald twin).
+        exceptions = {'icon3d_medal_alert', 'icon3d_medal_goldbar'}
+        for base in sorted(files):
+            if not base.startswith('icon3d_medal_') or base in exceptions:
+                continue
+            twin = 'icon3d_emerald_' + base[len('icon3d_medal_'):]
+            if twin not in files:
+                problems.append('%s has no emerald twin (%s)' % (base, twin))
+        if 'IconArt.emeraldName(n)' not in theme:
+            problems.append('Theme.chrome3d does not use the shared naming rule')
+        if 'icon3d_medal_' not in art or 'icon3d_emerald_' not in art:
+            problems.append('IconArt does not know the naming rule of the artwork')
+        ok = bool(arts) and not problems
+        report('هنر سه‌بعدی بخش‌های ایندکس', ok,
+               ('%d بخش ایندکس و %d آیکن فضای کاری؛ هر بخش تصویر سه‌بعدی دارد و هر مدال طلایی'
+                ' نسخهٔ زمردی دارد' % (len(arts), len(set(re.findall(r'R\.drawable\.(mi_\w+)', desk)))))
+               if ok else '؛ '.join(problems))
+    except Exception as e:
+        report('هنر سه‌بعدی بخش‌های ایندکس', False, 'ممیزی ناموفق: %s' % e)
+
+
 def main():
     print('════════ بازبینی جامع پروژهٔ Meelano ════════')
     check_syntax()
@@ -862,6 +925,7 @@ def main():
     check_lux_api()
     check_unified_app()
     check_nut_visual_assets()
+    check_section_art()
     check_engines()
     check_docs()
     failed = [n for n, ok, _ in RESULTS if not ok]

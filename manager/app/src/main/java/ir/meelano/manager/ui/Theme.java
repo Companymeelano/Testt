@@ -114,8 +114,11 @@ public final class Theme {
         if (!nuts || NUT_MEDALLIONS || appCtx == null || !isIcon3d(base)) return base;
         try {
             String n = appCtx.getResources().getResourceEntryName(base);
-            if (!n.startsWith("icon3d_")) return base;
-            int e = appCtx.getResources().getIdentifier("icon3d_emerald_" + n.substring(7), "drawable", appCtx.getPackageName());
+            // The medallions of the gold set have their own name; the emerald twin is the same
+            // subject in the emerald set (icon3d_medal_sales -> icon3d_emerald_sales).
+            String twin = ir.meelano.manager.core.IconArt.emeraldName(n);
+            if (twin.isEmpty()) return base;
+            int e = appCtx.getResources().getIdentifier(twin, "drawable", appCtx.getPackageName());
             return e != 0 ? e : base;
         } catch (Exception ignored) { return base; }
     }

@@ -150,7 +150,8 @@ public final class Kit {
         c.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(15));
         LinearLayout head = h();
         int heroVector = MeelanoIcons.iconFor(glyph);
-        int hero3d = heroVector == 0 ? 0 : Theme.icon3d(heroVector);
+        // The emblem of a title follows the skin: the nut look shows the emerald artwork.
+        int hero3d = heroVector == 0 ? 0 : Theme.chrome3d(heroVector);
         boolean use3dHero = heroVector != 0 && Theme.isIcon3d(hero3d);
         if (use3dHero) {
             ImageView emblem = new ImageView(a);

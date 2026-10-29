@@ -117,7 +117,8 @@ public class MainActivity extends Activity {
             new android.os.Handler(android.os.Looper.getMainLooper());
     private Runnable linkPending = null;
     private TextView licChip;
-    private View backFab;
+    /** The back control of the tab bar (a gold disc), not a button floating over the content. */
+    private View backCell;
     private TextView backLabel;
     private TextView companyName;
     private android.widget.FrameLayout logoBox;
@@ -579,7 +580,7 @@ public class MainActivity extends Activity {
         licChip.setBackground(Theme.pill(Theme.GOLD));
         licChip.setPadding(Theme.dp(8), Theme.dp(3), Theme.dp(8), Theme.dp(3));
         licChip.setSingleLine(true);
-        licChip.setMaxWidth(Theme.dp(120));
+        licChip.setMaxWidth(Theme.dp(96));
         licChip.setEllipsize(android.text.TextUtils.TruncateAt.END);
         Theme.pressable(licChip);
         licChip.setOnClickListener(v -> openLicense());
@@ -589,7 +590,8 @@ public class MainActivity extends Activity {
         userChip.setBackground(Theme.pill(Theme.GOLD));
         userChip.setPadding(Theme.dp(8), Theme.dp(3), Theme.dp(8), Theme.dp(3));
         userChip.setSingleLine(true);
-        userChip.setMaxWidth(Theme.dp(120));
+        // The name of the signed-in account is worth more room than the day counter.
+        userChip.setMaxWidth(Theme.dp(160));
         userChip.setEllipsize(android.text.TextUtils.TruncateAt.END);
         Theme.pressable(userChip);
         userChip.setOnClickListener(v -> userMenu());
@@ -871,8 +873,33 @@ public class MainActivity extends Activity {
             b.setOnClickListener(v -> nav(id));
             bottomBar.addView(b, kit.wlp(1f));
         }
+        // The back control lives in the tab bar, so it never covers the rows it points at.
+        // It sits at the start of the row, where the back arrow belongs in a Persian layout.
+        LinearLayout back = kit.v();
+        back.setGravity(Gravity.CENTER);
+        back.setTag(BACK_CELL_TAG);
+        back.setContentDescription("بازگشت به صفحه قبلی");
+        final int backInk = Theme.onAccent(Theme.GOLD);
+        android.graphics.drawable.GradientDrawable backDisc = new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                new int[]{Theme.GOLD_SOFT, Theme.GOLD});
+        backDisc.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        backDisc.setStroke(Theme.dp(1), Theme.alpha(backInk, 60));
+        TextView backArrow = kit.text("\u2192", 19f, backInk, true);
+        backArrow.setGravity(Gravity.CENTER);
+        backArrow.setBackground(backDisc);
+        backArrow.setContentDescription("بازگشت به صفحه قبلی");
+        Theme.pressable(backArrow);
+        backArrow.setOnClickListener(v -> goBack());
+        back.addView(backArrow, kit.lp(Theme.dp(38), Theme.dp(38)));
+        bottomBar.addView(back, 0, kit.lp(Theme.dp(50), -2));
+        backCell = back;
         paintBottom();
+        updateBackControl();
     }
+
+    /** Tag of the back control inside the tab bar, so the tab painter skips it. */
+    private static final String BACK_CELL_TAG = "back-cell";
 
     private int selectedNavIndex = -1;
 
@@ -907,10 +934,13 @@ public class MainActivity extends Activity {
 
     private void paintBottom() {
         selectedNavIndex = -1;
+        int tabIndex = 0;
         for (int i = 0; i < bottomBar.getChildCount(); i++) {
             LinearLayout b = (LinearLayout) bottomBar.getChildAt(i);
-            boolean on = i < tabs.length && (tabs[i].equals(currentId)
-                    || ("more".equals(tabs[i]) && !isTab(currentId)));
+            if (b == null) continue;
+            if (BACK_CELL_TAG.equals(b.getTag())) continue;   // the back control is not a tab
+            boolean on = tabIndex < tabs.length && (tabs[tabIndex].equals(currentId)
+                    || ("more".equals(tabs[tabIndex]) && !isTab(currentId)));
             LinearLayout badge = (LinearLayout) b.getChildAt(0);
             badge.setBackground(on ? Theme.bottomNavIconSelected() : null);
             // Gold underline under the selected tab (the marker was never shown before).
@@ -943,6 +973,7 @@ public class MainActivity extends Activity {
             b.setElevation(on ? Theme.dp(2) : 0f);
             b.setContentDescription(label.getText() + (on ? "، بخش فعال" : "، رفتن به بخش"));
             Theme.pressable(b); // Re-wrap the selected-state background with touch feedback.
+            tabIndex++;
         }
         moveCapsule(true);
     }
@@ -1202,12 +1233,12 @@ public class MainActivity extends Activity {
     /** Id of the screen that is on display right now. */
     public String currentScreenId() { return currentId; }
 
-    /** Repaint bottom bar + back FAB (screens call this after internal state changes). */
+    /** Repaint bottom bar + back control (screens call this after internal state changes). */
     public void refreshChrome() {
         Screen s = screens.get(currentId);
         if (s == null) return;
         paintBottom();
-        if (backFab != null) backFab.setVisibility("home".equals(currentId) ? View.GONE : View.VISIBLE);
+        updateBackControl();
         updateBackLabel();
     }
 
@@ -1248,45 +1279,29 @@ public class MainActivity extends Activity {
         } else nav("home");
     }
 
-    /** Golden circular back button, floating above the bottom bar on every section but Home. */
     /**
-     * The single back control for every screen: one gold capsule with a round arrow
-     * and the word «بازگشت», docked bottom-centre just above the tab bar. It stays in
-     * the same place on every page so the user always knows where to find it.
+     * The single back control for every screen: a gold disc with a round arrow, docked in the
+     * tab bar next to the sections. It used to float above the scrolling content, where it
+     * covered the very rows it points at - on the visitor grid that was the text of a section.
+     * In the bar it always sits in the same place and never hides anything.
      */
     private void syncBackFab() {
-        try {
-            if (backFab != null && backFab.getParent() instanceof android.view.ViewGroup)
-                ((android.view.ViewGroup) backFab.getParent()).removeView(backFab);
-        } catch (Exception ignored) { Diag.ignored("MainActivity:1079", ignored); }
-        backFab = null;
-        // Floating gold disc: one arrow, no label, a soft gold glow underneath.
-        final int ink = Theme.onAccent(Theme.GOLD);
-        android.graphics.drawable.GradientDrawable disc = new android.graphics.drawable.GradientDrawable(
-                android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
-                new int[]{Theme.GOLD_SOFT, Theme.GOLD});
-        disc.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-        disc.setStroke(Theme.dp(1), Theme.alpha(ink, 60));
-        TextView arrow = kit.text("\u2192", 22f, ink, true);
-        arrow.setGravity(Gravity.CENTER);
-        arrow.setBackground(disc);
-        arrow.setElevation(Theme.dp(14));
-        arrow.setContentDescription("بازگشت به صفحه قبلی");
-        Theme.pressable(arrow);
-        arrow.setOnClickListener(v -> goBack());
         backLabel = null;
-        // Compact disc in the bottom corner, above the tab bar, so list rows stay readable.
-        android.widget.FrameLayout.LayoutParams p = new android.widget.FrameLayout.LayoutParams(
-                Theme.dp(46), Theme.dp(46), Gravity.BOTTOM | Gravity.END);
-        p.setMargins(Theme.dp(14), 0, Theme.dp(14), Theme.dp(96));
-        try {
-            addContentView(arrow, p);
-        } catch (Exception ignored) {
-            return;
-        }
-        backFab = arrow;
-        backFab.setVisibility("home".equals(currentId) ? View.GONE : View.VISIBLE);
+        updateBackControl();
         updateBackLabel();
+    }
+
+    /**
+     * The back control of the tab bar: bright when there is a page to return to, dimmed on the
+     * first page. The cell always keeps its place, so the sections never jump while navigating.
+     */
+    private void updateBackControl() {
+        if (backCell == null) return;
+        boolean can = !"home".equals(currentId) && !history.isEmpty();
+        backCell.setAlpha(can ? 1f : 0.35f);
+        backCell.setContentDescription(can ? "بازگشت به صفحه قبلی" : "بازگشت به خانه");
+        android.view.View arrow = backCell.getChildCount() > 0 ? backCell.getChildAt(0) : null;
+        if (arrow != null) arrow.setContentDescription(backCell.getContentDescription());
     }
 
     // ================= Persian voice search =================

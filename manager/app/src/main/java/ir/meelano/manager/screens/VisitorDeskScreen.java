@@ -145,7 +145,7 @@ public final class VisitorDeskScreen extends Screen {
         hero.setGravity(Gravity.CENTER_VERTICAL);
         hero.setBackground(Theme.hero(Theme.GOLD));
         hero.setPadding(Theme.dp(13),Theme.dp(9),Theme.dp(13),Theme.dp(9));
-        ImageView heroArt=new ImageView(a);heroArt.setImageResource(Theme.chrome3d(R.drawable.mi_star_shine));
+        ImageView heroArt=new ImageView(a);heroArt.setImageResource(Theme.chrome3d(R.drawable.mi_shopping_cart));
         heroArt.setScaleType(ImageView.ScaleType.FIT_CENTER);
         hero.addView(heroArt,new LinearLayout.LayoutParams(Theme.dp(46),Theme.dp(46)));
         hero.addView(a.kit.space(9));
@@ -159,7 +159,7 @@ public final class VisitorDeskScreen extends Screen {
         // Section art follows the chosen theme: the nut look uses the emerald set, the dark
         // look its own, the ivory look the gold set - one family, never a fixed picture.
         int[] icons={Theme.chrome3d(R.drawable.mi_home),Theme.chrome3d(R.drawable.mi_group),
-                Theme.chrome3d(R.drawable.mi_grid_view),Theme.chrome3d(R.drawable.mi_task_alt)};
+                Theme.chrome3d(R.drawable.mi_grid_view),Theme.chrome3d(R.drawable.mi_person)};
         int selected=page<=ROUTE?page:-1;
         content.addView(a.kit.chipsWithIcons(labels,selected,icons,Theme.GOLD,i->{page=i;render(content);}),a.kit.lp(-1,-2));
         content.addView(a.kit.gap(7));
@@ -180,11 +180,17 @@ public final class VisitorDeskScreen extends Screen {
 
     private void renderHome(LinearLayout c) {
         c.addView(sectionTitle("شروع سریع", "کارهای پرکاربرد امروز"),a.kit.lp(-1,-2));
+        // The numbers of the signed-in account, so the workspace opens with facts, not only
+        // shortcuts. They arrive from the same tables the reports use.
+        LinearLayout status=a.kit.v();
+        c.addView(status,a.kit.lp(-1,-2));
+        c.addView(a.kit.gap(8));
+        loadDayStatus(status);
         addHomeRow(c,
                 homeTile("مشتریان", "مانده و تماس", R.drawable.mi_group, CUSTOMERS),
                 homeTile("کالا و موجودی", "جستجوی کالا و نرخ", R.drawable.mi_grid_view, PRODUCTS));
         addHomeRow(c,
-                homeTile("ثبت ویزیت", "نتیجه و یادداشت", R.drawable.mi_task_alt, ROUTE),
+                homeTile("ثبت ویزیت", "نتیجه و یادداشت", R.drawable.mi_person, ROUTE),
                 homeTile("پیش‌فاکتور هوشمند", "کالا با صدا یا متن", R.drawable.mi_add_shopping_cart, ORDER));
         addHomeRow(c,
                 homeTile("سفارش‌های من", "پیگیری وضعیت", R.drawable.mi_point_of_sale, MY_ORDERS),
@@ -193,6 +199,45 @@ public final class VisitorDeskScreen extends Screen {
         c.addView(reports,a.kit.lp(-1,-2));
         c.addView(a.kit.gap(8));
         c.addView(a.kit.hint("مشتریان و گزارش‌ها فقط برای حساب ویزیتور واردشده نمایش داده می‌شوند. نرخ کالا بر اساس تنظیم آتیران است؛ قلمِ بدون نرخ یکتا قابل ثبت نیست."),a.kit.lp(-1,-2));
+    }
+
+    /**
+     * The numbers of today for the signed-in account: the visits, the pre-invoices with their
+     * money and the ones waiting for the manager's review. Only the rows of this account count.
+     */
+    private void loadDayStatus(LinearLayout holder){
+        a.repo.run(db->{
+            VisitorData.beginRead(db);
+            VisitorIdentity.Identity id=identity(db);
+            VisitorPrefactorWriter.ensureTables(db);
+            ensureVisitTable(db);
+            List<String> ids=ownerIds(id);
+            String scope="visitor_id IN ("+placeholders(ids.size())+")";
+            String today="CONVERT(date,created_at)=CONVERT(date,SYSDATETIME())";
+            String sql="SELECT (SELECT COUNT_BIG(1) FROM dbo.meelano_visit_results WHERE "+today+" AND "+scope+") AS visits,"
+                    +"(SELECT COUNT_BIG(1) FROM dbo.meelano_prefactors WHERE "+today+" AND "+scope+") AS invoices,"
+                    +"(SELECT ISNULL(SUM(ISNULL(grand_total,total_amount)),0) FROM dbo.meelano_prefactors WHERE "+today+" AND "+scope+") AS amount,"
+                    +"(SELECT COUNT_BIG(1) FROM dbo.meelano_prefactors WHERE status=N'pending_approval' AND "+scope+") AS pending";
+            long visits=0,invoices=0,pending=0;double amount=0;
+            try(java.sql.PreparedStatement ps=VisitorData.read(db,sql)){
+                for(int i=0;i<4;i++)bindOwner(ps,ids,1+i*ids.size());
+                try(java.sql.ResultSet rs=ps.executeQuery()){
+                    if(rs.next()){visits=rs.getLong(1);invoices=rs.getLong(2);amount=rs.getDouble(3);pending=rs.getLong(4);}
+                }
+            }
+            return new double[]{visits,invoices,amount,pending};
+        },new Repo.Cb<double[]>(){
+            @Override public void ok(double[] v){
+                if(v==null||v.length<4)return;
+                java.util.List<ir.meelano.manager.ui.Kit.Kpi> kpis=new ArrayList<>();
+                kpis.add(new ir.meelano.manager.ui.Kit.Kpi("بازدید امروز",Money.fa(String.valueOf((long)v[0])),"",Theme.INFO));
+                kpis.add(new ir.meelano.manager.ui.Kit.Kpi("پیش‌فاکتور امروز",Money.fa(String.valueOf((long)v[1])),Money.rial(v[2]),Theme.GOLD));
+                kpis.add(new ir.meelano.manager.ui.Kit.Kpi("در انتظار بررسی",Money.fa(String.valueOf((long)v[3])),"منتظر تأیید مدیر",Theme.WARNING));
+                holder.removeAllViews();
+                holder.addView(a.kit.kpiGrid(kpis,3),a.kit.lp(-1,-2));
+            }
+            @Override public void fail(String e){holder.setVisibility(View.GONE);}
+        });
     }
 
     private LinearLayout sectionTitle(String title,String subtitle){

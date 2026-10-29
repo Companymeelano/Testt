@@ -188,30 +188,35 @@ public final class Settings {
     public boolean pinEnabled() { return p.getBoolean("pin_on", false); }
     public String pinHash() { return p.getString("pin_hash", ""); }
 
+    /** Legacy single-iteration verifier namespace (fixed prefix), kept only for verification. */
+    private static final String LEGACY_PIN_PREFIX = "meelano7:";
+
     public void setPin(String pinOrNull) {
         String pin = pinOrNull == null ? null : Money.en(pinOrNull).trim();
         if (pin == null || pin.length() < 4) {
             p.edit().putBoolean("pin_on", false).putString("pin_hash", "").apply();
-        } else {
-            p.edit().putBoolean("pin_on", true).putString("pin_hash", sha(pin)).apply();
+            return;
         }
+        String h = ir.meelano.manager.core.PinHash.hash(pin);
+        if (h.isEmpty()) {
+            // Hashing unavailable: fail closed — never store something derived from the PIN.
+            p.edit().putBoolean("pin_on", false).putString("pin_hash", "").apply();
+            return;
+        }
+        p.edit().putBoolean("pin_on", true).putString("pin_hash", h).apply();
     }
 
     public boolean checkPin(String pin) {
         if (!pinEnabled()) return true;
-        return pin != null && sha(Money.en(pin).trim()).equals(pinHash());
-    }
-
-    private static String sha(String s) {
-        try {
-            java.security.MessageDigest d = java.security.MessageDigest.getInstance("SHA-256");
-            byte[] h = d.digest(("meelano7:" + s).getBytes("UTF-8"));
-            StringBuilder b = new StringBuilder();
-            for (byte x : h) b.append(String.format("%02x", x));
-            return b.toString();
-        } catch (Exception e) {
-            return "x" + s;
+        if (pin == null) return false;
+        String norm = Money.en(pin).trim();
+        String saved = pinHash();
+        if (!ir.meelano.manager.core.PinHash.verify(norm, saved, LEGACY_PIN_PREFIX)) return false;
+        if (ir.meelano.manager.core.PinHash.legacy(saved)) {
+            String h = ir.meelano.manager.core.PinHash.hash(norm);
+            if (!h.isEmpty()) p.edit().putString("pin_hash", h).apply();
         }
+        return true;
     }
 
     // ---------------- luxury theme ----------------

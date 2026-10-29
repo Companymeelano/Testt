@@ -648,7 +648,9 @@ public final class AtiranAuth {
         return "home";
     }
 
-    // ---- per-user app PIN (4+ chars, salted SHA-256) ----
+    // ---- per-user app PIN (4+ chars, PBKDF2 v2; legacy SHA-256 accepted + upgraded) ----
+
+    private static final String LEGACY_PIN_PREFIX = "meelano_loginpin:";
 
     public static boolean pinSet(Context c, int uid) {
         try {
@@ -662,7 +664,13 @@ public final class AtiranAuth {
         try {
             String saved = prefs(c).getString("pin" + uid, "");
             if (saved.isEmpty() || pin == null) return false;
-            return sha(Money.en(pin).trim()).equals(saved);
+            String norm = Money.en(pin).trim();
+            if (!PinHash.verify(norm, saved, LEGACY_PIN_PREFIX)) return false;
+            if (PinHash.legacy(saved)) {
+                String h = PinHash.hash(norm);
+                if (!h.isEmpty()) prefs(c).edit().putString("pin" + uid, h).apply();
+            }
+            return true;
         } catch (Exception e) {
             return false;
         }
@@ -673,7 +681,7 @@ public final class AtiranAuth {
             String pin = pinOrNull == null ? "" : Money.en(pinOrNull).trim();
             SharedPreferences.Editor e = prefs(c).edit();
             if (pin.length() < 4) e.putString("pin" + uid, "");
-            else e.putString("pin" + uid, sha(pin));
+            else e.putString("pin" + uid, PinHash.hash(pin)); // "" on failure → pinSet()=false (fail closed)
             e.apply();
         } catch (Exception ignored) { Diag.ignored("AtiranAuth:559", ignored); }
     }
@@ -908,15 +916,5 @@ public final class AtiranAuth {
         } catch (Exception ignored) { Diag.ignored("AtiranAuth:749", ignored); }
     }
 
-    private static String sha(String s) {
-        try {
-            java.security.MessageDigest d = java.security.MessageDigest.getInstance("SHA-256");
-            byte[] h = d.digest(("meelano_loginpin:" + s).getBytes("UTF-8"));
-            StringBuilder b = new StringBuilder();
-            for (byte x : h) b.append(String.format("%02x", x));
-            return b.toString();
-        } catch (Exception e) {
-            return "x" + s;
-        }
-    }
+
 }

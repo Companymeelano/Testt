@@ -4,6 +4,8 @@ import ir.meelano.manager.core.Diag;
 import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.graphics.Canvas;
+import android.graphics.Paint;
 import android.text.InputType;
 import android.text.TextUtils;
 import android.view.Gravity;
@@ -554,26 +556,66 @@ public final class Kit {
         return c;
     }
 
+    /** Fraction bar: track + fill drawn in onDraw — exact at any size, no layout races. */
+    public static final class FracBar extends View {
+        private final Paint trackPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final android.graphics.RectF box = new android.graphics.RectF();
+        private float frac;
+
+        public FracBar(Activity a) {
+            super(a);
+            setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+        }
+
+        /** Fill grows smoothly from the right edge (RTL) when motion is allowed. */
+        public void set(float target, int color, boolean animate) {
+            final float f = Math.max(0f, Math.min(1f, target));
+            fillPaint.setColor(color);
+            trackPaint.setColor(Theme.alpha(color, 55));
+            if (!animate || !ir.meelano.manager.ui.Ui.motionOk((Activity) getContext())) {
+                frac = f;
+                invalidate();
+                return;
+            }
+            ValueAnimator anim = ValueAnimator.ofFloat(0f, f);
+            anim.setDuration(520);
+            anim.setInterpolator(new android.view.animation.DecelerateInterpolator());
+            anim.addUpdateListener(v -> {
+                frac = (float) v.getAnimatedValue();
+                invalidate();
+            });
+            anim.start();
+        }
+
+        @Override
+        protected void onDraw(Canvas g) {
+            super.onDraw(g);
+            float w = getWidth(), h = getHeight();
+            if (w <= 0 || h <= 0) return;
+            float r = h / 2f;
+            box.set(0, 0, w, h);
+            g.drawRoundRect(box, r, r, trackPaint);
+            float fw = frac >= 0.999f ? w : w * frac;
+            if (fw > 0 && frac > 0f) {
+                fw = Math.max(fw, Math.min(w, r)); // keep the rounded cap visible
+                box.set(w - fw, 0, w, h);
+                g.drawRoundRect(box, r, r, fillPaint);
+            }
+        }
+    }
+
     public View progressLine(String label, String value, double frac, int color) {
         LinearLayout root = v();
         LinearLayout head = h();
         head.addView(text(label, 11.5f, Theme.MUTED, false), wlp(1f));
         head.addView(text(value, 11.5f, color, true), lp(-2, -2));
         root.addView(head, lp(-1, -2));
-        FrameLayout track = new FrameLayout(a);
-        track.setBackground(Theme.pill(Theme.alpha(color, 60)));
-        final View fill = new View(a);
-        fill.setBackground(Theme.pill(color));
-        track.addView(fill, new FrameLayout.LayoutParams(-1, -1));
-        final float fr = (float) Math.max(0, Math.min(1, frac));
-        track.post(() -> {
-            android.view.ViewGroup.LayoutParams p = fill.getLayoutParams();
-            p.width = Math.max(Theme.dp(6), (int) (track.getWidth() * fr));
-            fill.setLayoutParams(p);
-        });
+        FracBar bar = new FracBar(a);
+        bar.set((float) frac, color, true);
         LinearLayout.LayoutParams tp = lp(-1, Theme.dp(7));
         tp.setMargins(0, Theme.dp(5), 0, 0);
-        root.addView(track, tp);
+        root.addView(bar, tp);
         return root;
     }
 

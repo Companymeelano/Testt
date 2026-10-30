@@ -1616,6 +1616,24 @@ public class MainActivity extends Activity {
         }
     }
 
+    /**
+     * A name worth showing: at least one real letter. Databases sometimes hand back
+     * placeholder runs like «؟؟؟؟؟؟؟؟» — those must never reach the header chip.
+     */
+    private static String cleanName(String s) {
+        if (s == null) return "";
+        String t = s.trim();
+        for (int i = 0; i < t.length(); i++) if (Character.isLetter(t.charAt(i))) return t;
+        return "";
+    }
+
+    private String displayName() {
+        String nm = cleanName(AtiranAuth.sessionName(this));
+        if (nm.isEmpty()) nm = cleanName(AtiranAuth.sessionUser(this));
+        if (nm.isEmpty()) nm = RoleStore.faName(AtiranAuth.sessionRole(this));
+        return nm;
+    }
+
     public void refreshUserChip() {
         try {
             boolean hasSession = AtiranAuth.hasSession(this);
@@ -1624,10 +1642,7 @@ public class MainActivity extends Activity {
                     userChip.setVisibility(View.GONE);
                 } else {
                     userChip.setVisibility(View.VISIBLE);
-                    String nm = AtiranAuth.sessionName(this);
-                    if (nm.isEmpty()) nm = AtiranAuth.sessionUser(this);
-                    if (nm.isEmpty()) nm = RoleStore.faName(AtiranAuth.sessionRole(this));
-                    ir.meelano.manager.ui.MeelanoIcons.set(userChip, "\uD83D\uDC64 " + nm);
+                    ir.meelano.manager.ui.MeelanoIcons.set(userChip, "\uD83D\uDC64 " + displayName());
                 }
             }
             if (compactUserAction != null) {
@@ -1644,9 +1659,9 @@ public class MainActivity extends Activity {
             if (!AtiranAuth.hasSession(this)) return;
             LinearLayout body = kit.v();
             body.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(16));
-            String nm = AtiranAuth.sessionName(this);
-            if (nm.isEmpty()) nm = AtiranAuth.sessionUser(this);
-            body.addView(kit.kv("کاربر", nm.isEmpty() ? "—" : nm, Theme.TEXT), kit.lp(-1, -2));
+            String nm = cleanName(AtiranAuth.sessionName(this));
+            if (nm.isEmpty()) nm = cleanName(AtiranAuth.sessionUser(this));
+            body.addView(kit.kv("کاربر", nm.isEmpty() ? displayName() : nm, Theme.TEXT), kit.lp(-1, -2));
             body.addView(kit.kv("نقش", RoleStore.faName(AtiranAuth.sessionRole(this)), Theme.TEXT),
                     kit.lp(-1, -2));
             if (!AtiranAuth.sessionUser(this).isEmpty())

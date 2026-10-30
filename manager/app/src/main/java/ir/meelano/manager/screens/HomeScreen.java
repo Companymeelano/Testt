@@ -272,12 +272,25 @@ public class HomeScreen extends Screen {
         FrameLayout badge = new FrameLayout(a);
         badge.setBackground(Theme.avatar(Theme.alpha(accent, Theme.isLight() ? 25 : 34)));
         if (state == BannerState.LOADING) {
-            android.widget.ProgressBar spinner = new android.widget.ProgressBar(a, null,
-                    android.R.attr.progressBarStyleSmall);
-            spinner.setIndeterminate(true);
-            if (android.os.Build.VERSION.SDK_INT >= 21) spinner.setIndeterminateTintList(
-                    android.content.res.ColorStateList.valueOf(accent));
-            badge.addView(spinner, new FrameLayout.LayoutParams(Theme.dp(26), Theme.dp(26), Gravity.CENTER));
+            // A rotating gold refresh mark — device spinners render as a dark square on
+            // some One UI builds and never matched the board's art.
+            android.widget.ImageView spinner = new android.widget.ImageView(a);
+            spinner.setImageResource(R.drawable.mi_refresh);
+            spinner.setColorFilter(accent);
+            spinner.setContentDescription(null);
+            if (ir.meelano.manager.ui.Ui.motionOk(a)) {
+                android.animation.ObjectAnimator rot = android.animation.ObjectAnimator.ofFloat(
+                        spinner, View.ROTATION, 0f, 360f);
+                rot.setDuration(1150);
+                rot.setRepeatCount(android.animation.ObjectAnimator.INFINITE);
+                rot.setInterpolator(new android.view.animation.LinearInterpolator());
+                rot.start();
+                spinner.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
+                    @Override public void onViewAttachedToWindow(View v) { }
+                    @Override public void onViewDetachedFromWindow(View v) { rot.cancel(); }
+                });
+            }
+            badge.addView(spinner, new FrameLayout.LayoutParams(Theme.dp(24), Theme.dp(24), Gravity.CENTER));
         } else {
             android.widget.ImageView icon = new android.widget.ImageView(a);
             icon.setImageResource(state == BannerState.UPDATED ? R.drawable.mi_check_circle : R.drawable.mi_wifi_off);
@@ -435,7 +448,7 @@ public class HomeScreen extends Screen {
         final Link L = new Link(c0);
         Data d = new Data();
         final String to = Jalali.todayStr();
-        final String from = Jalali.addDays(to, -30);
+        final String from = chartsFrom(to);
         d.salesDaily = liveL(token, L, d.notes, "روند فروش", () -> Repo.exec(L.c, Queries.factorDaily(L.m, true, from, to)));
         Filter todayFilter = new Filter();
         todayFilter.from = to;
@@ -443,11 +456,58 @@ public class HomeScreen extends Screen {
         todayFilter.top = 5;
         d.topItems = liveL(token, L, d.notes, "پرفروش‌ترین کالاهای امروز",
                 () -> Repo.exec(L.c, Queries.factorTopProducts(L.m, true, todayFilter, 5)));
-        d.monthlySales = liveL(token, L, d.notes, "فروش ماهانه",
-                () -> Repo.exec(L.c, MasterQueries.monthly(L.m, true, 12)));
+        // Monthly comparison is folded from the SAME daily rows the chart draws, so the
+        // month tiles can never disagree with the trend or the averages next to them.
+        d.monthlySales = monthlyFromDaily(d.salesDaily);
         d.dueIn = liveL(token, L, d.notes, "سررسید دریافتی", () -> Repo.exec(L.c, MoneyQueries.chequeDue(L.m, true, 3)));
         d.dueOut = liveL(token, L, d.notes, "سررسید پرداختی", () -> Repo.exec(L.c, MoneyQueries.chequeDue(L.m, false, 3)));
         return d;
+    }
+
+    /** Daily window: the last 30 days — or earlier, so the previous month is complete. */
+    private static String chartsFrom(String to) {
+        String base = Jalali.addDays(to, -30);
+        try {
+            int dom = Integer.parseInt(to.split("/")[2].trim());
+            String prevStart = Jalali.addDays(to, -(dom - 1 + 30));
+            if (prevStart != null && !prevStart.isEmpty() && prevStart.compareTo(base) < 0) return prevStart;
+        } catch (Exception ignored) { Diag.ignored("HomeScreen:chartsFrom", ignored); }
+        return base;
+    }
+
+    /** Month buckets («1405/08», total, docs) from daily rows — newest month first. */
+    private static List<Row> monthlyFromDaily(List<Row> daily) {
+        java.util.TreeMap<String, Row> byMonth = new java.util.TreeMap<>(java.util.Collections.reverseOrder());
+        if (daily != null) for (Row r : daily) {
+            String day = Jalali.disp(r.s("day"));
+            if (day.length() < 7) continue;
+            String key = day.substring(0, 7);
+            Row acc = byMonth.get(key);
+            if (acc == null) {
+                acc = new Row();
+                acc.put("month", key);
+                acc.put("total", 0d);
+                acc.put("docs", 0L);
+                byMonth.put(key, acc);
+            }
+            acc.put("total", acc.d("total") + r.d("total"));
+            acc.put("docs", acc.l("docs") + r.l("docs"));
+        }
+        return new ArrayList<>(byMonth.values());
+    }
+
+    /** Sum of the first {@code days} calendar days of a «YYYY/MM» bucket in the daily rows. */
+    private static double monthToDate(List<Row> daily, String monthKey, int days) {
+        if (daily == null || monthKey == null || days <= 0) return 0;
+        double total = 0;
+        for (Row r : daily) {
+            String day = Jalali.disp(r.s("day"));
+            if (day.length() < 10 || !day.startsWith(monthKey + "/")) continue;
+            try {
+                if (Integer.parseInt(day.substring(8).trim()) <= days) total += r.d("total");
+            } catch (Exception ignored) { Diag.ignored("HomeScreen:monthToDate", ignored); }
+        }
+        return total;
     }
 
     private static void mergeKpis(Data s, Data g) {
@@ -1035,7 +1095,10 @@ public class HomeScreen extends Screen {
         label.setEllipsize(TextUtils.TruncateAt.END);
         t.addView(label, a.kit.lp(-1, -2));
         // Prices are always in toman (the source's unit), whatever unit the rest of the app uses.
-        TextView price = a.kit.text(Money.fa(Money.num(r.toman)), 18f, Theme.TEXT, true);
+        // A zero price means the source has no figure — never show it as a real «۰ تومان».
+        boolean hasPrice = r.toman > 0;
+        TextView price = a.kit.text(hasPrice ? Money.fa(Money.num(r.toman)) : "ناموجود",
+                hasPrice ? 18f : 13f, hasPrice ? Theme.TEXT : Theme.MUTED, true);
         price.setMaxLines(1);
         price.setGravity(Gravity.CENTER_HORIZONTAL);
         // Tabular figures: digits keep their width when the price updates.
@@ -1044,28 +1107,33 @@ public class HomeScreen extends Screen {
         LinearLayout.LayoutParams pp = a.kit.lp(-1, -2);
         pp.setMargins(0, Theme.dp(6), 0, 0);
         t.addView(price, pp);
-        // Unit is smaller and quieter than the figure.
-        TextView unit = a.kit.text("تومان", 9f, Theme.MUTED, false);
-        unit.setMaxLines(1);
-        unit.setGravity(Gravity.CENTER_HORIZONTAL);
-        t.addView(unit, a.kit.lp(-1, -2));
-        int color = r.changePct > 0 ? Theme.SUCCESS : (r.changePct < 0 ? Theme.DANGER : Theme.MUTED);
-        String arrow = r.changePct > 0 ? "↗ +" : (r.changePct < 0 ? "↘ −" : "");
-        String changeText = Math.abs(r.changePct) < 0.05 ? "بدون تغییر"
-                : arrow + Money.fa(String.format(Locale.US, "%.1f", Math.abs(r.changePct))) + "٪";
-        TextView ch = a.kit.text(changeText, 10f, color, true);
-        ch.setMaxLines(1);
-        ch.setGravity(Gravity.CENTER_HORIZONTAL);
-        ch.setBackground(Theme.pill(color));
-        ch.setPadding(Theme.dp(8), Theme.dp(2), Theme.dp(8), Theme.dp(2));
-        LinearLayout.LayoutParams cp = a.kit.lp(-2, -2);
-        cp.gravity = Gravity.CENTER_HORIZONTAL;
-        cp.setMargins(0, Theme.dp(6), 0, 0);
-        t.addView(ch, cp);
-        String trendDescription = Math.abs(r.changePct) < 0.05 ? "بدون تغییر"
+        if (hasPrice) {
+            // Unit is smaller and quieter than the figure.
+            TextView unit = a.kit.text("تومان", 9f, Theme.MUTED, false);
+            unit.setMaxLines(1);
+            unit.setGravity(Gravity.CENTER_HORIZONTAL);
+            t.addView(unit, a.kit.lp(-1, -2));
+            int color = r.changePct > 0 ? Theme.SUCCESS : (r.changePct < 0 ? Theme.DANGER : Theme.MUTED);
+            String arrow = r.changePct > 0 ? "↗ +" : (r.changePct < 0 ? "↘ −" : "");
+            String changeText = Math.abs(r.changePct) < 0.05 ? "بدون تغییر"
+                    : arrow + Money.fa(String.format(Locale.US, "%.1f", Math.abs(r.changePct))) + "٪";
+            TextView ch = a.kit.text(changeText, 10f, color, true);
+            ch.setMaxLines(1);
+            ch.setGravity(Gravity.CENTER_HORIZONTAL);
+            ch.setBackground(Theme.pill(color));
+            ch.setPadding(Theme.dp(8), Theme.dp(2), Theme.dp(8), Theme.dp(2));
+            LinearLayout.LayoutParams cp = a.kit.lp(-2, -2);
+            cp.gravity = Gravity.CENTER_HORIZONTAL;
+            cp.setMargins(0, Theme.dp(6), 0, 0);
+            t.addView(ch, cp);
+        }
+        String trendDescription = !hasPrice ? "قیمت در دسترس نیست"
+                : Math.abs(r.changePct) < 0.05 ? "بدون تغییر"
                 : (r.changePct > 0 ? "افزایش " : "کاهش ")
                 + Money.fa(String.format(Locale.US, "%.1f", Math.abs(r.changePct))) + " درصد";
-        t.setContentDescription(r.label + "، " + Money.fa(Money.num(r.toman)) + " تومان، " + trendDescription);
+        t.setContentDescription(r.label + "، " + (hasPrice
+                ? Money.fa(Money.num(r.toman)) + " تومان، " + trendDescription
+                : trendDescription));
         return t;
     }
 
@@ -1220,7 +1288,11 @@ public class HomeScreen extends Screen {
 
     private void secKpis(LinearLayout content, Data d) {
         LinearLayout card = a.kit.card(Theme.GOLD);
-        card.addView(dashboardSectionHead("گردش امروز", R.drawable.mi_account_balance_wallet,
+        // The section names the day its tiles describe — «گردش دیروز» when yesterday is
+        // the latest day with documents, never a fixed «امروز» above «دیروز» tiles.
+        String kpiDay = dayOf(d.salesDay != null ? d.salesDay : d.inDay);
+        card.addView(dashboardSectionHead(kpiDay.isEmpty() ? "گردش روز" : "گردش " + kpiDay,
+                R.drawable.mi_account_balance_wallet,
                 Theme.GOLD, "فروش ›", navAction("sales")), a.kit.lp(-1, -2));
         card.addView(a.kit.text(isSalesManager()
                         ? "فروش روز و روند آن؛ لمس شاخص، ریز همان روز را باز می‌کند."
@@ -1266,11 +1338,14 @@ public class HomeScreen extends Screen {
                     "میانگین و مقایسه با روزهای قبل", R.drawable.mi_bar_chart,
                     navChip("گزارش فروش", "sales")), a.kit.lp(-1, -2));
             List<Mini> cmp = new ArrayList<>();
-            cmp.add(new Mini(R.drawable.mi_point_of_sale, snapshotLabel(d), Money.compactRial(todaySales),
-                    running ? partialTodayNote() : "تغییر ۷ روزه " + delta, Theme.TEXT));
+            cmp.add(new Mini(R.drawable.mi_point_of_sale, snapshotLabel(d),
+                    todaySales > 0 ? Money.compactRial(todaySales) : "—",
+                    todaySales > 0 ? (running ? partialTodayNote() : "تغییر ۷ روزه " + delta)
+                            : (running ? "هنوز فروشی ثبت نشده" : "بدون فروش"),
+                    Theme.TEXT));
             cmp.add(new Mini(R.drawable.mi_calendar_month, "دیروز", Money.compactRial(yesterday), null, Theme.TEXT));
             cmp.add(new Mini(R.drawable.mi_bar_chart, "میانگین ۳۰ روز", Money.compactRial(avg30), null, Theme.TEXT));
-            cmp.add(new Mini(R.drawable.mi_refresh, "۷ روز", Money.compactRial(avg7), null, Theme.TEXT));
+            cmp.add(new Mini(R.drawable.mi_refresh, "میانگین ۷ روز", Money.compactRial(avg7), null, Theme.TEXT));
             compare.addView(miniGrid(cmp, 2), a.kit.lp(-1, -2));
             a.kit.addCard(content, compare);
         }
@@ -1668,7 +1743,10 @@ public class HomeScreen extends Screen {
                 pulse.setGravity(Gravity.CENTER_VERTICAL);
                 pulse.setPadding(Theme.dp(9), Theme.dp(7), Theme.dp(9), Theme.dp(7));
                 pulse.setBackground(Theme.kpi(color));
-                pulse.addView(a.kit.text("فروش " + snapshotLabel(d), 10.5f, Theme.MUTED, false), a.kit.wlp(1f));
+                pulse.addView(a.kit.text("فروش " + snapshotLabel(d), 10.5f, Theme.MUTED, false), a.kit.lp(-2, -2));
+                pulse.addView(a.kit.space(7));
+                pulse.addView(a.kit.text(today > 0 ? Money.compactRial(today) : "—",
+                        11.5f, Theme.TEXT, true), a.kit.wlp(1f));
                 pulse.addView(a.kit.text(Money.pct(Math.abs(change)) + " " + direction + " از میانگین ۷ روز",
                         10.5f, color, true), a.kit.lp(-2, -2));
                 trend.addView(pulse, a.kit.lp(-1, -2));
@@ -1676,7 +1754,7 @@ public class HomeScreen extends Screen {
             }
             Charts.Area chart = new Charts.Area(a);
             TextView caption = a.kit.text(points.isEmpty() ? "" : lastCap(points), 10f, Theme.MUTED, false);
-            chart.setData(points, Theme.GOLD, Charts.COMPACT);
+            chart.setData(points, Theme.GOLD, Charts.MONEY);
             chart.setListener((idx, point) -> caption.setText(Money.fa(point.label) + " • " + Money.rial(point.value)));
             trend.addView(chart, new LinearLayout.LayoutParams(-1, Theme.dp(126)));
             trend.addView(caption, a.kit.lp(-1, -2));
@@ -1715,19 +1793,33 @@ public class HomeScreen extends Screen {
                     if (hasProducts) card.addView(a.kit.gap(7));
                     card.addView(insightSubhead("مقایسهٔ ماهانه", R.drawable.mi_sell, Theme.GOLD),
                             a.kit.lp(-1, -2));
+                    String curKey = currentMonth == null ? "" : currentMonth.replace('-', '/');
+                    String prevKey = previousMonth == null ? "" : previousMonth.replace('-', '/');
+                    boolean running = curKey.equals(Jalali.todayStr().substring(0, 7));
                     LinearLayout months = a.kit.h();
-                    months.addView(insightMetric(currentMonth == null ? "ماه جاری" : currentMonth.replace('-', '/'),
+                    months.addView(insightMetric((curKey.isEmpty() ? "ماه جاری" : curKey) + (running ? " • تا امروز" : ""),
                             Money.compactRial(current.d("total")), Theme.GOLD), a.kit.wlp(1f));
                     if (previous != null) {
                         months.addView(a.kit.space(7));
-                        months.addView(insightMetric(previousMonth == null ? "ماه قبل" : previousMonth.replace('-', '/'),
+                        months.addView(insightMetric(prevKey.isEmpty() ? "ماه قبل" : prevKey,
                                 Money.compactRial(previous.d("total")), Theme.INFO), a.kit.wlp(1f));
                     }
                     card.addView(months, a.kit.lp(-1, -2));
                     if (previous != null && previous.d("total") > 0) {
-                        double change = (current.d("total") - previous.d("total")) * 100.0 / previous.d("total");
-                        int color = current.d("total") >= previous.d("total") ? Theme.SUCCESS : Theme.WARNING;
-                        card.addView(a.kit.text("تغییر نسبت به ماه قبل: " + Money.pct(change),
+                        // A month still running is judged against the SAME days of the
+                        // previous month — never against its full, unfair total.
+                        double prevBase = previous.d("total");
+                        String basis = "ماه قبل";
+                        if (running) {
+                            try {
+                                int dom = Integer.parseInt(Jalali.todayStr().split("/")[2].trim());
+                                double same = monthToDate(d.salesDaily, prevKey, dom);
+                                if (same > 0) { prevBase = same; basis = "همین بازه از ماه قبل"; }
+                            } catch (Exception ignored) { Diag.ignored("HomeScreen:monthCompare", ignored); }
+                        }
+                        double change = (current.d("total") - prevBase) * 100.0 / prevBase;
+                        int color = current.d("total") >= prevBase ? Theme.SUCCESS : Theme.WARNING;
+                        card.addView(a.kit.text("تغییر نسبت به " + basis + ": " + Money.pct(change),
                                 10f, color, true), a.kit.lp(-1, -2));
                     }
                 }
@@ -1742,18 +1834,31 @@ public class HomeScreen extends Screen {
         LinearLayout card = a.kit.card(Theme.SUCCESS);
         card.addView(dashboardSectionHead("ترکیب دریافت " + dayOf(d.inDay), R.drawable.mi_receipt_long,
                 Theme.SUCCESS, "دریافت‌ها ›", navAction("dar_in")), a.kit.lp(-1, -2));
-        card.addView(a.kit.text("جمع " + Money.compactRial(d.inDay.d("total")),
+        double total = d.inDay.d("total");
+        double cash = d.inDay.d("cash"), pos = d.inDay.d("pos"),
+                havaleh = d.inDay.d("havaleh"), cheque = d.inDay.d("cheque");
+        card.addView(a.kit.text("جمع " + Money.compactRial(total),
                 11f, Theme.TEXT, true), a.kit.lp(-1, -2));
-        addPaymentMix(card, "نقد", d.inDay.d("cash"), d.inDay.d("total"), Theme.SUCCESS);
-        addPaymentMix(card, "کارت", d.inDay.d("pos"), d.inDay.d("total"), Theme.INFO);
-        addPaymentMix(card, "حواله", d.inDay.d("havaleh"), d.inDay.d("total"), Theme.GOLD);
-        addPaymentMix(card, "چک", d.inDay.d("cheque"), d.inDay.d("total"), Theme.VIOLET);
+        addPaymentMix(card, "نقد", cash, total, Theme.SUCCESS);
+        addPaymentMix(card, "کارت", pos, total, Theme.INFO);
+        addPaymentMix(card, "حواله", havaleh, total, Theme.GOLD);
+        addPaymentMix(card, "چک", cheque, total, Theme.VIOLET);
+        // The booked voucher total (dar.mab) can carry a discount or other items beyond the
+        // four means of payment — show the difference instead of leaving the rails unexplained.
+        double other = total - (cash + pos + havaleh + cheque);
+        if (Math.abs(other) >= 500_000) {
+            addPaymentMix(card, other > 0 ? "سایر (تخفیف، کسورات و اقلام دیگر)" : "تعدیل/اضافهٔ سند",
+                    Math.abs(other), total, Theme.WARNING);
+            card.addView(a.kit.text("تفاوت مجموع اجزا با کل قبض، ناشی از تخفیف یا اقلام دیگر است.",
+                    9f, Theme.MUTED, false), a.kit.lp(-1, -2));
+        }
         a.kit.addCard(content, card);
     }
 
     private void addPaymentMix(LinearLayout card, String label, double amount, double total, int color) {
         if (amount <= 0) return;
-        card.addView(a.kit.progressLine(label, Money.compactRial(amount), amount / total, color),
+        String share = total > 0 ? " · " + Money.pct(amount * 100.0 / total) : "";
+        card.addView(a.kit.progressLine(label, Money.compactRial(amount) + share, amount / total, color),
                 a.kit.lp(-1, -2));
     }
 

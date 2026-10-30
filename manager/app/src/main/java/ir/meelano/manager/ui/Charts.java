@@ -49,6 +49,21 @@ public final class Charts {
 
     public static final Formatter COMPACT = Money::compact;
     public static final Formatter FULL = Money::rial;
+    /**
+     * Money axis in the DISPLAY unit (Toman by default): the rest of the app shows
+     * Toman, so an axis of raw Rial magnitudes used to read ten times too large.
+     */
+    public static final Formatter MONEY = v -> Money.compact(Money.toUnit(v));
+
+    /** 1 / 2 / 2.5 / 5 × 10ⁿ — the friendliest step that covers the raw span. */
+    private static double niceStep(double raw) {
+        if (!(raw > 0) || Double.isNaN(raw)) return 1;
+        double exp = Math.floor(Math.log10(raw));
+        double base = Math.pow(10, exp);
+        double f = raw / base;
+        double n = f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10;
+        return n * base;
+    }
 
     private static final int[] PALETTE = {
             0xFFD9AE5A, 0xFF4FA3FF, 0xFF35C26E, 0xFF9A7BFF, 0xFFF5A524,
@@ -254,16 +269,19 @@ public final class Charts {
                 ys[i] = (float) (plot.bottom - plot.height() * ((data.get(i).value - mn) / (mx - mn)) * progress);
             }
             float zeroY = (float) (plot.bottom - plot.height() * ((0 - mn) / (mx - mn)) * progress);
-            // grid + y labels
+            // grid + y labels — round steps read better than thirds of the max.
             paint.setStyle(Paint.Style.STROKE);
             paint.setStrokeWidth(1);
             paint.setColor(Theme.alpha(Theme.TEXT, 22));
             text.setColor(Theme.MUTED);
             text.setTextAlign(Paint.Align.RIGHT);
-            for (int k = 0; k <= 3; k++) {
-                float y = plot.bottom - plot.height() * k / 3f;
+            double step = niceStep((mx - mn) / 3.0);
+            double lo = Math.floor(mn / step) * step;
+            int guard = 0;
+            for (double v = lo; v <= mx + step * 0.5 && guard < 8; v += step, guard++) {
+                float y = (float) (plot.bottom - plot.height() * ((v - mn) / (mx - mn)));
                 g.drawLine(plot.left, y, plot.right, y, paint);
-                g.drawText(Money.fa(fmt.format(mn + (mx - mn) * k / 3.0)), plot.left - Theme.dp(4), y + Theme.dp(4), text);
+                g.drawText(Money.fa(fmt.format(v)), plot.left - Theme.dp(4), y + Theme.dp(4), text);
             }
             if (mn < 0) {
                 paint.setColor(Theme.alpha(Theme.TEXT, 80));

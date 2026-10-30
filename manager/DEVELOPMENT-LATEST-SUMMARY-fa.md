@@ -1,10 +1,9 @@
-# آخرین وضعیت توسعهٔ میلانو — مدیر (به‌روزرسانی: دور ۸ — بررسی صحت بخش‌ها و دقت گزارش‌ها)
+# آخرین وضعیت توسعهٔ میلانو — مدیر (به‌روزرسانی: دور ۱۰ — پورت سرور، نام برنامه، بازبینی کامل)
 
 ## نسخهٔ فعلی
-- **MEELANO Manager v36.38.0** — package `ir.meelano.manager` — نسخه‌کد ۶۹
-  (versionCode 71).
-- APK مستقل: `dist/meelano-manager-v36-debug-20.apk` — SHA-256
-  `c5d9e02c28b63721015fb3b8579379a3ccecc9ddae9e37fbbdab00f19f7982e3` (هفت‌بُعدی — ساختِ شاملِ رفع‌های دور ۸).
+- **MEELANO Manager v36.38.0** — package `ir.meelano.manager` — versionCode **71**.
+- APK مستقل: `dist/meelano-manager-v36-debug-20.apk`
+  (SHA-256 معتبر همیشه در `dist/manager-v36-build-info.txt` کنار خودِ APK ثبت است).
 - لینک مستقیم:
   `https://github.com/Companymeelano/Testt/raw/arena/29e01a09-testt/dist/meelano-manager-v36-debug-20.apk`
 

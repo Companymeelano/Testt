@@ -183,6 +183,9 @@ public final class RoleStore {
         }
     }
 
+    /** Legacy single-iteration verifier namespace (fixed prefix), kept only for verification. */
+    private static final String LEGACY_PIN_PREFIX = "meelano_role:";
+
     public static boolean checkRole(Context c, String role, String pin) {
         try {
             String saved = prefs(c).getString(pinKey(role), "");
@@ -193,7 +196,14 @@ public final class RoleStore {
                 }
                 return true;
             }
-            return pin != null && sha(Money.en(pin).trim()).equals(saved);
+            if (pin == null) return false;
+            String norm = Money.en(pin).trim();
+            if (!PinHash.verify(norm, saved, LEGACY_PIN_PREFIX)) return false;
+            if (PinHash.legacy(saved)) {
+                String h = PinHash.hash(norm);
+                if (!h.isEmpty()) prefs(c).edit().putString(pinKey(role), h).apply();
+            }
+            return true;
         } catch (Exception e) {
             return false;
         }
@@ -206,7 +216,7 @@ public final class RoleStore {
             SharedPreferences.Editor e = prefs(c).edit();
             if (ADMIN.equals(role)) e.putBoolean("pin_admin_touched", true);
             if (pin.length() < 4) e.putString(pinKey(role), "");
-            else e.putString(pinKey(role), sha(pin));
+            else e.putString(pinKey(role), PinHash.hash(pin)); // "" on failure → no PIN stored (fail closed)
             e.apply();
         } catch (Exception ignored) { Diag.ignored("RoleStore:198", ignored); }
     }
@@ -259,17 +269,5 @@ public final class RoleStore {
         if (WAREHOUSE.equals(role)) return "pin_warehouse";
         if (MOADIAN.equals(role)) return "pin_moadian";
         return "pin_admin";
-    }
-
-    private static String sha(String s) {
-        try {
-            java.security.MessageDigest d = java.security.MessageDigest.getInstance("SHA-256");
-            byte[] h = d.digest(("meelano_role:" + s).getBytes("UTF-8"));
-            StringBuilder b = new StringBuilder();
-            for (byte x : h) b.append(String.format("%02x", x));
-            return b.toString();
-        } catch (Exception e) {
-            return "x" + s;
-        }
     }
 }

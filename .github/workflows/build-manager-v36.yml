@@ -1,4 +1,4 @@
-name: MEELANO Manager v36.35.1 debug APK
+name: MEELANO Manager v36.36.0 debug APK
 
 on:
   push:
@@ -47,7 +47,7 @@ jobs:
           curl -fsSL -o manager/app/libs/sherpa-onnx-1.13.8.aar https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-1.13.8.aar
           echo "633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96  manager/app/libs/sherpa-onnx-1.13.8.aar" | sha256sum -c -
 
-      - name: Run manager unit tests and build v36.35.1
+      - name: Run manager unit tests and build v36.36.0
         working-directory: manager
         run: |
           set -o pipefail
@@ -114,8 +114,8 @@ jobs:
           mkdir -p "$RUNNER_TEMP/reldesc"
           javac -d "$RUNNER_TEMP/reldesc" manager/licensing/src/main/java/ir/meelano/licensing/License.java tools/release/ReleaseDescriptor.java
           SHA=$(printf 'meelano' | sha256sum | cut -d' ' -f1)
-          java -cp "$RUNNER_TEMP/reldesc" ReleaseDescriptor 68 36.35.1 meelano-manager-v36.35.1-release.apk 1000 "$SHA" https://github.com/Companymeelano/Testt/releases/download/manager-v36.35.1/meelano-manager-v36.35.1-release.apk "test" | tee descriptor-check.json
-          grep -F '"code": 68' descriptor-check.json
+          java -cp "$RUNNER_TEMP/reldesc" ReleaseDescriptor 69 36.36.0 meelano-manager-v36.36.0-release.apk 1000 "$SHA" https://github.com/Companymeelano/Testt/releases/download/manager-v36.36.0/meelano-manager-v36.36.0-release.apk "test" | tee descriptor-check.json
+          grep -F '"code": 69' descriptor-check.json
 
       - name: Verify APK identity, version and signature
         run: |
@@ -124,7 +124,7 @@ jobs:
           cp manager/app/build/outputs/apk/debug/app-debug.apk dist/meelano-manager-v36-debug-18.apk
           BT="$ANDROID_HOME/build-tools/35.0.0"
           "$BT/aapt" dump badging dist/meelano-manager-v36-debug-18.apk | tee manager-badging.txt
-          grep -F "package: name='ir.meelano.manager.debug' versionCode='68' versionName='36.35.1'" manager-badging.txt
+          grep -F "package: name='ir.meelano.manager.debug' versionCode='69' versionName='36.36.0'" manager-badging.txt
           "$BT/apksigner" verify --verbose --print-certs dist/meelano-manager-v36-debug-18.apk | tee manager-signing.txt
           unzip -t dist/meelano-manager-v36-debug-18.apk | tail -1
           unzip -l dist/meelano-manager-v36-debug-18.apk | grep -F 'lib/arm64-v8a/libonnxruntime.so'
@@ -158,7 +158,7 @@ jobs:
           gradle :app:assembleRelease --no-daemon --stacktrace
           APK=$(ls app/build/outputs/apk/release/*.apk | head -1)
           BT="$ANDROID_HOME/build-tools/35.0.0"
-          "$BT/aapt" dump badging "$APK" | grep -F "package: name='ir.meelano.manager' versionCode='68' versionName='36.35.1'"
+          "$BT/aapt" dump badging "$APK" | grep -F "package: name='ir.meelano.manager' versionCode='69' versionName='36.36.0'"
           "$BT/apksigner" verify --verbose --print-certs "$APK" | tee ../release-signing.txt
           cp "$APK" ../meelano-manager-v36-release.apk
           sha256sum ../meelano-manager-v36-release.apk
@@ -184,7 +184,7 @@ jobs:
           mkdir -p dist
           cp manager/app/build/outputs/apk/debug/app-debug.apk dist/meelano-manager-v36-debug-18.apk
           {
-            echo "MEELANO Manager v36.35.1 (versionCode 68)"
+            echo "MEELANO Manager v36.36.0 (versionCode 69)"
             echo "Package: ir.meelano.manager.debug"
             echo "Build run: ${GITHUB_RUN_ID}"
             echo "Commit: ${SOURCE_COMMIT}"
@@ -197,7 +197,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "APK and build info are unchanged; nothing to commit."
           else
-            git commit -m "dist: MEELANO Manager v36.35.1 debug APK"
+            git commit -m "dist: MEELANO Manager v36.36.0 debug APK"
           fi
           git push origin HEAD:arena/29e01a09-testt
 

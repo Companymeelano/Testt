@@ -1221,7 +1221,7 @@ public class HomeScreen extends Screen {
     private void secKpis(LinearLayout content, Data d) {
         LinearLayout card = a.kit.card(Theme.GOLD);
         card.addView(dashboardSectionHead("گردش امروز", R.drawable.mi_account_balance_wallet,
-                Theme.GOLD, "فروش ›", v -> a.nav("sales")), a.kit.lp(-1, -2));
+                Theme.GOLD, "فروش ›", navAction("sales")), a.kit.lp(-1, -2));
         card.addView(a.kit.text(isSalesManager()
                         ? "فروش روز و روند آن؛ لمس شاخص، ریز همان روز را باز می‌کند."
                         : "چهار شاخص اصلی؛ لمس هر کارت، ریز همان روز را باز می‌کند.",
@@ -1229,24 +1229,27 @@ public class HomeScreen extends Screen {
         card.addView(a.kit.gap(8));
 
         // The board reads خرید، فروش، پرداخت، دریافت - the order of the reference.
-        Kit.Kpi[] items = {
-                dayKpi("خرید", "buy", d.buyDay, "docs", "فاکتور", Theme.GOLD),
-                dayKpi("فروش", "sales", d.salesDay, "docs", "فاکتور", Theme.GOLD),
-                dayKpi("پرداخت", "dar_out", d.outDay, "count", "قبض", Theme.GOLD),
-                dayKpi("دریافت", "dar_in", d.inDay, "count", "قبض", Theme.GOLD)
-        };
+        // Tiles whose target screen the current role cannot open are not shown at all:
+        // each person sees exactly their own items (the tap opens that day of the target).
+        java.util.List<Kit.Kpi> tiles = new java.util.ArrayList<>();
+        String[] tileTargets = {"buy", "sales", "dar_out", "dar_in"};
+        String[] tileTitles = {"خرید", "فروش", "پرداخت", "دریافت"};
+        Row[] tileRows = {d.buyDay, d.salesDay, d.outDay, d.inDay};
+        String[] tileCountKeys = {"docs", "docs", "count", "count"};
+        String[] tileCountLabels = {"فاکتور", "فاکتور", "قبض", "قبض"};
         int[] icons = {R.drawable.mi_shopping_cart, R.drawable.mi_point_of_sale,
                 R.drawable.mi_payments, R.drawable.mi_receipt_long};
-        for (int i = 0; i < items.length; i++) {
-            items[i].icon = icons[i];
-            items[i].emeraldIcon = true;
-            items[i].subColor = Theme.SUCCESS;
+        for (int i = 0; i < tileTargets.length; i++) {
+            if (isSalesManager() && !"sales".equals(tileTargets[i])) continue;
+            if (!RoleStore.allowed(a, tileTargets[i])) continue;
+            Kit.Kpi kpi = dayKpi(tileTitles[i], tileTargets[i], tileRows[i],
+                    tileCountKeys[i], tileCountLabels[i], Theme.GOLD);
+            kpi.icon = icons[i];
+            kpi.emeraldIcon = true;
+            kpi.subColor = Theme.SUCCESS;
+            tiles.add(kpi);
         }
-        if (isSalesManager()) {
-            card.addView(a.kit.kpiGrid(java.util.Collections.singletonList(items[1]), 2), a.kit.lp(-1, -2));
-        } else {
-            card.addView(a.kit.kpiGrid(java.util.Arrays.asList(items), 2), a.kit.lp(-1, -2));
-        }
+        if (!tiles.isEmpty()) card.addView(a.kit.kpiGrid(tiles, 2), a.kit.lp(-1, -2));
         a.kit.addCard(content, card);
 
         // The comparison card: the day against the recent days, as compact tiles.
@@ -1261,7 +1264,7 @@ public class HomeScreen extends Screen {
             LinearLayout compare = a.kit.card(Theme.GOLD);
             compare.addView(boardHead("فروش " + snapshotLabel(d) + " در مقایسه",
                     "میانگین و مقایسه با روزهای قبل", R.drawable.mi_bar_chart,
-                    chevronChip("گزارش فروش", v -> a.nav("sales"))), a.kit.lp(-1, -2));
+                    navChip("گزارش فروش", "sales")), a.kit.lp(-1, -2));
             List<Mini> cmp = new ArrayList<>();
             cmp.add(new Mini(R.drawable.mi_point_of_sale, snapshotLabel(d), Money.compactRial(todaySales),
                     running ? partialTodayNote() : "تغییر ۷ روزه " + delta, Theme.TEXT));
@@ -1392,6 +1395,23 @@ public class HomeScreen extends Screen {
         Theme.pressable(chip);
         if (onClick != null) chip.setOnClickListener(onClick);
         return chip;
+    }
+
+    /**
+     * Role-aware chevron chip: null (the head simply shows no chip) when the current
+     * role cannot open the target screen — each person only sees their own items.
+     */
+    private View navChip(String label, String screenId) {
+        if (!RoleStore.allowed(a, screenId)) return null;
+        return chevronChip(label, v -> a.nav(screenId));
+    }
+
+    /**
+     * Role-aware action for a section head: null when the role cannot open the target.
+     * {@link #dashboardSectionHead} hides the action whenever the listener is null.
+     */
+    private View.OnClickListener navAction(String screenId) {
+        return RoleStore.allowed(a, screenId) ? v -> a.nav(screenId) : null;
     }
 
     /** A small status chip: how many alerts are open, or that there are none. */
@@ -1560,7 +1580,7 @@ public class HomeScreen extends Screen {
         int n = 0;
         n += alert(rows, d, n);
         List<FollowUps.Due> dues = FollowUps.dueToday(a);
-        if (!dues.isEmpty()) {
+        if (!dues.isEmpty() && RoleStore.allowed(a, "customers")) {
             final FollowUps.Due fd = dues.get(0);
             String who = dues.size() == 1 ? fd.note.name : Money.fa(String.valueOf(dues.size())) + " یادداشت";
             rows.addView(a.kit.alertRow("پیگیری مشتری", who + " • سررسید یادداشت",
@@ -1585,7 +1605,7 @@ public class HomeScreen extends Screen {
     private void secReturns(LinearLayout content, Data d) {
         LinearLayout card = a.kit.card(Theme.GOLD);
         card.addView(boardHead("برگشتی‌های ۳۰ روز اخیر", "ابطال و برگشت، ۳۰ روز گذشته",
-                R.drawable.mi_refresh, chevronChip("گزارش برگشتی‌ها", v -> a.nav("reports"))),
+                R.drawable.mi_refresh, navChip("گزارش برگشتی‌ها", "reports")),
                 a.kit.lp(-1, -2));
         long docs = 0;
         double total = 0;
@@ -1639,7 +1659,7 @@ public class HomeScreen extends Screen {
             LinearLayout trend = a.kit.card(Theme.GOLD);
             trend.addView(boardHead("روند ۱۴ روزه فروش تا " + snapshotLabel(d),
                     "فروش روزانه، روز به روز", R.drawable.mi_refresh,
-                    chevronChip("گزارش فروش", v -> a.nav("sales"))), a.kit.lp(-1, -2));
+                    navChip("گزارش فروش", "sales")), a.kit.lp(-1, -2));
             if (avg7 > 0) {
                 double change = (today - avg7) * 100.0 / avg7;
                 int color = today >= avg7 ? Theme.SUCCESS : Theme.WARNING;
@@ -1666,7 +1686,7 @@ public class HomeScreen extends Screen {
         if (hasProducts || hasMonths) {
             LinearLayout card = a.kit.card(Theme.GOLD);
             card.addView(dashboardSectionHead("نبض فروش", R.drawable.mi_bar_chart,
-                    Theme.GOLD, "فروش ›", v -> a.nav("sales")), a.kit.lp(-1, -2));
+                    Theme.GOLD, "فروش ›", navAction("sales")), a.kit.lp(-1, -2));
             if (hasProducts) {
                 card.addView(insightSubhead("پرفروش‌های " + snapshotLabel(d), R.drawable.mi_grid_view, Theme.GOLD),
                         a.kit.lp(-1, -2));
@@ -1721,7 +1741,7 @@ public class HomeScreen extends Screen {
         if (d.inDay == null || d.inDay.d("total") <= 0) return;
         LinearLayout card = a.kit.card(Theme.SUCCESS);
         card.addView(dashboardSectionHead("ترکیب دریافت " + dayOf(d.inDay), R.drawable.mi_receipt_long,
-                Theme.SUCCESS, "دریافت‌ها ›", v -> a.nav("dar_in")), a.kit.lp(-1, -2));
+                Theme.SUCCESS, "دریافت‌ها ›", navAction("dar_in")), a.kit.lp(-1, -2));
         card.addView(a.kit.text("جمع " + Money.compactRial(d.inDay.d("total")),
                 11f, Theme.TEXT, true), a.kit.lp(-1, -2));
         addPaymentMix(card, "نقد", d.inDay.d("cash"), d.inDay.d("total"), Theme.SUCCESS);
@@ -1769,7 +1789,7 @@ public class HomeScreen extends Screen {
         if ((d.dueIn != null && !d.dueIn.isEmpty()) || (d.dueOut != null && !d.dueOut.isEmpty())) {
             LinearLayout c = a.kit.card(Theme.INFO);
             c.addView(boardHead("سررسید ۳ روز آینده", "چک‌های دریافتی و پرداختی",
-                    R.drawable.mi_cheque, chevronChip("گزارش چک‌ها", v -> a.nav("cheques"))), a.kit.lp(-1, -2));
+                    R.drawable.mi_cheque, navChip("گزارش چک‌ها", "cheques")), a.kit.lp(-1, -2));
             if (d.dueIn != null && !d.dueIn.isEmpty()) {
                 c.addView(statRow(R.drawable.mi_cheque, "دریافتی " + Money.fa(String.valueOf(d.dueIn.size())) + " فقره",
                         Money.rial(dueInSum), Theme.GOLD), a.kit.lp(-1, -2));
@@ -1822,7 +1842,7 @@ public class HomeScreen extends Screen {
 
     private int alert(LinearLayout box, Data d, int n) {
         // overdue top-1
-        if (d.overdue != null && !d.overdue.isEmpty()) {
+        if (d.overdue != null && !d.overdue.isEmpty() && RoleStore.allowed(a, "sales")) {
             Row o = d.overdue.get(0);
             long dd = o.l("days");
             // Without dif_date_alan the server sends −1: derive the delay from the due date.
@@ -1833,7 +1853,7 @@ public class HomeScreen extends Screen {
             n++;
         }
         // Company liquidity is visible only to the company manager.
-        if (!isSalesManager() && d.salesDay != null && d.buyDay != null
+        if (!isSalesManager() && RoleStore.allowed(a, "buy") && d.salesDay != null && d.buyDay != null
                 && d.salesDay.d("total") > 0 && d.buyDay.d("total") > d.salesDay.d("total") * 1.15) {
             box.addView(a.kit.alertRow("فشار نقدینگی", "خرید روز از فروش جلو زده؛ پرداخت‌ها را کنترل کنید.",
                     Theme.GOLD, v -> a.nav("buy")), padTop(n));
@@ -1841,7 +1861,7 @@ public class HomeScreen extends Screen {
         }
         // due cheques
         int dueN = (d.dueIn == null ? 0 : d.dueIn.size()) + (d.dueOut == null ? 0 : d.dueOut.size());
-        if (!isSalesManager() && dueN > 0) {
+        if (!isSalesManager() && RoleStore.allowed(a, "cheques") && dueN > 0) {
             box.addView(a.kit.alertRow("سررسید چک", Money.fa(String.valueOf(dueN)) + " فقره چک در ۳ روز آینده سررسید می‌شود.",
                     Theme.INFO, v -> a.nav("cheques")), padTop(n));
             n++;

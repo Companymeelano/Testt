@@ -627,7 +627,9 @@ public class MainActivity extends Activity {
         tools.setBackground(Theme.toolbarPanel());
         tools.setPadding(Theme.dp(3), Theme.dp(3), Theme.dp(3), Theme.dp(3));
 
-        if (!tiny) tools.addView(toolCell(toolIcon(R.drawable.mi_search), "جستجو", "جستجو", () -> nav("search")), toolLp());
+        // Role-aware toolbar: each person only sees the tools their own role may open.
+        if (!tiny && RoleStore.allowed(this, "search"))
+            tools.addView(toolCell(toolIcon(R.drawable.mi_search), "جستجو", "جستجو", () -> nav("search")), toolLp());
 
         final android.widget.ImageView themeIcon = toolIcon(R.drawable.mi_contrast);
         if (!tiny) tools.addView(toolCell(themeIcon, "تم", "تغییر تم روشن / تیره", () -> {
@@ -650,7 +652,8 @@ public class MainActivity extends Activity {
             refreshIcon.animate().rotationBy(360f).setDuration(600).start();
             renderCurrent();
         }), toolLp());
-        tools.addView(toolCell(toolIcon(R.drawable.mi_settings), "تنظیمات", "تنظیمات", () -> nav("settings")), toolLp());
+        if (RoleStore.allowed(this, "settings"))
+            tools.addView(toolCell(toolIcon(R.drawable.mi_settings), "تنظیمات", "تنظیمات", () -> nav("settings")), toolLp());
 
         // toolIcon() shows the 3D icon in both skins (and tints only flat vectors).
         android.widget.ImageView account = toolIcon(R.drawable.mi_person);

@@ -418,8 +418,9 @@ public final class Queries {
         // cancel/void marker, which is why this cannot be phrased as "cancelled":
         // those rows never reach the query at all.
         if ("not_confirmed".equals(f.status)) {
-            String statusCol = Sql.pick(cols, "Status");
-            if (statusCol == null) throw new Missing("ستون وضعیت در «" + AtiranSchema.faTitle(table) + "» پیدا نشد");
+            // sailfact carries "Status"; buyfact carries the confirmation flag "taeed".
+            String statusCol = Sql.pick(cols, "Status", "status", "taeed", "Taeed", "IsFinal", "isfinal", "vaziat");
+            if (statusCol == null) throw new Missing("ستون وضعیت/تأیید در «" + AtiranSchema.faTitle(table) + "» پیدا نشد");
             conds.add("ISNULL(TRY_CONVERT(int,h.[" + statusCol + "]),0)<>1");
         }
         if (f.search != null && !f.search.trim().isEmpty()) {

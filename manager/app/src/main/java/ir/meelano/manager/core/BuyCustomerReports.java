@@ -161,7 +161,7 @@ public final class BuyCustomerReports {
         String lineShka = m.must("subbuyfact", "کد کالا", "SHKA", "shka");
         String invShka = m.must("inventory", "SHKA", "shka");
         String invName = m.col("inventory", "naka", "NAKA");
-        String stock = m.must("inventory", "mojkavah");
+        String stock = m.must("inventory", "موجودی", "mojkavah", "MojKavah", "moj_kavah");
         String unit = m.col("inventory", "vahsanj");
         String label = "COALESCE(" + (invName == null ? "" : Sql.txt("i", invName, 250) + ",")
                 + Sql.txt("i", invShka, 120) + ",N'—')";
@@ -196,7 +196,7 @@ public final class BuyCustomerReports {
         String qty = m.must("subbuyfact", "تعداد", "TEDVAH", "tedvah");
         String invShka = m.must("inventory", "SHKA", "shka");
         String invName = m.col("inventory", "naka", "NAKA");
-        String stock = m.must("inventory", "mojkavah");
+        String stock = m.must("inventory", "موجودی", "mojkavah", "MojKavah", "moj_kavah");
         String label = "COALESCE(" + (invName == null ? "" : Sql.txt("i", invName, 250) + ",")
                 + Sql.txt("d", shka, 120) + ",N'—')";
         Queries.Q inner = new Queries.Q("SELECT TOP (" + Queries.clampTop(top) + ") " + label + " AS label"

@@ -80,7 +80,9 @@ public class LicenseActivity extends Activity {
     private String pendingSmsText = "";
     private boolean editingConnection;
     private EditText connectionIp;
+    private EditText connectionPort;
     private String restoredConnectionIp;
+    private String restoredConnectionPort;
 
     /** Intent extra used by Settings to reopen server/database selection. */
     public static final String EXTRA_EDIT_CONNECTION = "ir.meelano.manager.EDIT_CONNECTION";
@@ -157,6 +159,8 @@ public class LicenseActivity extends Activity {
                 && getIntent().getBooleanExtra(EXTRA_EDIT_CONNECTION, false);
         if (savedInstanceState != null && savedInstanceState.containsKey("manager_connection_ip"))
             restoredConnectionIp = savedInstanceState.getString("manager_connection_ip", "");
+        if (savedInstanceState != null && savedInstanceState.containsKey("manager_connection_port"))
+            restoredConnectionPort = savedInstanceState.getString("manager_connection_port", "");
         repo = new Repo(this, settings);
         try {
             device = DeviceId.code(this);
@@ -172,6 +176,8 @@ public class LicenseActivity extends Activity {
         try {
             if (connectionIp != null) outState.putString("manager_connection_ip",
                     connectionIp.getText().toString());
+            if (connectionPort != null) outState.putString("manager_connection_port",
+                    connectionPort.getText().toString());
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:174", ignored); }
         super.onSaveInstanceState(outState);
     }
@@ -251,8 +257,10 @@ public class LicenseActivity extends Activity {
     private void buildUi() {
         try {
             if (connectionIp != null) restoredConnectionIp = connectionIp.getText().toString();
+            if (connectionPort != null) restoredConnectionPort = connectionPort.getText().toString();
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:253", ignored); }
         connectionIp = null;
+        connectionPort = null;
         LinearLayout box = kit.v();
         int pad = Theme.dp(16);
         box.setPadding(pad, pad, pad, pad);
@@ -1222,14 +1230,28 @@ public class LicenseActivity extends Activity {
                     | android.text.InputType.TYPE_TEXT_VARIATION_URI);
         } catch (Exception e) { Diag.ignored("LicenseActivity:ipField", e); }
         c.addView(iconField(fIp, R.drawable.mi_my_location), kit.lp(-1, -2));
+        c.addView(kit.gap(4));
+        // Optional server port: empty = the default 1433. A forwarded port on the
+        // dedicated IP (e.g. 5050 → 1433) can be entered here, or typed directly
+        // into the address as IP:5050.
+        String initialPort = restoredConnectionPort;
+        if (initialPort == null) initialPort = savedPortFor(initialIp);
+        connectionPort = kit.edit("پورت سرور (پیش‌فرض ۱۴۳۳ — مثلاً ۵۰۵۰)", initialPort);
+        restoredConnectionPort = null;
+        final EditText fPort = connectionPort;
+        try {
+            fPort.setSingleLine(true);
+            fPort.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        } catch (Exception e) { Diag.ignored("LicenseActivity:portField", e); }
+        c.addView(iconField(fPort, R.drawable.mi_my_location), kit.lp(-1, -2));
         if (editingConnection) {
-            c.addView(kit.hint("برای اتصال به سرور دیگر، آدرس بالا را کامل جایگزین کنید؛ دیتابیس قبلی به‌صورت خودکار انتخاب نمی‌شود."),
+            c.addView(kit.hint("برای اتصال به سرور دیگر، آدرس بالا را کامل جایگزین کنید؛ دیتابیس قبلی به‌صورت خودکار انتخاب نمی‌شود. پورت خالی = ۱۴۳۳؛ اگر روی آی‌پی اختصاصی پورت دیگری (مثل ۵۰۵۰) به ۱۴۳۳ فوروارد شده، همان را وارد کنید."), 
                     kit.lp(-1, -2));
         }
         c.addView(kit.gap(4));
         final android.widget.Button[] btn = new android.widget.Button[1];
         btn[0] = kit.btnGold("✦ اتصال و نمایش دیتابیس‌ها",
-                v -> connectManual(txt(fIp), btn[0]));
+                v -> connectManual(txt(fIp), txt(fPort), btn[0]));
         c.addView(btn[0], kit.lp(-1, -2));
         c.addView(kit.gap(6));
         final android.widget.Button[] wbtn = new android.widget.Button[1];
@@ -1282,17 +1304,46 @@ public class LicenseActivity extends Activity {
         });
     }
 
+    /** Saved port for the profile this host belongs to ("" = default). */
+    private String savedPortFor(String host) {
+        try {
+            if (host == null || host.trim().isEmpty()) return settings.port();
+            Boolean priv = SmartLink.isPrivate(host);
+            String per = (priv != null && !priv) ? settings.portWan() : settings.portLan();
+            return per.isEmpty() ? settings.port() : per;
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    /**
+     * Port for one manual connection: the port field wins; then a ":port"
+     * typed into the address itself (IP:5050); then the default 1433.
+     */
+    private static int resolvePort(String portText, String typedHost) {
+        String t = portText == null ? "" : portText.trim();
+        if (!t.isEmpty()) {
+            try {
+                int v = Integer.parseInt(ir.meelano.manager.core.Money.en(t).trim());
+                if (v >= 1 && v <= 65535) return v;
+            } catch (Exception ignored) { Diag.ignored("LicenseActivity:resolvePort", ignored); }
+        }
+        int fromHost = LanDiscover.typedPort(typedHost);
+        return fromHost > 0 ? fromHost : LanDiscover.PORT;
+    }
+
     /**
      * Manual connection stays on the existing direct SQL Server/jTDS path.
      * The entered host is used as-is: databases are read from master, checked
      * for Atiran tables, and shown in the existing picker before saving.
      */
-    private void connectManual(String ip, final android.widget.Button btn) {
+    private void connectManual(String ip, String portText, final android.widget.Button btn) {
         final String fIp = LanDiscover.clean(ip);
         if (fIp.isEmpty()) {
             kit.toast("IP سرور را وارد کنید");
             return;
         }
+        final int fPort = resolvePort(portText, ip);
         if (!Net.online(this)) {
             kit.toast("شبکه قطع است — به وای‌فای یا دیتای موبایل وصل شوید");
             return;
@@ -1303,7 +1354,8 @@ public class LicenseActivity extends Activity {
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:991", ignored); }
         showRadar("در حال اتصال مستقیم به سرور…");
         new Thread(() -> {
-            List<String> databases = LanDiscover.listDatabases(fIp, LanDiscover.PORT,
+          try {
+            List<String> databases = LanDiscover.listDatabases(fIp, fPort,
                     License.SQL_USER, License.SQL_PASS);
             if (databases == null || databases.isEmpty()) {
                 runOnUiThread(() -> {
@@ -1316,14 +1368,14 @@ public class LicenseActivity extends Activity {
                     final String wan = (priv != null && !priv) ? fIp : "";
                     boolean vpn = NetRoute.isVpnActive(LicenseActivity.this);
                     SmartLink.diagnoseExplicit(LicenseActivity.this, lan, wan,
-                            LanDiscover.PORT, "master", License.SQL_USER,
+                            fPort, "master", License.SQL_USER,
                             License.SQL_PASS, vpn, r -> {
                                 if (isFinishing()) return;
                                 LinkPanel.showFixSheet(LicenseActivity.this, r,
-                                        () -> connectManual(fIp, btn),
+                                        () -> connectManual(ip, portText, btn),
                                         () -> LinkPanel.showDiagnoseExplicit(
                                                 LicenseActivity.this, lan, wan,
-                                                LanDiscover.PORT, "master",
+                                                fPort, "master",
                                                 License.SQL_USER, License.SQL_PASS));
                             });
                 });
@@ -1334,7 +1386,8 @@ public class LicenseActivity extends Activity {
             List<String[]> pairs = new ArrayList<>();
             for (String db : databases) {
                 if (pairs.size() >= 24) break;
-                if (db != null && !db.trim().isEmpty()) pairs.add(new String[]{fIp, db.trim()});
+                if (db != null && !db.trim().isEmpty())
+                    pairs.add(new String[]{fIp, db.trim(), String.valueOf(fPort)});
             }
             if (pairs.isEmpty()) {
                 runOnUiThread(() -> {
@@ -1352,7 +1405,7 @@ public class LicenseActivity extends Activity {
                 for (final String[] pair : pairs) {
                     fs.add(pool.submit(() -> {
                         try {
-                            return SmartLink.probeTables(pair[0], LanDiscover.PORT, pair[1],
+                            return SmartLink.probeTables(pair[0], Integer.parseInt(pair[2]), pair[1],
                                     License.SQL_USER, License.SQL_PASS);
                         } catch (Exception e) {
                             return -1;
@@ -1389,6 +1442,10 @@ public class LicenseActivity extends Activity {
                 // explicitly sees and selects the database before proceeding.
                 dbPickerDialog(found, counts);
             });
+          } catch (Throwable t) {
+            Diag.ignored("LicenseActivity:connectThread", t);
+            runOnUiThread(() -> { hideRadar(); restoreManualBtn(btn); });
+          }
         }).start();
     }
 
@@ -1411,7 +1468,21 @@ public class LicenseActivity extends Activity {
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:1099", ignored); }
         showRadar("در حال یافتن سرور در وای‌فای…");
         new Thread(() -> {
-            List<String> hosts = LanDiscover.find("", LanDiscover.PORT);
+          try {
+            // Probe both the default SQL port and the common forwarded port
+            // (5050 → 1433): a shop server may listen on either.
+            List<String> hosts = new ArrayList<>();
+            List<Integer> hostPorts = new ArrayList<>();
+            for (String h : LanDiscover.find("", LanDiscover.PORT)) {
+                hosts.add(h);
+                hostPorts.add(LanDiscover.PORT);
+            }
+            for (String h : LanDiscover.find("", LanDiscover.PORT_FWD)) {
+                if (!hosts.contains(h)) {
+                    hosts.add(h);
+                    hostPorts.add(LanDiscover.PORT_FWD);
+                }
+            }
             if (hosts.isEmpty()) {
                 runOnUiThread(() -> {
                     hideRadar();
@@ -1428,8 +1499,10 @@ public class LicenseActivity extends Activity {
             try {
                 List<String[]> pairs = new ArrayList<>();
                 List<Future<List<String>>> fs = new ArrayList<>();
-                for (final String h : hosts) {
-                    fs.add(pool.submit(() -> LanDiscover.listDatabases(h, LanDiscover.PORT,
+                for (int hi = 0; hi < hosts.size(); hi++) {
+                    final String h = hosts.get(hi);
+                    final int hp = hostPorts.get(hi);
+                    fs.add(pool.submit(() -> LanDiscover.listDatabases(h, hp,
                             License.SQL_USER, License.SQL_PASS)));
                 }
                 long deadline = System.currentTimeMillis() + 12000;
@@ -1441,7 +1514,8 @@ public class LicenseActivity extends Activity {
                         if (dbs != null) {
                             for (String d : dbs) {
                                 if (pairs.size() >= 24) break;
-                                pairs.add(new String[]{hosts.get(i), d});
+                                pairs.add(new String[]{hosts.get(i), d,
+                                        String.valueOf(hostPorts.get(i))});
                             }
                         }
                     } catch (Exception ignored) { Diag.ignored("LicenseActivity:1135", ignored); }
@@ -1460,7 +1534,8 @@ public class LicenseActivity extends Activity {
                 for (final String[] pr : pairs) {
                     vs.add(pool.submit(() -> {
                         try {
-                            return new int[]{SmartLink.probeTables(pr[0], LanDiscover.PORT, pr[1],
+                            return new int[]{SmartLink.probeTables(pr[0],
+                                    Integer.parseInt(pr[2]), pr[1],
                                     License.SQL_USER, License.SQL_PASS)};
                         } catch (Exception e) {
                             return new int[]{-1};
@@ -1492,7 +1567,7 @@ public class LicenseActivity extends Activity {
                         return;
                     }
                     if (fw.size() == 1) {
-                        saveSite(fw.get(0)[0], fw.get(0)[1], fn.get(0));
+                        saveSite(fw.get(0)[0], fw.get(0)[1], fn.get(0), pairPort(fw.get(0)));
                         return;
                     }
                     dbPickerDialog(fw, fn);
@@ -1500,6 +1575,10 @@ public class LicenseActivity extends Activity {
             } finally {
                 pool.shutdownNow();
             }
+          } catch (Throwable t) {
+            Diag.ignored("LicenseActivity:wifiThread", t);
+            runOnUiThread(() -> { hideRadar(); restoreWifiBtn(btn); });
+          }
         }).start();
     }
 
@@ -1508,6 +1587,17 @@ public class LicenseActivity extends Activity {
             btn.setEnabled(true);
             btn.setText("اتصال با وای‌فای");
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:1198", ignored); }
+    }
+
+    /** Port carried by a picker pair (host, db, port) — defaults to 1433. */
+    private static int pairPort(String[] pair) {
+        try {
+            if (pair != null && pair.length > 2) {
+                int v = Integer.parseInt(pair[2].trim());
+                if (v >= 1 && v <= 65535) return v;
+            }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:pairPort", ignored); }
+        return LanDiscover.PORT;
     }
 
     /** Luxury single-choice database picker (v33). */
@@ -1549,32 +1639,38 @@ public class LicenseActivity extends Activity {
             try {
                 box[0].dismiss();
             } catch (Exception ignored) { Diag.ignored("LicenseActivity:1239", ignored); }
-            saveSite(pairs.get(sel[0])[0], pairs.get(sel[0])[1], counts.get(sel[0]));
+            saveSite(pairs.get(sel[0])[0], pairs.get(sel[0])[1], counts.get(sel[0]),
+                    pairPort(pairs.get(sel[0])));
         }), kit.lp(-1, -2));
         box[0] = kit.dialog("انتخاب دیتابیس", kit.scrollWrap(b, 420), true);
         box[0].show();
     }
 
     /** Save a verified (host, db) and roll into the app (v33). */
-    private void saveSite(String host, String db, int tables) {
+    private void saveSite(String host, String db, int tables, int port) {
         try {
             Boolean priv = SmartLink.isPrivate(host);
             String lan = (priv == null || priv) ? host : "";
             String wan = (priv != null && !priv) ? host : "";
-            settings.saveSmart(lan, wan, String.valueOf(LanDiscover.PORT), db,
+            String portStr = String.valueOf(port);
+            String lanPort = (priv == null || priv) ? portStr : "";
+            String wanPort = (priv != null && !priv) ? portStr : "";
+            settings.saveSmart(lan, wan, lanPort, wanPort, db,
                     License.SQL_USER, License.SQL_PASS);
             settings.setLinkLast(lan.isEmpty() ? SmartLink.WAN : SmartLink.LAN);
             saveConnSummary(host, tables);
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:1256", ignored); }
         editingConnection = false;
         connectionIp = null;
+        connectionPort = null;
         restoredConnectionIp = null;
+        restoredConnectionPort = null;
         try {
             if (getIntent() != null) getIntent().removeExtra(EXTRA_EDIT_CONNECTION);
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:1262", ignored); }
         buzz();
         kit.toast("✓ وصل شد • " + Money.fa(String.valueOf(tables)) + " بخش پایه آماده");
-        copySiteLine(host, LanDiscover.PORT, db);
+        copySiteLine(host, port, db);
         buildUi();
     }
 

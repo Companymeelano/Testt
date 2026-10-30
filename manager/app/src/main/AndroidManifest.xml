@@ -93,8 +93,10 @@
             android:name=".LicenseActivity"
             android:configChanges="keyboard|keyboardHidden|screenSize|uiMode"
             android:exported="true"
-            android:label="فعال‌سازی میلانو"
             android:windowSoftInputMode="adjustResize">
+            <!-- No android:label here on purpose: the launcher label would override
+                 the application name on the phone's home screen (it used to show
+                 «فعال‌سازی میلانو» instead of «میلانو»). -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

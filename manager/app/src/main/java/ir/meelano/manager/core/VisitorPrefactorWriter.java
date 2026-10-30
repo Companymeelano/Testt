@@ -120,11 +120,11 @@ public final class VisitorPrefactorWriter {
             c.commit();
             return new Receipt(id, false, subtotal);
         } catch (Exception e) {
-            try { c.rollback(); } catch (Exception ignored) { }
+            try { c.rollback(); } catch (Exception ignored) { Diag.ignored("writer:rollback", ignored); }
             throw e;
         } finally {
-            try { c.setTransactionIsolation(isolation); } catch (Exception ignored) { }
-            try { c.setAutoCommit(auto); } catch (Exception ignored) { }
+            try { c.setTransactionIsolation(isolation); } catch (Exception ignored) { Diag.ignored("writer:rollback", ignored); }
+            try { c.setAutoCommit(auto); } catch (Exception ignored) { Diag.ignored("writer:rollback", ignored); }
         }
     }
 

@@ -184,7 +184,7 @@ public final class SmartLink {
             try {
                 // LAN answers in milliseconds; a public (WAN) address over mobile data needs longer.
                 int tcpMs = LAN.equals(k.kind) ? 1500 : 6000;
-                Connection conn = Atiran.open(k.host, s.effPort(), s.effDb(),
+                Connection conn = Atiran.open(k.host, s.effPortFor(k.kind), s.effDb(),
                         s.effUser(), s.effPass(), tcpMs, 5, false);
                 try {
                     s.setLinkLast(k.kind);
@@ -313,26 +313,37 @@ public final class SmartLink {
         r.transportFa = Net.transportFa(c);
         r.vpnOn = vpnOn;
         List<Cand> cands = new ArrayList<>();
-        int port;
         String db, user, pass, mode = "auto";
+        // Per-profile ports: the shop LAN usually keeps 1433 while the
+        // dedicated/public address may answer on a forwarded port (5050 → 1433).
+        final int portLan, portWan;
         if (e != null) {
             if (!e.lan.isEmpty()) cands.add(new Cand(LAN, e.lan));
             if (!e.wan.isEmpty() && !sameHost(e.wan, e.lan)) cands.add(new Cand(WAN, e.wan));
-            port = e.port;
+            portLan = e.port;
+            portWan = e.port;
             db = e.db;
             user = e.user;
             pass = e.pass;
         } else {
             cands = allSaved(s);
-            port = s.effPort();
+            portLan = s.effPortFor(LAN);
+            portWan = s.effPortFor(WAN);
             db = s.effDb();
             user = s.effUser();
             pass = s.effPass();
             mode = s.linkMode();
         }
-        r.portDb = "پورت " + Money.fa(String.valueOf(port)) + " • دیتابیس " + (db.isEmpty() ? "—" : db);
+        r.portDb = (portLan == portWan
+                        ? "پورت " + Money.fa(String.valueOf(portLan))
+                        : "پورت " + Money.fa(String.valueOf(portLan)) + " (داخل) • "
+                                + Money.fa(String.valueOf(portWan)) + " (خارج)")
+                + " • دیتابیس " + (db.isEmpty() ? "—" : db);
         boolean online = Net.online(c);
-        for (Cand k : cands) r.profs.add(testProfile(c, k, port, db, user, pass, online));
+        for (Cand k : cands) {
+            int port = LAN.equals(k.kind) ? portLan : portWan;
+            r.profs.add(testProfile(c, k, port, db, user, pass, online));
+        }
         for (Prof p : r.profs) if (p.ok) r.anyOk = true;
         if (r.anyOk) {
             for (Prof p : r.profs)
@@ -355,7 +366,7 @@ public final class SmartLink {
         }
         if (!"auto".equals(mode))
             r.verdict += " (حالت: فقط " + kindShort(mode) + ")";
-        r.copyText = copyFa(r, port, db);
+        r.copyText = copyFa(r, r.portDb);
         return r;
     }
 
@@ -485,12 +496,12 @@ public final class SmartLink {
         return t;
     }
 
-    private static String copyFa(Report r, int port, String db) {
+    private static String copyFa(Report r, String portDb) {
         StringBuilder b = new StringBuilder();
         b.append("گزارش اتصال میلانو\n");
         b.append("شبکه گوشی: ").append(r.transportFa);
         if (r.vpnOn) b.append(" + فیلترشکن");
-        b.append("\nپورت: ").append(port).append(" • دیتابیس: ").append(db).append("\n");
+        b.append("\n").append(portDb).append("\n");
         for (Prof p : r.profs) {
             b.append("— ").append(kindShort(p.kind)).append(": ").append(p.host);
             b.append(p.ok ? " ✓\n" : " ✕\n");

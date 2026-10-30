@@ -1,12 +1,22 @@
 # آخرین وضعیت توسعهٔ میلانو — مدیر (به‌روزرسانی: دور ۸ — بررسی صحت بخش‌ها و دقت گزارش‌ها)
 
 ## نسخهٔ فعلی
-- **MEELANO Manager v36.37.0** — package `ir.meelano.manager` — نسخه‌کد ۶۹
-  (versionCode 70).
-- APK مستقل: `dist/meelano-manager-v36-debug-19.apk` — SHA-256
+- **MEELANO Manager v36.38.0** — package `ir.meelano.manager` — نسخه‌کد ۶۹
+  (versionCode 71).
+- APK مستقل: `dist/meelano-manager-v36-debug-20.apk` — SHA-256
   `c5d9e02c28b63721015fb3b8579379a3ccecc9ddae9e37fbbdab00f19f7982e3` (هفت‌بُعدی — ساختِ شاملِ رفع‌های دور ۸).
 - لینک مستقیم:
-  `https://github.com/Companymeelano/Testt/raw/arena/29e01a09-testt/dist/meelano-manager-v36-debug-19.apk`
+  `https://github.com/Companymeelano/Testt/raw/arena/29e01a09-testt/dist/meelano-manager-v36-debug-20.apk`
+
+## دور ۱۰ (آخرین دور) — پورت سرور + نام برنامه + بازبینی کامل
+- **پورت سرور در بخش اتصال:** پیش‌فرض ۱۴۳۳؛ پورت دلخواه (مثل ۵۰۵۰) برای آی‌پی اختصاصی
+  (فوروارد به ۱۴۳۳)؛ پورت جداگانهٔ داخل/خارج شبکه؛ `IP:5050` در آدرس هم پذیرفته می‌شود؛
+  جست‌وجوی وای‌فای هر دو پورت را می‌یابد.
+- **نام آیکن روی گوشی درست شد:** دیگر «فعال‌سازی میلانو» نیست — همیشه «میلانو».
+- **بازبینی کد‌به‌کد:** ۱۷۷ فایل parse سالم؛ سفت‌سازی threadهای اتصال، PersianNumbers،
+  لاگ مسیرهای rollback؛ audit schema صفر خطا.
+- نسخه: **v36.38.0 (71)** — `dist/meelano-manager-v36-debug-20.apk`.
+  جزئیات: `manager/DEVELOPMENT-ROUND-10-ports-review-fa.md`.
 
 ## دور ۸ — «همهٔ بخش‌ها درست کار می‌کنند و گزارش‌ها دقیق‌اند؟»
 - **صحت بخش‌ها:** تطبیق یک‌به‌یک «اتاق فرمان» (۳۴ ورودی) ↔ ثبت صفحه‌ها (۳۴ `reg`) — کامل ✓.
@@ -19,13 +29,13 @@
 - ابزار تشخیص CI تقویم شد: نام هر گزارش در لاگ + پیام کامل خطاها در summary/annotation.
 - CI `41049270954` **کاملاً سبز**. جزئیات: `manager/DEVELOPMENT-ROUND-08-reports-fa.md`.
 
-## دور ۹ (آخرین دور) — رفع مشکل نقش ورود
+## دور ۹ — رفع مشکل نقش ورود
 - **Modir/123** دیگر «ویزیتور» شناخته نمی‌شود ← **«مدیر مجموعه»** با همهٔ ۳۴ بخش.
 - **Admin/1385** دیگر به خطای «نقش تعریف نشده» نمی‌خورد ← **«مدیر مجموعه»**.
 - زنجیرهٔ شواهد نقش: نام نقش آتیران (`Roles`/`role`/`userrole`) ← نام‌کاربری کاملِ استانداردِ
   مدیر (Modir، Admin… فقط نام کامل؛ نام خانوادگی مثل modirnejad هرگز) ← پیش‌فرض مستند «فروشنده».
 - بن‌بست نسخه‌های نقش حذف شد؛ ورود/میزکار ویزیتور دست‌نخورده.
-- نسخه: **v36.37.0 (70)** — `dist/meelano-manager-v36-debug-19.apk`.
+- نسخه: **v36.37.0 (70)** — `dist/meelano-manager-v36-debug-20.apk`.
   جزئیات: `manager/DEVELOPMENT-ROUND-09-login-roles-fa.md`.
 
 ## دور ۷ — «برای نقش مدیر چه آیتم‌هایی در نظر گرفتی؟»

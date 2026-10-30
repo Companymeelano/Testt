@@ -461,9 +461,9 @@ public final class ProductionWriter {
             if (auto) c.commit();
             return id;
         } catch (Exception e) {
-            try { if (auto) c.rollback(); } catch (Exception ignored) { }
+            try { if (auto) c.rollback(); } catch (Exception ignored) { Diag.ignored("writer:rollback", ignored); }
             throw e;
-        } finally { if (auto) try { c.setAutoCommit(true); } catch (Exception ignored) { } }
+        } finally { if (auto) try { c.setAutoCommit(true); } catch (Exception ignored) { Diag.ignored("writer:rollback", ignored); } }
     }
 
     /**
@@ -555,9 +555,9 @@ public final class ProductionWriter {
             c.commit();
             return new Posted(id, revision, costing, false);
         } catch (Exception e) {
-            try { if (!c.getAutoCommit()) c.rollback(); } catch (Exception ignored) { }
+            try { if (!c.getAutoCommit()) c.rollback(); } catch (Exception ignored) { Diag.ignored("writer:rollback", ignored); }
             throw e;
-        } finally { if (auto) try { c.setAutoCommit(true); } catch (Exception ignored) { } }
+        } finally { if (auto) try { c.setAutoCommit(true); } catch (Exception ignored) { Diag.ignored("writer:rollback", ignored); } }
     }
 
     /** Read-only cost preview; uses the same purchase valuation as the posting transaction. */

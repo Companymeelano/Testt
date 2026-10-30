@@ -34,6 +34,7 @@ import ir.meelano.manager.core.CrashReporter;
 import ir.meelano.manager.core.DeviceId;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.LanDiscover;
+import ir.meelano.manager.core.LicenseRecovery;
 import ir.meelano.manager.core.LicenseStore;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.SmartLink;

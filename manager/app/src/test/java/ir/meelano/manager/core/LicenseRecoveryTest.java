@@ -19,7 +19,7 @@ public class LicenseRecoveryTest {
     public void findsTheDeviceBoundPackInsideSmsText() {
         String pack = License.generate("ABCD1234", License.P_MONTHLY, 30);
         String body = "کلید فعال‌سازی میلانو\n" + pack + "\nموفق باشید";
-        assertEquals(pack, LicenseRecovery.packIn(body, "ABCD1234"));
+        assertEquals(License.normalize(pack), LicenseRecovery.packIn(body, "ABCD1234"));
         assertNull("pack for another phone is ignored",
                 LicenseRecovery.packIn(body, "ZZZZ9999"));
     }

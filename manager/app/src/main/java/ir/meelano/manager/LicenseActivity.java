@@ -67,6 +67,11 @@ import ir.meelano.licensing.License;
 public class LicenseActivity extends Activity {
 
     private static final int REQ_RECV = 906;
+    private static final int REQ_READ_SMS = 907;
+    private static final int REQ_PHONE = 908;
+    /** One automatic permission/recovery prompt per screen entry — never nags. */
+    private boolean autoRecoveryAsked;
+    private boolean phonePermAsked;
 
     /** Fixed issuer line: requests fly straight here, no chooser, no field. */
     private static final String DEFAULT_SELLER = "09355559305";
@@ -169,6 +174,9 @@ public class LicenseActivity extends Activity {
         }
         buildUi();
         ensureRecvPerm();
+        // Reinstall case: silently restore the device-bound license from the
+        // SMS inbox (one permission prompt at most — see attemptRecovery).
+        attemptRecovery(false);
     }
 
     @Override
@@ -247,6 +255,11 @@ public class LicenseActivity extends Activity {
                 }
             } else if (req == REQ_RECV) {
                 updateRecvHint();
+                buildUi();
+            } else if (req == REQ_READ_SMS) {
+                if (readSmsGranted()) attemptRecovery(true);
+                else buildUi();
+            } else if (req == REQ_PHONE) {
                 buildUi();
             }
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:245", ignored); }
@@ -498,14 +511,20 @@ public class LicenseActivity extends Activity {
         luxField(fName);
         c.addView(iconField(fName, R.drawable.mi_person), kit.lp(-1, -2));
         c.addView(errName, kit.lp(-1, -2));
-        final EditText fPhone = kit.editLux("شماره تماس", LicenseStore.contactPhone(this));
+        final EditText fPhone = kit.editLux("شماره تماس", autoPhone());
+        try {
+            if (autoPhone().isEmpty() && !phonePermAsked) {
+                phonePermAsked = true;
+                requestPermissions(new String[]{android.Manifest.permission.READ_PHONE_NUMBERS}, REQ_PHONE);
+            }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:phonePerm", ignored); }
         try {
             fPhone.setInputType(android.text.InputType.TYPE_CLASS_PHONE);
             fPhone.setTextDirection(View.TEXT_DIRECTION_LOCALE);
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:427", ignored); }
         final TextView tick = kit.text("✓", 18, Theme.GOLD_SOFT, true);
         try {
-            tick.setVisibility(SmsIo.cleanPhone(LicenseStore.contactPhone(this)).length() == 11
+            tick.setVisibility(SmsIo.cleanPhone(autoPhone()).length() == 11
                     ? View.VISIBLE : View.INVISIBLE);
         } catch (Exception ignored) {
             tick.setVisibility(View.INVISIBLE);
@@ -544,8 +563,15 @@ public class LicenseActivity extends Activity {
         startBtn.setOnClickListener(v -> requestStart(txt(fName), txt(fPhone),
                 fName, fPhone, errName, errPhone, startBtn));
         c.addView(startBtn, kit.lp(-1, -2));
+        try {
+            if (!autoPhone().isEmpty())
+                c.addView(kit.hint("✓ شماره تماس به‌صورت خودکار از گوشی خوانده شد."), kit.lp(-1, -2));
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:autoPhoneHint", ignored); }
         Card3D.mount(box, c);
         buildDevFooter(box);
+        // Reinstall recovery: silently re-apply the device-bound license found
+        // in the SMS inbox (one system prompt at most, never a nag).
+        attemptRecovery(false);
     }
 
     /**
@@ -1983,6 +2009,89 @@ public class LicenseActivity extends Activity {
                 requestPermissions(new String[]{android.Manifest.permission.RECEIVE_SMS}, REQ_RECV);
             }
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:1548", ignored); }
+    }
+
+    private boolean readSmsGranted() {
+        try {
+            return Build.VERSION.SDK_INT < 23 || checkSelfPermission(android.Manifest.permission.READ_SMS)
+                    == PackageManager.PERMISSION_GRANTED;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private boolean phoneGranted() {
+        try {
+            return Build.VERSION.SDK_INT < 26 || checkSelfPermission(android.Manifest.permission.READ_PHONE_NUMBERS)
+                    == PackageManager.PERMISSION_GRANTED
+                    || checkSelfPermission(android.Manifest.permission.READ_PHONE_STATE)
+                    == PackageManager.PERMISSION_GRANTED;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * Contact number of this phone (SIM line), canonical 09xxxxxxxxx — or ""
+     * when the phone does not expose one. Read automatically during activation
+     * so the customer never types it.
+     */
+    private String simPhone() {
+        try {
+            if (!phoneGranted()) return "";
+            android.telephony.TelephonyManager tm = (android.telephony.TelephonyManager)
+                    getSystemService(TELEPHONY_SERVICE);
+            if (tm == null) return "";
+            String raw = null;
+            try {
+                raw = tm.getLine1Number();
+            } catch (Exception ignored) { Diag.ignored("LicenseActivity:line1", ignored); }
+            String p = SmsIo.normalizeMobile(raw == null ? "" : raw);
+            return p.length() >= 10 ? p : "";
+        } catch (Exception e) {
+            Diag.ignored("LicenseActivity:simPhone", e);
+            return "";
+        }
+    }
+
+    /** Saved contact number; when none, the number read automatically from the phone/SIM. */
+    private String autoPhone() {
+        String saved = LicenseStore.contactPhone(this);
+        if (saved != null && !saved.trim().isEmpty()) return saved.trim();
+        return simPhone();
+    }
+
+    /**
+     * Automatic license recovery from the SMS inbox (reinstall case): the
+     * signed pack is device-bound and carries its own dates, so the elapsed
+     * time keeps counting. Silent when the permission is already there;
+     * otherwise one system prompt explains and asks.
+     */
+    private void attemptRecovery(boolean fromGrant) {
+        try {
+            if (LicenseStore.check(this).ok) return;
+            if (!readSmsGranted()) {
+                if (!autoRecoveryAsked && !fromGrant) {
+                    autoRecoveryAsked = true;
+                    kit.toast("برای فعال‌سازی خودکار از پیامک‌های قبلی، دسترسی پیامک را تأیید کنید");
+                    requestPermissions(new String[]{android.Manifest.permission.READ_SMS}, REQ_READ_SMS);
+                }
+                return;
+            }
+            new Thread(() -> {
+                String pack = LicenseRecovery.tryRecover(LicenseActivity.this);
+                runOnUiThread(() -> {
+                    if (isFinishing()) return;
+                    if (!pack.isEmpty()) {
+                        buzz();
+                        kit.toast("✦ لایسنس به‌صورت خودکار فعال شد — خوش آمدید!");
+                        buildUi();
+                    } else if (fromGrant) {
+                        kit.toast("پیامک فعال‌سازی قبلی پیدا نشد؛ درخواست را دوباره بفرستید");
+                    }
+                });
+            }).start();
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:attemptRecovery", ignored); }
     }
 
     private void updateRecvHint() {

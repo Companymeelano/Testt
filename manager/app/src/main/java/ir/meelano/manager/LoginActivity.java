@@ -400,17 +400,13 @@ public class LoginActivity extends Activity {
                     return;
                 }
                 String role = AtiranAuth.effectiveRole(LoginActivity.this, u.uid, u.appRole);
-                if (u.roleName == null || u.roleName.trim().isEmpty()) {
-                    if (AtiranAuth.overrideRole(LoginActivity.this, u.uid).isEmpty()) {
-                        uiFail("ورود رمز تأیید شد، اما عنوان نقش از جدول Roles/role قابل خواندن نیست (role_id="
-                                + u.roleId + "). ساختار یا مجوز خواندن جدول نقش‌های آتیران را بررسی کنید.");
-                        return;
-                    }
-                }
+                // A missing/unreadable role name no longer blocks the login: the
+                // evidence chain (role name → user-name → documented default) has
+                // already resolved a role, and a manager can override it per user.
                 if (!AtiranAuth.phaseOpen(LoginActivity.this, role)) {
-                    uiFail("نقش آتیران «" + (u.roleName == null || u.roleName.trim().isEmpty()
+                    uiFail("نقش این حساب («" + (u.roleName == null || u.roleName.trim().isEmpty()
                             ? RoleStore.faName(role) : u.roleName.trim())
-                            + "» هنوز در این نسخه فعال نشده است.");
+                            + "») هنوز در این نسخه تعریف نشده است؛ از مدیر بخواهید نقش جایگزین را در «کاربران» تنظیم کند.");
                     return;
                 }
                 AtiranAuth.putPwCache(LoginActivity.this, u.uid, u.pw);

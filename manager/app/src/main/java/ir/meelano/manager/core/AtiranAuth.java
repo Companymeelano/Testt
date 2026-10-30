@@ -142,7 +142,9 @@ public final class AtiranAuth {
             closeQuiet(ps);
         }
         if (roleCol != null) u.roleName = roleNameOf(c, m, u.roleId);
-        u.appRole = mapRole(u.roleId, u.roleName);
+        if (u.roleName == null || u.roleName.trim().isEmpty())
+            u.roleName = roleNameForUser(c, m, u.uid, u.roleId);
+        u.appRole = resolveAppRole(u.roleId, u.roleName, u.userName);
         return u;
     }
 
@@ -233,8 +235,13 @@ public final class AtiranAuth {
         visitor.userName = loginName;
         visitor.displayName = displayName == null || displayName.trim().isEmpty()
                 ? loginName : displayName.trim();
-        visitor.roleName = "ویزیتور";
-        visitor.appRole = RoleStore.VISITOR;
+        // The visitors table has no role column; the login name is the only role
+        // evidence on this path. Canonical manager panels (Modir, Admin, …) open
+        // the manager edition; every other visitor keeps the visitor workspace,
+        // unchanged and scoped to its own sys_vis identity.
+        String byUser = managerRoleForUserName(loginName);
+        visitor.roleName = byUser.isEmpty() ? "ویزیتور" : "مدیر";
+        visitor.appRole = byUser.isEmpty() ? RoleStore.VISITOR : byUser;
         visitor.active = true;
         visitor.pwColFound = true;
         visitor.pw = storedPassword == null ? null : storedPassword.getBytes(StandardCharsets.UTF_8);
@@ -274,6 +281,71 @@ public final class AtiranAuth {
                 closeQuiet(ps);
             }
         }
+        return "";
+    }
+
+    /**
+     * Role name for one system user, from every role source Atiran may use:
+     * 1. the sys_users.role_id → Roles/role name (via {@link #roleNameOf});
+     * 2. the userrole mapping table (user_id → RoleId → role name) when the
+     *    account carries its role there instead of sys_users.role_id;
+     * 3. a role-name column directly on sys_users, if the database has one.
+     * Returns "" when none of the sources is readable — the caller then falls
+     * back to the user-name evidence, never to a hard login failure.
+     */
+    public static String roleNameForUser(Connection c, Meta m, int uid, int roleId) {
+        if (roleId > 0) {
+            String n = roleNameOf(c, m, roleId);
+            if (n != null && !n.trim().isEmpty()) return n.trim();
+        }
+        try {
+            if (uid > 0 && m.table("userrole") && m.canSelect("userrole")) {
+                String uCol = m.col("userrole", "user_id", "UserID", "userid", "UserId");
+                String rCol = m.col("userrole", "RoleId", "role_id", "RoleID", "RollID");
+                if (uCol != null && rCol != null) {
+                    PreparedStatement ps = null;
+                    ResultSet rs = null;
+                    try {
+                        ps = c.prepareStatement("SELECT " + Sql.q(rCol) + " FROM " + m.qTable("userrole")
+                                + " WHERE " + Sql.q(uCol) + " = ?");
+                        ps.setInt(1, uid);
+                        rs = ps.executeQuery();
+                        while (rs.next()) {
+                            int rid;
+                            try { rid = rs.getInt(1); } catch (Exception ignored) { continue; }
+                            if (rid <= 0) continue;
+                            String n = roleNameOf(c, m, rid);
+                            if (n != null && !n.trim().isEmpty()) return n.trim();
+                        }
+                    } finally {
+                        closeQuiet(rs);
+                        closeQuiet(ps);
+                    }
+                }
+            }
+        } catch (Exception ignored) { Diag.ignored("AtiranAuth:roleNameForUser", ignored); }
+        try {
+            String idCol = m.col("sys_users", "user_id");
+            String nmCol = m.col("sys_users", "role_name", "RoleName", "roleName", "RoleTitle",
+                    "roleTitle", "RollName", "RoleText");
+            if (uid > 0 && idCol != null && nmCol != null) {
+                PreparedStatement ps = null;
+                ResultSet rs = null;
+                try {
+                    ps = c.prepareStatement("SELECT TOP 1 " + Sql.q(nmCol) + " FROM " + m.qTable("sys_users")
+                            + " WHERE " + Sql.q(idCol) + " = ?");
+                    ps.setInt(1, uid);
+                    rs = ps.executeQuery();
+                    if (rs.next()) {
+                        String v = rs.getString(1);
+                        if (v != null && !v.trim().isEmpty()) return v.trim();
+                    }
+                } finally {
+                    closeQuiet(rs);
+                    closeQuiet(ps);
+                }
+            }
+        } catch (Exception ignored) { Diag.ignored("AtiranAuth:roleNameForUser2", ignored); }
         return "";
     }
 
@@ -451,9 +523,12 @@ public final class AtiranAuth {
      * Map an Atiran role name to an app role id by Persian/English keywords.
      * Sales-manager phrases are tested before the general manager rule so
      * «مدیر فروش» receives the narrow sales role, not company-wide access.
-     * Unknown or empty names still fall back to SELLER; an admin may override per user.
+     * Returns "" when the name carries no recognizable role information, so
+     * callers can fall through to the next evidence source (see
+     * {@link #resolveAppRole}); {@link #mapRole} keeps the historic
+     * unknown→SELLER fallback on top of this.
      */
-    public static String mapRole(int roleId, String roleName) {
+    static String mapRoleCore(int roleId, String roleName) {
         String n = normalizeRoleText(roleName);
         String l = n.toLowerCase(Locale.US);
         boolean salesLead = (has(n, "مدیر") || has(n, "سرپرست") || has(n, "رئیس")
@@ -476,7 +551,49 @@ public final class AtiranAuth {
                 || l.contains("moadi") || l.contains("tax")) return RoleStore.MOADIAN;
         if (has(n, "فروش") || l.contains("sell") || l.contains("forosh"))
             return RoleStore.SELLER;
-        return RoleStore.SELLER;
+        return "";
+    }
+
+    /**
+     * Map an Atiran role name to an app role id; unknown or empty names fall
+     * back to SELLER (the documented default). Kept for callers that only have
+     * a role name; login resolution goes through {@link #resolveAppRole}.
+     */
+    public static String mapRole(int roleId, String roleName) {
+        String r = mapRoleCore(roleId, roleName);
+        return r.isEmpty() ? RoleStore.SELLER : r;
+    }
+
+    /**
+     * Manager identity from the Atiran user name itself. Used only when the
+     * role name carries no information. Matches WHOLE names (never
+     * substrings), so personal names like «modirnejad» or «ali_modir» never
+     * qualify: admin / administrator / sysadmin / sys_admin / modir /
+     * modiramel / modir_amel — optionally with a numeric suffix such as
+     * admin2 — plus the Persian «مدیر» and «مدیرعامل».
+     */
+    public static String managerRoleForUserName(String userName) {
+        if (userName == null) return "";
+        String u = normalizeRoleText(Money.en(userName)).toLowerCase(Locale.US).trim();
+        if (u.isEmpty()) return "";
+        if (u.equals("مدیر") || u.equals("مدیرعامل")) return RoleStore.ADMIN;
+        if (u.matches("^(admin|administrator|sysadmin|sys_admin|modir_amel|modiramel|modir)([._-]?\\d+)?$"))
+            return RoleStore.ADMIN;
+        return "";
+    }
+
+    /**
+     * Effective app role from the Atiran evidence, in order:
+     * 1. an informative role name (Roles/role/userrole) always wins;
+     * 2. when the role name is missing or unknown, canonical manager user
+     *    names (Modir, Admin, …) decide — see {@link #managerRoleForUserName};
+     * 3. everything else falls back to the documented default (SELLER).
+     */
+    public static String resolveAppRole(int roleId, String roleName, String userName) {
+        String mapped = mapRoleCore(roleId, roleName);
+        if (!mapped.isEmpty()) return mapped;
+        String byUser = managerRoleForUserName(userName);
+        return byUser.isEmpty() ? RoleStore.SELLER : byUser;
     }
 
     /** Canonicalize the Arabic/Persian code points often mixed in Atiran role labels. */
@@ -806,15 +923,13 @@ public final class AtiranAuth {
     // ================= release phases (v27) =================
 
     /**
-     * ONE app — the Atiran role picks the edition. Company manager, sales
-     * manager, warehouse and visitor are live; unfinished roles stay gated.
+     * ONE app — the Atiran role picks the edition. Every defined role is live:
+     * the role's own item set (RoleStore) decides what it sees, so a valid
+     * Atiran login never dead-ends on an «edition not ready» wall. Only
+     * strings that are not roles at all stay blocked.
      */
     public static boolean phaseOpen(Context c, String role) {
-        if (RoleStore.ADMIN.equals(role)) return true;
-        if (RoleStore.SALES_MANAGER.equals(role)) return true; // PHASE 4 (v36.29)
-        if (RoleStore.WAREHOUSE.equals(role)) return true; // PHASE 2 (v28)
-        if (RoleStore.VISITOR.equals(role)) return true; // PHASE 3 (v36.28)
-        return false;
+        return RoleStore.isValid(role);
     }
 
     // ---- cached verifier bytes: the real-password check, offline ----

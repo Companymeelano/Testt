@@ -13,6 +13,14 @@ public class AtiranAuthPhaseTest {
         assertTrue(AtiranAuth.phaseOpen(null, RoleStore.VISITOR));
     }
 
+    @Test public void everyDefinedRoleCanLogInWithoutTheOldDeadEnd() {
+        // The role's own RoleStore item set is the access boundary now; a valid
+        // Atiran login must never fail on an «edition not ready» wall.
+        for (String role : RoleStore.ALL) {
+            assertTrue("role must be open: " + role, AtiranAuth.phaseOpen(null, role));
+        }
+    }
+
     @Test public void atiranSalesManagerMapsToTheNarrowRoleBeforeGenericManager() {
         org.junit.Assert.assertEquals(RoleStore.SALES_MANAGER, AtiranAuth.mapRole(0, "مدیر فروش"));
         org.junit.Assert.assertEquals(RoleStore.ADMIN, AtiranAuth.mapRole(0, "مدیر مجموعه"));
@@ -25,11 +33,9 @@ public class AtiranAuthPhaseTest {
         org.junit.Assert.assertEquals(RoleStore.SALES_MANAGER, AtiranAuth.mapRole(0, "مدير فروش"));
     }
 
-    @Test public void unfinishedRolesRemainExplicitlyGated() {
-        assertFalse(AtiranAuth.phaseOpen(null, RoleStore.SELLER));
-        assertFalse(AtiranAuth.phaseOpen(null, RoleStore.ACCOUNTANT));
-        assertFalse(AtiranAuth.phaseOpen(null, RoleStore.DISTRIBUTOR));
-        assertFalse(AtiranAuth.phaseOpen(null, RoleStore.MOADIAN));
+    @Test public void onlyNonRoleStringsStayBlocked() {
         assertFalse(AtiranAuth.phaseOpen(null, "unknown"));
+        assertFalse(AtiranAuth.phaseOpen(null, ""));
+        assertFalse(AtiranAuth.phaseOpen(null, "manager")); // not a RoleStore id
     }
 }

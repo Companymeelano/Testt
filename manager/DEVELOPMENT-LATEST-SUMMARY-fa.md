@@ -4,7 +4,7 @@
 - **MEELANO Manager v36.27.0** — package `ir.meelano.manager` — نسخه‌کد ۶۹
   (درخواست «نسخهٔ ۲۷» با این شماره‌گذاری پیوسته یکی است؛ هر دو ۶۹).
 - APK مستقل: `dist/meelano-manager-v36-debug-18.apk` — SHA-256
-  `075ae039733288213de60170694c4b33af0041a0714a6547f357757c19a4b2ca` (هفت‌بُعدی).
+  `c5d9e02c28b63721015fb3b8579379a3ccecc9ddae9e37fbbdab00f19f7982e3` (هفت‌بُعدی — ساختِ شاملِ رفع‌های دور ۸).
 - لینک مستقیم:
   `https://github.com/Companymeelano/Testt/raw/arena/29e01a09-testt/dist/meelano-manager-v36-debug-18.apk`
 

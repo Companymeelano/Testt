@@ -46,20 +46,21 @@ public class ReportCatalogIntegrityTest {
         f.from = "1405/01/01";
         f.to = "1405/12/29";
         int built = 0;
+        List<String> broken = new ArrayList<>();
         for (ReportCatalog.Spec spec : ReportCatalog.ALL) {
-            Queries.Q q;
             try {
-                q = ReportCatalog.query(meta, spec.id, f);
+                Queries.Q q = ReportCatalog.query(meta, spec.id, f);
+                if (q == null || q.sql == null || q.sql.trim().length() <= 10)
+                    broken.add(spec.id + ": empty SQL");
+                else built++;
             } catch (Queries.Missing e) {
-                throw new AssertionError("report does not build: " + spec.id + " — " + e.getMessage(), e);
+                broken.add(spec.id + " — " + e.getMessage());
             } catch (RuntimeException e) {
-                throw new AssertionError("report crashed while building: " + spec.id, e);
+                broken.add(spec.id + " — " + e);
             }
-            assertNotNull(spec.id, q);
-            assertTrue(spec.id + ": empty SQL", q.sql != null && q.sql.trim().length() > 10);
-            built++;
         }
         assertTrue("the catalog lost reports: " + built, built >= 100);
+        assertTrue("broken reports: " + broken, broken.isEmpty());
     }
 
     @Test
@@ -83,7 +84,7 @@ public class ReportCatalogIntegrityTest {
 
     // ================= schema fixture (mirrors AtiranSampleSchemaTest) =================
 
-    private static JSONObject loadManifest() throws Exception {
+    static JSONObject loadManifest() throws Exception {
         try (InputStream in = ReportCatalogIntegrityTest.class.getResourceAsStream("/atiran/sample-schema.json")) {
             assertNotNull("metadata-only sample schema resource", in);
             ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -94,7 +95,7 @@ public class ReportCatalogIntegrityTest {
         }
     }
 
-    private static Connection connection(JSONObject manifest) {
+    static Connection connection(JSONObject manifest) {
         return proxy(Connection.class, (proxy, method, args) -> {
             if ("prepareStatement".equals(method.getName()))
                 return statement(manifest, (String) args[0]);
@@ -102,7 +103,7 @@ public class ReportCatalogIntegrityTest {
         });
     }
 
-    private static PreparedStatement statement(JSONObject manifest, String sql) {
+    static PreparedStatement statement(JSONObject manifest, String sql) {
         Map<Integer, Object> binds = new HashMap<>();
         return proxy(PreparedStatement.class, (proxy, method, args) -> {
             String name = method.getName();
@@ -115,7 +116,7 @@ public class ReportCatalogIntegrityTest {
         });
     }
 
-    private static List<Object[]> rowsFor(JSONObject manifest, String sql, Map<Integer, Object> binds) throws Exception {
+    static List<Object[]> rowsFor(JSONObject manifest, String sql, Map<Integer, Object> binds) throws Exception {
         JSONArray objects = manifest.getJSONArray("objects");
         List<JSONObject> matches = new ArrayList<>();
         String lowerSql = sql.toLowerCase(Locale.US);
@@ -174,7 +175,7 @@ public class ReportCatalogIntegrityTest {
         return rows;
     }
 
-    private static int objectId(JSONArray objects, JSONObject wanted) throws Exception {
+    static int objectId(JSONArray objects, JSONObject wanted) throws Exception {
         for (int i = 0; i < objects.length(); i++)
             if (objects.getJSONObject(i) == wanted) return i;
         for (int i = 0; i < objects.length(); i++) {
@@ -185,7 +186,7 @@ public class ReportCatalogIntegrityTest {
         throw new IllegalStateException("manifest object not found");
     }
 
-    private static ResultSet resultSet(List<Object[]> rows) {
+    static ResultSet resultSet(List<Object[]> rows) {
         final int[] cursor = {-1};
         return proxy(ResultSet.class, (proxy, method, args) -> {
             String name = method.getName();
@@ -203,11 +204,11 @@ public class ReportCatalogIntegrityTest {
     }
 
     @SuppressWarnings("unchecked")
-    private static <T> T proxy(Class<T> type, InvocationHandler handler) {
+    static <T> T proxy(Class<T> type, InvocationHandler handler) {
         return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[]{type}, handler);
     }
 
-    private static Object defaultValue(Class<?> type) {
+    static Object defaultValue(Class<?> type) {
         if (type == boolean.class) return false;
         if (type == int.class) return 0;
         if (type == long.class) return 0L;

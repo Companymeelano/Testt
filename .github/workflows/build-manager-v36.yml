@@ -71,6 +71,22 @@ jobs:
       - name: Include Gradle diagnostics in job summary
         if: failure()
         run: |
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY" || true
+          import glob, re, html
+          out = []
+          for f in glob.glob("manager/app/build/test-results/testDebugUnitTest/*.xml"):
+              src = open(f, encoding="utf-8").read()
+              for m in re.finditer(r'<testcase[^>]*name="([^"]*)"[^>]*>(.*?)</testcase>', src, re.S):
+                  name, body = m.group(1), m.group(2)
+                  if "<failure" in body or "<error" in body:
+                      msg = re.search(r'message="([^"]*)"', body)
+                      out.append(f"{name}\n  {html.unescape(msg.group(1)) if msg else ''}")
+          if out:
+              print("### Failing test cases (with messages)")
+              print("```text")
+              print("\n".join(out)[:60000])
+              print("```")
+          PY
           if [ -f manager-build.log ]; then
             {
               echo '### Manager Gradle diagnostics (last 150 lines)'

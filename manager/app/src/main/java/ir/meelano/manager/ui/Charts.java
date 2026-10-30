@@ -275,10 +275,10 @@ public final class Charts {
             paint.setColor(Theme.alpha(Theme.TEXT, 22));
             text.setColor(Theme.MUTED);
             text.setTextAlign(Paint.Align.RIGHT);
-            double step = niceStep((mx - mn) / 3.0);
-            double lo = Math.floor(mn / step) * step;
+            double valStep = niceStep((mx - mn) / 3.0);
+            double lo = Math.floor(mn / valStep) * valStep;
             int guard = 0;
-            for (double v = lo; v <= mx + step * 0.5 && guard < 8; v += step, guard++) {
+            for (double v = lo; v <= mx + valStep * 0.5 && guard < 8; v += valStep, guard++) {
                 float y = (float) (plot.bottom - plot.height() * ((v - mn) / (mx - mn)));
                 g.drawLine(plot.left, y, plot.right, y, paint);
                 g.drawText(Money.fa(fmt.format(v)), plot.left - Theme.dp(4), y + Theme.dp(4), text);

@@ -14,7 +14,7 @@
 - **نام آیکن روی گوشی درست شد:** دیگر «فعال‌سازی میلانو» نیست — همیشه «میلانو».
 - **بازبینی کد‌به‌کد:** ۱۷۷ فایل parse سالم؛ سفت‌سازی threadهای اتصال، PersianNumbers،
   لاگ مسیرهای rollback؛ audit schema صفر خطا.
-- نسخه: **v36.38.0 (71)** — `dist/meelano-manager-v36-debug-21.apk`.
+- نسخه: **v36.38.0 (71)** — `dist/meelano-manager-v36-debug-20.apk`.
   جزئیات: `manager/DEVELOPMENT-ROUND-10-ports-review-fa.md`.
 
 ## دور ۸ — «همهٔ بخش‌ها درست کار می‌کنند و گزارش‌ها دقیق‌اند؟»

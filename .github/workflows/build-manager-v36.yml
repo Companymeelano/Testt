@@ -71,8 +71,8 @@ jobs:
       - name: Include Gradle diagnostics in job summary
         if: failure()
         run: |
-          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY" || true
-          import glob, re, html
+          python3 - <<'PY' || true
+          import glob, os, re, html
           out = []
           for f in glob.glob("manager/app/build/test-results/testDebugUnitTest/*.xml"):
               src = open(f, encoding="utf-8").read()
@@ -82,10 +82,11 @@ jobs:
                       msg = re.search(r'message="([^"]*)"', body)
                       out.append(f"{name}\n  {html.unescape(msg.group(1)) if msg else ''}")
           if out:
-              print("### Failing test cases (with messages)")
-              print("```text")
-              print("\n".join(out)[:60000])
-              print("```")
+              block = "### Failing test cases (with messages)\n````text\n" + "\n".join(out)[:30000] + "\n````\n"
+              with open(os.environ.get("GITHUB_STEP_SUMMARY", "/dev/null"), "a") as fh:
+                  fh.write(block)
+              msg = ("\n".join(out)[:30000]).replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+              print(f"::notice title=Failing test cases::{msg}")
           PY
           if [ -f manager-build.log ]; then
             {

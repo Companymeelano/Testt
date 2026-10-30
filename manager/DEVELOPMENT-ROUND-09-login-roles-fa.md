@@ -49,7 +49,9 @@
 ## ۵) نسخهٔ جدید
 
 - **MEELANO Manager v36.37.0 (versionCode 70)** — `dist/meelano-manager-v36-debug-19.apk`
-  (پین‌های workflow + build.gradle + Changelog یک‌جا به‌روز شدند؛ CI مرجع تطبیق هویت APK است).
+  (پین‌های workflow + build.gradle + Changelog یک‌جا به‌روز شدند).
+- SHA-256: `62a4180dceadd23981da4eaeb3a09023d36b4d7a6e70330185acc1fd284bd4cf` — لینک مستقیم:
+  `https://github.com/Companymeelano/Testt/raw/arena/29e01a09-testt/dist/meelano-manager-v36-debug-19.apk`
 - تغییرات فنی: `core/AtiranAuth.java` (mapRoleCore/managerRoleForUserName/resolveAppRole/
   roleNameForUser)، `LoginActivity.java` (حذف بن‌بست)، `ui/Changelog.java`، تست‌ها،
   `docs/UNIFIED-ROLES-fa.md` (قاعدهٔ تکمیلی نگاشت).

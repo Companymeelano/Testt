@@ -54,6 +54,8 @@ public final class HomeDashboardScreenshotTest {
         settings.setHomeSimpleMode(true);
         settings.setHomeOrder(Settings.HOME_ORDER_DEFAULT);
         settings.setHomeSections(Settings.HOME_SECTIONS_DEFAULT);
+        settings.setCloseoutCashOpening(Jalali.todayStr(), "1000000000");
+        settings.setCloseoutCashCounted(Jalali.todayStr(), "1100000000");
         settings.saveConnection("127.0.0.1", "1", "HOME_PREVIEW", "preview", "preview");
         settings.saveHomeCache(sampleCache());
 
@@ -121,6 +123,7 @@ public final class HomeDashboardScreenshotTest {
                 .append("|returnsok=1|returnsprevok=1|trendok=1")
                 .append("|trendfrom=").append(Jalali.addDays(today, -13))
                 .append("|stockok=1|reorderok=1|priceok=1|dueinok=1|dueoutok=1|topok=1|overdueok=1")
+                .append("|retodayok=1|cashinok=1|cashoutok=1|gpok=1")
                 .append("|top0=label=پستهٔ نمونه;total=2400000000;qty=18;docs=7")
                 .append("|overdue0=party=مشتری نمونه;amount=730000000;dueDate=").append(today)
                 .append(";days=2;invoice=۴۸۲۱");
@@ -145,6 +148,10 @@ public final class HomeDashboardScreenshotTest {
                 .append("|inmix1=label=کارت‌خوان;amount=2800000000")
                 .append("|inmix2=label=حواله;amount=1800000000")
                 .append("|inmix3=label=چک‌های دریافتی;amount=700000000")
+                .append("|cashin=cash=3100000000;pos=2800000000;havaleh=1800000000;cheque=700000000;breakdownAvailable=1")
+                .append("|cashout=cash=1600000000;pos=900000000;havaleh=400000000;cheque=0;breakdownAvailable=1")
+                .append("|retoday0=label=فاکتور برگشتی;docs=1;total=250000000")
+                .append("|gp0=day=").append(today).append(";sales=9200000000;cogs=6100000000;profit=3100000000")
                 .append("|ret0=total=0;docs=0")
                 .append("|retprev0=total=500000000;docs=2")
                 .append("|stock0=shka=1001;name=بادام نمونه;stockPieces=0;reorderPoint=5;reorderKnown=1;isOut=1")

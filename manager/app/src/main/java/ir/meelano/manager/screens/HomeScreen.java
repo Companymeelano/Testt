@@ -26,6 +26,7 @@ import android.widget.TextView;
 import ir.meelano.manager.core.AtiranAuth;
 import ir.meelano.manager.core.AtiranSchema;
 import ir.meelano.manager.core.AlertEngine;
+import ir.meelano.manager.core.CashCloseMath;
 import ir.meelano.manager.core.Filter;
 import ir.meelano.manager.core.FollowUps;
 import ir.meelano.manager.core.HomeRange;
@@ -113,6 +114,14 @@ public class HomeScreen extends Screen {
         boolean dueOutAvailable;
         /** Return documents (اسناد برگشتی) of the last 30 days, grouped by type. */
         List<Row> returns = new ArrayList<>();
+        List<Row> returnsToday = new ArrayList<>();
+        boolean returnsTodayAvailable;
+        Row cashReceipts = new Row();
+        Row cashPayments = new Row();
+        boolean cashReceiptsAvailable;
+        boolean cashPaymentsAvailable;
+        List<Row> grossProfitDaily = new ArrayList<>();
+        boolean grossProfitAvailable;
         Map<String, String> notes = new LinkedHashMap<>();
     }
 
@@ -386,6 +395,26 @@ public class HomeScreen extends Screen {
         d.returnsPrevious = liveL(token, L, d.notes, "برگشتی دورهٔ قبل",
                 () -> Repo.exec(L.c, MasterQueries.returnsByKind(L.m, previousReturns)));
         d.returnsPreviousAvailable = d.returnsPrevious != null;
+        boolean canCloseout = RoleStore.allowed(a, "closeout");
+        if (canCloseout && (homeSectionSelected("closeout") || homeSectionSelected("gross_profit"))) {
+            d.cashReceipts = liveL(token, L, d.notes, "تفکیک نقد دریافتی امروز",
+                    () -> Repo.one(L.c, MoneyQueries.darSummary(L.m, todayMix, 0)));
+            d.cashReceiptsAvailable = d.cashReceipts != null && d.cashReceipts.l("breakdownAvailable") > 0;
+            d.cashPayments = liveL(token, L, d.notes, "تفکیک نقد پرداختی امروز",
+                    () -> Repo.one(L.c, MoneyQueries.darSummary(L.m, todayMix, 1)));
+            d.cashPaymentsAvailable = d.cashPayments != null && d.cashPayments.l("breakdownAvailable") > 0;
+            Filter profitRange = new Filter();
+            profitRange.from = Jalali.monthStart(to);
+            profitRange.to = to;
+            d.grossProfitDaily = liveL(token, L, d.notes, "سود ناخالص برآوردی",
+                    () -> Repo.exec(L.c, MasterQueries.profitDaily(L.m, profitRange)));
+            d.grossProfitAvailable = d.grossProfitDaily != null;
+        }
+        if (canCloseout && homeSectionSelected("closeout")) {
+            d.returnsToday = liveL(token, L, d.notes, "برگشتی امروز",
+                    () -> Repo.exec(L.c, MasterQueries.returnsByKindOn(L.m, todayMix)));
+            d.returnsTodayAvailable = d.returnsToday != null;
+        }
         if (d.salesDay == null && d.inDay == null && d.buyDay == null && d.outDay == null)
             throw new Exception(firstNote(d.notes));
         return d;
@@ -489,6 +518,14 @@ public class HomeScreen extends Screen {
         s.overdue = g.overdue;
         s.overdueAvailable = g.overdueAvailable;
         s.returns = g.returns;
+        s.returnsToday = g.returnsToday;
+        s.returnsTodayAvailable = g.returnsTodayAvailable;
+        s.cashReceipts = g.cashReceipts;
+        s.cashPayments = g.cashPayments;
+        s.cashReceiptsAvailable = g.cashReceiptsAvailable;
+        s.cashPaymentsAvailable = g.cashPaymentsAvailable;
+        s.grossProfitDaily = g.grossProfitDaily;
+        s.grossProfitAvailable = g.grossProfitAvailable;
         s.notes.putAll(g.notes);
     }
 
@@ -569,7 +606,11 @@ public class HomeScreen extends Screen {
                     .append("|dueinok=").append(d.dueInAvailable ? "1" : "0")
                     .append("|dueoutok=").append(d.dueOutAvailable ? "1" : "0")
                     .append("|topok=").append(d.topItemsAvailable ? "1" : "0")
-                    .append("|overdueok=").append(d.overdueAvailable ? "1" : "0");
+                    .append("|overdueok=").append(d.overdueAvailable ? "1" : "0")
+                    .append("|retodayok=").append(d.returnsTodayAvailable ? "1" : "0")
+                    .append("|cashinok=").append(d.cashReceiptsAvailable ? "1" : "0")
+                    .append("|cashoutok=").append(d.cashPaymentsAvailable ? "1" : "0")
+                    .append("|gpok=").append(d.grossProfitAvailable ? "1" : "0");
             if (d.buyDaily != null) for (int i = 0; i < Math.min(7, d.buyDaily.size()); i++)
                 s.append("|buytrend").append(i).append('=').append(rowStr(d.buyDaily.get(i)));
             if (d.inDaily != null) for (int i = 0; i < Math.min(7, d.inDaily.size()); i++)
@@ -590,6 +631,16 @@ public class HomeScreen extends Screen {
                 for (int i = 0; i < Math.min(5, d.overdue.size()); i++)
                     s.append("|overdue").append(i).append('=').append(rowStr(cacheFields(d.overdue.get(i),
                             "code", "party", "amount", "dueDate", "days", "visitor", "invoice")));
+            }
+            if (d.cashReceipts != null) s.append("|cashin=").append(rowStr(d.cashReceipts));
+            if (d.cashPayments != null) s.append("|cashout=").append(rowStr(d.cashPayments));
+            if (d.returnsToday != null) {
+                for (int i = 0; i < Math.min(20, d.returnsToday.size()); i++)
+                    s.append("|retoday").append(i).append('=').append(rowStr(d.returnsToday.get(i)));
+            }
+            if (d.grossProfitDaily != null) {
+                for (int i = 0; i < Math.min(36, d.grossProfitDaily.size()); i++)
+                    s.append("|gp").append(i).append('=').append(rowStr(d.grossProfitDaily.get(i)));
             }
             if (d.stockAlerts != null) {
                 for (int i = 0; i < Math.min(20, d.stockAlerts.size()); i++)
@@ -679,8 +730,16 @@ public class HomeScreen extends Screen {
                 else if ("dueoutok".equals(k)) d.dueOutAvailable = "1".equals(v);
                 else if ("topok".equals(k)) d.topItemsAvailable = "1".equals(v);
                 else if ("overdueok".equals(k)) d.overdueAvailable = "1".equals(v);
+                else if ("retodayok".equals(k)) d.returnsTodayAvailable = "1".equals(v);
+                else if ("cashinok".equals(k)) d.cashReceiptsAvailable = "1".equals(v);
+                else if ("cashoutok".equals(k)) d.cashPaymentsAvailable = "1".equals(v);
+                else if ("gpok".equals(k)) d.grossProfitAvailable = "1".equals(v);
+                else if ("cashin".equals(k)) { d.cashReceipts = rowFrom(v); any = true; }
+                else if ("cashout".equals(k)) { d.cashPayments = rowFrom(v); any = true; }
                 else if (k.matches("top[0-4]")) { d.topItems.add(rowFrom(v)); any = true; }
                 else if (k.matches("overdue[0-4]")) { d.overdue.add(rowFrom(v)); any = true; }
+                else if (k.matches("retoday(?:[0-9]|1[0-9])")) { d.returnsToday.add(rowFrom(v)); any = true; }
+                else if (k.matches("gp(?:[0-9]|[12][0-9]|3[0-5])")) { d.grossProfitDaily.add(rowFrom(v)); any = true; }
                 else if (k.matches("stock(?:[0-9]|1[0-9])")) { d.stockAlerts.add(rowFrom(v)); any = true; }
                 else if (k.matches("price(?:[0-9]|1[0-9])")) { d.purchasePriceTrend.add(rowFrom(v)); any = true; }
                 else if (k.matches("duein(?:[0-9]|1[0-9])")) { d.dueIn.add(rowFrom(v)); any = true; }
@@ -1552,6 +1611,7 @@ public class HomeScreen extends Screen {
 
     private void renderHomeSection(LinearLayout content, Data d, String key) {
         if ("smart_report".equals(key)) secSmartReport(content, d);
+        else if ("closeout".equals(key)) secHomeCloseout(content, d);
         else if ("kpis".equals(key)) secKpis(content, d);
         else if ("alerts".equals(key)) secAlerts(content, d);
         else if ("sales_insight".equals(key)) secSalesInsight(content, d);
@@ -1784,6 +1844,7 @@ public class HomeScreen extends Screen {
 
     /** Select a stable jewel hue by section; outcome colors stay reserved for deltas only. */
     private int dashboardAccent(int vector) {
+        if (vector == R.drawable.mi_point_of_sale) return Theme.SECTION_CLOSEOUT;
         if (vector == R.drawable.mi_shopping_cart || vector == R.drawable.mi_add_shopping_cart)
             return Theme.SECTION_PURCHASE;
         if (vector == R.drawable.mi_receipt_long || vector == R.drawable.mi_cheque)
@@ -2603,6 +2664,153 @@ public class HomeScreen extends Screen {
         }
     }
 
+    private void secHomeCloseout(LinearLayout content, Data d) {
+        if (!RoleStore.allowed(a, "closeout")) return;
+        final String day = snapshotDay(d);
+        LinearLayout card = a.kit.card(Theme.SECTION_CLOSEOUT);
+        card.addView(boardHead("بستن روز", "خلاصهٔ ثبت‌شده و تطبیق نقد صندوق • " + day,
+                R.drawable.mi_point_of_sale, null), a.kit.lp(-1, -2));
+
+        boolean salesAvailable = d.salesSnapshot != null && d.salesSnapshot.isAvailable()
+                && RoleStore.allowed(a, "sales");
+        card.addView(statRow(R.drawable.mi_sell, "فروش روز",
+                salesAvailable ? HomeNumberFormatter.money(d.salesSnapshot.salesRialsOn(day))
+                        : "داده در دسترس نیست", Theme.SECTION_SALES), a.kit.lp(-1, -2));
+        card.addView(a.kit.gap(6));
+        card.addView(statRow(R.drawable.mi_payments, "دریافت ثبت‌شده",
+                d.inDay == null ? "داده در دسترس نیست" : HomeNumberFormatter.money(d.inDay.d("total")),
+                Theme.SECTION_RECEIVE), a.kit.lp(-1, -2));
+        card.addView(a.kit.gap(6));
+        card.addView(statRow(R.drawable.mi_account_balance_wallet, "پرداخت ثبت‌شده",
+                d.outDay == null ? "داده در دسترس نیست" : HomeNumberFormatter.money(d.outDay.d("total")),
+                Theme.SECTION_PAY), a.kit.lp(-1, -2));
+        card.addView(a.kit.gap(6));
+
+        long returnDocs = sumLongField(d.returnsToday, "docs");
+        String returnValue = !d.returnsTodayAvailable ? "داده در دسترس نیست"
+                : HomeNumberFormatter.money(sumField(d.returnsToday, "total")) + " • "
+                + HomeNumberFormatter.integer(returnDocs) + " سند";
+        card.addView(statRow(R.drawable.mi_assignment_return, "برگشتی امروز", returnValue,
+                Theme.SECTION_RETURNS), a.kit.lp(-1, -2));
+        card.addView(a.kit.gap(6));
+
+        String grossProfit = !d.grossProfitAvailable ? "مبنای بهای تمام‌شده در دسترس نیست"
+                : HomeNumberFormatter.money(grossProfitOnDay(d, day)) + " • برآورد";
+        card.addView(statRow(R.drawable.mi_bar_chart, "سود ناخالص برآوردی", grossProfit,
+                Theme.SECTION_CLOSEOUT), a.kit.lp(-1, -2));
+        card.addView(a.kit.gap(8));
+        String variance = closeoutVarianceLabel(d, day);
+        card.addView(statRow(R.drawable.mi_point_of_sale, "اختلاف شمارش صندوق",
+                variance, Theme.SECTION_CLOSEOUT), a.kit.lp(-1, -2));
+        card.addView(a.kit.btnGhost("ثبت موجودی آغاز و شمارش پایان صندوق", Theme.SECTION_CLOSEOUT,
+                v -> showCloseoutCashDialog(content, d, day)), a.kit.lp(-1, -2));
+        card.addView(a.kit.gap(8));
+        card.addView(a.kit.btnGhost("اشتراک گزارش پایان روز (PDF)", Theme.SECTION_CLOSEOUT,
+                v -> shareCloseoutReport(d, day, false)), a.kit.lp(-1, -2));
+        card.addView(a.kit.gap(5));
+        card.addView(a.kit.btnGhost("چاپ گزارش پایان روز", Theme.SECTION_CLOSEOUT,
+                v -> shareCloseoutReport(d, day, true)), a.kit.lp(-1, -2));
+        a.kit.addCard(content, card);
+    }
+
+    private double grossProfitOnDay(Data d, String day) {
+        if (d == null || d.grossProfitDaily == null) return 0;
+        double total = 0;
+        String target = Jalali.disp(day);
+        for (Row row : d.grossProfitDaily) {
+            if (row != null && target.equals(Jalali.disp(row.s("day")))) total += row.d("profit");
+        }
+        return total;
+    }
+
+    private String closeoutVarianceLabel(Data d, String day) {
+        if (d == null || !d.cashReceiptsAvailable || !d.cashPaymentsAvailable)
+            return "تفکیک نقد در دادهٔ فروشگاه موجود نیست";
+        String openingText = a.settings.closeoutCashOpening(day);
+        String countedText = a.settings.closeoutCashCounted(day);
+        Double opening = parseLocalRials(openingText);
+        Double counted = parseLocalRials(countedText);
+        if (opening == null || counted == null) return "شمارش محلی ثبت نشده";
+        double variance = CashCloseMath.variance(opening, d.cashReceipts.d("cash"),
+                d.cashPayments.d("cash"), counted);
+        if (Double.isNaN(variance) || Double.isInfinite(variance)) return "قابل محاسبه نیست";
+        String direction = variance > 0 ? "مازاد " : variance < 0 ? "کسری " : "بدون اختلاف ";
+        return direction + HomeNumberFormatter.money(Math.abs(variance));
+    }
+
+    private Double parseLocalRials(String raw) {
+        if (raw == null || raw.trim().isEmpty()) return null;
+        String normalized = ir.meelano.manager.core.Money.en(raw).replace(",", "")
+                .replace("٬", "").replace('٫', '.').trim();
+        try {
+            double value = Double.parseDouble(normalized);
+            return value >= 0 && !Double.isNaN(value) && !Double.isInfinite(value) ? value : null;
+        } catch (Exception invalid) {
+            return null;
+        }
+    }
+
+    private void showCloseoutCashDialog(LinearLayout content, Data d, String day) {
+        android.widget.LinearLayout form = a.kit.v();
+        form.setPadding(Theme.dp(20), Theme.dp(10), Theme.dp(20), Theme.dp(8));
+        form.addView(a.kit.hint("مبالغ به ریال وارد می‌شوند و فقط روی این دستگاه برای همین روز می‌مانند. هیچ تغییری در دفتر فروشگاه ثبت نمی‌شود."), a.kit.lp(-1, -2));
+        android.widget.EditText opening = a.kit.edit("موجودی نقد آغاز روز به ریال",
+                a.settings.closeoutCashOpening(day));
+        android.widget.EditText counted = a.kit.edit("شمارش نقد پایان روز به ریال",
+                a.settings.closeoutCashCounted(day));
+        int numberInput = android.text.InputType.TYPE_CLASS_NUMBER
+                | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL;
+        opening.setInputType(numberInput);
+        counted.setInputType(numberInput);
+        opening.setContentDescription("موجودی نقد آغاز روز به ریال");
+        counted.setContentDescription("شمارش نقد پایان روز به ریال");
+        form.addView(opening, a.kit.lp(-1, -2));
+        form.addView(counted, a.kit.lp(-1, -2));
+        new android.app.AlertDialog.Builder(a).setTitle("ثبت شمارش صندوق • " + day).setView(form)
+                .setPositiveButton("ذخیره روی دستگاه", (dialog, which) -> {
+                    Double open = parseLocalRials(opening.getText().toString());
+                    Double close = parseLocalRials(counted.getText().toString());
+                    if (open == null || close == null) {
+                        a.kit.toast("هر دو مبلغ را به‌صورت عدد صفر یا بیشتر وارد کنید");
+                        return;
+                    }
+                    a.settings.setCloseoutCashOpening(day, opening.getText().toString());
+                    a.settings.setCloseoutCashCounted(day, counted.getText().toString());
+                    render(content);
+                }).setNegativeButton("انصراف", null).show();
+    }
+
+    private void shareCloseoutReport(Data d, String day, boolean print) {
+        java.util.List<Row> rows = new java.util.ArrayList<>();
+        addCloseoutExportRow(rows, "فروش", d.salesSnapshot != null && d.salesSnapshot.isAvailable()
+                ? HomeNumberFormatter.money(d.salesSnapshot.salesRialsOn(day)) : "داده در دسترس نیست");
+        addCloseoutExportRow(rows, "دریافت ثبت‌شده", d.inDay == null ? "داده در دسترس نیست"
+                : HomeNumberFormatter.money(d.inDay.d("total")));
+        addCloseoutExportRow(rows, "پرداخت ثبت‌شده", d.outDay == null ? "داده در دسترس نیست"
+                : HomeNumberFormatter.money(d.outDay.d("total")));
+        addCloseoutExportRow(rows, "برگشتی امروز", d.returnsTodayAvailable
+                ? HomeNumberFormatter.money(sumField(d.returnsToday, "total")) + " • "
+                    + HomeNumberFormatter.integer(sumLongField(d.returnsToday, "docs")) + " سند"
+                : "داده در دسترس نیست");
+        addCloseoutExportRow(rows, "سود ناخالص برآوردی", d.grossProfitAvailable
+                ? HomeNumberFormatter.money(grossProfitOnDay(d, day)) : "مبنای بهای تمام‌شده موجود نیست");
+        addCloseoutExportRow(rows, "اختلاف شمارش صندوق", closeoutVarianceLabel(d, day));
+        ir.meelano.manager.core.ReportCatalog.Col[] columns = {
+                new ir.meelano.manager.core.ReportCatalog.Col("label", "شرح", ir.meelano.manager.core.ReportCatalog.T_TEXT),
+                new ir.meelano.manager.core.ReportCatalog.Col("value", "مبلغ / وضعیت", ir.meelano.manager.core.ReportCatalog.T_TEXT)
+        };
+        String subtitle = day + " • خلاصهٔ خواندنی از دفتر و شمارش محلی دستگاه";
+        if (print) a.printPdf("گزارش بستن روز", subtitle, columns, rows);
+        else a.sharePdf("گزارش بستن روز", subtitle, columns, rows);
+    }
+
+    private void addCloseoutExportRow(java.util.List<Row> rows, String label, String value) {
+        Row row = new Row();
+        row.put("label", label);
+        row.put("value", value);
+        rows.add(row);
+    }
+
     private void secSmartReport(LinearLayout content, Data d) {
         if (!RoleStore.allowed(a, "sales")) return;
         final List<String> sentences = smartReportSentences(d);
@@ -2632,8 +2840,6 @@ public class HomeScreen extends Screen {
                 a.kit.toast("ساخت تصویر ممکن نشد");
             }
         }), a.kit.lp(-1, -2));
-        card.setContentDescription("گزارش هوشمند امروز؛ " + sentences.get(0) + " "
-                + sentences.get(1) + " " + sentences.get(2));
         a.kit.addCard(content, card);
     }
 

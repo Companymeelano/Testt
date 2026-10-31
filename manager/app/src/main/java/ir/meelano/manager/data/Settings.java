@@ -452,6 +452,37 @@ public final class Settings {
         p.edit().putBoolean("home_simple", simple).apply();
     }
 
+    /** Local till observations keyed by Jalali day; they never leave this device or alter Atiran. */
+    public String closeoutCashOpening(String day) { return p.getString(closeoutCashKey("open", day), ""); }
+    public String closeoutCashCounted(String day) { return p.getString(closeoutCashKey("counted", day), ""); }
+    public void setCloseoutCashOpening(String day, String rials) {
+        saveCloseoutCash("open", day, rials);
+    }
+    public void setCloseoutCashCounted(String day, String rials) {
+        saveCloseoutCash("counted", day, rials);
+    }
+
+    private String closeoutCashKey(String kind, String day) {
+        String normalized = ir.meelano.manager.core.Jalali.disp(day);
+        if (normalized.isEmpty()) return "home_cash_" + kind + "_unknown";
+        return "home_cash_" + kind + "_" + normalized.replace('/', '_');
+    }
+
+    private void saveCloseoutCash(String kind, String day, String raw) {
+        String normalized = ir.meelano.manager.core.Jalali.disp(day);
+        if (normalized.isEmpty()) return;
+        String value = Money.en(raw == null ? "" : raw.trim()).replace(",", "")
+                .replace("٬", "").replace('٫', '.').trim();
+        try {
+            java.math.BigDecimal amount = new java.math.BigDecimal(value);
+            if (amount.signum() < 0) return;
+            value = amount.stripTrailingZeros().toPlainString();
+        } catch (Exception invalid) {
+            if (!value.isEmpty()) return;
+        }
+        p.edit().putString(closeoutCashKey(kind, normalized), value).apply();
+    }
+
     // ---------------- stock alerts + auto backup (v18) ----------------
     public boolean stockOn() { return p.getBoolean("stock_on", true); }
 

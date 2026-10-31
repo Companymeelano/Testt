@@ -52,7 +52,8 @@ public final class Sparkline extends View {
         path.reset();
         area.reset();
         for (int i = 0; i < n; i++) {
-            float x = w * i / (float) (n - 1);
+            // RTL chronology: the oldest sample sits at the right, the newest at the left.
+            float x = w - w * i / (float) (n - 1);
             double norm = span <= 0 ? 0.5 : (values[i] - min) / span;
             float y = (float) (bottom - norm * (bottom - top));
             if (i == 0) {
@@ -64,7 +65,7 @@ public final class Sparkline extends View {
                 area.lineTo(x, y);
             }
         }
-        area.lineTo(w, h);
+        area.lineTo(0, h);
         area.close();
         fill.setShader(new LinearGradient(0, 0, 0, h,
                 Theme.alpha(color, 70), Theme.alpha(color, 0), Shader.TileMode.CLAMP));

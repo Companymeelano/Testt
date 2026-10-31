@@ -403,10 +403,16 @@ public final class Kit {
         public final Runnable action;
         /** Optional unabridged value announced by TalkBack and shown on long-press. */
         public String fullValue;
+        /** Supporting count/document line below the amount. */
+        public String detail;
+        /** A neutral checked state for zero-risk counts such as no return documents. */
+        public boolean neutralStatus;
         /** When not NaN, the tile counts up from 0 to this number. */
         public final double countTo;
         /** Optional daily series (oldest first) drawn as a sparkline under the value. */
         public double[] spark;
+        /** Accessibility scope for the sparkline when it represents a non-daily comparison. */
+        public String sparkDescription;
         /** Optional drawable shown above the label (0 = none). */
         public int icon = 0;
         /** True when the tile wears the emerald family of the manager's board. Off by default. */
@@ -499,14 +505,26 @@ public final class Kit {
             amount.addView(v, lp(-1, -2));
         }
         t.addView(amount, lp(-1, -2));
+        if (k.detail != null && !k.detail.trim().isEmpty()) {
+            TextView detail = text(k.detail, 9f, Theme.MUTED, false);
+            detail.setGravity(Gravity.CENTER_HORIZONTAL);
+            detail.setSingleLine(true);
+            detail.setEllipsize(TextUtils.TruncateAt.END);
+            detail.setMinHeight(Theme.dp(20));
+            t.addView(detail, lp(-1, -2));
+        }
         if (k.spark != null && k.spark.length > 1) {
             LinearLayout.LayoutParams sp = lp(-1, Theme.dp(26));
             sp.setMargins(0, Theme.dp(4), 0, Theme.dp(2));
-            t.addView(new Sparkline(a, k.spark, accent), sp);
+            Sparkline sparkline = new Sparkline(a, k.spark, accent);
+            sparkline.setContentDescription(k.sparkDescription == null
+                    ? "روند هفت‌روزهٔ " + k.label : k.sparkDescription);
+            sparkline.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+            t.addView(sparkline, sp);
         }
-        if (!Double.isNaN(k.countTo)) {
+        if (!Double.isNaN(k.countTo) && Ui.motionOk(a)) {
             ValueAnimator va = ValueAnimator.ofFloat(0f, 1f);
-            va.setDuration(900);
+            va.setDuration(600);
             va.setInterpolator(new android.view.animation.DecelerateInterpolator());
             va.addUpdateListener(an -> v.setText(Money.fa(Money.compact(k.countTo * (float) an.getAnimatedValue()))));
             va.addListener(new android.animation.AnimatorListenerAdapter() {
@@ -514,8 +532,11 @@ public final class Kit {
             });
             va.start();
         } else {
-            v.setAlpha(0f);
-            v.animate().alpha(1f).setDuration(350).start();
+            v.setText(stableNumberValue);
+            if (Ui.motionOk(a)) {
+                v.setAlpha(0f);
+                v.animate().alpha(1f).setDuration(350).start();
+            } else v.setAlpha(1f);
         }
         // Every tile reserves equal space; outcome colors are restricted to actual deltas.
         String sub0 = k.sub == null ? "" : k.sub.trim();
@@ -526,7 +547,16 @@ public final class Kit {
         int direction = probe.startsWith("▲") || probe.startsWith("↗") || probe.startsWith("+") ? 1
                 : probe.startsWith("▼") || probe.startsWith("↘") || probe.startsWith("-")
                 || probe.startsWith("−") ? -1 : 0;
-        if (direction != 0) {
+        if (k.neutralStatus) {
+            TextView note = text(sub0.isEmpty() ? "✓" : sub0, 9.5f, Theme.MUTED, true);
+            note.setGravity(Gravity.CENTER);
+            note.setSingleLine(true);
+            note.setEllipsize(TextUtils.TruncateAt.END);
+            note.setPadding(Theme.dp(7), Theme.dp(3), Theme.dp(7), Theme.dp(3));
+            note.setMinHeight(Theme.dp(32));
+            note.setBackground(Theme.pill(Theme.MUTED));
+            t.addView(note, lp(-1, Theme.dp(32)));
+        } else if (direction != 0) {
             String detail = sub0.replaceFirst("^(▲|▼|↗|↘)\\s*", "").trim();
             if (detail.startsWith("+") || detail.startsWith("−") || detail.startsWith("-"))
                 detail = detail.substring(1).trim();
@@ -550,7 +580,9 @@ public final class Kit {
         more.setSingleLine(true);
         t.addView(more, lp(-1, -2));
         String complete = k.fullValue == null || k.fullValue.trim().isEmpty() ? k.value : k.fullValue;
-        String spoken = k.label + ": " + (complete == null ? "" : complete);
+        String spoken = k.label + ": " + (complete == null ? "" : complete)
+                + (k.detail == null || k.detail.trim().isEmpty() ? "" : "؛ " + k.detail)
+                + (sub0.isEmpty() ? "" : "؛ " + sub0);
         t.setContentDescription(spoken);
         if (android.os.Build.VERSION.SDK_INT >= 26) t.setTooltipText(spoken);
         View.OnLongClickListener reveal = vw -> {

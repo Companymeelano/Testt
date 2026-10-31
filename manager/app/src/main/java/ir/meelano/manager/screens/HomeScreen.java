@@ -78,6 +78,15 @@ public class HomeScreen extends Screen {
         Row buyDay;
         Row inDay;
         Row outDay;
+        List<Row> buyDaily = new ArrayList<>();
+        List<Row> inDaily = new ArrayList<>();
+        List<Row> outDaily = new ArrayList<>();
+        List<Row> returnsPrevious = new ArrayList<>();
+        boolean buyTrendAvailable;
+        boolean inTrendAvailable;
+        boolean outTrendAvailable;
+        boolean returnsAvailable;
+        boolean returnsPreviousAvailable;
         List<Row> overdue = new ArrayList<>();
         List<Row> salesDaily = new ArrayList<>();
         SalesSnapshot salesSnapshot;
@@ -325,9 +334,17 @@ public class HomeScreen extends Screen {
         // Sales are deliberately not queried through a separate latest-data KPI path:
         // the daily snapshot below is the only source for every Home sales amount.
         // Purchases, receipts and payments use this same explicit calendar day.
-        List<Row> purchaseDaily = liveL(token, L, d.notes, "خرید امروز",
-                () -> Repo.exec(L.c, Queries.factorDaily(L.m, false, todayRange.from, todayRange.to)));
-        d.buyDay = HomeRange.aggregateDay(purchaseDaily, todayRange.to);
+        HomeRange sparkRange = HomeRange.last7Days(todayRange.to);
+        d.buyDaily = liveL(token, L, d.notes, "خرید ۷ روزه",
+                () -> Repo.exec(L.c, Queries.factorDaily(L.m, false, sparkRange.from, sparkRange.to)));
+        d.buyTrendAvailable = d.buyDaily != null;
+        d.buyDay = HomeRange.aggregateDay(d.buyDaily, todayRange.to);
+        d.inDaily = liveL(token, L, d.notes, "دریافت ۷ روزه",
+                () -> Repo.exec(L.c, MoneyQueries.darDaily(L.m, 0, sparkRange.from, sparkRange.to)));
+        d.inTrendAvailable = d.inDaily != null;
+        d.outDaily = liveL(token, L, d.notes, "پرداخت ۷ روزه",
+                () -> Repo.exec(L.c, MoneyQueries.darDaily(L.m, 1, sparkRange.from, sparkRange.to)));
+        d.outTrendAvailable = d.outDaily != null;
         d.inDay = liveL(token, L, d.notes, "دریافت امروز", () -> Repo.one(L.c, MoneyQueries.darDay(L.m, 0, todayRange.to)));
         d.outDay = liveL(token, L, d.notes, "پرداخت امروز", () -> Repo.one(L.c, MoneyQueries.darDay(L.m, 1, todayRange.to)));
         d.overdue = liveL(token, L, d.notes, "معوق‌ها", () -> Repo.exec(L.c, Queries.overdueInvoices(L.m, 5)));
@@ -336,6 +353,13 @@ public class HomeScreen extends Screen {
         rf.from = stFrom;
         rf.to = to;
         d.returns = liveL(token, L, d.notes, "برگشتی", () -> Repo.exec(L.c, MasterQueries.returnsByKind(L.m, rf)));
+        d.returnsAvailable = d.returns != null;
+        Filter previousReturns = new Filter();
+        previousReturns.from = Jalali.addDays(stFrom, -30);
+        previousReturns.to = Jalali.addDays(stFrom, -1);
+        d.returnsPrevious = liveL(token, L, d.notes, "برگشتی دورهٔ قبل",
+                () -> Repo.exec(L.c, MasterQueries.returnsByKind(L.m, previousReturns)));
+        d.returnsPreviousAvailable = d.returnsPrevious != null;
         if (d.salesDay == null && d.inDay == null && d.buyDay == null && d.outDay == null)
             throw new Exception(firstNote(d.notes));
         return d;
@@ -422,6 +446,15 @@ public class HomeScreen extends Screen {
         s.buyDay = g.buyDay;
         s.inDay = g.inDay;
         s.outDay = g.outDay;
+        s.buyDaily = g.buyDaily;
+        s.inDaily = g.inDaily;
+        s.outDaily = g.outDaily;
+        s.returnsPrevious = g.returnsPrevious;
+        s.buyTrendAvailable = g.buyTrendAvailable;
+        s.inTrendAvailable = g.inTrendAvailable;
+        s.outTrendAvailable = g.outTrendAvailable;
+        s.returnsAvailable = g.returnsAvailable;
+        s.returnsPreviousAvailable = g.returnsPreviousAvailable;
         s.overdue = g.overdue;
         s.returns = g.returns;
         s.notes.putAll(g.notes);
@@ -487,6 +520,11 @@ public class HomeScreen extends Screen {
                     .append("|buy=").append(rowStr(d.buyDay))
                     .append("|in=").append(rowStr(d.inDay))
                     .append("|out=").append(rowStr(d.outDay))
+                    .append("|buytrendok=").append(d.buyTrendAvailable ? "1" : "0")
+                    .append("|intrendok=").append(d.inTrendAvailable ? "1" : "0")
+                    .append("|outtrendok=").append(d.outTrendAvailable ? "1" : "0")
+                    .append("|returnsok=").append(d.returnsAvailable ? "1" : "0")
+                    .append("|returnsprevok=").append(d.returnsPreviousAvailable ? "1" : "0")
                     .append("|trendok=").append(d.salesSnapshot != null && d.salesSnapshot.isAvailable() ? "1" : "0")
                     .append("|trendfrom=").append(esc(d.salesHistoryFrom == null ? "" : d.salesHistoryFrom))
                     .append("|stockok=").append(d.stockAlertsAvailable ? "1" : "0")
@@ -494,6 +532,16 @@ public class HomeScreen extends Screen {
                     .append("|priceok=").append(d.purchasePriceTrendAvailable ? "1" : "0")
                     .append("|dueinok=").append(d.dueInAvailable ? "1" : "0")
                     .append("|dueoutok=").append(d.dueOutAvailable ? "1" : "0");
+            if (d.buyDaily != null) for (int i = 0; i < Math.min(7, d.buyDaily.size()); i++)
+                s.append("|buytrend").append(i).append('=').append(rowStr(d.buyDaily.get(i)));
+            if (d.inDaily != null) for (int i = 0; i < Math.min(7, d.inDaily.size()); i++)
+                s.append("|intrend").append(i).append('=').append(rowStr(d.inDaily.get(i)));
+            if (d.outDaily != null) for (int i = 0; i < Math.min(7, d.outDaily.size()); i++)
+                s.append("|outtrend").append(i).append('=').append(rowStr(d.outDaily.get(i)));
+            if (d.returns != null) for (int i = 0; i < Math.min(20, d.returns.size()); i++)
+                s.append("|ret").append(i).append('=').append(rowStr(d.returns.get(i)));
+            if (d.returnsPrevious != null) for (int i = 0; i < Math.min(20, d.returnsPrevious.size()); i++)
+                s.append("|retprev").append(i).append('=').append(rowStr(d.returnsPrevious.get(i)));
             if (d.topItems != null) {
                 for (int i = 0; i < Math.min(5, d.topItems.size()); i++)
                     s.append("|top").append(i).append('=').append(rowStr(d.topItems.get(i)));
@@ -565,6 +613,16 @@ public class HomeScreen extends Screen {
                 else if ("buy".equals(k)) { d.buyDay = v.isEmpty() ? null : rowFrom(v); any = true; }
                 else if ("in".equals(k)) { d.inDay = v.isEmpty() ? null : rowFrom(v); any = true; }
                 else if ("out".equals(k)) { d.outDay = v.isEmpty() ? null : rowFrom(v); any = true; }
+                else if ("buytrendok".equals(k)) d.buyTrendAvailable = "1".equals(v);
+                else if ("intrendok".equals(k)) d.inTrendAvailable = "1".equals(v);
+                else if ("outtrendok".equals(k)) d.outTrendAvailable = "1".equals(v);
+                else if ("returnsok".equals(k)) d.returnsAvailable = "1".equals(v);
+                else if ("returnsprevok".equals(k)) d.returnsPreviousAvailable = "1".equals(v);
+                else if (k.matches("buytrend[0-6]")) { d.buyDaily.add(rowFrom(v)); any = true; }
+                else if (k.matches("intrend[0-6]")) { d.inDaily.add(rowFrom(v)); any = true; }
+                else if (k.matches("outtrend[0-6]")) { d.outDaily.add(rowFrom(v)); any = true; }
+                else if (k.matches("ret[0-9]|ret1[0-9]")) { d.returns.add(rowFrom(v)); any = true; }
+                else if (k.matches("retprev[0-9]|retprev1[0-9]")) { d.returnsPrevious.add(rowFrom(v)); any = true; }
                 else if ("trendok".equals(k)) d.salesTrendAvailable = "1".equals(v);
                 else if ("trendfrom".equals(k)) d.salesHistoryFrom = Jalali.disp(unesc(v));
                 else if ("stockok".equals(k)) d.stockAlertsAvailable = "1".equals(v);
@@ -1311,12 +1369,15 @@ public class HomeScreen extends Screen {
             content.addView(salesHero(d, syncState), a.kit.lp(-1, -2));
             content.addView(a.kit.gap(10));
         }
+        LinearLayout kpiSection = a.kit.v();
+        secKpis(kpiSection, d);
+        if (kpiSection.getChildCount() > 0) content.addView(kpiSection, a.kit.lp(-1, -2));
 
         // The former "dashboard details" accordion is gone. Operational and analytical
         // sections now have a clear, compact hierarchy and remain directly discoverable.
         for (String key : orderedKeys()) {
-            if ("sales_insight".equals(key) || "kpis".equals(key))
-                continue; // The sales Hero owns all sales figures; KPI strip is rebuilt in its dedicated section.
+            if ("sales_insight".equals(key) || "kpis".equals(key) || "returns".equals(key))
+                continue; // Sales lives in the Hero; returns are part of the KPI strip above.
             LinearLayout block = a.kit.v();
             renderHomeSection(block, d, key);
             if (block.getChildCount() == 0) continue;
@@ -1425,86 +1486,174 @@ public class HomeScreen extends Screen {
     }
 
     private void secKpis(LinearLayout content, Data d) {
+        final String today = snapshotDay(d);
+        List<Kit.Kpi> tiles = new ArrayList<>();
+
+        if (RoleStore.allowed(a, "buy")) {
+            boolean available = d.buyDay != null;
+            double amount = available ? d.buyDay.d("total") : 0;
+            Double previous = d.buyTrendAvailable
+                    ? dailyAmount(d.buyDaily, Jalali.addDays(today, -1)) : null;
+            tiles.add(homeKpi("خرید", amount, available ? d.buyDay.l("docs") : 0,
+                    "فاکتور " + snapshotLabel(d), available, previous,
+                    kpiSpark(d.buyDaily, today, d.buyTrendAvailable),
+                    Theme.SECTION_PURCHASE, R.drawable.mi_shopping_cart, true, false,
+                    () -> a.nav("buy")));
+        }
+        if (RoleStore.allowed(a, "dar_in")) {
+            boolean available = d.inDay != null;
+            double amount = available ? d.inDay.d("total") : 0;
+            Double previous = d.inTrendAvailable
+                    ? dailyAmount(d.inDaily, Jalali.addDays(today, -1)) : null;
+            tiles.add(homeKpi("دریافت", amount, available ? d.inDay.l("count") : 0,
+                    "قبض " + snapshotLabel(d), available, previous,
+                    kpiSpark(d.inDaily, today, d.inTrendAvailable),
+                    Theme.SECTION_RECEIVE, R.drawable.mi_receipt_long, true, false,
+                    () -> a.nav("dar_in")));
+        }
+        if (RoleStore.allowed(a, "dar_out")) {
+            boolean available = d.outDay != null;
+            double amount = available ? d.outDay.d("total") : 0;
+            Double previous = d.outTrendAvailable
+                    ? dailyAmount(d.outDaily, Jalali.addDays(today, -1)) : null;
+            tiles.add(homeKpi("پرداخت", amount, available ? d.outDay.l("count") : 0,
+                    "قبض " + snapshotLabel(d), available, previous,
+                    kpiSpark(d.outDaily, today, d.outTrendAvailable),
+                    Theme.SECTION_PAY, R.drawable.mi_payments, false, false,
+                    () -> a.nav("dar_out")));
+        }
+        if (RoleStore.allowed(a, "sales") || RoleStore.allowed(a, "reports")) {
+            double amount = sumField(d.returns, "total");
+            long documents = sumLongField(d.returns, "docs");
+            boolean available = d.returnsAvailable;
+            Double previous = d.returnsPreviousAvailable
+                    ? sumField(d.returnsPrevious, "total") : null;
+            double[] spark = available && d.returnsPreviousAvailable
+                    ? new double[]{sumField(d.returnsPrevious, "total"), amount} : null;
+            View.OnClickListener open = navAction(RoleStore.allowed(a, "reports") ? "reports" : "sales");
+            tiles.add(homeKpi("برگشتی", amount, documents, "سند در ۳۰ روز", available,
+                    previous, spark, Theme.SECTION_RETURNS, R.drawable.mi_assignment_return,
+                    false, true, open == null ? null : () -> open.onClick(null)));
+        }
+
+        if (tiles.isEmpty()) return;
         LinearLayout card = a.kit.card(Theme.GOLD);
-        // Every daily KPI uses the same explicit HomeRange.today() date; do not label
-        // one metric with its own latest-transaction day while comparing another date.
-        String kpiDay = dayOf(d.salesDay != null ? d.salesDay : d.inDay);
-        card.addView(dashboardSectionHead(kpiDay.isEmpty() ? "گردش روز" : "گردش " + kpiDay,
-                R.drawable.mi_account_balance_wallet,
-                Theme.GOLD, "فروش ›", navAction("sales")), a.kit.lp(-1, -2));
-        card.addView(a.kit.text(isSalesManager()
-                        ? "فروش امروز تا پایان شب ناقص است؛ لمس شاخص، ریز همان روز را باز می‌کند."
-                        : "چهار شاخص مالی امروز؛ فروش روز جاری تا ساعت ۲۴ کامل نمی‌شود.",
-                10.5f, Theme.MUTED, false), a.kit.lp(-1, -2));
-        card.addView(a.kit.gap(8));
+        card.addView(a.kit.sectionHeader("شاخص‌های مالی", R.drawable.mi_account_balance_wallet,
+                Theme.GOLD, null, null), a.kit.lp(-1, -2));
+        TextView subtitle = a.kit.text("خرید، دریافت و پرداخت " + snapshotLabel(d) + " · برگشتی در ۳۰ روز اخیر",
+                9.5f, Theme.MUTED, false);
+        subtitle.setSingleLine(true);
+        subtitle.setEllipsize(TextUtils.TruncateAt.END);
+        card.addView(subtitle, a.kit.lp(-1, -2));
+        card.addView(a.kit.gap(6));
 
-        // The board reads خرید، فروش، پرداخت، دریافت - the order of the reference.
-        // Tiles whose target screen the current role cannot open are not shown at all:
-        // each person sees exactly their own items (the tap opens that day of the target).
-        java.util.List<Kit.Kpi> tiles = new java.util.ArrayList<>();
-        String[] tileTargets = {"buy", "sales", "dar_out", "dar_in"};
-        String[] tileTitles = {"خرید", "فروش", "پرداخت", "دریافت"};
-        Row[] tileRows = {d.buyDay, d.salesDay, d.outDay, d.inDay};
-        String[] tileCountKeys = {"docs", "docs", "count", "count"};
-        String[] tileCountLabels = {"فاکتور", "فاکتور", "قبض", "قبض"};
-        int[] icons = {R.drawable.mi_shopping_cart, R.drawable.mi_point_of_sale,
-                R.drawable.mi_payments, R.drawable.mi_receipt_long};
-        int[] tileAccents = {Theme.SECTION_PURCHASE, Theme.SECTION_SALES,
-                Theme.SECTION_PAY, Theme.SECTION_RECEIVE};
-        for (int i = 0; i < tileTargets.length; i++) {
-            if (isSalesManager() && !"sales".equals(tileTargets[i])) continue;
-            if (!RoleStore.allowed(a, tileTargets[i])) continue;
-            Kit.Kpi kpi = dayKpi(tileTitles[i], tileTargets[i], tileRows[i],
-                    tileCountKeys[i], tileCountLabels[i], tileAccents[i]);
-            kpi.icon = icons[i];
-            kpi.emeraldIcon = true;
-            // Document counts are informational; an in-progress day is not a success state.
-            kpi.subColor = Theme.MUTED;
-            tiles.add(kpi);
+        HorizontalScrollView scroll = new HorizontalScrollView(a);
+        scroll.setHorizontalScrollBarEnabled(false);
+        scroll.setHorizontalFadingEdgeEnabled(true);
+        scroll.setFadingEdgeLength(Theme.dp(18));
+        scroll.setClipToPadding(false);
+        scroll.setFillViewport(false);
+        scroll.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        LinearLayout strip = a.kit.h();
+        strip.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        strip.setGravity(Gravity.CENTER_VERTICAL);
+        strip.setPadding(Theme.dp(2), Theme.dp(2), Theme.dp(2), Theme.dp(2));
+        int tileWidth = ir.meelano.manager.ui.Ui.widthDp(a) >= 600 ? 168 : 148;
+        for (int i = 0; i < tiles.size(); i++) {
+            View tile = a.kit.kpiTile(tiles.get(i));
+            LinearLayout.LayoutParams p = a.kit.lp(Theme.dp(tileWidth), -2);
+            if (i < tiles.size() - 1) p.setMarginEnd(Theme.dp(8));
+            strip.addView(tile, p);
         }
-        if (!tiles.isEmpty()) card.addView(a.kit.kpiGrid(tiles, 2), a.kit.lp(-1, -2));
+        scroll.addView(strip, new HorizontalScrollView.LayoutParams(-2, -2));
+        scroll.setContentDescription("شاخص‌های مالی؛ برای دیدن همهٔ شاخص‌ها افقی بکشید");
+        card.addView(scroll, a.kit.lp(-1, -2));
         a.kit.addCard(content, card);
+    }
 
-        // The comparison card: the day against the recent days, as compact tiles.
-        if (d.salesSnapshot != null && d.salesSnapshot.isAvailable()) {
-            String compareDay = snapshotDay(d);
-            boolean running = compareDay.equals(Jalali.todayStr());
-            int elapsedMinute = running ? currentMinuteOfDay() : SalesComparison.MINUTES_PER_DAY;
-            SalesComparison.DayResult dayComparison = SalesComparison.evaluate(d.salesSnapshot, compareDay,
-                    elapsedMinute, SalesComparison.DEFAULT_COMPARABLE_WEEKS);
-            double todaySales = dayComparison.actualRials;
-            HomeRange yesterdayRange = HomeRange.yesterday(compareDay);
-            HomeRange last7Range = HomeRange.last7Days(compareDay);
-            double yesterday = salesOnDay(d, yesterdayRange.to);
-            double last7Sales = d.salesSnapshot.salesRialsBetween(last7Range.from, last7Range.to);
-            double avg30 = averageSalesBefore(d, compareDay, 30);
-            String weekday = Jalali.weekday(compareDay);
-            LinearLayout compare = a.kit.card(Theme.SECTION_SALES);
-            compare.addView(boardHead("فروش " + snapshotLabel(d) + " در مقایسه",
-                    "میانگین و مقایسه با روزهای قبل", R.drawable.mi_bar_chart,
-                    navChip("گزارش فروش", "sales")), a.kit.lp(-1, -2));
-            List<Mini> cmp = new ArrayList<>();
-            String todayNote = running ? partialTodayNote()
-                    : (dayComparison.hasBaseline() ? "مقایسهٔ روز کامل" : "بدون مبنای هم‌روز");
-            cmp.add(new Mini(R.drawable.mi_point_of_sale, snapshotLabel(d),
-                    HomeNumberFormatter.compactMoney(todaySales), todayNote, Theme.TEXT));
-            cmp.add(new Mini(R.drawable.mi_calendar_month, "دیروز", HomeNumberFormatter.compactMoney(yesterday), null, Theme.TEXT));
-            cmp.add(new Mini(R.drawable.mi_bar_chart, "فروش ۷ روز اخیر", HomeNumberFormatter.compactMoney(last7Sales),
-                    running ? "روز جاری ناقص است" : null, Theme.TEXT));
-            cmp.add(new Mini(R.drawable.mi_bar_chart, "میانگین ۳۰ روز", HomeNumberFormatter.compactMoney(avg30), null, Theme.TEXT));
-            cmp.add(new Mini(R.drawable.mi_calendar_month, "میانگین ۴ " + weekday + " گذشته",
-                    HomeNumberFormatter.compactMoney(dayComparison.sameWeekdayAverageRials), "روزهای هم‌هفته", Theme.TEXT));
-            if (dayComparison.projectionAvailable) {
-                String forecastNote = dayComparison.hasBaseline()
-                        ? "در برابر " + weekday + "ها: " + HomeNumberFormatter.signedPercent(dayComparison.changePercent())
-                        : "مبنای هم‌روز کافی نیست";
-                if (running) forecastNote = "برآورد ناقص · " + forecastNote;
-                cmp.add(new Mini(R.drawable.mi_trending_up, "پیش‌بینی پایان روز",
-                        HomeNumberFormatter.compactMoney(dayComparison.projectedRials), forecastNote, Theme.TEXT));
+    private Kit.Kpi homeKpi(String label, double amountRials, long documents, String countLabel,
+                            boolean available, Double previousRials, double[] spark, int accent,
+                            int icon, boolean increaseIsGood, boolean returnsMetric, Runnable action) {
+        String amount = available
+                ? HomeNumberFormatter.compactUnit(ir.meelano.manager.core.Money.toUnit(amountRials)) : "—";
+        String unit = available ? ir.meelano.manager.core.Money.unitName() : "";
+        String detail = available ? HomeNumberFormatter.integer(documents) + " " + countLabel
+                : "داده در دسترس نیست";
+        String sub;
+        String comparisonBasis = returnsMetric ? " · نسبت به ۳۰ روز قبل" : " · نسبت به روز قبل";
+        int subTone = Theme.MUTED;
+        boolean neutralReturn = returnsMetric && available && documents == 0;
+        if (!available) {
+            sub = "گزارش در دسترس نیست";
+        } else if (neutralReturn) {
+            sub = "✓ بدون برگشتی";
+        } else if (previousRials != null) {
+            double previous = previousRials;
+            if (previous > 0) {
+                double change = (amountRials - previous) * 100d / previous;
+                int direction = Math.abs(change) < 0.05d ? 0 : change > 0 ? 1 : -1;
+                if (direction == 0) sub = "۰٪" + comparisonBasis;
+                else {
+                    sub = HomeNumberFormatter.signedPercent(change) + comparisonBasis;
+                    boolean favorable = (direction > 0) == increaseIsGood;
+                    subTone = favorable ? Theme.SUCCESS : Theme.DANGER;
+                }
+            } else if (amountRials > 0) {
+                sub = "▲ شروع از صفر" + comparisonBasis;
+                subTone = increaseIsGood ? Theme.SUCCESS : Theme.DANGER;
+            } else {
+                sub = "۰٪" + comparisonBasis;
             }
-            compare.addView(miniGrid(cmp, 2, Theme.SECTION_SALES), a.kit.lp(-1, -2));
-            a.kit.addCard(content, compare);
+        } else {
+            sub = "مبنای مقایسه کافی نیست";
         }
+        Kit.Kpi tile = new Kit.Kpi(label,
+                available ? ir.meelano.manager.core.Money.toUnit(amountRials) : Double.NaN,
+                amount + (unit.isEmpty() ? "" : " " + unit), sub, accent, action);
+        tile.fullValue = available ? HomeNumberFormatter.money(amountRials) : "داده در دسترس نیست";
+        tile.detail = detail;
+        tile.neutralStatus = neutralReturn;
+        tile.icon = icon;
+        tile.spark = spark;
+        tile.sparkDescription = returnsMetric ? "مقایسهٔ دو بازهٔ ۳۰روزهٔ اسناد برگشتی"
+                : "روند هفت‌روزهٔ " + label;
+        tile.subColor = subTone;
+        return tile;
+    }
+
+    private double[] kpiSpark(List<Row> rows, String end, boolean available) {
+        if (!available || rows == null) return null;
+        double[] values = new double[7];
+        for (int i = 0; i < values.length; i++)
+            values[i] = dailyAmount(rows, Jalali.addDays(end, i - values.length + 1));
+        return values;
+    }
+
+    private static double dailyAmount(List<Row> rows, String date) {
+        if (rows == null || date == null || date.isEmpty()) return 0;
+        double amount = 0;
+        String target = Jalali.disp(date);
+        for (Row row : rows) {
+            if (row == null) continue;
+            String rowDate = Jalali.disp(row.s("day"));
+            if (rowDate.isEmpty()) rowDate = Jalali.disp(row.s("d"));
+            if (target.equals(rowDate)) amount += row.d("total");
+        }
+        return amount;
+    }
+
+    private static double sumField(List<Row> rows, String field) {
+        if (rows == null) return 0;
+        double total = 0;
+        for (Row row : rows) if (row != null) total += row.d(field);
+        return total;
+    }
+
+    private static long sumLongField(List<Row> rows, String field) {
+        if (rows == null) return 0;
+        long total = 0;
+        for (Row row : rows) if (row != null) total += row.l(field);
+        return total;
     }
 
     /** Select a stable jewel hue by section; outcome colors stay reserved for deltas only. */

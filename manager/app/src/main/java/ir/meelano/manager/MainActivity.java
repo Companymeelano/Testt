@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.os.Bundle;
+import android.text.TextPaint;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.LinearLayout;
@@ -677,7 +678,9 @@ public class MainActivity extends Activity {
         // The name of the signed-in account is worth more room than the day counter, but the
         // whole status line has to stay inside the room that is left of the brand mark.
         userChip.setMaxWidth(Theme.dp(Math.max(96, Math.min(160, nameRoomDp - 134))));
-        userChip.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        // The account name is shortened by grapheme and measured width below; TextView's
+        // code-unit ellipsizer can otherwise split a combining or ZWJ sequence.
+        userChip.setEllipsize(null);
         Theme.pressable(userChip);
         userChip.setOnClickListener(v -> userMenu());
         status.addView(userChip, kit.lp(-2, -2));
@@ -1804,11 +1807,14 @@ public class MainActivity extends Activity {
     }
 
     /**
-     * Reject empty placeholders and JDBC's Unicode replacement marker. A damaged display name
-     * falls back to the account name/role label; the persisted Atiran value is never rewritten.
+     * The header iconizer maps «◆» to a diamond vector, so a damaged name containing a valid
+     * letter plus «◆?» could pass the old any-letter check and appear as an icon/question mark.
+     * Reject the whole display value and fall back to the account/role label; never rewrite the
+     * persisted Atiran name or username.
      */
     private static String cleanName(String s) {
-        return PersianText.isUsablePersonName(s) ? s.trim() : "";
+        if (!PersianText.isUsablePersonName(s)) return "";
+        return PersianText.cleanDisplayLabel(s).trim();
     }
 
     private String displayName() {
@@ -1816,6 +1822,29 @@ public class MainActivity extends Activity {
         if (nm.isEmpty()) nm = cleanName(AtiranAuth.sessionUser(this));
         if (nm.isEmpty()) nm = cleanName(RoleStore.faName(AtiranAuth.sessionRole(this)));
         return nm;
+    }
+
+    /** Fit the short header chip without cutting a combining sequence, emoji or Persian joiner. */
+    private String fitUserChipName(String fullName, float chipWidth) {
+        if (userChip == null || fullName == null || fullName.isEmpty()) return "";
+        TextPaint paint = userChip.getPaint();
+        if (chipWidth <= 0) chipWidth = userChip.getMaxWidth();
+        float available = chipWidth - userChip.getPaddingLeft() - userChip.getPaddingRight();
+        // MeelanoIcons renders the leading person glyph as a 1.22-em replacement span.
+        available -= paint.getTextSize() * 1.22f + paint.measureText(" ");
+        available = Math.max(0f, available);
+        if (paint.measureText(fullName) <= available) return fullName;
+
+        String best = "…";
+        int clusters = PersianText.graphemeCount(fullName);
+        for (int count = 1; count <= clusters; count++) {
+            int end = PersianText.graphemeBoundary(fullName, count);
+            if (end <= 0) continue;
+            String candidate = fullName.substring(0, end).trim() + "…";
+            if (paint.measureText(candidate) <= available) best = candidate;
+            else break;
+        }
+        return best;
     }
 
     public void refreshUserChip() {
@@ -1827,10 +1856,21 @@ public class MainActivity extends Activity {
                 } else {
                     userChip.setVisibility(View.VISIBLE);
                     String fullName = displayName();
-                    ir.meelano.manager.ui.MeelanoIcons.set(userChip, "\uD83D\uDC64 " + fullName);
+                    userChip.setTypeface(Theme.faceForText(fullName, true));
+                    ir.meelano.manager.ui.MeelanoIcons.set(userChip,
+                            "\uD83D\uDC64 " + fitUserChipName(fullName, userChip.getMaxWidth()));
                     userChip.setTextDirection(View.TEXT_DIRECTION_RTL);
                     userChip.setContentDescription("کاربر، " + fullName + "؛ لمس برای اطلاعات حساب");
                     if (android.os.Build.VERSION.SDK_INT >= 26) userChip.setTooltipText(fullName);
+                    // Use the measured width too: the header column may be narrower than maxWidth.
+                    userChip.post(() -> {
+                        if (userChip == null || userChip.getVisibility() != View.VISIBLE
+                                || !AtiranAuth.hasSession(this) || !fullName.equals(displayName())) return;
+                        String fitted = fitUserChipName(fullName, userChip.getWidth());
+                        String label = "\uD83D\uDC64 " + fitted;
+                        if (!label.contentEquals(userChip.getText()))
+                            ir.meelano.manager.ui.MeelanoIcons.set(userChip, label);
+                    });
                 }
             }
             if (compactUserAction != null) {

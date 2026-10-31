@@ -4,6 +4,7 @@ import ir.meelano.manager.R;
 import ir.meelano.manager.core.Diag;
 import android.content.Context;
 import android.graphics.Color;
+import android.graphics.Paint;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.view.View;
@@ -288,8 +289,10 @@ public final class Theme {
             regular = Typeface.createFromAsset(c.getAssets(), "fonts/Vazirmatn-Regular.ttf");
             bold = Typeface.createFromAsset(c.getAssets(), "fonts/Vazirmatn-Bold.ttf");
         } catch (Exception ignored) {
-            regular = Typeface.DEFAULT;
-            bold = Typeface.DEFAULT_BOLD;
+            // The platform sans family has a broader Arabic/Persian fallback chain than
+            // Typeface.DEFAULT on OEM builds where the bundled Vazirmatn asset is missing.
+            regular = systemTypeface(false);
+            bold = systemTypeface(true);
         }
         apply(c);
     }
@@ -386,8 +389,40 @@ public final class Theme {
     }
 
     public static Typeface face(boolean isBold) {
-        if (isBold) return bold == null ? Typeface.DEFAULT_BOLD : bold;
-        return regular == null ? Typeface.DEFAULT : regular;
+        if (isBold) return bold == null ? systemTypeface(true) : bold;
+        return regular == null ? systemTypeface(false) : regular;
+    }
+
+    /** Use the bundled face when it covers the name; otherwise let Android's sans fallback draw it. */
+    public static Typeface faceForText(String text, boolean isBold) {
+        Typeface preferred = face(isBold);
+        if (text == null || text.isEmpty()) return preferred;
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= 23) {
+                Paint probe = new Paint();
+                probe.setTypeface(preferred);
+                // Check code points separately: a Persian word is several glyphs shaped as
+                // a run, so Paint.hasGlyph("علی") is not a valid whole-name coverage test.
+                for (int i = 0; i < text.length();) {
+                    int cp = text.codePointAt(i);
+                    i += Character.charCount(cp);
+                    if (Character.isWhitespace(cp) || Character.isSpaceChar(cp)
+                            || Character.getType(cp) == Character.FORMAT) continue;
+                    if (!probe.hasGlyph(new String(Character.toChars(cp)))) return systemTypeface(isBold);
+                }
+            }
+        } catch (Exception ignored) {
+            return systemTypeface(isBold);
+        }
+        return preferred;
+    }
+
+    private static Typeface systemTypeface(boolean isBold) {
+        try {
+            Typeface system = Typeface.create("sans-serif", isBold ? Typeface.BOLD : Typeface.NORMAL);
+            if (system != null) return system;
+        } catch (Exception ignored) { Diag.ignored("Theme:face", ignored); }
+        return isBold ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT;
     }
 
     public static int alpha(int color, int a) {

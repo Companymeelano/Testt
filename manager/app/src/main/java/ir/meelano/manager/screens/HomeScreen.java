@@ -23,6 +23,7 @@ import ir.meelano.manager.core.AtiranAuth;
 import ir.meelano.manager.core.AtiranSchema;
 import ir.meelano.manager.core.Filter;
 import ir.meelano.manager.core.FollowUps;
+import ir.meelano.manager.core.HomeRange;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.Money;
@@ -477,15 +478,10 @@ public class HomeScreen extends Screen {
         return d;
     }
 
-    /** Daily window: the last 30 days — or earlier, so the previous month is complete. */
+    /** History includes the full previous month plus the current Jalali month-to-date. */
     private static String chartsFrom(String to) {
-        String base = Jalali.addDays(to, -30);
-        try {
-            int dom = Integer.parseInt(to.split("/")[2].trim());
-            String prevStart = Jalali.addDays(to, -(dom - 1 + 30));
-            if (prevStart != null && !prevStart.isEmpty() && prevStart.compareTo(base) < 0) return prevStart;
-        } catch (Exception ignored) { Diag.ignored("HomeScreen:chartsFrom", ignored); }
-        return base;
+        String start = HomeRange.salesHistoryStart(to);
+        return start == null || start.isEmpty() ? Jalali.addDays(to, -13) : start;
     }
 
     /** Build every Home sales figure and month bucket from the one read-only daily snapshot. */
@@ -673,6 +669,12 @@ public class HomeScreen extends Screen {
         String day = d == null ? "" : Jalali.disp(d.snapshotDay);
         if (day.isEmpty()) return "آخرین داده";
         return day.equals(Jalali.todayStr()) ? "امروز" : "روز " + Jalali.shortLabel(day);
+    }
+
+    private String monthLabel(String monthStart) {
+        String day = Jalali.disp(monthStart);
+        if (day.isEmpty()) return "ماه نامشخص";
+        return Jalali.monthName(day) + " " + Money.fa(day.substring(0, 4));
     }
 
     /** Depth layer behind the hero: two gold light sources, a glossy top sheen, a thin ring and a rim highlight. */
@@ -1750,7 +1752,7 @@ public class HomeScreen extends Screen {
     private void secSalesInsight(LinearLayout content, Data d) {
         boolean hasDaily = d.salesSnapshot != null && d.salesSnapshot.isAvailable();
         boolean hasProducts = d.topItems != null && !d.topItems.isEmpty();
-        boolean hasMonths = d.monthlySales != null && !d.monthlySales.isEmpty();
+        boolean hasMonths = hasDaily;
         if (!hasDaily && !hasProducts && !hasMonths) return;
 
         if (hasDaily) {
@@ -1812,44 +1814,42 @@ public class HomeScreen extends Screen {
                 }
             }
             if (hasMonths) {
-                Row current = d.monthlySales.get(0);
-                Row previous = d.monthlySales.size() > 1 ? d.monthlySales.get(1) : null;
-                String currentMonth = current.s("month");
-                String previousMonth = previous == null ? null : previous.s("month");
-                if (currentMonth != null || previous != null) {
-                    if (hasProducts) card.addView(a.kit.gap(7));
-                    card.addView(insightSubhead("مقایسهٔ ماهانه", R.drawable.mi_sell, Theme.GOLD),
-                            a.kit.lp(-1, -2));
-                    String curKey = currentMonth == null ? "" : currentMonth.replace('-', '/');
-                    String prevKey = previousMonth == null ? "" : previousMonth.replace('-', '/');
-                    boolean running = curKey.equals(Jalali.todayStr().substring(0, 7));
-                    LinearLayout months = a.kit.h();
-                    months.addView(insightMetric((curKey.isEmpty() ? "ماه جاری" : curKey) + (running ? " • تا امروز" : ""),
-                            Money.compactRial(current.d("total")), Theme.GOLD), a.kit.wlp(1f));
-                    if (previous != null) {
-                        months.addView(a.kit.space(7));
-                        months.addView(insightMetric(prevKey.isEmpty() ? "ماه قبل" : prevKey,
-                                Money.compactRial(previous.d("total")), Theme.INFO), a.kit.wlp(1f));
-                    }
-                    card.addView(months, a.kit.lp(-1, -2));
-                    if (previous != null && previous.d("total") > 0) {
-                        // A month still running is judged against the SAME days of the
-                        // previous month — never against its full, unfair total.
-                        double prevBase = previous.d("total");
-                        String basis = "ماه قبل";
-                        if (running) {
-                            try {
-                                int dom = Integer.parseInt(Jalali.todayStr().split("/")[2].trim());
-                                double same = d.salesSnapshot == null ? 0 : d.salesSnapshot.monthToDateRials(prevKey, dom);
-                                if (same > 0) { prevBase = same; basis = "همین بازه از ماه قبل"; }
-                            } catch (Exception ignored) { Diag.ignored("HomeScreen:monthCompare", ignored); }
-                        }
-                        double change = (current.d("total") - prevBase) * 100.0 / prevBase;
-                        int color = current.d("total") >= prevBase ? Theme.SUCCESS : Theme.WARNING;
-                        card.addView(a.kit.text("تغییر نسبت به " + basis + ": " + Money.pct(change),
-                                10f, color, true), a.kit.lp(-1, -2));
-                    }
+                String today = Jalali.todayStr();
+                HomeRange currentRange = HomeRange.monthToDate(today);
+                HomeRange previousRange = HomeRange.previousMonthSamePeriod(today);
+                double currentMtd = d.salesSnapshot.salesRialsBetween(currentRange.from, currentRange.to);
+                double previousComparable = d.salesSnapshot.salesRialsBetween(previousRange.from, previousRange.to);
+                int elapsed = HomeRange.dayOfMonth(today);
+                int monthDays = HomeRange.daysInMonth(today);
+                double forecast = HomeRange.projectMonthEnd(currentMtd, today);
+                String currentLabel = monthLabel(currentRange.from) + " • روز ۱ تا " + Money.fa(String.valueOf(elapsed));
+                String previousLabel = monthLabel(previousRange.from) + " • هم‌بازه";
+
+                if (hasProducts) card.addView(a.kit.gap(7));
+                card.addView(insightSubhead("مقایسهٔ ماهانه", R.drawable.mi_sell, Theme.GOLD),
+                        a.kit.lp(-1, -2));
+                LinearLayout months = a.kit.h();
+                months.addView(insightMetric(currentLabel, Money.compactRial(currentMtd), Theme.GOLD),
+                        a.kit.wlp(1f));
+                months.addView(a.kit.space(7));
+                months.addView(insightMetric(previousLabel, Money.compactRial(previousComparable), Theme.INFO),
+                        a.kit.wlp(1f));
+                card.addView(months, a.kit.lp(-1, -2));
+
+                if (previousComparable > 0) {
+                    double change = (currentMtd - previousComparable) * 100.0 / previousComparable;
+                    int color = currentMtd >= previousComparable ? Theme.SUCCESS : Theme.WARNING;
+                    card.addView(a.kit.text("تغییر هم‌بازه: " + Money.pct(change),
+                            10f, color, true), a.kit.lp(-1, -2));
+                } else {
+                    card.addView(a.kit.text("برای این مقایسه، فروش هم‌بازه‌ای در ماه قبل ثبت نشده است.",
+                            10f, Theme.MUTED, false), a.kit.lp(-1, -2));
                 }
+
+                String forecastText = "پیش‌بینی پایان " + monthLabel(currentRange.from) + " بر پایهٔ "
+                        + Money.fa(String.valueOf(elapsed)) + " روز از " + Money.fa(String.valueOf(monthDays))
+                        + " روز تقویمی: " + Money.compactRial(forecast);
+                card.addView(a.kit.text(forecastText, 10f, Theme.INFO, true), a.kit.lp(-1, -2));
             }
             a.kit.addCard(content, card);
         }

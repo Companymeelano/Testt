@@ -1,0 +1,61 @@
+name: Home dashboard PR build
+
+on:
+  push:
+    branches:
+      - arena/e7d9f96e-testt
+    paths:
+      - "manager/app/**"
+      - "manager/gradle/**"
+      - "manager/build.gradle"
+      - "manager/settings.gradle"
+      - "manager/gradle.properties"
+      - ".github/workflows/home-dashboard-apk.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Test, lint, and package Manager debug APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Audit required manager columns against the Atiran sample schema
+        run: python3 tools/audit_manager_schema.py --manifest manager/app/src/test/resources/atiran/sample-schema.json
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: "17"
+          distribution: temurin
+
+      - name: Install Android SDK 35
+        run: |
+          SDKMAN="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMAN" --licenses > /dev/null || true
+          "$SDKMAN" "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+
+      - name: Set up Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.11.1
+
+      - name: Fetch pinned offline Persian voice engine
+        run: |
+          mkdir -p manager/app/libs
+          curl -fsSL -o manager/app/libs/sherpa-onnx-1.13.8.aar https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-1.13.8.aar
+          echo "633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96  manager/app/libs/sherpa-onnx-1.13.8.aar" | sha256sum -c -
+
+      - name: Run unit tests, lint, and build debug APK
+        working-directory: manager
+        run: gradle clean :app:testDebugUnitTest :app:lintDebug :app:assembleDebug --stacktrace --no-daemon
+
+      - name: Upload installable debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: meelano-manager-home-dashboard-${{ github.sha }}
+          path: manager/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30

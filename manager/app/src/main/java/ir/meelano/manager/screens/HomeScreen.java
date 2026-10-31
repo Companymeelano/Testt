@@ -958,15 +958,11 @@ public class HomeScreen extends Screen {
         return wrap;
     }
 
-    /** A compact luxury launchpad to the five high-frequency management destinations. */
-    /** Compact rates + store/device weather. Cached values show immediately while the refresh runs in background. */
-    /** Place shown with weather: a fresh permissioned device location, or the configured store-city fallback. */
+    /** Compact rates + optional device-location weather. Cached values show while refresh runs. */
     private String weatherPlace = "";
-    /** True only when the weather card uses a fresh device fix rather than the store fallback. */
+    /** True only when the user opted in and the weather card uses a device fix. */
     private boolean weatherFromDevice = false;
 
-    private static final String PLACE_KEY = "weather_place";
-    private static final String DEVICE_KEY = "weather_device";
     private LinearLayout marketView;
     private int marketViewGeneration = Integer.MIN_VALUE;
     private boolean marketRefreshInFlight;
@@ -986,10 +982,19 @@ public class HomeScreen extends Screen {
         final LinearLayout card = a.kit.card(Theme.GOLD);
         marketView = card;
         marketViewGeneration = gen;
-        // Show the last saved values and place straight away; the live refresh replaces them below.
-        String savedPlace = MarketWeather.cached(a, PLACE_KEY);
-        boolean savedFromDevice = "1".equals(MarketWeather.cached(a, DEVICE_KEY));
-        // Discard legacy city-fallback cache entries whose location was guessed by an older build.
+        // Device weather requires both an explicit in-app opt-in and Android permission.
+        boolean locationEnabled = MarketWeather.weatherLocationEnabled(a);
+        if (locationEnabled && !ir.meelano.manager.core.DeviceLocation.granted(a)) {
+            MarketWeather.setWeatherLocationEnabled(a, false);
+            locationEnabled = false;
+        }
+        if (!locationEnabled && (MarketWeather.cached(a, MarketWeather.weatherKey()) != null
+                || MarketWeather.weatherWasFromDevice(a) || MarketWeather.weatherPlace(a) != null)) {
+            // Erase location-derived cache left by an earlier version or a revoked permission.
+            MarketWeather.setWeatherLocationEnabled(a, false);
+        }
+        String savedPlace = locationEnabled ? MarketWeather.weatherPlace(a) : null;
+        boolean savedFromDevice = locationEnabled && MarketWeather.weatherWasFromDevice(a);
         String savedWeather = savedFromDevice && savedPlace != null && !savedPlace.isEmpty()
                 ? MarketWeather.cached(a, MarketWeather.weatherKey()) : null;
         weatherFromDevice = savedWeather != null;
@@ -998,9 +1003,12 @@ public class HomeScreen extends Screen {
         if (!beginMarketRefresh()) return card;
         new Thread(() -> {
             try {
-                // Position: fresh fix only; denied/unavailable falls back to the configured store city.
+                // Location and weather requests happen only after the user opts in.
                 android.location.Location loc = null;
-                try { loc = ir.meelano.manager.core.DeviceLocation.resolve(a, 6000); } catch (Exception e) { Diag.ignored("Home:location", e); }
+                if (MarketWeather.weatherLocationEnabled(a)) {
+                    try { loc = ir.meelano.manager.core.DeviceLocation.resolve(a, 6000); }
+                    catch (Exception e) { Diag.ignored("Home:location", e); }
+                }
                 final boolean fromDevice = loc != null;
                 final double lat = fromDevice ? loc.getLatitude() : 0d;
                 final double lon = fromDevice ? loc.getLongitude() : 0d;
@@ -1014,24 +1022,25 @@ public class HomeScreen extends Screen {
                     MarketWeather.parseRates(candidate); // never replace a known-good cache with malformed/stale JSON
                     rRaw = candidate;
                 } catch (Exception e) { Diag.ignored("Home:ratesFetch", e); }
-                // Without a fresh, permissioned fix we do not invent or transmit a city/coordinate.
-                if (fromDevice) try {
+                // A fresh permissioned fix is never inferred or transmitted without the app-level opt-in.
+                if (fromDevice && MarketWeather.weatherLocationEnabled(a)) try {
                     String candidate = MarketWeather.get(MarketWeather.weatherUrl(lat, lon));
                     MarketWeather.parseWeather(candidate);
                     wRaw = candidate;
                 } catch (Exception e) { Diag.ignored("Home:weatherFetch", e); }
                 final boolean rLive = rRaw != null;
-                final boolean wLive = wRaw != null;
                 if (rLive) MarketWeather.save(a, MarketWeather.ratesKey(), rRaw);
-                if (wLive) {
-                    MarketWeather.save(a, MarketWeather.weatherKey(), wRaw);
-                    MarketWeather.save(a, PLACE_KEY, place);
-                    MarketWeather.save(a, DEVICE_KEY, fromDevice ? "1" : "0");
+                if (MarketWeather.weatherLocationEnabled(a)
+                        && !ir.meelano.manager.core.DeviceLocation.granted(a)) {
+                    MarketWeather.setWeatherLocationEnabled(a, false);
                 }
+                boolean wLive = wRaw != null && MarketWeather.weatherLocationEnabled(a);
+                if (wLive) wLive = MarketWeather.saveWeather(a, wRaw, place);
+                final boolean weatherLive = wLive;
                 final String fr = rLive ? rRaw : MarketWeather.cached(a, MarketWeather.ratesKey());
-                final String fw = wLive ? wRaw : MarketWeather.cached(a, MarketWeather.weatherKey());
-                final String fp = wLive ? place : (MarketWeather.cached(a, PLACE_KEY) == null ? place : MarketWeather.cached(a, PLACE_KEY));
-                final boolean fd = wLive ? fromDevice : "1".equals(MarketWeather.cached(a, DEVICE_KEY));
+                final String fw = weatherLive ? wRaw : MarketWeather.cached(a, MarketWeather.weatherKey());
+                final String fp = weatherLive ? place : MarketWeather.weatherPlace(a);
+                final boolean fd = weatherLive || MarketWeather.weatherWasFromDevice(a);
                 a.runOnUiThread(() -> {
                     if (!"home".equals(a.currentScreenId())) return;
                     LinearLayout target = marketView;
@@ -1039,7 +1048,7 @@ public class HomeScreen extends Screen {
                     weatherPlace = fp;
                     weatherFromDevice = fd;
                     try {
-                        renderMarket(target, fr, fw, rLive, wLive);
+                        renderMarket(target, fr, fw, rLive, weatherLive);
                     } catch (RuntimeException renderError) {
                         Diag.warn("HomeScreen:marketRender", renderError);
                         ir.meelano.manager.core.CrashReporter.recordHandled(
@@ -1068,7 +1077,9 @@ public class HomeScreen extends Screen {
         card.removeAllViews();
         List<MarketWeather.Rate> rates = null;
         MarketWeather.Weather w = null;
-        try { if (rJson != null) rates = MarketWeather.parseRates(rJson); } catch (Exception e) { Diag.warn("Home:parseRates", e); }
+        try {
+            if (rJson != null) rates = MarketWeather.parseRates(rJson, MarketWeather.previousRates(a));
+        } catch (Exception e) { Diag.warn("Home:parseRates", e); }
         try { if (wJson != null) w = MarketWeather.parseWeather(wJson); } catch (Exception e) { Diag.warn("Home:parseWeather", e); }
 
         LinearLayout head = a.kit.h();
@@ -1155,31 +1166,55 @@ public class HomeScreen extends Screen {
             wr.addView(wc, a.kit.wlp(1f));
             card.addView(wr, a.kit.lp(-1, -2));
         } else {
-            String weatherHint = ir.meelano.manager.core.DeviceLocation.granted(a)
-                    ? "موقعیت تازه‌ای به‌دست نیامد؛ برای تلاش دوباره تازه‌سازی کنید. هیچ شهر ثابتی حدس زده نمی‌شود."
-                    : "برای نمایش آب‌وهوا در موقعیت خود، «استفاده از موقعیت من» را انتخاب کنید؛ تا آن زمان مختصات شما ارسال نمی‌شود.";
+            boolean locationEnabled = MarketWeather.weatherLocationEnabled(a);
+            boolean locationGranted = ir.meelano.manager.core.DeviceLocation.granted(a);
+            String weatherHint = !locationEnabled
+                    ? "آب‌وهوا بر اساس موقعیت خاموش است؛ برای فعال‌سازی، «استفاده از موقعیت من» را انتخاب کنید. تا آن زمان موقعیت شما ارسال نمی‌شود."
+                    : !locationGranted
+                    ? "مجوز موقعیت در دسترس نیست؛ بدون اجازهٔ شما هیچ موقعیتی ارسال نمی‌شود."
+                    : "موقعیت تازه‌ای به‌دست نیامد؛ برای تلاش دوباره تازه‌سازی کنید. موقعیت فقط برای دریافت آب‌وهوا استفاده می‌شود.";
             card.addView(a.kit.hint(weatherHint), a.kit.lp(-1, -2));
         }
 
-        if (!weatherFromDevice || !ir.meelano.manager.core.DeviceLocation.granted(a)) {
-            // Location is opt-in; the user can choose a device-based city whenever they want.
-            android.widget.Button loc = a.kit.btnGhost("📍 استفاده از موقعیت من", Theme.GOLD, v -> a.requestLocationAccess());
-            loc.setSingleLine(true);
-            loc.setTextSize(11f * Theme.fontScale());
-            loc.setPadding(Theme.dp(10), Theme.dp(4), Theme.dp(10), Theme.dp(4));
-            loc.setMinHeight(Theme.dp(48));
-            LinearLayout.LayoutParams lp = a.kit.lp(-2, -2);
-            lp.setMargins(0, Theme.dp(6), 0, 0);
-            lp.gravity = Gravity.END;
-            card.addView(loc, lp);
-        }
+        boolean locationEnabled = MarketWeather.weatherLocationEnabled(a);
+        boolean locationGranted = ir.meelano.manager.core.DeviceLocation.granted(a);
+        boolean removeLocation = locationEnabled && locationGranted;
+        android.widget.Button loc = a.kit.btnGhost(removeLocation
+                        ? "خاموش‌کردن موقعیت" : "📍 استفاده از موقعیت من",
+                Theme.GOLD, v -> {
+                    if (removeLocation) {
+                        MarketWeather.setWeatherLocationEnabled(a, false);
+                        weatherPlace = "";
+                        weatherFromDevice = false;
+                        a.nav("home");
+                    } else if (locationGranted) {
+                        MarketWeather.setWeatherLocationEnabled(a, true);
+                        a.nav("home");
+                    } else {
+                        a.requestLocationAccess();
+                    }
+                });
+        loc.setContentDescription(removeLocation
+                ? "خاموش‌کردن آب‌وهوا با موقعیت و حذف دادهٔ ذخیره‌شده؛ مجوز سیستم‌عامل را می‌توان در تنظیمات گوشی لغو کرد."
+                : "فعال‌کردن آب‌وهوا با موقعیت دستگاه؛ بدون اجازهٔ شما موقعیتی ارسال نمی‌شود.");
+        loc.setSingleLine(true);
+        loc.setTextSize(11f * Theme.fontScale());
+        loc.setPadding(Theme.dp(10), Theme.dp(4), Theme.dp(10), Theme.dp(4));
+        loc.setMinHeight(Theme.dp(48));
+        LinearLayout.LayoutParams lp = a.kit.lp(-2, -2);
+        lp.setMargins(0, Theme.dp(6), 0, 0);
+        lp.gravity = Gravity.END;
+        card.addView(loc, lp);
 
         String stamp = rates != null && !rates.isEmpty() ? rates.get(0).asOf : "";
         View rule = new View(a);
         rule.setBackgroundColor(Theme.alpha(Theme.GOLD, 48));
         card.addView(rule, a.kit.lp(-1, Theme.dp(1)));
         card.addView(a.kit.gap(6));
-        card.addView(a.kit.hint("منبع قیمت: TGJU · واحد: تومان\nزمان منبع: "
+        String changeBasis = rates != null && !rates.isEmpty() && rates.get(0).comparesWithPreviousFetch
+                ? "تغییر نسبت به دریافت قبلی" : "درصد تغییر اعلامی TGJU";
+        card.addView(a.kit.hint("منبع قیمت: TGJU · واحد: تومان · " + changeBasis
+                + "\nزمان منبع: "
                 + HomeNumberFormatter.localizeText(stamp == null || stamp.isEmpty() ? "نامشخص" : stamp)
                 + " · دریافت برنامه: " + marketFreshness(MarketWeather.ratesKey(), rLive)), a.kit.lp(-1, -2));
         localizeHomeNumbers(card);
@@ -1251,12 +1286,17 @@ public class HomeScreen extends Screen {
             cp.setMargins(0, Theme.dp(6), 0, 0);
             t.addView(ch, cp);
         }
+        String comparisonBasis = r.comparesWithPreviousFetch
+                ? "نسبت به دریافت قبلی" : "بر اساس تغییر اعلام‌شده توسط TGJU";
         String trendDescription = !hasPrice ? "قیمت در دسترس نیست"
-                : Math.abs(r.changePct) < 0.05 ? "بدون تغییر"
+                : Math.abs(r.changePct) < 0.05
+                ? "بدون تغییر " + comparisonBasis
                 : (r.changePct > 0 ? "افزایش " : "کاهش ")
-                + HomeNumberFormatter.decimal(Math.abs(r.changePct)) + " درصد";
+                + HomeNumberFormatter.decimal(Math.abs(r.changePct)) + " درصد " + comparisonBasis;
+        String previousPrice = r.comparesWithPreviousFetch
+                ? "؛ نرخ قبلی " + HomeNumberFormatter.rounded(r.previousToman) + " تومان" : "";
         t.setContentDescription(r.label + "، " + (hasPrice
-                ? HomeNumberFormatter.rounded(r.toman) + " تومان، " + trendDescription
+                ? HomeNumberFormatter.rounded(r.toman) + " تومان، " + trendDescription + previousPrice
                 : trendDescription));
         return t;
     }

@@ -18,9 +18,9 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Device position for the weather card. Uses the last known fix when it is recent, otherwise asks
- * the network provider once. Everything here degrades to "no location" (the caller then uses the configured
- * store-city fallback and labels it) when permission is missing, location is off, or no fix arrives in time.
+ * Optional device position for the weather card. Uses a recent last-known fix, otherwise asks
+ * the network provider once. Missing permission, disabled location, or a timeout yields no fix;
+ * the caller must not infer or send a fallback city.
  */
 public final class DeviceLocation {
     private DeviceLocation() { }

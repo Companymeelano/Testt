@@ -17,6 +17,7 @@ import ir.meelano.manager.core.AtiranPreflight;
 import ir.meelano.manager.core.Filter;
 import ir.meelano.manager.core.Finger;
 import ir.meelano.manager.core.LicenseStore;
+import ir.meelano.manager.core.MarketWeather;
 import ir.meelano.manager.core.UpdateCenter;
 import ir.meelano.manager.ui.WhatsNew;
 import ir.meelano.manager.core.RoleStore;
@@ -1614,7 +1615,10 @@ public class MainActivity extends Activity {
         boolean granted = grantResults != null && grantResults.length > 0
                 && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED;
         if (requestCode == LOC_PERM) {
-            // Location is optional: redraw the home card so weather follows the new permission at once.
+            // A grant records the user's opt-in; a denial removes any location-derived cache.
+            if (ir.meelano.manager.core.DeviceLocation.granted(this))
+                MarketWeather.setWeatherLocationEnabled(this, true);
+            else MarketWeather.setWeatherLocationEnabled(this, false);
             if ("home".equals(currentId)) renderCurrent();
             return;
         }

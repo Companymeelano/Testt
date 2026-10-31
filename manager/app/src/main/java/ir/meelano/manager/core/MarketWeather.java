@@ -12,10 +12,10 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 /**
- * Public market and weather data for the home card. No API key, no writes.
- * Rates: iran-market «popular.json» (TGJU quotes, IRT/toman; the provider reports its own timestamp/stale flag).
- * Weather: Open-Meteo current conditions only for a fresh, permissioned device fix; no city is guessed when permission is absent.
- * The last good response of each is cached so the card still shows values offline.
+ * Public market and weather data for the home card. No API key or writes to the store database.
+ * Rates: iran-market «popular.json» (TGJU quotes, IRT/toman); the previous valid quote is kept locally.
+ * Weather: Open-Meteo current conditions only after an in-app opt-in, Android permission, and a fresh device fix.
+ * The local weather cache and opt-in can be cleared from the Home card; no city is guessed or sent by default.
  */
 public final class MarketWeather {
     private MarketWeather() { }
@@ -33,7 +33,11 @@ public final class MarketWeather {
 
     private static final String PREFS = "market_cache_v1";
     private static final String KEY_RATES = "rates";
+    private static final String KEY_PREVIOUS_RATES = "rates_previous";
     private static final String KEY_WEATHER = "weather";
+    private static final String KEY_WEATHER_LOCATION_ENABLED = "weather_location_enabled";
+    private static final String KEY_WEATHER_PLACE = "weather_place";
+    private static final String KEY_WEATHER_DEVICE = "weather_device";
 
     /** One displayed price: Persian label, toman price, change percent, Jalali timestamp. */
     public static final class Rate {
@@ -41,12 +45,21 @@ public final class MarketWeather {
         public final long toman;
         public final double changePct;
         public final String asOf;
+        public final long previousToman;
+        public final boolean comparesWithPreviousFetch;
 
         Rate(String label, long toman, double changePct, String asOf) {
+            this(label, toman, changePct, asOf, 0L, false);
+        }
+
+        Rate(String label, long toman, double changePct, String asOf,
+             long previousToman, boolean comparesWithPreviousFetch) {
             this.label = label;
             this.toman = toman;
             this.changePct = changePct;
             this.asOf = asOf;
+            this.previousToman = previousToman;
+            this.comparesWithPreviousFetch = comparesWithPreviousFetch;
         }
     }
 
@@ -135,6 +148,26 @@ public final class MarketWeather {
         return out;
     }
 
+    /** Compare valid fresh quotes with the previous app fetch, falling back to source change_pct. */
+    public static List<Rate> parseRates(String json, String previousJson) throws Exception {
+        List<Rate> current = parseRates(json);
+        if (previousJson == null || previousJson.trim().isEmpty()) return current;
+        final List<Rate> previous;
+        try {
+            previous = parseRates(previousJson);
+        } catch (Exception invalidPrevious) {
+            return current;
+        }
+        List<Rate> compared = new ArrayList<>(current.size());
+        for (int i = 0; i < current.size(); i++) {
+            Rate now = current.get(i);
+            Rate old = previous.get(i); // Both parsers enforce the same three-symbol order.
+            double pct = ((double) now.toman - (double) old.toman) * 100.0 / old.toman;
+            compared.add(new Rate(now.label, now.toman, pct, now.asOf, old.toman, true));
+        }
+        return compared;
+    }
+
     public static Weather parseWeather(String json) throws Exception {
         JSONObject cur = new JSONObject(json).getJSONObject("current");
         double temp = cur.getDouble("temperature_2m");
@@ -174,10 +207,69 @@ public final class MarketWeather {
     // ------------------------------------------------------------------ cache
 
     public static void save(Context c, String key, String raw) {
-        c.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-                .putString(key, raw)
-                .putLong(key + "_saved_at", System.currentTimeMillis())
-                .apply();
+        synchronized (MarketWeather.class) {
+            SharedPreferences prefs = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+            SharedPreferences.Editor edit = prefs.edit();
+            if (KEY_RATES.equals(key)) {
+                String previous = prefs.getString(KEY_RATES, null);
+                if (previous != null && !previous.isEmpty()) edit.putString(KEY_PREVIOUS_RATES, previous);
+            }
+            edit.putString(key, raw)
+                    .putLong(key + "_saved_at", System.currentTimeMillis())
+                    .apply();
+        }
+    }
+
+    /** Last successful rate response, retained locally as the baseline for the next fetch. */
+    public static String previousRates(Context c) {
+        return c.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_PREVIOUS_RATES, null);
+    }
+
+    /** Weather access is an explicit local opt-in, independent of Android's permission state. */
+    public static boolean weatherLocationEnabled(Context c) {
+        return c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getBoolean(KEY_WEATHER_LOCATION_ENABLED, false);
+    }
+
+    /** Disable location weather and erase its cached response/place; Android permission remains user-controlled. */
+    public static void setWeatherLocationEnabled(Context c, boolean enabled) {
+        synchronized (MarketWeather.class) {
+            SharedPreferences.Editor edit = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                    .putBoolean(KEY_WEATHER_LOCATION_ENABLED, enabled);
+            if (!enabled) {
+                edit.remove(KEY_WEATHER)
+                        .remove(KEY_WEATHER + "_saved_at")
+                        .remove(KEY_WEATHER_PLACE)
+                        .remove(KEY_WEATHER_DEVICE);
+            }
+            edit.apply();
+        }
+    }
+
+    /** Save a weather response only while the app-level location opt-in remains enabled. */
+    public static boolean saveWeather(Context c, String raw, String place) {
+        if (raw == null || raw.isEmpty()) return false;
+        synchronized (MarketWeather.class) {
+            SharedPreferences prefs = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+            if (!prefs.getBoolean(KEY_WEATHER_LOCATION_ENABLED, false) || !DeviceLocation.granted(c))
+                return false;
+            prefs.edit()
+                    .putString(KEY_WEATHER, raw)
+                    .putLong(KEY_WEATHER + "_saved_at", System.currentTimeMillis())
+                    .putString(KEY_WEATHER_PLACE, place == null ? "" : place)
+                    .putString(KEY_WEATHER_DEVICE, "1")
+                    .apply();
+            return true;
+        }
+    }
+
+    public static String weatherPlace(Context c) {
+        return c.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_WEATHER_PLACE, null);
+    }
+
+    public static boolean weatherWasFromDevice(Context c) {
+        return "1".equals(c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getString(KEY_WEATHER_DEVICE, "0"));
     }
 
     /** Last saved raw response for key, or null. */

@@ -5,6 +5,7 @@ import org.junit.Test;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class MarketWeatherTest {
@@ -23,6 +24,25 @@ public class MarketWeatherTest {
         assertEquals("طلای ۱۸ عیار (گرم)", rows.get(1).label);
         assertEquals("سکه امامی", rows.get(2).label);
         assertEquals(-0.5d, rows.get(1).changePct, 0.0001d);
+        assertFalse(rows.get(0).comparesWithPreviousFetch);
+    }
+
+    @Test public void localPreviousRatesOverrideSourceChangeWithPreviousFetchPercent() throws Exception {
+        List<MarketWeather.Rate> rows = MarketWeather.parseRates(
+                rates("110", "900", "10000", "false"),
+                rates("100", "1000", "10000", "false"));
+        assertEquals(10d, rows.get(0).changePct, 0.0001d);
+        assertEquals(100L, rows.get(0).previousToman);
+        assertTrue(rows.get(0).comparesWithPreviousFetch);
+        assertEquals(-10d, rows.get(1).changePct, 0.0001d);
+        assertEquals(0d, rows.get(2).changePct, 0.0001d);
+    }
+
+    @Test public void invalidPreviousCacheFallsBackToTheProviderPercent() throws Exception {
+        MarketWeather.Rate rate = MarketWeather.parseRates(
+                rates("110", "900", "10000", "false"), "not-json").get(0);
+        assertEquals(1.2d, rate.changePct, 0.0001d);
+        assertFalse(rate.comparesWithPreviousFetch);
     }
 
     @Test public void rejectsStaleMissingWrongCurrencyAndInvalidPrices() {

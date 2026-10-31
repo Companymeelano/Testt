@@ -689,14 +689,11 @@ public class MainActivity extends Activity {
         status.addView(userChip, kit.lp(-2, -2));
         // Gold tag badge at the end of the chips row, as in the reference header (decorative).
         android.widget.ImageView tagBadge = new android.widget.ImageView(this);
-        try {
-            int tagRes = Theme.icon3d(R.drawable.mi_sell);
-            tagBadge.setImageResource(tagRes);
-            if (!Theme.isIcon3d(tagRes)) tagBadge.setColorFilter(Theme.GOLD);
-        } catch (Exception ignored) { Diag.ignored("MainActivity:tagBadge", ignored); }
+        tagBadge.setImageResource(R.drawable.mi_sell);
+        tagBadge.setColorFilter(Theme.sectionText(Theme.SECTION_SALES));
         tagBadge.setPadding(Theme.dp(5), Theme.dp(5), Theme.dp(5), Theme.dp(5));
-        tagBadge.setBackground(Theme.ghostButton(Theme.GOLD));
-        tagBadge.setClickable(false);
+        tagBadge.setContentDescription(null);
+        tagBadge.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         status.addView(kit.space(8));
         status.addView(tagBadge, new LinearLayout.LayoutParams(Theme.dp(30), Theme.dp(30)));
         titleCol.addView(status, kit.lp(-2, -2));
@@ -873,11 +870,11 @@ public class MainActivity extends Activity {
     private android.widget.ImageView toolIcon(int res) {
         android.widget.ImageView iv = new android.widget.ImageView(this);
         try {
-            // Tint only flat vectors: decide on the base icon, since emerald twins are not in isIcon3d().
-            int base3 = Theme.icon3d(res);
-            iv.setImageResource(Theme.chrome3d(res));
-            if (!Theme.isIcon3d(base3)) iv.setColorFilter(Theme.GOLD_SOFT);
-        } catch (Exception ignored) { Diag.ignored("MainActivity:694", ignored); }
+            iv.setImageResource(res);
+            iv.setColorFilter(Theme.sectionText(Theme.PRIMARY));
+            iv.setScaleType(android.widget.ImageView.ScaleType.CENTER_INSIDE);
+            iv.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        } catch (Exception ignored) { Diag.ignored("MainActivity:toolIcon", ignored); }
         return iv;
     }
 
@@ -957,14 +954,11 @@ public class MainActivity extends Activity {
             LinearLayout badge = new LinearLayout(this);
             badge.setGravity(Gravity.CENTER);
             int iconRes = MeelanoIcons.iconFor(s.glyph());
-            // A 3D bitmap must not be tinted; remember that on the symbol.
-            boolean is3d = iconRes != 0 && Theme.isIcon3d(Theme.icon3d(iconRes));
+            // Navigation uses the same 24dp line icon family in every skin.
             if (iconRes != 0) {
-                android.widget.ImageView symbol = kit.icon(iconRes, Theme.MUTED, Theme.isNuts() ? 46 : 22);
-                if (Theme.isNuts() && is3d) symbol.setImageResource(Theme.chrome3d(iconRes));
-                symbol.setTag(is3d ? Boolean.TRUE : Boolean.FALSE);
-                int sz = Theme.isNuts() ? 40 : 24;
-                badge.addView(symbol, new LinearLayout.LayoutParams(Theme.dp(sz), Theme.dp(sz)));
+                android.widget.ImageView symbol = kit.icon(iconRes, Theme.MUTED, 24);
+                symbol.setTag(Boolean.FALSE);
+                badge.addView(symbol, new LinearLayout.LayoutParams(Theme.dp(24), Theme.dp(24)));
             } else {
                 TextView symbol = kit.text(s.glyph(), 20, Theme.MUTED, true);
                 symbol.setGravity(Gravity.CENTER);

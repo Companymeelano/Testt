@@ -145,9 +145,8 @@ public final class VisitorDeskScreen extends Screen {
         hero.setGravity(Gravity.CENTER_VERTICAL);
         hero.setBackground(Theme.hero(Theme.GOLD));
         hero.setPadding(Theme.dp(13),Theme.dp(9),Theme.dp(13),Theme.dp(9));
-        ImageView heroArt=new ImageView(a);heroArt.setImageResource(Theme.chrome3d(R.drawable.mi_shopping_cart));
-        heroArt.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        hero.addView(heroArt,new LinearLayout.LayoutParams(Theme.dp(46),Theme.dp(46)));
+        hero.addView(a.kit.iconBadge(R.drawable.mi_shopping_cart,Theme.SECTION_PURCHASE,40),
+                new LinearLayout.LayoutParams(Theme.dp(40),Theme.dp(40)));
         hero.addView(a.kit.space(9));
         LinearLayout heroCopy=a.kit.v();
         heroCopy.addView(a.kit.text("فروش میدانی",18,Theme.TEXT,true),a.kit.lp(-1,-2));
@@ -158,8 +157,7 @@ public final class VisitorDeskScreen extends Screen {
         String[] labels={"خانه","مشتریان","کالاها","ویزیت"};
         // Section art follows the chosen theme: the nut look uses the emerald set, the dark
         // look its own, the ivory look the gold set - one family, never a fixed picture.
-        int[] icons={Theme.chrome3d(R.drawable.mi_home),Theme.chrome3d(R.drawable.mi_group),
-                Theme.chrome3d(R.drawable.mi_grid_view),Theme.chrome3d(R.drawable.mi_person)};
+        int[] icons={R.drawable.mi_home,R.drawable.mi_group,R.drawable.mi_grid_view,R.drawable.mi_person};
         int selected=page<=ROUTE?page:-1;
         content.addView(a.kit.chipsWithIcons(labels,selected,icons,Theme.GOLD,i->{page=i;render(content);}),a.kit.lp(-1,-2));
         content.addView(a.kit.gap(7));
@@ -251,19 +249,13 @@ public final class VisitorDeskScreen extends Screen {
     private LinearLayout homeTile(String title,String subtitle,int icon,int target){
         LinearLayout tile=a.kit.v();
         tile.setGravity(Gravity.CENTER);
-        tile.setBackground(Theme.cardAccent(Theme.GOLD));
+        int accent = Theme.sectionAccent(title);
+        tile.setBackground(Theme.cardAccent(accent));
         tile.setPadding(Theme.dp(8),Theme.dp(7),Theme.dp(8),Theme.dp(7));
         tile.setMinimumHeight(Theme.dp(108));
-        ImageView art=new ImageView(a);
-        // The artwork of a section follows the skin the user chose: emerald in the nut look,
-        // its own set in the dark look, gold in the ivory look. A flat glyph is the last resort.
-        int artRes=Theme.chrome3d(icon);
-        art.setImageResource(artRes);
-        if(!Theme.isIcon3d(artRes))art.setColorFilter(Theme.GOLD);
-        art.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        LinearLayout.LayoutParams ip=new LinearLayout.LayoutParams(Theme.dp(48),Theme.dp(48));
+        LinearLayout.LayoutParams ip=new LinearLayout.LayoutParams(Theme.dp(36),Theme.dp(36));
         ip.gravity=Gravity.CENTER;
-        tile.addView(art,ip);
+        tile.addView(a.kit.iconBadge(icon, accent, 36),ip);
         TextView name=a.kit.text(title,13.5f,Theme.TEXT,true);name.setGravity(Gravity.CENTER);
         name.setMaxLines(1);name.setEllipsize(android.text.TextUtils.TruncateAt.END);
         tile.addView(name,a.kit.lp(-1,-2));
@@ -287,10 +279,10 @@ public final class VisitorDeskScreen extends Screen {
     }
 
     private View visitorErrorCard(String title,String error,Runnable retry){
-        LinearLayout card=a.kit.card(Theme.DANGER);
+        LinearLayout card=a.kit.card(Theme.SECTION_ALERT);
         LinearLayout head=a.kit.h();head.setGravity(Gravity.CENTER_VERTICAL);
-        ImageView art=new ImageView(a);art.setImageResource(R.drawable.icon3d_dark_plug);art.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        head.addView(art,new LinearLayout.LayoutParams(Theme.dp(48),Theme.dp(48)));
+        head.addView(a.kit.iconBadge(R.drawable.mi_wifi_off,Theme.SECTION_ALERT,40),
+                new LinearLayout.LayoutParams(Theme.dp(40),Theme.dp(40)));
         head.addView(a.kit.space(9));
         LinearLayout copy=a.kit.v();
         copy.addView(a.kit.text(title,14.5f,Theme.TEXT,true),a.kit.lp(-1,-2));

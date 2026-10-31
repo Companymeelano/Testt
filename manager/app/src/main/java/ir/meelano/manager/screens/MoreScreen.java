@@ -8,6 +8,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import ir.meelano.manager.MainActivity;
+import ir.meelano.manager.R;
 import ir.meelano.manager.core.AtiranAuth;
 import ir.meelano.manager.core.CommandRoom;
 import ir.meelano.manager.core.Money;
@@ -328,19 +329,14 @@ public class MoreScreen extends Screen {
         tile.setMinimumHeight(Theme.dp(122));
         tile.setPadding(Theme.dp(10), Theme.dp(12), Theme.dp(10), Theme.dp(10));
 
-        // The artwork of a section is shown as large as in the workspace tiles: inside a small
-        // circle it was too small to recognise.
-        if (art > 0) {
-            ImageView picture = new ImageView(a);
-            int res3 = Theme.chrome3d(art);
-            picture.setImageResource(res3);
-            if (!Theme.isIcon3d(res3)) picture.setColorFilter(accent);
-            picture.setScaleType(ImageView.ScaleType.FIT_CENTER);
-            picture.setContentDescription(null);
-            tile.addView(picture, new LinearLayout.LayoutParams(Theme.dp(46), Theme.dp(46)));
+        int vector = art > 0 && !Theme.isIcon3d(art) ? art : MeelanoIcons.iconFor(glyph);
+        if (vector == 0) vector = iconFor(title, entry.id);
+        if (vector != 0) {
+            tile.addView(a.kit.iconBadge(vector, accent, 36),
+                    new LinearLayout.LayoutParams(Theme.dp(36), Theme.dp(36)));
         } else {
-            tile.addView(iconBadge(goldReportGlyph(title, glyph), accent, 46),
-                    new LinearLayout.LayoutParams(Theme.dp(46), Theme.dp(46)));
+            tile.addView(iconBadge(goldReportGlyph(title, glyph), accent, 36),
+                    new LinearLayout.LayoutParams(Theme.dp(36), Theme.dp(36)));
         }
         tile.addView(a.kit.gap(5));
 
@@ -372,7 +368,7 @@ public class MoreScreen extends Screen {
         return tile;
     }
 
-    /** The themed 3D artwork of a section (the name comes from the shared index). */
+    /** Drawable names in the command index point to vectors, not display artwork. */
     private int artRes(String name) {
         if (name == null || name.trim().isEmpty()) return 0;
         try {
@@ -382,43 +378,29 @@ public class MoreScreen extends Screen {
         }
     }
 
-    /** A badge that shows the section's own 3D artwork in the skin the user chose. */
+    private int iconFor(String title, String id) {
+        if ("tv".equals(id)) return R.drawable.mi_apps;
+        if ("assistant".equals(id) || "voice".equals(id)) return R.drawable.mi_star_shine;
+        if ("products".equals(id) || "product_file".equals(id)) return R.drawable.mi_grid_view;
+        if ("customers".equals(id)) return R.drawable.mi_group;
+        if ("home".equals(id)) return R.drawable.mi_home;
+        if (title != null && title.contains("انبار")) return R.drawable.mi_inventory_2;
+        return MeelanoIcons.iconFor(goldReportGlyph(title, ""));
+    }
+
     private View artBadge(int vector, int accent, int sizeDp) {
-        android.widget.FrameLayout badge = new android.widget.FrameLayout(a);
-        badge.setBackground(Theme.avatar(Theme.alpha(accent, Theme.isLight() ? 34 : 46)));
-        badge.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-        int res3 = Theme.chrome3d(vector);
-        ImageView image = new ImageView(a);
-        image.setImageResource(res3);
-        if (!Theme.isIcon3d(res3)) image.setColorFilter(accent);
-        image.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        int inside = Math.max(20, Math.round(sizeDp * 0.72f));
-        android.widget.FrameLayout.LayoutParams ip = new android.widget.FrameLayout.LayoutParams(
-                Theme.dp(inside), Theme.dp(inside), Gravity.CENTER);
-        badge.addView(image, ip);
-        return badge;
+        return a.kit.iconBadge(vector, accent, sizeDp);
     }
 
     private View iconBadge(String glyph, int accent, int sizeDp) {
-        android.widget.FrameLayout badge = new android.widget.FrameLayout(a);
-        badge.setBackground(Theme.avatar(Theme.alpha(accent, Theme.isLight() ? 34 : 46)));
-        badge.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         int iconRes = MeelanoIcons.iconFor(glyph);
-        if (iconRes != 0) {
-            ImageView image = new ImageView(a);
-            int res3 = Theme.chrome3d(iconRes);
-            image.setImageResource(res3);
-            if (!Theme.isIcon3d(res3)) image.setColorFilter(accent);
-            image.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-            int inside = Math.max(20, Math.round(sizeDp * 0.72f));
-            android.widget.FrameLayout.LayoutParams ip = new android.widget.FrameLayout.LayoutParams(
-                    Theme.dp(inside), Theme.dp(inside), Gravity.CENTER);
-            badge.addView(image, ip);
-        } else {
-            TextView fallback = a.kit.text(glyph, sizeDp * 0.48f, accent, true);
-            fallback.setGravity(Gravity.CENTER);
-            badge.addView(fallback, new android.widget.FrameLayout.LayoutParams(-1, -1));
-        }
+        if (iconRes != 0) return a.kit.iconBadge(iconRes, accent, sizeDp);
+        android.widget.FrameLayout badge = new android.widget.FrameLayout(a);
+        badge.setBackground(Theme.avatar(Theme.alpha(accent, Theme.isLight() ? 28 : 42)));
+        badge.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        TextView fallback = a.kit.text(glyph, sizeDp * 0.42f, Theme.sectionText(accent), true);
+        fallback.setGravity(Gravity.CENTER);
+        badge.addView(fallback, new android.widget.FrameLayout.LayoutParams(-1, -1));
         return badge;
     }
 
@@ -452,11 +434,11 @@ public class MoreScreen extends Screen {
     }
 
     private int groupAccent(String accent) {
-        if ("success".equals(accent)) return Theme.SUCCESS;
-        if ("info".equals(accent)) return Theme.INFO;
-        if ("teal".equals(accent)) return Theme.GOLD;
-        if ("violet".equals(accent)) return Theme.VIOLET;
-        if ("steel".equals(accent)) return Theme.STEEL;
-        return Theme.GOLD;
+        if ("success".equals(accent)) return Theme.SECTION_RECEIVE;
+        if ("info".equals(accent)) return Theme.SECTION_WAREHOUSE;
+        if ("teal".equals(accent)) return Theme.SECTION_MARKET;
+        if ("violet".equals(accent)) return Theme.SECTION_RETURNS;
+        if ("steel".equals(accent)) return Theme.MUTED;
+        return Theme.SECTION_SALES;
     }
 }

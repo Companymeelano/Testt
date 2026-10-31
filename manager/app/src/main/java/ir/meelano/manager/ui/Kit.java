@@ -158,20 +158,14 @@ public final class Kit {
         c.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(15));
         LinearLayout head = h();
         int heroVector = MeelanoIcons.iconFor(glyph);
-        // The emblem of a title follows the skin: the nut look shows the emerald artwork.
-        int hero3d = heroVector == 0 ? 0 : Theme.chrome3d(heroVector);
-        boolean use3dHero = heroVector != 0 && Theme.isIcon3d(hero3d);
-        if (use3dHero) {
-            ImageView emblem = new ImageView(a);
-            emblem.setImageResource(hero3d);
-            emblem.setScaleType(ImageView.ScaleType.FIT_CENTER);
-            emblem.setContentDescription(null);
-            head.addView(emblem, new LinearLayout.LayoutParams(Theme.dp(58), Theme.dp(58)));
+        if (heroVector != 0) {
+            head.addView(iconBadge(heroVector, accent, 44),
+                    new LinearLayout.LayoutParams(Theme.dp(44), Theme.dp(44)));
         } else {
-            TextView g = text(glyph, 30, accent, true);
+            TextView g = text(glyph, 24, Theme.sectionText(accent), true);
             g.setGravity(Gravity.CENTER);
-            g.setBackground(Theme.avatar(Theme.alpha(accent, 60)));
-            head.addView(g, new LinearLayout.LayoutParams(Theme.dp(58), Theme.dp(58)));
+            g.setBackground(Theme.avatar(Theme.alpha(accent, 44)));
+            head.addView(g, new LinearLayout.LayoutParams(Theme.dp(44), Theme.dp(44)));
         }
         head.addView(space(10));
         LinearLayout copy = v();
@@ -190,19 +184,11 @@ public final class Kit {
         r.setPadding(Theme.dp(3), Theme.dp(4), Theme.dp(3), Theme.dp(7));
 
         int sectionGlyph = sectionIcon(title);
-        boolean useLarge3d = Theme.isIcon3d(Theme.icon3d(sectionGlyph));
-        FrameLayout badge = new FrameLayout(a);
-        badge.setBackground(Theme.avatar(Theme.alpha(accent, Theme.isLight() ? 38 : 48)));
-        ImageView symbol = icon(sectionGlyph, accent, useLarge3d ? 28 : 17);
-        int symbolSize = useLarge3d ? 30 : 20;
-        FrameLayout.LayoutParams sp = new FrameLayout.LayoutParams(
-                Theme.dp(symbolSize), Theme.dp(symbolSize), Gravity.CENTER);
-        badge.addView(symbol, sp);
-        int badgeSize = useLarge3d ? 42 : 34;
-        r.addView(badge, new LinearLayout.LayoutParams(Theme.dp(badgeSize), Theme.dp(badgeSize)));
+        r.addView(iconBadge(sectionGlyph, accent, 36),
+                new LinearLayout.LayoutParams(Theme.dp(36), Theme.dp(36)));
         r.addView(space(8));
 
-        TextView t = text(title, 14f, accent, true);
+        TextView t = text(title, 14f, Theme.sectionText(accent), true);
         t.setMaxLines(2);
         t.setEllipsize(TextUtils.TruncateAt.END);
         r.addView(t, wlp(1f));
@@ -224,8 +210,7 @@ public final class Kit {
         if (s.contains("هشدار")) return R.drawable.mi_warning;
         // Dashboard comparisons and trends are analytics sections, not sale-category labels.
         if (s.contains("روند") || s.contains("مقایسه")) return R.drawable.mi_bar_chart;
-        // Use mapped 3D concepts for section-specific glyphs that have no dedicated gold artwork.
-        if (s.contains("برگشت")) return R.drawable.mi_refresh;
+        if (s.contains("برگشت")) return R.drawable.mi_assignment_return;
         if (s.contains("ویزیتور")) return R.drawable.mi_group;
         if (s.contains("مشتری") || s.contains("بدهکار") || s.contains("طرف‌حساب")) return R.drawable.mi_group;
         if (s.contains("انبار") || s.contains("موجودی") || s.contains("کالا")) return R.drawable.mi_inventory_2;
@@ -246,15 +231,7 @@ public final class Kit {
     }
 
     private int sectionAccent(String title) {
-        String s = title == null ? "" : title.replace('ي', 'ی').replace('ك', 'ک');
-        if (s.contains("هشدار") || s.contains("برگشت") || s.contains("معوق")) return Theme.DANGER;
-        if (s.contains("دریافت") || s.contains("وصول")) return Theme.SUCCESS;
-        if (s.contains("پرداخت") || s.contains("نقدینگی")) return Theme.INFO;
-        if (s.contains("خرید")) return Theme.VIOLET;
-        if (s.contains("انبار") || s.contains("موجودی") || s.contains("کالا")) return Theme.VIOLET;
-        if (s.contains("ویزیتور") || s.contains("گزارش") || s.contains("تحلیل") || s.contains("روند")) return Theme.INFO;
-        if (s.contains("مشتری") || s.contains("بدهکار")) return Theme.WARNING;
-        return Theme.GOLD;
+        return Theme.sectionAccent(title);
     }
 
     // ---------------- KPI ----------------
@@ -307,19 +284,11 @@ public final class Kit {
         // Centred composition like the reference: icon, label, value and note share one axis.
         t.setGravity(Gravity.CENTER_HORIZONTAL);
         if (k.icon != 0) {
-            // Optional gold glyph above the label (dashboard tiles). The manager's own
-            // board asks for the emerald twin; every other tile keeps the gold set.
-            int ico = k.emeraldIcon ? Theme.emerald3d(k.icon) : Theme.icon3d(k.icon);
-            android.widget.ImageView ic = new android.widget.ImageView(a);
-            try {
-                ic.setImageResource(ico);
-                if (!Theme.isIcon3d(ico)) ic.setColorFilter(Theme.GOLD);
-            } catch (Exception ignored) { Diag.ignored("Kit:kpiIcon", ignored); }
-            int isz = Theme.isIcon3d(ico) ? (Theme.isNuts() ? 60 : 30) : 24;
-            LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(Theme.dp(isz), Theme.dp(isz));
+            View badge = iconBadge(k.icon, k.accent, 32);
+            LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(Theme.dp(32), Theme.dp(32));
             ip.gravity = Gravity.CENTER_HORIZONTAL;
             ip.bottomMargin = Theme.dp(4);
-            t.addView(ic, ip);
+            t.addView(badge, ip);
         }
         TextView l = text(k.label, 10.5f, Theme.MUTED, false);
         l.setGravity(Gravity.CENTER_HORIZONTAL);
@@ -1504,19 +1473,9 @@ public final class Kit {
         return e;
     }
 
-    /** Static vector icon (v34): one family (Material Symbols Rounded), decorative by default. */
+    /** One 24dp Material vector icon family; 3D artwork is reserved for hero/empty states. */
     public ImageView icon(int res, int color, int dp) {
         ImageView v = new ImageView(a);
-        // Light skin: rendered 3D gold icon instead of the flat glyph; it keeps its own colours.
-        int res3 = Theme.icon3d(res);
-        if (Theme.isIcon3d(res3)) {
-            v.setImageResource(res3);
-            v.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-            int s3 = Theme.dp(Theme.isNuts() ? Math.round(dp * 1.35f) : dp);
-            v.setLayoutParams(new LinearLayout.LayoutParams(s3, s3));
-            v.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-            return v;
-        }
         try {
             android.graphics.drawable.Drawable d = a.getDrawable(res);
             if (d != null) {
@@ -1529,12 +1488,27 @@ public final class Kit {
         } catch (Exception ex) {
             try {
                 v.setImageResource(res);
-            } catch (Exception ignored) { Diag.ignored("Kit:1198", ignored); }
+            } catch (Exception ignored) { Diag.ignored("Kit:icon", ignored); }
         }
         int s = Theme.dp(dp);
         v.setLayoutParams(new LinearLayout.LayoutParams(s, s));
+        v.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         v.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         return v;
+    }
+
+    /** Duotone section mark: accent wash + a 24dp vector inside a small outlined circle. */
+    public FrameLayout iconBadge(int iconRes, int accent, int sizeDp) {
+        FrameLayout badge = new FrameLayout(a);
+        badge.setBackground(Theme.avatar(Theme.alpha(accent, Theme.isLight() ? 28 : 42)));
+        badge.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        int inner = Math.min(24, Math.max(16, sizeDp - 8));
+        ImageView symbol = icon(iconRes, Theme.sectionText(accent), inner);
+        symbol.setContentDescription(null);
+        FrameLayout.LayoutParams p = new FrameLayout.LayoutParams(
+                Theme.dp(inner), Theme.dp(inner), Gravity.CENTER);
+        badge.addView(symbol, p);
+        return badge;
     }
 
     /** Numeric PIN field (the 4-digit lock code). */

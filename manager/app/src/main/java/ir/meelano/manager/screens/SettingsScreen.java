@@ -138,45 +138,25 @@ public class SettingsScreen extends Screen {
         return out.toArray(new String[0][]);
     }
 
-    /** Section header inside the open section: a title and one line of guidance. */
-    /** 3D dark-skin icon for a settings section title that starts with its emoji (0 = none). */
-    private static int sectionIcon3d(String title) {
-        if (title == null) return 0;
-        if (title.startsWith("🔌")) return R.drawable.icon3d_dark_plug;
-        if (title.startsWith("🎨")) return R.drawable.icon3d_dark_palette;
-        if (title.startsWith("🔔")) return R.drawable.icon3d_dark_bell;
-        if (title.startsWith("🏪")) return R.drawable.icon3d_dark_shop;
-        if (title.startsWith("💾")) return R.drawable.icon3d_dark_backup;
-        if (title.startsWith("🔐")) return R.drawable.icon3d_dark_lock;
-        if (title.startsWith("👥")) return R.drawable.icon3d_dark_roles;
-        if (title.startsWith("🧭")) return R.drawable.icon3d_dark_compass;
-        if (title.startsWith("ℹ")) return R.drawable.icon3d_dark_info;
-        return 0;
-    }
-
+    /** Shared section header: one duotone icon, title and one line of guidance. */
     private LinearLayout sectionHead(String title, String subtitle, int accent) {
-        LinearLayout h = a.kit.card(accent);
-        int ic = Theme.isLight() ? 0 : sectionIcon3d(title);
-        if (ic != 0) {
-            // Dark skin: the emoji becomes a 3D gold icon; the title keeps its words.
-            LinearLayout hr = a.kit.h();
-            hr.setGravity(android.view.Gravity.CENTER_VERTICAL);
-            android.widget.ImageView iv = new android.widget.ImageView(a);
-            iv.setImageResource(ic);
-            iv.setScaleType(android.widget.ImageView.ScaleType.CENTER_INSIDE);
-            iv.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-            hr.addView(iv, new LinearLayout.LayoutParams(Theme.dp(34), Theme.dp(34)));
-            hr.addView(a.kit.space(10));
-            int sp = title.indexOf(' ');
-            String words = sp > 0 ? title.substring(sp + 1) : title;
-            hr.addView(a.kit.text(words, 15f, Theme.TEXT, true), a.kit.wlp(1f));
-            h.addView(hr, a.kit.lp(-1, -2));
-        } else {
-            h.addView(a.kit.text(title, 15f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        LinearLayout card = a.kit.card(accent);
+        LinearLayout row = a.kit.h();
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        int split = title == null ? -1 : title.indexOf(' ');
+        String glyph = split > 0 ? title.substring(0, split) : "";
+        String words = split > 0 ? title.substring(split + 1) : (title == null ? "" : title);
+        int icon = ir.meelano.manager.ui.MeelanoIcons.iconFor(glyph);
+        if (icon != 0) {
+            row.addView(a.kit.iconBadge(icon, accent, 36),
+                    new LinearLayout.LayoutParams(Theme.dp(36), Theme.dp(36)));
+            row.addView(a.kit.space(8));
         }
+        row.addView(a.kit.text(words, 15f, Theme.sectionText(accent), true), a.kit.wlp(1f));
+        card.addView(row, a.kit.lp(-1, -2));
         if (subtitle != null && !subtitle.isEmpty())
-            h.addView(a.kit.hint(subtitle), a.kit.lp(-1, -2));
-        return h;
+            card.addView(a.kit.hint(subtitle), a.kit.lp(-1, -2));
+        return card;
     }
 
     // ================= reusable rows =================
@@ -310,7 +290,7 @@ public class SettingsScreen extends Screen {
         th.addView(a.kit.chipsWithIcons(
                 new String[]{"تیره • ابسیدین طلایی", "روشن • عاج سلطنتی", "آجیل و خشکبار"},
                 themeIdx,
-                new int[]{R.drawable.icon3d_dark_theme, R.drawable.icon3d_theme, R.drawable.icon3d_nut_theme},
+                new int[]{R.drawable.mi_dark_mode, R.drawable.mi_light_mode, R.drawable.mi_storefront},
                 Theme.GOLD, idx -> {
                     a.settings.setThemeMode(idx == 2 ? "nuts" : idx == 1 ? "light" : "dark");
                     a.refreshTheme();
@@ -686,10 +666,7 @@ public class SettingsScreen extends Screen {
         ab.addView(a.kit.gap(6), a.kit.lp(-1, -2));
         LinearLayout updateHead = a.kit.h();
         updateHead.setGravity(Gravity.CENTER_VERTICAL);
-        ImageView updateArt = new ImageView(a);
-        int updateIcon = Theme.icon3d(R.drawable.mi_refresh);
-        updateArt.setImageResource(updateIcon);
-        updateArt.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        View updateArt = a.kit.iconBadge(R.drawable.mi_refresh, Theme.GOLD_METAL, 34);
         updateHead.addView(updateArt, a.kit.lp(Theme.dp(34), Theme.dp(34)));
         updateHead.addView(a.kit.space(8));
         updateHead.addView(a.kit.text("بروزرسانی برنامه", 14f, Theme.GOLD, true), a.kit.wlp(1f));

@@ -1042,23 +1042,12 @@ public class HomeScreen extends Screen {
             card.addView(a.kit.gap(8));
             LinearLayout wr = a.kit.h();
             wr.setGravity(Gravity.CENTER_VERTICAL);
-            // Gold vector icon instead of a text glyph (visual only; same weather code mapping).
-            android.widget.ImageView wi = new android.widget.ImageView(a);
             int wRes = w.code <= 1 ? R.drawable.mi_light_mode
                     : w.code <= 3 ? R.drawable.mi_wb_twilight
                     : (w.code >= 95 ? R.drawable.mi_bolt
                     : (w.code >= 51 ? R.drawable.mi_beach_access : R.drawable.mi_wb_twilight));
-            try {
-                if (!Theme.isLight()) {
-                    // A single 3D weather emblem identifies the section; the text below carries
-                    // the actual changing condition, so the icon never misstates the forecast.
-                    wi.setImageResource(R.drawable.icon3d_weather);
-                } else {
-                    wi.setImageResource(wRes);
-                    wi.setColorFilter(Theme.GOLD);
-                }
-            } catch (Exception ignored) { Diag.ignored("HomeScreen:weatherIcon", ignored); }
-            wr.addView(wi, a.kit.lp(Theme.dp(44), Theme.dp(44)));
+            wr.addView(a.kit.iconBadge(wRes, Theme.SECTION_MARKET, 36),
+                    a.kit.lp(Theme.dp(36), Theme.dp(36)));
             wr.addView(a.kit.space(8));
             LinearLayout wc = a.kit.v();
             TextView line = a.kit.text(weatherPlace + " • " + HomeNumberFormatter.integer(Math.round(w.temp)) + "°  "
@@ -1154,9 +1143,8 @@ public class HomeScreen extends Screen {
         // The market card belongs to the manager's board: its art follows the skin.
         String lbl = r.label == null ? "" : r.label;
         int tileIcon = lbl.contains("دلار") ? R.drawable.mi_trending_up
-                : (lbl.contains("طلا") ? R.drawable.mi_diamond
-                : (Theme.isLight() ? R.drawable.icon3d_coin : R.drawable.icon3d_dark_coin));
-        int tile = Theme.isNuts() ? 64 : 42;
+                : (lbl.contains("طلا") ? R.drawable.mi_diamond : R.drawable.mi_account_balance_wallet);
+        int tile = 36;
         t.addView(dashboardArt(tileIcon), new LinearLayout.LayoutParams(Theme.dp(tile), Theme.dp(tile)));
         TextView label = a.kit.text(r.label, 10.5f, Theme.TEXT, false);
         label.setGravity(Gravity.CENTER_HORIZONTAL);
@@ -1458,7 +1446,7 @@ public class HomeScreen extends Screen {
             cmp.add(new Mini(R.drawable.mi_bar_chart, "فروش ۷ روز اخیر", HomeNumberFormatter.compactMoney(last7Sales),
                     running ? "روز جاری ناقص است" : null, Theme.TEXT));
             cmp.add(new Mini(R.drawable.mi_bar_chart, "میانگین ۳۰ روز", HomeNumberFormatter.compactMoney(avg30), null, Theme.TEXT));
-            cmp.add(new Mini(R.drawable.mi_refresh, "میانگین ۴ " + weekday + " گذشته",
+            cmp.add(new Mini(R.drawable.mi_calendar_month, "میانگین ۴ " + weekday + " گذشته",
                     HomeNumberFormatter.compactMoney(dayComparison.sameWeekdayAverageRials), "روزهای هم‌هفته", Theme.TEXT));
             if (dayComparison.projectionAvailable) {
                 String forecastNote = dayComparison.hasBaseline()
@@ -1473,73 +1461,53 @@ public class HomeScreen extends Screen {
         }
     }
 
-    /** Dashboard-only art mapping keeps gold and nut identities distinct without changing other screens. */
-    private int dashboardIcon(int vector) {
-        if (Theme.isNuts()) {
-            // The board wears the nut skin's own emerald family - the same artwork as the
-            // header emblem. Explicit twins first, then the generic fold (medal_x / x -> emerald_x);
-            // a name without an emerald twin keeps its own 3D art in the fallbacks below.
-            if (vector == R.drawable.mi_account_balance_wallet) return R.drawable.icon3d_emerald_coin;
-            if (vector == R.drawable.mi_assignment_return) return R.drawable.icon3d_emerald_refresh;
-            if (vector == R.drawable.mi_payments) return R.drawable.icon3d_emerald_cash_out;
-            if (vector == R.drawable.mi_sell) return R.drawable.icon3d_emerald_light_tag;
-            if (vector == R.drawable.mi_receipt_long) return R.drawable.icon3d_emerald_cash_in;
-            if (vector == R.drawable.mi_warning) return R.drawable.icon3d_emerald_alert;
-            int e = Theme.emerald3d(vector);
-            if (Theme.isIcon3d(e)) return e;
-            if (vector == R.drawable.mi_warning) return R.drawable.icon3d_medal_alert;
-            if (vector == R.drawable.mi_account_balance_wallet) return R.drawable.icon3d_medal_coin;
-            if (vector == R.drawable.mi_assignment_return) return R.drawable.icon3d_medal_refresh;
-            if (vector == R.drawable.mi_sell) return R.drawable.icon3d_medal_dollar;
-            if (vector == R.drawable.mi_grid_view) return R.drawable.icon3d_medal_products;
-            if (vector == R.drawable.mi_bar_chart) return R.drawable.icon3d_medal_reports;
-            if (vector == R.drawable.mi_receipt_long) return R.drawable.icon3d_medal_cash_in;
-            if (vector == R.drawable.mi_calendar_month) return R.drawable.icon3d_medal_dues;
-        }
-        if (Theme.DARK) {
-            if (vector == R.drawable.mi_account_balance_wallet) return R.drawable.icon3d_treasury;
-            if (vector == R.drawable.mi_warning) return R.drawable.icon3d_dark_bell;
-            if (vector == R.drawable.mi_assignment_return) return R.drawable.icon3d_dark_refresh;
-            if (vector == R.drawable.mi_sell) return R.drawable.icon3d_dark_tag;
-            if (vector == R.drawable.mi_grid_view) return R.drawable.icon3d_dark_products;
-            if (vector == R.drawable.mi_bar_chart) return R.drawable.icon3d_dark_reports;
-            if (vector == R.drawable.mi_receipt_long) return R.drawable.icon3d_dark_cash_in;
-            if (vector == R.drawable.mi_calendar_month) return R.drawable.icon3d_dark_dues;
-        }
-        int themed = Theme.icon3d(vector);
-        if (Theme.isIcon3d(themed)) return themed;
-        if (vector == R.drawable.mi_warning) return R.drawable.icon3d_dark_bell;
-        if (vector == R.drawable.mi_account_balance_wallet) return R.drawable.icon3d_coin;
-        if (vector == R.drawable.mi_assignment_return) return R.drawable.icon3d_refresh;
-        return R.drawable.icon3d_gold;
+    /** Select a stable jewel hue by section; outcome colors stay reserved for deltas only. */
+    private int dashboardAccent(int vector) {
+        if (vector == R.drawable.mi_shopping_cart || vector == R.drawable.mi_add_shopping_cart)
+            return Theme.SECTION_PURCHASE;
+        if (vector == R.drawable.mi_receipt_long || vector == R.drawable.mi_cheque)
+            return Theme.SECTION_RECEIVE;
+        if (vector == R.drawable.mi_payments || vector == R.drawable.mi_trending_down)
+            return Theme.SECTION_PAY;
+        if (vector == R.drawable.mi_assignment_return) return Theme.SECTION_RETURNS;
+        if (vector == R.drawable.mi_warning || vector == R.drawable.mi_error)
+            return Theme.SECTION_ALERT;
+        if (vector == R.drawable.mi_diamond || vector == R.drawable.mi_trending_up
+                || vector == R.drawable.mi_account_balance_wallet)
+            return Theme.SECTION_MARKET;
+        if (vector == R.drawable.mi_inventory_2 || vector == R.drawable.mi_grid_view
+                || vector == R.drawable.mi_warehouse)
+            return Theme.SECTION_WAREHOUSE;
+        return Theme.SECTION_SALES;
     }
 
+    /** Vector icon in a quiet accent circle; data cards never use the 3D artwork set. */
     private ImageView dashboardArt(int iconVector) {
-        ImageView image = new ImageView(a);
-        image.setImageResource(dashboardIcon(iconVector));
+        int accent = dashboardAccent(iconVector);
+        ImageView image = a.kit.icon(iconVector, Theme.sectionText(accent), 24);
+        image.setBackground(Theme.avatar(Theme.alpha(accent, Theme.isLight() ? 26 : 40)));
+        int inset = Theme.dp(6);
+        image.setPadding(inset, inset, inset, inset);
         image.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         image.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         return image;
     }
 
-    /** Explicitly sized, untinted 3D header icon for each dashboard card. */
+    /** Compact section title with one duotone vector icon and optional action. */
     private View dashboardSectionHead(String title, int iconVector, int accent,
                                       String actionLabel, View.OnClickListener action) {
         LinearLayout row = a.kit.h();
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(Theme.dp(3), Theme.dp(4), Theme.dp(3), Theme.dp(7));
-        FrameLayout badge = new FrameLayout(a);
-        badge.setBackground(Theme.avatar(Theme.alpha(accent, Theme.isLight() ? 38 : 48)));
-        badge.addView(dashboardArt(iconVector),
-                new FrameLayout.LayoutParams(Theme.dp(30), Theme.dp(30), Gravity.CENTER));
-        row.addView(badge, new LinearLayout.LayoutParams(Theme.dp(38), Theme.dp(38)));
+        row.addView(dashboardArt(iconVector),
+                new LinearLayout.LayoutParams(Theme.dp(36), Theme.dp(36)));
         row.addView(a.kit.space(8));
-        TextView label = a.kit.text(title, 14f, accent, true);
+        TextView label = a.kit.text(title, 14f, Theme.sectionText(accent), true);
         label.setMaxLines(2);
         label.setEllipsize(TextUtils.TruncateAt.END);
         row.addView(label, a.kit.wlp(1f));
         if (actionLabel != null && action != null) {
-            TextView button = a.kit.text(actionLabel, 10.5f, accent, true);
+            TextView button = a.kit.text(actionLabel, 10.5f, Theme.sectionText(accent), true);
             button.setPadding(Theme.dp(9), Theme.dp(6), Theme.dp(9), Theme.dp(6));
             button.setBackground(Theme.ghostButton(accent));
             button.setContentDescription(actionLabel.replace("›", "") + "؛ باز کردن");
@@ -1551,22 +1519,17 @@ public class HomeScreen extends Screen {
         return row;
     }
 
-    /**
-     * Head of a reference-style section: a 3D badge, the title, an optional subtitle
-     * and one element at the end - a compact chevron chip or a status chip.
-     */
+    /** Section heading: a duotone icon, title, optional subtitle and action. */
     private View boardHead(String title, String subtitle, int iconVector, View end) {
         LinearLayout box = a.kit.v();
         LinearLayout row = a.kit.h();
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(Theme.dp(3), Theme.dp(4), Theme.dp(3), Theme.dp(7));
-        FrameLayout badge = new FrameLayout(a);
-        badge.setBackground(Theme.avatar(Theme.alpha(Theme.GOLD, Theme.isLight() ? 38 : 48)));
-        badge.addView(dashboardArt(iconVector),
-                new FrameLayout.LayoutParams(Theme.dp(30), Theme.dp(30), Gravity.CENTER));
-        row.addView(badge, new LinearLayout.LayoutParams(Theme.dp(38), Theme.dp(38)));
+        int accent = dashboardAccent(iconVector);
+        row.addView(dashboardArt(iconVector),
+                new LinearLayout.LayoutParams(Theme.dp(36), Theme.dp(36)));
         row.addView(a.kit.space(8));
-        TextView label = a.kit.text(title, 15f, Theme.TEXT, true);
+        TextView label = a.kit.text(title, 15f, Theme.sectionText(accent), true);
         label.setMaxLines(1);
         label.setEllipsize(TextUtils.TruncateAt.END);
         row.addView(label, a.kit.wlp(1f));
@@ -1667,7 +1630,7 @@ public class HomeScreen extends Screen {
             tile.setPadding(Theme.dp(10), Theme.dp(12), Theme.dp(10), Theme.dp(12));
             tile.setGravity(Gravity.CENTER_HORIZONTAL);
             ImageView ic = dashboardArt(m.icon);
-            LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(Theme.dp(52), Theme.dp(52));
+            LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(Theme.dp(36), Theme.dp(36));
             ip.gravity = Gravity.CENTER_HORIZONTAL;
             ip.bottomMargin = Theme.dp(6);
             tile.addView(ic, ip);
@@ -1939,7 +1902,7 @@ public class HomeScreen extends Screen {
     private void secReturns(LinearLayout content, Data d) {
         LinearLayout card = a.kit.card(Theme.GOLD);
         card.addView(boardHead("برگشتی‌های ۳۰ روز اخیر", "ابطال و برگشت، ۳۰ روز گذشته",
-                R.drawable.mi_refresh, navChip("گزارش برگشتی‌ها", "reports")),
+                R.drawable.mi_assignment_return, navChip("گزارش برگشتی‌ها", "reports")),
                 a.kit.lp(-1, -2));
         long docs = 0;
         double total = 0;
@@ -1951,7 +1914,7 @@ public class HomeScreen extends Screen {
             card.addView(a.kit.kv("سند برگشتی فعالی در این بازه ثبت نشده", "✓", Theme.SUCCESS), a.kit.lp(-1, -2));
         } else {
             // One wide summary line, then one compact tile per kind of return.
-            card.addView(statRow(R.drawable.mi_refresh, "برگشتی ۳۰ روز اخیر",
+            card.addView(statRow(R.drawable.mi_assignment_return, "برگشتی ۳۰ روز اخیر",
                     HomeNumberFormatter.integer(docs) + " سند • " + HomeNumberFormatter.compactMoney(total), Theme.GOLD),
                     a.kit.lp(-1, -2));
             card.addView(a.kit.gap(10));
@@ -1994,7 +1957,7 @@ public class HomeScreen extends Screen {
             double today = dayComparison.actualRials;
             LinearLayout trend = a.kit.card(Theme.GOLD);
             trend.addView(boardHead("روند ۱۴ روزه فروش تا " + snapshotLabel(d),
-                    "فروش روزانه، روز به روز", R.drawable.mi_refresh,
+                    "فروش روزانه، روز به روز", R.drawable.mi_bar_chart,
                     navChip("گزارش فروش", "sales")), a.kit.lp(-1, -2));
             if (dayComparison.hasBaseline() && dayComparison.projectionAvailable) {
                 double change = dayComparison.changePercent();
@@ -2129,9 +2092,9 @@ public class HomeScreen extends Screen {
         LinearLayout row = a.kit.h();
         row.setGravity(Gravity.CENTER_VERTICAL);
         ImageView art = dashboardArt(icon);
-        row.addView(art, a.kit.lp(Theme.dp(25), Theme.dp(25)));
+        row.addView(art, a.kit.lp(Theme.dp(32), Theme.dp(32)));
         row.addView(a.kit.space(6));
-        row.addView(a.kit.text(title, 11f, accent, true), a.kit.wlp(1f));
+        row.addView(a.kit.text(title, 11f, Theme.sectionText(accent), true), a.kit.wlp(1f));
         return row;
     }
 

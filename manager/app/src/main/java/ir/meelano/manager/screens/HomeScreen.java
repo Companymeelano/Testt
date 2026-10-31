@@ -3059,8 +3059,8 @@ public class HomeScreen extends Screen {
         final String monthKey = monthStart != null && monthStart.length() >= 7
                 ? monthStart.substring(0, 7) : "";
         final String periodLabel = monthLabel(monthStart);
-        Double target = parseLocalRials(a.settings.homeSalesGoalRials(monthKey));
-        if (target != null && target <= 0d) target = null;
+        Double parsedTarget = parseLocalRials(a.settings.homeSalesGoalRials(monthKey));
+        final Double target = parsedTarget != null && parsedTarget > 0d ? parsedTarget : null;
         SalesSnapshot snapshot = d == null ? null : d.salesSnapshot;
         boolean salesAvailable = snapshot != null && snapshot.isAvailable();
 

@@ -1,22 +1,29 @@
-# آخرین وضعیت توسعهٔ میلانو — مدیر (به‌روزرسانی: دور ۱۴ — عیب‌یابی دریافت اطلاعات و فعال‌سازی بی‌نام)
+# آخرین وضعیت توسعهٔ میلانو — مدیر (به‌روزرسانی: دور ۱۵ — رفع خطای داشبورد و ورود آتیران)
 
 ## نسخهٔ فعلی
-- **MEELANO Manager v36.42.0** — package `ir.meelano.manager` — versionCode **75**.
-- APK مستقل: `dist/meelano-manager-v36-debug-24.apk`؛ SHA-256: `845ff41251cb05183715f392617aed71fe58a19270464f9d5841fafbcb61c02d` (`dist/manager-v36-build-info.txt`).
+- **MEELANO Manager v36.43.0** — package `ir.meelano.manager.debug` — versionCode **76**.
+- APK مستقل: `dist/meelano-manager-v36-debug-25.apk`؛ SHA-256: `ef988dfa4550fea84a2ce3ab99c3a9f79a830a16708a8d4ff2b3e9b693b16e16` (`dist/manager-v36-build-info.txt`).
 - لینک مستقیم Manager:
-  `https://github.com/Companymeelano/Testt/raw/arena/29e01a09-testt/dist/meelano-manager-v36-debug-24.apk`
-- ابزار فروشندهٔ صدور لایسنس **v1.9.1 (11)**: `dist/meelano-admin-v1.9.1-debug.apk`؛ SHA-256: `a20372cd5afc0712840f22a25cb8780f18b8697492dffe98f4dfe0d4542ca46f` (`dist/admin-license-build-info.txt`).
+  `https://github.com/Companymeelano/Testt/raw/arena/29e01a09-testt/dist/meelano-manager-v36-debug-25.apk`
+- ابزار فروشندهٔ صدور لایسنس **v1.9.1 (11)**: `dist/meelano-admin-v1.9.1-debug.apk`؛ SHA-256: `20376df663ae9816a23dde8715c226b16dd81e16764dfe489b92335935bd41a0` (`dist/admin-license-build-info.txt`).
   لینک مستقیم:
   `https://github.com/Companymeelano/Testt/raw/arena/29e01a09-testt/dist/meelano-admin-v1.9.1-debug.apk`
 
-## دور ۱۴ (آخرین دور) — عیب‌یابی مسیر دریافت + نام مشتری در ابزار صدور
+## دور ۱۵ (آخرین دور) — رفع خطای رندر هشدار + خطای SQL هنگام ورود
+- علت stack trace اکنون قطعی است: `HomeScreen.secAlerts` یک View را پیش از جداکردن از `rows` دوباره به `alerts` اضافه می‌کرد؛ با detach پیش از reparent رفع شد.
+- استعلام اولیهٔ ویزیتور و پیوند `sys_vis` در ورود دیگر `TRY_CONVERT` نمی‌خواهند؛ خواندن رمز/وضعیت و کنترل شناسه/دسترسی حفظ شده است.
+- تست‌های SQL سازگارتر و شناسه/رمز اضافه شد؛ `verify_all.py` **۲۴/۲۴** و schema audit **۰ خطا**.
+- CI **41159244435 success**؛ unit tests، build و بررسی هویت/امضای APK سبز.
+- APK debug: `dist/meelano-manager-v36-debug-25.apk`, SHA-256 `ef988dfa4550fea84a2ce3ab99c3a9f79a830a16708a8d4ff2b3e9b693b16e16`.
+- **محدودیت:** سایر queryهای گزارش/داده هم در نقاطی از `TRY_CONVERT` استفاده می‌کنند؛ پروژه SQL Server 2014 را مبنا می‌گیرد. اگر سرور فروشگاه این تابع را نمی‌شناسد، پشتیبانی کامل همهٔ صفحات روی همان نسخهٔ قدیمی هنوز نیازمند بررسی است. جزئیات: `manager/DEVELOPMENT-ROUND-15-dashboard-render-and-sql-login-fa.md`.
+
+## دور ۱۴ — عیب‌یابی مسیر دریافت + نام مشتری در ابزار صدور
 - خطای runtime در رندر داشبورد/نتیجهٔ دریافت مهار می‌شود؛ خطای بازار/آب‌وهوا در نخ مستقل
   دیگر کل برنامه را نمی‌بندد؛ بعد از crash صفحهٔ امن برای کپی گزارش محلی نمایش داده می‌شود.
 - صفحهٔ فعال‌سازی دیگر نام نمی‌خواهد؛ کد دستگاه خودکار ارسال می‌شود و فروشنده نام شخص را
   در ابزار صدور وارد می‌کند. تکرار درخواست برای یک دستگاه، اطلاعات مشتری قبلی را پاک نمی‌کند.
 - تست پروتکل درخواست بی‌نام + سازگاری درخواست نام‌دار قدیمی افزوده شد.
-- **علت crash قبلی هنوز با قطعیت مشخص نیست** چون گزارش/stack trace از گوشی در دسترس نبود؛
-  کد برای جلوگیری از crash UI و گرفتن گزارش امن اصلاح شده تا در صورت تکرار علت دقیق روشن شود.
+- **در زمان تحویل دور ۱۴** علت crash قبلی هنوز با قطعیت مشخص نبود چون stack trace گوشی در دسترس نبود؛ گزارش دور ۱۵ علت رخداد جدیدِ ارسالی را به‌طور قطعی مشخص و رفع می‌کند.
 - CI **41156568125 success**؛ تست Manager + build/verify دو APK سبز. این دور فقط APKهای debug تحویل شدند؛ release امضاشده جداگانه منتشر نشد.
 - گزارش کامل و لینک‌ها: `manager/DEVELOPMENT-ROUND-14-login-and-license-flow-fa.md`.
 

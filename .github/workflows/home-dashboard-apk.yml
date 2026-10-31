@@ -181,7 +181,7 @@ jobs:
 
       # Explicit opt-in: include [publish-apk] in a push commit to create a debug prerelease.
       - name: Publish direct-download debug APK
-        if: ${{ always() && github.event_name == 'push' && contains(github.event.head_commit.message, '[publish-apk]') && hashFiles('manager/app/build/outputs/apk/debug/app-debug.apk') != '' }}
+        if: ${{ success() && github.event_name == 'push' && contains(github.event.head_commit.message, '[publish-apk]') && hashFiles('manager/app/build/outputs/apk/debug/app-debug.apk') != '' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -198,3 +198,73 @@ jobs:
             --title "MEELANO Manager Home Dashboard Debug ${short_sha}" \
             --notes "Installable debug APK built from ${GITHUB_SHA}. This is not a production-signed release." \
             --prerelease
+
+  screenshots:
+    name: Capture Light and Dark Home screenshots
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: "17"
+          distribution: temurin
+
+      - name: Install Android SDK 35
+        run: |
+          SDKMAN="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMAN" --licenses > /dev/null || true
+          "$SDKMAN" "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+
+      - name: Set up Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.11.1
+
+      - name: Fetch pinned offline Persian voice engine
+        run: |
+          mkdir -p manager/app/libs
+          curl -fsSL -o manager/app/libs/sherpa-onnx-1.13.8.aar https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-1.13.8.aar
+          echo "633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96  manager/app/libs/sherpa-onnx-1.13.8.aar" | sha256sum -c -
+
+      - name: Run the real Home Views on an Android emulator and save both themes
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect
+          script: |
+            set -euo pipefail
+            cd manager
+            gradle :app:connectedDebugAndroidTest -PhomeScreenshotAbi=true --console=plain --stacktrace --no-daemon
+            mkdir -p ../design/screenshots
+            adb pull /sdcard/Android/data/ir.meelano.manager.debug/files/home-dashboard-screenshots/home-dashboard-light.png ../design/screenshots/home-dashboard-light.png
+            adb pull /sdcard/Android/data/ir.meelano.manager.debug/files/home-dashboard-screenshots/home-dashboard-dark.png ../design/screenshots/home-dashboard-dark.png
+            test -s ../design/screenshots/home-dashboard-light.png
+            test -s ../design/screenshots/home-dashboard-dark.png
+
+      - name: Upload screenshot pair
+        uses: actions/upload-artifact@v4
+        with:
+          name: home-dashboard-screenshots-${{ github.sha }}
+          path: design/screenshots/home-dashboard-*.png
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Add screenshots to the Home dashboard PR
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add design/screenshots/home-dashboard-light.png design/screenshots/home-dashboard-dark.png
+          git commit -m "docs(home): add Light and Dark dashboard screenshots"
+          git fetch origin arena/e7d9f96e-testt
+          git rebase origin/arena/e7d9f96e-testt
+          git push origin HEAD:arena/e7d9f96e-testt

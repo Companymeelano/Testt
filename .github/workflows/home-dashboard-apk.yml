@@ -70,7 +70,7 @@ jobs:
           if end < start:
               end = len(text)
           snippet = text[start:end + len("BUILD FAILED")]
-          details = (snippet[:1400] or text[-1400:])
+          details = (snippet[:700] or text[-700:])
 
           # Lint's failure summary is terse; surface every error plus warnings in the
           # touched UI files so the check run contains actionable diagnostics without
@@ -96,7 +96,9 @@ jobs:
                       touched_warnings += 1
                   else:
                       continue
-                  findings.append(line)
+                  rule = re.search(r"\[([A-Za-z0-9_]+)\]\s*$", line)
+                  rule_id = rule.group(1) if rule else "Lint"
+                  findings.append(f"{Path(path).name}:{match.group(2)} [{rule_id}] {severity}")
               if findings:
                   details += (f"\n\nLint findings: {errors} errors; "
                               f"{touched_warnings} warnings in changed UI files.\n")

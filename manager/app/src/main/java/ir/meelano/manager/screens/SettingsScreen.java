@@ -7,6 +7,7 @@ import android.view.View;
 import ir.meelano.manager.R;
 import android.widget.EditText;
 import android.widget.HorizontalScrollView;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -306,10 +307,14 @@ public class SettingsScreen extends Screen {
         final boolean isLight = "light".equals(a.settings.themeMode());
         final boolean isNuts = "nuts".equals(a.settings.themeMode());
         final int themeIdx = isNuts ? 2 : isLight ? 1 : 0;
-        th.addView(a.kit.chips(new String[]{"◐ تیره • ابسیدین طلایی", "◑ روشن • عاج سلطنتی", "🥜 آجیل و خشکبار"}, themeIdx, idx -> {
-            a.settings.setThemeMode(idx == 2 ? "nuts" : idx == 1 ? "light" : "dark");
-            a.refreshTheme();
-        }), a.kit.lp(-1, -2));
+        th.addView(a.kit.chipsWithIcons(
+                new String[]{"تیره • ابسیدین طلایی", "روشن • عاج سلطنتی", "آجیل و خشکبار"},
+                themeIdx,
+                new int[]{R.drawable.icon3d_dark_theme, R.drawable.icon3d_theme, R.drawable.icon3d_nut_theme},
+                Theme.GOLD, idx -> {
+                    a.settings.setThemeMode(idx == 2 ? "nuts" : idx == 1 ? "light" : "dark");
+                    a.refreshTheme();
+                }), a.kit.lp(-1, -2));
         th.addView(a.kit.gap(8));
         th.addView(a.kit.text("نمایش", 12f, Theme.MUTED, true), a.kit.lp(-1, -2));
         th.addView(a.kit.btnGhost("🔍 بزرگ‌نمایی متن: " + MainActivity.zoomLabel(a.settings.zoomIdx()), Theme.GOLD, v -> {
@@ -325,7 +330,7 @@ public class SettingsScreen extends Screen {
             a.refreshTheme();
         }), a.kit.lp(-1, -2));
         th.addView(a.kit.gap(6));
-        th.addView(a.kit.hint("قالب انتخابی فوراً روی همه بخش‌ها، جدول‌ها، نمودارها و آیکن‌ها اعمال می‌شود."),
+        th.addView(a.kit.hint("برای دیدن همهٔ قالب‌ها ردیف را افقی بکشید. انتخاب قالب فوراً روی همهٔ بخش‌ها، جدول‌ها، نمودارها و آیکن‌ها اعمال می‌شود."),
                 a.kit.lp(-1, -2));
         a.kit.addCard(content, th);
     }
@@ -482,7 +487,7 @@ public class SettingsScreen extends Screen {
 
     private void buildSecurity(final LinearLayout content) {
         content.addView(sectionHead("🔐 امنیت و ورود",
-                "قفل مدیریتی و ورود با حساب محلی. رمزها روی همین گوشی ذخیره می‌شوند.",
+                "قفل محلی برنامه و ورود نقش‌محور با حساب واقعی آتیران.",
                 Theme.INFO), a.kit.lp(-1, -2));
 
         LinearLayout p = a.kit.card(Theme.INFO);
@@ -512,7 +517,7 @@ public class SettingsScreen extends Screen {
 
         LinearLayout lg = a.kit.card(Theme.GOLD);
         lg.addView(a.kit.text("حساب ورود", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
-        lg.addView(a.kit.kv("وضعیت", "ورود با حساب محلی الزامی است", Theme.SUCCESS), a.kit.lp(-1, -2));
+        lg.addView(a.kit.kv("وضعیت", "ورود با حساب آتیران الزامی است", Theme.SUCCESS), a.kit.lp(-1, -2));
         if (ir.meelano.manager.core.AtiranAuth.hasSession(a)) {
             lg.addView(a.kit.kv("کاربر فعلی",
                     ir.meelano.manager.core.AtiranAuth.sessionName(a) + " («"
@@ -521,7 +526,7 @@ public class SettingsScreen extends Screen {
                             + "»)", Theme.TEXT), a.kit.lp(-1, -2));
             lg.addView(a.kit.btnGhost("خروج از حساب فعلی", Theme.DANGER, v -> a.logout()), a.kit.lp(-1, -2));
         }
-        lg.addView(a.kit.hint("پس از فعال‌سازی لایسنس و انتخاب دیتابیس، برای ورود به نسخه مدیریت یا انبارداری باید با حساب محلی همین اپ وارد شوید."),
+        lg.addView(a.kit.hint("پس از فعال‌سازی لایسنس و انتخاب دیتابیس، همهٔ نقش‌ها از جمله مدیریت و انبارداری باید با حساب فعال خود در آتیران وارد شوند."),
                 a.kit.lp(-1, -2));
         a.kit.addCard(content, lg);
     }
@@ -541,7 +546,9 @@ public class SettingsScreen extends Screen {
             render(content);
         }));
         if (ren) {
-            String[][] rr = {{"admin", "مدیر"}, {"seller", "فروشنده"}, {"accountant", "حسابدار"}, {"visitor", "ویزیتور"}, {"distributor", "موزع"}, {"warehouse", "انباردار"}, {"moadian", "مودیان"}};
+            String[][] rr = {{"admin", "مدیر مجموعه"}, {"sales_manager", "مدیر فروش"},
+                    {"seller", "فروشنده"}, {"accountant", "حسابدار"}, {"visitor", "ویزیتور"},
+                    {"distributor", "موزع"}, {"warehouse", "انباردار"}, {"moadian", "مودیان"}};
             for (String[] role : rr) {
                 final String rk = role[0];
                 final String rn = role[1];
@@ -577,22 +584,17 @@ public class SettingsScreen extends Screen {
 
     private void buildDashboard(final LinearLayout content) {
         content.addView(sectionHead("🧭 ترتیب داشبورد خانه",
-                "بخش‌های صفحهٔ خانه را با ↑ و ↓ جابه‌جا کنید.",
+                "بخش‌های فعال را با ↑ و ↓ بر اساس اولویت روزانه مرتب کنید.",
                 Theme.GOLD), a.kit.lp(-1, -2));
         LinearLayout ho = a.kit.card(Theme.GOLD);
         final String[][] secs = {
-                {"kpis", "شاخص‌های روز"},
+                {"kpis", "گردش امروز"},
                 {"alerts", "هشدار امروز"},
                 {"due", "سررسید چک‌ها"},
-                {"invstatus", "وضعیت فاکتورها"},
-                {"returns", "برگشتی‌ها"},
-                {"today_top", "پرفروش‌ترین کالاهای امروز"},
-                {"trend", "روند ۱۴ روزه فروش"},
-                {"debtors", "بدهکاران اولویت‌دار"},
-                {"visitors", "عملکرد ویزیتورها"},
-                {"donut", "ترکیب دریافت"},
+                {"returns", "برگشتی‌های فعال"},
+                {"sales_insight", "نبض فروش (نمودار، کالاها و مقایسه ماهانه)"},
+                {"cash_mix", "ترکیب دریافت"},
                 {"eod", "جمع‌بندی پایان روز"},
-                {"shortcuts", "دسترسی سریع"},
         };
         final java.util.List<String> order = new java.util.ArrayList<>();
         for (String k : a.settings.homeOrder().split(","))
@@ -637,7 +639,7 @@ public class SettingsScreen extends Screen {
                         a.kit.toast("گزارش فنی در دسترس نیست");
                         return;
                     }
-                    cm.setPrimaryClip(android.content.ClipData.newPlainText("گزارش خطای میلانو زرین‌فرمان", report));
+                    cm.setPrimaryClip(android.content.ClipData.newPlainText("گزارش خطای میلانو", report));
                     a.kit.toast("گزارش کپی شد؛ آن را برای پشتیبانی بفرستید");
                 } catch (Exception e) {
                     a.kit.toast("کپی گزارش ممکن نشد");
@@ -660,14 +662,14 @@ public class SettingsScreen extends Screen {
         TextView dr = a.kit.text("✦ طراح و توسعه‌دهنده ✦", 13f, Theme.TEXT, true);
         dr.setGravity(Gravity.CENTER);
         ab.addView(dr, a.kit.lp(-1, -2));
-        TextView tag = a.kit.text("میلانو زرین‌فرمان • داشبورد مدیریتی آتیران", 11f, Theme.MUTED, false);
+        TextView tag = a.kit.text("میلانو • داشبورد مدیریتی آتیران", 11f, Theme.MUTED, false);
         tag.setGravity(Gravity.CENTER);
         ab.addView(tag, a.kit.lp(-1, -2));
         ab.addView(a.kit.gap(4));
         ab.addView(a.kit.kv("نسخه", appVersion() + " • " + editionNow(), Theme.TEXT), a.kit.lp(-1, -2));
         addUpdateCard(ab);
         ab.addView(a.kit.kv("منبع داده", "SQL Server آتیران (اتصال مستقیم)", Theme.TEXT), a.kit.lp(-1, -2));
-        ab.addView(a.kit.text("✦ پشتیبانی میلانو زرین‌فرمان", 13f, Theme.GOLD_SOFT, true), a.kit.lp(-1, -2));
+        ab.addView(a.kit.text("✦ پشتیبانی میلانو", 13f, Theme.GOLD_SOFT, true), a.kit.lp(-1, -2));
         ab.addView(a.kit.btnGhost("🌐  " + ir.meelano.manager.core.Brand.SITE_LABEL, Theme.GOLD, v ->
                 ir.meelano.manager.core.Brand.openSite(a)), a.kit.lp(-1, -2));
         for (String ph : ir.meelano.manager.core.Brand.PHONES) {
@@ -682,7 +684,22 @@ public class SettingsScreen extends Screen {
     /** Themed update card: manual check, status, and a manual release-page fallback. */
     private void addUpdateCard(LinearLayout ab) {
         ab.addView(a.kit.gap(6), a.kit.lp(-1, -2));
-        ab.addView(a.kit.text("⟳ بروزرسانی برنامه", 14f, Theme.GOLD, true), a.kit.lp(-1, -2));
+        LinearLayout updateHead = a.kit.h();
+        updateHead.setGravity(Gravity.CENTER_VERTICAL);
+        ImageView updateArt = new ImageView(a);
+        int updateIcon = Theme.icon3d(R.drawable.mi_refresh);
+        updateArt.setImageResource(updateIcon);
+        updateArt.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        updateHead.addView(updateArt, a.kit.lp(Theme.dp(34), Theme.dp(34)));
+        updateHead.addView(a.kit.space(8));
+        updateHead.addView(a.kit.text("بروزرسانی برنامه", 14f, Theme.GOLD, true), a.kit.wlp(1f));
+        ab.addView(updateHead, a.kit.lp(-1, -2));
+        if (!ir.meelano.manager.core.UpdateCenter.releaseUpdateSupported(a)) {
+            ab.addView(a.kit.hint("این نسخهٔ آزمایشی است؛ نصب مستقیم درون‌برنامه‌ای فقط در نسخهٔ انتشارِ رسمی با امضای پایدار فعال می‌شود."), a.kit.lp(-1, -2));
+            ab.addView(a.kit.btnGhost("📦  صفحه نسخه‌های منتشرشده", Theme.GOLD, v -> openReleasesPage()),
+                    a.kit.lp(-1, -2));
+            return;
+        }
         ab.addView(a.kit.hint(ir.meelano.manager.core.UpdateCenter.statusLine(a)), a.kit.lp(-1, -2));
         ab.addView(a.kit.hint(ir.meelano.manager.core.UpdateCenter.lastCheckLine(a)), a.kit.lp(-1, -2));
         ab.addView(a.kit.btnGold("⟳  بررسی و دریافت نسخه جدید", v ->
@@ -775,7 +792,7 @@ public class SettingsScreen extends Screen {
                 render(content);
                 try {
                     java.io.File shared = Backup.toShareDir(a, zip);
-                    if (shared != null) ShareProvider.share(a, shared, "application/zip", "بکاپ هوشمند میلانو زرین‌فرمان");
+                    if (shared != null) ShareProvider.share(a, shared, "application/zip", "بکاپ هوشمند میلانو");
                     else a.kit.toast("فایل در پوشه Downloads ذخیره شد");
                 } catch (Exception e) {
                     a.kit.toast("فایل در پوشه Downloads ذخیره شد");

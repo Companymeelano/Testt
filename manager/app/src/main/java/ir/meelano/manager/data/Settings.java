@@ -67,6 +67,32 @@ public final class Settings {
         return hostSet && !db().isEmpty();
     }
     public String port() { return p.getString("db_port", "").trim(); }
+
+    /** Inside-profile port ("" → shared port → 1433). */
+    public String portLan() { return p.getString("db_port_lan", "").trim(); }
+
+    /** Outside-profile port ("" → shared port → 1433) — e.g. 5050 forwarded to 1433 on the dedicated IP. */
+    public String portWan() { return p.getString("db_port_wan", "").trim(); }
+
+    /**
+     * Parse a port text (Persian digits accepted): 1..65535, else the
+     * default 1433. Pure — safe to unit-test.
+     */
+    public static int parsePort(String v) {
+        try {
+            int n = Integer.parseInt(Money.en(v == null ? "" : v.trim()).trim());
+            return (n >= 1 && n <= 65535) ? n : Atiran.DEFAULT_PORT;
+        } catch (Exception ignored) {
+            return Atiran.DEFAULT_PORT;
+        }
+    }
+
+    /** Effective port for one smart-link profile (see {@link #effPort}). */
+    public int effPortFor(String kind) {
+        String per = ir.meelano.manager.core.SmartLink.WAN.equals(kind) ? portWan() : portLan();
+        if (!per.isEmpty()) return parsePort(per);
+        return effPort();
+    }
     public String db() { return p.getString("db_name", "").trim(); }
     public String user() { return p.getString("db_user", "").trim(); }
     /**
@@ -95,12 +121,7 @@ public final class Settings {
     public String effUser() { return Atiran.defaultUser(); }
     public String effPass() { return Atiran.defaultPass(); }
     public int effPort() {
-        try {
-            int v = Integer.parseInt(Money.en(port()).trim());
-            return v > 0 ? v : Atiran.DEFAULT_PORT;
-        } catch (Exception ignored) {
-            return Atiran.DEFAULT_PORT;
-        }
+        return parsePort(port());
     }
 
     /**
@@ -111,6 +132,7 @@ public final class Settings {
     public void clearSavedServer() {
         p.edit().remove("db_host").remove("db_lan").remove("db_wan")
                 .remove("db_name").remove("link_last")
+                .remove("db_port_lan").remove("db_port_wan")
                 .putString("link_mode", "auto").apply();
     }
 
@@ -125,9 +147,22 @@ public final class Settings {
 
     /** Save both smart-link profiles at once (either address may be empty). */
     public void saveSmart(String lan, String wan, String port, String db, String user, String pass) {
+        saveSmart(lan, wan, port, port, db, user, pass);
+    }
+
+    /**
+     * Save both smart-link profiles with their own ports (either may be empty;
+     * empty = the default 1433, or the shared port when one was saved before).
+     * The dedicated/public address often answers on a forwarded port
+     * (e.g. 5050 → 1433) while the shop LAN keeps 1433.
+     */
+    public void saveSmart(String lan, String wan, String lanPort, String wanPort,
+                          String db, String user, String pass) {
         p.edit().putString("db_lan", lan == null ? "" : lan.trim())
                 .putString("db_wan", wan == null ? "" : wan.trim())
-                .putString("db_port", port == null ? "" : port.trim())
+                .putString("db_port_lan", lanPort == null ? "" : lanPort.trim())
+                .putString("db_port_wan", wanPort == null ? "" : wanPort.trim())
+                .putString("db_port", "")
                 .putString("db_name", db == null ? "" : db.trim())
                 .putString("db_user", user == null ? "" : user.trim())
                 .apply();
@@ -136,15 +171,22 @@ public final class Settings {
 
     /**
      * Store one address into the matching profile (private → inside,
-     * public → outside) without touching the other profile.
+     * public → outside) without touching the other profile. The port is
+     * stored per-profile too (a forwarded port on the dedicated IP does
+     * not have to match the shop LAN port).
      */
     public void placeHost(String host, String port, String db, String user, String pass) {
         String h = host == null ? "" : host.trim();
         SharedPreferences.Editor e = p.edit();
         if (!h.isEmpty()) {
             Boolean priv = ir.meelano.manager.core.SmartLink.isPrivate(h);
-            if (priv != null && !priv) e.putString("db_wan", h);
-            else e.putString("db_lan", h);
+            if (priv != null && !priv) {
+                e.putString("db_wan", h);
+                e.putString("db_port_wan", port == null ? "" : port.trim());
+            } else {
+                e.putString("db_lan", h);
+                e.putString("db_port_lan", port == null ? "" : port.trim());
+            }
         }
         e.putString("db_port", port == null ? "" : port.trim())
                 .putString("db_name", db == null ? "" : db.trim())
@@ -188,51 +230,59 @@ public final class Settings {
     public boolean pinEnabled() { return p.getBoolean("pin_on", false); }
     public String pinHash() { return p.getString("pin_hash", ""); }
 
+    /** Legacy single-iteration verifier namespace (fixed prefix), kept only for verification. */
+    private static final String LEGACY_PIN_PREFIX = "meelano7:";
+
     public void setPin(String pinOrNull) {
         String pin = pinOrNull == null ? null : Money.en(pinOrNull).trim();
         if (pin == null || pin.length() < 4) {
             p.edit().putBoolean("pin_on", false).putString("pin_hash", "").apply();
-        } else {
-            p.edit().putBoolean("pin_on", true).putString("pin_hash", sha(pin)).apply();
+            return;
         }
+        String h = ir.meelano.manager.core.PinHash.hash(pin);
+        if (h.isEmpty()) {
+            // Hashing unavailable: fail closed — never store something derived from the PIN.
+            p.edit().putBoolean("pin_on", false).putString("pin_hash", "").apply();
+            return;
+        }
+        p.edit().putBoolean("pin_on", true).putString("pin_hash", h).apply();
     }
 
     public boolean checkPin(String pin) {
         if (!pinEnabled()) return true;
-        return pin != null && sha(Money.en(pin).trim()).equals(pinHash());
-    }
-
-    private static String sha(String s) {
-        try {
-            java.security.MessageDigest d = java.security.MessageDigest.getInstance("SHA-256");
-            byte[] h = d.digest(("meelano7:" + s).getBytes("UTF-8"));
-            StringBuilder b = new StringBuilder();
-            for (byte x : h) b.append(String.format("%02x", x));
-            return b.toString();
-        } catch (Exception e) {
-            return "x" + s;
+        if (pin == null) return false;
+        String norm = Money.en(pin).trim();
+        String saved = pinHash();
+        if (!ir.meelano.manager.core.PinHash.verify(norm, saved, LEGACY_PIN_PREFIX)) return false;
+        if (ir.meelano.manager.core.PinHash.legacy(saved)) {
+            String h = ir.meelano.manager.core.PinHash.hash(norm);
+            if (!h.isEmpty()) p.edit().putString("pin_hash", h).apply();
         }
+        return true;
     }
 
     // ---------------- luxury theme ----------------
-    /** "dark" (Midnight Gold) or "light" (Ivory Royal). */
+    /** "dark" (Midnight Gold), "light" (Ivory Royal), or "nuts" (Nut & Dry Fruit). */
     public String themeMode() {
-        // Dark («Midnight Gold») is the default. One-time migration: installs that were
-        // still on the old light default switch to dark once; a later manual choice is kept.
-        if (!p.getBoolean("theme_dark_default_v38", false)) {
-            p.edit().putString("theme_mode", "dark").putBoolean("theme_dark_default_v38", true).apply();
-        }
-        // v39: «آجیل و خشکبار» is the default for everyone once; a later manual choice is kept.
+        // Mark the older migration as complete without replacing an explicit user selection.
+        // The previous v39 migration wrote "nuts" unconditionally and overwrote a saved dark/light choice.
+        if (!p.getBoolean("theme_dark_default_v38", false))
+            p.edit().putBoolean("theme_dark_default_v38", true).apply();
         if (!p.getBoolean("theme_nuts_default_v39", false)) {
-            p.edit().putString("theme_mode", "nuts").putBoolean("theme_nuts_default_v39", true).apply();
+            android.content.SharedPreferences.Editor edit = p.edit();
+            if (!p.contains("theme_mode")) edit.putString("theme_mode", "nuts");
+            edit.putBoolean("theme_nuts_default_v39", true).apply();
         }
-        String m = p.getString("theme_mode", "nuts");
-        return "light".equals(m) ? "light" : "nuts".equals(m) ? "nuts" : "dark";
+        return normalizeThemeMode(p.getString("theme_mode", "nuts"));
+    }
+
+    /** Pure, fail-safe theme normalization; exposed for regression tests. */
+    public static String normalizeThemeMode(String mode) {
+        return "light".equals(mode) ? "light" : "dark".equals(mode) ? "dark" : "nuts";
     }
 
     public void setThemeMode(String mode) {
-        String v = "light".equals(mode) ? "light" : "nuts".equals(mode) ? "nuts" : "dark";
-        p.edit().putString("theme_mode", v).apply();
+        p.edit().putString("theme_mode", normalizeThemeMode(mode)).apply();
     }
 
     /** Accent key: gold / emerald / sapphire / ruby / violet / teal. */
@@ -326,32 +376,43 @@ public final class Settings {
     public void setWhDirect(boolean on) { p.edit().putBoolean("wh_direct", on).apply(); }
 
     // ---------------- home dashboard order ----------------
-    /** Day KPIs and the sales comparison first (as in the reference design), then trends, then alerts. */
-    public static final String HOME_ORDER_DEFAULT = "kpis,trend,donut,today_top,alerts,invstatus,returns,due,debtors,visitors,eod,shortcuts";
-    private static final String HOME_ORDER_V1_DEFAULT = "kpis,alerts,due,invstatus,returns,today_top,trend,debtors,visitors,donut,eod,shortcuts";
-    private static final String HOME_ORDER_PREVIOUS_DEFAULT = "kpis,alerts,trend,donut,debtors,visitors,due,invstatus,returns,shortcuts";
+    /** Manager-first order: daily flow and actions, then trends and product analysis. */
+    public static final String HOME_ORDER_DEFAULT = "kpis,alerts,due,returns,sales_insight,cash_mix,eod";
 
     public String homeOrder() {
-        String v = p.getString("home_order", null);
-        if (v == null || v.trim().isEmpty()) return HOME_ORDER_DEFAULT;
-        // Move installations still using the untouched old default to the new
-        // manager-first order, while preserving any order the user customized.
-        if (HOME_ORDER_V1_DEFAULT.equals(v.trim()) || HOME_ORDER_PREVIOUS_DEFAULT.equals(v.trim())) {
+        String stored = p.getString("home_order", null);
+        if (stored == null || stored.trim().isEmpty()) return HOME_ORDER_DEFAULT;
+        if ("kpis,alerts,due,invstatus,returns,today_top,trend,debtors,visitors,donut,eod,shortcuts".equals(stored.trim())
+                || "kpis,alerts,trend,donut,debtors,visitors,due,invstatus,returns,shortcuts".equals(stored.trim())
+                || "kpis,trend,donut,today_top,alerts,invstatus,returns,due,debtors,visitors,eod,shortcuts".equals(stored.trim())) {
             p.edit().putString("home_order", HOME_ORDER_DEFAULT).apply();
             return HOME_ORDER_DEFAULT;
         }
-        return v;
+        StringBuilder clean = new StringBuilder();
+        java.util.HashSet<String> seen = new java.util.HashSet<>();
+        String[] active = HOME_ORDER_DEFAULT.split(",");
+        for (String key : stored.split(",")) {
+            String candidate = key == null ? "" : key.trim();
+            boolean known = false;
+            for (String valid : active) if (valid.equals(candidate)) { known = true; break; }
+            if (known && seen.add(candidate)) {
+                if (clean.length() > 0) clean.append(',');
+                clean.append(candidate);
+            }
+        }
+        for (String valid : active) {
+            if (seen.add(valid)) {
+                if (clean.length() > 0) clean.append(',');
+                clean.append(valid);
+            }
+        }
+        String normalized = clean.toString();
+        if (!normalized.equals(stored)) p.edit().putString("home_order", normalized).apply();
+        return normalized;
     }
 
     public void setHomeOrder(String csv) {
         p.edit().putString("home_order", csv == null ? HOME_ORDER_DEFAULT : csv).apply();
-    }
-
-    /** Whether the manager dashboard's lower-priority analysis cards are expanded. */
-    public boolean homeDetailsExpanded() { return p.getBoolean("home_details_expanded", false); }
-
-    public void setHomeDetailsExpanded(boolean expanded) {
-        p.edit().putBoolean("home_details_expanded", expanded).apply();
     }
 
     // ---------------- stock alerts + auto backup (v18) ----------------

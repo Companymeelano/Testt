@@ -30,6 +30,37 @@ public final class LanDiscover {
     /** SQL Server port — hidden from the customer, always this. */
     public static final int PORT = 1433;
 
+    /** Common forwarded port (router forwards 5050 → 1433 on the dedicated IP). */
+    public static final int PORT_FWD = 5050;
+
+    /** Ports probed while discovering a server: the default first, then the forwarded one. */
+    public static final int[] PROBE_PORTS = {PORT, PORT_FWD};
+
+    /**
+     * Port typed as part of the address ("1.2.3.4:5050"), or 0 when the
+     * address carries none. The customer may type the forwarded port into
+     * the address itself — it is honored instead of being dropped.
+     */
+    public static int typedPort(String in) {
+        try {
+            String t = in == null ? "" : in.trim();
+            int s = t.indexOf("://");
+            if (s >= 0) t = t.substring(s + 3);
+            int slash = t.indexOf('/');
+            if (slash >= 0) t = t.substring(0, slash);
+            t = t.trim();
+            int colon = t.lastIndexOf(':');
+            if (colon > 0 && t.indexOf(':') == colon && colon > t.lastIndexOf(']')) {
+                int v = Integer.parseInt(ir.meelano.manager.core.Money.en(
+                        t.substring(colon + 1).trim()).trim());
+                return (v >= 1 && v <= 65535) ? v : 0;
+            }
+            return 0;
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
     private static final int TCP_MS = 600;
     private static final String[] COMMON = {
             "1", "2", "3", "5", "7", "10", "11", "20", "21",
@@ -68,7 +99,7 @@ public final class LanDiscover {
                 NetworkInterface ni = nis.nextElement();
                 try {
                     if (!ni.isUp() || ni.isLoopback() || ni.isVirtual()) continue;
-                    String nm = ni.getName() == null ? "" : ni.getName().toLowerCase();
+                    String nm = ni.getName() == null ? "" : ni.getName().toLowerCase(java.util.Locale.US);
                     if (!(nm.startsWith("wlan") || nm.startsWith("wl")
                             || nm.startsWith("eth") || nm.startsWith("enp")
                             || nm.startsWith("enx") || nm.startsWith("ens")
@@ -129,6 +160,14 @@ public final class LanDiscover {
             }
         } catch (Exception ignored) { Diag.ignored("LanDiscover:130", ignored); }
         return ordered;
+    }
+
+    /** First answering SQL port of a host (1433, else 5050), or 0 when none. */
+    public static int openPortOf(String host) {
+        for (int port : PROBE_PORTS) {
+            if (SmartLink.probeTcp(host, port, 700) == null) return port;
+        }
+        return 0;
     }
 
     /**

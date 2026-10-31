@@ -32,6 +32,11 @@ final class MeelanoProductPhotos {
         if (has(t, "کره", "روغن", "بستنی", "کیک", "بیسکو", "ویفر", "شوکو", "بایکیت", "تابلت", "کلوچه")
                 // whole words only: «کرم» is inside «کرمان»
                 || hasWord(t, "شیر", "کرم", "نان", "نانی", "آرد", "ارد")) return null;
+
+        // Match the exact products in the supplied sales photos before falling back to generic food art.
+        String exact = productSpecificKey(t);
+        if (exact != null) return exact;
+
         // Chocolates, sweets and snacks (Atiran group «شکلات و آبنبات ها»).
         if (has(t, "شکلات", "کاکائو", "پرالین", "ترافل")) return "chocolate";
         if (has(t, "آبنبات", "ابنبات", "ابنیات", "آدامس", "ادامس", "تافی", "پاستیل", "دراژه", "اسمارتیز", "اچاچی", "آچاچی", "نبات", "سوهان", "گز ")
@@ -57,6 +62,47 @@ final class MeelanoProductPhotos {
         if (has(t, "آلو بخارا", "آلوبخارا", "آلوچه", "الوچه", "برگ زرد", "برگه")
                 || hasWord(t, "آلو", "الو", "توت", "توت خشک", "هلو خشک", "سیب خشک", "کیوی خشک")) return "dried_fruit";
         if (has(t, "خشکبار")) return "nuts";
+        return null;
+    }
+
+    /**
+     * Brand/SKU aliases from the visitor's product flyers. Keep this ahead of the broad
+     * category rules so, for example, a branded hot chocolate never gets a generic candy photo.
+     */
+    private static String productSpecificKey(String t) {
+        boolean delbos = has(t, "دلبوث", "دلبوس", "delbos");
+        boolean plum = has(t, "آلوچه", "الوچه", "آلو", "الو", "آلو خشک", "آلوخشک");
+        boolean shandiz = has(t, "شاندیز", "shandiz");
+
+        if (delbos && has(t, "گیلاس", "آلبالو", "الوچه ترش", "sour cherry")) return "delbos_sour_cherry";
+        if (delbos && has(t, "زردآلو", "زرد آلو", "برگه زردآلو", "آلو طلایی", "golden plum")) return "delbos_golden_plum";
+        if (delbos && plum) return "delbos_processed_plum";
+        if (has(t, "ساحل", "sahil") && plum) return "sahil_prune";
+        if (shandiz && plum && has(t, "10", "۱۰", "ده عدد", "ده تایی", "ده‌تایی", "کارتن 8", "کارتن ۸"))
+            return "shandiz_ten_pack";
+        if (shandiz && has(t, "سانتریزه", "سانتریز", "سانتريزه", "سانتريز")) return "shandiz_sun_plum";
+        if (shandiz && plum && has(t, "جنگلی", "جنگلى", "forest")) return "shandiz_forest_plum";
+
+        if (has(t, "مولتی کافه", "مولتی‌کافه", "multicafe")
+                && has(t, "بلک گلد", "black gold", "اسپرسو", "espresso")) return "multicafe_black_gold";
+        boolean farmand = has(t, "فرمند", "formand");
+        boolean chocolateSauce = has(t, "سس شکلاتی", "سس شکلات", "chocolate sauce");
+        boolean caramelSauce = has(t, "سس کارامل", "کارامل", "caramel sauce");
+        if (farmand && chocolateSauce && caramelSauce) return "farmand_sauce_pair";
+        if (farmand && chocolateSauce) return "farmand_chocolate_sauce";
+        if (farmand && caramelSauce) return "farmand_caramel_sauce";
+
+        if (has(t, "جلیتو", "gelito") && has(t, "کولا", "cola")) return "gelito_cola_gummy";
+        if (has(t, "هات چاکلت", "هات شکلات", "hot chocolate")
+                && has(t, "دیسترو", "دیسترو", "distro", "دسترو")) return "distro_hot_chocolate";
+        if (has(t, "کاپوچینو", "کاپوچينو", "cappuccino")
+                && has(t, "دیسترو", "distro", "دسترو")) return "distro_cappuccino";
+        if (has(t, "جلیتو", "gelito") && has(t, "فوم", "فومدار", "آیدین", "ايدين", "aidin"))
+            return "aidin_gelito_foam";
+        if (has(t, "لواشک رولی", "لواشک رول", "fruit leather roll")
+                && has(t, "باغتام", "باغ تام", "baghtam")) return "baghtam_fruit_roll";
+        if (has(t, "هایفروت", "های فروت", "highfruit", "hyfruit")
+                && has(t, "لواشک", "استیکی", "استيكي", "fruit bar")) return "baghban_highfruit_bar";
         return null;
     }
 

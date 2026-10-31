@@ -6,17 +6,18 @@ import android.content.SharedPreferences;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 
 import ir.meelano.manager.data.Meta;
 
 /**
- * Atiran user login (v26).
+ * Atiran user login and role session.
  *
- * After license + connection setup, the app asks for the Atiran username and
- * password. The user row comes from Atiran's own `sys_users` table
- * (user_id / user_name / user_password / role_id / active / IsLocked …) and
- * the in-app role is derived from the Atiran role name (Roles/role tables).
+ * System users authenticate through `sys_users` and `Roles`/`role`. Field
+ * visitors use a separate path: credentials and active state come from
+ * `visitors`, while `sys_vis` must link the visitor row to a positive Atiran
+ * UserID. Visitor usernames are never searched in `sys_users`.
  *
  * Password reality: Atiran stores `user_password` as varbinary(50) — a
  * proprietary binary hash whose algorithm is NOT documented. So verification
@@ -31,9 +32,9 @@ import ir.meelano.manager.data.Meta;
  * the same real-password check also works OFFLINE after the first online
  * login. The per-user app PIN (Users section) stays as managed tooling for
  * later phases.
- * Release phases (single app, role editions): admin + warehouse are live
- * (phases 1-2); seller / accountant / visitor / distributor / moadian get
- * a «coming soon» gate until their phase opens (see phaseOpen).
+ * Release phases (single app, role editions): company manager + sales manager
+ * + warehouse + visitor are live; seller / accountant / distributor / moadian remain gated until
+ * their phase opens (see phaseOpen).
  *
  * Everything here is READ-ONLY against the server: we never write
  * IsLoggedIn / LoginDetails / PINs back to Atiran. PINs, sessions and the
@@ -47,7 +48,12 @@ public final class AtiranAuth {
         public NoTable(String m) { super(m); }
     }
 
-    /** One Atiran login identity, resolved from sys_users (+ role name). */
+    /** A visitor username was found, but its visitor credentials/access link did not validate. */
+    public static final class VisitorLoginException extends Exception {
+        public VisitorLoginException(String message) { super(message); }
+    }
+
+    /** One authenticated Atiran identity, resolved from sys_users or visitors + sys_vis. */
     public static final class AuthUser {
         public int uid;
         public String userName = "";
@@ -60,7 +66,7 @@ public final class AtiranAuth {
         public boolean active = true;
         public boolean locked;
         public byte[] pw;
-        /** False when sys_users has no user_password column we could recognise. */
+        /** False when the relevant Atiran account table has no recognized credential column. */
         public boolean pwColFound;
         /** Result of the server-side pwdcompare() probe, when it could be run. */
         public boolean serverCompared;
@@ -69,9 +75,9 @@ public final class AtiranAuth {
     // ================= server read (call off the UI thread) =================
 
     /**
-     * Resolve one username to its Atiran identity. Returns null when the
-     * username does not exist. Throws NoTable when sys_users (or its
-     * user_name column) is absent, other Exceptions for connection errors.
+     * Resolve one regular system-user login. Returns null when the username
+     * does not exist. Visitor logins are handled separately by fetchVisitorUser.
+     * Throws NoTable when sys_users (or its user_name column) is absent.
      */
     public static AuthUser fetchUser(Connection c, String username) throws Exception {
         Meta m = new Meta(c);
@@ -116,7 +122,8 @@ public final class AtiranAuth {
             if (actCol != null) {
                 try {
                     Object o = rs.getObject("a_act");
-                    u.active = flagOn(o);
+                    // Match Atiran clients' convention: a NULL active flag is not an explicit disable.
+                    u.active = o == null || flagOn(o);
                 } catch (Exception ignored) { Diag.ignored("AtiranAuth:120", ignored); }
             }
             if (lockCol != null) {
@@ -135,8 +142,208 @@ public final class AtiranAuth {
             closeQuiet(ps);
         }
         if (roleCol != null) u.roleName = roleNameOf(c, m, u.roleId);
-        u.appRole = mapRole(u.roleId, u.roleName);
+        if (u.roleName == null || u.roleName.trim().isEmpty())
+            u.roleName = roleNameForUser(c, m, u.uid, u.roleId);
+        u.appRole = resolveAppRole(u.roleId, u.roleName, u.userName);
         return u;
+    }
+
+    /**
+     * Authenticate a field visitor from Atiran's visitor account and access-link tables.
+     * Credential fields live on dbo.visitors; dbo.sys_vis grants the system link and supplies
+     * the positive Atiran UserID used for auditing. Do not look up this login in sys_users.
+     * Returns null only when no visitor row has this username, allowing the caller to try the
+     * regular sys_users flow for non-visitor roles.
+     */
+    public static AuthUser fetchVisitorUser(Connection c, String username, String typedPassword)
+            throws Exception {
+        if (c == null || username == null || username.trim().isEmpty()) return null;
+        Meta meta = new Meta(c);
+        if (!meta.table("visitors")) return null;
+        String visitorIdCol = meta.col("visitors", "vis_rdf", "visitor_id", "VisitorID", "shvis", "rdf");
+        String loginCol = meta.col("visitors", "Username", "UserName", "username", "user_name", "login", "login_name");
+        String passwordCol = meta.col("visitors", "Password", "password", "Pass", "pass", "pwd", "user_password");
+        String activeCol = meta.col("visitors", "active", "Active", "is_active", "enabled");
+        String displayCol = meta.col("visitors", "vis_name", "visitor_name", "Name", "name", "FullName");
+        if (visitorIdCol == null || loginCol == null || passwordCol == null) return null;
+
+        String sql = visitorLookupSql(meta.qTable("visitors"), visitorIdCol, loginCol,
+                passwordCol, activeCol, displayCol);
+
+        int visitorId;
+        String storedUsername;
+        byte[] storedPassword;
+        Object activeValue;
+        String displayName;
+        try (PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, username.trim());
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) return null;
+                Integer parsedVisitorId = sqlInteger(rs.getObject(1));
+                if (parsedVisitorId == null)
+                    throw new VisitorLoginException("شناسهٔ ویزیتور در آتیران معتبر نیست.");
+                visitorId = parsedVisitorId;
+                storedUsername = readSqlText(rs.getObject(2));
+                storedPassword = passwordBytes(rs.getObject(3));
+                activeValue = rs.getObject(4);
+                displayName = readSqlText(rs.getObject(5));
+                if (rs.next())
+                    throw new VisitorLoginException("برای این نام کاربری چند ردیف ویزیتور پیدا شد؛ پیوندها باید یکتا شوند.");
+            }
+        }
+        if (visitorId <= 0)
+            throw new VisitorLoginException("شناسهٔ ویزیتور در آتیران معتبر نیست.");
+        if (activeCol == null || !flagOn(activeValue))
+            throw new VisitorLoginException("حساب ویزیتور در آتیران غیرفعال است یا وضعیت فعال‌بودن آن قابل تأیید نیست.");
+        String loginName = storedUsername == null || storedUsername.trim().isEmpty()
+                ? username.trim() : storedUsername.trim();
+        if (!verifyPassword(storedPassword, typedPassword, loginName))
+            throw new VisitorLoginException("رمز حساب ویزیتور آتیران تأیید نشد.");
+
+        if (!meta.table("sys_vis"))
+            throw new VisitorLoginException("جدول دسترسی ویزیتور آتیران (sys_vis) پیدا نشد.");
+        String grantVisitorCol = meta.col("sys_vis", "shvis", "vis_rdf", "visitor_id", "visitor");
+        String grantUserCol = meta.col("sys_vis", "UserID", "user_id", "userid");
+        String grantSystemCol = meta.col("sys_vis", "SysID", "sys_id", "system_id");
+        if (grantVisitorCol == null || grantUserCol == null || grantSystemCol == null)
+            throw new VisitorLoginException("ستون‌های پیوند ویزیتور در جدول sys_vis آتیران کامل نیستند.");
+        String visitorKeyType = meta.columnType("sys_vis", grantVisitorCol);
+        String grantSql = visitorGrantSql(meta.qTable("sys_vis"), grantVisitorCol,
+                visitorKeyType, grantUserCol, grantSystemCol);
+        int atiranUid = -1;
+        try (PreparedStatement ps = c.prepareStatement(grantSql)) {
+            if (isNumericSqlType(visitorKeyType)) ps.setInt(1, visitorId);
+            else ps.setString(1, String.valueOf(visitorId));
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    Integer linkedUidValue = sqlInteger(rs.getObject(1));
+                    Integer linkedSystemValue = sqlInteger(rs.getObject(2));
+                    if (linkedSystemValue == null || linkedUidValue == null || linkedUidValue <= 0) continue;
+                    int linkedUid = linkedUidValue;
+                    if (atiranUid > 0 && atiranUid != linkedUid)
+                        throw new VisitorLoginException("پیوند این ویزیتور در sys_vis به چند کاربر آتیران می‌رسد؛ دسترسی حدسی داده نشد.");
+                    atiranUid = linkedUid;
+                }
+            }
+        }
+        if (atiranUid <= 0)
+            throw new VisitorLoginException("برای این ویزیتور دسترسی به سیستم در جدول sys_vis آتیران ثبت نشده است.");
+
+        AuthUser visitor = new AuthUser();
+        visitor.uid = atiranUid;
+        visitor.userName = loginName;
+        visitor.displayName = displayName == null || displayName.trim().isEmpty()
+                ? loginName : displayName.trim();
+        // The visitors table has no role column; the login name is the only role
+        // evidence on this path. Canonical manager panels (Modir, Admin, …) open
+        // the manager edition; every other visitor keeps the visitor workspace,
+        // unchanged and scoped to its own sys_vis identity.
+        String byUser = managerRoleForUserName(loginName);
+        visitor.roleName = byUser.isEmpty() ? "ویزیتور" : "مدیر";
+        visitor.appRole = byUser.isEmpty() ? RoleStore.VISITOR : byUser;
+        visitor.active = true;
+        visitor.pwColFound = true;
+        visitor.pw = storedPassword;
+        return visitor;
+    }
+
+    /**
+     * SQL Server 2008-compatible visitor lookup. Read credential columns in their native types;
+     * only CAST the login key to text for a stable, case-insensitive comparison. TRY_CONVERT
+     * is intentionally absent because this query runs before we know which account type is logging in.
+     */
+    static String visitorLookupSql(String table, String idCol, String loginCol, String passwordCol,
+                                   String activeCol, String displayCol) {
+        String active = activeCol == null ? "CAST(NULL AS nvarchar(32))" : Sql.q(activeCol);
+        String display = displayCol == null ? "CAST(N'' AS nvarchar(220))" : Sql.q(displayCol);
+        String loginText = "CAST(" + Sql.q(loginCol) + " AS nvarchar(200))";
+        return "SELECT TOP (2) " + Sql.q(idCol) + ", " + Sql.q(loginCol) + ", " + Sql.q(passwordCol)
+                + ", " + active + ", " + display + " FROM " + table
+                + " WHERE LOWER(LTRIM(RTRIM(" + loginText + ")))="
+                + "LOWER(LTRIM(RTRIM(?)))";
+    }
+
+    /** Build the visitor grant query without SQL Server 2012-only TRY_CONVERT. */
+    static String visitorGrantSql(String table, String visitorCol, String visitorType,
+                                  String userCol, String systemCol) {
+        return "SELECT " + Sql.q(userCol) + ", " + Sql.q(systemCol) + " FROM " + table
+                + " WHERE " + integerKeyPredicate(visitorCol, visitorType);
+    }
+
+    /**
+     * Match an Atiran integer key using its catalog type. Text-backed legacy IDs are trimmed
+     * and compared as text; numeric columns keep a native indexed equality comparison.
+     */
+    static String integerKeyPredicate(String column, String sqlType) {
+        if (isNumericSqlType(sqlType)) return Sql.q(column) + "=?";
+        return "LTRIM(RTRIM(CAST(" + Sql.q(column) + " AS nvarchar(100))))=?";
+    }
+
+    static boolean isNumericSqlType(String sqlType) {
+        if (sqlType == null) return false;
+        String type = sqlType.trim().toLowerCase(Locale.US);
+        return "tinyint".equals(type) || "smallint".equals(type) || "int".equals(type)
+                || "bigint".equals(type) || "decimal".equals(type) || "numeric".equals(type)
+                || "money".equals(type) || "smallmoney".equals(type) || "float".equals(type)
+                || "real".equals(type) || "bit".equals(type);
+    }
+
+    /** Read common JDBC values without SQL-side TRY_CONVERT; invalid IDs fail closed. */
+    static Integer sqlInteger(Object value) {
+        if (value == null) return null;
+        if (value instanceof Boolean) return (Boolean) value ? 1 : 0;
+        String text;
+        if (value instanceof byte[]) text = new String((byte[]) value, StandardCharsets.UTF_8);
+        else text = String.valueOf(value);
+        text = Money.en(text).trim();
+        if (text.isEmpty()) return null;
+        try {
+            java.math.BigDecimal parsed = new java.math.BigDecimal(text);
+            if (parsed.stripTrailingZeros().scale() > 0) return null;
+            return parsed.intValueExact();
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    /** Convert a JDBC text value; binary-backed credentials remain byte arrays instead. */
+    private static String readSqlText(Object value) {
+        if (value == null) return "";
+        try {
+            if (value instanceof java.sql.Clob) {
+                java.sql.Clob c = (java.sql.Clob) value;
+                long len = c.length();
+                if (len > Integer.MAX_VALUE) return "";
+                return c.getSubString(1, (int) len).trim();
+            }
+            if (value instanceof byte[]) return new String((byte[]) value, StandardCharsets.UTF_8).trim();
+            return String.valueOf(value).trim();
+        } catch (Exception ignored) {
+            return "";
+        }
+    }
+
+    /** Preserve native binary hashes; text passwords are UTF-8 encoded as before. */
+    static byte[] passwordBytes(Object value) {
+        if (value == null) return null;
+        if (value instanceof byte[]) return ((byte[]) value).clone();
+        try {
+            if (value instanceof java.sql.Blob) {
+                java.sql.Blob b = (java.sql.Blob) value;
+                long len = b.length();
+                if (len > Integer.MAX_VALUE) return null;
+                return b.getBytes(1, (int) len);
+            }
+            if (value instanceof java.sql.Clob) {
+                java.sql.Clob c = (java.sql.Clob) value;
+                long len = c.length();
+                if (len > Integer.MAX_VALUE) return null;
+                return c.getSubString(1, (int) len).getBytes(StandardCharsets.UTF_8);
+            }
+        } catch (Exception ignored) {
+            return null;
+        }
+        return String.valueOf(value).getBytes(StandardCharsets.UTF_8);
     }
 
     /** Best-effort role-name lookup over the unknown Roles/role schema. */
@@ -175,7 +382,78 @@ public final class AtiranAuth {
         return "";
     }
 
+    /**
+     * Role name for one system user, from every role source Atiran may use:
+     * 1. the sys_users.role_id → Roles/role name (via {@link #roleNameOf});
+     * 2. the userrole mapping table (user_id → RoleId → role name) when the
+     *    account carries its role there instead of sys_users.role_id;
+     * 3. a role-name column directly on sys_users, if the database has one.
+     * Returns "" when none of the sources is readable — the caller then falls
+     * back to the user-name evidence, never to a hard login failure.
+     */
+    public static String roleNameForUser(Connection c, Meta m, int uid, int roleId) {
+        if (roleId > 0) {
+            String n = roleNameOf(c, m, roleId);
+            if (n != null && !n.trim().isEmpty()) return n.trim();
+        }
+        try {
+            if (uid > 0 && m.table("userrole") && m.canSelect("userrole")) {
+                String uCol = m.col("userrole", "user_id", "UserID", "userid", "UserId");
+                String rCol = m.col("userrole", "RoleId", "role_id", "RoleID", "RollID");
+                if (uCol != null && rCol != null) {
+                    PreparedStatement ps = null;
+                    ResultSet rs = null;
+                    try {
+                        ps = c.prepareStatement("SELECT " + Sql.q(rCol) + " FROM " + m.qTable("userrole")
+                                + " WHERE " + Sql.q(uCol) + " = ?");
+                        ps.setInt(1, uid);
+                        rs = ps.executeQuery();
+                        while (rs.next()) {
+                            int rid;
+                            try { rid = rs.getInt(1); } catch (Exception ignored) { continue; }
+                            if (rid <= 0) continue;
+                            String n = roleNameOf(c, m, rid);
+                            if (n != null && !n.trim().isEmpty()) return n.trim();
+                        }
+                    } finally {
+                        closeQuiet(rs);
+                        closeQuiet(ps);
+                    }
+                }
+            }
+        } catch (Exception ignored) { Diag.ignored("AtiranAuth:roleNameForUser", ignored); }
+        try {
+            String idCol = m.col("sys_users", "user_id");
+            String nmCol = m.col("sys_users", "role_name", "RoleName", "roleName", "RoleTitle",
+                    "roleTitle", "RollName", "RoleText");
+            if (uid > 0 && idCol != null && nmCol != null) {
+                PreparedStatement ps = null;
+                ResultSet rs = null;
+                try {
+                    ps = c.prepareStatement("SELECT TOP 1 " + Sql.q(nmCol) + " FROM " + m.qTable("sys_users")
+                            + " WHERE " + Sql.q(idCol) + " = ?");
+                    ps.setInt(1, uid);
+                    rs = ps.executeQuery();
+                    if (rs.next()) {
+                        String v = rs.getString(1);
+                        if (v != null && !v.trim().isEmpty()) return v.trim();
+                    }
+                } finally {
+                    closeQuiet(rs);
+                    closeQuiet(ps);
+                }
+            }
+        } catch (Exception ignored) { Diag.ignored("AtiranAuth:roleNameForUser2", ignored); }
+        return "";
+    }
+
     // ================= password verification =================
+
+    /** Visitor credentials are stored as text on Atiran's visitors row; verify locally without logging them. */
+    public static boolean verifyVisitorPassword(String stored, String typed, String userName) {
+        if (stored == null || stored.isEmpty() || typed == null || typed.isEmpty()) return false;
+        return verifyPassword(stored.getBytes(StandardCharsets.UTF_8), typed, userName);
+    }
 
     /**
      * Compare the typed password with Atiran's stored bytes through every
@@ -191,7 +469,7 @@ public final class AtiranAuth {
         if (stored == null || stored.length == 0 || typed == null) return false;
         String[] texts = {typed, typed.trim()};
         String[] charsets = {"UTF-8", "UTF-16LE", "UTF-16BE", "windows-1256"};
-        String[] algs = {"MD5", "SHA-1", "SHA-224", "SHA-256", "SHA-384"};
+        String[] algs = {"MD5", "SHA-1", "SHA-224", "SHA-256", "SHA-384", "SHA-512"};
         try {
             for (String t : texts) {
                 for (String cs : charsets) {
@@ -209,7 +487,7 @@ public final class AtiranAuth {
             }
             // Username-salted variants: salt+pw and pw+salt.
             String[] salts = saltVariants(userName);
-            String[] sAlgs = {"MD5", "SHA-1", "SHA-256"};
+            String[] sAlgs = {"MD5", "SHA-1", "SHA-256", "SHA-512"};
             String[] sCs = {"UTF-8", "UTF-16LE"};
             for (String t : texts) {
                 for (String salt : salts) {
@@ -327,7 +605,7 @@ public final class AtiranAuth {
             s.append(ch);
         }
         int n = s.length();
-        if (n == 32 || n == 40 || n == 56 || n == 64 || n == 96) return s.toString();
+        if (n == 32 || n == 40 || n == 56 || n == 64 || n == 96 || n == 128) return s.toString();
         return null;
     }
 
@@ -341,12 +619,21 @@ public final class AtiranAuth {
 
     /**
      * Map an Atiran role name to an app role id by Persian/English keywords.
-     * Unknown or empty names fall back to SELLER (a safe middle); the
-     * manager can pin the exact role per user (override) in Users.
+     * Sales-manager phrases are tested before the general manager rule so
+     * «مدیر فروش» receives the narrow sales role, not company-wide access.
+     * Returns "" when the name carries no recognizable role information, so
+     * callers can fall through to the next evidence source (see
+     * {@link #resolveAppRole}); {@link #mapRole} keeps the historic
+     * unknown→SELLER fallback on top of this.
      */
-    public static String mapRole(int roleId, String roleName) {
-        String n = roleName == null ? "" : roleName.trim();
+    static String mapRoleCore(int roleId, String roleName) {
+        String n = normalizeRoleText(roleName);
         String l = n.toLowerCase(Locale.US);
+        boolean salesLead = (has(n, "مدیر") || has(n, "سرپرست") || has(n, "رئیس")
+                || l.contains("manager") || l.contains("lead"))
+                && (has(n, "فروش") || l.contains("sales") || l.contains("forosh"));
+        if (salesLead || l.contains("sales_manager") || l.contains("sales-manager"))
+            return RoleStore.SALES_MANAGER;
         if (has(n, "مدیر") || l.contains("admin") || l.contains("modir")
                 || l.contains("manage") || l.contains("sysadmin")) return RoleStore.ADMIN;
         if (has(n, "حساب") || l.contains("account") || l.contains("hesab"))
@@ -362,7 +649,57 @@ public final class AtiranAuth {
                 || l.contains("moadi") || l.contains("tax")) return RoleStore.MOADIAN;
         if (has(n, "فروش") || l.contains("sell") || l.contains("forosh"))
             return RoleStore.SELLER;
-        return RoleStore.SELLER;
+        return "";
+    }
+
+    /**
+     * Map an Atiran role name to an app role id; unknown or empty names fall
+     * back to SELLER (the documented default). Kept for callers that only have
+     * a role name; login resolution goes through {@link #resolveAppRole}.
+     */
+    public static String mapRole(int roleId, String roleName) {
+        String r = mapRoleCore(roleId, roleName);
+        return r.isEmpty() ? RoleStore.SELLER : r;
+    }
+
+    /**
+     * Manager identity from the Atiran user name itself. Used only when the
+     * role name carries no information. Matches WHOLE names (never
+     * substrings), so personal names like «modirnejad» or «ali_modir» never
+     * qualify: admin / administrator / sysadmin / sys_admin / modir /
+     * modiramel / modir_amel — optionally with a numeric suffix such as
+     * admin2 — plus the Persian «مدیر» and «مدیرعامل».
+     */
+    public static String managerRoleForUserName(String userName) {
+        if (userName == null) return "";
+        String u = normalizeRoleText(Money.en(userName)).toLowerCase(Locale.US).trim();
+        if (u.isEmpty()) return "";
+        if (u.equals("مدیر") || u.equals("مدیرعامل")) return RoleStore.ADMIN;
+        if (u.matches("^(admin|administrator|sysadmin|sys_admin|modir_amel|modiramel|modir)([._-]?\\d+)?$"))
+            return RoleStore.ADMIN;
+        return "";
+    }
+
+    /**
+     * Effective app role from the Atiran evidence, in order:
+     * 1. an informative role name (Roles/role/userrole) always wins;
+     * 2. when the role name is missing or unknown, canonical manager user
+     *    names (Modir, Admin, …) decide — see {@link #managerRoleForUserName};
+     * 3. everything else falls back to the documented default (SELLER).
+     */
+    public static String resolveAppRole(int roleId, String roleName, String userName) {
+        String mapped = mapRoleCore(roleId, roleName);
+        if (!mapped.isEmpty()) return mapped;
+        String byUser = managerRoleForUserName(userName);
+        return byUser.isEmpty() ? RoleStore.SELLER : byUser;
+    }
+
+    /** Canonicalize the Arabic/Persian code points often mixed in Atiran role labels. */
+    private static String normalizeRoleText(String value) {
+        if (value == null) return "";
+        return value.replace('\u064A', '\u06CC').replace('\u0643', '\u06A9')
+                .replace('\u200C', ' ').replace('\u200E', ' ').replace('\u200F', ' ')
+                .trim().replaceAll("\\s+", " ");
     }
 
     private static boolean has(String s, String sub) {
@@ -384,7 +721,7 @@ public final class AtiranAuth {
         return c.getSharedPreferences("meelano_login", Context.MODE_PRIVATE);
     }
 
-    /** Legacy preference retained for migration; it cannot bypass the local account gate. */
+    /** Legacy preference retained for migration; it cannot bypass Atiran authentication. */
     public static boolean enabled(Context c) {
         try {
             return prefs(c).getBoolean("login_on", true);
@@ -420,12 +757,10 @@ public final class AtiranAuth {
         } catch (Exception ignored) { Diag.ignored("AtiranAuth:421", ignored); }
     }
 
-    /** Require a valid local manager/warehouse account session in this standalone build. */
+    /** Require a live Atiran-backed session; synthetic/local user IDs cannot open the shell. */
     public static boolean gate(Context c) {
         try {
-            if (!validSession(c)) return true;
-            return !LocalAccounts.isLocalSession(
-                    sessionUser(c), sessionUid(c), sessionRole(c));
+            return !validSession(c) || sessionUid(c) <= 0;
         } catch (Exception e) {
             return true;
         }
@@ -528,7 +863,9 @@ public final class AtiranAuth {
         return "home";
     }
 
-    // ---- per-user app PIN (4+ chars, salted SHA-256) ----
+    // ---- per-user app PIN (4+ chars, PBKDF2 v2; legacy SHA-256 accepted + upgraded) ----
+
+    private static final String LEGACY_PIN_PREFIX = "meelano_loginpin:";
 
     public static boolean pinSet(Context c, int uid) {
         try {
@@ -542,7 +879,13 @@ public final class AtiranAuth {
         try {
             String saved = prefs(c).getString("pin" + uid, "");
             if (saved.isEmpty() || pin == null) return false;
-            return sha(Money.en(pin).trim()).equals(saved);
+            String norm = Money.en(pin).trim();
+            if (!PinHash.verify(norm, saved, LEGACY_PIN_PREFIX)) return false;
+            if (PinHash.legacy(saved)) {
+                String h = PinHash.hash(norm);
+                if (!h.isEmpty()) prefs(c).edit().putString("pin" + uid, h).apply();
+            }
+            return true;
         } catch (Exception e) {
             return false;
         }
@@ -553,7 +896,7 @@ public final class AtiranAuth {
             String pin = pinOrNull == null ? "" : Money.en(pinOrNull).trim();
             SharedPreferences.Editor e = prefs(c).edit();
             if (pin.length() < 4) e.putString("pin" + uid, "");
-            else e.putString("pin" + uid, sha(pin));
+            else e.putString("pin" + uid, PinHash.hash(pin)); // "" on failure → pinSet()=false (fail closed)
             e.apply();
         } catch (Exception ignored) { Diag.ignored("AtiranAuth:559", ignored); }
     }
@@ -678,14 +1021,13 @@ public final class AtiranAuth {
     // ================= release phases (v27) =================
 
     /**
-     * ONE app — the Atiran role picks the edition. Admin + warehouse are
-     * live; every other role waits for its phase. Opening a phase is a
-     * deliberate one-line change here, never an accident.
+     * ONE app — the Atiran role picks the edition. Every defined role is live:
+     * the role's own item set (RoleStore) decides what it sees, so a valid
+     * Atiran login never dead-ends on an «edition not ready» wall. Only
+     * strings that are not roles at all stay blocked.
      */
     public static boolean phaseOpen(Context c, String role) {
-        if (RoleStore.ADMIN.equals(role)) return true;
-        if (RoleStore.WAREHOUSE.equals(role)) return true; // PHASE 2 (v28)
-        return false;
+        return RoleStore.isValid(role);
     }
 
     // ---- cached verifier bytes: the real-password check, offline ----
@@ -767,14 +1109,12 @@ public final class AtiranAuth {
     }
 
     private static String str(ResultSet rs, String alias) throws Exception {
-        Object o = rs.getObject(alias);
-        return o == null ? "" : String.valueOf(o).trim();
+        return readSqlText(rs.getObject(alias));
     }
 
     private static String col(ResultSet rs, String alias) {
         try {
-            Object o = rs.getObject(alias);
-            return o == null ? "" : String.valueOf(o).trim();
+            return readSqlText(rs.getObject(alias));
         } catch (Exception e) {
             return "";
         }
@@ -787,15 +1127,5 @@ public final class AtiranAuth {
         } catch (Exception ignored) { Diag.ignored("AtiranAuth:749", ignored); }
     }
 
-    private static String sha(String s) {
-        try {
-            java.security.MessageDigest d = java.security.MessageDigest.getInstance("SHA-256");
-            byte[] h = d.digest(("meelano_loginpin:" + s).getBytes("UTF-8"));
-            StringBuilder b = new StringBuilder();
-            for (byte x : h) b.append(String.format("%02x", x));
-            return b.toString();
-        } catch (Exception e) {
-            return "x" + s;
-        }
-    }
+
 }

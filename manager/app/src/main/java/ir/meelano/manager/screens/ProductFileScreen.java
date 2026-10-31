@@ -1,5 +1,6 @@
 package ir.meelano.manager.screens;
 
+import android.view.Gravity;
 import android.view.View;
 import android.widget.LinearLayout;
 
@@ -8,6 +9,8 @@ import ir.meelano.manager.core.AtiranSchema;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.Money;
+import ir.meelano.manager.core.PersianText;
+import ir.meelano.manager.core.ProductStockStatus;
 import ir.meelano.manager.data.Meta;
 import ir.meelano.manager.data.Repo;
 import ir.meelano.manager.data.Row;
@@ -21,7 +24,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * پروندهٔ کالا: مشخصات، موجودی، نمودار گردش، و کاردکس کامل. هر حرکت را می‌توان باز کرد و اگر
+ * پروندهٔ کالا: مشخصات، موجودی، نمودار و حرکت‌های اخیرِ کاردکس. هر حرکت را می‌توان باز کرد و اگر
  * حرکت مربوط به فاکتور فروش یا خرید باشد، همان فاکتور نمایش داده می‌شود.
  */
 public class ProductFileScreen extends Screen {
@@ -75,7 +78,7 @@ public class ProductFileScreen extends Screen {
             Meta m = new Meta(c);
             Data d = new Data();
             d.head = Repo.one(c, MasterQueries.productHeader(m, shka));
-            d.kardex = soft(d.notes, "گردش", () -> Repo.exec(c, MasterQueries.productKardex(m, shka, 1500)));
+            d.kardex = soft(d.notes, "گردش", () -> Repo.exec(c, MasterQueries.productKardex(m, shka, 500)));
             if (d.kardex == null) d.kardex = new ArrayList<>();
             if (d.head == null) throw new Exception("کالا یافت نشد");
             return d;
@@ -98,10 +101,33 @@ public class ProductFileScreen extends Screen {
         content.removeAllViews();
         addBack(content);
         Row h = d.head;
-        String name = h.s("naka");
-        String group = h.s("groupName");
-        content.addView(a.kit.hero(glyph(), name.isEmpty() ? "کالا" : name,
-                (group.isEmpty() ? "" : group + "  •  ") + "شِکالا " + Money.fa(h.s("shka")), accent()), a.kit.lp(-1, -2));
+        String name = PersianText.cleanDisplayLabel(h.s("naka"));
+        if (name.isEmpty()) name = "کالا";
+        String group = PersianText.cleanGroupLabel(h.s("groupName"));
+        String code = PersianText.cleanDisplayLabel(h.s("StuffCode"));
+        if (code.isEmpty()) code = PersianText.cleanDisplayLabel(h.s("coka"));
+        if (code.isEmpty()) code = h.s("shka");
+        String heroSub = (group.isEmpty() ? "" : group + "  •  ")
+                + "کد کالا " + Money.ltrIsolate(Money.fa(code));
+        content.addView(a.kit.hero(glyph(), name, heroSub, accent()), a.kit.lp(-1, -2));
+
+        boolean stockKnown = h.has("mojkavah");
+        double stock = h.d("mojkavah");
+        double packSize = h.has("mohvah") ? h.d("mohvah") : 1d;
+        double loose = h.d("mojkajoz");
+        double pieces = stockKnown ? stock * packSize + loose : 0;
+        ProductStockStatus.Band stockBand = ProductStockStatus.classify(stockKnown, stock, pieces,
+                h.d("reopoint"), AtiranSchema.LOW_STOCK_VAH);
+        LinearLayout badges = a.kit.h();
+        badges.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        badges.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        badges.addView(a.kit.stockChip(ProductStockStatus.label(stockBand), stockTone(stockBand)), a.kit.lp(-2, -2));
+        if (h.i("activeKnown") != 0) {
+            badges.addView(a.kit.space(6));
+            boolean active = ProductStockStatus.isActive(h.s("active"));
+            badges.addView(a.kit.stockChip(active ? "فعال" : "غیرفعال", active ? Theme.SUCCESS : Theme.MUTED), a.kit.lp(-2, -2));
+        }
+        content.addView(badges, a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
 
         // ---- movement totals (counting units) ----
@@ -110,29 +136,39 @@ public class ProductFileScreen extends Screen {
             if (r.l("outFlag") == 1) out += Math.abs(r.d("qty"));
             else in += Math.abs(r.d("qty"));
         }
-        double stock = h.d("mojkavah");
+        String unit = PersianText.cleanDisplayLabel(h.s("vahsanj"));
+        String stockText = stockKnown ? Money.qtyText(stock) : "نامشخص";
+        if (stockKnown && Math.abs(loose) > 0.000001d) stockText += " + " + Money.qtyText(loose) + " عدد";
         List<Kit.Kpi> kpis = new ArrayList<>();
-        kpis.add(new Kit.Kpi("موجودی کنونی", Money.qty(stock), h.s("vahsanj"), Theme.VIOLET));
-        kpis.add(new Kit.Kpi("ورود (کل ثبت‌شده)", Money.qty(in), "", Theme.SUCCESS));
-        kpis.add(new Kit.Kpi("خروج (کل ثبت‌شده)", Money.qty(out), "", Theme.DANGER));
-        kpis.add(new Kit.Kpi("تعداد حرکت", Money.fa(String.valueOf(d.kardex.size())), "سند", Theme.INFO));
+        Kit.Kpi currentStock = new Kit.Kpi("موجودی کنونی", stockText, unit, Theme.VIOLET);
+        currentStock.fullValue = stockText;
+        kpis.add(currentStock);
+        String unitCaption = unit.isEmpty() ? "" : "واحد " + unit;
+        kpis.add(new Kit.Kpi("ورود اخیر", Money.qtyText(in), unitCaption, Theme.SUCCESS));
+        kpis.add(new Kit.Kpi("خروج اخیر", Money.qtyText(out), unitCaption, Theme.DANGER));
+        kpis.add(new Kit.Kpi("تعداد حرکت", Money.num(d.kardex.size()), "ردیف", Theme.INFO));
         content.addView(a.kit.kpiGrid(kpis, 2), a.kit.lp(-1, -2));
+        content.addView(a.kit.hint("جمع ورود و خروج و نمودار بر پایهٔ " + Money.num(d.kardex.size())
+                + " ردیف گردش دریافت‌شده است؛ درخواست حداکثر ۵۰۰ حرکت اخیر را می‌خواند و این عدد، سندهای یکتا یا کل تاریخچه نیست."),
+                a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
 
         // ---- specification card ----
         LinearLayout spec = a.kit.card(Theme.VIOLET);
         spec.addView(a.kit.text("مشخصات کالا", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
-        String code = h.has("StuffCode") ? h.s("StuffCode") : h.s("coka");
-        if (!code.isEmpty()) spec.addView(a.kit.kv("کد", Money.fa(code), Theme.TEXT), a.kit.lp(-1, -2));
-        if (!h.s("vahsanj").isEmpty()) spec.addView(a.kit.kv("واحد", h.s("vahsanj"), Theme.TEXT), a.kit.lp(-1, -2));
-        if (h.has("mojkajoz") && Math.abs(h.d("mojkajoz")) > 0.0005)
-            spec.addView(a.kit.kv("موجودی جزء", Money.qty(h.d("mojkajoz")), Theme.TEXT), a.kit.lp(-1, -2));
+        if (!code.isEmpty()) spec.addView(a.kit.kv("کد کالا", Money.ltrIsolate(Money.fa(code)), Theme.TEXT), a.kit.lp(-1, -2));
+        if (!unit.isEmpty()) spec.addView(a.kit.kv("واحد", unit, Theme.TEXT), a.kit.lp(-1, -2));
+        if (h.has("mojkajoz") && Math.abs(loose) > 0.0005)
+            spec.addView(a.kit.kv("موجودی جزء", Money.qtyText(loose), Theme.TEXT), a.kit.lp(-1, -2));
         if (h.has("reopoint") && Math.abs(h.d("reopoint")) > 0.0005)
-            spec.addView(a.kit.kv("نقطه سفارش", Money.qty(h.d("reopoint")), Theme.WARNING), a.kit.lp(-1, -2));
+            spec.addView(a.kit.kv("نقطه سفارش", Money.qtyText(h.d("reopoint")), Theme.WARNING), a.kit.lp(-1, -2));
         double buy = h.has("buy_price") ? h.d("buy_price") : (h.has("pure_buy_price") ? h.d("pure_buy_price") : 0);
-        if (buy > 0) spec.addView(a.kit.kv("قیمت خرید", Money.rial(buy), Theme.TEXT), a.kit.lp(-1, -2));
-        if (h.has("FinalSalePrice") && h.d("FinalSalePrice") > 0)
-            spec.addView(a.kit.kv("قیمت فروش", Money.rial(h.d("FinalSalePrice")), Theme.GOLD_SOFT), a.kit.lp(-1, -2));
+        if (buy > 0) spec.addView(a.kit.kv("قیمت خرید", Money.rialText(buy), Theme.TEXT), a.kit.lp(-1, -2));
+        if (h.i("saleKnown") != 0) {
+            if (h.has("FinalSalePrice") && h.d("FinalSalePrice") > 0)
+                spec.addView(a.kit.kv("قیمت فروش", Money.rialText(h.d("FinalSalePrice")), Theme.GOLD_SOFT), a.kit.lp(-1, -2));
+            else spec.addView(a.kit.kv("هشدار قیمت", "قیمت فروش ثبت نشده", Theme.WARNING), a.kit.lp(-1, -2));
+        }
         if (h.has("sharh") && !h.s("sharh").isEmpty())
             spec.addView(a.kit.kv("شرح", h.s("sharh"), Theme.MUTED), a.kit.lp(-1, -2));
         a.kit.addCard(content, spec);
@@ -155,41 +191,56 @@ public class ProductFileScreen extends Screen {
             run.add(new Charts.Point(Jalali.shortLabel(r.s("date")), acc));
         }
         LinearLayout ch = a.kit.card(Theme.VIOLET);
-        ch.addView(a.kit.text("روند تجمعی موجودی در دفتر گردش", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
-        ch.addView(a.kit.hint("نمودار مقدار خالص ورود منهای خروج از اولین حرکت ثبت‌شدهٔ این کالا"), a.kit.lp(-1, -2));
+        ch.addView(a.kit.text("خالص گردش در حرکت‌های اخیر", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        ch.addView(a.kit.hint("جمع ورود منهای خروج در ردیف‌های دریافت‌شده؛ ماندهٔ افتتاحیه در نمودار لحاظ نشده است."),
+                a.kit.lp(-1, -2));
         Charts.Area area = new Charts.Area(a);
         area.setData(run, Theme.VIOLET, Charts.COMPACT);
+        Charts.Point firstMovement = run.get(0);
+        Charts.Point lastMovement = run.get(run.size() - 1);
+        area.setContentDescription("نمودار تجمعی خالص ورود منهای خروج در حرکت‌های بارگیری‌شده؛ ماندهٔ افتتاحیه منظور نشده است. "
+                + "قدیمی‌ترین ردیف " + firstMovement.label + ": "
+                + Money.qtyText(firstMovement.value) + "؛ جدیدترین ردیف " + lastMovement.label
+                + ": " + Money.qtyText(lastMovement.value) + (unit.isEmpty() ? " واحد." : " " + unit + "."));
+        area.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
         ch.addView(area, a.kit.lp(-1, Theme.dp(190)));
         a.kit.addCard(content, ch);
 
         // ---- distribution by operation ----
         Map<String, Double> byOp = new LinkedHashMap<>();
         for (Row r : d.kardex) {
-            String k = r.s("opLabel").isEmpty() ? "عملیات" : r.s("opLabel");
-            byOp.put(k, (byOp.containsKey(k) ? byOp.get(k) : 0) + Math.abs(r.d("qty")));
+            String operation = PersianText.cleanDisplayLabel(r.s("opLabel"));
+            if (operation.isEmpty()) operation = AtiranSchema.actNameFallback(r.s("act"));
+            if (operation.isEmpty()) operation = "عملیات";
+            byOp.put(operation, (byOp.containsKey(operation) ? byOp.get(operation) : 0) + Math.abs(r.d("qty")));
         }
         List<Charts.Point> pts = new ArrayList<>();
-        for (Map.Entry<String, Double> e : byOp.entrySet()) pts.add(new Charts.Point(e.getKey(), e.getValue()));
+        for (Map.Entry<String, Double> entry : byOp.entrySet()) {
+            if (entry.getValue() > 0) pts.add(new Charts.Point(entry.getKey(), entry.getValue()));
+        }
         LinearLayout dc = a.kit.card(Theme.GOLD);
-        dc.addView(a.kit.text("ترکیب گردش بر اساس عملیات", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        dc.addView(a.kit.text("سهم مقدار گردش بر اساس عملیات", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
         Charts.Donut donut = new Charts.Donut(a);
-        donut.setData(pts, "گردش", Money.fa(String.valueOf(d.kardex.size())) + " سند");
+        donut.setData(pts, "مقدار", Money.num(d.kardex.size()) + " حرکت");
+        donut.setContentDescription(movementDonutDescription(pts, d.kardex.size(), unit));
+        donut.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
         dc.addView(donut, a.kit.lp(-1, -2));
         a.kit.addCard(content, dc);
 
         // ---- movement list (newest first, tap a movement) ----
-        content.addView(a.kit.sectionHead("کاردکس کالا", Money.fa(String.valueOf(d.kardex.size())) + " حرکت", null),
-                a.kit.lp(-1, -2));
+        int shown = Math.min(d.kardex.size(), 300);
+        String movementRange = "نمایش " + Money.num(shown) + " از " + Money.num(d.kardex.size()) + " حرکتِ دریافت‌شده";
+        content.addView(a.kit.sectionHead("کاردکس کالا", null, null), a.kit.lp(-1, -2));
+        content.addView(a.kit.hint(movementRange), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(6));
-        int shown = 0;
-        for (final Row r : d.kardex) {
-            if (shown++ >= 300) break;
+        for (int i = 0; i < shown; i++) {
+            final Row r = d.kardex.get(i);
             boolean outFlag = r.l("outFlag") == 1;
             String opLabel = r.s("opLabel").isEmpty() ? AtiranSchema.actNameFallback(r.s("act")) : r.s("opLabel");
             String mid = (r.s("doc").isEmpty() ? "بدون شماره سند" : "سند " + Money.fa(r.s("doc")))
                     + (r.s("warehouse").isEmpty() ? "" : "  •  انبار " + Money.fa(r.s("warehouse")));
             View row = a.kit.docRow(opLabel, mid, Jalali.shortLabel(r.s("date")),
-                    (outFlag ? "−" : "+") + Money.qty(Math.abs(r.d("qty"))),
+                    Money.signedQty(outFlag ? -Math.abs(r.d("qty")) : Math.abs(r.d("qty"))),
                     outFlag ? "خروج" : "ورود", outFlag ? Theme.DANGER : Theme.SUCCESS,
                     v -> openMovement(r));
             LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
@@ -197,8 +248,50 @@ public class ProductFileScreen extends Screen {
             content.addView(row, p);
         }
         if (d.kardex.size() > shown)
-            content.addView(a.kit.hint("برای " + Money.fa(String.valueOf(shown)) + " حرکت اول نمایش داده شد"), a.kit.lp(-1, -2));
+            content.addView(a.kit.hint("فقط " + Money.num(shown) + " حرکت از " + Money.num(d.kardex.size())
+                    + " ردیف دریافت‌شده نمایش داده شد."), a.kit.lp(-1, -2));
         renderNotes(content, d.notes);
+    }
+
+    private String movementDonutDescription(List<Charts.Point> points, int movementCount, String unit) {
+        List<Charts.Point> sorted = new ArrayList<>(points);
+        java.util.Collections.sort(sorted, (left, right) -> Double.compare(right.value, left.value));
+        double total = 0;
+        for (Charts.Point point : sorted) total += Math.max(0, point.value);
+        StringBuilder description = new StringBuilder("دونات سهم مقدار مطلق گردش بر اساس نوع عملیات؛ مقدارها ");
+        description.append(unit.isEmpty() ? "بر حسب واحد کالا هستند. " : "بر حسب " + unit + " هستند. ");
+        if (sorted.isEmpty()) {
+            description.append("مقداری برای ترسیم ثبت نشده است.");
+        } else {
+            int top = Math.min(7, sorted.size());
+            for (int i = 0; i < top; i++) {
+                Charts.Point point = sorted.get(i);
+                if (i > 0) description.append("؛ ");
+                description.append(point.label).append(": ").append(Money.qtyText(point.value))
+                        .append("، ").append(Money.pct(total > 0 ? point.value * 100.0 / total : 0));
+            }
+            double rest = 0;
+            for (int i = top; i < sorted.size(); i++) rest += sorted.get(i).value;
+            if (rest > 0.5) {
+                if (top > 0) description.append("؛ ");
+                description.append("سایر: ").append(Money.qtyText(rest))
+                        .append("، ").append(Money.pct(total > 0 ? rest * 100.0 / total : 0));
+            }
+        }
+        description.append(". تعداد ردیف‌های گردش: ").append(Money.num(movementCount)).append(".");
+        return description.toString();
+    }
+
+    private int stockTone(ProductStockStatus.Band band) {
+        switch (band) {
+            case NEGATIVE:
+            case OUT: return Theme.DANGER;
+            case REORDER: return Theme.INFO;
+            case LOW: return Theme.WARNING;
+            case NORMAL: return Theme.SUCCESS;
+            case UNKNOWN:
+            default: return Theme.MUTED;
+        }
     }
 
     /** Sales and purchase acts link to their invoice; the rest show the document number only. */
@@ -208,33 +301,69 @@ public class ProductFileScreen extends Screen {
         return null;
     }
 
+    private int movementSheetMaxDp() {
+        android.util.DisplayMetrics metrics = a.getResources().getDisplayMetrics();
+        float density = metrics.density > 0 ? metrics.density : 1f;
+        int screenHeightDp = Math.round(metrics.heightPixels / density);
+        return Math.max(160, Math.min(480, Math.round(screenHeightDp * 0.62f)));
+    }
+
     private void openMovement(final Row r) {
-        LinearLayout body = a.kit.v();
         String opLabel = r.s("opLabel").isEmpty() ? AtiranSchema.actNameFallback(r.s("act")) : r.s("opLabel");
         boolean outFlag = r.l("outFlag") == 1;
-        body.addView(a.kit.kv("تاریخ", Jalali.dispFa(r.s("date")), Theme.TEXT), a.kit.lp(-1, -2));
-        body.addView(a.kit.kv("عملیات", opLabel, Theme.TEXT), a.kit.lp(-1, -2));
-        body.addView(a.kit.kv("جهت", outFlag ? "خروج از انبار" : "ورود به انبار",
-                outFlag ? Theme.DANGER : Theme.SUCCESS), a.kit.lp(-1, -2));
-        body.addView(a.kit.kv("مقدار", Money.qty(Math.abs(r.d("qty"))), Theme.TEXT), a.kit.lp(-1, -2));
-        if (r.d("price") > 0) body.addView(a.kit.kv("فی", Money.rial(r.d("price")), Theme.GOLD_SOFT), a.kit.lp(-1, -2));
-        if (!r.s("warehouse").isEmpty()) body.addView(a.kit.kv("انبار", Money.fa(r.s("warehouse")), Theme.TEXT), a.kit.lp(-1, -2));
-        if (!r.s("doc").isEmpty()) body.addView(a.kit.kv("شماره سند", Money.fa(r.s("doc")), Theme.TEXT), a.kit.lp(-1, -2));
-        if (!r.s("descrip").isEmpty()) body.addView(a.kit.kv("شرح", r.s("descrip"), Theme.MUTED), a.kit.lp(-1, -2));
+        double q = Math.abs(r.d("qty"));
+        int accent = outFlag ? Theme.DANGER : Theme.SUCCESS;
+        LinearLayout body = a.kit.v();
+
+        // header: direction pill, operation name and the document date
+        LinearLayout head = a.kit.h();
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        head.addView(a.kit.pill(outFlag ? "خروج از انبار" : "ورود به انبار", accent), a.kit.lp(-2, -2));
+        head.addView(a.kit.space(8));
+        head.addView(a.kit.text(opLabel, 15f, Theme.TEXT, true), a.kit.wlp(1f));
+        body.addView(head, a.kit.lp(-1, -2));
+        body.addView(a.kit.text(Jalali.dispFa(r.s("date")), 11.5f, Theme.MUTED, false), a.kit.lp(-1, -2));
+        body.addView(a.kit.gap(6));
+
+        // facts — quantity first, then price and the line value it adds up to
+        body.addView(a.kit.kv("مقدار", Money.qtyText(q), accent), a.kit.lp(-1, -2));
+        if (r.d("price") > 0) {
+            body.addView(a.kit.kv("فی", Money.rialText(r.d("price")), Theme.GOLD_SOFT), a.kit.lp(-1, -2));
+            body.addView(a.kit.kv("ارزش", Money.rialText(r.d("price") * q), Theme.GOLD_SOFT), a.kit.lp(-1, -2));
+        }
+        if (!r.s("warehouse").isEmpty())
+            body.addView(a.kit.kv("انبار", Money.fa(r.s("warehouse")), Theme.TEXT), a.kit.lp(-1, -2));
+        if (!r.s("doc").isEmpty())
+            body.addView(a.kit.kv("شماره سند", Money.fa(r.s("doc")), Theme.TEXT), a.kit.lp(-1, -2));
+        if (!r.s("descrip").isEmpty()) {
+            LinearLayout note = a.kit.card(Theme.MUTED);
+            note.addView(a.kit.text("شرح", 10.5f, Theme.MUTED, false), a.kit.lp(-1, -2));
+            note.addView(a.kit.text(r.s("descrip"), 12f, Theme.TEXT, false), a.kit.lp(-1, -2));
+            body.addView(note, a.kit.lp(-1, -2));
+        }
+
+        // actions — the sheet is always dismissible and links to the invoice when there is one
         final String screenId = invoiceScreenFor((int) r.l("act"));
         final String doc = r.s("doc");
         final android.app.AlertDialog[] holder = new android.app.AlertDialog[1];
-        if (screenId != null && !doc.isEmpty()) {
-            body.addView(a.kit.gap(10), a.kit.lp(-1, -2));
-            body.addView(a.kit.btn("نمایش فاکتور " + Money.fa(doc), v -> {
-                if (holder[0] != null) holder[0].dismiss();
-                Screen s = a.screen(screenId);
-                if (s instanceof TradeScreen) ((TradeScreen) s).openInvoice(doc);
-            }), a.kit.lp(-1, -2));
-        } else {
+        if (screenId == null || doc.isEmpty())
             body.addView(a.kit.hint("این حرکت به فاکتور فروش یا خرید مربوط نیست؛ فقط شماره سند ثبت شده است."), a.kit.lp(-1, -2));
+        body.addView(a.kit.gap(10), a.kit.lp(-1, -2));
+        LinearLayout acts = a.kit.h();
+        if (screenId != null && !doc.isEmpty()) {
+            acts.addView(a.kit.btn("نمایش فاکتور " + Money.fa(doc), v -> {
+                if (holder[0] != null) holder[0].dismiss();
+                Screen sc = a.screen(screenId);
+                if (sc instanceof TradeScreen) ((TradeScreen) sc).openInvoice(doc);
+            }), a.kit.wlp(1f));
+            acts.addView(a.kit.space(8));
         }
-        holder[0] = a.kit.dialog("گردش کالا", body, false);
+        acts.addView(a.kit.btn("بستن", v -> {
+            if (holder[0] != null) holder[0].dismiss();
+        }), a.kit.wlp(1f));
+        body.addView(acts, a.kit.lp(-1, -2));
+
+        holder[0] = a.kit.dialog("جزئیات حرکت کالا", a.kit.scrollWrap(body, movementSheetMaxDp()), true);
         holder[0].show();
     }
 }

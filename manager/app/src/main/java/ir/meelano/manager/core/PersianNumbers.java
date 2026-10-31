@@ -72,7 +72,8 @@ public final class PersianNumbers {
 
     /** Words for a string of ASCII digits. */
     static String words(String digits) {
-        String s = digits.replaceFirst("^0+(?=\\d)", "");
+        String s = digits == null ? "" : digits.replaceAll("[^0-9]", "");
+        s = s.replaceFirst("^0+(?=\\d)", "");
         if (s.isEmpty() || "0".equals(s)) return "صفر";
         if (s.length() > 15) {
             // Too long to name: read it digit by digit.

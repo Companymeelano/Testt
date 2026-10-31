@@ -7,6 +7,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import ir.meelano.manager.core.CacheStore;
+import ir.meelano.manager.core.AtiranSpecialReports;
 
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.R;
@@ -15,6 +16,9 @@ import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.Queries;
 import ir.meelano.manager.core.ReportCatalog;
+import ir.meelano.manager.core.VisitorScorecard;
+import ir.meelano.manager.core.RoleStore;
+import ir.meelano.manager.core.AtiranAuth;
 import ir.meelano.manager.data.Meta;
 import ir.meelano.manager.data.Repo;
 import ir.meelano.manager.data.Row;
@@ -47,7 +51,7 @@ public class ReportsScreen extends Screen {
     public String title() { return "گزارشات"; }
 
     @Override
-    public String glyph() { return "▤"; }
+    public String glyph() { return Theme.isLight() ? "▤" : "📊"; }
 
     @Override
     public int accent() { return Theme.GOLD; }
@@ -62,11 +66,15 @@ public class ReportsScreen extends Screen {
                 || "cheque_reliability".equals(sel.id) || "stock_forecast".equals(sel.id)
                 || "dying_stock".equals(sel.id) || "fresh_debtors".equals(sel.id)
                 || "order_suggest".equals(sel.id) || "invoice_profit".equals(sel.id)
-                || sel.id.startsWith("sf_");
+                || "visitor_scorecard".equals(sel.id) || "expiry_watch".equals(sel.id)
+                || "staff_attendance".equals(sel.id) || sel.id.startsWith("sf_");
         if (!sel.needsRange && !search) return null;
         FilterSheet.Config c = new FilterSheet.Config();
         c.search = search;
-        c.searchHint = "جستجوی مشتری / کالا / فاکتور…";
+        c.searchHint = "visitor_scorecard".equals(sel.id) ? "جستجوی نام ویزیتور…"
+                : ("expiry_watch".equals(sel.id) ? "جستجوی نام یا کد کالا…"
+                : ("staff_attendance".equals(sel.id) ? "جستجوی نام یا شناسه پرسنل…" : "جستجوی مشتری / کالا / فاکتور…"));
+        c.visitors = "visitor_scorecard".equals(sel.id);
         c.range = sel.needsRange;
         return c;
     }
@@ -94,7 +102,7 @@ public class ReportsScreen extends Screen {
         if ("ویزیتورها".equals(section)) return Theme.WARNING;
         if ("سود و زیان".equals(section)) return Theme.GOLD;
         if ("بانک و صندوق".equals(section)) return Theme.INFO;
-        if ("کاربران و نظارت".equals(section)) return Theme.STEEL;
+        if ("پرسنل و نظارت".equals(section)) return Theme.STEEL;
         if ("هوشمند".equals(section)) return Theme.VIOLET;
         if ("هزینه‌ها".equals(section)) return Theme.ROSE;
         if ("برگشتی و ابطالی".equals(section)) return Theme.DANGER;
@@ -108,15 +116,15 @@ public class ReportsScreen extends Screen {
         if ("فروش".equals(section)) return R.drawable.mi_point_of_sale;
         if ("خرید".equals(section)) return R.drawable.mi_shopping_cart;
         if ("دریافتی‌ها و پرداخت".equals(section)) return R.drawable.mi_payments;
-        if ("چک‌ها".equals(section)) return R.drawable.mi_receipt_long;
+        if ("چک‌ها".equals(section)) return R.drawable.mi_cheque;
         if ("عملکرد صندوق".equals(section)) return R.drawable.mi_account_balance_wallet;
         if ("خزانه‌داری".equals(section)) return R.drawable.mi_account_balance;
         if ("کالا و انبار".equals(section)) return R.drawable.mi_inventory_2;
         if ("مشتریان".equals(section)) return R.drawable.mi_group;
         if ("ویزیتورها".equals(section)) return R.drawable.mi_directions_car;
-        if ("سود و زیان".equals(section)) return R.drawable.mi_diamond;
+        if ("سود و زیان".equals(section)) return R.drawable.mi_profit;
         if ("بانک و صندوق".equals(section)) return R.drawable.mi_account_balance;
-        if ("کاربران و نظارت".equals(section)) return R.drawable.mi_admin_panel_settings;
+        if ("پرسنل و نظارت".equals(section)) return R.drawable.mi_admin_panel_settings;
         if ("هوشمند".equals(section)) return R.drawable.mi_lightbulb;
         if ("هزینه‌ها".equals(section)) return R.drawable.mi_trending_down;
         if ("برگشتی و ابطالی".equals(section)) return R.drawable.mi_assignment_return;
@@ -137,6 +145,9 @@ public class ReportsScreen extends Screen {
             sel = null;
             pendingCategory = null;
         }
+        String role = reportRole();
+        if (sel != null && !ReportCatalog.availableToRole(sel, role)) sel = null;
+        if (selCat != null && !hasVisibleSection(selCat, role)) selCat = null;
         if (sel == null) renderList(content);
         else renderReport(content, sel);
         saveState();
@@ -144,6 +155,31 @@ public class ReportsScreen extends Screen {
 
     private static final String STATE_PREFS = "reports_state";
     private boolean restored = false;
+
+    private String reportRole() {
+        String role = AtiranAuth.sessionRole(a);
+        if (role != null && !role.isEmpty()) return role;
+        return RoleStore.enabled(a) ? RoleStore.current(a) : RoleStore.ADMIN;
+    }
+
+    private List<ReportCatalog.Spec> visibleReports() {
+        List<ReportCatalog.Spec> out = new ArrayList<>();
+        String role = reportRole();
+        for (ReportCatalog.Spec spec : ReportCatalog.ALL)
+            if (ReportCatalog.availableToRole(spec, role)) out.add(spec);
+        return out;
+    }
+
+    private boolean hasVisibleSection(String section, String role) {
+        for (ReportCatalog.Spec spec : ReportCatalog.ALL)
+            if (section.equals(spec.section) && ReportCatalog.availableToRole(spec, role)) return true;
+        if (ReportCatalog.TREASURY.equals(section)) {
+            for (ReportCatalog.Spec spec : ReportCatalog.ALL)
+                if (ReportCatalog.isTreasurySection(spec.section)
+                        && ReportCatalog.availableToRole(spec, role)) return true;
+        }
+        return false;
+    }
 
     /** Restores the last section, report, period and search so returning to Reports picks up where the user left off. */
     private void restoreState() {
@@ -181,15 +217,19 @@ public class ReportsScreen extends Screen {
     private void renderList(final LinearLayout content) {
         content.removeAllViews();
         content.addView(a.kit.hero(glyph(), title(),
-                Money.fa(String.valueOf(ReportCatalog.ALL.length)) + " گزارش مدیریتی • جست‌وجوی سریع و دسته‌بندی‌شده",
+                Money.fa(String.valueOf(visibleReports().size())) + " گزارش در دسترس این نقش • جست‌وجوی سریع و دسته‌بندی‌شده",
                 accent()), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
-        content.addView(a.kit.btnGhost("📈  داشبورد تحلیلی فروش", Theme.VIOLET, v -> a.nav("analytics")), a.kit.lp(-1, -2));
+        if (RoleStore.allowed(a, "analytics"))
+            content.addView(a.kit.btnGhost("📈  داشبورد تحلیلی فروش", Theme.VIOLET,
+                    v -> a.nav("analytics")), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(8));
         LinearLayout tr = a.kit.h();
         tr.addView(a.kit.btnGhost("🧾  فاکتورهای فروش", Theme.SALES_HUE, v -> a.nav("sales")), a.kit.wlp(1f));
-        tr.addView(a.kit.space(8));
-        tr.addView(a.kit.btnGhost("🧺  فاکتورهای خرید", Theme.BUY_HUE, v -> a.nav("buy")), a.kit.wlp(1f));
+        if (RoleStore.allowed(a, "buy")) {
+            tr.addView(a.kit.space(8));
+            tr.addView(a.kit.btnGhost("🧺  فاکتورهای خرید", Theme.BUY_HUE, v -> a.nav("buy")), a.kit.wlp(1f));
+        }
         content.addView(tr, a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
         content.addView(a.kit.searchBar("جست‌وجوی نام، کاربرد یا دستهٔ گزارش…", browseQuery, q -> {
@@ -216,10 +256,8 @@ public class ReportsScreen extends Screen {
         if (selCat == null) {
             java.util.List<String> secs = new java.util.ArrayList<>();
             java.util.List<Integer> counts = new java.util.ArrayList<>();
-            int treasuryCount = 0;
-            for (ReportCatalog.Spec spec : ReportCatalog.ALL) {
+            for (ReportCatalog.Spec spec : visibleReports()) {
                 if (ReportCatalog.isTreasurySection(spec.section)) {
-                    treasuryCount++;
                     // All treasury sub-sections live behind one «خزانه‌داری» card.
                     if (!secs.contains(ReportCatalog.TREASURY)) { secs.add(ReportCatalog.TREASURY); counts.add(0); }
                     int tx = secs.indexOf(ReportCatalog.TREASURY);
@@ -232,6 +270,7 @@ public class ReportsScreen extends Screen {
                     counts.add(1);
                 } else counts.set(ix, counts.get(ix) + 1);
             }
+            sortSectionsByPriority(secs, counts);
             int cols = a.kit.isWide() ? 3 : 2;
             LinearLayout grid = a.kit.v();
             LinearLayout row = null;
@@ -260,7 +299,7 @@ public class ReportsScreen extends Screen {
             }), a.kit.lp(-1, -2));
             content.addView(a.kit.gap(10));
             int treasuryTotal = 0;
-            for (ReportCatalog.Spec spec : ReportCatalog.ALL)
+            for (ReportCatalog.Spec spec : visibleReports())
                 if (ReportCatalog.isTreasurySection(spec.section)) treasuryTotal++;
             content.addView(a.kit.hero("▤", ReportCatalog.TREASURY,
                     "بخش‌های مالی و بانکی • " + Money.fa(String.valueOf(treasuryTotal)) + " گزارش",
@@ -268,7 +307,7 @@ public class ReportsScreen extends Screen {
             content.addView(a.kit.gap(12));
             java.util.List<String> subs = new java.util.ArrayList<>();
             java.util.List<Integer> subCounts = new java.util.ArrayList<>();
-            for (ReportCatalog.Spec spec : ReportCatalog.ALL) {
+            for (ReportCatalog.Spec spec : visibleReports()) {
                 if (!ReportCatalog.isTreasurySection(spec.section)) continue;
                 int ix = subs.indexOf(spec.section);
                 if (ix < 0) { subs.add(spec.section); subCounts.add(1); }
@@ -294,9 +333,34 @@ public class ReportsScreen extends Screen {
         addReportRows(content, filteredReports("", selCat));
     }
 
+    /** Stable manager order: controls, sales/customer growth and field team, then supply and finance. */
+    private static void sortSectionsByPriority(List<String> sections, List<Integer> counts) {
+        String[] priority = {"ویژه مدیر", "فروش", "مشتریان", "تحلیل ویزیتور و مسیر",
+                "خرید", ReportCatalog.TREASURY, "چک‌ها", "کالا و انبار", "سرفصل‌ها",
+                "سود و زیان", "هزینه‌ها", "پرسنل و نظارت", "برگشتی و ابطالی",
+                "هوشمند", "گزارش‌های اختصاصی"};
+        for (int i = 0; i < sections.size(); i++) {
+            for (int j = i + 1; j < sections.size(); j++) {
+                if (sectionPriority(sections.get(j), priority) < sectionPriority(sections.get(i), priority)) {
+                    String section = sections.get(i);
+                    sections.set(i, sections.get(j));
+                    sections.set(j, section);
+                    Integer count = counts.get(i);
+                    counts.set(i, counts.get(j));
+                    counts.set(j, count);
+                }
+            }
+        }
+    }
+
+    private static int sectionPriority(String section, String[] priority) {
+        for (int i = 0; i < priority.length; i++) if (priority[i].equals(section)) return i;
+        return priority.length;
+    }
+
     private int countInSection(String section) {
         int n = 0;
-        for (ReportCatalog.Spec spec : ReportCatalog.ALL)
+        for (ReportCatalog.Spec spec : visibleReports())
             if (section.equals(spec.section)) n++;
         return n;
     }
@@ -304,7 +368,7 @@ public class ReportsScreen extends Screen {
     private List<ReportCatalog.Spec> filteredReports(String query, String section) {
         List<ReportCatalog.Spec> out = new ArrayList<>();
         String q = normalize(query);
-        for (ReportCatalog.Spec spec : ReportCatalog.ALL) {
+        for (ReportCatalog.Spec spec : visibleReports()) {
             if (section != null && !section.equals(spec.section)) continue;
             if (!q.isEmpty() && !normalize(spec.title + " " + spec.desc + " " + spec.section + " " + spec.id).contains(q))
                 continue;
@@ -338,8 +402,15 @@ public class ReportsScreen extends Screen {
         Theme.lift(c, Theme.cardElevation());
 
         ImageView icon = new ImageView(a);
-        icon.setImageResource(reportIcon(spec));
-        icon.setColorFilter(color);
+        int reportVector = reportIcon(spec);
+        int reportArt = Theme.icon3d(reportVector);
+        if (!Theme.isIcon3d(reportArt)) {
+            int categoryArt = Theme.icon3d(sectionIcon(spec.section));
+            if (Theme.isIcon3d(categoryArt)) reportArt = categoryArt;
+        }
+        icon.setImageResource(reportArt);
+        if (Theme.isIcon3d(reportArt)) icon.clearColorFilter();
+        else icon.setColorFilter(color);
         icon.setBackground(Theme.avatar(Theme.alpha(color, 48)));
         icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         c.addView(icon, new LinearLayout.LayoutParams(Theme.dp(48), Theme.dp(48)));
@@ -385,6 +456,9 @@ public class ReportsScreen extends Screen {
             case "lost_basket": return R.drawable.mi_shopping_bag;
             case "cheque_reliability": return R.drawable.mi_verified_user;
             case "visitor_yield": return R.drawable.mi_badge;
+            case "visitor_scorecard": return R.drawable.mi_badge;
+            case "expiry_watch": return R.drawable.mi_hourglass_top;
+            case "staff_attendance": return R.drawable.mi_schedule;
             case "golden_hours": return R.drawable.mi_bolt;
             case "sleeping_capital": return R.drawable.mi_account_balance_wallet;
             case "stock_forecast": return R.drawable.mi_trending_down;
@@ -439,8 +513,10 @@ public class ReportsScreen extends Screen {
         c.setMinimumHeight(Theme.dp(122));
         ImageView iv = new ImageView(a);
         try {
-            iv.setImageResource(sectionIcon(section));
-            iv.setColorFilter(sectionAccent(section));
+            int art = Theme.icon3d(sectionIcon(section));
+            iv.setImageResource(art);
+            if (Theme.isIcon3d(art)) iv.clearColorFilter();
+            else iv.setColorFilter(sectionAccent(section));
         } catch (Exception ignored) { Diag.ignored("ReportsScreen:349", ignored); }
         int sz = Theme.dp(44);
         c.addView(iv, new LinearLayout.LayoutParams(sz, sz));
@@ -526,7 +602,7 @@ java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
         if (a.settings.offlineMode()) cb.fail(OFFLINE_MISS);
         else a.repo.run(c -> {
             Meta m = new Meta(c);
-            return applyMaps(m, spec.id, Repo.exec(c, ReportCatalog.query(m, spec.id, f)));
+            return applyMaps(m, spec.id, Repo.exec(c, ReportCatalog.query(m, spec.id, f)), f);
         }, cb);
     }
 
@@ -535,6 +611,13 @@ java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
 
     /** Report-specific shaping shared by the live screen and the nightly offline copy. */
     public static List<Row> applyMaps(Meta m, String id, List<Row> rows) {
+        return applyMaps(m, id, rows, null);
+    }
+
+    public static List<Row> applyMaps(Meta m, String id, List<Row> rows, Filter filter) {
+        if ("visitor_scorecard".equals(id)) rows = VisitorScorecard.score(rows, filter);
+        if ("expiry_watch".equals(id)) rows = AtiranSpecialReports.mapExpiry(rows);
+        if ("staff_attendance".equals(id)) rows = AtiranSpecialReports.mapAttendance(rows);
         if ("yoy_sales".equals(id)) rows = mapYoY(rows);
         if ("aging".equals(id)) mapAging(rows, m);
         if ("unsettled".equals(id)) mapUnsettled(rows);
@@ -546,8 +629,9 @@ java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
 
     /** Key of an offline report copy: id plus range and search, so periods never mix. */
     public static String cacheKey(String id, Filter f) {
+        String visitor = "visitor_scorecard".equals(id) ? String.valueOf(f.visitor) : "";
         return "cx_rep_" + id + "_"
-                + Integer.toHexString((f.from + "|" + f.to + "|" + f.search + "|" + f.status).hashCode());
+                + Integer.toHexString((f.from + "|" + f.to + "|" + f.search + "|" + f.status + "|" + visitor).hashCode());
     }
 
     /** Without dif_date_alan the server sends days=−1: derive the delay from the due date. */

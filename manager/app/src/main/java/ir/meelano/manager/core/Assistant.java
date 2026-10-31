@@ -12,7 +12,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * «دستیار میلانو زرین‌فرمان»: a data-grounded manager assistant.
+ * «دستیار میلانو»: a data-grounded manager assistant.
  *
  * It never sends shop data to a third party. Every answer is built from a live
  * snapshot of the store database (sales, purchases, receipts, payments, cheques,

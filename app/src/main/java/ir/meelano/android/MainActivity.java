@@ -269,6 +269,11 @@ public class MainActivity extends Activity {
     private UserSession session;
     private LinearLayout assistantChatLog;
     private EditText assistantInput;
+    private boolean assistantPrefactorMode = false;
+    private boolean assistantPrefactorAwaitingCustomer = false;
+    private boolean assistantOrderLookupRunning = false;
+    private int assistantOrderRequestGeneration = 0;
+    private volatile boolean visitorAiExternalConsent = false;
     private TextToSpeech tts;
     private boolean ttsReady = false;
     private String pendingTtsText = "";
@@ -349,7 +354,8 @@ public class MainActivity extends Activity {
         if (STAFF_EDITION) STORE_EDITION = false;
         try { MANAGER_EDITION = getResources().getBoolean(R.bool.meelano_manager_edition); } catch (Exception ignored) { MANAGER_EDITION = false; }
         try { UNIFIED_EDITION = getResources().getBoolean(R.bool.meelano_unified_edition); } catch (Exception ignored) { UNIFIED_EDITION = false; }
-        if (UNIFIED_EDITION) MANAGER_EDITION = true; // the unified home uses the new manager dashboard
+        // Unified is a packaging/authorization mode, not a manager skin. Keep the shared visitor
+        // brand and theme for every account; manager routes are enabled from the signed-in role.
         if (MANAGER_EDITION) { STORE_EDITION = false; STAFF_EDITION = false; }
         prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         managerReportRange = prefs.getInt("mgr_range", 2);
@@ -1179,6 +1185,14 @@ public class MainActivity extends Activity {
         String savedTheme = prefs.getString(KEY_THEME, "");
         SharedPreferences.Editor ed = prefs.edit();
         if (savedTheme == null || savedTheme.trim().isEmpty() || (VISITOR_EDITION && "onyx_gold".equals(savedTheme))) ed.putString(KEY_THEME, defaultThemeId());
+        // v7.0.2 incorrectly forced the manager skin on every unified account. Migrate only
+        // that auto-assigned manager default once; preserve a theme the user actually selected.
+        if (UNIFIED_EDITION && !prefs.getBoolean("unified_shared_shell_v1", false)) {
+            if (prefs.getBoolean("manager_theme_pearl_platinum", false) && "pearl_platinum".equals(savedTheme)) {
+                ed.putString(KEY_THEME, DEFAULT_THEME);
+            }
+            ed.putBoolean("unified_shared_shell_v1", true);
+        }
         // Store app: move once to the emerald theme made from its green launcher icon.
         if (STORE_EDITION && !prefs.getBoolean("store_theme_emerald_royal", false)) {
             ed.putString(KEY_THEME, "emerald_royal").putBoolean("store_theme_emerald_royal", true);
@@ -2403,7 +2417,7 @@ public class MainActivity extends Activity {
                 .setNegativeButton("بستن", null)
                 .create();
         addThemeOption(box, dialog, THEME_AUTO, "خودکار", "روشن در روز، تیره در شب — هماهنگ با گوشی", new int[]{Color.rgb(244, 251, 255), Color.rgb(0, 126, 255), Color.rgb(5, 8, 18)});
-        if (MANAGER_EDITION) addThemeOption(box, dialog, "espresso_gold", "اسپرسو طلایی", "تیرهٔ لوکس هم‌خانواده با آیکون مدیر", new int[]{Color.rgb(23, 16, 9), Color.rgb(200, 154, 63), Color.rgb(228, 197, 124)});
+        if (MANAGER_EDITION || UNIFIED_EDITION) addThemeOption(box, dialog, "espresso_gold", "اسپرسو طلایی", "تم تیرهٔ لوکس", new int[]{Color.rgb(23, 16, 9), Color.rgb(200, 154, 63), Color.rgb(228, 197, 124)});
         if (MANAGER_EDITION) {
             android.widget.CheckBox esp = new android.widget.CheckBox(this);
             esp.setText("اسپرسو طلایی به‌عنوان تم پیش‌فرض مدیر");
@@ -2419,8 +2433,7 @@ public class MainActivity extends Activity {
         addThemeOption(box, dialog, "pearl_platinum", "روشن ۱", "مروارید پلاتینیوم", new int[]{Color.rgb(245, 247, 251), Color.rgb(168, 122, 44), Color.rgb(48, 96, 176)});
         addThemeOption(box, dialog, "rose_quartz_lux", "روشن ۲", "رز کوارتز لاکچری", new int[]{Color.rgb(255, 247, 248), Color.rgb(177, 102, 82), Color.rgb(111, 90, 174)});
         addThemeOption(box, dialog, "emerald_silk", "روشن ۳", "زمرد ابریشمی", new int[]{Color.rgb(241, 249, 245), Color.rgb(16, 132, 91), Color.rgb(160, 128, 55)});
-        if (!VISITOR_EDITION) {
-            addThemeOption(box, dialog, "azure_diamond", "روشن کلاسیک", "الماس آبی", new int[]{Color.rgb(240, 247, 255), Color.rgb(45, 98, 190), Color.rgb(91, 167, 220)});
+        if (!VISITOR_EDITION || UNIFIED_EDITION) {
             addThemeOption(box, dialog, "crystal_lagoon", "روشن کلاسیک", "کریستالی", new int[]{Color.rgb(237, 249, 250), Color.rgb(18, 142, 166), Color.rgb(54, 117, 203)});
             addThemeOption(box, dialog, "ivory_sunrise", "روشن کلاسیک", "عاجی", new int[]{Color.rgb(249, 243, 233), Color.rgb(194, 117, 54), Color.rgb(29, 143, 113)});
         }
@@ -2999,6 +3012,11 @@ public class MainActivity extends Activity {
         if (session != null) autosaveCart(true);
         activePage = "login";
         session = null;
+        assistantOrderRequestGeneration++;
+        assistantPrefactorMode = false;
+        assistantPrefactorAwaitingCustomer = false;
+        assistantOrderLookupRunning = false;
+        visitorAiExternalConsent = false;
         updateBackCallback();
         cartAutosaveRestoreChecked = false;
         if (visitorCartItems != null) resetCartState();
@@ -3453,7 +3471,7 @@ public class MainActivity extends Activity {
         // Owner directive: never block entry to the manager app. Access scoping (when configured)
         // still applies per page via permissions; the hard gate only produced support dead-ends.
         String targetPage = (page == null || page.trim().isEmpty()) ? "dashboard" : page.trim();
-        if (VISITOR_EDITION && !MANAGER_EDITION && "dashboard".equals(targetPage)) targetPage = "visitor_dashboard";
+        if (VISITOR_EDITION && !MANAGER_EDITION && !UNIFIED_EDITION && "dashboard".equals(targetPage)) targetPage = "visitor_dashboard";
         if (STORE_EDITION && ("visitor_dashboard".equals(targetPage) || "visit".equals(targetPage) || "visitor_reports".equals(targetPage))) targetPage = "store_home";
         if (STAFF_EDITION && ("visitor_dashboard".equals(targetPage) || "visit".equals(targetPage) || "visitor_reports".equals(targetPage) || "store_home".equals(targetPage) || "dashboard".equals(targetPage))) targetPage = "staff_home";
         if (MANAGER_EDITION && !UNIFIED_EDITION && ("visitor_dashboard".equals(targetPage) || "visit".equals(targetPage) || "visitor_reports".equals(targetPage) || "store_home".equals(targetPage) || "staff_home".equals(targetPage))) targetPage = "dashboard";
@@ -3600,6 +3618,8 @@ public class MainActivity extends Activity {
         String[][] items = UNIFIED_EDITION ? (isFullAccessUser() ? new String[][]{
                 {"dashboard", "مدیریت", "⌂"}, {"showcase", "کالا", "◈"}, {"cart", "فروش", "⊕"},
                 {"warehouse", "انبار", "▧"}, {"finance", "مالی", "↗"}, {"manager_more", "بیشتر", "☰"}
+        } : "warehouse".equals(currentAccessRole()) ? new String[][]{
+                {"warehouse", "انبار", "▧"}, {"products", "کالاها", "◈"}, {"showcase", "موجودی", "▣"}, {"attendance", "حضور", "◷"}
         } : new String[][]{
                 {"visitor_dashboard", "خانه", "⌂"}, {"visit", "ویزیت", "✦"}, {"showcase", "کالا", "◈"},
                 {"cart", "سبد", "⊕"}, {"visitor_more", "بیشتر", "☰"}
@@ -3670,10 +3690,11 @@ public class MainActivity extends Activity {
     /** Which dock tab represents a page. Sub-pages (settings, reports, chat …) belong to «بیشتر» (B8). */
     private String dockKeyFor(String page) {
         if (page == null) return MANAGER_EDITION ? "dashboard" : STAFF_EDITION ? "staff_home" : STORE_EDITION ? "store_home" : "visitor_dashboard";
-        if (MANAGER_EDITION) {
+        if (MANAGER_EDITION || UNIFIED_EDITION) {
             if ("login".equals(page)) return "";
             if (UNIFIED_EDITION) {
                 if ("dashboard".equals(page) || "showcase".equals(page) || "cart".equals(page) || "warehouse".equals(page) || "finance".equals(page) || "manager_more".equals(page)) return page;
+                if ("warehouse".equals(currentAccessRole()) && ("products".equals(page) || "attendance".equals(page))) return page;
                 if ("visitor_dashboard".equals(page) || "visit".equals(page) || "visitor_more".equals(page)) return page;
                 return isFullAccessUser() ? "manager_more" : "visitor_more";
             }
@@ -3868,7 +3889,7 @@ public class MainActivity extends Activity {
             case "products": loadProducts(productsCacheQuery == null ? "" : productsCacheQuery, productsCacheFilter == null ? "all" : productsCacheFilter); break;
             case "sales": loadTable("فروش و اسناد", "نمای مستقیم از جدول فروش", "sailfact", ""); break;
             case "checks": loadTable("چک‌ها و وصول", "نمای مستقیم از چک‌های دریافتی", "getchk", ""); break;
-            case "reports": if (MANAGER_EDITION) loadManagerReports(); else loadReports(); break;
+            case "reports": if (MANAGER_EDITION || (UNIFIED_EDITION && isFullAccessUser())) loadManagerReports(); else loadReports(); break;
             case "diagnostics": loadDiagnosticsPage(); break;
             case "settings": renderSettings(); break;
             case "management": loadAccessManagement(); break;
@@ -3876,7 +3897,7 @@ public class MainActivity extends Activity {
             case "manager_approvals": loadManagerApprovals(); break;
             case "health": renderConnectionHealthPage(); break;
             case "dashboard":
-                if (MANAGER_EDITION) { loadManagerExecutive(); break; }
+                if (MANAGER_EDITION || (UNIFIED_EDITION && isFullAccessUser())) { loadManagerExecutive(); break; }
             case "mgr_drill": loadManagerDrill(); break;
             case "mgr_cockpit": loadManagerCockpit(); break;
             case "mgr_collection": loadManagerCollection(); break;
@@ -6865,12 +6886,28 @@ public class MainActivity extends Activity {
     }
 
     private boolean isAdminUser() {
+        if (UNIFIED_EDITION) {
+            String role = currentAccessRole();
+            return "admin".equals(role) || "manager".equals(role);
+        }
         return identityLooksAdmin(currentAccountName(), session == null ? "" : session.userName);
+    }
+
+    private boolean canAdminChat() {
+        if (!UNIFIED_EDITION) return isAdminUser();
+        String role = currentAccessRole();
+        return "admin".equals(role) || ("manager".equals(role) && canUsePermission("management_access"));
     }
 
     private boolean isFullAccessUser() {
         String role = currentAccessRole();
-        return isAdminUser() || "admin".equals(role) || "manager".equals(role);
+        if (!UNIFIED_EDITION) return isAdminUser() || "admin".equals(role) || "manager".equals(role);
+        if ("admin".equals(role)) return true;
+        // Managers receive the broad default profile, but a deliberately narrowed user-level
+        // profile must not be silently promoted back to full access here.
+        String raw = session == null ? "" : session.permissions;
+        if (raw == null || raw.trim().isEmpty()) raw = defaultPermissionString(role);
+        return permissionSet(raw).containsAll(permissionSet(allPermissionString()));
     }
 
     private String currentAccessRole() {
@@ -6893,13 +6930,10 @@ public class MainActivity extends Activity {
         if (UNIFIED_EDITION) {
             String k = key.trim();
             if (!unifiedEditionPermissionAllowed(k)) return false;
-            // Preserve the original all-in-one visitor/sales surface; only added management routes
-            // are constrained by the account's management permissions.
-            if (visitorEditionPermissionAllowed(k)) return true;
-            // «dashboard» now means the manager's consolidated view; ordinary sales accounts must not
-            // inherit it merely because the legacy role has a generic dashboard permission.
-            if ("dashboard".equals(k) && !isFullAccessUser()) return false;
-            return isFullAccessUser() || currentPermissionSet().contains(k);
+            String permission = pagePermissionKey(k);
+            // Edition membership only says a page exists in this APK. The signed-in Atiran role
+            // (and any explicitly assigned grants) decides whether that account may open it.
+            return MeelanoAccessPolicy.allows(currentAccessRole(), currentPermissionSet(), permission);
         }
         if (MANAGER_EDITION) return managerEditionPermissionAllowed(key.trim());
         if (STAFF_EDITION) return STAFF_PAGE_KEYS.contains(key.trim());
@@ -6938,7 +6972,7 @@ public class MainActivity extends Activity {
                 || "attendance".equals(k) || "attendance_admin".equals(k) || "leave_balance".equals(k) || "leave_request".equals(k)
                 || "customers".equals(k) || "customer_detail".equals(k) || "customer_call".equals(k) || "customer_message".equals(k)
                 || "products".equals(k) || "product_detail".equals(k)
-                || "management_access".equals(k) || "manager_approvals".equals(k) || "delivery_admin".equals(k) || "assistant".equals(k)
+                || "management_access".equals(k) || "manager_approvals".equals(k) || "delivery_admin".equals(k) || "production".equals(k) || "assistant".equals(k)
                 || "chat".equals(k) || "settings".equals(k) || "connection_health".equals(k);
     }
 
@@ -6968,6 +7002,7 @@ public class MainActivity extends Activity {
 
     private String pagePermissionKey(String page) {
         if ("visit".equals(page) || "visitor_more".equals(page)) return "visitor_dashboard";
+        if ("store_receipt".equals(page)) return "visitor_receipt";
         if ("health".equals(page)) return "connection_health";
         if ("management".equals(page)) return "management_access";
         if ("manager_more".equals(page)) return "settings";
@@ -6977,6 +7012,7 @@ public class MainActivity extends Activity {
     }
 
     private String resolveHeuristicAccessRole(String login, String display, Integer visitorId) {
+        if (UNIFIED_EDITION) return MeelanoAccessPolicy.fallbackRole(visitorId != null && visitorId > 0);
         if (identityLooksAdmin(login, display)) return "admin";
         String n = normalizeIdentity((login == null ? "" : login) + " " + (display == null ? "" : display));
         String compact = n.replace(" ", "").replace("_", "").replace("-", "");
@@ -7020,23 +7056,7 @@ public class MainActivity extends Activity {
     }
 
     private String canonicalAccessRole(String value) {
-        String v = normalizeIdentity(value);
-        if (v.isEmpty()) return "";
-        if (v.contains("admin") || v.contains("administrator") || v.contains("مدیرکل") || v.contains("مديرکل")) return "admin";
-        if (v.contains("manager") || v.contains("مدیر") || v.contains("مدير") || v.contains("modir")) return "manager";
-        String compact = v.replace(" ", "").replace("_", "").replace("-", "");
-        if (v.contains("senior_accountant") || compact.contains("senioraccountant") || v.contains("حسابدار ارشد") || compact.contains("حسابدارارشد") || v.contains("senior accountant")) return "senior_accountant";
-        if (v.contains("accountant") || v.contains("حسابدار")) return "accountant";
-        if (v.contains("senior") || v.contains("supervisor") || v.contains("ارشد")) return "senior";
-        if (v.contains("warehouse") || v.contains("انباردار") || v.contains("انبار")) return "warehouse";
-        if (v.contains("collections") || v.contains("مطالبات") || v.contains("وصول")) return "collections";
-        if (v.contains("sales_employee") || v.contains("کارمند بخش فروش") || v.contains("کارمندفروش") || v.contains("sales")) return "sales_employee";
-        if (v.contains("employee") || v.contains("کارمند")) return "employee";
-        if (v.contains("distributor") || v.contains("distribution") || v.contains("پخش") || v.contains("مامور پخش") || v.contains("مأمور پخش")) return "distributor";
-        if (v.contains("driver") || v.contains("راننده")) return "driver";
-        if (v.contains("worker") || v.contains("کارگر")) return "worker";
-        if (v.contains("visitor") || v.contains("ویزیت") || v.contains("ويزيت") || v.contains("بازاریاب")) return "visitor";
-        return "user";
+        return MeelanoAccessPolicy.canonicalRole(value);
     }
 
     private String accessRoleLabel(String role) {
@@ -7075,6 +7095,7 @@ public class MainActivity extends Activity {
                 {"cart", "سبد خرید", "ویزیتور"},
                 {"cart_draft", "ذخیره پیش‌نویس سبد", "ویزیتور"},
                 {"cart_submit", "ارسال پیش‌فاکتور", "ویزیتور"},
+                {"visitor_receipt", "ثبت قبض دریافت برای مشتریان مجاز", "ویزیتور"},
                 {"cart_signature", "امضای مشتری", "ویزیتور"},
                 {"customer_select", "انتخاب مشتری برای پیش‌فاکتور", "ویزیتور"},
                 {"prefactor_list", "پیگیری پیش‌فاکتورهای من", "ویزیتور"},
@@ -7108,7 +7129,8 @@ public class MainActivity extends Activity {
                 {"hardware_control", "فرمان سخت‌افزار امنیتی", "سخت‌افزار"},
                 {"settings", "تنظیمات عمومی", "مدیریتی"},
                 {"connection_health", "سلامت اتصال", "مدیریتی"},
-                {"management_access", "مدیریت دسترسی کاربران", "مدیریتی"}
+                {"management_access", "مدیریت دسترسی کاربران", "مدیریتی"},
+                {"production", "مشاهده و ثبت تولید", "مدیریتی"}
         };
     }
 
@@ -7137,38 +7159,8 @@ public class MainActivity extends Activity {
 
     private String defaultPermissionString(String role) {
         role = canonicalAccessRole(role);
-        Set<String> s = new HashSet<>();
-        s.add("dashboard");
-        s.add("attendance");
-        s.add("attendance_self");
-        s.add("leave_balance");
-        s.add("leave_request");
         if ("admin".equals(role) || "manager".equals(role)) return allPermissionString();
-        if ("senior".equals(role) || "visitor".equals(role) || "sales_employee".equals(role)) {
-            s.add("visitor_dashboard"); s.add("showcase"); s.add("cart"); s.add("cart_draft"); s.add("cart_submit"); s.add("cart_signature"); s.add("customer_select");
-            s.add("prefactor_list"); s.add("visit_route"); s.add("cart_discount"); s.add("cart_pdf"); s.add("offline_queue"); s.add("day_report");
-            s.add("customers"); s.add("customer_detail"); s.add("customer_call"); s.add("customer_message");
-            s.add("products"); s.add("product_detail");
-        } else if ("distributor".equals(role)) {
-            s.add("visitor_dashboard"); s.add("showcase"); s.add("cart"); s.add("cart_draft"); s.add("customer_select");
-            s.add("prefactor_list"); s.add("visit_route"); s.add("offline_queue"); s.add("day_report");
-            s.add("customers"); s.add("customer_detail"); s.add("customer_call"); s.add("products"); s.add("product_detail");
-        } else if ("driver".equals(role)) {
-            s.add("visitor_dashboard"); s.add("customers"); s.add("customer_call");
-        } else if ("worker".equals(role)) {
-            s.add("products");
-        } else if ("warehouse".equals(role)) {
-            s.add("products"); s.add("product_detail"); s.add("showcase");
-        } else if ("senior_accountant".equals(role)) {
-            s.add("customers"); s.add("customer_detail"); s.add("reports"); s.add("command"); s.add("taxpayers"); s.add("tax_send"); s.add("connection_health");
-        } else if ("accountant".equals(role)) {
-            s.add("customers"); s.add("customer_detail"); s.add("reports"); s.add("taxpayers");
-        } else if ("employee".equals(role)) {
-            s.add("customers"); s.add("products");
-        } else if ("collections".equals(role)) {
-            s.add("customers"); s.add("customer_detail"); s.add("customer_call"); s.add("customer_message"); s.add("reports");
-        }
-        return permissionCsv(s);
+        return permissionCsv(MeelanoAccessPolicy.defaultPermissions(role));
     }
 
     private boolean permissionEnabled(String raw, String key) {
@@ -7177,7 +7169,10 @@ public class MainActivity extends Activity {
 
     private UserSession withResolvedAccessRole(Connection c, UserSession base, String login) throws Exception {
         if (base == null) return null;
-        if (isPrivilegedLogin(login)) return new UserSession(base.userId, base.visitorId, base.userName, "admin", allPermissionString());
+        // Username-shaped admin shortcuts are retained only by the legacy standalone manager
+        // edition. In the signed unified app, privilege must come from Atiran's role or an
+        // explicit administrator-managed permission profile.
+        if (!UNIFIED_EDITION && isPrivilegedLogin(login)) return new UserSession(base.userId, base.visitorId, base.userName, "admin", allPermissionString());
         Integer visitorId = base.visitorId;
         if (visitorId == null || visitorId <= 0) visitorId = resolveVisitorIdForAccount(c, login, base.userName, base.userId);
         AccessProfile profile = resolveAccessProfile(c, login, base.userName, base.userId, visitorId);
@@ -7196,10 +7191,16 @@ public class MainActivity extends Activity {
         boolean enabled = true;
         boolean explicit = false;
         try {
-            if (c != null && tableExists(c, "meelano_access_users")) {
-                try (PreparedStatement ps = c.prepareStatement("SELECT TOP (1) role_key, permissions, enabled FROM dbo.meelano_access_users WHERE LOWER(LTRIM(RTRIM(username)))=LOWER(LTRIM(RTRIM(?))) OR LOWER(LTRIM(RTRIM(display_name)))=LOWER(LTRIM(RTRIM(?))) ORDER BY updated_at DESC")) {
-                    ps.setString(1, stringOr(login, ""));
-                    ps.setString(2, stringOr(display, ""));
+            if (c != null && tableExists(c, "meelano_access_users") && login != null && !login.trim().isEmpty()) {
+                // In the licensed unified app, authorization profiles are bound to the
+                // authenticated Atiran login, never to a non-unique display name. Keep the
+                // standalone editions' existing profile matching for backwards compatibility.
+                String profileSql = UNIFIED_EDITION
+                        ? "SELECT TOP (1) role_key, permissions, enabled FROM dbo.meelano_access_users WHERE LOWER(LTRIM(RTRIM(username)))=LOWER(LTRIM(RTRIM(?))) ORDER BY updated_at DESC"
+                        : "SELECT TOP (1) role_key, permissions, enabled FROM dbo.meelano_access_users WHERE LOWER(LTRIM(RTRIM(username)))=LOWER(LTRIM(RTRIM(?))) OR LOWER(LTRIM(RTRIM(display_name)))=LOWER(LTRIM(RTRIM(?))) ORDER BY updated_at DESC";
+                try (PreparedStatement ps = c.prepareStatement(profileSql)) {
+                    ps.setString(1, login.trim());
+                    if (!UNIFIED_EDITION) ps.setString(2, stringOr(display, ""));
                     try (ResultSet r = ps.executeQuery()) {
                         if (r.next()) {
                             String storedRole = canonicalAccessRole(r.getString(1));
@@ -7218,7 +7219,7 @@ public class MainActivity extends Activity {
                 }
             }
         } catch (Exception ignored) { }
-        if (identityLooksAdmin(login, display)) { role = "admin"; permissions = allPermissionString(); enabled = true; }
+        if (!UNIFIED_EDITION && identityLooksAdmin(login, display)) { role = "admin"; permissions = allPermissionString(); enabled = true; }
         return new AccessProfile(role, permissions, enabled, explicit);
     }
 
@@ -7234,10 +7235,23 @@ public class MainActivity extends Activity {
             if (userId != null && userId > 0 && userIdCol != null) { where.add("TRY_CONVERT(nvarchar(100),[" + userIdCol + "])=?"); params.add(String.valueOf(userId)); }
             String uname = resolveFlexible(cols, "Username", "username", "user_name", "login", "UserName");
             if (uname != null && login != null && !login.trim().isEmpty()) { where.add("LOWER(LTRIM(RTRIM(TRY_CONVERT(nvarchar(160),[" + uname + "]))))=LOWER(LTRIM(RTRIM(?)))"); params.add(login.trim()); }
-            String name = resolveFlexible(cols, "vis_name", "name", "Name", "VisitorName", "moname");
-            if (name != null && display != null && !display.trim().isEmpty()) { where.add("LOWER(LTRIM(RTRIM(TRY_CONVERT(nvarchar(220),[" + name + "]))))=LOWER(LTRIM(RTRIM(?)))"); params.add(display.trim()); }
+            // The live sample has both visitors.UserID and visitors.Username. The unified app
+            // uses only authenticated identifiers: a duplicate display name must not attach a
+            // different visitor's customer scope. Preserve name fallback in standalone editions.
+            if (!UNIFIED_EDITION) {
+                String name = resolveFlexible(cols, "vis_name", "name", "Name", "VisitorName", "moname");
+                if (name != null && display != null && !display.trim().isEmpty()) {
+                    where.add("LOWER(LTRIM(RTRIM(TRY_CONVERT(nvarchar(220),[" + name + "]))))=LOWER(LTRIM(RTRIM(?)))");
+                    params.add(display.trim());
+                }
+            }
             if (where.isEmpty()) return null;
-            String sql = "SELECT TOP (1) TRY_CONVERT(int,[" + vid + "]) FROM dbo.visitors WHERE (" + join(where, " OR ") + ")" + activeAnd(cols, "") + " ORDER BY [" + vid + "]";
+            String orderBy = " ORDER BY [" + vid + "]";
+            if (userId != null && userId > 0 && userIdCol != null) {
+                orderBy = " ORDER BY CASE WHEN TRY_CONVERT(nvarchar(100),[" + userIdCol + "])=? THEN 0 ELSE 1 END,[" + vid + "]";
+                params.add(String.valueOf(userId));
+            }
+            String sql = "SELECT TOP (1) TRY_CONVERT(int,[" + vid + "]) FROM dbo.visitors WHERE (" + join(where, " OR ") + ")" + activeAnd(cols, "") + orderBy;
             try (PreparedStatement ps = c.prepareStatement(sql)) {
                 setParams(ps, params);
                 try (ResultSet r = ps.executeQuery()) { if (r.next() && r.getObject(1) != null) return r.getInt(1); }
@@ -7248,7 +7262,13 @@ public class MainActivity extends Activity {
 
     private String resolveAccessRole(Connection c, String login, String display, Integer userId, Integer visitorId) {
         try {
-            if (identityLooksAdmin(login, display)) return "admin";
+            if (!UNIFIED_EDITION && identityLooksAdmin(login, display)) return "admin";
+            if (UNIFIED_EDITION) {
+                String atiran = atiranRoleFromSysUser(c, userId);
+                if (!atiran.isEmpty() && !"user".equals(atiran)) return atiran;
+                atiran = atiranRoleFromVisitor(c, visitorId);
+                if (!atiran.isEmpty() && !"user".equals(atiran)) return atiran;
+            }
             String explicit = roleFromAccessTable(c, login, display);
             if (!explicit.isEmpty() && !"user".equals(explicit)) return explicit;
             explicit = roleFromFlexibleTable(c, "sys_users", "user_id", userId, new String[]{"role", "Role", "user_role", "access_role", "AccessRole", "semat", "سمت", "level", "AccessLevel"});
@@ -7256,14 +7276,98 @@ public class MainActivity extends Activity {
             explicit = roleFromFlexibleTable(c, "visitors", "vis_rdf", visitorId, new String[]{"role", "Role", "vis_role", "access_role", "semat", "سمت", "level", "VisitorRole"});
             if (!explicit.isEmpty() && !"user".equals(explicit)) return explicit;
         } catch (Exception ignored) { }
+        // In the unified release, an account with no readable Atiran role is least-privilege:
+        // a linked visitor row gets visitor defaults; every other unknown user stays restricted.
+        if (UNIFIED_EDITION) return MeelanoAccessPolicy.fallbackRole(visitorId != null && visitorId > 0);
         return resolveHeuristicAccessRole(login, display, visitorId);
+    }
+
+    /** Resolve Atiran's linked role_id to a role name before applying any application fallback. */
+    private String atiranRoleFromSysUser(Connection c, Integer userId) {
+        return atiranRoleFromLinkedRow(c, "sys_users", userId,
+                new String[]{"user_id", "UserID", "userid", "id", "ID"});
+    }
+
+    private String atiranRoleFromVisitor(Connection c, Integer visitorId) {
+        return atiranRoleFromLinkedRow(c, "visitors", visitorId,
+                new String[]{"vis_rdf", "visitor_id", "VisitorID", "shvis", "id", "ID"});
+    }
+
+    private String atiranRoleFromLinkedRow(Connection c, String table, Integer rowId, String[] idCandidates) {
+        if (c == null || rowId == null || rowId <= 0) return "";
+        try {
+            if (!tableExists(c, table)) return "";
+            Set<String> cols = columns(c, table);
+            String idCol = resolveFlexible(cols, idCandidates);
+            if (idCol == null) return "";
+            String direct = resolveFlexible(cols, "role", "user_role", "access_role", "AccessRole", "role_name", "RoleName",
+                    "vis_role", "VisitorRole", "semat", "سمت", "level", "AccessLevel");
+            String roleId = resolveFlexible(cols, "role_id", "RoleID", "roleid", "RoleRdf", "RoleRDF", "role_rdf", "role_ref", "RoleRef");
+            String raw = "";
+            if (direct != null) {
+                try (PreparedStatement ps = c.prepareStatement("SELECT TOP (1) TRY_CONVERT(nvarchar(160),[" + direct + "]) FROM dbo.[" + table + "] WHERE TRY_CONVERT(nvarchar(100),[" + idCol + "])=?")) {
+                    ps.setString(1, String.valueOf(rowId));
+                    try (ResultSet r = ps.executeQuery()) {
+                        if (r.next()) raw = stringOr(r.getString(1), "").trim();
+                    }
+                }
+                String mapped = canonicalAccessRole(raw);
+                if (!mapped.isEmpty() && !"user".equals(mapped)) return mapped;
+            }
+            if (roleId != null) {
+                try (PreparedStatement ps = c.prepareStatement("SELECT TOP (1) TRY_CONVERT(nvarchar(100),[" + roleId + "]) FROM dbo.[" + table + "] WHERE TRY_CONVERT(nvarchar(100),[" + idCol + "])=?")) {
+                    ps.setString(1, String.valueOf(rowId));
+                    try (ResultSet r = ps.executeQuery()) {
+                        if (r.next()) {
+                            String ref = stringOr(r.getString(1), "").trim();
+                            String mapped = canonicalAccessRole(ref);
+                            if (!mapped.isEmpty() && !"user".equals(mapped)) return mapped;
+                            String lookedUp = atiranRoleNameForId(c, ref);
+                            if (!lookedUp.isEmpty()) return lookedUp;
+                        }
+                    }
+                }
+            }
+            if (!raw.isEmpty()) return atiranRoleNameForId(c, raw);
+        } catch (Exception ignored) { }
+        return "";
+    }
+
+    private String atiranRoleNameForId(Connection c, String rawId) {
+        if (c == null || rawId == null || !rawId.trim().matches("-?\\d+")) return "";
+        String[] tables = {"Roles", "role", "sys_roles"};
+        for (String table : tables) {
+            try {
+                if (!tableExists(c, table)) continue;
+                Set<String> cols = columns(c, table);
+                String id = resolveFlexible(cols, "ID", "id", "RoleID", "role_id", "RoleRdf", "RoleRDF", "role_rdf", "rdf", "RDF", "Code", "code");
+                String name = resolveFlexible(cols, "Name", "name", "RoleName", "role_name", "Title", "title", "RoleTitle", "Role", "role", "RoleText", "RollName");
+                if (id == null || name == null) continue;
+                try (PreparedStatement ps = c.prepareStatement("SELECT TOP (1) TRY_CONVERT(nvarchar(160),[" + name + "]) FROM dbo.[" + table + "] WHERE TRY_CONVERT(nvarchar(100),[" + id + "])=?")) {
+                    ps.setString(1, rawId.trim());
+                    try (ResultSet r = ps.executeQuery()) {
+                        if (r.next()) {
+                            String mapped = canonicalAccessRole(stringOr(r.getString(1), ""));
+                            if (!mapped.isEmpty() && !"user".equals(mapped)) return mapped;
+                        }
+                    }
+                }
+            } catch (Exception ignored) { }
+        }
+        return "";
     }
 
     private String roleFromAccessTable(Connection c, String login, String display) {
         try {
-            if (c == null || !tableExists(c, "meelano_chat_members")) return "";
-            try (PreparedStatement ps = c.prepareStatement("SELECT TOP (1) role FROM dbo.meelano_chat_members WHERE LOWER(LTRIM(RTRIM(username)))=LOWER(LTRIM(RTRIM(?))) OR LOWER(LTRIM(RTRIM(display_name)))=LOWER(LTRIM(RTRIM(?)))")) {
-                ps.setString(1, stringOr(login, "")); ps.setString(2, stringOr(display, ""));
+            if (c == null || !tableExists(c, "meelano_chat_members") || login == null || login.trim().isEmpty()) return "";
+            // In the unified edition, a display name is not a unique identity and cannot be
+            // used to grant a role. Preserve the independent editions' legacy lookup behavior.
+            String sql = UNIFIED_EDITION
+                    ? "SELECT TOP (1) role FROM dbo.meelano_chat_members WHERE LOWER(LTRIM(RTRIM(username)))=LOWER(LTRIM(RTRIM(?)))"
+                    : "SELECT TOP (1) role FROM dbo.meelano_chat_members WHERE LOWER(LTRIM(RTRIM(username)))=LOWER(LTRIM(RTRIM(?))) OR LOWER(LTRIM(RTRIM(display_name)))=LOWER(LTRIM(RTRIM(?)))";
+            try (PreparedStatement ps = c.prepareStatement(sql)) {
+                ps.setString(1, login.trim());
+                if (!UNIFIED_EDITION) ps.setString(2, stringOr(display, ""));
                 try (ResultSet r = ps.executeQuery()) { if (r.next()) return canonicalAccessRole(r.getString(1)); }
             }
         } catch (Exception ignored) { }
@@ -7422,7 +7526,12 @@ public class MainActivity extends Activity {
             try { String ex = storeCustomerExclusion(cols, p); if (!ex.isEmpty()) conditions.add(ex); } catch (Exception ignored) { }
         }
         String latifiNameScope = customerName08RestrictionCondition(cols, alias);
-        if (!latifiNameScope.isEmpty()) return latifiNameScope; // name tag replaces the visitor filter
+        if (!latifiNameScope.isEmpty()) {
+            // Preserve the standalone visitor build's historic name-tag rule. Unified accounts must
+            // satisfy BOTH that legacy tag and their authenticated Atiran visitor assignment.
+            if (!UNIFIED_EDITION) return latifiNameScope;
+            conditions.add(latifiNameScope);
+        }
         if (restrictCustomerData()) {
             Integer vid = currentVisitorScopeId();
             String vis = resolveFlexible(cols, "vis_rdf", "VisitorID", "visid", "visitor", "shvis");
@@ -7451,8 +7560,12 @@ public class MainActivity extends Activity {
     }
 
     private String firstAllowedPage() {
-        if (MANAGER_EDITION) {
+        if (MANAGER_EDITION || UNIFIED_EDITION) {
             if (UNIFIED_EDITION) {
+                if ("warehouse".equals(currentAccessRole()) && !isFullAccessUser()) {
+                    String[] warehousePages = {"warehouse", "products", "showcase", "attendance"};
+                    for (String p : warehousePages) if (canOpenPage(p)) return p;
+                }
                 String[] allInOnePages = isFullAccessUser()
                         ? new String[]{"dashboard", "showcase", "cart", "warehouse", "finance", "manager_more", "reports", "command", "personnel", "attendance", "customers", "products", "management", "visitor_dashboard", "visit", "visitor_reports", "taxpayers", "cameras", "alarm", "assistant", "chat", "settings", "health"}
                         : new String[]{"visitor_dashboard", "visit", "cart", "visitor_more", "showcase", "customers", "products", "reports", "command", "warehouse", "finance", "personnel", "attendance", "taxpayers", "assistant", "chat", "visitor_reports", "settings", "manager_more"};
@@ -7759,7 +7872,7 @@ public class MainActivity extends Activity {
     private void upsertCollabMember(Connection c) throws Exception {
         String username = currentAccountName();
         String display = session == null ? username : stringOr(session.userName, username);
-        String role = isAdminUser() ? "admin" : "user";
+        String role = canAdminChat() ? "admin" : "user";
         String sql = "IF EXISTS (SELECT 1 FROM dbo.meelano_chat_members WHERE username=?) " +
                 "UPDATE dbo.meelano_chat_members SET display_name=?, role=CASE WHEN role=N'user' AND ?=N'admin' THEN N'admin' ELSE role END, last_seen=SYSDATETIME() WHERE username=? " +
                 "ELSE INSERT INTO dbo.meelano_chat_members(username,display_name,role,kicked,last_seen) VALUES(?,?,?,0,SYSDATETIME())";
@@ -7790,7 +7903,7 @@ public class MainActivity extends Activity {
             JSONObject out = new JSONObject();
             out.put("username", username);
             out.put("display", session == null ? username : session.userName);
-            out.put("admin", isAdminUser() || "admin".equals(chatRole(c, username)) || "manager".equals(chatRole(c, username)));
+            out.put("admin", canAdminChat() || "admin".equals(chatRole(c, username)) || "manager".equals(chatRole(c, username)));
             out.put("closed", "1".equals(chatSetting(c, "chat_closed", "0")));
             out.put("silentUntil", chatSetting(c, "silent_until", ""));
             out.put("scheduleDelay", prefs == null ? 0 : prefs.getInt("chat_schedule_delay", 0));
@@ -7817,7 +7930,7 @@ public class MainActivity extends Activity {
             ps.setString(1, username);
             try (ResultSet r = ps.executeQuery()) { if (r.next()) return stringOr(r.getString(1), "user"); }
         } catch (Exception ignored) { }
-        return isAdminUser() ? "admin" : "user";
+        return canAdminChat() ? "admin" : "user";
     }
 
     private boolean isChatKicked(Connection c, String username) {
@@ -8051,7 +8164,7 @@ public class MainActivity extends Activity {
         try (Connection c = openConnection()) {
             ensureMeelanoCollabTables(c);
             String username = currentAccountName();
-            boolean admin = isAdminUser() || "admin".equals(chatRole(c, username)) || "manager".equals(chatRole(c, username));
+            boolean admin = canAdminChat() || "admin".equals(chatRole(c, username)) || "manager".equals(chatRole(c, username));
             if (isChatKicked(c, username)) throw new DbException("دسترسی شما به گفتگو بسته شده است.");
             if (!admin && "1".equals(chatSetting(c, "chat_closed", "0"))) throw new DbException("گفتگو موقتاً توسط مدیر بسته شده است.");
             if (!admin && isChatMuted(c, username)) throw new DbException("ارسال پیام شما موقتاً محدود است.");
@@ -8123,7 +8236,7 @@ public class MainActivity extends Activity {
         try (Connection c = openConnection()) {
             ensureMeelanoCollabTables(c);
             String username = currentAccountName();
-            boolean admin = isAdminUser() || "admin".equals(chatRole(c, username)) || "manager".equals(chatRole(c, username));
+            boolean admin = canAdminChat() || "admin".equals(chatRole(c, username)) || "manager".equals(chatRole(c, username));
             if (isChatKicked(c, username)) throw new DbException("دسترسی شما به گفتگو بسته شده است.");
             if (!admin && "1".equals(chatSetting(c, "chat_closed", "0"))) throw new DbException("گفتگو موقتاً توسط مدیر بسته شده است.");
             if (!admin && isChatMuted(c, username)) throw new DbException("ارسال پیام شما موقتاً محدود است.");
@@ -8397,7 +8510,7 @@ public class MainActivity extends Activity {
         addHero("پرسنل", "مانده، فروش، آخرین فعالیت و گردش اختصاصی هر نفر");
         addManualRefreshPanel("personnel", "بروزرسانی دستی پرسنل", "آخرین بروزرسانی: " + lastRefreshText("personnel"), () -> loadPersonnel());
         addPersonnelKpiSummary(rows);
-        if (isAdminUser()) addPersonnelAdminPanel();
+        if (canUsePermission("management_access")) addPersonnelAdminPanel();
         if (rows == null || rows.length() == 0) { addEmptyTo(content, "پرسنلی پیدا نشد؛ جدول visitors یا sys_users داده قابل نمایش ندارد."); return; }
         for (int i = 0; i < rows.length(); i++) {
             JSONObject r = rows.optJSONObject(i); if (r == null) continue;
@@ -11872,7 +11985,7 @@ public class MainActivity extends Activity {
         grid.addView(text("ابزار فروش سریع", 15.4f, TEXT, Typeface.BOLD), new LinearLayout.LayoutParams(-1, -2));
         LinearLayout r1 = new LinearLayout(this); r1.setOrientation(LinearLayout.HORIZONTAL);
         addVisitorVisitTile(r1, "انتخاب مشتری", "جستجو و اتصال به سبد", "♙", navAccent("customers"), () -> { if (ensurePermission("customer_select", "انتخاب مشتری")) showCartCustomerPicker(""); });
-        addVisitorVisitTile(r1, "کالا", "قیمت فروش ۱ و ۲", "◈", navAccent("showcase"), () -> showApp("showcase"));
+        addVisitorVisitTile(r1, "کالا", priceTierLabel(1) + " و " + priceTierLabel(2), "◈", navAccent("showcase"), () -> showApp("showcase"));
         LinearLayout.LayoutParams r1p = new LinearLayout.LayoutParams(-1, -2); r1p.setMargins(0, dp(9), 0, 0); grid.addView(r1, r1p);
         LinearLayout r2 = new LinearLayout(this); r2.setOrientation(LinearLayout.HORIZONTAL);
         addVisitorVisitTile(r2, "سبد", "فقط پیش‌فاکتور", "🛒", navAccent("cart"), () -> showApp("cart"));
@@ -14022,6 +14135,18 @@ public class MainActivity extends Activity {
     private void decideIncomplete(long id, boolean fix) { runDb(() -> { try (Connection c = openConnection()) { ensureMeelanoHrTables(c); try (PreparedStatement ps = c.prepareStatement("UPDATE dbo.meelano_hr_incomplete SET status=?, fixed_by=?, fixed_at=SYSDATETIME(), manager_note=? WHERE id=? AND status=N'open'")) { ps.setString(1, fix ? "fixed" : "dismissed"); ps.setString(2, currentAccountName()); ps.setString(3, fix ? "اصلاح مدیر" : "چشم‌پوشی مدیر"); ps.setLong(4, id); ps.executeUpdate(); } } return "ok"; }, new DbCallback() { @Override public void ok(String b) { showNotice(fix ? "تردد اصلاح شد." : "تردد بسته شد.", false); loadManagerApprovals(); } @Override public void fail(Exception e) { showPageError("تردد", e, () -> loadManagerApprovals()); } }); }
 
     /** Manager app, «بیشتر»: every management tool in one place, filtered by the signed-in role. */
+    private void openManagerProduction() {
+        if ((!UNIFIED_EDITION && !MANAGER_EDITION)
+                || (UNIFIED_EDITION ? !canUsePermission("production") : !isFullAccessUser())) {
+            showNotice("تولید فقط برای حساب مدیر دارای مجوز ثبت تولید در دسترس است.", true);
+            return;
+        }
+        Intent intent = new Intent(this, ProductionActivity.class);
+        intent.putExtra("atiran_uid", session == null || session.userId == null ? 0 : session.userId);
+        intent.putExtra("atiran_username", currentAccountName());
+        startActivity(intent);
+    }
+
     private void renderManagerMorePage() {
         content.removeAllViews();
         int accent = navAccent("manager_more");
@@ -14059,6 +14184,7 @@ public class MainActivity extends Activity {
         });
         addVisitorMoreGroup("انبار و مالی", "تحلیل موجودی، برچسب بارکد، مطالبات و نقدینگی", new VisitorToolSpec[]{
                 new VisitorToolSpec("انبار هوشمند", "ABC، نقطهٔ سفارش، کالای راکد، کارت کالا", "◈", GOLD, () -> showApp("warehouse"), canOpenPage("warehouse")),
+                new VisitorToolSpec("تولید محصول", "فرمول، مصرف مواد و ثبت رسمی تولید در آتیران", "⚙", GOLD, this::openManagerProduction, (UNIFIED_EDITION || MANAGER_EDITION) && canUsePermission("production")),
                 new VisitorToolSpec("اتاق فرمان مالی", "وصول، چک، قیمت‌گذاری، جریان نقدی", "☷", SUCCESS, () -> showApp("finance"), canOpenPage("finance")),
                 new VisitorToolSpec("چاپ برچسب کالا", "برگهٔ A4 بارکد و QR (PDF)", "🏷", INFO, () -> { MeelanoWarehouseUi.tab = "labels"; showApp("warehouse"); }, canOpenPage("warehouse"))
         });
@@ -14097,10 +14223,13 @@ public class MainActivity extends Activity {
                 new VisitorToolSpec("مسیر امروز", "روی نقشه", "⌖", navAccent("visit"), () -> openTodayRouteMap(), true),
                 new VisitorToolSpec("صف آفلاین", formatNumber(offlineQueue().length()) + " مورد", "⇅", offlineQueue().length() > 0 ? DANGER : navAccent("visitor_more"), () -> trySendOfflineQueue(), canUsePermission("offline_queue"))
         });
+        addVisitorMoreGroup("دریافت و وصول", "ثبت قبض رسمی آتیران برای مشتریان مجاز", new VisitorToolSpec[]{
+                new VisitorToolSpec("دریافت وجه / پیش‌دریافت", "نقد، کارت‌خوان، انتقال بانکی یا چک", "☷", SUCCESS, () -> openStoreReceipt(null), canUsePermission("visitor_receipt"))
+        });
         addVisitorMoreGroup("مشتری و کالا", "ابزارهای فروش سریع", new VisitorToolSpec[]{
                 new VisitorToolSpec("مشتریان", "جستجو و پیگیری", "♙", navAccent("customers"), () -> showApp("customers"), canOpenPage("customers")),
                 new VisitorToolSpec("انتخاب مشتری", "برای سبد فعلی", "+", navAccent("customers"), () -> showCartCustomerPicker(""), canUsePermission("customer_select")),
-                new VisitorToolSpec("کالا", "قیمت ۱ و ۲", "◈", navAccent("showcase"), () -> showApp("showcase"), canOpenPage("showcase")),
+                new VisitorToolSpec("کالا", priceTierLabel(1) + " و " + priceTierLabel(2), "◈", navAccent("showcase"), () -> showApp("showcase"), canOpenPage("showcase")),
                 new VisitorToolSpec("کدخوان", "جستجوی کالا", "⌕", navAccent("visitor_more"), () -> showBarcodeSearchDialog(), canOpenPage("showcase"))
         });
         if (UNIFIED_EDITION) addVisitorMoreGroup("مدیریت و بخش‌های سازمانی", "فقط بخش‌های مجاز حساب کاربری شما", new VisitorToolSpec[]{
@@ -14417,15 +14546,43 @@ public class MainActivity extends Activity {
         addVisitorActivityTile(r5, "پیش‌فاکتورها", "لیست، PDF و تبدیل", "▤", navAccent("visitor_reports"), () -> loadMyPrefactors());
         addVisitorActivityTile(r5, "کدخوان کالا", "بارکد یا کد", "⌕", INFO, () -> showBarcodeSearchDialog());
         LinearLayout.LayoutParams r5p = new LinearLayout.LayoutParams(-1, -2); r5p.setMargins(0, dp(8), 0, 0); c.addView(r5, r5p);
+        LinearLayout r6 = new LinearLayout(this); r6.setOrientation(LinearLayout.HORIZONTAL);
+        if (canOpenPage("customers")) addVisitorActivityTile(r6, "مشتریان", "پیگیری و گردش حساب", "♙", navAccent("customers"), () -> showApp("customers"));
+        if (canUsePermission("visitor_receipt")) addVisitorActivityTile(r6, "دریافت وجه", "پیش‌دریافت مشتری", "◉", SUCCESS, () -> openStoreReceipt(null));
+        if (r6.getChildCount() > 0) { LinearLayout.LayoutParams r6p = new LinearLayout.LayoutParams(-1, -2); r6p.setMargins(0, dp(8), 0, 0); c.addView(r6, r6p); }
+        LinearLayout r7 = new LinearLayout(this); r7.setOrientation(LinearLayout.HORIZONTAL);
+        if (canOpenPage("assistant")) addVisitorActivityTile(r7, "دستیار هوشمند", "گفتگو و فرمان صوتی", "✧", INFO, () -> showApp("assistant"));
+        if (r7.getChildCount() > 0) { LinearLayout.LayoutParams r7p = new LinearLayout.LayoutParams(-1, -2); r7p.setMargins(0, dp(8), 0, 0); c.addView(r7, r7p); }
         LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2); cp.setMargins(0, 0, 0, dp(12)); content.addView(c, cp);
+    }
+
+    private int visitorActivityIconResource(String title) {
+        if (title == null) return 0;
+        if (title.contains("مشتری")) return R.drawable.visitor3d_customers;
+        if (title.equals("کالا") || title.contains("کدخوان")) return R.drawable.visitor3d_products;
+        if (title.contains("سبد") || title.contains("پیش‌فاکتور")) return R.drawable.visitor3d_prefactor;
+        if (title.contains("دریافت وجه")) return R.drawable.visitor3d_receipt;
+        if (title.contains("دستیار") || title.equals("گفتگو")) return R.drawable.visitor3d_assistant;
+        return 0;
     }
 
     private void addVisitorActivityTile(LinearLayout row, String title, String sub, String glyph, int accent, final Runnable action) {
         LinearLayout tile = new LinearLayout(this); tile.setOrientation(LinearLayout.VERTICAL); tile.setGravity(Gravity.CENTER); tile.setPadding(dp(10), dp(12), dp(10), dp(10));
         tile.setClickable(true); tile.setFocusable(true); tile.setOnClickListener(v -> { if (action != null) action.run(); }); applyTouchFeedback(tile);
         tile.setBackground(unifiedCardBg(accent, 24, false));
-        TextView icon = text(glyph, 21, onColorFor(accent), Typeface.BOLD); icon.setGravity(Gravity.CENTER); icon.setBackground(luxuryButtonBg(accent, true, 14));
-        tile.addView(icon, new LinearLayout.LayoutParams(dp(54), dp(54)));
+        int iconResource = visitorActivityIconResource(title);
+        if (iconResource != 0) {
+            ImageView icon = new ImageView(this);
+            icon.setImageResource(iconResource);
+            icon.setContentDescription(title);
+            icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+            icon.setPadding(dp(5), dp(5), dp(5), dp(5));
+            icon.setBackground(luxuryButtonBg(accent, true, 14));
+            tile.addView(icon, new LinearLayout.LayoutParams(dp(62), dp(62)));
+        } else {
+            TextView icon = text(glyph, 21, onColorFor(accent), Typeface.BOLD); icon.setGravity(Gravity.CENTER); icon.setBackground(luxuryButtonBg(accent, true, 14));
+            tile.addView(icon, new LinearLayout.LayoutParams(dp(54), dp(54)));
+        }
         TextView t = text(title, 13.8f, TEXT, Typeface.BOLD); t.setGravity(Gravity.CENTER); t.setSingleLine(false); LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(-1, -2); tp.setMargins(0, dp(8), 0, 0); tile.addView(t, tp);
         TextView s = text(sub, 10.2f, MUTED, Typeface.NORMAL); s.setGravity(Gravity.CENTER); s.setSingleLine(false); tile.addView(s, new LinearLayout.LayoutParams(-1, -2));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(150), 1f); lp.setMargins(dp(4), 0, dp(4), 0); row.addView(tile, lp);
@@ -14525,7 +14682,7 @@ public class MainActivity extends Activity {
         c.addView(text("دسترسی سریع به بخش‌های پرکاربرد.", 10.3f, MUTED, Typeface.NORMAL), new LinearLayout.LayoutParams(-1, -2));
         LinearLayout row1 = new LinearLayout(this); row1.setOrientation(LinearLayout.HORIZONTAL);
         addVisitorLaunchTile(row1, "مسیر", "بازدید امروز", "◎", navAccent("visitor_dashboard"), () -> loadVisitRoutePage(""));
-        addVisitorLaunchTile(row1, "کالا", "قیمت ۱ و ۲", "◈", navAccent("showcase"), () -> showApp("showcase"));
+        addVisitorLaunchTile(row1, "کالا", priceTierLabel(1) + " و " + priceTierLabel(2), "◈", navAccent("showcase"), () -> showApp("showcase"));
         LinearLayout.LayoutParams r1p = new LinearLayout.LayoutParams(-1, -2); r1p.setMargins(0, dp(10), 0, 0); c.addView(row1, r1p);
         LinearLayout row2 = new LinearLayout(this); row2.setOrientation(LinearLayout.HORIZONTAL);
         addVisitorLaunchTile(row2, "سبد", cartCountSummary(), "⊕", navAccent("cart"), () -> showApp("cart"));
@@ -14634,7 +14791,7 @@ public class MainActivity extends Activity {
         TextView title = text("مسیر طلایی امروز ویزیتور", 16.2f, TEXT, Typeface.BOLD);
         title.setGravity(Gravity.CENTER);
         c.addView(title, new LinearLayout.LayoutParams(-1, -2));
-        TextView desc = text("مشتری را انتخاب کنید، کالا را با قیمت ۱ یا ۲ به سبد اضافه کنید، امضا بگیرید و پیش‌فاکتور را بفرستید.", 10.8f, MUTED, Typeface.NORMAL);
+        TextView desc = text("مشتری را انتخاب کنید، کالا را با " + priceTierLabel(1) + " یا " + priceTierLabel(2) + " به سبد اضافه کنید، امضا بگیرید و پیش‌فاکتور را بفرستید.", 10.8f, MUTED, Typeface.NORMAL);
         desc.setGravity(Gravity.CENTER); desc.setLineSpacing(dp(3), 1.05f);
         c.addView(desc, new LinearLayout.LayoutParams(-1, -2));
         LinearLayout row = new LinearLayout(this); row.setOrientation(LinearLayout.HORIZONTAL);
@@ -14686,7 +14843,7 @@ public class MainActivity extends Activity {
         content.removeAllViews();
         if (VISITOR_EDITION) addVisitorShowcaseSmartControls(null, q, f, true);
         else {
-            addHero("کالاها", "قیمت فروش ۱ و ۲، جستجوی سریع و افزودن به سبد");
+            addHero("کالاها", priceTierLabel(1) + " و " + priceTierLabel(2) + "، جستجوی سریع و افزودن به سبد");
             addManualRefreshPanel("showcase", "بروزرسانی کالا", "سبد فعلی: " + cartCountSummary(), () -> loadShowcase(q, f, true));
             addSearchBox("جستجوی کالا، کد یا بارکد…", q, qq -> loadShowcase(qq, f));
             addShowcaseFilters(q, f);
@@ -15127,13 +15284,15 @@ public class MainActivity extends Activity {
             addVisitorShowcaseSmartControls(rows, query, filter, false);
             if (visitorCartItems.length() > 0 && !"compact".equals(visitorShowcaseMode()) && !"ultra".equals(visitorShowcaseMode())) addVisitorSmartOfferBar(rows, query, filter);
         } else {
-            addHero("کالاها", STORE_EDITION ? "همه کالاهای آتیران • قیمت فروش ۱ و ۲ و موجودی دقیق" : "کالاها با قیمت فروش ۱ و ۲");
+            addHero("کالاها", STORE_EDITION ? "همه کالاهای آتیران • قیمت فروش ۱ و ۲ و موجودی دقیق" : "کالاها با " + priceTierLabel(1) + " و " + priceTierLabel(2));
             addManualRefreshPanel("showcase", "بروزرسانی کالا", "آخرین بروزرسانی: " + lastRefreshText("showcase"), () -> loadShowcase(query, filter, true));
             addSearchBox("جستجوی کالا، کد یا بارکد…", query, q -> loadShowcase(q, filter));
             addShowcaseFilters(query, filter);
             if (STORE_EDITION) addStoreShowcaseModeBar(rows == null ? 0 : rows.length(), query, filter);
             if (!(STORE_EDITION && storeShowcaseList)) addShowcaseIntelligencePanel(rows, query, filter);
         }
+        int visitorUnpricedCount = countUnpricedVisitorProducts(rows);
+        if (visitorUnpricedCount > 0) addVisitorPriceIntegrityNotice(visitorUnpricedCount);
         LinearLayout list = new LinearLayout(this); list.setOrientation(LinearLayout.VERTICAL); content.addView(list, new LinearLayout.LayoutParams(-1, -2));
         if (rows == null || rows.length() == 0) { addEmptyTo(list, "کالایی برای این فیلتر پیدا نشد."); addShowcaseFloatingCartBar(); return; }
         int total = rows.length();
@@ -15143,6 +15302,26 @@ public class MainActivity extends Activity {
         for (int i = 0; i < renderLimit; i++) addShowcaseProductCard(list, rows.optJSONObject(i), i, query, filter);
         if (total > renderLimit) addShowcaseMoreButton(list, rows, query, filter, total, renderLimit);
         addShowcaseFloatingCartBar();
+    }
+
+    private int countUnpricedVisitorProducts(JSONArray rows) {
+        if (!visitorPricingRequiredForSession() || rows == null) return 0;
+        int count = 0;
+        for (int i = 0; i < rows.length(); i++) {
+            JSONObject row = rows.optJSONObject(i);
+            if (row != null && !row.optBoolean("_local", false) && jsonDouble(row, "قیمت_فروش", 0) <= 0) count++;
+        }
+        return count;
+    }
+
+    private void addVisitorPriceIntegrityNotice(int count) {
+        LinearLayout notice = card();
+        notice.setBackground(roundedStroke(alpha(WARNING, isLightTheme() ? 16 : 28), 18, alpha(WARNING, 76)));
+        notice.addView(text("⚠ نرخ اختصاصی ویزیتور برای " + formatNumber(count) + " کالا از آتیران با تنوع یکتا تأیید نشد.", 11.2f, tc(WARNING), Typeface.BOLD), new LinearLayout.LayoutParams(-1, -2));
+        notice.addView(text("قیمت عمومی جایگزین نمی‌شود. این کالاها را فقط با نرخ دستیِ تأییدشده از آتیران ارسال کنید.", 9.8f, MUTED, Typeface.NORMAL), new LinearLayout.LayoutParams(-1, -2));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+        lp.setMargins(0, 0, 0, dp(9));
+        content.addView(notice, lp);
     }
 
     // ---------------------------------------------------------------- store: «فهرست همه کالاها» (light rows)
@@ -15471,9 +15650,9 @@ public class MainActivity extends Activity {
 
         LinearLayout prices = new LinearLayout(this);
         prices.setOrientation(LinearLayout.HORIZONTAL);
-        prices.addView(fastPriceCell("قیمت فروش ۱", price1Ok ? moneyOrDash(r, "قیمت_فروش") : "—", accent, true), new LinearLayout.LayoutParams(0, -2, 1f));
+        prices.addView(fastPriceCell(priceTierLabel(1), price1Ok ? moneyOrDash(r, "قیمت_فروش") : "—", accent, true), new LinearLayout.LayoutParams(0, -2, 1f));
         LinearLayout.LayoutParams p2lp = new LinearLayout.LayoutParams(0, -2, 1f); p2lp.setMargins(dp(6), 0, 0, 0);
-        prices.addView(fastPriceCell("قیمت فروش ۲", price2Ok ? moneyOrDash(r, "قیمت_فروش۲") : "—", accent, false), p2lp);
+        prices.addView(fastPriceCell(priceTierLabel(2), price2Ok ? moneyOrDash(r, "قیمت_فروش۲") : "—", accent, false), p2lp);
         LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(-1, -2); plp.setMargins(0, dp(ultra ? 6 : 8), 0, 0);
         c.addView(prices, plp);
 
@@ -15481,12 +15660,13 @@ public class MainActivity extends Activity {
         actions.setOrientation(LinearLayout.HORIZONTAL);
         actions.setGravity(Gravity.CENTER_VERTICAL);
         Button add1 = themedActionButton(PRICE1_BUTTON, accent, true);
+        add1.setText(priceTierShortLabel(1));
         add1.setTextSize(fs(9.4f)); add1.setEnabled(price1Ok); add1.setAlpha(price1Ok ? 1f : .48f);
-        add1.setContentDescription("افزودن یک عدد با قیمت فروش ۱");
+        add1.setContentDescription("افزودن یک عدد با " + priceTierLabel(1));
         add1.setOnClickListener(v -> cardAddToCart(r, 1, query, filter));
-        Button add2 = themedActionButton(price2Ok ? PRICE2_BUTTON : "قیمت ۲ ندارد", accent, false);
+        Button add2 = themedActionButton(price2Ok ? priceTierShortLabel(2) : "قیمت ۲ ندارد", accent, false);
         add2.setTextSize(fs(9.4f)); add2.setEnabled(price2Ok); add2.setAlpha(price2Ok ? 1f : .42f);
-        add2.setContentDescription("افزودن یک عدد با قیمت فروش ۲");
+        add2.setContentDescription("افزودن یک عدد با " + priceTierLabel(2));
         add2.setOnClickListener(v -> cardAddToCart(r, 2, query, filter));
         Button addM = themedActionButton(MANUAL_PRICE_BUTTON, GOLD_2, false);
         addM.setTextSize(fs(9.0f));
@@ -15580,8 +15760,8 @@ public class MainActivity extends Activity {
 
         LinearLayout priceRow = new LinearLayout(this);
         priceRow.setOrientation(LinearLayout.HORIZONTAL);
-        priceRow.addView(showcaseMetric("قیمت ۲", price2Ok ? moneyOrDash(r, "قیمت_فروش۲") : "—", navAccent("cart"), true), showcaseCellLp(1f, 58));
-        priceRow.addView(showcaseMetric("قیمت ۱", moneyOrDash(r, "قیمت_فروش"), navAccent("cart"), true), showcaseCellLp(1f, 58));
+        priceRow.addView(showcaseMetric(priceTierLabel(2), price2Ok ? moneyOrDash(r, "قیمت_فروش۲") : "—", navAccent("cart"), true), showcaseCellLp(1f, 58));
+        priceRow.addView(showcaseMetric(priceTierLabel(1), moneyOrDash(r, "قیمت_فروش"), navAccent("cart"), true), showcaseCellLp(1f, 58));
         priceRow.addView(showcaseMetric("موجودی", stockWithUnit(r), inStock ? SUCCESS : DANGER, false), showcaseCellLp(1f, 58));
         LinearLayout.LayoutParams prp = new LinearLayout.LayoutParams(-1, -2); prp.setMargins(0, dp(9), 0, 0); c.addView(priceRow, prp);
         String p2q = "";
@@ -15596,9 +15776,9 @@ public class MainActivity extends Activity {
             LinearLayout actions = new LinearLayout(this);
             actions.setOrientation(LinearLayout.HORIZONTAL);
             Button detail = themedActionButton("جزئیات", accent, false); detail.setTextSize(fs(8.9f)); detail.setOnClickListener(v -> showShowcaseProductDialog(r, query, filter));
-            Button add2 = themedActionButton(price2Ok ? PRICE2_BUTTON : "قیمت ۲ ندارد", navAccent("cart"), false); add2.setTextSize(fs(8.8f)); add2.setEnabled(price2Ok); add2.setAlpha(price2Ok ? 1f : .48f);
+            Button add2 = themedActionButton(price2Ok ? priceTierShortLabel(2) : "قیمت ۲ ندارد", navAccent("cart"), false); add2.setTextSize(fs(8.8f)); add2.setEnabled(price2Ok); add2.setAlpha(price2Ok ? 1f : .48f);
             add2.setOnClickListener(v -> cardAddToCart(r, 2, query, filter));
-            Button add1 = themedActionButton(PRICE1_BUTTON, navAccent("cart"), true); add1.setTextSize(fs(8.9f)); add1.setEnabled(price1Ok); add1.setAlpha(price1Ok ? 1f : .48f);
+            Button add1 = themedActionButton(priceTierShortLabel(1), navAccent("cart"), true); add1.setTextSize(fs(8.9f)); add1.setEnabled(price1Ok); add1.setAlpha(price1Ok ? 1f : .48f);
             add1.setOnClickListener(v -> cardAddToCart(r, 1, query, filter));
             Button addM = themedActionButton(MANUAL_PRICE_BUTTON, GOLD_2, false); addM.setTextSize(fs(8.6f));
             addM.setContentDescription("افزودن با قیمت دستی");
@@ -15656,10 +15836,10 @@ public class MainActivity extends Activity {
         pricePanel.setBackground(unifiedInnerBg(price2Ok ? GOLD_2 : navAccent("showcase"), 22));
         pricePanel.addView(text("🏷  قیمت‌های کالا (ریال)", 14.0f, tc(GOLD_2), Typeface.BOLD), new LinearLayout.LayoutParams(-1, -2));
         LinearLayout priceRow = new LinearLayout(this); priceRow.setOrientation(LinearLayout.HORIZONTAL);
-        priceRow.addView(showcaseMetric("قیمت ۲", price2Ok ? moneyOrDash(r, "قیمت_فروش۲") : "—", navAccent("cart"), true), showcaseCellLp(1f, 74));
-        priceRow.addView(showcaseMetric("قیمت ۱", moneyOrDash(r, "قیمت_فروش"), navAccent("cart"), true), showcaseCellLp(1f, 74));
+        priceRow.addView(showcaseMetric(priceTierLabel(2), price2Ok ? moneyOrDash(r, "قیمت_فروش۲") : "—", navAccent("cart"), true), showcaseCellLp(1f, 74));
+        priceRow.addView(showcaseMetric(priceTierLabel(1), moneyOrDash(r, "قیمت_فروش"), navAccent("cart"), true), showcaseCellLp(1f, 74));
         LinearLayout.LayoutParams prp = new LinearLayout.LayoutParams(-1, -2); prp.setMargins(0, dp(8), 0, 0); pricePanel.addView(priceRow, prp);
-        TextView profit = text("قیمت ۲ = قیمت ۱ + ۶٪  •  موجودی: " + stockWithUnit(r), 10.0f, tc(GOLD_2), Typeface.BOLD); profit.setGravity(Gravity.CENTER); profit.setPadding(dp(8), dp(7), dp(8), dp(7)); profit.setBackground(roundedStroke(alpha(GOLD, 24), 999, alpha(GOLD, 72)));
+        TextView profit = text(priceTierRuleText() + "  •  موجودی: " + stockWithUnit(r), 10.0f, tc(GOLD_2), Typeface.BOLD); profit.setGravity(Gravity.CENTER); profit.setPadding(dp(8), dp(7), dp(8), dp(7)); profit.setBackground(roundedStroke(alpha(GOLD, 24), 999, alpha(GOLD, 72)));
         LinearLayout.LayoutParams pfp = new LinearLayout.LayoutParams(-1, -2); pfp.setMargins(0, dp(8), 0, 0); pricePanel.addView(profit, pfp);
         LinearLayout.LayoutParams panelLp = new LinearLayout.LayoutParams(-1, -2); panelLp.setMargins(0, dp(11), 0, 0); c.addView(pricePanel, panelLp);
 
@@ -15672,8 +15852,8 @@ public class MainActivity extends Activity {
             LinearLayout.LayoutParams dpLp = new LinearLayout.LayoutParams(dp(70), dp(48)); dpLp.setMargins(dp(8), 0, 0, 0); qtyRow.addView(detail, dpLp);
             LinearLayout.LayoutParams qrp = new LinearLayout.LayoutParams(-1, -2); qrp.setMargins(0, dp(11), 0, 0); c.addView(qtyRow, qrp);
             LinearLayout actions = new LinearLayout(this); actions.setOrientation(LinearLayout.HORIZONTAL);
-            Button add2 = themedActionButton(price2Ok ? PRICE2_BUTTON : "قیمت ۲ ندارد", navAccent("cart"), false); add2.setEnabled(price2Ok); add2.setAlpha(price2Ok ? 1f : .48f); add2.setOnClickListener(v -> confirmStockThen(r, () -> { addOrUpdateCartItem(r, qty.getText().toString(), 2); showNotice("با قیمت ۲ به سبد اضافه شد.", false); rerenderShowcaseFast(query, filter); }));
-            Button add1 = themedActionButton(PRICE1_BUTTON, navAccent("cart"), true); add1.setEnabled(price1Ok); add1.setAlpha(price1Ok ? 1f : .48f); add1.setOnClickListener(v -> confirmStockThen(r, () -> { addOrUpdateCartItem(r, qty.getText().toString(), 1); showNotice("با قیمت ۱ به سبد اضافه شد.", false); rerenderShowcaseFast(query, filter); }));
+            Button add2 = themedActionButton(price2Ok ? priceTierShortLabel(2) : "قیمت ۲ ندارد", navAccent("cart"), false); add2.setEnabled(price2Ok); add2.setAlpha(price2Ok ? 1f : .48f); add2.setOnClickListener(v -> confirmStockThen(r, () -> { addOrUpdateCartItem(r, qty.getText().toString(), 2); showNotice("با " + priceTierLabel(2) + " به سبد اضافه شد.", false); rerenderShowcaseFast(query, filter); }));
+            Button add1 = themedActionButton(priceTierShortLabel(1), navAccent("cart"), true); add1.setEnabled(price1Ok); add1.setAlpha(price1Ok ? 1f : .48f); add1.setOnClickListener(v -> confirmStockThen(r, () -> { addOrUpdateCartItem(r, qty.getText().toString(), 1); showNotice("با " + priceTierLabel(1) + " به سبد اضافه شد.", false); rerenderShowcaseFast(query, filter); }));
             Button addM = themedActionButton(MANUAL_PRICE_BUTTON, GOLD_2, false);
             addM.setContentDescription("افزودن با قیمت دستی");
             addM.setOnClickListener(v -> confirmStockThen(r, () -> showManualPriceDialog(r, qty.getText().toString(), () -> rerenderShowcaseFast(query, filter))));
@@ -15865,10 +16045,10 @@ public class MainActivity extends Activity {
         c.addView(head, new LinearLayout.LayoutParams(-1, -2));
 
         LinearLayout priceRow = new LinearLayout(this); priceRow.setOrientation(LinearLayout.HORIZONTAL);
-        priceRow.addView(showcaseMetric("قیمت فروش ۱", moneyOrDash(r, "قیمت_فروش"), navAccent("cart"), true), showcaseCellLp(1f, 64));
-        priceRow.addView(showcaseMetric("قیمت فروش ۲", price2Ok ? moneyOrDash(r, "قیمت_فروش۲") : "—", navAccent("cart"), true), showcaseCellLp(1.12f, 64));
+        priceRow.addView(showcaseMetric(priceTierLabel(1), moneyOrDash(r, "قیمت_فروش"), navAccent("cart"), true), showcaseCellLp(1f, 64));
+        priceRow.addView(showcaseMetric(priceTierLabel(2), price2Ok ? moneyOrDash(r, "قیمت_فروش۲") : "—", navAccent("cart"), true), showcaseCellLp(1.12f, 64));
         LinearLayout.LayoutParams prp = new LinearLayout.LayoutParams(-1, -2); prp.setMargins(0, dp(11), 0, 0); c.addView(priceRow, prp);
-        TextView price2Ribbon = text(price2Ok ? "قیمت فروش ۲ برای افزودن مستقیم آماده است" : "قیمت فروش ۲ برای این کالا ثبت نشده است", 9.6f, tc(price2Ok ? navAccent("cart") : MUTED), Typeface.BOLD);
+        TextView price2Ribbon = text(price2Ok ? priceTierLabel(2) + " برای افزودن مستقیم آماده است" : priceTierLabel(2) + " برای این کالا موجود نیست", 9.6f, tc(price2Ok ? navAccent("cart") : MUTED), Typeface.BOLD);
         price2Ribbon.setGravity(Gravity.CENTER);
         price2Ribbon.setPadding(dp(8), dp(5), dp(8), dp(5));
         price2Ribbon.setBackground(roundedStroke(alpha(price2Ok ? WARNING : MUTED, isLightTheme() ? 16 : 28), 14, alpha(price2Ok ? WARNING : MUTED, 60)));
@@ -15901,14 +16081,14 @@ public class MainActivity extends Activity {
             LinearLayout.LayoutParams qrp = new LinearLayout.LayoutParams(-1, -2); qrp.setMargins(0, dp(11), 0, 0); c.addView(qtyRow, qrp);
 
             LinearLayout action = new LinearLayout(this); action.setOrientation(LinearLayout.HORIZONTAL);
-            Button add = themedActionButton(PRICE1_BUTTON, navAccent("cart"), true);
+            Button add = themedActionButton(priceTierShortLabel(1), navAccent("cart"), true);
             add.setTextSize(fs(9.4f));
             add.setEnabled(price1Ok); add.setAlpha(price1Ok ? 1f : 0.52f);
-            add.setOnClickListener(v -> confirmStockThen(r, () -> { addOrUpdateCartItem(r, qty.getText().toString(), 1); showNotice("کالا با قیمت ۱ به سبد اضافه شد.", false); rerenderShowcaseFast(query, filter); }));
-            Button add2 = themedActionButton(price2Ok ? PRICE2_BUTTON : "قیمت ۲ ندارد", navAccent("cart"), false);
+            add.setOnClickListener(v -> confirmStockThen(r, () -> { addOrUpdateCartItem(r, qty.getText().toString(), 1); showNotice("کالا با " + priceTierLabel(1) + " به سبد اضافه شد.", false); rerenderShowcaseFast(query, filter); }));
+            Button add2 = themedActionButton(price2Ok ? priceTierShortLabel(2) : "قیمت ۲ ندارد", navAccent("cart"), false);
             add2.setTextSize(fs(9.2f));
             add2.setEnabled(price2Ok); add2.setAlpha(price2Ok ? 1f : 0.52f);
-            add2.setOnClickListener(v -> confirmStockThen(r, () -> { addOrUpdateCartItem(r, qty.getText().toString(), 2); showNotice("کالا با قیمت ۲ به سبد اضافه شد.", false); rerenderShowcaseFast(query, filter); }));
+            add2.setOnClickListener(v -> confirmStockThen(r, () -> { addOrUpdateCartItem(r, qty.getText().toString(), 2); showNotice("کالا با " + priceTierLabel(2) + " به سبد اضافه شد.", false); rerenderShowcaseFast(query, filter); }));
             action.addView(add, showcaseButtonLp(1f));
             action.addView(add2, showcaseButtonLp(1f));
             LinearLayout.LayoutParams ap = new LinearLayout.LayoutParams(-1, -2); ap.setMargins(0, dp(8), 0, 0); c.addView(action, ap);
@@ -16014,11 +16194,11 @@ public class MainActivity extends Activity {
 
         boolean price2Ok = hasPositiveNumber(r, "قیمت_فروش۲");
         LinearLayout prices = new LinearLayout(this); prices.setOrientation(LinearLayout.HORIZONTAL);
-        prices.addView(showcaseMetric("قیمت فروش ۱", moneyOrDash(r, "قیمت_فروش"), navAccent("cart"), true), showcaseCellLp(1f, 66));
-        prices.addView(showcaseMetric("قیمت فروش ۲", price2Ok ? moneyOrDash(r, "قیمت_فروش۲") : "—", navAccent("cart"), true), showcaseCellLp(1.1f, 66));
+        prices.addView(showcaseMetric(priceTierLabel(1), moneyOrDash(r, "قیمت_فروش"), navAccent("cart"), true), showcaseCellLp(1f, 66));
+        prices.addView(showcaseMetric(priceTierLabel(2), price2Ok ? moneyOrDash(r, "قیمت_فروش۲") : "—", navAccent("cart"), true), showcaseCellLp(1.1f, 66));
         LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(-1, -2); pp.setMargins(0, dp(12), 0, 0); box.addView(prices, pp);
         String p2quality = price2QualityText(r);
-        TextView p2Status = text(price2Ok ? (p2quality.isEmpty() ? "این کالا با قیمت فروش ۲ آماده افزودن به سبد است." : p2quality) : "برای این کالا قیمت فروش ۲ ثبت نشده یا مقدار آن صفر است.", 10.0f, tc(price2Ok ? GOLD_2 : MUTED), Typeface.BOLD);
+        TextView p2Status = text(price2Ok ? (p2quality.isEmpty() ? "این کالا با " + priceTierLabel(2) + " آماده افزودن به سبد است." : p2quality) : "برای این کالا " + priceTierLabel(2) + " ثبت نشده یا مقدار آن صفر است.", 10.0f, tc(price2Ok ? GOLD_2 : MUTED), Typeface.BOLD);
         p2Status.setGravity(Gravity.CENTER);
         p2Status.setPadding(dp(8), dp(6), dp(8), dp(6));
         p2Status.setBackground(roundedStroke(alpha(price2Ok ? GOLD_2 : MUTED, isLightTheme() ? 16 : 28), 15, alpha(price2Ok ? GOLD_2 : MUTED, 66)));
@@ -16049,8 +16229,8 @@ public class MainActivity extends Activity {
             LinearLayout.LayoutParams qlp = new LinearLayout.LayoutParams(-1, dp(48)); qlp.setMargins(0, dp(12), 0, 0); box.addView(qty, qlp);
 
             LinearLayout actions = new LinearLayout(this); actions.setOrientation(LinearLayout.HORIZONTAL);
-            Button add1 = themedActionButton(PRICE1_BUTTON, navAccent("cart"), true); add1Ref[0] = add1;
-            Button add2 = themedActionButton(price2Ok ? PRICE2_BUTTON : "قیمت ۲ ندارد", navAccent("cart"), false); add2Ref[0] = add2;
+            Button add1 = themedActionButton(priceTierShortLabel(1), navAccent("cart"), true); add1Ref[0] = add1;
+            Button add2 = themedActionButton(price2Ok ? priceTierShortLabel(2) : "قیمت ۲ ندارد", navAccent("cart"), false); add2Ref[0] = add2;
             boolean p1 = hasPositiveNumber(r, "قیمت_فروش");
             add1.setEnabled(p1); add1.setAlpha(p1 ? 1f : 0.52f); add2.setEnabled(price2Ok); add2.setAlpha(price2Ok ? 1f : 0.52f);
             actions.addView(add1, showcaseButtonLp(1f)); actions.addView(add2, showcaseButtonLp(1f));
@@ -16070,8 +16250,8 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams elp = new LinearLayout.LayoutParams(-1, dp(45)); elp.setMargins(0, dp(6), 0, 0); box.addView(editProduct, elp);
 
         AlertDialog dlg = new MeelanoDialogBuilder().setView(box).setNegativeButton("بستن", null).create();
-        if (add1Ref[0] != null) add1Ref[0].setOnClickListener(v -> confirmStockThen(r, () -> { addOrUpdateCartItem(r, qtyRef[0].getText().toString(), 1); showNotice("با قیمت ۱ به سبد اضافه شد.", false); dlg.dismiss(); if (query != null || filter != null) rerenderShowcaseFast(stringOr(query, ""), stringOr(filter, "all")); }));
-        if (add2Ref[0] != null) add2Ref[0].setOnClickListener(v -> confirmStockThen(r, () -> { addOrUpdateCartItem(r, qtyRef[0].getText().toString(), 2); showNotice("با قیمت ۲ به سبد اضافه شد.", false); dlg.dismiss(); if (query != null || filter != null) rerenderShowcaseFast(stringOr(query, ""), stringOr(filter, "all")); }));
+        if (add1Ref[0] != null) add1Ref[0].setOnClickListener(v -> confirmStockThen(r, () -> { addOrUpdateCartItem(r, qtyRef[0].getText().toString(), 1); showNotice("با " + priceTierLabel(1) + " به سبد اضافه شد.", false); dlg.dismiss(); if (query != null || filter != null) rerenderShowcaseFast(stringOr(query, ""), stringOr(filter, "all")); }));
+        if (add2Ref[0] != null) add2Ref[0].setOnClickListener(v -> confirmStockThen(r, () -> { addOrUpdateCartItem(r, qtyRef[0].getText().toString(), 2); showNotice("با " + priceTierLabel(2) + " به سبد اضافه شد.", false); dlg.dismiss(); if (query != null || filter != null) rerenderShowcaseFast(stringOr(query, ""), stringOr(filter, "all")); }));
         if (removeRef[0] != null) removeRef[0].setOnClickListener(v -> { dlg.dismiss(); removeCartItemWithUndo(safeDisplayText(r.opt("کد"), ""), () -> { if (query != null || filter != null) rerenderShowcaseFast(stringOr(query, ""), stringOr(filter, "all")); }); });
         fixVisual.setOnClickListener(v -> { dlg.dismiss(); showProductVisualChooser(r, query, filter); });
         if (photoRef[0] != null) photoRef[0].setOnClickListener(v -> { dlg.dismiss(); pickVisitorProductImage(r); });
@@ -16134,9 +16314,10 @@ public class MainActivity extends Activity {
             boolean computedP2 = price1 > 0;
             int tier = priceTier == 2 && price2 > 0 ? 2 : 1;
             double price = tier == 2 ? price2 : price1;
+            boolean localProduct = product.optBoolean("_local", false);
             JSONObject item = new JSONObject();
             item.put("code", code); item.put("name", safeDisplayText(product.opt("نام"), "کالا")); item.put("unit", safeDisplayText(product.opt("واحد"), "")); item.put("qty", qty);
-            item.put("price", price); item.put("price1", price1); item.put("price2", price2); item.put("priceTier", String.valueOf(tier)); item.put("price2Computed", computedP2);
+            item.put("price", price); item.put("price1", price1); item.put("price2", price2); item.put("priceTier", localProduct ? "m" : String.valueOf(tier)); item.put("price2Computed", computedP2); item.put("_local", localProduct);
             item.put("stock", jsonDouble(product, "موجودی", 0)); item.put("pack", jsonDouble(product, "تعداد_در_بسته", 1)); item.put("image", product.optString("تصویر", ""));
             item.put("lineDiscount", old == null ? 0 : old.optDouble("lineDiscount", 0)); item.put("note", old == null ? "" : old.optString("note", "")); item.put("amount", cartItemNet(item));
             if (ix >= 0) visitorCartItems.put(ix, item); else visitorCartItems.put(item);
@@ -16167,7 +16348,7 @@ public class MainActivity extends Activity {
         LinearLayout box = new LinearLayout(this); box.setOrientation(LinearLayout.VERTICAL); box.setPadding(dp(12), dp(8), dp(12), dp(6));
         TextView name = text(safeDisplayText(product.opt("نام"), "کالا"), 15f, TEXT, Typeface.BOLD); name.setMaxLines(2);
         box.addView(name, new LinearLayout.LayoutParams(-1, -2));
-        box.addView(text("قیمت ۱: " + (p1 > 0 ? money(p1) : "—") + "  •  قیمت ۲: " + (p2 > 0 ? money(p2) : "—"), 10f, MUTED, Typeface.BOLD), new LinearLayout.LayoutParams(-1, -2));
+        box.addView(text(priceTierLabel(1) + ": " + (p1 > 0 ? money(p1) : "—") + "  •  " + priceTierLabel(2) + ": " + (p2 > 0 ? money(p2) : "—"), 10f, MUTED, Typeface.BOLD), new LinearLayout.LayoutParams(-1, -2));
         TextView pl = text("قیمت هر " + (unitOrDash(product).equals("—") ? "واحد" : unitOrDash(product)) + " (ریال)", 11f, TEXT, Typeface.BOLD);
         LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(-1, -2); plp.setMargins(0, dp(10), 0, dp(4)); box.addView(pl, plp);
         double startPrice = inCart != null && "m".equals(inCart.optString("priceTier", "")) ? inCart.optDouble("price", 0) : 0;
@@ -16974,7 +17155,7 @@ public class MainActivity extends Activity {
     private String cartTierLabel(JSONObject item) {
         String t = item == null ? "1" : item.optString("priceTier", "1");
         if ("m".equals(t)) return "قیمت دستی";
-        return "2".equals(t) ? "قیمت ۲" : "قیمت ۱";
+        return "2".equals(t) ? priceTierLabel(2) : priceTierLabel(1);
     }
 
     /** Number box for one cart row; the row total and the page totals follow while typing. */
@@ -17032,8 +17213,8 @@ public class MainActivity extends Activity {
         addLabeledField(box, "قیمت واحد (ریال)", price, 48);
         addLabeledField(box, "تخفیف این ردیف (ریال)", discount, 48);
         LinearLayout priceRow = new LinearLayout(this); priceRow.setOrientation(LinearLayout.HORIZONTAL);
-        Button p1 = secondaryButton("قیمت ۱: " + money(item.optDouble("price1", item.optDouble("price", 0)))); p1.setTextSize(fs(8.5f)); p1.setOnClickListener(v -> { price.setText(plainNumber(item.optDouble("price1", item.optDouble("price", 0)))); try { item.put("priceTier", "1"); } catch (Exception ignored) { } });
-        Button p2 = secondaryButton("قیمت ۲: " + (item.optDouble("price2", 0) > 0 ? money(item.optDouble("price2", 0)) : "—")); p2.setTextSize(fs(8.5f)); p2.setEnabled(item.optDouble("price2", 0) > 0); p2.setAlpha(item.optDouble("price2", 0) > 0 ? 1f : .45f); p2.setOnClickListener(v -> { if (item.optDouble("price2", 0) <= 0) return; price.setText(plainNumber(item.optDouble("price2", item.optDouble("price", 0)))); try { item.put("priceTier", "2"); } catch (Exception ignored) { } });
+        Button p1 = secondaryButton(priceTierLabel(1) + ": " + money(item.optDouble("price1", item.optDouble("price", 0)))); p1.setTextSize(fs(8.5f)); p1.setOnClickListener(v -> { price.setText(plainNumber(item.optDouble("price1", item.optDouble("price", 0)))); try { item.put("priceTier", "1"); } catch (Exception ignored) { } });
+        Button p2 = secondaryButton(priceTierLabel(2) + ": " + (item.optDouble("price2", 0) > 0 ? money(item.optDouble("price2", 0)) : "—")); p2.setTextSize(fs(8.5f)); p2.setEnabled(item.optDouble("price2", 0) > 0); p2.setAlpha(item.optDouble("price2", 0) > 0 ? 1f : .45f); p2.setOnClickListener(v -> { if (item.optDouble("price2", 0) <= 0) return; price.setText(plainNumber(item.optDouble("price2", item.optDouble("price", 0)))); try { item.put("priceTier", "2"); } catch (Exception ignored) { } });
         priceRow.addView(p1, weightedButtonLp()); priceRow.addView(p2, weightedButtonLp()); LinearLayout.LayoutParams prp = new LinearLayout.LayoutParams(-1, -2); prp.setMargins(0, dp(7), 0, 0); box.addView(priceRow, prp);
         addLabeledField(box, "توضیح", note, 76);
         AlertDialog dlg = new MeelanoDialogBuilder().setView(box).setNegativeButton("بستن", null).setPositiveButton("ذخیره", null).create();
@@ -17355,9 +17536,26 @@ public class MainActivity extends Activity {
         }
         scroll.addView(list, new ScrollView.LayoutParams(-1, -2));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, dp(360)); lp.setMargins(0, dp(8), 0, 0); box.addView(scroll, lp);
-        dlg[0] = new MeelanoDialogBuilder().setView(box).setNegativeButton("بستن", null).create();
+        dlg[0] = new MeelanoDialogBuilder().setView(box)
+                .setNegativeButton("بستن", (dialog, which) -> cancelAssistantCustomerSelection())
+                .create();
         styleMeelanoDialog(dlg[0], accent);
+        dlg[0].setOnCancelListener(dialog -> cancelAssistantCustomerSelection());
         dlg[0].show();
+    }
+
+    /** Close an unfinished voice-order customer picker without leaving stale resume state. */
+    private void cancelAssistantCustomerSelection() {
+        if (!assistantPrefactorAwaitingCustomer) return;
+        assistantPrefactorAwaitingCustomer = false;
+        if (assistantPrefactorMode && visitorCartCustomer != null) {
+            // Changing customer was canceled; the previously selected customer and draft survive.
+            showApp("assistant");
+            addAssistantBubble(false, "تغییر مشتری لغو شد؛ مشتری قبلی و پیش‌نویس حفظ شدند. می‌توانید گفتگو را ادامه دهید.");
+        } else {
+            assistantPrefactorMode = false;
+            showNotice("انتخاب مشتری لغو شد؛ پیش‌نویس محلی حفظ شد و چیزی ارسال نشد.", false);
+        }
     }
 
     private void addCartPickerCustomerRow(LinearLayout list, JSONObject r, String currentCode, AlertDialog[] dlg) {
@@ -17383,7 +17581,21 @@ public class MainActivity extends Activity {
             top.addView(names, new LinearLayout.LayoutParams(0, -2, 1f));
             Button choose = themedActionButton(isCurrent ? "✓ فعلی" : "انتخاب", GOLD, !isCurrent);
             choose.setTextSize(fs(8.4f));
-            View.OnClickListener select = v -> { visitorCartCustomer = r; if (visitorCartAddress.trim().isEmpty()) visitorCartAddress = r.optString("address", ""); if (dlg[0] != null) dlg[0].dismiss(); if ("visit".equals(activePage)) showApp("visit"); else renderCartPage(); };
+            View.OnClickListener select = v -> {
+                String previousCustomerCode = visitorCartCustomer == null ? "" : visitorCartCustomer.optString("code", "");
+                boolean customerChanged = !previousCustomerCode.equals(r.optString("code", ""));
+                visitorCartCustomer = r;
+                if (customerChanged || visitorCartAddress.trim().isEmpty()) visitorCartAddress = r.optString("address", "");
+                autosaveCart(false);
+                if (dlg[0] != null) dlg[0].dismiss();
+                if (assistantPrefactorAwaitingCustomer) {
+                    assistantPrefactorAwaitingCustomer = false;
+                    assistantPrefactorMode = true;
+                    showApp("assistant");
+                    addAssistantBubble(false, "مشتری «" + visitorCartCustomerName() + "» به سبد پیوست شد. حالا نام هر کالا و تعدادش را بگویید؛ قبل از افزودن، نتیجه و قیمت را تأیید می‌کنید.");
+                } else if ("visit".equals(activePage)) showApp("visit");
+                else renderCartPage();
+            };
             choose.setOnClickListener(select);
             card.setOnClickListener(select);
             top.addView(choose, new LinearLayout.LayoutParams(dp(80), dp(44)));
@@ -17675,7 +17887,6 @@ public class MainActivity extends Activity {
     // "New version available" check. CI writes apk/latest.json next to each APK.
     // ---------------------------------------------------------------------------------------------
     private static final String UPDATE_MANIFEST_URL = "https://github.com/Companymeelano/Newhamrah/raw/arena/01a0e474-newhamrah/apk/latest.json";
-    private static final String UNIFIED_UPDATE_MANIFEST_URL = "https://github.com/Companymeelano/Testt/raw/arena/c192ed08-testt/dist/latest-unified.json";
     private static final String KEY_UPDATE_CHECKED_AT = "update_checked_at";
     private static final String KEY_UPDATE_LATEST = "update_latest_json";
     private static final long UPDATE_CHECK_INTERVAL_MS = 12L * 60 * 60 * 1000;
@@ -17689,6 +17900,7 @@ public class MainActivity extends Activity {
 
     /** Latest version seen on the server, or null when unknown / not newer than this install. */
     private JSONObject pendingAppUpdate() {
+        if (UNIFIED_EDITION) return MeelanoAppUpdater.pending(this);
         try {
             String raw = prefs == null ? "" : prefs.getString(KEY_UPDATE_LATEST, "");
             if (raw == null || raw.isEmpty()) return null;
@@ -17699,6 +17911,12 @@ public class MainActivity extends Activity {
 
     private void maybeCheckForAppUpdate(boolean manual) {
         if (prefs == null || designPreview) return;
+        if (UNIFIED_EDITION) {
+            MeelanoAppUpdater.check(this, manual, () -> {
+                if ("settings".equals(activePage)) renderVisitorEditionSettings();
+            });
+            return;
+        }
         long last = prefs.getLong(KEY_UPDATE_CHECKED_AT, 0);
         if (!manual && System.currentTimeMillis() - last < UPDATE_CHECK_INTERVAL_MS) return;
         prefs.edit().putLong(KEY_UPDATE_CHECKED_AT, System.currentTimeMillis()).apply();
@@ -17707,7 +17925,7 @@ public class MainActivity extends Activity {
             String body = null;
             java.net.HttpURLConnection conn = null;
             try {
-                String manifestUrl = UNIFIED_EDITION ? UNIFIED_UPDATE_MANIFEST_URL : MANAGER_EDITION ? MANAGER_UPDATE_MANIFEST_URL : STAFF_EDITION ? STAFF_UPDATE_MANIFEST_URL : STORE_EDITION ? STORE_UPDATE_MANIFEST_URL : UPDATE_MANIFEST_URL;
+                String manifestUrl = MANAGER_EDITION ? MANAGER_UPDATE_MANIFEST_URL : STAFF_EDITION ? STAFF_UPDATE_MANIFEST_URL : STORE_EDITION ? STORE_UPDATE_MANIFEST_URL : UPDATE_MANIFEST_URL;
                 conn = (java.net.HttpURLConnection) new java.net.URL(manifestUrl).openConnection();
                 conn.setConnectTimeout(8000); conn.setReadTimeout(8000); conn.setInstanceFollowRedirects(true);
                 if (conn.getResponseCode() == 200) {
@@ -17733,6 +17951,10 @@ public class MainActivity extends Activity {
     }
 
     private void openAppUpdate(JSONObject up) {
+        if (UNIFIED_EDITION) {
+            MeelanoAppUpdater.open(this, up);
+            return;
+        }
         try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(up.optString("url", "")))); }
         catch (Exception ex) { showNotice("باز کردن لینک دانلود ممکن نشد.", false); }
     }
@@ -18922,8 +19144,76 @@ public class MainActivity extends Activity {
         }
     }
 
+    private boolean visitorPricingRequiredForSession() {
+        if (VISITOR_EDITION) return true;
+        if (!UNIFIED_EDITION) return false;
+        String role = currentAccessRole();
+        return "visitor".equals(role) || "sales_employee".equals(role)
+                || (session != null && session.visitorId != null && session.visitorId > 0);
+    }
+
+    /** DeviceSettings is per visitor. Return only an unambiguous configured group (1..5). */
+    private String priceTierLabel(int tier) {
+        if (visitorPricingRequiredForSession()) return tier == 2 ? "نرخ دوم (+۶٪)" : "نرخ پیش‌فرض ویزیتور";
+        return tier == 2 ? "قیمت فروش ۲" : "قیمت فروش ۱";
+    }
+
+    private String priceTierShortLabel(int tier) {
+        if (visitorPricingRequiredForSession()) return tier == 2 ? "دوم +۶٪" : "پیش‌فرض";
+        return tier == 2 ? PRICE2_BUTTON : PRICE1_BUTTON;
+    }
+
+    private String priceTierRuleText() {
+        return visitorPricingRequiredForSession()
+                ? "نرخ دوم = نرخ پیش‌فرض ویزیتور + " + PRICE2_MARKUP_TEXT
+                : "قیمت فروش ۲ = قیمت فروش ۱ + " + PRICE2_MARKUP_TEXT;
+    }
+
+    private int visitorDefaultPriceGroup(Connection c) throws Exception {
+        if (!visitorPricingRequiredForSession()) return 0;
+        int visitorId = session == null || session.visitorId == null ? 0 : session.visitorId;
+        if (visitorId <= 0) return 0;
+        Set<String> cols = columnsInSchema(c, "Hamrah", "DeviceSettings");
+        String visitorCol = resolveFlexible(cols, "VisitorId", "VisitorID", "vis_rdf");
+        String groupCol = resolveFlexible(cols, "DefaultPriceGrp", "DefaultPriceGroup");
+        if (visitorCol == null || groupCol == null) return 0;
+        String groupValue = "TRY_CONVERT(int,[" + groupCol + "])";
+        String sql = "SELECT CASE WHEN COUNT_BIG(1)=COUNT_BIG(" + groupValue + ") AND MIN(" + groupValue + ")=MAX(" + groupValue + ") "
+                + "THEN MIN(" + groupValue + ") ELSE 0 END FROM [Hamrah].[DeviceSettings] WHERE TRY_CONVERT(int,[" + visitorCol + "])=?";
+        try (PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, visitorId);
+            try (ResultSet r = ps.executeQuery()) {
+                if (!r.next()) return 0;
+                int group = r.getInt(1);
+                return group >= 1 && group <= 5 ? group : 0;
+            }
+        }
+    }
+
+    /**
+     * forosh_price is keyed by VarietyID, not by product. Use the visitor's chosen foroshN only
+     * when exactly one active variety price row exists for this product; never pick an arbitrary
+     * variant or fall back to a company-wide inventory price for a visitor.
+     */
+    private String visitorPriceApply(Connection c, int priceGroup, String inventoryAlias, String productKey) throws Exception {
+        String configuredColumn = AtiranVisitorPricePolicy.priceColumn(priceGroup);
+        if (configuredColumn == null) return "OUTER APPLY (SELECT CAST(0 AS decimal(19,2)) price1, CAST(0 AS decimal(19,2)) price2, CAST(0 AS bigint) price_rows) prx ";
+        Set<String> cols = columns(c, "forosh_price");
+        String key = resolveProductKeyColumn(cols);
+        String price = resolveFlexible(cols, configuredColumn, configuredColumn.replace("forosh", "forosh_"),
+                configuredColumn.replace("forosh", "forush"), configuredColumn.replace("forosh", "forosh") + faDigits(String.valueOf(priceGroup)));
+        if (key == null || price == null) return "OUTER APPLY (SELECT CAST(0 AS decimal(19,2)) price1, CAST(0 AS decimal(19,2)) price2, CAST(0 AS bigint) price_rows) prx ";
+        String active = activeAnd(cols, "vpr");
+        String where = "TRY_CONVERT(nvarchar(100),vpr.[" + key + "])=TRY_CONVERT(nvarchar(100)," + inventoryAlias + ".[" + productKey + "])" + active;
+        return "OUTER APPLY (SELECT CASE WHEN COUNT_BIG(1)=1 THEN MAX(" + sqlNumberExpr("vpr", price, "decimal(19,2)")
+                + ") ELSE CAST(0 AS decimal(19,2)) END price1, CAST(0 AS decimal(19,2)) price2, COUNT_BIG(1) price_rows "
+                + "FROM dbo.[forosh_price] vpr WHERE " + where + ") prx ";
+    }
+
     private JSONObject checkCartSnapshotAgainstInventory(Connection c, JSONArray items, boolean strict) throws Exception {
         JSONObject out = new JSONObject(); JSONArray warnings = new JSONArray(); boolean blocked = false;
+        boolean visitorPricingRequired = visitorPricingRequiredForSession();
+        int visitorPriceGroup = visitorPricingRequired ? visitorDefaultPriceGroup(c) : 0;
         Set<String> cols = columns(c, "inventory");
         String shka = resolveProductKeyColumn(cols);
         if (shka == null) { out.put("warnings", warnings); return out; }
@@ -18953,12 +19243,13 @@ public class MainActivity extends Activity {
         String saleApply = saleKey != null ? "OUTER APPLY (SELECT " + (saleQty == null ? "CAST(0 AS decimal(19,3))" : "ISNULL(SUM(" + sqlNumberExpr("s", saleQty, "decimal(19,3)") + "),0)") + " sale_qty FROM dbo.subsailfact s WHERE TRY_CONVERT(nvarchar(100),s.[" + saleKey + "])=TRY_CONVERT(nvarchar(100),i.[" + shka + "])" + activeAnd(saleCols, "s") + (saleSoft.isEmpty()?"":" AND "+saleSoft) + ") sa " : "OUTER APPLY (SELECT CAST(0 AS decimal(19,3)) sale_qty) sa ";
         String buyApply = buyKey != null ? "OUTER APPLY (SELECT " + (buyQty == null ? "CAST(0 AS decimal(19,3))" : "ISNULL(SUM(" + sqlNumberExpr("b", buyQty, "decimal(19,3)") + "),0)") + " buy_qty FROM dbo.subbuyfact b WHERE TRY_CONVERT(nvarchar(100),b.[" + buyKey + "])=TRY_CONVERT(nvarchar(100),i.[" + shka + "])" + activeAnd(buyCols, "b") + (buySoft.isEmpty()?"":" AND "+buySoft) + ") ba " : "OUTER APPLY (SELECT CAST(0 AS decimal(19,3)) buy_qty) ba ";
         String relPriceSoft = softDeleteCondition(relPriceCols == null ? new HashSet<String>() : relPriceCols, "pr");
-        String priceApply = relPriceTable != null && relPriceKey != null ? "OUTER APPLY (SELECT TOP (1) " + sqlNumberExpr("pr", relPrice1, "decimal(19,2)") + " price1, " + sqlNumberExpr("pr", relPrice2, "decimal(19,2)") + " price2 FROM dbo.[" + relPriceTable + "] pr WHERE TRY_CONVERT(nvarchar(100),pr.[" + relPriceKey + "])=TRY_CONVERT(nvarchar(100),i.[" + shka + "])" + activeAnd(relPriceCols, "pr") + (relPriceSoft.isEmpty()?"":" AND "+relPriceSoft) + relatedTopOrder(relPriceCols, "pr") + ") prx " : "OUTER APPLY (SELECT CAST(NULL AS decimal(19,2)) price1, CAST(NULL AS decimal(19,2)) price2) prx ";
+        String priceApply = visitorPricingRequired ? visitorPriceApply(c, visitorPriceGroup, "i", shka)
+                : (relPriceTable != null && relPriceKey != null ? "OUTER APPLY (SELECT TOP (1) " + sqlNumberExpr("pr", relPrice1, "decimal(19,2)") + " price1, " + sqlNumberExpr("pr", relPrice2, "decimal(19,2)") + " price2 FROM dbo.[" + relPriceTable + "] pr WHERE TRY_CONVERT(nvarchar(100),pr.[" + relPriceKey + "])=TRY_CONVERT(nvarchar(100),i.[" + shka + "])" + activeAnd(relPriceCols, "pr") + (relPriceSoft.isEmpty()?"":" AND "+relPriceSoft) + relatedTopOrder(relPriceCols, "pr") + ") prx " : "OUTER APPLY (SELECT CAST(NULL AS decimal(19,2)) price1, CAST(NULL AS decimal(19,2)) price2) prx ");
         String stockApply = atiranStockLedger(c) ? atiranStockApply("i", "stx") : relatedStockApply(relStockTable, relStockCols, relStockKey, relStockBalance, relStockIn, relStockOut, relStockQty, relStockDir, "i", shka, "stx");
         String invP1 = sqlNumberExpr("i", price1, "decimal(19,2)");
         String invP2 = sqlNumberExpr("i", price2, "decimal(19,2)");
-        String p1Expr = "COALESCE(NULLIF(prx.price1,0)," + invP1 + ",0)";
-        String p2RawExpr = "COALESCE(NULLIF(prx.price2,0)," + invP2 + ",0)";
+        String p1Expr = visitorPricingRequired ? "COALESCE(prx.price1,0)" : "COALESCE(NULLIF(prx.price1,0)," + invP1 + ",0)";
+        String p2RawExpr = visitorPricingRequired ? "CAST(0 AS decimal(19,2))" : "COALESCE(NULLIF(prx.price2,0)," + invP2 + ",0)";
         String p2FinalExpr = "CASE WHEN ISNULL(" + p2RawExpr + ",0)>0 THEN " + p2RawExpr + " WHEN ISNULL(" + p1Expr + ",0)>0 THEN ROUND(" + p1Expr + "*1.06,0) ELSE 0 END";
         String movement = "(ISNULL(ba.buy_qty,0)-ISNULL(sa.sale_qty,0))";
         String invStock = atiranStockLedger(c) ? ATIRAN_INVENTORY_PIECES : stock == null ? "CAST(NULL AS decimal(19,3))" : sqlNumberExpr("i", stock, "decimal(19,3)");
@@ -18972,7 +19263,14 @@ public class MainActivity extends Activity {
             if(row == null){ warnings.put("کالا پیدا نشد: "+it.optString("name","")); blocked=true; continue; }
             double st=row[0]; double p1=row[1]; double p2=row[2];
             if(hasReliableStockSource && st<it.optDouble("qty",0)){ warnings.put("موجودی کافی نیست: "+it.optString("name","")+" / موجودی "+formatNumber(st)); blocked=true; }
-            double dbPrice="m".equals(it.optString("priceTier","1"))?0:("2".equals(it.optString("priceTier","1"))?p2:p1);
+            String tier = it.optString("priceTier", "1");
+            if (visitorPricingRequired && !"m".equals(tier)
+                    && !AtiranVisitorPricePolicy.hasUnambiguousPrice(visitorPriceGroup, p1 > 0 ? 1 : 0, p1)) {
+                warnings.put("قیمت اختصاصی و یکتای «" + it.optString("name", "کالا") + "» در آتیران پیدا نشد؛ نرخ تأییدشده را دستی وارد کنید.");
+                blocked = true;
+                continue;
+            }
+            double dbPrice="m".equals(tier)?0:("2".equals(tier)?p2:p1);
             if(dbPrice>0 && Math.abs(dbPrice-it.optDouble("price",0))>1){ warnings.put("قیمت کالا تغییر کرده: "+it.optString("name","")); if(strict) blocked=true; }
         }
         out.put("warnings", warnings); out.put("blocked", blocked); out.put("ok", !blocked);
@@ -19944,6 +20242,8 @@ public class MainActivity extends Activity {
      */
     private String queryProducts(String search, String filter, int topLimit) throws Exception {
         try (Connection c = openConnection()) {
+            boolean visitorPricingRequired = visitorPricingRequiredForSession();
+            int visitorPriceGroup = visitorPricingRequired ? visitorDefaultPriceGroup(c) : 0;
             Set<String> cols = columns(c, "inventory");
             Map<String, String> invTypes = columnTypes(c, "inventory");
             Set<String> saleCols = columns(c, "subsailfact");
@@ -19996,8 +20296,8 @@ public class MainActivity extends Activity {
             select.add(code == null ? "CAST(NULL AS nvarchar(100)) AS بارکد" : "TRY_CONVERT(nvarchar(100),i.[" + code + "]) AS بارکد");
             String invPriceExpr = sqlNumberExpr("i", price, "decimal(19,2)");
             String invPrice2RawExpr = sqlNumberExpr("i", price2, "decimal(19,2)");
-            String priceExpr = "COALESCE(NULLIF(prx.price1,0)," + invPriceExpr + ",0)";
-            String price2RawExpr = "COALESCE(NULLIF(prx.price2,0)," + invPrice2RawExpr + ",0)";
+            String priceExpr = visitorPricingRequired ? "COALESCE(prx.price1,0)" : "COALESCE(NULLIF(prx.price1,0)," + invPriceExpr + ",0)";
+            String price2RawExpr = visitorPricingRequired ? "CAST(0 AS decimal(19,2))" : "COALESCE(NULLIF(prx.price2,0)," + invPrice2RawExpr + ",0)";
             // Business rule: price 2 = price 1 + 6% (rounded to whole rials). The raw stored value is kept for comparison.
             String price2FinalExpr = "(CASE WHEN ISNULL(" + priceExpr + ",0)>0 THEN ROUND(CAST(ISNULL(" + priceExpr + ",0) AS decimal(19,2))*1.06,0) ELSE ISNULL(" + price2RawExpr + ",0) END)";
             select.add(priceExpr + " AS قیمت_فروش");
@@ -20036,8 +20336,9 @@ public class MainActivity extends Activity {
                     (buyQty == null ? "CAST(0 AS decimal(19,3))" : "ISNULL(SUM(" + sqlNumberExpr("b", buyQty, "decimal(19,3)") + "),0)") + " buy_qty, " +
                     (buyAmount == null ? "CAST(0 AS decimal(19,2))" : "ISNULL(SUM(" + sqlNumberExpr("b", buyAmount, "decimal(19,2)") + "),0)") + " buy_amount FROM dbo.subbuyfact b WHERE TRY_CONVERT(nvarchar(100),b.[" + buyKey + "])=TRY_CONVERT(nvarchar(100),i.[" + shka + "])" + activeAnd(buyCols, "b") + (buyDetailSoft.isEmpty()?"":" AND "+buyDetailSoft) + ") ba " : "OUTER APPLY (SELECT CAST(0 AS decimal(19,3)) buy_qty, CAST(0 AS decimal(19,2)) buy_amount) ba ";
             String relPriceSoft = softDeleteCondition(relPriceCols == null ? new HashSet<String>() : relPriceCols, "pr");
-            String priceApply = relPriceTable != null && relPriceKey != null ? "OUTER APPLY (SELECT TOP (1) " +
-                    sqlNumberExpr("pr", relPrice1, "decimal(19,2)") + " price1, " + sqlNumberExpr("pr", relPrice2, "decimal(19,2)") + " price2 FROM dbo.[" + relPriceTable + "] pr WHERE TRY_CONVERT(nvarchar(100),pr.[" + relPriceKey + "])=TRY_CONVERT(nvarchar(100),i.[" + shka + "])" + activeAnd(relPriceCols, "pr") + (relPriceSoft.isEmpty()?"":" AND "+relPriceSoft) + relatedTopOrder(relPriceCols, "pr") + ") prx " : "OUTER APPLY (SELECT CAST(NULL AS decimal(19,2)) price1, CAST(NULL AS decimal(19,2)) price2) prx ";
+            String priceApply = visitorPricingRequired ? visitorPriceApply(c, visitorPriceGroup, "i", shka)
+                    : (relPriceTable != null && relPriceKey != null ? "OUTER APPLY (SELECT TOP (1) " +
+                    sqlNumberExpr("pr", relPrice1, "decimal(19,2)") + " price1, " + sqlNumberExpr("pr", relPrice2, "decimal(19,2)") + " price2 FROM dbo.[" + relPriceTable + "] pr WHERE TRY_CONVERT(nvarchar(100),pr.[" + relPriceKey + "])=TRY_CONVERT(nvarchar(100),i.[" + shka + "])" + activeAnd(relPriceCols, "pr") + (relPriceSoft.isEmpty()?"":" AND "+relPriceSoft) + relatedTopOrder(relPriceCols, "pr") + ") prx " : "OUTER APPLY (SELECT CAST(NULL AS decimal(19,2)) price1, CAST(NULL AS decimal(19,2)) price2) prx ");
             String stockApply = atiranStockLedger(c) ? atiranStockApply("i", "stx") : relatedStockApply(relStockTable, relStockCols, relStockKey, relStockBalance, relStockIn, relStockOut, relStockQty, relStockDir, "i", shka, "stx");
             String unitJoin = unitTable != null && unitRef != null && unitKey != null && unitName != null ? "LEFT JOIN dbo.[" + unitTable + "] u ON TRY_CONVERT(nvarchar(100),u.[" + unitKey + "])=TRY_CONVERT(nvarchar(100),i.[" + unitRef + "]) " : "";
             String kaImageApply = kaImages ? "OUTER APPLY (SELECT TOP (1) CAST(DATALENGTH(ki.pic) AS bigint) pic_len FROM dbo.ka_image ki WHERE ki.shka=i.[" + shka + "] AND DATALENGTH(ki.pic)>100 ORDER BY ki.rdf DESC) kim " : "";
@@ -22518,7 +22819,12 @@ public class MainActivity extends Activity {
 
     private void showAssistant() {
         content.removeAllViews();
-        addHero("میلو، پسته زنده هوشمند", "تحلیل کوتاه فروش، مشتری، کالا، چک و ریسک");
+        boolean scopedVisitorAssistant = UNIFIED_EDITION && !isFullAccessUser()
+                && ("visitor".equals(currentAccessRole()) || "sales_employee".equals(currentAccessRole()));
+        boolean canComposePrefactor = scopedVisitorAssistant && canUsePermission("cart_submit")
+                && canUsePermission("customer_select") && canUsePermission("cart");
+        addHero(scopedVisitorAssistant ? "میلو ویزیتور — همیار فروش" : "میلو، پسته زنده هوشمند",
+                scopedVisitorAssistant ? "پرسش صوتی/متنی درباره مشتریان، کالاها و پیش‌فاکتورهای محدوده خودتان" : "تحلیل کوتاه فروش، مشتری، کالا، چک و ریسک");
         if (!prefs.getBoolean(KEY_NAME_ASKED, false)) maybeAskFirstName(false);
 
         LinearLayout intro = card();
@@ -22532,26 +22838,42 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(-1, -2);
         tp.setMargins(0, dp(10), 0, 0);
         intro.addView(title, tp);
-        TextView body = text("یک سؤال کوتاه بپرس؛ جواب مدیریتی، دقیق و سریع می‌دهم.", 11.2f, MUTED, Typeface.NORMAL);
+        TextView body = text(scopedVisitorAssistant
+                ? "میلو فقط داده‌های مجاز حساب شما را می‌بیند؛ ارسال داده به AI آنلاین فقط پس از رضایت شما انجام می‌شود. برای پیش‌فاکتور، نام/قیمت از کاتالوگ زنده می‌آید و هر قلم جداگانه تأیید می‌شود؛ ارسال نهایی فقط از پیش‌نمایش است."
+                : "یک سؤال کوتاه بپرس؛ جواب مدیریتی، دقیق و سریع می‌دهم.", 11.2f, MUTED, Typeface.NORMAL);
         body.setGravity(Gravity.CENTER);
         intro.addView(body, new LinearLayout.LayoutParams(-1, -2));
         addAssistantBusinessElements(intro);
 
         LinearLayout chips = new LinearLayout(this);
         chips.setOrientation(LinearLayout.HORIZONTAL);
-        addAssistantQuickChip(chips, "امروز", "امروز چه چیزهایی برای مدیریت مهم‌تر است؟");
-        addAssistantQuickChip(chips, "بدهکار", "بدهکارهای مهم و اولویت وصول امروز را بگو.");
-        addAssistantQuickChip(chips, "فروش", "فروش امروز و فرصت رشد را کوتاه تحلیل کن.");
-        addAssistantQuickChip(chips, "تصمیم", "یک تصمیم مدیریتی پیشنهادی برای امروز بده.");
+        if (scopedVisitorAssistant) {
+            addAssistantQuickChip(chips, "فروش امروز", "فروش ثبت‌شده و پیش‌فاکتورهای امروز من را خلاصه کن.");
+            addAssistantQuickChip(chips, "پیگیری مشتری", "مشتریان بدهکار یا نیازمند پیگیری من را اولویت‌بندی کن.");
+            addAssistantQuickChip(chips, "کالا", "کالاهای پرفروش و قیمت‌های ثبت‌شده برای حساب من را خلاصه کن.");
+            addAssistantQuickChip(chips, "پیش‌فاکتور", "پیش‌فاکتورهای من و وضعیت ارسالشان را بگو.");
+        } else {
+            addAssistantQuickChip(chips, "امروز", "امروز چه چیزهایی برای مدیریت مهم‌تر است؟");
+            addAssistantQuickChip(chips, "بدهکار", "بدهکارهای مهم و اولویت وصول امروز را بگو.");
+            addAssistantQuickChip(chips, "فروش", "فروش امروز و فرصت رشد را کوتاه تحلیل کن.");
+            addAssistantQuickChip(chips, "تصمیم", "یک تصمیم مدیریتی پیشنهادی برای امروز بده.");
+        }
         LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2);
         cp.setMargins(0, dp(12), 0, 0);
         intro.addView(chips, cp);
         LinearLayout chips2 = new LinearLayout(this);
         chips2.setOrientation(LinearLayout.HORIZONTAL);
-        addAssistantQuickChip(chips2, "ریسک", "ریسک‌های وصول، زیان و مشتریان خطرناک را کوتاه بگو.");
-        addAssistantQuickChip(chips2, "قیمت", "برای قیمت‌گذاری و بازار فروش پیشنهاد عملی بده.");
-        addAssistantQuickChip(chips2, "پورسانت", "برای پورسانت ویزیتورها پیشنهاد بده.");
-        addAssistantQuickChip(chips2, "شوخی", "با لحن بامزه اما مفید یک خلاصه مدیریتی بده.");
+        if (scopedVisitorAssistant) {
+            addAssistantQuickChip(chips2, "موجودی", "موجودی و قیمت فروش کالاهای مورد نیاز را بررسی کن.");
+            addAssistantQuickChip(chips2, "ویزیت", "برای مشتریان امروز چه پیگیری‌هایی انجام بدهم؟");
+            addAssistantQuickChip(chips2, "کمک فروش", "برای تکمیل سبد مشتری پیشنهاد بده؛ قیمت‌ها را تغییر نده.");
+            addAssistantQuickChip(chips2, "راهنما", "ساده و مرحله‌به‌مرحله بگو چطور پیش‌فاکتور ارسال کنم.");
+        } else {
+            addAssistantQuickChip(chips2, "ریسک", "ریسک‌های وصول، زیان و مشتریان خطرناک را کوتاه بگو.");
+            addAssistantQuickChip(chips2, "قیمت", "برای قیمت‌گذاری و بازار فروش پیشنهاد عملی بده.");
+            addAssistantQuickChip(chips2, "پورسانت", "برای پورسانت ویزیتورها پیشنهاد بده.");
+            addAssistantQuickChip(chips2, "شوخی", "با لحن بامزه اما مفید یک خلاصه مدیریتی بده.");
+        }
         LinearLayout.LayoutParams cp2 = new LinearLayout.LayoutParams(-1, -2);
         cp2.setMargins(0, dp(7), 0, 0);
         intro.addView(chips2, cp2);
@@ -22570,7 +22892,7 @@ public class MainActivity extends Activity {
         LinearLayout inputRow = new LinearLayout(this);
         inputRow.setOrientation(LinearLayout.HORIZONTAL);
         inputRow.setGravity(Gravity.CENTER_VERTICAL);
-        assistantInput = input("از میلو بپرس…", "", false);
+        assistantInput = input(assistantPrefactorMode ? "مثلاً: دو بسته پسته اکبری…" : "از میلو بپرس…", "", false);
         assistantInput.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) assistantInput.setTextDirection(View.TEXT_DIRECTION_RTL);
         assistantInput.setImeOptions(EditorInfo.IME_ACTION_SEND);
@@ -22582,20 +22904,36 @@ public class MainActivity extends Activity {
 
         LinearLayout voiceRow = new LinearLayout(this);
         voiceRow.setOrientation(LinearLayout.HORIZONTAL);
-        Button voice = secondaryButton("🎙 پرسش صوتی");
+        Button voice = secondaryButton(assistantPrefactorMode ? "🎙 گفتن قلم سفارش" : scopedVisitorAssistant ? "🎙 پرسش از میلو" : "🎙 پرسش صوتی");
         Button speak = secondaryButton("🔊 خواندن پاسخ");
-        Button settings = secondaryButton("⚙ کلیدهای AI");
-        voice.setTextSize(fs(10.5f)); speak.setTextSize(fs(10.5f)); settings.setTextSize(fs(10.5f));
+        voice.setTextSize(fs(10.5f)); speak.setTextSize(fs(10.5f));
         voice.setOnClickListener(v -> startAssistantVoiceInput());
         speak.setOnClickListener(v -> speakAssistantText(lastAssistantAnswer.isEmpty() ? "هنوز پاسخی ندارم؛ اول یک سوال بپرس." : lastAssistantAnswer));
-        settings.setOnClickListener(v -> showApp("settings"));
         LinearLayout.LayoutParams vp = new LinearLayout.LayoutParams(0, dp(42), 1f); vp.setMargins(dp(3), dp(10), dp(3), 0);
         voiceRow.addView(voice, vp);
         LinearLayout.LayoutParams vp2 = new LinearLayout.LayoutParams(0, dp(42), 1f); vp2.setMargins(dp(3), dp(10), dp(3), 0);
         voiceRow.addView(speak, vp2);
-        LinearLayout.LayoutParams vp3 = new LinearLayout.LayoutParams(0, dp(42), 1f); vp3.setMargins(dp(3), dp(10), dp(3), 0);
-        voiceRow.addView(settings, vp3);
+        if (canOpenPage("settings")) {
+            Button settings = secondaryButton("⚙ کلیدهای AI"); settings.setTextSize(fs(10.5f));
+            settings.setOnClickListener(v -> showApp("settings"));
+            LinearLayout.LayoutParams vp3 = new LinearLayout.LayoutParams(0, dp(42), 1f); vp3.setMargins(dp(3), dp(10), dp(3), 0);
+            voiceRow.addView(settings, vp3);
+        }
         inputCard.addView(voiceRow, new LinearLayout.LayoutParams(-1, -2));
+        if (scopedVisitorAssistant) {
+            Button privacy = secondaryButton(visitorAiExternalConsent ? "🔐 اجازهٔ AI آنلاین فعال • تغییر" : "🔐 تنظیم رضایت برای AI آنلاین");
+            privacy.setTextSize(fs(9.7f));
+            privacy.setOnClickListener(v -> showVisitorAiConsentDialog());
+            LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(-1, dp(42)); pp.setMargins(0, dp(7), 0, 0);
+            inputCard.addView(privacy, pp);
+        }
+        if (canComposePrefactor) {
+            Button order = secondaryButton(assistantPrefactorMode ? "✓ پایان افزودن اقلام و پیش‌نمایش" : "🧾 ساخت پیش‌فاکتور با گفتگو و صدا");
+            order.setTextSize(fs(10.5f));
+            order.setOnClickListener(v -> { if (assistantPrefactorMode) finishAssistantPrefactorConversation(); else startAssistantPrefactorConversation(); });
+            LinearLayout.LayoutParams op = new LinearLayout.LayoutParams(-1, dp(46)); op.setMargins(0, dp(8), 0, 0);
+            inputCard.addView(order, op);
+        }
         LinearLayout.LayoutParams icp = new LinearLayout.LayoutParams(-1, -2); icp.setMargins(0, dp(12), 0, 0);
         content.addView(inputCard, icp);
 
@@ -22646,11 +22984,283 @@ public class MainActivity extends Activity {
         return "happy";
     }
 
+    private void showVisitorAiConsentDialog() {
+        if (!UNIFIED_EDITION || isFullAccessUser() || !("visitor".equals(currentAccessRole()) || "sales_employee".equals(currentAccessRole()))) return;
+        String details = "برای پرسش‌های آنلاین، خلاصهٔ مجاز گزارش‌ها (از جمله نام مشتریان و ارقام مربوط به محدودهٔ همین ویزیتور) به سرویس AI انتخاب‌شده فرستاده می‌شود. در تطبیق قلم سفارش، فقط عبارت شما و فهرست محدود کالاهای کاتالوگ (کد، نام و واحد) فرستاده می‌شود؛ قیمت از AI گرفته نمی‌شود. "
+                + "بدون اجازه، سرویس AI بیرونی استفاده نمی‌شود؛ پاسخ داخلی است، اما جستجوی کالا و قیمت زنده همچنان از آتیران خوانده می‌شود. هیچ اجازه‌ای برای ثبت مالی یا ارسال خودکار پیش‌فاکتور داده نمی‌شود. این انتخاب فقط تا خروج از حساب معتبر است.";
+        AlertDialog.Builder builder = new MeelanoDialogBuilder().setTitle("حریم خصوصی دستیار آنلاین").setMessage(details);
+        if (visitorAiExternalConsent) {
+            builder.setPositiveButton("لغو اجازهٔ آنلاین", (d, w) -> { visitorAiExternalConsent = false; showAssistant(); addAssistantBubble(false, "اجازهٔ ارسال داده به سرویس AI لغو شد؛ از این پس پاسخ محلی استفاده می‌شود."); });
+            builder.setNegativeButton("نگه‌داشتن اجازه", null);
+        } else {
+            builder.setPositiveButton("اجازه برای این ورود", (d, w) -> { visitorAiExternalConsent = true; showAssistant(); addAssistantBubble(false, "اجازهٔ AI آنلاین برای همین ورود فعال شد. می‌توانید هر زمان از همین بخش لغوش کنید."); });
+            builder.setNegativeButton("فقط تحلیل داخلی", (d, w) -> { visitorAiExternalConsent = false; showAssistant(); addAssistantBubble(false, "سرویس AI بیرونی استفاده نمی‌شود؛ دادهٔ کاتالوگ برای جستجوی قیمت از آتیران خوانده خواهد شد."); });
+        }
+        AlertDialog dialog = builder.create();
+        dialog.setOnShowListener(d -> styleMeelanoDialog(dialog, INFO));
+        dialog.show();
+    }
+
+    private boolean canComposeVisitorPrefactor() {
+        String role = currentAccessRole();
+        return UNIFIED_EDITION && !isFullAccessUser()
+                && ("visitor".equals(role) || "sales_employee".equals(role))
+                && canUsePermission("assistant") && canUsePermission("cart")
+                && canUsePermission("cart_submit") && canUsePermission("customer_select");
+    }
+
+    private void startAssistantPrefactorConversation() {
+        if (!canComposeVisitorPrefactor()) { showNotice("گفتگوی ساخت پیش‌فاکتور برای این نقش مجاز نیست.", true); return; }
+        if (cartHasItems()) {
+            new MeelanoDialogBuilder().setTitle("ادامه سبد فعلی؟")
+                    .setMessage("سبد فعلی " + cartCountSummary() + " دارد. اقلام گفتگویی به همین پیش‌نویس اضافه می‌شوند؛ سبد قبلی پاک نمی‌شود.")
+                    .setNegativeButton("انصراف", null)
+                    .setPositiveButton("ادامه همین سبد", (d, w) -> beginAssistantPrefactorConversation())
+                    .show();
+            return;
+        }
+        beginAssistantPrefactorConversation();
+    }
+
+    private void beginAssistantPrefactorConversation() {
+        if (!canComposeVisitorPrefactor()) return;
+        assistantOrderRequestGeneration++;
+        assistantPrefactorMode = true;
+        if (visitorCartCustomer == null) {
+            assistantPrefactorAwaitingCustomer = true;
+            showApp("cart");
+            showCartCustomerPicker("");
+            return;
+        }
+        showAssistant();
+        addAssistantBubble(false, "حالت ساخت پیش‌فاکتور روشن شد. مشتری «" + visitorCartCustomerName() + "» انتخاب شده است. هر بار نام یک کالا و تعدادش را بگویید یا بنویسید؛ تطبیق از فهرست کالاهای واقعی است و هر قلم پیش از افزودن به پیش‌نویس نیاز به تأیید شما دارد. برای پایان بگویید «پیش‌نمایش»، برای لغو حالت بگویید «لغو گفتگو».");
+        addAssistantBubble(false, "قیمت پیش‌فرض ویزیتور از DefaultPriceGrp آتیران انتخاب می‌شود؛ گروه‌های ۱ تا ۵ به‌ترتیب forosh1 تا forosh5 هستند. اگر نرخ فعال و تنوع دقیق کالا یکتا نباشد، مبلغ خودکار نمایش داده نمی‌شود و ثبت با نرخ پیش‌فرض مسدود می‌ماند.");
+        if (!visitorAiExternalConsent) addAssistantBubble(false, "اجازهٔ AI بیرونی فعال نیست؛ تطبیق داخلی است، ولی جستجوی نام و قیمت زنده از آتیران انجام می‌شود. برای فعال‌سازی AI، دکمهٔ رضایت را بزنید.");
+    }
+
+    private void finishAssistantPrefactorConversation() {
+        assistantOrderRequestGeneration++;
+        assistantPrefactorMode = false;
+        if (!cartHasItems()) {
+            showNotice("هنوز قلمی به پیش‌نویس اضافه نشده است؛ چیزی ثبت نشد.", false);
+            showAssistant();
+            return;
+        }
+        if (visitorCartCustomer == null) {
+            assistantPrefactorAwaitingCustomer = true;
+            showApp("cart");
+            showCartCustomerPicker("");
+            return;
+        }
+        showApp("cart");
+        syncCartFormInputs();
+        showPrefactorPreviewDialog();
+    }
+
+    private boolean submitAssistantPrefactorTurn(String message) {
+        if (!canComposeVisitorPrefactor()) {
+            assistantPrefactorMode = false;
+            showNotice("مجوز گفتگوی سفارش برای این حساب فعال نیست.", true);
+            return true;
+        }
+        String normalized = VisitorVoiceOrderParser.normalize(message);
+        if (assistantInput != null) assistantInput.setText("");
+        addAssistantBubble(true, message);
+        if (normalized.equals("لغو") || normalized.contains("لغو گفتگو") || normalized.equals("انصراف")) {
+            assistantOrderRequestGeneration++;
+            assistantPrefactorMode = false;
+            addAssistantBubble(false, "حالت ساخت پیش‌فاکتور بسته شد. پیش‌نویس محلی شما دست‌نخورده ماند و چیزی به آتیران ارسال نشد.");
+            return true;
+        }
+        if (assistantOrderLookupRunning) {
+            addAssistantBubble(false, "جستجوی قلم قبلی هنوز تمام نشده است؛ کمی صبر کنید تا نتیجه و قیمت زنده بیاید.");
+            return true;
+        }
+        if (normalized.contains("پیش نمایش") || normalized.contains("پیش‌نمایش") || normalized.equals("تمام") || normalized.equals("تموم") || normalized.contains("پایان سفارش") || normalized.contains("ارسال پیش فاکتور") || normalized.contains("ارسال پیش‌فاکتور")) {
+            addAssistantBubble(false, "حالت گفتگو پایان یافت. پیش‌نمایش را باز می‌کنم؛ ارسال نهایی فقط پس از تأیید دکمهٔ داخل پیش‌نمایش انجام می‌شود.");
+            finishAssistantPrefactorConversation();
+            return true;
+        }
+        if (normalized.contains("تغییر مشتری") || normalized.startsWith("مشتری ")) {
+            assistantPrefactorAwaitingCustomer = true;
+            assistantPrefactorMode = true;
+            showApp("cart");
+            String customerQuery = normalized.startsWith("مشتری ") ? normalized.substring("مشتری ".length()).trim() : "";
+            showCartCustomerPicker(customerQuery, true);
+            return true;
+        }
+        VisitorVoiceOrderParser.Request request = VisitorVoiceOrderParser.parse(message);
+        if (!request.isValid()) {
+            addAssistantBubble(false, "قلم را با نام کالا و تعداد بفرستید؛ نمونه: «دو بسته پسته اکبری». مقدار صفر یا خیلی بزرگ پذیرفته نمی‌شود. برای دیدن سبد بگویید «پیش‌نمایش».");
+            return true;
+        }
+        updateMiloMood("thinking");
+        TextView pending = addAssistantBubble(false, "دارم نام کالا را فقط در کاتالوگ زندهٔ آتیران جستجو می‌کنم؛ هنوز چیزی به سبد اضافه نشده است…");
+        setConnectionStatus("loading");
+        assistantOrderLookupRunning = true;
+        final int requestGeneration = assistantOrderRequestGeneration;
+        executor.execute(() -> {
+            JSONArray candidates = null;
+            String preferredCode = "";
+            String failure = "";
+            try {
+                candidates = queryAssistantOrderProducts(request.productQuery);
+                if (candidates.length() == 0) failure = "کالایی با این عبارت در محدودهٔ کاتالوگ پیدا نشد.";
+                else preferredCode = queryAssistantPreferredProductCode(message, request, candidates);
+            } catch (Exception ex) { failure = "جستجوی کاتالوگ انجام نشد: " + shortError(ex); }
+            final JSONArray result = candidates == null ? new JSONArray() : candidates;
+            final String recommended = preferredCode;
+            final String error = failure;
+            runOnUiThread(() -> {
+                assistantOrderLookupRunning = false;
+                setConnectionStatus("connected");
+                if (pending != null) pending.setText(error.isEmpty() ? "کاتالوگ بررسی شد؛ برای افزودن به پیش‌نویس، کالا را انتخاب و قیمت/تعداد را تأیید کنید." : error + " هیچ تغییری در پیش‌نویس ایجاد نشد.");
+                if (result.length() > 0 && requestGeneration == assistantOrderRequestGeneration && assistantPrefactorMode && "assistant".equals(activePage)) showAssistantPrefactorCandidates(result, request, recommended);
+            });
+        });
+        return true;
+    }
+
+    private JSONArray queryAssistantOrderProducts(String productQuery) throws Exception {
+        String query = productQuery == null ? "" : productQuery.trim();
+        if (query.length() < 2) return new JSONArray();
+        JSONArray found = new JSONArray(queryProducts(query, "all", 80));
+        if (found.length() > 0) return found;
+        JSONArray combined = new JSONArray();
+        Set<String> seen = new HashSet<>();
+        for (String token : query.split("\\s+")) {
+            String t = token.trim();
+            if (t.length() < 3 || "برای".equals(t) || "پسته".equals(t) && query.trim().equals(t)) continue;
+            JSONArray rows = new JSONArray(queryProducts(t, "all", 24));
+            for (int i = 0; i < rows.length() && combined.length() < 80; i++) {
+                JSONObject row = rows.optJSONObject(i);
+                String code = row == null ? "" : safeDisplayText(row.opt("کد"), "");
+                if (!code.isEmpty() && seen.add(code)) combined.put(row);
+            }
+        }
+        return combined;
+    }
+
+    private String queryAssistantPreferredProductCode(String utterance, VisitorVoiceOrderParser.Request request, JSONArray candidates) {
+        String provider = activeAiProvider();
+        String key = storedAiKey(provider);
+        boolean externalAiAllowed = !UNIFIED_EDITION || isFullAccessUser() || visitorAiExternalConsent;
+        if (externalAiAllowed && provider != null && !provider.trim().isEmpty() && key != null && !key.trim().isEmpty()) {
+            try {
+                String code = callAiProductMatch(provider, key, utterance, candidates);
+                for (int i = 0; i < candidates.length(); i++) {
+                    JSONObject row = candidates.optJSONObject(i);
+                    if (row != null && code.equals(safeDisplayText(row.opt("کد"), ""))) return code;
+                }
+            } catch (Exception ex) { android.util.Log.w("MEELANO_ORDER_AI", "product match fallback: " + shortError(ex)); }
+        }
+        String query = VisitorVoiceOrderParser.normalize(request.productQuery);
+        String bestCode = ""; int bestScore = 0; boolean tie = false;
+        for (int i = 0; i < candidates.length(); i++) {
+            JSONObject row = candidates.optJSONObject(i); if (row == null) continue;
+            String name = VisitorVoiceOrderParser.normalize(row.optString("نام", ""));
+            int score = name.contains(query) ? 100 : 0;
+            for (String token : query.split("\\s+")) if (token.length() > 1 && name.contains(token)) score += 10;
+            if (score > bestScore) { bestScore = score; bestCode = safeDisplayText(row.opt("کد"), ""); tie = false; }
+            else if (score == bestScore && score > 0) tie = true;
+        }
+        return tie ? "" : bestCode;
+    }
+
+    private void showAssistantPrefactorCandidates(JSONArray candidates, VisitorVoiceOrderParser.Request request, String preferredCode) {
+        LinearLayout list = new LinearLayout(this); list.setOrientation(LinearLayout.VERTICAL); list.setPadding(dp(10), dp(8), dp(10), dp(8));
+        list.addView(text("انتخاب کالای کاتالوگ", 16, TEXT, Typeface.BOLD), new LinearLayout.LayoutParams(-1, -2));
+        list.addView(text("درخواست: " + formatNumber(request.quantity) + (request.requestedUnit.isEmpty() ? "" : " " + request.requestedUnit) + " • انتخاب فقط پیش‌نویس را تغییر می‌دهد؛ ثبت نهایی جداگانه تأیید می‌شود.", 10.5f, MUTED, Typeface.BOLD), new LinearLayout.LayoutParams(-1, -2));
+        ScrollView scroll = new ScrollView(this); styleVerticalScroll(scroll);
+        LinearLayout rows = new LinearLayout(this); rows.setOrientation(LinearLayout.VERTICAL);
+        JSONArray displayCandidates = new JSONArray();
+        JSONObject recommended = null;
+        for (int i = 0; i < candidates.length(); i++) {
+            JSONObject row = candidates.optJSONObject(i);
+            if (row != null && safeDisplayText(row.opt("کد"), "").equals(preferredCode)) { recommended = row; break; }
+        }
+        if (recommended != null) displayCandidates.put(recommended);
+        for (int i = 0; i < candidates.length(); i++) {
+            JSONObject row = candidates.optJSONObject(i);
+            if (row != null && (recommended == null || !safeDisplayText(row.opt("کد"), "").equals(safeDisplayText(recommended.opt("کد"), "")))) displayCandidates.put(row);
+        }
+        for (int i = 0; i < displayCandidates.length() && i < 24; i++) {
+            JSONObject product = displayCandidates.optJSONObject(i); if (product == null) continue;
+            String code = safeDisplayText(product.opt("کد"), "");
+            String name = safeDisplayText(product.opt("نام"), "کالا");
+            String unit = unitOrDash(product);
+            String price = money(product.opt("قیمت_فروش"));
+            String stock = formatNumber(product.optDouble("موجودی", 0));
+            String mark = code.equals(preferredCode) ? " • پیشنهاد تطبیق AI" : "";
+            Button choose = secondaryButton(name + " • " + price + " / " + unit + " • موجودی " + stock + mark);
+            choose.setTextSize(fs(10.0f)); choose.setAllCaps(false); choose.setMaxLines(3);
+            choose.setOnClickListener(v -> showAssistantPrefactorLineConfirmation(product, request, code.equals(preferredCode)));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2); lp.setMargins(0, dp(6), 0, 0); rows.addView(choose, lp);
+        }
+        scroll.addView(rows, new ScrollView.LayoutParams(-1, -2));
+        list.addView(scroll, new LinearLayout.LayoutParams(-1, dp(360)));
+        AlertDialog dlg = new MeelanoDialogBuilder().setView(list).setNegativeButton("هیچ‌کدام", null).create();
+        dlg.setOnShowListener(d -> styleMeelanoDialog(dlg, navAccent("cart")));
+        dlg.show();
+    }
+
+    private void showAssistantPrefactorLineConfirmation(JSONObject product, VisitorVoiceOrderParser.Request request, boolean aiMatch) {
+        if (product == null || request == null || !request.isValid()) return;
+        String unit = unitOrDash(product);
+        String warning = !request.requestedUnit.isEmpty() && !"—".equals(unit)
+                && !VisitorVoiceOrderParser.normalize(unit).contains(VisitorVoiceOrderParser.normalize(request.requestedUnit))
+                ? "\nتوجه: واحدی که گفتید («" + request.requestedUnit + "») با واحد کاتالوگ («" + unit + "») متفاوت است؛ تعداد تبدیل نمی‌شود." : "";
+        String code = safeDisplayText(product.opt("کد"), "");
+        int existingIndex = cartFindIndex(code);
+        JSONObject existingLine = existingIndex < 0 ? null : visitorCartItems.optJSONObject(existingIndex);
+        String existingNote = existingLine == null ? "" : "\nاین کالا در سبد هست؛ تعداد به " + formatNumber(existingLine.optDouble("qty", 0) + request.quantity) + " می‌رسد و قیمت فعلی سبد (" + money(existingLine.optDouble("price", 0)) + ") حفظ می‌شود.";
+        String body = "کالا: " + safeDisplayText(product.opt("نام"), "کالا") + "\nکد: " + code
+                + "\nتعداد افزوده‌شونده: " + formatNumber(request.quantity) + " " + unit
+                + "\n" + priceTierLabel(1) + " زنده: " + money(product.opt("قیمت_فروش"))
+                + "\n" + priceTierLabel(2) + ": " + money(product.opt("قیمت_فروش۲"))
+                + "\nموجودی گزارش‌شده: " + formatNumber(product.optDouble("موجودی", 0))
+                + (aiMatch ? "\nتطبیق پیشنهادی آنلاین؛ کد نهایی فقط از کاتالوگ مجاز انتخاب شده است." : "\nتطبیق محلی از کاتالوگ زنده.") + warning + existingNote
+                + "\n\nنرخ پیش‌فرض از گروه قیمت متصل به این ویزیتور در آتیران خوانده شده است؛ در صورت نبودن نرخ فعال/تنوع یکتا، مبلغ خودکار قابل ثبت نیست و باید نرخ را دستی یا تنوع دقیق را انتخاب کنید."
+                + "\n\nبا افزودن، فقط پیش‌نویس محلی سبد تغییر می‌کند؛ پیش‌فاکتور ارسال نمی‌شود.";
+        new MeelanoDialogBuilder().setTitle("تأیید قلم پیش‌نویس").setMessage(body)
+                .setNegativeButton("بازگشت", null)
+                .setPositiveButton("بررسی موجودی و افزودن", (d, w) -> confirmStockThen(product, () -> {
+                    boolean added = addAssistantPrefactorProduct(product, request.quantity);
+                    if (assistantPrefactorMode && added) addAssistantBubble(false, "«" + safeDisplayText(product.opt("نام"), "کالا") + "» با تعداد " + formatNumber(request.quantity) + " به پیش‌نویس محلی افزوده شد. قیمت انتخاب‌شده در تأیید حفظ شد. قلم بعدی را بگویید یا «پیش‌نمایش» را انتخاب کنید.");
+                    else if (assistantPrefactorMode) addAssistantBubble(false, "تعداد این قلم از سقف مجاز بیشتر می‌شود؛ پیش‌نویس تغییر نکرد. تعداد کمتری را بگویید.");
+                })).show();
+    }
+
+    private boolean addAssistantPrefactorProduct(JSONObject product, double quantity) {
+        if (product == null || !Double.isFinite(quantity) || quantity <= 0 || quantity > 10000) return false;
+        String code = safeDisplayText(product.opt("کد"), "");
+        int index = cartFindIndex(code);
+        if (index >= 0) {
+            JSONObject existing = visitorCartItems.optJSONObject(index);
+            if (existing == null) return false;
+            double newQty = existing.optDouble("qty", 0) + quantity;
+            if (!Double.isFinite(newQty) || newQty <= 0 || newQty > 10000) return false;
+            try {
+                existing.put("qty", newQty);
+                existing.put("amount", cartItemNet(existing));
+                visitorCartItems.put(index, existing);
+            } catch (Exception ignored) { return false; }
+            refreshVisitorCartBadge();
+        } else {
+            addOrUpdateCartItem(product, plainNumber(quantity), 1);
+        }
+        autosaveCart(false);
+        return true;
+    }
+
     private void submitAssistantQuestion(String question) {
+        final boolean visitorAssistant = UNIFIED_EDITION && !isFullAccessUser()
+                && ("visitor".equals(currentAccessRole()) || "sales_employee".equals(currentAccessRole()));
         if (question == null || question.trim().isEmpty()) {
             showNotice("یک سوال کوتاه بنویس؛ ذهن‌خوانی هنوز در نسخه بتاست!", false);
             return;
         }
+        if (assistantPrefactorMode && submitAssistantPrefactorTurn(question)) return;
         if (handleAssistantNavigationCommand(question)) {
             if (assistantInput != null) assistantInput.setText("");
             return;
@@ -22673,14 +23283,16 @@ public class MainActivity extends Activity {
                     } else {
                         String provider = activeAiProvider();
                         String key = storedAiKey(provider);
+                        if (visitorAssistant && !visitorAiExternalConsent) { provider = ""; key = ""; }
                         if (provider.isEmpty() || key.isEmpty()) {
-                            answer = localAssistantAnswer(question, snapshot);
+                            answer = visitorAssistant ? localVisitorAssistantAnswer(question, snapshot) : localAssistantAnswer(question, snapshot);
                         } else {
                             try {
                                 answer = callAiProvider(provider, key, question, snapshot);
-                                if (answer == null || answer.trim().isEmpty()) answer = localAssistantAnswer(question, snapshot);
+                                if (answer == null || answer.trim().isEmpty()) answer = visitorAssistant ? localVisitorAssistantAnswer(question, snapshot) : localAssistantAnswer(question, snapshot);
                             } catch (Exception apiEx) {
-                                answer = localAssistantAnswer(question, snapshot) + "\n\nاتصال به «" + providerDisplayName(provider) + "» جواب نداد؛ فعلاً با تحلیل داخلی جواب دادم. خطا: " + shortError(apiEx);
+                                String fallback = visitorAssistant ? localVisitorAssistantAnswer(question, snapshot) : localAssistantAnswer(question, snapshot);
+                                answer = fallback + "\n\nاتصال به «" + providerDisplayName(provider) + "» جواب نداد؛ فعلاً با تحلیل داخلی جواب دادم. خطا: " + shortError(apiEx);
                             }
                         }
                     }
@@ -22703,6 +23315,14 @@ public class MainActivity extends Activity {
         boolean command = q.contains("نشان بده") || q.contains("باز کن") || q.contains("برو") || q.contains("بخوان") || q.contains("نمایش");
         if (!command) return false;
         if (session == null) { showLogin("برای اجرای فرمان صوتی ابتدا وارد شوید."); return true; }
+        if (UNIFIED_EDITION && !isFullAccessUser()) {
+            if (q.contains("پیش فاکتور") || q.contains("پیش‌فاکتور") || q.contains("سبد") || q.contains("فروش")) { showApp("cart"); return true; }
+            if (q.contains("کالا") || q.contains("موجودی") || q.contains("قیمت")) { showApp("showcase"); return true; }
+            if (q.contains("ویزیت") || q.contains("مسیر")) { showApp("visit"); return true; }
+            if (q.contains("گزارش")) { showApp("visitor_reports"); return true; }
+            if (q.contains("دریافت") || q.contains("پیش دریافت") || q.contains("پیش‌دریافت")) { openStoreReceipt(null); return true; }
+            if (q.contains("بدهکار") || q.contains("پیگیری") || q.contains("مشتری")) { showApp("customers"); loadCustomers("", "debt"); return true; }
+        }
         if (q.contains("بدهکار") || q.contains("مشتری پرریسک")) {
             showApp("customers");
             loadCustomers("", "debt");
@@ -22726,9 +23346,76 @@ public class MainActivity extends Activity {
         return displayFirstName() + " عزیز، این برنامه را " + DEVELOPER_NAME + " طراحی و برنامه‌نویسی کرده است.";
     }
 
+    /** Local answer fallback for field accounts; input data is already visitor-scoped. */
+    private String localVisitorAssistantAnswer(String question, String snapshot) throws Exception {
+        JSONObject root = new JSONObject(snapshot == null ? "{}" : snapshot);
+        JSONObject d = root.optJSONObject("dashboard");
+        JSONObject reports = root.optJSONObject("visitorReports");
+        if (d == null) d = new JSONObject();
+        if (reports == null) reports = new JSONObject();
+        JSONObject sales = d.optJSONObject("sales");
+        if (sales == null) sales = reports.optJSONObject("sales");
+        JSONObject todayPref = d.optJSONObject("todayPrefactors");
+        if (todayPref == null) todayPref = reports.optJSONObject("today");
+        String q = question == null ? "" : question.toLowerCase(Locale.US);
+        StringBuilder out = new StringBuilder(displayFirstName()).append(" عزیز، خلاصه حساب ویزیت شما:\n");
+        if (q.contains("بدهکار") || q.contains("پیگیری") || q.contains("وصول")) {
+            JSONArray debtors = d.optJSONArray("topDebtors");
+            JSONArray overdue = d.optJSONArray("overdueInvoices");
+            out.append("• مشتریان اولویت‌دار:\n");
+            int shown = 0;
+            for (int i = 0; debtors != null && i < debtors.length() && shown < 4; i++) {
+                JSONObject row = debtors.optJSONObject(i); if (row == null) continue;
+                out.append("  – ").append(row.optString("party", "مشتری")).append(" • ").append(money(row.opt("amount"))).append("\n"); shown++;
+            }
+            if (shown == 0) out.append("  – بدهکار اولویت‌داری در داده‌های محدوده شما برنگشت.\n");
+            out.append("• فاکتورهای سررسید گذشته: ").append(formatNumber(overdue == null ? 0 : overdue.length())).append(" مورد.\n");
+        } else if (q.contains("کالا") || q.contains("موجودی") || q.contains("پرفروش")) {
+            JSONArray products = reports.optJSONArray("topProducts");
+            out.append("• کالاهای پرفروش پیش‌فاکتورهای شما:\n");
+            int shown = 0;
+            for (int i = 0; products != null && i < products.length() && shown < 5; i++) {
+                JSONObject row = products.optJSONObject(i); if (row == null) continue;
+                out.append("  – ").append(row.optString("name", "کالا")).append(" • ").append(formatNumber(row.optDouble("qty", 0))).append(" عدد • ").append(money(row.opt("amount"))).append("\n"); shown++;
+            }
+            if (shown == 0) out.append("  – هنوز پیش‌فاکتور کافی برای رتبه‌بندی کالاها ثبت نشده است.\n");
+            out.append("قیمت و موجودی لحظه‌ای را در صفحه کالا ببینید؛ این پاسخ قیمت را تغییر نمی‌دهد.\n");
+        } else if (q.contains("مشتری")) {
+            JSONArray customers = reports.optJSONArray("topCustomers");
+            out.append("• مشتریان پرتکرار در محدوده شما:\n");
+            int shown = 0;
+            for (int i = 0; customers != null && i < customers.length() && shown < 5; i++) {
+                JSONObject row = customers.optJSONObject(i); if (row == null) continue;
+                out.append("  – ").append(row.optString("name", "مشتری")).append(" • ").append(formatNumber(row.optLong("count", 0))).append(" پیش‌فاکتور • ").append(money(row.opt("amount"))).append("\n"); shown++;
+            }
+            if (shown == 0) out.append("  – سابقه‌ای برای نمایش پیدا نشد.\n");
+        } else {
+            Object salesAmount = sales == null ? 0 : (sales.has("amount") ? sales.opt("amount") : sales.opt("total"));
+            String salesDate = d.optString("date", "");
+            out.append("• فروش ثبت‌شده").append(salesDate.isEmpty() ? "" : " تا " + salesDate).append(": ").append(money(salesAmount)).append(" در ").append(formatNumber(sales == null ? 0 : sales.optLong("count", 0))).append(" فاکتور.\n");
+            out.append("• پیش‌فاکتور امروز: ").append(formatNumber(todayPref == null ? 0 : todayPref.optLong("count", 0))).append(" مورد، جمع ").append(money(todayPref == null ? 0 : todayPref.opt("amount"))).append(".\n");
+            JSONObject visits = reports.optJSONObject("visitsToday");
+            out.append("• ویزیت امروز: ").append(formatNumber(visits == null ? 0 : visits.optLong("count", 0))).append(" مراجعه.\n");
+        }
+        out.append("برای ثبت یا ارسال پیش‌فاکتور، سبد را باز کنید و پیش‌نمایش را بررسی و تأیید کنید.");
+        return out.toString();
+    }
+
     private String queryAssistantSnapshot() throws Exception {
         JSONObject out = new JSONObject();
         out.put("user", session == null ? "" : session.userName);
+        if (UNIFIED_EDITION && !isFullAccessUser()) {
+            String role = currentAccessRole();
+            Integer visitorId = currentVisitorScopeId();
+            if (("visitor".equals(role) || "sales_employee".equals(role)) && visitorId != null && visitorId > 0) {
+                // Never send the company's global manager snapshot to a field account or AI provider.
+                out.put("scope", "Atiran visitor id " + visitorId + " only");
+                out.put("dashboard", new JSONObject(queryVisitorDashboardSql()));
+                out.put("visitorReports", new JSONObject(queryVisitorReportsSql()));
+                return out.toString();
+            }
+            throw new DbException("برای دستیار این حساب، محدوده ویزیتور آتیران تأیید نشد؛ داده عمومی ارسال نشد.");
+        }
         try { out.put("dashboard", new JSONObject(queryDashboard())); }
         catch (Exception ex) { out.put("dashboard_error", readableError(ex)); }
         try { out.put("analytics", new JSONObject(queryAnalytics())); }
@@ -22883,6 +23570,64 @@ public class MainActivity extends Activity {
         return callChatCompletions("https://api.openai.com/v1/chat/completions", "gpt-4o-mini", key, question, snapshot);
     }
 
+    /** AI may recommend only a catalog code from the supplied allowlist; app-side validation is mandatory. */
+    private String callAiProductMatch(String provider, String key, String utterance, JSONArray liveProducts) throws Exception {
+        JSONArray allowed = new JSONArray();
+        for (int i = 0; liveProducts != null && i < liveProducts.length() && i < 40; i++) {
+            JSONObject p = liveProducts.optJSONObject(i); if (p == null) continue;
+            allowed.put(new JSONObject().put("code", safeDisplayText(p.opt("کد"), ""))
+                    .put("name", safeDisplayText(p.opt("نام"), ""))
+                    .put("unit", unitOrDash(p)));
+        }
+        JSONObject userData = new JSONObject().put("spoken_request", utterance == null ? "" : utterance)
+                .put("quantity_hint", VisitorVoiceOrderParser.parse(utterance).quantity)
+                .put("allowed_products", allowed);
+        String system = "تو فقط تطبیق‌دهندهٔ نام کالا هستی. از فهرست allowed_products دقیقاً یک code را فقط وقتی انتخاب کن که نام spoken_request با آن کالا سازگار باشد. "
+                + "هیچ قیمت، تخفیف یا کالای تازه نساز. اگر مطمئن نیستی code خالی بده. خروجی فقط JSON معتبر با شکل {\"code\":\"کد دقیق یا خالی\"} باشد؛ هیچ متن دیگری ننویس.";
+        String response;
+        if ("gemini".equals(provider)) response = callStructuredGemini(key, system, userData.toString());
+        else {
+            String endpoint, model;
+            if ("groq".equals(provider)) { endpoint = "https://api.groq.com/openai/v1/chat/completions"; model = "llama-3.3-70b-versatile"; }
+            else if ("gapgpt".equals(provider)) { endpoint = prefString(KEY_AI_GAPGPT_BASE, "https://api.gapgpt.app/v1") + "/chat/completions"; model = "gpt-4o-mini"; }
+            else if ("grok".equals(provider)) { endpoint = "https://api.x.ai/v1/chat/completions"; model = "grok-2-latest"; }
+            else { endpoint = "https://api.openai.com/v1/chat/completions"; model = "gpt-4o-mini"; }
+            response = callStructuredChat(endpoint, model, key, system, userData.toString());
+        }
+        try {
+            int start = response.indexOf('{'), end = response.lastIndexOf('}');
+            if (start < 0 || end <= start) return "";
+            return new JSONObject(response.substring(start, end + 1)).optString("code", "").trim();
+        } catch (Exception ignored) { return ""; }
+    }
+
+    private String callStructuredChat(String endpoint, String model, String key, String system, String user) throws Exception {
+        JSONObject req = new JSONObject().put("model", model).put("temperature", 0).put("max_tokens", 120);
+        JSONArray messages = new JSONArray();
+        messages.put(new JSONObject().put("role", "system").put("content", system));
+        messages.put(new JSONObject().put("role", "user").put("content", user));
+        req.put("messages", messages);
+        String raw = httpPost(endpoint, req.toString(), Collections.singletonMap("Authorization", "Bearer " + key));
+        JSONArray choices = new JSONObject(raw).optJSONArray("choices");
+        JSONObject choice = choices == null || choices.length() == 0 ? null : choices.optJSONObject(0);
+        JSONObject msg = choice == null ? null : choice.optJSONObject("message");
+        return msg == null ? "" : msg.optString("content", "").trim();
+    }
+
+    private String callStructuredGemini(String key, String system, String user) throws Exception {
+        JSONObject req = new JSONObject();
+        req.put("systemInstruction", new JSONObject().put("parts", new JSONArray().put(new JSONObject().put("text", system))));
+        req.put("contents", new JSONArray().put(new JSONObject().put("parts", new JSONArray().put(new JSONObject().put("text", user)))));
+        req.put("generationConfig", new JSONObject().put("temperature", 0).put("maxOutputTokens", 120).put("responseMimeType", "application/json"));
+        String endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + URLEncoder.encode(key, "UTF-8");
+        JSONObject response = new JSONObject(httpPost(endpoint, req.toString(), Collections.emptyMap()));
+        JSONArray candidates = response.optJSONArray("candidates");
+        JSONObject candidate = candidates == null || candidates.length() == 0 ? null : candidates.optJSONObject(0);
+        JSONObject content = candidate == null ? null : candidate.optJSONObject("content");
+        JSONArray parts = content == null ? null : content.optJSONArray("parts");
+        return parts == null || parts.length() == 0 ? "" : parts.optJSONObject(0).optString("text", "").trim();
+    }
+
     private String callChatCompletions(String endpoint, String model, String key, String question, String snapshot) throws Exception {
         JSONObject req = new JSONObject();
         req.put("model", model);
@@ -22928,21 +23673,25 @@ public class MainActivity extends Activity {
 
     private String httpPost(String endpoint, String body, Map<String, String> headers) throws Exception {
         HttpURLConnection con = (HttpURLConnection) new URL(endpoint).openConnection();
-        con.setRequestMethod("POST");
-        con.setConnectTimeout(18000);
-        con.setReadTimeout(45000);
-        con.setDoOutput(true);
-        con.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-        con.setRequestProperty("Accept", "application/json");
-        if (headers != null) for (Map.Entry<String, String> e : headers.entrySet()) con.setRequestProperty(e.getKey(), e.getValue());
-        byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
-        con.setFixedLengthStreamingMode(bytes.length);
-        try (OutputStream os = con.getOutputStream()) { os.write(bytes); }
-        int code = con.getResponseCode();
-        InputStream stream = code >= 200 && code < 300 ? con.getInputStream() : con.getErrorStream();
-        String response = readFully(stream);
-        if (code < 200 || code >= 300) throw new Exception("HTTP " + code + ": " + limitText(response, 240));
-        return response;
+        try {
+            con.setRequestMethod("POST");
+            con.setConnectTimeout(18000);
+            con.setReadTimeout(45000);
+            con.setDoOutput(true);
+            con.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+            con.setRequestProperty("Accept", "application/json");
+            if (headers != null) for (Map.Entry<String, String> e : headers.entrySet()) con.setRequestProperty(e.getKey(), e.getValue());
+            byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+            con.setFixedLengthStreamingMode(bytes.length);
+            try (OutputStream os = con.getOutputStream()) { os.write(bytes); }
+            int code = con.getResponseCode();
+            String response;
+            try (InputStream stream = code >= 200 && code < 300 ? con.getInputStream() : con.getErrorStream()) {
+                response = readFully(stream);
+            }
+            if (code < 200 || code >= 300) throw new Exception("HTTP " + code + ": " + limitText(response, 240));
+            return response;
+        } finally { con.disconnect(); }
     }
 
     private String readFully(InputStream in) throws Exception {
@@ -23248,7 +23997,7 @@ public class MainActivity extends Activity {
             Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
             intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
             intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fa-IR");
-            intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "سوالت را برای میلو بگو…");
+            intent.putExtra(RecognizerIntent.EXTRA_PROMPT, assistantPrefactorMode ? "نام کالا و تعداد را بگویید؛ میلو قبل از افزودن از شما تأیید می‌گیرد…" : "سوالت را برای میلو بگو…");
             startActivityForResult(intent, REQ_ASSISTANT_VOICE);
         } catch (Exception ex) {
             showNotice("ورودی صوتی روی این دستگاه فعال نیست.", false);
@@ -23996,6 +24745,16 @@ public class MainActivity extends Activity {
         Set<String> set = new HashSet<>();
         try (PreparedStatement ps = c.prepareStatement("SELECT c.name FROM sys.columns c JOIN sys.objects o ON o.object_id=c.object_id JOIN sys.schemas s ON s.schema_id=o.schema_id WHERE s.name=N'dbo' AND o.type IN (N'U',N'V') AND o.name=? ORDER BY c.column_id")) {
             ps.setString(1, table);
+            try (ResultSet r = ps.executeQuery()) { while (r.next()) set.add(r.getString(1)); }
+        }
+        return set;
+    }
+
+    private Set<String> columnsInSchema(Connection c, String schema, String table) throws Exception {
+        Set<String> set = new HashSet<>();
+        try (PreparedStatement ps = c.prepareStatement("SELECT c.name FROM sys.columns c JOIN sys.objects o ON o.object_id=c.object_id JOIN sys.schemas s ON s.schema_id=o.schema_id WHERE s.name=? AND o.type IN (N'U',N'V') AND o.name=? ORDER BY c.column_id")) {
+            ps.setString(1, schema);
+            ps.setString(2, table);
             try (ResultSet r = ps.executeQuery()) { while (r.next()) set.add(r.getString(1)); }
         }
         return set;
@@ -25752,9 +26511,50 @@ public class MainActivity extends Activity {
             throw new DbException("این برنامه فقط برای کارکنان فروشگاه (خانم محمودی و خانم نظری) است. ویزیتورها از برنامه پخش درخشان ویزیتور وارد شوند.");
     }
 
+    /** A real Atiran user+visitor identity for an authorized account in the signed unified app. */
+    private JSONObject resolveUnifiedVisitorIdentity(Connection c) throws Exception {
+        if (!UNIFIED_EDITION || session == null || !canUsePermission("visitor_receipt"))
+            throw new DbException("ثبت دریافت برای این نقش مجاز نیست.");
+        int uid = session.userId == null ? 0 : session.userId;
+        int vis = session.visitorId == null ? 0 : session.visitorId;
+        if (uid <= 0 || vis <= 0) throw new DbException("برای ثبت دریافت، حساب آتیران باید هم کاربر سیستمی و هم ردیف ویزیتور معتبر داشته باشد.");
+
+        Set<String> userCols = columns(c, "sys_users");
+        String userIdCol = resolveFlexible(userCols, "user_id", "UserID", "userid", "id", "ID");
+        String userNameCol = resolveFlexible(userCols, "user_name", "UserName", "username", "Username");
+        if (userIdCol == null || !tableExists(c, "sys_users")) throw new DbException("شناسه کاربر آتیران پیدا نشد.");
+        String unameExpr = userNameCol == null ? "CAST(N'' AS nvarchar(100))" : "TRY_CONVERT(nvarchar(100),[" + userNameCol + "])";
+        String userSql = "SELECT TOP (1) " + unameExpr + " FROM dbo.sys_users WHERE TRY_CONVERT(int,[" + userIdCol + "]) = ?" + activeAnd(userCols, "");
+        String atiranUser = "";
+        try (PreparedStatement ps = c.prepareStatement(userSql)) {
+            ps.setInt(1, uid);
+            try (ResultSet r = ps.executeQuery()) { if (r.next()) atiranUser = stringOr(r.getString(1), "").trim(); }
+        }
+        if (atiranUser.isEmpty()) throw new DbException("کاربر آتیران فعال و معتبر پیدا نشد؛ قبض به نام شخص دیگری ثبت نخواهد شد.");
+
+        Set<String> visitorCols = columns(c, "visitors");
+        String visitorIdCol = resolveFlexible(visitorCols, "vis_rdf", "visitor_id", "VisitorID", "shvis", "id", "ID");
+        String visitorNameCol = resolveFlexible(visitorCols, "vis_name", "visitor_name", "VisitorName", "name", "Name");
+        if (visitorIdCol == null || !tableExists(c, "visitors")) throw new DbException("ردیف ویزیتور آتیران پیدا نشد.");
+        String visitorNameExpr = visitorNameCol == null ? "CAST(N'' AS nvarchar(220))" : "TRY_CONVERT(nvarchar(220),[" + visitorNameCol + "])";
+        String visitorSql = "SELECT TOP (1) " + visitorNameExpr + " FROM dbo.visitors WHERE TRY_CONVERT(int,[" + visitorIdCol + "]) = ?" + activeAnd(visitorCols, "");
+        String visitorName = "";
+        try (PreparedStatement ps = c.prepareStatement(visitorSql)) {
+            ps.setInt(1, vis);
+            try (ResultSet r = ps.executeQuery()) { if (r.next()) visitorName = stringOr(r.getString(1), "").trim(); }
+        }
+        if (visitorName.isEmpty()) throw new DbException("ردیف ویزیتور آتیران فعال و معتبر پیدا نشد.");
+
+        JSONObject out = new JSONObject();
+        out.put("login", currentAccountName()); out.put("key", "atiran_visitor");
+        out.put("vis", vis); out.put("uid", uid); out.put("user", atiranUser); out.put("name", visitorName);
+        return out;
+    }
+
     /** Atiran identity of the signed-in staff member: visitor row, system user id and user name. */
     private JSONObject resolveStoreStaff(Connection c) throws Exception {
         if (STAFF_EDITION) return resolveStaffPerson(c);
+        if (UNIFIED_EDITION) return resolveUnifiedVisitorIdentity(c);
         String login = currentAccountName();
         if (storeStaff != null && login.equals(storeStaff.optString("login"))) return storeStaff;
         String key = storeStaffKey(login, session == null ? "" : session.userName);
@@ -26803,6 +27603,24 @@ public class MainActivity extends Activity {
         return m;
     }
 
+    /** Re-check customer scope on the server immediately before a visitor receipt is posted. */
+    private void ensureReceiptCustomerInScope(Connection c, long customerCode) throws Exception {
+        if (!UNIFIED_EDITION || !restrictCustomerData()) return;
+        if (customerCode <= 0 || !tableExists(c, "CUSTOMERS")) throw new DbException("مشتری مجاز پیدا نشد.");
+        Set<String> cols = columns(c, "CUSTOMERS");
+        String id = resolveFlexible(cols, "SHMO", "shmo", "customer_id", "CustomerID");
+        if (id == null) throw new DbException("کد مشتری در آتیران پیدا نشد.");
+        List<Object> params = new ArrayList<>();
+        params.add(String.valueOf(customerCode));
+        String scope = customerScopeCondition(cols, "c", params);
+        if (scope.isEmpty()) throw new DbException("دامنه مشتری این حساب ویزیتور مشخص نیست.");
+        String sql = "SELECT TOP (1) 1 FROM dbo.CUSTOMERS c WHERE TRY_CONVERT(nvarchar(100),c.[" + id + "])=? AND " + scope;
+        try (PreparedStatement ps = c.prepareStatement(sql)) {
+            setParams(ps, params);
+            try (ResultSet r = ps.executeQuery()) { if (!r.next()) throw new DbException("این مشتری در محدوده دسترسی شما نیست؛ هیچ دریافتی ثبت نشد."); }
+        }
+    }
+
     /** Runs res/raw/atiran_receipt.sql (Atiran's Daryaft → PosDetails → TemplateDaryaftCheque → settlement). */
     private JSONObject submitStoreReceipt(long shmo, JSONObject rs, JSONArray alloc, long newNo, String desc) throws Exception {
         if (shmo <= 0) throw new DbException("مشتری دریافت مشخص نیست.");
@@ -26828,6 +27646,7 @@ public class MainActivity extends Activity {
         }
         x.append("</r>");
         try (Connection c = openConnection()) {
+            ensureReceiptCustomerInScope(c, shmo);
             JSONObject staff = resolveStoreStaff(c);
             try (PreparedStatement ps = c.prepareStatement(atiranRawSql(R.raw.atiran_receipt))) {
                 int i = 1;
@@ -26995,11 +27814,16 @@ public class MainActivity extends Activity {
         JSONArray a = new JSONArray();
         if (designPreview) { a.put(new JSONObject().put("code", "412").put("name", "سوپر مارکت امید").put("man", 86_500_000)); return a; }
         try (Connection c = openConnection()) {
+            Set<String> cols = columns(c, "CUSTOMERS");
             List<String> parts = new ArrayList<>(); List<Object> params = new ArrayList<>();
             for (String v : searchVariants(query)) { parts.add("CAST(MONAME AS nvarchar(500)) LIKE N'%' + ? + N'%'"); params.add(v); }
             String digits = normalizeDigits(query).trim();
             if (digits.matches("\\d{1,12}")) { parts.add("SHMO = ?"); params.add(Long.parseLong(digits)); parts.add("ISNULL(CAST(cell AS nvarchar(60)),N'') LIKE N'%' + ? + N'%'"); params.add(digits); }
-            String sql = "SELECT TOP (30) SHMO, ISNULL(CAST(MONAME AS nvarchar(500)),N''), ISNULL(man,0) FROM dbo.CUSTOMERS WHERE " + join(parts, " OR ") + " ORDER BY CASE WHEN man > 0 THEN 0 ELSE 1 END, MONAME";
+            List<String> where = new ArrayList<>();
+            where.add("(" + join(parts, " OR ") + ")");
+            String scope = customerScopeCondition(cols, "", params);
+            if (!scope.isEmpty()) where.add(scope);
+            String sql = "SELECT TOP (30) SHMO, ISNULL(CAST(MONAME AS nvarchar(500)),N''), ISNULL(man,0) FROM dbo.CUSTOMERS WHERE " + join(where, " AND ") + " ORDER BY CASE WHEN man > 0 THEN 0 ELSE 1 END, MONAME";
             try (PreparedStatement ps = c.prepareStatement(sql)) {
                 setParams(ps, params);
                 try (ResultSet r = ps.executeQuery()) {
@@ -29595,6 +30419,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (MeelanoAppUpdater.handleActivityResult(this, requestCode)) return;
         if (requestCode == REQ_CONFIRM_IDENTITY) {
             IdentityCallback cb = pendingIdentity; pendingIdentity = null;
             if (cb != null) { if (resultCode == RESULT_OK) cb.done(true); else showNotice("تأیید هویت لغو شد؛ چیزی ثبت نشد.", true); }
@@ -29637,7 +30462,12 @@ public class MainActivity extends Activity {
     }
 
     private String homePage() {
-        String home = MANAGER_EDITION ? "dashboard" : STAFF_EDITION ? "staff_home" : STORE_EDITION ? "store_home" : VISITOR_EDITION ? "visitor_dashboard" : "dashboard";
+        String home;
+        if (UNIFIED_EDITION) {
+            home = MeelanoAccessPolicy.unifiedHomePage(currentAccessRole(), isFullAccessUser());
+        } else {
+            home = MANAGER_EDITION ? "dashboard" : STAFF_EDITION ? "staff_home" : STORE_EDITION ? "store_home" : VISITOR_EDITION ? "visitor_dashboard" : "dashboard";
+        }
         return canOpenPage(home) ? home : firstAllowedPage();
     }
 

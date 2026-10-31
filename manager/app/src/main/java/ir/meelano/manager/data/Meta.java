@@ -59,6 +59,7 @@ public final class Meta {
     private final Connection c;
     private final Map<String, ObjectRef> tables = new HashMap<>();
     private final Map<String, Set<String>> cols = new HashMap<>();
+    private final Map<String, String> colTypes = new HashMap<>();
     private final Map<String, ObjectRef> functions = new HashMap<>();
     private final Map<String, Boolean> executableFunctions = new HashMap<>();
 
@@ -185,6 +186,31 @@ public final class Meta {
     public String col(String table, String... candidates) {
         if (!table(table)) return null;
         return Sql.pick(columns(table), candidates);
+    }
+
+    /**
+     * The SQL type name of a column ("int", "nvarchar", …), or null when it cannot be read.
+     * The field-sales queries need it: comparing a numeric visitor column directly lets the
+     * database use an index, while a text column has to be compared as text.
+     */
+    public String columnType(String table, String column) {
+        ObjectRef ref = resolveTable(table);
+        if (ref == null || column == null) return null;
+        String k = key(table) + "|" + column.toLowerCase(Locale.US);
+        if (colTypes.containsKey(k)) return colTypes.get(k);
+        String type = null;
+        try (PreparedStatement ps = c.prepareStatement(
+                "SELECT TYPE_NAME(user_type_id) FROM sys.columns WHERE object_id=? AND name=?")) {
+            ps.setLong(1, ref.id);
+            ps.setString(2, column);
+            try (ResultSet r = ps.executeQuery()) {
+                if (r.next()) type = r.getString(1);
+            }
+        } catch (Exception e) {
+            throw new MetadataException(e);
+        }
+        colTypes.put(k, type);
+        return type;
     }
 
     /** Flexible resolve (ignores case/underscores) or null. */

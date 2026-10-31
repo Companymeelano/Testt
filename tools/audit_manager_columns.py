@@ -16,6 +16,7 @@ def cols_of(t):
     hits.sort(key=lambda o:(o['schema'].casefold()!='dbo',o['schema']))
     return {c['name'] for c in hits[0].get('columns',[])}
 rows=[]
+dynamic_skips=0
 for path in sorted(A.SOURCE.rglob('*.java')):
     src=path.read_text(encoding='utf-8')
     for method in ('col','colFlex'):
@@ -25,6 +26,11 @@ for path in sorted(A.SOURCE.rglob('*.java')):
             if t is None: continue
             cands=[A.java_string(a) for a in args[1:]]
             cands=[c for c in cands if c is not None]
+            if not cands:
+                # Calls with an attribute/loop variable/array expression cannot be
+                # checked as literal candidates; report the skip, not a false mismatch.
+                dynamic_skips += 1
+                continue
             line=src.count('\n',0,off)+1
             actual=cols_of(t)
             if actual is None:
@@ -33,4 +39,5 @@ for path in sorted(A.SOURCE.rglob('*.java')):
             ok=any(c in actual or any(c.casefold()==a.casefold() for a in actual) for c in cands)
             if not ok: rows.append((str(path.relative_to(A.ROOT)).split('/')[-1],line,method,t,'NO CANDIDATE',cands))
 for r in rows: print(r)
+print('dynamic calls skipped:',dynamic_skips)
 print('total mismatches:',len(rows))

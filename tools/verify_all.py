@@ -48,17 +48,25 @@ def java_files():
     return sorted(glob.glob(os.path.join(ROOT, 'app/src/**/*.java'), recursive=True))
 
 
+def project_java_files():
+    """Every application, test and licensing Java source in both Gradle projects."""
+    paths = glob.glob(os.path.join(ROOT, 'app/src/**/*.java'), recursive=True)
+    paths += glob.glob(os.path.join(ROOT, 'manager/**/*.java'), recursive=True)
+    return sorted(set(paths))
+
+
 # ---------------------------------------------------------------- ۱) نحو
 def check_syntax():
     bad = []
-    for f in java_files():
+    files = project_java_files()
+    for f in files:
         src = open(f, encoding='utf-8').read()
         try:
             javalang.parse.parse(src)
         except Exception as e:
             bad.append((f, src, e))
     if not bad:
-        report('نحو همهٔ فایل‌های جاوا', True, f'{len(java_files())} فایل بدون خطا')
+        report('نحو همهٔ فایل‌های جاوا (هر دو پروژه و تست‌ها)', True, f'{len(files)} فایل بدون خطا')
         return
     # تلاش برای اثبات «محدودیت ابزار»: آرایه‌های تودرتوی چندبعدی را ساده می‌کنیم و دوباره می‌خوانیم
     real = []
@@ -75,7 +83,7 @@ def check_syntax():
         for f, msg in real:
             report('نحو ' + os.path.basename(f), False, msg)
     else:
-        report('نحو بقیهٔ فایل‌ها', True, f'{len(java_files()) - len(bad)} فایل سالم')
+        report('نحو بقیهٔ فایل‌ها', True, f'{len(files) - len(bad)} فایل سالم')
 
 
 def strip_nested_array_initialisers(src: str) -> str:
@@ -769,6 +777,220 @@ def check_unified_app():
     report('هویت برنامهٔ اصلیِ یکپارچه', ok, tail[0] if ok else '؛ '.join(bad[:4]) or 'ابزار کنترل شکست خورد')
 
 
+def check_nut_visual_assets():
+    """Check the nut-theme selector icon and every bundled product-photo key/file pair."""
+    import struct
+
+    photos_src = os.path.join(ROOT, 'app/src/main/java/ir/meelano/android/MeelanoProductPhotos.java')
+    theme_src = os.path.join(ROOT, 'manager/app/src/main/java/ir/meelano/manager/ui/Theme.java')
+    settings_src = os.path.join(ROOT, 'manager/app/src/main/java/ir/meelano/manager/screens/SettingsScreen.java')
+    kit_src = os.path.join(ROOT, 'manager/app/src/main/java/ir/meelano/manager/ui/Kit.java')
+    assets_dir = os.path.join(ROOT, 'app/src/main/assets/products')
+    drawable_dir = os.path.join(ROOT, 'manager/app/src/main/res/drawable-nodpi')
+    try:
+        photos = open(photos_src, encoding='utf-8').read()
+        theme = open(theme_src, encoding='utf-8').read()
+        settings = open(settings_src, encoding='utf-8').read()
+        kit = open(kit_src, encoding='utf-8').read()
+        keys = set(re.findall(r'return\s+"([a-z_]+)"', photos))
+        files = {os.path.splitext(n)[0] for n in os.listdir(assets_dir) if n.lower().endswith('.jpg')}
+        missing = sorted(keys - files)
+        unreferenced = sorted(files - keys)
+        bad_jpegs = [k for k in sorted(keys & files)
+                     if not open(os.path.join(assets_dir, k + '.jpg'), 'rb').read(3).startswith(b'\xff\xd8\xff')]
+        icon_name = 'icon3d_nut_theme'
+        icon_path = os.path.join(drawable_dir, icon_name + '.png')
+        bad_icons = []
+        if not os.path.isfile(icon_path):
+            bad_icons.append(icon_name + ' missing')
+        else:
+            data = open(icon_path, 'rb').read(29)
+            if len(data) < 29 or data[:8] != b'\x89PNG\r\n\x1a\n' or data[12:16] != b'IHDR':
+                bad_icons.append(icon_name + ' invalid PNG')
+            else:
+                width, height = struct.unpack('>II', data[16:24])
+                if width != 128 or height != 128 or data[25] != 6:
+                    bad_icons.append(icon_name + ' must be 128px RGBA')
+        required_ui = (
+            'chipsWithIcons(' in settings,
+            'R.drawable.icon3d_dark_theme' in settings and 'R.drawable.icon3d_theme' in settings
+            and 'R.drawable.icon3d_nut_theme' in settings,
+            '"آجیل و خشکبار"' in settings,
+            'برای دیدن همهٔ قالب‌ها' in settings,
+            'res == R.drawable.icon3d_nut_theme' in theme
+            and 'res == R.drawable.icon3d_dark_theme' in theme and 'res == R.drawable.icon3d_theme' in theme,
+            'R.drawable.icon3d_nut_products' not in theme and 'R.drawable.icon3d_nut_inventory' not in theme,
+            'if (icons != null) ch.setMinimumHeight(Theme.dp(48));' in kit,
+            'c.setSelected(selected);' in kit,
+            'ImageView artwork = icon(iconRes, ink, 26);' in kit,
+        )
+        absent_ui = [name for name, present in zip(
+            ('theme selector uses matched image chips', 'all three theme choices use their 3D icons',
+             'theme selector labels the nut option', 'horizontal overflow is explained', 'nut icon remains untinted',
+             'nut icon is not mapped to catalog or inventory pages', 'theme choices meet a 48dp touch target',
+             'selected state is exposed for accessibility', 'icons use a consistent 26dp size'), required_ui) if not present]
+        ok = bool(keys) and not missing and not unreferenced and not bad_jpegs and not bad_icons and not absent_ui
+        details = []
+        if missing: details.append('عکس‌های مفقود: ' + ', '.join(missing))
+        if unreferenced: details.append('عکس‌های بدون نگاشت: ' + ', '.join(unreferenced))
+        if bad_jpegs: details.append('JPEG خراب: ' + ', '.join(bad_jpegs))
+        if bad_icons: details.append('آیکن ۳بعدی نامعتبر: ' + ', '.join(bad_icons))
+        if absent_ui: details.append('اتصال چیپ انتخاب تم ناقص است: ' + ', '.join(absent_ui))
+        report('پوشش آیکن‌ها و تصاویر آجیل و خشکبار', ok,
+               ('%d کلید عکس، هرکدام دارای JPEG؛ تصویر آجیل شفاف ۱۲۸×۱۲۸ و سه گزینهٔ انتخاب تم با آیکن‌های ۳بعدی و هدف لمسی ۴۸dp' % len(keys))
+               if ok else '؛ '.join(details))
+    except Exception as e:
+        report('پوشش آیکن‌ها و تصاویر آجیل و خشکبار', False, 'ممیزی ناموفق: %s' % e)
+
+
+def check_section_art():
+    """Every section of the index must have 3D artwork, and the nut theme must be able to
+    show its emerald twin: a section that keeps the small gold medallion looks tiny next to
+    the emerald pictures and breaks the look of the skin the user picked."""
+    theme_src = os.path.join(ROOT, 'manager/app/src/main/java/ir/meelano/manager/ui/Theme.java')
+    room_src = os.path.join(ROOT, 'manager/app/src/main/java/ir/meelano/manager/core/CommandRoom.java')
+    art_src = os.path.join(ROOT, 'manager/app/src/main/java/ir/meelano/manager/core/IconArt.java')
+    desk_src = os.path.join(ROOT, 'manager/app/src/main/java/ir/meelano/manager/screens/VisitorDeskScreen.java')
+    drawable_dir = os.path.join(ROOT, 'manager/app/src/main/res/drawable-nodpi')
+    try:
+        theme = open(theme_src, encoding='utf-8').read()
+        room = open(room_src, encoding='utf-8').read()
+        art = open(art_src, encoding='utf-8').read()
+        desk = open(desk_src, encoding='utf-8').read()
+        files = {os.path.splitext(n)[0] for n in os.listdir(drawable_dir) if n.lower().endswith('.png')}
+        # The mapping of Theme.icon3d(). The dark-skin rules are skipped: the nut look is light.
+        light_theme = re.sub(r'if \(!light\) \{.*?\n        \}', '', theme, flags=re.S)
+        mapping = {}
+        for m in re.finditer(r'if \(([^)]*)\) return ([^;]+);', light_theme):
+            res = re.search(r'R\.drawable\.(\w+)', m.group(2))
+            if not res:
+                continue
+            for vec in re.findall(r'R\.drawable\.(\w+)', m.group(1)):
+                mapping[vec] = res.group(1)
+        problems = []
+        arts = sorted(set(re.findall(r'"(mi_\w+)"', room)))
+        for name in arts:
+            base = mapping.get(name)
+            if base is None:
+                problems.append('%s has no 3D artwork' % name)
+            elif base not in files:
+                problems.append('%s -> %s.png is missing' % (name, base))
+        # The workspace tiles of the visitor use their own artwork; they must be 3D as well.
+        for name in sorted(set(re.findall(r'R\.drawable\.(mi_\w+)', desk))):
+            base = mapping.get(name)
+            if base is None:
+                problems.append('workspace tile %s has no 3D artwork' % name)
+            elif base not in files:
+                problems.append('workspace tile %s -> %s.png is missing' % (name, base))
+        # Every medallion of the gold set needs its emerald twin, or the nut theme keeps the
+        # small gold medallion. icon3d_medal_alert has no emerald picture (the alert keeps the
+        # gold medallion on purpose) and icon3d_medal_goldbar is unused (mi_diamond maps to
+        # icon3d_gold, which has an emerald twin).
+        exceptions = {'icon3d_medal_alert', 'icon3d_medal_goldbar'}
+        for base in sorted(files):
+            if not base.startswith('icon3d_medal_') or base in exceptions:
+                continue
+            twin = 'icon3d_emerald_' + base[len('icon3d_medal_'):]
+            if twin not in files:
+                problems.append('%s has no emerald twin (%s)' % (base, twin))
+        if 'IconArt.emeraldName(n)' not in theme:
+            problems.append('Theme.chrome3d does not use the shared naming rule')
+        if 'icon3d_medal_' not in art or 'icon3d_emerald_' not in art:
+            problems.append('IconArt does not know the naming rule of the artwork')
+        ok = bool(arts) and not problems
+        report('هنر سه‌بعدی بخش‌های ایندکس', ok,
+               ('%d بخش ایندکس و %d آیکن فضای کاری؛ هر بخش تصویر سه‌بعدی دارد و هر مدال طلایی'
+                ' نسخهٔ زمردی دارد' % (len(arts), len(set(re.findall(r'R\.drawable\.(mi_\w+)', desk)))))
+               if ok else '؛ '.join(problems))
+    except Exception as e:
+        report('هنر سه‌بعدی بخش‌های ایندکس', False, 'ممیزی ناموفق: %s' % e)
+
+
+def check_header_room():
+    """The name of the shop and the status chips must stay clear of the brand mark.
+
+    The mark sits at the start of the header row (the right in Persian). When the name
+    column is measured with a weight it can become wider than the row, and a long shop
+    name then runs under the mark and loses its last letters. The column therefore has to
+    get a computed width, the label a maximum width, and the chips a share of that room.
+    """
+    src = os.path.join(ROOT, 'manager/app/src/main/java/ir/meelano/manager/MainActivity.java')
+    try:
+        code = open(src, encoding='utf-8').read()
+        problems = []
+        if 'int nameRoomDp' not in code:
+            problems.append('the header has no computed room for the name column')
+        add = re.search(r'brand\.addView\(titleCol,\s*([^)]*)\)', code)
+        if not add:
+            problems.append('the name column is not added to the brand row')
+        else:
+            params = add.group(1)
+            if 'wlp(' in params:
+                problems.append('the name column is weighted, so it can grow under the brand mark')
+            if 'nameRoomDp' not in params:
+                problems.append('the name column does not use the computed room')
+        if 'companyName.setMaxWidth' not in code:
+            problems.append('the company name has no maximum width')
+        if 'userChip.setMaxWidth' not in code or 'nameRoomDp' not in code:
+            problems.append('the account chip is not bounded by the room of the header')
+        if 'licChip.setMaxWidth' not in code:
+            problems.append('the licence chip has no maximum width')
+        ok = not problems
+        report('جای نام و چیپ‌های سربرگ', ok,
+               'ستون نام با عرض محاسبه‌شده ساخته می‌شود؛ نام و چیپ‌های سربرگ زیر نشان برند نمی‌روند'
+               if ok else '؛ '.join(problems))
+    except Exception as e:
+        report('جای نام و چیپ‌های سربرگ', False, 'ممیزی ناموفق: %s' % e)
+
+
+def check_visitor_art_agrees():
+    """A page of the field-sales workspace must wear the same artwork in the command room
+    and in the workspace itself.
+
+    The two lists are written apart, and a section could end up with one picture in the
+    room (the black clipboard of the daily close) and another one in the workspace (the
+    emerald person). The visitor then saw two different icons for the same job.
+    """
+    room_src = os.path.join(ROOT, 'manager/app/src/main/java/ir/meelano/manager/core/CommandRoom.java')
+    desk_src = os.path.join(ROOT, 'manager/app/src/main/java/ir/meelano/manager/screens/VisitorDeskScreen.java')
+    try:
+        room = open(room_src, encoding='utf-8').read()
+        desk = open(desk_src, encoding='utf-8').read()
+        problems = []
+        # The entries of the visitor group of the index: id -> artwork.
+        group = re.search(r'VISITOR_GROUPS = \{(.*?)\n    \};', room, flags=re.S)
+        if not group:
+            problems.append('the index has no visitor group')
+            index_art = {}
+        else:
+            index_art = {}
+            for m in re.finditer(r'v\("(\w+)",\s*"[^"]*",\s*"[^"]*",\s*"(mi_\w+)"\)', group.group(1)):
+                index_art[m.group(1)] = m.group(2)
+        # The tiles of the workspace: target constant -> artwork.
+        tile_art = {}
+        for m in re.finditer(r'homeTile\("[^"]*",\s*"[^"]*",\s*R\.drawable\.(mi_\w+),\s*(\w+)\)', desk):
+            tile_art[m.group(2)] = m.group(1)
+        # The page each target constant stands for.
+        page_of = {'CUSTOMERS': 'customers', 'PRODUCTS': 'products', 'ROUTE': 'route',
+                   'ORDER': 'order', 'MY_ORDERS': 'my_orders', 'RECEIPT': 'receipt',
+                   'REPORTS': 'reports'}
+        for target, art in sorted(tile_art.items()):
+            page = page_of.get(target)
+            if page is None:
+                continue
+            if page not in index_art:
+                problems.append('%s is not listed in the index of the visitor' % page)
+            elif index_art[page] != art:
+                problems.append('%s: the room shows %s but the workspace shows %s'
+                                % (page, index_art[page], art))
+        ok = bool(index_art) and bool(tile_art) and not problems
+        report('یکسانی آیکن بخش‌های ویزیتور', ok,
+               '%d بخش ویزیتور؛ آیکن اتاق فرمان و آیکن میزکار برای هر بخش یکی است'
+               % len(index_art) if ok else '؛ '.join(problems))
+    except Exception as e:
+        report('یکسانی آیکن بخش‌های ویزیتور', False, 'ممیزی ناموفق: %s' % e)
+
+
 def main():
     print('════════ بازبینی جامع پروژهٔ Meelano ════════')
     check_syntax()
@@ -787,6 +1009,10 @@ def main():
     check_shadow_and_json()
     check_lux_api()
     check_unified_app()
+    check_nut_visual_assets()
+    check_section_art()
+    check_header_room()
+    check_visitor_art_agrees()
     check_engines()
     check_docs()
     failed = [n for n, ok, _ in RESULTS if not ok]

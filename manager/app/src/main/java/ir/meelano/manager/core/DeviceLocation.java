@@ -19,8 +19,8 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Device position for the weather card. Uses the last known fix when it is recent, otherwise asks
- * the network provider once. Everything here degrades to "no location" (the caller then shows Tehran
- * and says so) when permission is missing, location is off, or no fix arrives in time.
+ * the network provider once. Everything here degrades to "no location" (the caller then uses the configured
+ * store-city fallback and labels it) when permission is missing, location is off, or no fix arrives in time.
  */
 public final class DeviceLocation {
     private DeviceLocation() { }
@@ -56,23 +56,24 @@ public final class DeviceLocation {
      */
     public static Location resolve(Context c, long waitMs) {
         Location last = lastKnown(c);
-        if (last != null && System.currentTimeMillis() - last.getTime() < RECENT_MS) return last;
-        if (!granted(c)) return last;
+        if (usableForWeather(last, System.currentTimeMillis())) return last;
+        // Never send a months-old last-known coordinate to the weather provider as if it were current.
+        if (!granted(c)) return null;
         final LocationManager lm;
         try {
             lm = (LocationManager) c.getSystemService(Context.LOCATION_SERVICE);
         } catch (Exception e) {
-            return last;
+            return null;
         }
-        if (lm == null) return last;
+        if (lm == null) return null;
         String provider = null;
         try {
             if (lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) provider = LocationManager.NETWORK_PROVIDER;
             else if (lm.isProviderEnabled(LocationManager.GPS_PROVIDER)) provider = LocationManager.GPS_PROVIDER;
         } catch (Exception e) {
-            return last;
+            return null;
         }
-        if (provider == null) return last;
+        if (provider == null) return null;
 
         final Location[] out = {null};
         final CountDownLatch latch = new CountDownLatch(1);
@@ -101,7 +102,22 @@ public final class DeviceLocation {
         } catch (Exception ignored) {
             // nothing to remove
         }
-        return out[0] != null ? out[0] : last;
+        return usableForWeather(out[0], System.currentTimeMillis()) ? out[0] : null;
+    }
+
+    /** Reject invalid, stale, future-dated, or too imprecise fixes before sending coordinates for weather. */
+    static boolean usableForWeather(Location location, long nowMs) {
+        if (location == null) return false;
+        double lat = location.getLatitude(), lon = location.getLongitude();
+        if (!Double.isFinite(lat) || !Double.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180)
+            return false;
+        long age = nowMs - location.getTime();
+        if (age < -60_000L || age > RECENT_MS) return false;
+        if (location.hasAccuracy()) {
+            float accuracy = location.getAccuracy();
+            if (!Float.isFinite(accuracy) || accuracy < 0 || accuracy > 50_000f) return false;
+        }
+        return true;
     }
 
     /** City or district name for the coordinates, or null when the geocoder has no answer. Worker thread only. */

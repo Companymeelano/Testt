@@ -114,8 +114,30 @@ public final class Theme {
         if (!nuts || NUT_MEDALLIONS || appCtx == null || !isIcon3d(base)) return base;
         try {
             String n = appCtx.getResources().getResourceEntryName(base);
+            // The medallions of the gold set have their own name; the emerald twin is the same
+            // subject in the emerald set (icon3d_medal_sales -> icon3d_emerald_sales).
+            String twin = ir.meelano.manager.core.IconArt.emeraldName(n);
+            if (twin.isEmpty()) return base;
+            int e = appCtx.getResources().getIdentifier(twin, "drawable", appCtx.getPackageName());
+            return e != 0 ? e : base;
+        } catch (Exception ignored) { return base; }
+    }
+
+    /**
+     * The 3D icon of the manager's board in the nut theme: the emerald twin of the
+     * section's icon, so the board, the header and the tab bar read as one family.
+     * The medallion names are folded to their plain twin (medal_sales -> sales).
+     * The other skins keep the gold set, and a section without a twin keeps its icon.
+     */
+    public static int emerald3d(int vector) {
+        int base = icon3d(vector);
+        if (!nuts || NUT_MEDALLIONS || appCtx == null || !isIcon3d(base)) return base;
+        try {
+            String n = appCtx.getResources().getResourceEntryName(base);
             if (!n.startsWith("icon3d_")) return base;
-            int e = appCtx.getResources().getIdentifier("icon3d_emerald_" + n.substring(7), "drawable", appCtx.getPackageName());
+            String key = n.substring(7);
+            if (key.startsWith("medal_")) key = key.substring(6);
+            int e = appCtx.getResources().getIdentifier("icon3d_emerald_" + key, "drawable", appCtx.getPackageName());
             return e != 0 ? e : base;
         } catch (Exception ignored) { return base; }
     }
@@ -125,8 +147,24 @@ public final class Theme {
             int m = medal(vector);
             if (m != 0) return m;
         }
+        // A coherent 3D set for the command room and financial sections, shared by all three themes.
+        // The source artwork is a transparent emerald/gold medallion, so it remains legible on ivory and obsidian.
+        if (vector == R.drawable.mi_warehouse) return R.drawable.icon3d_production;
+        if (vector == R.drawable.mi_task_alt) return R.drawable.icon3d_closeout;
+        if (vector == R.drawable.mi_military_tech) return R.drawable.icon3d_score;
+        if (vector == R.drawable.mi_profit) return R.drawable.icon3d_profit;
+        if (vector == R.drawable.mi_account_balance || vector == R.drawable.mi_account_balance_wallet) return R.drawable.icon3d_treasury;
+        if (vector == R.drawable.mi_directions_car || vector == R.drawable.mi_local_shipping) return R.drawable.icon3d_logistics;
+        if (vector == R.drawable.mi_mic) return R.drawable.icon3d_voice;
+        if (vector == R.drawable.mi_admin_panel_settings) return R.drawable.icon3d_dark_roles;
+        if (vector == R.drawable.mi_request_quote) return R.drawable.icon3d_medal_sales;
+        if (vector == R.drawable.mi_add_shopping_cart) return R.drawable.icon3d_medal_purchase;
+        if (vector == R.drawable.mi_warning) return R.drawable.icon3d_medal_alert;
         if (!light) {
             // Dark skin: icons rendered on black, with a brighter gold glow.
+            if (vector == R.drawable.mi_lightbulb) return R.drawable.icon3d_dark_assistant;
+            if (vector == R.drawable.mi_trending_down) return R.drawable.icon3d_dark_cash_out;
+            if (vector == R.drawable.mi_assignment_return) return R.drawable.icon3d_dark_refresh;
             if (vector == R.drawable.mi_trending_up) return R.drawable.icon3d_dark_dollar;
             if (vector == R.drawable.mi_diamond) return R.drawable.icon3d_dark_gold;
             if (vector == R.drawable.mi_search) return R.drawable.icon3d_dark_search;
@@ -177,13 +215,37 @@ public final class Theme {
 
     /** True for bitmap 3D icons, which must not be tinted. */
     public static boolean isIcon3d(int res) {
+        if (res == R.drawable.visitor3d_assistant || res == R.drawable.visitor3d_customers
+                || res == R.drawable.visitor3d_prefactor || res == R.drawable.visitor3d_products
+                || res == R.drawable.visitor3d_receipt) return true;
+        // The emerald set is the nut theme's own 3D artwork. It is produced by chrome3d(),
+        // so it must be recognised as 3D as well - otherwise it would be tinted like a flat
+        // glyph and lose the colour of the skin it belongs to.
+        if (res == R.drawable.icon3d_emerald_account || res == R.drawable.icon3d_emerald_assistant
+                || res == R.drawable.icon3d_emerald_cash_in || res == R.drawable.icon3d_emerald_cash_out
+                || res == R.drawable.icon3d_emerald_cheque || res == R.drawable.icon3d_emerald_coin
+                || res == R.drawable.icon3d_emerald_customers || res == R.drawable.icon3d_emerald_dollar
+                || res == R.drawable.icon3d_emerald_dues || res == R.drawable.icon3d_emerald_gold
+                || res == R.drawable.icon3d_emerald_home || res == R.drawable.icon3d_emerald_inventory
+                || res == R.drawable.icon3d_emerald_light_tag || res == R.drawable.icon3d_emerald_more
+                || res == R.drawable.icon3d_emerald_products || res == R.drawable.icon3d_emerald_purchase
+                || res == R.drawable.icon3d_emerald_refresh || res == R.drawable.icon3d_emerald_reports
+                || res == R.drawable.icon3d_emerald_sales || res == R.drawable.icon3d_emerald_search
+                || res == R.drawable.icon3d_emerald_settings || res == R.drawable.icon3d_emerald_theme
+                || res == R.drawable.icon3d_emerald_zoom) return true;
+        if (res == R.drawable.icon3d_dark_bell || res == R.drawable.icon3d_medal_alert) return true;
         if (res == R.drawable.icon3d_medal_account || res == R.drawable.icon3d_medal_refresh || res == R.drawable.icon3d_medal_theme || res == R.drawable.icon3d_medal_zoom || res == R.drawable.icon3d_medal_assistant || res == R.drawable.icon3d_medal_more || res == R.drawable.icon3d_medal_goldbar || res == R.drawable.icon3d_medal_dollar || res == R.drawable.icon3d_medal_coin) return true;
         if (res == R.drawable.icon3d_medal_home || res == R.drawable.icon3d_medal_customers
                 || res == R.drawable.icon3d_medal_inventory || res == R.drawable.icon3d_medal_products
                 || res == R.drawable.icon3d_medal_reports || res == R.drawable.icon3d_medal_settings
                 || res == R.drawable.icon3d_medal_search || res == R.drawable.icon3d_medal_cheque
                 || res == R.drawable.icon3d_medal_dues) return true;
-        return res == R.drawable.icon3d_medal_sales || res == R.drawable.icon3d_medal_purchase
+        return res == R.drawable.icon3d_nut_theme || res == R.drawable.icon3d_production
+                || res == R.drawable.icon3d_closeout
+                || res == R.drawable.icon3d_treasury || res == R.drawable.icon3d_logistics
+                || res == R.drawable.icon3d_voice || res == R.drawable.icon3d_dark_roles
+                || res == R.drawable.icon3d_score || res == R.drawable.icon3d_profit
+                || res == R.drawable.icon3d_medal_sales || res == R.drawable.icon3d_medal_purchase
                 || res == R.drawable.icon3d_medal_cash_in || res == R.drawable.icon3d_medal_cash_out
                 || res == R.drawable.icon3d_sales || res == R.drawable.icon3d_purchase
                 || res == R.drawable.icon3d_cash_in || res == R.drawable.icon3d_cash_out
@@ -204,7 +266,8 @@ public final class Theme {
                 || res == R.drawable.icon3d_dark_home || res == R.drawable.icon3d_dark_settings
                 || res == R.drawable.icon3d_dark_assistant
                 || res == R.drawable.icon3d_dark_tag || res == R.drawable.icon3d_light_tag
-                || res == R.drawable.icon3d_dark_cash_in || res == R.drawable.icon3d_dark_cash_out || res == R.drawable.icon3d_dark_cheque || res == R.drawable.icon3d_dark_inventory || res == R.drawable.icon3d_dark_reports || res == R.drawable.icon3d_dark_account || res == R.drawable.icon3d_dark_products || res == R.drawable.icon3d_dark_more || res == R.drawable.icon3d_dark_dues;
+                || res == R.drawable.icon3d_dark_cash_in || res == R.drawable.icon3d_dark_cash_out || res == R.drawable.icon3d_dark_cheque || res == R.drawable.icon3d_dark_inventory || res == R.drawable.icon3d_dark_reports || res == R.drawable.icon3d_dark_account || res == R.drawable.icon3d_dark_products || res == R.drawable.icon3d_dark_more || res == R.drawable.icon3d_dark_dues
+                || res == R.drawable.icon3d_alert || res == R.drawable.icon3d_emerald_alert;
     }
 
     /** 1.0 normal, 1.3 large-text mode (applied in Kit.text). */
@@ -213,7 +276,7 @@ public final class Theme {
     /** Screen-aware type multiplier (1.00 on small phones, up to 1.18 on large ones). */
     public static float typeScale() { return typeScale; }
 
-    /** Seasonal themes were removed: the app has exactly two curated themes now. */
+    /** Legacy compatibility hook: seasonal themes are gone; the three permanent looks remain. */
     public static String seasonGlyph(android.content.Context c) { return ""; }
 
     public static void init(Context c) {
@@ -245,11 +308,11 @@ public final class Theme {
             if (s.bigFont()) zi = 3;
         } catch (Exception ignored) { Diag.ignored("Theme:154", ignored); }
         fontScale = zi == 0 ? 0.9f : zi == 2 ? 1.15f : zi == 3 ? 1.3f : 1f;
-        // Exactly two curated themes; the accent is part of each theme, not a user choice.
-        int dark = 0xFFD4AF37, darkSoft = 0xFFF0D98C, lite = 0xFF9C7A1A, liteSoft = 0xFF5C4510;
+        // Three fixed looks share two palette families: obsidian/gold and ivory/emerald;
+        // the nut-shop look adds its own surfaces and artwork to the ivory/emerald palette.
         if (light) {
-            // «ایوری و زمرد»: ivory base, deep emerald accent, antique gold ornaments.
-            // v31 adds nut-themed 3D icons on the light skin (see icon3d_nut_*).
+            // «ایوری و زمرد»: ivory base, deep emerald accent, antique-gold ornaments.
+            // Both light and nut looks use this palette; nuts adds its separate visual treatment.
             // Reference mockup: ivory silk, emerald panels, gold rims. Text pairs stay ≥4.5:1.
             BG = 0xFFFBF6EA;
             SURFACE = 0xFFFFFFFF;

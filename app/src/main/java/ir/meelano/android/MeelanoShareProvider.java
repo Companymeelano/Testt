@@ -70,6 +70,7 @@ public class MeelanoShareProvider extends ContentProvider {
 
     @Override public String getType(Uri uri) {
         String n = uri == null || uri.getLastPathSegment() == null ? "" : uri.getLastPathSegment().toLowerCase();
+        if (n.endsWith(".apk")) return "application/vnd.android.package-archive";
         if (n.endsWith(".pdf")) return "application/pdf";
         if (n.endsWith(".png")) return "image/png";
         if (n.endsWith(".jpg") || n.endsWith(".jpeg")) return "image/jpeg";

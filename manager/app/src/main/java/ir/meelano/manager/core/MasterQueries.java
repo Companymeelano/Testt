@@ -19,23 +19,30 @@ public final class MasterQueries {
     // =====================================================================================
     // PRODUCTS — inventory / inventory_anbars / ka_act.
     // =====================================================================================
-    /** Summary: count,active,low,out,value. */
+    /** Summary: total,active,low,out,reorderN,value. Status/value KPIs use active items only. */
     public static Queries.Q productsSummary(Meta m) throws Queries.Missing {
-        String shka = m.must("inventory", "کد کالا", "shka");
+        m.must("inventory", "کد کالا", "shka");
         String active = m.col("inventory", "active", "Active");
         String vah = m.must("inventory", "موجودی", "mojkavah", "MojKavah");
         String cost = m.col("inventory", "inventory_price", "buy_price", "pure_buy_price", "ImPureBuyPrice");
-        String actCond = active == null ? "" : " AND " + boolTrue("[" + active + "]");
         String reo = m.col("inventory", "reopoint", "reorder_point");
-        String pcs = stockPieces(m, "");
-        String act = active == null ? "1=1" : boolTrue("[" + active + "]");
+        String pieces = stockPieces(m, "");
+        String activeExpr = active == null ? "1=1" : boolTrue("[" + active + "]");
+        String quantity = "TRY_CONVERT(decimal(19,3),[" + vah + "])";
+        String value = "ISNULL(SUM(CASE WHEN " + activeExpr + " THEN " + pieces
+                + "*COALESCE(TRY_CONVERT(decimal(19,2)," + (cost == null ? "NULL" : "[" + cost + "]")
+                + "),0) ELSE 0 END),0)";
         return new Queries.Q("SELECT COUNT_BIG(1) AS count"
-                + ", SUM(CASE WHEN 1=1" + actCond + " THEN 1 ELSE 0 END) AS active"
-                + ", SUM(CASE WHEN TRY_CONVERT(decimal(19,3),[" + vah + "])>0 AND TRY_CONVERT(decimal(19,3),[" + vah + "])<=" + AtiranSchema.LOW_STOCK_VAH + " THEN 1 ELSE 0 END) AS low"
-                + ", SUM(CASE WHEN " + pcs + "<=0 THEN 1 ELSE 0 END) AS out"
-                + ", ISNULL(SUM(CASE WHEN " + act + " THEN " + pcs + "*COALESCE(TRY_CONVERT(decimal(19,2),"
-                + (cost == null ? "NULL" : "[" + cost + "]") + "),0) ELSE 0 END),0) AS value"
-                + (reo == null ? ", CAST(0 AS bigint) AS reorderN" : ", SUM(CASE WHEN TRY_CONVERT(decimal(19,2),[" + reo + "])>0 AND " + pcs + "<=TRY_CONVERT(decimal(19,2),[" + reo + "]) THEN 1 ELSE 0 END) AS reorderN")
+                + ", SUM(CASE WHEN " + activeExpr + " THEN 1 ELSE 0 END) AS active"
+                + ", CAST(" + (active == null ? "0" : "1") + " AS int) AS activeKnown"
+                + ", SUM(CASE WHEN " + activeExpr + " AND " + quantity + ">0 AND " + quantity + "<="
+                + AtiranSchema.LOW_STOCK_VAH + " THEN 1 ELSE 0 END) AS low"
+                + ", SUM(CASE WHEN " + activeExpr + " AND " + pieces + "<=0 THEN 1 ELSE 0 END) AS out"
+                + ", " + value + " AS value"
+                + ", CAST(" + (reo == null ? "0" : "1") + " AS int) AS reorderKnown"
+                + (reo == null ? ", CAST(0 AS bigint) AS reorderN"
+                : ", SUM(CASE WHEN " + activeExpr + " AND TRY_CONVERT(decimal(19,2),[" + reo + "])>0 AND "
+                + pieces + "<=TRY_CONVERT(decimal(19,2),[" + reo + "]) THEN 1 ELSE 0 END) AS reorderN")
                 + " FROM dbo.inventory");
     }
 
@@ -57,72 +64,163 @@ public final class MasterQueries {
                 + ", COUNT_BIG(1) AS count FROM dbo.inventory i" + join + where + " GROUP BY " + label + " ORDER BY 2 DESC");
     }
 
-    /** Product list: shka,naka,code,groupName,unit,vah,joz,buy,sale,active,anbarQty. */
-    public static Queries.Q productsList(Meta m, Filter f) throws Queries.Missing {
-        String shka = m.must("inventory", "کد کالا", "shka");
-        String naka = m.must("inventory", "نام کالا", "naka", "NAKA");
-        String code = m.col("inventory", "StuffCode", "coka", "code");
-        String grp = m.col("inventory", "group_rdf");
-        String unit = m.col("inventory", "vahsanj");
-        String vah = m.col("inventory", "mojkavah", "MojKavah");
-        String joz = m.col("inventory", "mojkajoz", "MojKajoz");
-        String buy = m.col("inventory", "buy_price", "pure_buy_price", "ImPureBuyPrice");
-        String sale = m.col("inventory", "FinalSalePrice", "sale_price", "forosh_price");
-        String reo = m.col("inventory", "reopoint", "reorder_point");
-        String active = m.col("inventory", "active", "Active");
-        String grpName = m.col("kagroup", "group_name");
-        String grpKey = m.col("kagroup", "group_rdf");
-        boolean needGrp = (f.kalaGroup >= 0 && grp != null) || (grpName != null && grpKey != null && grp != null);
-        // Warehouse filter via inventory_anbars (best-effort columns).
+    /** Product list and exact matching count share one read-only filter builder. */
+    private static final class ProductListParts {
+        String shka, naka, code, groupName, unit, vah, joz, mohvah, buy, sale, reorder, active;
+        String joins, where, order, pieces, warehouseVah, warehousePieces;
+        boolean useWarehouse, saleKnown;
+        final List<Object> binds = new ArrayList<>();
+    }
+
+    private static ProductListParts productListParts(Meta m, Filter input) throws Queries.Missing {
+        Filter f = input == null ? new Filter() : input;
+        ProductListParts p = new ProductListParts();
+        p.shka = m.must("inventory", "کد کالا", "shka");
+        p.naka = m.must("inventory", "نام کالا", "naka", "NAKA");
+        p.code = m.col("inventory", "StuffCode", "coka", "code");
+        String group = m.col("inventory", "group_rdf");
+        String groupName = m.col("kagroup", "group_name");
+        String groupKey = m.col("kagroup", "group_rdf");
+        boolean groupJoin = group != null && groupName != null && groupKey != null && m.table("kagroup");
+        p.unit = m.col("inventory", "vahsanj");
+        p.vah = m.col("inventory", "mojkavah", "MojKavah");
+        p.joz = m.col("inventory", "mojkajoz", "MojKajoz");
+        p.mohvah = m.col("inventory", "mohvah");
+        p.buy = m.col("inventory", "buy_price", "pure_buy_price", "ImPureBuyPrice");
+        p.sale = m.col("inventory", "FinalSalePrice", "sale_price", "forosh_price");
+        p.saleKnown = p.sale != null;
+        p.reorder = m.col("inventory", "reopoint", "reorder_point");
+        p.active = m.col("inventory", "active", "Active");
+        p.pieces = p.vah == null ? "CAST(NULL AS decimal(19,3))" : stockPieces(m, "i.");
+
         String anShka = m.col("inventory_anbars", "shka", "SHKA");
         String anWh = m.col("inventory_anbars", "rdf_anbars");
-        String anQty = m.colFlex("inventory_anbars", "mojkavah", "mojodi", "tedad", "qty", "meghdar");
-        boolean useAnbar = f.warehouse >= 0 && anShka != null && anWh != null;
-        List<Object> binds = new ArrayList<>();
+        String anVah = m.colFlex("inventory_anbars", "mojkavah", "mojodi", "tedad", "qty", "meghdar");
+        String anJoz = m.colFlex("inventory_anbars", "mojkajoz", "MojKajoz");
+        p.useWarehouse = f.warehouse >= 0 && anShka != null && anWh != null
+                && (anVah != null || anJoz != null);
+
         List<String> conds = new ArrayList<>();
-        if (vah != null) {
-            if ("low".equals(f.status)) conds.add("(TRY_CONVERT(decimal(19,3),i.[" + vah + "])>0 AND TRY_CONVERT(decimal(19,3),i.[" + vah + "])<=" + AtiranSchema.LOW_STOCK_VAH + ")");
-            if ("out".equals(f.status)) conds.add(stockPieces(m, "i.") + "<=0");
-            if ("ok".equals(f.status)) conds.add("TRY_CONVERT(decimal(19,3),i.[" + vah + "])>" + AtiranSchema.LOW_STOCK_VAH);
-            if ("reorder".equals(f.status)) {
-                if (vah == null || reo == null)
-                    throw new Queries.Missing("ستون نقطه سفارش در «کالاها» پیدا نشد");
-                conds.add("(TRY_CONVERT(decimal(19,2),i.[" + reo + "])>0 AND " + stockPieces(m, "i.") + "<=TRY_CONVERT(decimal(19,2),i.[" + reo + "]))");
-            }
+        String activeExpr = p.active == null ? null : boolTrue("i.[" + p.active + "]");
+        if (activeExpr != null) {
+            if ("inactive".equals(f.status)) conds.add("CASE WHEN " + activeExpr + " THEN 0 ELSE 1 END=1");
+            else if ("active".equals(f.status) || "low".equals(f.status) || "out".equals(f.status)
+                    || "ok".equals(f.status) || "reorder".equals(f.status)) conds.add(activeExpr);
         }
-        if ("inactive".equals(f.status) && active != null)
-            conds.add("UPPER(LTRIM(RTRIM(TRY_CONVERT(nvarchar(20),i.[" + active + "])))) NOT IN (N'T',N'1',N'TRUE',N'Y')");
-        if (f.kalaGroup >= 0 && grp != null) { conds.add("TRY_CONVERT(int,i.[" + grp + "])=?"); binds.add(f.kalaGroup); }
-        if (useAnbar) { conds.add("TRY_CONVERT(int,ab.[" + anWh + "])=?"); binds.add(f.warehouse); }
+
+        String statusVah = p.useWarehouse ? "ab.vah"
+                : p.vah == null ? "CAST(NULL AS decimal(19,3))" : "TRY_CONVERT(decimal(19,3),i.[" + p.vah + "])";
+        p.warehouseVah = p.useWarehouse ? "ab.vah" : "CAST(NULL AS decimal(19,3))";
+        p.warehousePieces = p.useWarehouse
+                ? "(CASE WHEN ab.vah IS NULL AND ab.joz IS NULL THEN CAST(NULL AS decimal(19,3)) ELSE "
+                + "((COALESCE(TRY_CONVERT(decimal(19,3),ab.vah),0)*COALESCE(TRY_CONVERT(decimal(19,3),"
+                + (p.mohvah == null ? "NULL" : "i.[" + p.mohvah + "]") + "),1))"
+                + "+COALESCE(TRY_CONVERT(decimal(19,3),ab.joz),0)) END)"
+                : "CAST(NULL AS decimal(19,3))";
+        String statusPieces = p.useWarehouse ? p.warehousePieces : p.pieces;
+        if ("low".equals(f.status)) {
+            if (p.vah == null) throw new Queries.Missing("ستون موجودی در «کالاها» پیدا نشد");
+            conds.add("(" + statusVah + ">0 AND " + statusVah + "<=" + AtiranSchema.LOW_STOCK_VAH + ")");
+        } else if ("out".equals(f.status)) {
+            if (p.vah == null) throw new Queries.Missing("ستون موجودی در «کالاها» پیدا نشد");
+            conds.add(statusPieces + "<=0");
+        } else if ("ok".equals(f.status)) {
+            if (p.vah == null) throw new Queries.Missing("ستون موجودی در «کالاها» پیدا نشد");
+            conds.add(statusVah + ">" + AtiranSchema.LOW_STOCK_VAH);
+        } else if ("reorder".equals(f.status)) {
+            if (p.vah == null || p.reorder == null)
+                throw new Queries.Missing("ستون نقطه سفارش در «کالاها» پیدا نشد");
+            conds.add("(TRY_CONVERT(decimal(19,2),i.[" + p.reorder + "])>0 AND "
+                    + statusPieces + "<=TRY_CONVERT(decimal(19,2),i.[" + p.reorder + "]))");
+        }
+
+        if (f.kalaGroup >= 0) {
+            if (group == null) throw new Queries.Missing("ستون گروه کالا برای اعمال این فیلتر پیدا نشد");
+            conds.add("TRY_CONVERT(int,i.[" + group + "])=?");
+            p.binds.add(f.kalaGroup);
+        }
+        if (f.warehouse >= 0) {
+            if (!p.useWarehouse) throw new Queries.Missing("ستون‌های انبار برای اعمال این فیلتر پیدا نشد");
+            conds.add("ab.warehouseKey=?");
+            p.binds.add(f.warehouse);
+        }
         if (f.search != null && !f.search.trim().isEmpty()) {
-            List<String> exprs = new ArrayList<>();
-            exprs.add(Sql.txt("i", naka, 250));
-            if (code != null) exprs.add(Sql.txt("i", code, 120));
-            exprs.add(Sql.txt("i", shka, 60));
-            String sc = Queries.searchCond(binds, f.search, exprs.toArray(new String[0]));
-            if (!sc.isEmpty()) conds.add(sc);
+            List<String> expressions = new ArrayList<>();
+            expressions.add(Sql.txt("i", p.naka, 250));
+            if (p.code != null) expressions.add(Sql.txt("i", p.code, 120));
+            expressions.add(Sql.txt("i", p.shka, 60));
+            String search = Queries.productSearchCond(p.binds, f.search, expressions.toArray(new String[0]));
+            if (!search.isEmpty()) conds.add(search);
         }
-        String where = conds.isEmpty() ? "" : " WHERE " + Sql.join(conds, " AND ");
-        String order = "i.[" + naka + "]";
-        if ("stock_asc".equals(f.sort) && vah != null) order = "TRY_CONVERT(decimal(19,3),i.[" + vah + "]) ASC";
-        if ("stock_desc".equals(f.sort) && vah != null) order = "TRY_CONVERT(decimal(19,3),i.[" + vah + "]) DESC";
-        if ("price_desc".equals(f.sort) && sale != null) order = "TRY_CONVERT(decimal(19,2),i.[" + sale + "]) DESC";
-        String sql = "SELECT " + Sql.txt("i", shka, 60) + " AS shka"
-                + ", " + Sql.txt("i", naka, 250) + " AS naka"
-                + ", " + (code == null ? "N''" : "COALESCE(" + Sql.txt("i", code, 120) + ",N'')") + " AS code"
-                + ", " + (needGrp && grpName != null ? "COALESCE(" + Sql.txt("g", grpName, 150) + ",N'')" : "N''") + " AS groupName"
-                + ", " + (unit == null ? "N''" : "COALESCE(" + Sql.txt("i", unit, 60) + ",N'')") + " AS unit"
-                + ", " + (vah == null ? "CAST(NULL AS decimal(19,3))" : "TRY_CONVERT(decimal(19,3),i.[" + vah + "])") + " AS vah"
-                + ", " + (joz == null ? "CAST(NULL AS decimal(19,3))" : "TRY_CONVERT(decimal(19,3),i.[" + joz + "])") + " AS joz"
-                + ", " + (buy == null ? "CAST(NULL AS decimal(19,2))" : "TRY_CONVERT(decimal(19,2),i.[" + buy + "])") + " AS buy"
-                + ", " + (sale == null ? "CAST(NULL AS decimal(19,2))" : "TRY_CONVERT(decimal(19,2),i.[" + sale + "])") + " AS sale"
-                + ", " + (active == null ? "N''" : "COALESCE(" + Sql.txt("i", active, 10) + ",N'')") + " AS active"
-                + ", " + (useAnbar && anQty != null ? "TRY_CONVERT(decimal(19,3),ab.[" + anQty + "])" : "CAST(NULL AS decimal(19,3))") + " AS anbarQty"
-                + " FROM dbo.inventory i"
-                + (needGrp ? " LEFT JOIN dbo.kagroup g ON TRY_CONVERT(nvarchar(50),g.[" + grpKey + "])=TRY_CONVERT(nvarchar(50),i.[" + grp + "])" : "")
-                + (useAnbar ? " JOIN dbo.inventory_anbars ab ON TRY_CONVERT(nvarchar(100),ab.[" + anShka + "])=TRY_CONVERT(nvarchar(100),i.[" + shka + "])" : "")
-                + where + " ORDER BY " + order + Queries.pageClause(binds, f.page, f.top);
+        p.where = conds.isEmpty() ? "" : " WHERE " + Sql.join(conds, " AND ");
+
+        StringBuilder joins = new StringBuilder();
+        if (groupJoin) {
+            joins.append(" LEFT JOIN (SELECT TRY_CONVERT(nvarchar(50),g0.[").append(groupKey)
+                    .append("]) AS groupKey, MAX(").append(Sql.txt("g0", groupName, 150))
+                    .append(") AS groupName FROM dbo.kagroup g0 GROUP BY TRY_CONVERT(nvarchar(50),g0.[")
+                    .append(groupKey).append("])) g ON g.groupKey=TRY_CONVERT(nvarchar(50),i.[")
+                    .append(group).append("]) ");
+            p.groupName = "COALESCE(g.groupName,N'')";
+        } else p.groupName = "N''";
+        if (p.useWarehouse) {
+            String vahAgg = anVah == null ? "CAST(NULL AS decimal(19,3))"
+                    : "SUM(TRY_CONVERT(decimal(19,3),a.[" + anVah + "]))";
+            String jozAgg = anJoz == null ? "CAST(NULL AS decimal(19,3))"
+                    : "SUM(TRY_CONVERT(decimal(19,3),a.[" + anJoz + "]))";
+            joins.append(" JOIN (SELECT TRY_CONVERT(nvarchar(100),a.[").append(anShka)
+                    .append("]) AS productKey, TRY_CONVERT(int,a.[").append(anWh)
+                    .append("]) AS warehouseKey, ").append(vahAgg).append(" AS vah, ").append(jozAgg)
+                    .append(" AS joz FROM dbo.inventory_anbars a GROUP BY TRY_CONVERT(nvarchar(100),a.[")
+                    .append(anShka).append("]),TRY_CONVERT(int,a.[").append(anWh).append("])) ab ON ab.productKey=TRY_CONVERT(nvarchar(100),i.[")
+                    .append(p.shka).append("]) ");
+        }
+        p.joins = joins.toString();
+        p.order = "i.[" + p.naka + "] ASC";
+        if ("stock_asc".equals(f.sort) && p.vah != null)
+            p.order = (p.useWarehouse ? "TRY_CONVERT(decimal(19,3),ab.vah)" : "TRY_CONVERT(decimal(19,3),i.[" + p.vah + "])") + " ASC";
+        if ("stock_desc".equals(f.sort) && p.vah != null)
+            p.order = (p.useWarehouse ? "TRY_CONVERT(decimal(19,3),ab.vah)" : "TRY_CONVERT(decimal(19,3),i.[" + p.vah + "])") + " DESC";
+        if ("price_desc".equals(f.sort) && p.sale != null)
+            p.order = "TRY_CONVERT(decimal(19,2),i.[" + p.sale + "]) DESC";
+        p.order += ", i.[" + p.shka + "] ASC";
+        return p;
+    }
+
+    /** Product list: shka,naka,code,groupName,unit,vah,joz,stockPieces,reorderPoint,buy,sale,active,anbarQty. */
+    public static Queries.Q productsList(Meta m, Filter f) throws Queries.Missing {
+        Filter filter = f == null ? new Filter() : f;
+        ProductListParts p = productListParts(m, filter);
+        String activeExpr = p.active == null ? "N''" : "COALESCE(" + Sql.txt("i", p.active, 10) + ",N'')";
+        String sql = "SELECT " + Sql.txt("i", p.shka, 60) + " AS shka"
+                + ", " + Sql.txt("i", p.naka, 250) + " AS naka"
+                + ", " + (p.code == null ? "N''" : "COALESCE(" + Sql.txt("i", p.code, 120) + ",N'')") + " AS code"
+                + ", " + p.groupName + " AS groupName"
+                + ", " + (p.unit == null ? "N''" : "COALESCE(" + Sql.txt("i", p.unit, 60) + ",N'')") + " AS unit"
+                + ", " + (p.vah == null ? "CAST(NULL AS decimal(19,3))" : "TRY_CONVERT(decimal(19,3),i.[" + p.vah + "])") + " AS vah"
+                + ", " + (p.joz == null ? "CAST(NULL AS decimal(19,3))" : "TRY_CONVERT(decimal(19,3),i.[" + p.joz + "])") + " AS joz"
+                + ", " + p.pieces + " AS stockPieces"
+                + ", " + (p.reorder == null ? "CAST(NULL AS decimal(19,2))" : "TRY_CONVERT(decimal(19,2),i.[" + p.reorder + "])") + " AS reorderPoint"
+                + ", " + (p.buy == null ? "CAST(NULL AS decimal(19,2))" : "TRY_CONVERT(decimal(19,2),i.[" + p.buy + "])") + " AS buy"
+                + ", " + (p.sale == null ? "CAST(NULL AS decimal(19,2))" : "TRY_CONVERT(decimal(19,2),i.[" + p.sale + "])") + " AS sale"
+                + ", " + (p.saleKnown ? "CAST(1 AS int)" : "CAST(0 AS int)") + " AS saleKnown"
+                + ", " + activeExpr + " AS active"
+                + ", " + (p.active == null ? "CAST(0 AS int)" : "CAST(1 AS int)") + " AS activeKnown"
+                + ", " + (p.useWarehouse ? "ab.vah" : "CAST(NULL AS decimal(19,3))") + " AS anbarQty"
+                + ", " + (p.useWarehouse ? "ab.joz" : "CAST(NULL AS decimal(19,3))") + " AS anbarJoz"
+                + ", " + p.warehousePieces + " AS anbarPieces"
+                + " FROM dbo.inventory i" + p.joins + p.where
+                + " ORDER BY " + p.order;
+        List<Object> binds = new ArrayList<>(p.binds);
+        sql += Queries.pageClause(binds, filter.page, filter.top);
         return new Queries.Q(sql, binds);
+    }
+
+    /** Exact read-only count matching every product-list filter, without page bounds. */
+    public static Queries.Q productsCount(Meta m, Filter f) throws Queries.Missing {
+        ProductListParts p = productListParts(m, f);
+        return new Queries.Q("SELECT COUNT_BIG(DISTINCT i.[" + p.shka + "]) AS total"
+                + " FROM dbo.inventory i" + p.joins + p.where, p.binds);
     }
 
     /** Full product header + group name. */
@@ -132,6 +230,8 @@ public final class MasterQueries {
         String grp = m.col("inventory", "group_rdf");
         String grpName = m.col("kagroup", "group_name");
         String grpKey = m.col("kagroup", "group_rdf");
+        String activeCol = m.col("inventory", "active", "Active");
+        String saleCol = m.col("inventory", "FinalSalePrice", "sale_price", "forosh_price");
         String[] colsWanted = {"StuffCode", "coka", "vahsanj", "mohvah", "mojkavah", "mojkajoz", "reopoint",
                 "bastebandi", "buy_price", "pure_buy_price", "buyjoz", "FinalSalePrice", "inventory_price",
                 "MODPAR", "maxtafnaghd", "active", "sharh", "min_sef", "barbari_vahed", "ptax"};
@@ -147,7 +247,9 @@ public final class MasterQueries {
             sb.append(" AS ").append(w);
         }
         sb.append(", ").append(grp != null && grpName != null && grpKey != null && m.table("kagroup")
-                ? "COALESCE(" + Sql.txt("g", grpName, 150) + ",N'')" : "N''").append(" AS groupName");
+                ? "COALESCE(" + Sql.txt("g", grpName, 150) + ",N'')" : "N''").append(" AS groupName")
+                .append(", CAST(").append(activeCol == null ? "0" : "1").append(" AS int) AS activeKnown")
+                .append(", CAST(").append(saleCol == null ? "0" : "1").append(" AS int) AS saleKnown");
         List<Object> binds = new ArrayList<>();
         binds.add(shkaVal);
         sb.append(" FROM dbo.inventory i");

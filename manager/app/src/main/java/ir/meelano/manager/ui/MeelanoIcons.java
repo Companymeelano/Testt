@@ -61,12 +61,12 @@ public final class MeelanoIcons {
         any("❌", R.drawable.mi_cancel); any("✕", R.drawable.mi_close); any("✖", R.drawable.mi_close);
         any("✦", R.drawable.mi_star_shine); any("✨", R.drawable.mi_star_shine); any("◆", R.drawable.mi_diamond);
         any("◇", R.drawable.mi_inbox); any("★", R.drawable.mi_star_fill); any("🎉", R.drawable.mi_celebration);
-        any("😊", R.drawable.mi_sentiment_satisfied); any("↗", R.drawable.mi_trending_up); any("↙", R.drawable.mi_shopping_bag);
+        any("😊", R.drawable.mi_sentiment_satisfied); any("↗", R.drawable.mi_trending_up); any("↙", R.drawable.mi_shopping_bag); any("💹", R.drawable.mi_profit);
         any("↘", R.drawable.mi_login); any("⎋", R.drawable.mi_logout); any("⇧", R.drawable.mi_upload); any("↩", R.drawable.mi_undo);
         any("♙", R.drawable.mi_group); any("👤", R.drawable.mi_person); any("👥", R.drawable.mi_group);
         any("🧑", R.drawable.mi_badge); any("💼", R.drawable.mi_badge); any("🪪", R.drawable.mi_badge);
         any("♛", R.drawable.mi_admin_panel_settings); any("◈", R.drawable.mi_inventory_2); any("◍", R.drawable.mi_inventory_2);
-        any("◼", R.drawable.mi_category); any("▦", R.drawable.mi_grid_view); any("▣", R.drawable.mi_widgets);
+        any("◼", R.drawable.mi_category); any("▦", R.drawable.mi_grid_view); any("▣", R.drawable.mi_widgets); any("🏭", R.drawable.mi_warehouse);
         any("▤", R.drawable.mi_receipt_long); any("📋", R.drawable.mi_assignment); any("◷", R.drawable.mi_schedule);
         any("⏱", R.drawable.mi_timer); any("⟳", R.drawable.mi_refresh); any("⇅", R.drawable.mi_sync); any("🔄", R.drawable.mi_sync);
         any("↺", R.drawable.mi_restart_alt); any("⇄", R.drawable.mi_compare_arrows);
@@ -74,6 +74,9 @@ public final class MeelanoIcons {
         any("←", R.drawable.mi_chevron_left); any("→", R.drawable.mi_arrow_forward);
         any("⨯", R.drawable.mi_close); any("⚑", R.drawable.mi_flag);
         any("💰", R.drawable.mi_payments); any("⌕", R.drawable.mi_search);
+        any("🧮", R.drawable.mi_cheque); any("🪙", R.drawable.mi_receipt_long);
+        any("💸", R.drawable.mi_payments); any("🛍", R.drawable.mi_point_of_sale);
+        any("🏦", R.drawable.mi_account_balance);
         any("⚙", R.drawable.mi_settings); any("◎", R.drawable.mi_track_changes); any("◉", R.drawable.mi_account_balance);
         any("⌁", R.drawable.mi_bolt); any("🔐", R.drawable.mi_lock); any("🛒", R.drawable.mi_shopping_cart);
         any("⊕", R.drawable.mi_add_shopping_cart); any("🏬", R.drawable.mi_store); any("🏷", R.drawable.mi_sell);
@@ -92,7 +95,7 @@ public final class MeelanoIcons {
 
         // ---- v34: the rest of the glyphs used across the app, all from the same
         // Material Symbols family, so no raw emoji is left anywhere in the UI. ----
-        any("🖨", R.drawable.mi_print); any("🔍", R.drawable.mi_search);
+        any("🖨", R.drawable.mi_print); any("🔍", R.drawable.mi_search); any("🔎", R.drawable.mi_search);
         any("🛻", R.drawable.mi_local_shipping); any("📥", R.drawable.mi_download);
         any("💾", R.drawable.mi_save); any("🛠", R.drawable.mi_tune);
         any("🛡", R.drawable.mi_shield); any("⛨", R.drawable.mi_shield);

@@ -34,6 +34,7 @@ import ir.meelano.manager.core.CrashReporter;
 import ir.meelano.manager.core.DeviceId;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.LanDiscover;
+import ir.meelano.manager.core.LicenseRecovery;
 import ir.meelano.manager.core.LicenseStore;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.SmartLink;
@@ -56,9 +57,9 @@ import ir.meelano.manager.ui.Theme;
 import ir.meelano.licensing.License;
 
 /**
- * Offline license gate (v31 steps): page 1 asks ONLY the name + contact
- * number, then a beautiful fixed waiting page holds until the license
- * lands; page 2 asks for the server address, lists compatible databases,
+ * Offline license gate: page 1 uses the device code automatically and asks only for a contact
+ * number; the seller records the customer's name while issuing the license. A fixed waiting page
+ * holds until the license arrives; page 2 asks for the server address and lists compatible databases,
  * and lets the user choose one before entering the app. Everything activates silently:
  * no mechanism talk, no notification. Remote revoke/block enforcement
  * stays, plus the luxury gold designer signature on every page.
@@ -67,6 +68,11 @@ import ir.meelano.licensing.License;
 public class LicenseActivity extends Activity {
 
     private static final int REQ_RECV = 906;
+    private static final int REQ_READ_SMS = 907;
+    private static final int REQ_PHONE = 908;
+    /** One automatic permission/recovery prompt per screen entry — never nags. */
+    private boolean autoRecoveryAsked;
+    private boolean phonePermAsked;
 
     /** Fixed issuer line: requests fly straight here, no chooser, no field. */
     private static final String DEFAULT_SELLER = "09355559305";
@@ -74,13 +80,15 @@ public class LicenseActivity extends Activity {
             "کلید طلایی‌تان در راه است؛ کمی صبر کنید ✦",
             "داریم کلید را تراش می‌دهیم…",
             "کمی مانده — همین‌جا منتظر بمانید…",
-            "به‌زودی وارد دنیای میلانو زرین‌فرمان می‌شوید…",
+            "به‌زودی وارد دنیای میلانو می‌شوید…",
     };
     private String pendingSmsPhone = "";
     private String pendingSmsText = "";
     private boolean editingConnection;
     private EditText connectionIp;
+    private EditText connectionPort;
     private String restoredConnectionIp;
+    private String restoredConnectionPort;
 
     /** Intent extra used by Settings to reopen server/database selection. */
     public static final String EXTRA_EDIT_CONNECTION = "ir.meelano.manager.EDIT_CONNECTION";
@@ -157,6 +165,8 @@ public class LicenseActivity extends Activity {
                 && getIntent().getBooleanExtra(EXTRA_EDIT_CONNECTION, false);
         if (savedInstanceState != null && savedInstanceState.containsKey("manager_connection_ip"))
             restoredConnectionIp = savedInstanceState.getString("manager_connection_ip", "");
+        if (savedInstanceState != null && savedInstanceState.containsKey("manager_connection_port"))
+            restoredConnectionPort = savedInstanceState.getString("manager_connection_port", "");
         repo = new Repo(this, settings);
         try {
             device = DeviceId.code(this);
@@ -165,6 +175,9 @@ public class LicenseActivity extends Activity {
         }
         buildUi();
         ensureRecvPerm();
+        // Reinstall case: silently restore the device-bound license from the
+        // SMS inbox (one permission prompt at most — see attemptRecovery).
+        attemptRecovery(false);
     }
 
     @Override
@@ -172,6 +185,8 @@ public class LicenseActivity extends Activity {
         try {
             if (connectionIp != null) outState.putString("manager_connection_ip",
                     connectionIp.getText().toString());
+            if (connectionPort != null) outState.putString("manager_connection_port",
+                    connectionPort.getText().toString());
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:174", ignored); }
         super.onSaveInstanceState(outState);
     }
@@ -236,11 +251,15 @@ public class LicenseActivity extends Activity {
                 if (g && t != null && !t.isEmpty()) doSmsSend(d, t);
                 else if (!g) {
                     if (SmsIo.permaDenied(LicenseActivity.this)) permSettingsDialog();
-                    else shareRequest(LicenseStore.distName(this),
-                            LicenseStore.contactPhone(this));
+                    else shareRequest(LicenseStore.contactPhone(this));
                 }
             } else if (req == REQ_RECV) {
                 updateRecvHint();
+                buildUi();
+            } else if (req == REQ_READ_SMS) {
+                if (readSmsGranted()) attemptRecovery(true);
+                else buildUi();
+            } else if (req == REQ_PHONE) {
                 buildUi();
             }
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:245", ignored); }
@@ -251,8 +270,10 @@ public class LicenseActivity extends Activity {
     private void buildUi() {
         try {
             if (connectionIp != null) restoredConnectionIp = connectionIp.getText().toString();
+            if (connectionPort != null) restoredConnectionPort = connectionPort.getText().toString();
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:253", ignored); }
         connectionIp = null;
+        connectionPort = null;
         LinearLayout box = kit.v();
         int pad = Theme.dp(16);
         box.setPadding(pad, pad, pad, pad);
@@ -269,7 +290,6 @@ public class LicenseActivity extends Activity {
         else if (editingConnection || !conn) buildConnPage(box, s);
         else buildDonePage(box, s);
 
-        addCrashReportCard(box);
         if (Tamper.isRooted()) {
             box.addView(kit.hint("⚠ گوشی روت شده است؛ در صورت مشکل با پشتیبانی در میان بگذارید."),
                     kit.lp(-1, -2));
@@ -424,7 +444,7 @@ public class LicenseActivity extends Activity {
         return row;
     }
 
-    // ================= page 1: name + contact, nothing else =================
+    // ================= page 1: automatic device code + contact =================
 
     /** Brand header for the licence pages: framed gold logo, title and a muted subtitle. */
     private LinearLayout heroHeader(String title, String sub) {
@@ -455,50 +475,31 @@ public class LicenseActivity extends Activity {
     }
 
     private void buildRequestPage(LinearLayout box) {
-        box.addView(heroHeader("فعال‌سازی مجوز", "برای شروع، نام و شماره‌تان را ثبت کنید"), kit.lp(-1, -2));
+        box.addView(heroHeader("فعال‌سازی مجوز", "کد دستگاه خودکار است؛ نام را اینجا وارد نمی‌کنید"), kit.lp(-1, -2));
         box.addView(stepBar(1), kit.lp(-1, -2));
         box.addView(kit.gap(10));
         LinearLayout c = Card3D.card(this, CARD_EDGE);
         c.addView(sectionHead(R.drawable.mi_star_shine, Theme.GOLD, "خوش آمدید"), kit.lp(-1, -2));
-        c.addView(kit.text("نام و شماره‌تان را بنویسید؛ بقیه‌اش با ما.",
-                13f, Theme.TEXT, false), kit.lp(-1, -2));
+        c.addView(kit.text("شناسهٔ گوشی برای درخواست به‌صورت خودکار ساخته می‌شود. شمارهٔ تماس برای هماهنگی است؛ نام شخص را فروشنده هنگام صدور لایسنس ثبت می‌کند.",
+                12.5f, Theme.TEXT, false), kit.lp(-1, -2));
         c.addView(kit.gap(6));
         c.addView(deviceCodeView(), kit.lp(-1, -2));
         c.addView(kit.gap(6));
-        final TextView errName = errSlot();
         final TextView errPhone = errSlot();
-        final EditText fName = kit.editLux("نام", LicenseStore.distName(this));
+        final EditText fPhone = kit.editLux("شماره تماس", autoPhone());
         try {
-            fName.setInputType(android.text.InputType.TYPE_CLASS_TEXT
-                    | android.text.InputType.TYPE_TEXT_VARIATION_PERSON_NAME);
-        } catch (Exception ignored) { Diag.ignored("LicenseActivity:404", ignored); }
-        fName.addTextChangedListener(new android.text.TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence x, int a, int b, int cc) { }
-            @Override
-            public void onTextChanged(CharSequence x, int a, int b, int cc) { }
-            @Override
-            public void afterTextChanged(android.text.Editable x) {
-                try {
-                    if (x != null && x.toString().trim().length() > 0
-                            && errName.getText().length() > 0) {
-                        errName.setText("");
-                        fName.setBackground(Theme.fieldBg());
-                    }
-                } catch (Exception ignored) { Diag.ignored("LicenseActivity:418", ignored); }
+            if (autoPhone().isEmpty() && !phonePermAsked) {
+                phonePermAsked = true;
+                requestPermissions(new String[]{android.Manifest.permission.READ_PHONE_NUMBERS}, REQ_PHONE);
             }
-        });
-        luxField(fName);
-        c.addView(iconField(fName, R.drawable.mi_person), kit.lp(-1, -2));
-        c.addView(errName, kit.lp(-1, -2));
-        final EditText fPhone = kit.editLux("شماره تماس", LicenseStore.contactPhone(this));
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:phonePerm", ignored); }
         try {
             fPhone.setInputType(android.text.InputType.TYPE_CLASS_PHONE);
             fPhone.setTextDirection(View.TEXT_DIRECTION_LOCALE);
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:427", ignored); }
         final TextView tick = kit.text("✓", 18, Theme.GOLD_SOFT, true);
         try {
-            tick.setVisibility(SmsIo.cleanPhone(LicenseStore.contactPhone(this)).length() == 11
+            tick.setVisibility(SmsIo.cleanPhone(autoPhone()).length() == 11
                     ? View.VISIBLE : View.INVISIBLE);
         } catch (Exception ignored) {
             tick.setVisibility(View.INVISIBLE);
@@ -521,7 +522,7 @@ public class LicenseActivity extends Activity {
                 } catch (Exception ignored) { Diag.ignored("LicenseActivity:450", ignored); }
             }
         });
-        // Same width as the name row: the validity tick used to narrow this field, so it is no longer placed here.
+        // Same width as the name row used to have: the validity tick never narrows the phone field.
         luxField(fPhone);
         LinearLayout prow = iconField(fPhone, R.drawable.mi_call);
         c.addView(prow, kit.lp(-1, -2));
@@ -534,11 +535,17 @@ public class LicenseActivity extends Activity {
             startBtn.setMinHeight(Theme.dp(52));
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:464", ignored); }
         glowBtn = startBtn;
-        startBtn.setOnClickListener(v -> requestStart(txt(fName), txt(fPhone),
-                fName, fPhone, errName, errPhone, startBtn));
+        startBtn.setOnClickListener(v -> requestStart(txt(fPhone), fPhone, errPhone, startBtn));
         c.addView(startBtn, kit.lp(-1, -2));
+        try {
+            if (!autoPhone().isEmpty())
+                c.addView(kit.hint("✓ شماره تماس به‌صورت خودکار از گوشی خوانده شد."), kit.lp(-1, -2));
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:autoPhoneHint", ignored); }
         Card3D.mount(box, c);
         buildDevFooter(box);
+        // Reinstall recovery: silently re-apply the device-bound license found
+        // in the SMS inbox (one system prompt at most, never a nag).
+        attemptRecovery(false);
     }
 
     /**
@@ -750,7 +757,7 @@ public class LicenseActivity extends Activity {
         final TextView copyNote = kit.text("", 12f, Theme.SUCCESS, true);
         copyNote.setVisibility(View.GONE);
         copyBtn.setOnClickListener(v -> {
-            boolean ok = copyText("کد دستگاه میلانو زرین‌فرمان", device);
+            boolean ok = copyText("کد دستگاه میلانو", device);
             copyNote.setTextColor(ok ? Theme.SUCCESS : Theme.DANGER);
             copyNote.setText(ok ? "کد دستگاه کپی شد" : "کپی نشد؛ دوباره تلاش کنید");
             copyNote.setVisibility(View.VISIBLE);
@@ -779,26 +786,18 @@ public class LicenseActivity extends Activity {
         return card;
     }
 
-    private void requestStart(String dist, String phone, EditText fName, EditText fPhone,
-                                TextView errName, TextView errPhone, android.widget.Button btn) {
+    private void requestStart(String phone, EditText fPhone, TextView errPhone,
+                              android.widget.Button btn) {
         if (sending) return;
-        boolean badName = dist == null || dist.trim().isEmpty();
         boolean badPhone = SmsIo.cleanPhone(phone).length() < 10;
         try {
-            errName.setText(badName ? "نام را وارد کنید" : "");
             errPhone.setText(badPhone ? "شماره تماس معتبر وارد کنید (مثلاً 09123456789)" : "");
-            if (badName) fName.setBackground(Theme.fieldBgError()); else luxField(fName);
             if (badPhone) fPhone.setBackground(Theme.fieldBgError()); else luxField(fPhone);
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:551", ignored); }
-        if (badName || badPhone) {
+        if (badPhone) {
             try {
-                if (badName) {
-                    fName.requestFocus();
-                    Ui.announce(errName, "نام را وارد کنید");
-                } else {
-                    fPhone.requestFocus();
-                    Ui.announce(errPhone, "شماره تماس معتبر وارد کنید");
-                }
+                fPhone.requestFocus();
+                Ui.announce(errPhone, "شماره تماس معتبر وارد کنید");
             } catch (Exception ignored) { Diag.ignored("LicenseActivity:561", ignored); }
             return;
         }
@@ -807,10 +806,9 @@ public class LicenseActivity extends Activity {
             btn.setEnabled(false);
             btn.setText("در حال ارسال…");
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:568", ignored); }
-        LicenseStore.setDistName(this, dist);
         LicenseStore.setContactPhone(this, phone);
         LicenseStore.setRequested(this, true);
-        directSend(buildRequestMsg(dist, phone));
+        directSend(buildRequestMsg(phone));
         buildUi();
     }
 
@@ -835,8 +833,7 @@ public class LicenseActivity extends Activity {
 
             @Override
             public void fail(String fa) {
-                shareRequest(LicenseStore.distName(LicenseActivity.this),
-                        LicenseStore.contactPhone(LicenseActivity.this));
+                shareRequest(LicenseStore.contactPhone(LicenseActivity.this));
             }
         });
     }
@@ -859,8 +856,8 @@ public class LicenseActivity extends Activity {
         box[0].show();
     }
 
-    private void shareRequest(String name, String phone) {
-        String msg = buildRequestMsg(name, phone);
+    private void shareRequest(String phone) {
+        String msg = buildRequestMsg(phone);
         copyText("درخواست فعال‌سازی", msg);
         try {
             Intent i = new Intent(Intent.ACTION_SEND);
@@ -929,8 +926,8 @@ public class LicenseActivity extends Activity {
         c.addView(deviceCodeView(), kit.lp(-1, -2));
         c.addView(kit.gap(6));
         LinearLayout row = kit.h();
-        row.addView(kit.btnGhost("↻ ارسال مجدد", Theme.MUTED, v -> directSend(buildRequestMsg(
-                LicenseStore.distName(this), LicenseStore.contactPhone(this)))), kit.wlp(1f));
+        row.addView(kit.btnGhost("↻ ارسال مجدد", Theme.MUTED,
+                v -> directSend(buildRequestMsg(LicenseStore.contactPhone(this)))), kit.wlp(1f));
         row.addView(kit.space(8));
         final android.widget.Button[] recall = new android.widget.Button[1];
         recall[0] = kit.btnGold("✦ دریافت کلید", v -> recallFlow(recall[0]));
@@ -1085,31 +1082,93 @@ public class LicenseActivity extends Activity {
         return v;
     }
 
-    /** Crash diagnostics are available from the launch/license screen as well as Settings. */
+    /** Local crash diagnostics are tucked into the support footer and collapsed by default. */
     private void addCrashReportCard(LinearLayout box) {
         if (!CrashReporter.hasReport(this)) return;
-        LinearLayout c = Card3D.card(this, Theme.DANGER);
-        c.addView(kit.text("گزارش خطای اخیر", 14f, Theme.TEXT, true), kit.lp(-1, -2));
-        c.addView(kit.hint("برای هنگ‌های بدون گزارش Java همچنان Logcat لازم است. این گزارش محلی است و پیام خطا، IP، رمز یا اطلاعات فروش را شامل نمی‌شود."),
-                kit.lp(-1, -2));
-        final TextView reportNote = kit.text("", 12f, Theme.INFO, true);
+
+        LinearLayout card = kit.v();
+        card.setPadding(Theme.dp(12), Theme.dp(6), Theme.dp(12), Theme.dp(8));
+        android.graphics.drawable.GradientDrawable surface = new android.graphics.drawable.GradientDrawable();
+        surface.setColor(Theme.SURFACE2);
+        surface.setCornerRadius(Theme.dp(16));
+        surface.setStroke(Theme.dp(1), Theme.alpha(Theme.MUTED, Theme.isLight() ? 60 : 42));
+        card.setBackground(surface);
+
+        LinearLayout head = kit.h();
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        head.setMinimumHeight(Theme.dp(48));
+        head.addView(kit.icon(R.drawable.mi_history, Theme.MUTED, 20),
+                new LinearLayout.LayoutParams(Theme.dp(24), Theme.dp(24)));
+        head.addView(kit.space(8));
+        LinearLayout titleCol = kit.v();
+        titleCol.addView(kit.text("گزارش فنی ذخیره‌شده", 12.5f, Theme.TEXT, true), kit.lp(-1, -2));
+        titleCol.addView(kit.text("محلی است و خودکار ارسال نمی‌شود", 10.5f, Theme.MUTED, false), kit.lp(-1, -2));
+        head.addView(titleCol, kit.wlp(1f));
+        TextView disclosure = kit.text("نمایش جزئیات", 10.5f, Theme.INFO, true);
+        disclosure.setGravity(Gravity.CENTER);
+        disclosure.setMinHeight(Theme.dp(44));
+        head.addView(disclosure, kit.lp(-2, -2));
+        head.setContentDescription("گزارش فنی ذخیره‌شده؛ برای نمایش جزئیات لمس کنید");
+        head.setFocusable(true);
+        Theme.pressable(head);
+
+        LinearLayout details = kit.v();
+        details.setVisibility(View.GONE);
+        TextView explanation = kit.text(
+                "این گزارش فقط نوع خطا و مسیر کد را ثبت می‌کند؛ پیام خطا، اطلاعات اتصال، حساب و فروش در آن نیست. برای پشتیبانی می‌توانید آن را کپی کنید.",
+                10.5f, Theme.MUTED, false);
+        details.addView(explanation, kit.lp(-1, -2));
+        final TextView reportNote = kit.text("", 11.5f, Theme.INFO, true);
         reportNote.setVisibility(View.GONE);
-        c.addView(kit.btnGhost("کپی گزارش فنی", Theme.INFO, v -> {
+        details.addView(kit.btnGhost("کپی گزارش برای پشتیبانی", Theme.INFO, v -> {
             String report = CrashReporter.readReport(this);
-            boolean ok = !report.isEmpty() && copyText("گزارش خطای میلانو زرین‌فرمان", report);
+            boolean ok = !report.isEmpty() && copyText("گزارش فنی میلانو", report);
             reportNote.setTextColor(ok ? Theme.SUCCESS : Theme.DANGER);
             reportNote.setText(report.isEmpty() ? "گزارش فنی در دسترس نیست"
                     : (ok ? "گزارش کپی شد؛ برای پشتیبانی بفرستید" : "کپی گزارش ممکن نشد"));
             reportNote.setVisibility(View.VISIBLE);
             reportNote.postDelayed(() -> reportNote.setVisibility(View.GONE), 2500);
         }), kit.lp(-1, -2));
-        c.addView(reportNote, kit.lp(-1, -2));
-        c.addView(kit.btnGhost("پاک‌کردن گزارش", Theme.DANGER, v -> {
+        details.addView(reportNote, kit.lp(-1, -2));
+        details.addView(kit.btnGhost("حذف گزارش ذخیره‌شده", Theme.MUTED,
+                v -> confirmClearCrashReport()), kit.lp(-1, -2));
+        card.addView(head, kit.lp(-1, -2));
+        card.addView(details, kit.lp(-1, -2));
+
+        head.setOnClickListener(v -> {
+            boolean expanded = details.getVisibility() != View.VISIBLE;
+            details.setVisibility(expanded ? View.VISIBLE : View.GONE);
+            disclosure.setText(expanded ? "بستن جزئیات" : "نمایش جزئیات");
+            head.setContentDescription(expanded
+                    ? "گزارش فنی ذخیره‌شده؛ برای بستن جزئیات لمس کنید"
+                    : "گزارش فنی ذخیره‌شده؛ برای نمایش جزئیات لمس کنید");
+        });
+        LinearLayout.LayoutParams cardLp = kit.lp(-1, -2);
+        cardLp.topMargin = Theme.dp(8);
+        box.addView(card, cardLp);
+    }
+
+    private void confirmClearCrashReport() {
+        LinearLayout body = kit.v();
+        body.setPadding(Theme.dp(16), Theme.dp(8), Theme.dp(16), Theme.dp(8));
+        body.addView(kit.text("این گزارش محلی برای عیب‌یابی است. پس از حذف، برای ارسال به پشتیبانی در دسترس نخواهد بود.",
+                12f, Theme.MUTED, false), kit.lp(-1, -2));
+        final AlertDialog[] dialog = new AlertDialog[1];
+        LinearLayout actions = kit.h();
+        actions.setGravity(Gravity.CENTER);
+        actions.addView(kit.btnGhost("انصراف", Theme.MUTED, v -> {
+            if (dialog[0] != null) dialog[0].dismiss();
+        }), new LinearLayout.LayoutParams(0, -2, 1f));
+        actions.addView(kit.space(8));
+        actions.addView(kit.btnGhost("حذف گزارش", Theme.DANGER, v -> {
             CrashReporter.clearReport(this);
+            if (dialog[0] != null) dialog[0].dismiss();
             kit.toast("گزارش پاک شد");
             buildUi();
-        }), kit.lp(-1, -2));
-        Card3D.mount(box, c);
+        }), new LinearLayout.LayoutParams(0, -2, 1f));
+        body.addView(actions, kit.lp(-1, -2));
+        dialog[0] = kit.dialog("حذف گزارش فنی؟", body, true);
+        dialog[0].show();
     }
 
     private void buildConnPage(LinearLayout box, LicenseStore.Status s) {
@@ -1161,14 +1220,28 @@ public class LicenseActivity extends Activity {
                     | android.text.InputType.TYPE_TEXT_VARIATION_URI);
         } catch (Exception e) { Diag.ignored("LicenseActivity:ipField", e); }
         c.addView(iconField(fIp, R.drawable.mi_my_location), kit.lp(-1, -2));
+        c.addView(kit.gap(4));
+        // Optional server port: empty = the default 1433. A forwarded port on the
+        // dedicated IP (e.g. 5050 → 1433) can be entered here, or typed directly
+        // into the address as IP:5050.
+        String initialPort = restoredConnectionPort;
+        if (initialPort == null) initialPort = savedPortFor(initialIp);
+        connectionPort = kit.edit("پورت سرور (پیش‌فرض ۱۴۳۳ — مثلاً ۵۰۵۰)", initialPort);
+        restoredConnectionPort = null;
+        final EditText fPort = connectionPort;
+        try {
+            fPort.setSingleLine(true);
+            fPort.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        } catch (Exception e) { Diag.ignored("LicenseActivity:portField", e); }
+        c.addView(iconField(fPort, R.drawable.mi_my_location), kit.lp(-1, -2));
         if (editingConnection) {
-            c.addView(kit.hint("برای اتصال به سرور دیگر، آدرس بالا را کامل جایگزین کنید؛ دیتابیس قبلی به‌صورت خودکار انتخاب نمی‌شود."),
+            c.addView(kit.hint("برای اتصال به سرور دیگر، آدرس بالا را کامل جایگزین کنید؛ دیتابیس قبلی به‌صورت خودکار انتخاب نمی‌شود. پورت خالی = ۱۴۳۳؛ اگر روی آی‌پی اختصاصی پورت دیگری (مثل ۵۰۵۰) به ۱۴۳۳ فوروارد شده، همان را وارد کنید."), 
                     kit.lp(-1, -2));
         }
         c.addView(kit.gap(4));
         final android.widget.Button[] btn = new android.widget.Button[1];
         btn[0] = kit.btnGold("✦ اتصال و نمایش دیتابیس‌ها",
-                v -> connectManual(txt(fIp), btn[0]));
+                v -> connectManual(txt(fIp), txt(fPort), btn[0]));
         c.addView(btn[0], kit.lp(-1, -2));
         c.addView(kit.gap(6));
         final android.widget.Button[] wbtn = new android.widget.Button[1];
@@ -1221,17 +1294,46 @@ public class LicenseActivity extends Activity {
         });
     }
 
+    /** Saved port for the profile this host belongs to ("" = default). */
+    private String savedPortFor(String host) {
+        try {
+            if (host == null || host.trim().isEmpty()) return settings.port();
+            Boolean priv = SmartLink.isPrivate(host);
+            String per = (priv != null && !priv) ? settings.portWan() : settings.portLan();
+            return per.isEmpty() ? settings.port() : per;
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    /**
+     * Port for one manual connection: the port field wins; then a ":port"
+     * typed into the address itself (IP:5050); then the default 1433.
+     */
+    private static int resolvePort(String portText, String typedHost) {
+        String t = portText == null ? "" : portText.trim();
+        if (!t.isEmpty()) {
+            try {
+                int v = Integer.parseInt(ir.meelano.manager.core.Money.en(t).trim());
+                if (v >= 1 && v <= 65535) return v;
+            } catch (Exception ignored) { Diag.ignored("LicenseActivity:resolvePort", ignored); }
+        }
+        int fromHost = LanDiscover.typedPort(typedHost);
+        return fromHost > 0 ? fromHost : LanDiscover.PORT;
+    }
+
     /**
      * Manual connection stays on the existing direct SQL Server/jTDS path.
      * The entered host is used as-is: databases are read from master, checked
      * for Atiran tables, and shown in the existing picker before saving.
      */
-    private void connectManual(String ip, final android.widget.Button btn) {
+    private void connectManual(String ip, String portText, final android.widget.Button btn) {
         final String fIp = LanDiscover.clean(ip);
         if (fIp.isEmpty()) {
             kit.toast("IP سرور را وارد کنید");
             return;
         }
+        final int fPort = resolvePort(portText, ip);
         if (!Net.online(this)) {
             kit.toast("شبکه قطع است — به وای‌فای یا دیتای موبایل وصل شوید");
             return;
@@ -1242,7 +1344,8 @@ public class LicenseActivity extends Activity {
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:991", ignored); }
         showRadar("در حال اتصال مستقیم به سرور…");
         new Thread(() -> {
-            List<String> databases = LanDiscover.listDatabases(fIp, LanDiscover.PORT,
+          try {
+            List<String> databases = LanDiscover.listDatabases(fIp, fPort,
                     License.SQL_USER, License.SQL_PASS);
             if (databases == null || databases.isEmpty()) {
                 runOnUiThread(() -> {
@@ -1255,14 +1358,14 @@ public class LicenseActivity extends Activity {
                     final String wan = (priv != null && !priv) ? fIp : "";
                     boolean vpn = NetRoute.isVpnActive(LicenseActivity.this);
                     SmartLink.diagnoseExplicit(LicenseActivity.this, lan, wan,
-                            LanDiscover.PORT, "master", License.SQL_USER,
+                            fPort, "master", License.SQL_USER,
                             License.SQL_PASS, vpn, r -> {
                                 if (isFinishing()) return;
                                 LinkPanel.showFixSheet(LicenseActivity.this, r,
-                                        () -> connectManual(fIp, btn),
+                                        () -> connectManual(ip, portText, btn),
                                         () -> LinkPanel.showDiagnoseExplicit(
                                                 LicenseActivity.this, lan, wan,
-                                                LanDiscover.PORT, "master",
+                                                fPort, "master",
                                                 License.SQL_USER, License.SQL_PASS));
                             });
                 });
@@ -1273,7 +1376,8 @@ public class LicenseActivity extends Activity {
             List<String[]> pairs = new ArrayList<>();
             for (String db : databases) {
                 if (pairs.size() >= 24) break;
-                if (db != null && !db.trim().isEmpty()) pairs.add(new String[]{fIp, db.trim()});
+                if (db != null && !db.trim().isEmpty())
+                    pairs.add(new String[]{fIp, db.trim(), String.valueOf(fPort)});
             }
             if (pairs.isEmpty()) {
                 runOnUiThread(() -> {
@@ -1291,7 +1395,7 @@ public class LicenseActivity extends Activity {
                 for (final String[] pair : pairs) {
                     fs.add(pool.submit(() -> {
                         try {
-                            return SmartLink.probeTables(pair[0], LanDiscover.PORT, pair[1],
+                            return SmartLink.probeTables(pair[0], Integer.parseInt(pair[2]), pair[1],
                                     License.SQL_USER, License.SQL_PASS);
                         } catch (Exception e) {
                             return -1;
@@ -1328,6 +1432,10 @@ public class LicenseActivity extends Activity {
                 // explicitly sees and selects the database before proceeding.
                 dbPickerDialog(found, counts);
             });
+          } catch (Throwable t) {
+            Diag.ignored("LicenseActivity:connectThread", t);
+            runOnUiThread(() -> { hideRadar(); restoreManualBtn(btn); });
+          }
         }).start();
     }
 
@@ -1350,7 +1458,21 @@ public class LicenseActivity extends Activity {
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:1099", ignored); }
         showRadar("در حال یافتن سرور در وای‌فای…");
         new Thread(() -> {
-            List<String> hosts = LanDiscover.find("", LanDiscover.PORT);
+          try {
+            // Probe both the default SQL port and the common forwarded port
+            // (5050 → 1433): a shop server may listen on either.
+            List<String> hosts = new ArrayList<>();
+            List<Integer> hostPorts = new ArrayList<>();
+            for (String h : LanDiscover.find("", LanDiscover.PORT)) {
+                hosts.add(h);
+                hostPorts.add(LanDiscover.PORT);
+            }
+            for (String h : LanDiscover.find("", LanDiscover.PORT_FWD)) {
+                if (!hosts.contains(h)) {
+                    hosts.add(h);
+                    hostPorts.add(LanDiscover.PORT_FWD);
+                }
+            }
             if (hosts.isEmpty()) {
                 runOnUiThread(() -> {
                     hideRadar();
@@ -1367,8 +1489,10 @@ public class LicenseActivity extends Activity {
             try {
                 List<String[]> pairs = new ArrayList<>();
                 List<Future<List<String>>> fs = new ArrayList<>();
-                for (final String h : hosts) {
-                    fs.add(pool.submit(() -> LanDiscover.listDatabases(h, LanDiscover.PORT,
+                for (int hi = 0; hi < hosts.size(); hi++) {
+                    final String h = hosts.get(hi);
+                    final int hp = hostPorts.get(hi);
+                    fs.add(pool.submit(() -> LanDiscover.listDatabases(h, hp,
                             License.SQL_USER, License.SQL_PASS)));
                 }
                 long deadline = System.currentTimeMillis() + 12000;
@@ -1380,7 +1504,8 @@ public class LicenseActivity extends Activity {
                         if (dbs != null) {
                             for (String d : dbs) {
                                 if (pairs.size() >= 24) break;
-                                pairs.add(new String[]{hosts.get(i), d});
+                                pairs.add(new String[]{hosts.get(i), d,
+                                        String.valueOf(hostPorts.get(i))});
                             }
                         }
                     } catch (Exception ignored) { Diag.ignored("LicenseActivity:1135", ignored); }
@@ -1399,7 +1524,8 @@ public class LicenseActivity extends Activity {
                 for (final String[] pr : pairs) {
                     vs.add(pool.submit(() -> {
                         try {
-                            return new int[]{SmartLink.probeTables(pr[0], LanDiscover.PORT, pr[1],
+                            return new int[]{SmartLink.probeTables(pr[0],
+                                    Integer.parseInt(pr[2]), pr[1],
                                     License.SQL_USER, License.SQL_PASS)};
                         } catch (Exception e) {
                             return new int[]{-1};
@@ -1431,7 +1557,7 @@ public class LicenseActivity extends Activity {
                         return;
                     }
                     if (fw.size() == 1) {
-                        saveSite(fw.get(0)[0], fw.get(0)[1], fn.get(0));
+                        saveSite(fw.get(0)[0], fw.get(0)[1], fn.get(0), pairPort(fw.get(0)));
                         return;
                     }
                     dbPickerDialog(fw, fn);
@@ -1439,6 +1565,10 @@ public class LicenseActivity extends Activity {
             } finally {
                 pool.shutdownNow();
             }
+          } catch (Throwable t) {
+            Diag.ignored("LicenseActivity:wifiThread", t);
+            runOnUiThread(() -> { hideRadar(); restoreWifiBtn(btn); });
+          }
         }).start();
     }
 
@@ -1447,6 +1577,17 @@ public class LicenseActivity extends Activity {
             btn.setEnabled(true);
             btn.setText("اتصال با وای‌فای");
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:1198", ignored); }
+    }
+
+    /** Port carried by a picker pair (host, db, port) — defaults to 1433. */
+    private static int pairPort(String[] pair) {
+        try {
+            if (pair != null && pair.length > 2) {
+                int v = Integer.parseInt(pair[2].trim());
+                if (v >= 1 && v <= 65535) return v;
+            }
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:pairPort", ignored); }
+        return LanDiscover.PORT;
     }
 
     /** Luxury single-choice database picker (v33). */
@@ -1488,32 +1629,38 @@ public class LicenseActivity extends Activity {
             try {
                 box[0].dismiss();
             } catch (Exception ignored) { Diag.ignored("LicenseActivity:1239", ignored); }
-            saveSite(pairs.get(sel[0])[0], pairs.get(sel[0])[1], counts.get(sel[0]));
+            saveSite(pairs.get(sel[0])[0], pairs.get(sel[0])[1], counts.get(sel[0]),
+                    pairPort(pairs.get(sel[0])));
         }), kit.lp(-1, -2));
         box[0] = kit.dialog("انتخاب دیتابیس", kit.scrollWrap(b, 420), true);
         box[0].show();
     }
 
     /** Save a verified (host, db) and roll into the app (v33). */
-    private void saveSite(String host, String db, int tables) {
+    private void saveSite(String host, String db, int tables, int port) {
         try {
             Boolean priv = SmartLink.isPrivate(host);
             String lan = (priv == null || priv) ? host : "";
             String wan = (priv != null && !priv) ? host : "";
-            settings.saveSmart(lan, wan, String.valueOf(LanDiscover.PORT), db,
+            String portStr = String.valueOf(port);
+            String lanPort = (priv == null || priv) ? portStr : "";
+            String wanPort = (priv != null && !priv) ? portStr : "";
+            settings.saveSmart(lan, wan, lanPort, wanPort, db,
                     License.SQL_USER, License.SQL_PASS);
             settings.setLinkLast(lan.isEmpty() ? SmartLink.WAN : SmartLink.LAN);
             saveConnSummary(host, tables);
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:1256", ignored); }
         editingConnection = false;
         connectionIp = null;
+        connectionPort = null;
         restoredConnectionIp = null;
+        restoredConnectionPort = null;
         try {
             if (getIntent() != null) getIntent().removeExtra(EXTRA_EDIT_CONNECTION);
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:1262", ignored); }
         buzz();
         kit.toast("✓ وصل شد • " + Money.fa(String.valueOf(tables)) + " بخش پایه آماده");
-        copySiteLine(host, LanDiscover.PORT, db);
+        copySiteLine(host, port, db);
         buildUi();
     }
 
@@ -1560,7 +1707,8 @@ public class LicenseActivity extends Activity {
     // ================= done =================
 
     private void buildDonePage(LinearLayout box, LicenseStore.Status s) {
-        // Relaunch page: licence details live in the app header now; this page only confirms and enters.
+        // The license is valid and the connection profile is saved; do not imply the server
+        // has just been reached because this welcome page performs no live database probe.
         LinearLayout hero = kit.v();
         hero.setGravity(Gravity.CENTER_HORIZONTAL);
         android.widget.FrameLayout ring = new android.widget.FrameLayout(this);
@@ -1572,33 +1720,60 @@ public class LicenseActivity extends Activity {
         mark.setOutlineProvider(new android.view.ViewOutlineProvider() {
             @Override
             public void getOutline(View v, android.graphics.Outline o) {
-                o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), Theme.dp(26));
+                o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), Theme.dp(22));
             }
         });
-        ring.addView(mark, new android.widget.FrameLayout.LayoutParams(Theme.dp(104), Theme.dp(104), Gravity.CENTER));
-        hero.addView(ring, new LinearLayout.LayoutParams(Theme.dp(112), Theme.dp(112)));
-        TextView t = kit.text("همه‌چیز آماده است", 21f, Theme.TEXT, true);
+        ring.addView(mark, new android.widget.FrameLayout.LayoutParams(Theme.dp(80), Theme.dp(80), Gravity.CENTER));
+        LinearLayout.LayoutParams logoLp = new LinearLayout.LayoutParams(Theme.dp(88), Theme.dp(88));
+        logoLp.bottomMargin = Theme.dp(8);
+        hero.addView(ring, logoLp);
+
+        TextView t = kit.text("خوش آمدید", 20f, Theme.TEXT, true);
         t.setGravity(Gravity.CENTER);
         hero.addView(t, kit.lp(-1, -2));
-        TextView sub = kit.text("لایسنس فعال است؛ با یک لمس وارد میلانو زرین‌فرمان شوید.", 12.5f, Theme.MUTED, false);
+        LinearLayout licenseState = kit.h();
+        licenseState.setGravity(Gravity.CENTER);
+        licenseState.setBackground(Theme.pill(Theme.alpha(Theme.SUCCESS, Theme.isLight() ? 26 : 34)));
+        licenseState.setPadding(Theme.dp(11), Theme.dp(5), Theme.dp(11), Theme.dp(5));
+        TextView stateText = kit.text("✓ مجوز معتبر است", 11.5f, Theme.SUCCESS, true);
+        licenseState.addView(stateText, kit.lp(-2, -2));
+        LinearLayout.LayoutParams stateLp = kit.lp(-2, -2);
+        stateLp.topMargin = Theme.dp(6);
+        hero.addView(licenseState, stateLp);
+        TextView sub = kit.text("تنظیمات اتصال سرور ذخیره شده است.", 11.5f, Theme.MUTED, false);
         sub.setGravity(Gravity.CENTER);
-        hero.addView(sub, kit.lp(-1, -2));
-        box.addView(kit.gap(18));
-        box.addView(hero, kit.lp(-1, -2));
-        box.addView(kit.gap(18));
+        LinearLayout.LayoutParams subLp = kit.lp(-1, -2);
+        subLp.topMargin = Theme.dp(5);
+        hero.addView(sub, subLp);
 
-        LinearLayout c = Card3D.card(this, Theme.GOLD);
-        c.addView(goldAction("ورود به برنامه", R.drawable.mi_login, v -> enterApp()), kit.lp(-1, -2));
-        c.addView(kit.gap(8));
-        c.addView(ghostAction("تغییر سرور یا دیتابیس", Theme.GOLD, R.drawable.mi_swap_horiz, v -> {
-            editingConnection = true;
-            try {
-                getIntent().putExtra(EXTRA_EDIT_CONNECTION, true);
-            } catch (Exception ignored) { Diag.ignored("LicenseActivity:1345", ignored); }
-            buildUi();
-        }), kit.lp(-1, -2));
-        Card3D.mount(box, c);
+        box.addView(kit.gap(8));
+        box.addView(hero, kit.lp(-1, -2));
+        box.addView(kit.gap(12));
+        box.addView(goldAction("ورود به برنامه", R.drawable.mi_login, v -> enterApp()), kit.lp(-1, -2));
+
+        LinearLayout setup = kit.h();
+        setup.setGravity(Gravity.CENTER);
+        setup.setMinimumHeight(Theme.dp(48));
+        setup.setPadding(Theme.dp(12), 0, Theme.dp(12), 0);
+        setup.addView(kit.icon(R.drawable.mi_swap_horiz, Theme.GOLD_SOFT, 20),
+                new LinearLayout.LayoutParams(Theme.dp(22), Theme.dp(22)));
+        setup.addView(kit.space(7));
+        setup.addView(kit.text("تنظیم اتصال فروشگاه", 12f, Theme.GOLD_SOFT, true), kit.lp(-2, -2));
+        setup.setContentDescription("تنظیم اتصال سرور یا دیتابیس فروشگاه");
+        setup.setFocusable(true);
+        Theme.pressable(setup);
+        setup.setOnClickListener(v -> openConnectionSettings());
+        box.addView(setup, kit.lp(-1, Theme.dp(48)));
+
         buildDevFooter(box);
+    }
+
+    private void openConnectionSettings() {
+        editingConnection = true;
+        try {
+            getIntent().putExtra(EXTRA_EDIT_CONNECTION, true);
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:connectionEdit", ignored); }
+        buildUi();
     }
 
     private boolean connConfigured() {
@@ -1672,13 +1847,16 @@ public class LicenseActivity extends Activity {
     // ---- the one luxury frame: request + receive + network, all in one ----
 
 
-    private String buildRequestMsg(String dist, String phone) {
-        String line = License.requestLine(device, dist, "", dist, phone, "");
+    private String buildRequestMsg(String phone) {
+        // The 8-character device code is created locally; a name cannot be derived from it.
+        // Keep the request protocol compatible, but leave customer-identification fields blank
+        // so the seller enters the person's name in the licensing tool.
+        String line = License.requestLine(device, "", "", "", phone, "");
         String use = Usage.reportLine(this, device);
-        StringBuilder b = new StringBuilder("درخواست فعال‌سازی میلانو زرین‌فرمان\n").append(line);
+        StringBuilder b = new StringBuilder("درخواست فعال‌سازی میلانو\n").append(line);
         if (!use.isEmpty()) b.append('\n').append(use);
-        b.append("\nنام: ").append(dist.trim());
-        b.append("\nتماس: ").append(phone.trim());
+        b.append("\nکد دستگاه: ").append(prettyDev(device));
+        if (phone != null && !phone.trim().isEmpty()) b.append("\nتماس: ").append(phone.trim());
         return b.toString();
     }
 
@@ -1695,7 +1873,7 @@ public class LicenseActivity extends Activity {
             kit.toast("گزارشی برای ارسال نیست");
             return;
         }
-        String msg = "گزارش مصرف میلانو زرین‌فرمان\n" + use
+        String msg = "گزارش مصرف میلانو\n" + use
                 + "\nکارکرد: " + Usage.faSummary(this);
         copyText("گزارش مصرف", msg);
         try {
@@ -1798,6 +1976,89 @@ public class LicenseActivity extends Activity {
                 requestPermissions(new String[]{android.Manifest.permission.RECEIVE_SMS}, REQ_RECV);
             }
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:1548", ignored); }
+    }
+
+    private boolean readSmsGranted() {
+        try {
+            return Build.VERSION.SDK_INT < 23 || checkSelfPermission(android.Manifest.permission.READ_SMS)
+                    == PackageManager.PERMISSION_GRANTED;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private boolean phoneGranted() {
+        try {
+            return Build.VERSION.SDK_INT < 26 || checkSelfPermission(android.Manifest.permission.READ_PHONE_NUMBERS)
+                    == PackageManager.PERMISSION_GRANTED
+                    || checkSelfPermission(android.Manifest.permission.READ_PHONE_STATE)
+                    == PackageManager.PERMISSION_GRANTED;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * Contact number of this phone (SIM line), canonical 09xxxxxxxxx — or ""
+     * when the phone does not expose one. Read automatically during activation
+     * so the customer never types it.
+     */
+    private String simPhone() {
+        try {
+            if (!phoneGranted()) return "";
+            android.telephony.TelephonyManager tm = (android.telephony.TelephonyManager)
+                    getSystemService(TELEPHONY_SERVICE);
+            if (tm == null) return "";
+            String raw = null;
+            try {
+                raw = tm.getLine1Number();
+            } catch (Exception ignored) { Diag.ignored("LicenseActivity:line1", ignored); }
+            String p = SmsIo.normalizeMobile(raw == null ? "" : raw);
+            return p.length() >= 10 ? p : "";
+        } catch (Exception e) {
+            Diag.ignored("LicenseActivity:simPhone", e);
+            return "";
+        }
+    }
+
+    /** Saved contact number; when none, the number read automatically from the phone/SIM. */
+    private String autoPhone() {
+        String saved = LicenseStore.contactPhone(this);
+        if (saved != null && !saved.trim().isEmpty()) return saved.trim();
+        return simPhone();
+    }
+
+    /**
+     * Automatic license recovery from the SMS inbox (reinstall case): the
+     * signed pack is device-bound and carries its own dates, so the elapsed
+     * time keeps counting. Silent when the permission is already there;
+     * otherwise one system prompt explains and asks.
+     */
+    private void attemptRecovery(boolean fromGrant) {
+        try {
+            if (LicenseStore.check(this).ok) return;
+            if (!readSmsGranted()) {
+                if (!autoRecoveryAsked && !fromGrant) {
+                    autoRecoveryAsked = true;
+                    kit.toast("برای فعال‌سازی خودکار از پیامک‌های قبلی، دسترسی پیامک را تأیید کنید");
+                    requestPermissions(new String[]{android.Manifest.permission.READ_SMS}, REQ_READ_SMS);
+                }
+                return;
+            }
+            new Thread(() -> {
+                String pack = LicenseRecovery.tryRecover(LicenseActivity.this);
+                runOnUiThread(() -> {
+                    if (isFinishing()) return;
+                    if (!pack.isEmpty()) {
+                        buzz();
+                        kit.toast("✦ لایسنس به‌صورت خودکار فعال شد — خوش آمدید!");
+                        buildUi();
+                    } else if (fromGrant) {
+                        kit.toast("پیامک فعال‌سازی قبلی پیدا نشد؛ درخواست را دوباره بفرستید");
+                    }
+                });
+            }).start();
+        } catch (Exception ignored) { Diag.ignored("LicenseActivity:attemptRecovery", ignored); }
     }
 
     private void updateRecvHint() {
@@ -1952,12 +2213,14 @@ public class LicenseActivity extends Activity {
         }
         box.addView(div, new LinearLayout.LayoutParams(-1, Theme.dp(2)));
         box.addView(kit.gap(8));
-        TextView tag = kit.text(Brand.TAGLINE, 11.5f, Theme.MUTED, false);
+        TextView tag = kit.text(Brand.TAGLINE, 10.5f, Theme.MUTED, false);
         tag.setGravity(Gravity.CENTER);
+        tag.setMaxLines(2);
         box.addView(tag, kit.lp(-1, -2));
         box.addView(kit.gap(4));
         box.addView(kit.btnGhost("پشتیبانی", Theme.GOLD, v -> supportDialog()), kit.lp(-1, -2));
-        TextView ver = kit.text(appVer(), 11f, Theme.MUTED, false);
+        addCrashReportCard(box);
+        TextView ver = kit.text(appVer(), 10.5f, Theme.MUTED, false);
         ver.setGravity(Gravity.CENTER);
         box.addView(ver, kit.lp(-1, -2));
         luxurySig(box);
@@ -1966,11 +2229,11 @@ public class LicenseActivity extends Activity {
     /** Metallic-gold English designer signature with a soft 3D shadow. */
     private void luxurySig(LinearLayout c) {
         try {
-            c.addView(kit.gap(6));
-            TextView over = kit.text("D E S I G N E D   B Y", 10f, Theme.MUTED, true);
+            c.addView(kit.gap(4));
+            TextView over = kit.text("D E S I G N E D   B Y", 8.5f, Theme.MUTED, true);
             over.setGravity(Gravity.CENTER);
             c.addView(over, kit.lp(-1, -2));
-            final TextView name = kit.text("Milad Yaghoubi", 20, Theme.GOLD_SOFT, true);
+            final TextView name = kit.text("Milad Yaghoubi", 14.5f, Theme.GOLD_SOFT, true);
             name.setGravity(Gravity.CENTER);
             try {
                 name.setTypeface(Theme.face(true));
@@ -2021,7 +2284,7 @@ public class LicenseActivity extends Activity {
         body.addView(kit.btn("بستن", v -> {
             if (dlgH[0] != null) dlgH[0].dismiss();
         }), kit.lp(-1, -2));
-        dlgH[0] = kit.dialog("پشتیبانی میلانو زرین‌فرمان", body, true);
+        dlgH[0] = kit.dialog("پشتیبانی میلانو", body, true);
         dlgH[0].show();
     }
 
@@ -2099,7 +2362,7 @@ public class LicenseActivity extends Activity {
             TextView t = kit.text("در حال چیدن میز کار شما…", 14f, Theme.GOLD_SOFT, true);
             t.setGravity(Gravity.CENTER);
             box.addView(t, kit.lp(-1, -2));
-            final AlertDialog d = kit.dialog("میلانو زرین‌فرمان", box, false);
+            final AlertDialog d = kit.dialog("میلانو", box, false);
             try {
                 d.setCancelable(false);
                 d.setCanceledOnTouchOutside(false);

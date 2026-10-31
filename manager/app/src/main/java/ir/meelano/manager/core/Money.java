@@ -60,6 +60,21 @@ public final class Money {
         return fa(group(Math.round(toUnit(v)))) + " " + unitName();
     }
 
+    /** TextView-safe money format: the signed number stays LTR-isolated inside an RTL label. */
+    public static String rialText(double v) {
+        return ltrIsolate(fa(group(Math.round(toUnit(v))))) + " " + unitName();
+    }
+
+    /** Isolate a numeric run for correct bidi ordering in RTL controls. */
+    public static String ltrIsolate(String value) {
+        return "\u2066" + (value == null ? "" : value) + "\u2069";
+    }
+
+    /** TextView-safe quantity, including a visible zero and a stable negative sign. */
+    public static String qtyText(double value) {
+        return ltrIsolate(qty(value));
+    }
+
     /** Compact amount WITH the current unit for tiles/cards: «۱۲٫۴ میلیون تومان». */
     public static String compactMoney(double v) {
         return compact(toUnit(v)) + " " + unitName();
@@ -72,6 +87,14 @@ public final class Money {
 
     public static String num(long v) {
         return fa(group(v));
+    }
+
+    /**
+     * Quantity with an explicit sign inside one LTR isolate, so the sign always hugs
+     * the digits («−۹٫۸») instead of drifting to the far side of an RTL line.
+     */
+    public static String signedQty(double v) {
+        return "\u2066" + (v < 0 ? "\u2212" : "+") + qty(Math.abs(v)) + "\u2069";
     }
 
     /** Quantity with up to 3 decimals, trimmed: «۱۲٫۵». */

@@ -93,6 +93,8 @@ public final class Atiran {
         if (e == null) return "خطای نامشخص اتصال";
         String m = String.valueOf(e.getMessage());
         String l = m.toLowerCase(java.util.Locale.US);
+        if (l.contains("lock timeout"))
+            return "پایگاه‌دادهٔ آتیران مشغول است؛ چند لحظه بعد دوباره تلاش کنید";
         if (l.contains("timeout") || l.contains("timed out")) return "سرور پاسخ نداد؛ اینترنت و آدرس سرور را بررسی کنید";
         // TLS first: jTDS reports a failed encrypted handshake as "Network error ... SSL handshake aborted".
         // That is not a routing problem, so it must not fall into the network branch below.

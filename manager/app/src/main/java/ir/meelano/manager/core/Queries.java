@@ -43,7 +43,8 @@ public final class Queries {
 
     public static String pageClause(List<Object> binds, int page, int top) {
         top = clampTop(top);
-        binds.add(Math.max(0, page) * top);
+        long offset = (long) Math.max(0, page) * top;
+        binds.add(offset);
         binds.add(top);
         return " OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
     }
@@ -91,6 +92,62 @@ public final class Queries {
             for (String v : vars) { parts.add(e + " LIKE N'%' + ? + N'%' ESCAPE N'\\'"); binds.add(escapeLike(v)); }
         }
         return parts.isEmpty() ? "" : "(" + Sql.join(parts, " OR ") + ")";
+    }
+
+    /**
+     * Product-only normalized search. Whitespace separates required tokens, while spaces and
+     * ZWNJ inside stored names are removed on both sides. Arabic/Persian yeh, kaf, alef forms,
+     * digits and common marks fold to the same key without changing stored data.
+     */
+    public static String productSearchCond(List<Object> binds, String search, String... exprs) {
+        List<String> tokens = PersianText.productSearchTokens(search);
+        if (tokens.isEmpty() || exprs == null || exprs.length == 0) return "";
+        List<String> normalized = new ArrayList<>();
+        for (String expr : exprs) {
+            if (expr != null && !expr.trim().isEmpty()) normalized.add(productSqlSearchExpr(expr));
+        }
+        if (normalized.isEmpty()) return "";
+        List<String> groups = new ArrayList<>();
+        for (String token : tokens) {
+            List<String> alternatives = new ArrayList<>();
+            for (String expr : normalized) {
+                alternatives.add(expr + " LIKE N'%' + ? + N'%' ESCAPE N'\\'");
+                binds.add(escapeLike(token));
+            }
+            groups.add("(" + Sql.join(alternatives, " OR ") + ")");
+        }
+        return "(" + Sql.join(groups, " AND ") + ")";
+    }
+
+    private static String productSqlSearchExpr(String expression) {
+        String out = "COALESCE(" + expression + ",N'')";
+        int[][] folds = {
+                {0x064A, 0x06CC}, {0x0649, 0x06CC}, {0x0643, 0x06A9}, {0x0629, 0x0647},
+                {0x0624, 0x0648}, {0x0622, 0x0627}, {0x0623, 0x0627}, {0x0625, 0x0627},
+                {0x0671, 0x0627}
+        };
+        for (int[] fold : folds) out = sqlReplace(out, fold[0], fold[1]);
+        for (int digit = 0; digit <= 9; digit++) {
+            out = sqlReplace(out, 0x06F0 + digit, '0' + digit);
+            out = sqlReplace(out, 0x0660 + digit, '0' + digit);
+        }
+        for (int cp : new int[]{32, 9, 10, 13, 160, 8192, 8193, 8194, 8195, 8196, 8197,
+                8198, 8199, 8200, 8201, 8202, 8203, 8204, 8205, 8206, 8207, 8232, 8233,
+                8288, 8294, 8295, 8296, 8297, 0xFEFF, '*'}) {
+            out = sqlReplace(out, cp, 0);
+        }
+        for (int cp = 0x064B; cp <= 0x065F; cp++) out = sqlReplace(out, cp, 0);
+        out = sqlReplace(out, 0x0670, 0);
+        for (int cp : new int[]{0x06D6, 0x06D7, 0x06D8, 0x06D9, 0x06DA, 0x06DB, 0x06DC,
+                0x06DF, 0x06E0, 0x06E1, 0x06E2, 0x06E3, 0x06E4, 0x06E7, 0x06E8,
+                0x06EA, 0x06EB, 0x06EC, 0x06ED}) out = sqlReplace(out, cp, 0);
+        return "LOWER(" + out + ")";
+    }
+
+    private static String sqlReplace(String expression, int from, int to) {
+        String target = from == '*' ? "N'*'" : "NCHAR(" + from + ")";
+        String replacement = to == 0 ? "N''" : "NCHAR(" + to + ")";
+        return "REPLACE(" + expression + "," + target + "," + replacement + ")";
     }
 
     /**
@@ -418,8 +475,9 @@ public final class Queries {
         // cancel/void marker, which is why this cannot be phrased as "cancelled":
         // those rows never reach the query at all.
         if ("not_confirmed".equals(f.status)) {
-            String statusCol = Sql.pick(cols, "Status");
-            if (statusCol == null) throw new Missing("ستون وضعیت در «" + AtiranSchema.faTitle(table) + "» پیدا نشد");
+            // sailfact carries "Status"; buyfact carries the confirmation flag "taeed".
+            String statusCol = Sql.pick(cols, "Status", "status", "taeed", "Taeed", "IsFinal", "isfinal", "vaziat");
+            if (statusCol == null) throw new Missing("ستون وضعیت/تأیید در «" + AtiranSchema.faTitle(table) + "» پیدا نشد");
             conds.add("ISNULL(TRY_CONVERT(int,h.[" + statusCol + "]),0)<>1");
         }
         if (f.search != null && !f.search.trim().isEmpty()) {

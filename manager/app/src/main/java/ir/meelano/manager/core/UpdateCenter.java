@@ -54,8 +54,11 @@ public final class UpdateCenter {
     /** startActivityForResult code for the unknown-sources settings screen. */
     public static final int REQ_UNKNOWN = 907;
 
+    /** Whether this installed package can participate in the signed release update channel. */
+    public static boolean releaseUpdateSupported(Context c) { return !isDebug(c); }
+
     private static final String PREFS = "meelano_update";
-    private static boolean autoDone = false;
+    private static volatile boolean autoDone = false;
     private static volatile boolean cancelled = false;
     private static File pendingApk = null;
 
@@ -75,20 +78,23 @@ public final class UpdateCenter {
      */
     public static void autoCheck(Activity a) {
         if (autoDone) return;
-        autoDone = true;
         try {
             if (isDebug(a) || !LicenseStore.unlocked(a)) return;
-            // Checked on every app open (cold start); the once-per-session guard above prevents repeats.
+            // Do not consume the once-per-process attempt while offline; a later foreground
+            // resume may retry after connectivity returns. Manual checks remain available too.
             if (!online(a)) return;
+            autoDone = true;
             final Context app = a.getApplicationContext();
             new Thread(() -> {
                 Info info = fetch(app);
+                // A missing/invalid descriptor and a transient network error both return null;
+                // keep this process's single attempt consumed to avoid retrying on every resume.
+                // Settings still offers an explicit manual check.
                 if (info == null) return;
                 markChecked(app);
                 rememberLatest(app, info);
                 purgeStale(app, info.code);
                 if (info.code <= currentCode(app)) return;
-                SharedPreferences p = prefs(app);
                 // Automatic: on Wi-Fi / unmetered data the update downloads with a progress screen;
                 // on metered data the user is asked first. Android still shows its own install confirmation.
                 if (metered(app)) {
@@ -97,7 +103,10 @@ public final class UpdateCenter {
                     run(a, () -> startDownload(a, info));
                 }
             }).start();
-        } catch (Exception ignored) { Diag.ignored("UpdateCenter:96", ignored); }
+        } catch (Exception ignored) {
+            autoDone = false;
+            Diag.ignored("UpdateCenter:96", ignored);
+        }
     }
 
     /** Manual check from Settings: always talks to the user. */
@@ -309,7 +318,7 @@ public final class UpdateCenter {
                     if (box[0] != null) box[0].dismiss();
                 } catch (Exception ignored) { Diag.ignored("UpdateCenter:276", ignored); }
             }), kit.lp(-1, -2));
-            AlertDialog d = kit.dialog("⬆ بروزرسانی میلانو زرین‌فرمان", kit.scrollWrap(body, 440), true);
+            AlertDialog d = kit.dialog("⬆ بروزرسانی میلانو", kit.scrollWrap(body, 440), true);
             box[0] = d;
             d.setOnDismissListener(dd -> recordDismiss(a, info.code));
             d.show();
@@ -620,7 +629,7 @@ public final class UpdateCenter {
                 LinearLayout body = kit.v();
                 body.setPadding(Theme.dp(18), Theme.dp(4), Theme.dp(18), Theme.dp(12));
                 body.addView(kit.text(
-                        "برای نصب نسخه جدید، در صفحه بعد گزینه «اجازه نصب از این منبع» را برای «میلانو زرین‌فرمان» روشن کنید و برگردید؛ نصب خودکار ادامه پیدا می‌کند.",
+                        "برای نصب نسخه جدید، در صفحه بعد گزینه «اجازه نصب از این منبع» را برای «میلانو» روشن کنید و برگردید؛ نصب خودکار ادامه پیدا می‌کند.",
                         13.5f, Theme.TEXT, false), kit.lp(-1, -2));
                 body.addView(kit.gap(10));
                 final AlertDialog[] box = new AlertDialog[1];
@@ -679,7 +688,7 @@ public final class UpdateCenter {
             LinearLayout body = kit.v();
             body.setPadding(Theme.dp(18), Theme.dp(4), Theme.dp(18), Theme.dp(12));
             body.addView(kit.text(
-                    "نسخه " + Money.fa(info.name) + " با امضای رسمی و امن میلانو زرین‌فرمان منتشر شده، ولی نصب فعلی شما آزمایشی است و اندروید اجازه جایگزینی مستقیم نمی‌دهد. فقط همین یک‌بار این سه قدم را انجام دهید؛ از این به بعد همه بروزرسانی‌ها با یک لمس نصب می‌شوند:",
+                    "نسخه " + Money.fa(info.name) + " با امضای رسمی و امن میلانو منتشر شده، ولی نصب فعلی شما آزمایشی است و اندروید اجازه جایگزینی مستقیم نمی‌دهد. فقط همین یک‌بار این سه قدم را انجام دهید؛ از این به بعد همه بروزرسانی‌ها با یک لمس نصب می‌شوند:",
                     13.5f, Theme.TEXT, false), kit.lp(-1, -2));
             body.addView(kit.gap(8));
             LinearLayout card = kit.card(Theme.GOLD);
@@ -718,7 +727,7 @@ public final class UpdateCenter {
                 return;
             }
             ShareProvider.share(a, pub, "application/vnd.android.package-archive",
-                    "فایل نصب میلانو زرین‌فرمان " + info.name);
+                    "فایل نصب میلانو " + info.name);
         } catch (Exception e) {
             toast(a, "اشتراک ممکن نشد؛ دوباره تلاش کنید");
         }

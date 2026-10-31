@@ -38,7 +38,7 @@ public class UsersScreen extends Screen {
     public String title() { return "کاربران"; }
 
     @Override
-    public String glyph() { return "⛉"; }
+    public String glyph() { return Theme.isLight() ? "⛉" : "♛"; }
 
     @Override
     public int accent() { return Theme.STEEL; }

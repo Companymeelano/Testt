@@ -2,6 +2,10 @@ package ir.meelano.manager.core;
 
 import ir.meelano.manager.data.Meta;
 
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+
 /** The complete report list: every report the system offers, in one place. */
 public final class ReportCatalog {
     private ReportCatalog() { }
@@ -65,6 +69,25 @@ public final class ReportCatalog {
     /** The group that holds the financial sections (treasury). */
     public static final String TREASURY = "خزانه‌داری";
 
+    /**
+     * Sales managers get actionable sales, customer-retention and field-team reports only.
+     * Company managers continue to see the complete catalog; finance, profit, HR and stock
+     * diagnostics are deliberately not exposed through the sales-manager report screen.
+     */
+    private static final Set<String> SALES_MANAGER_REPORTS = new HashSet<>(Arrays.asList(
+            "today_top", "fleeing_customers", "lost_basket", "visitor_yield", "visitor_scorecard",
+            "golden_hours", "sales_daily", "sales_top_products", "sales_by_customer", "sales_monthly",
+            "yoy_sales", "sales_price_spread", "sales_by_visitor", "sales_by_route", "sales_by_group",
+            "sales_by_kala_group", "visitor_perf", "new_customers", "inactive_customers", "cust_by_kind",
+            "cust_by_personality", "cust_no_cell", "cust_no_location", "cust_frequency", "cust_new_monthly",
+            "cust_avg_invoice", "uniq_retention", "uniq_basket", "uniq_declining"));
+
+    /** Report visibility is role-based as well as screen-based; a hidden row cannot be opened by search. */
+    public static boolean availableToRole(Spec spec, String role) {
+        if (spec == null) return false;
+        return !RoleStore.SALES_MANAGER.equals(role) || SALES_MANAGER_REPORTS.contains(spec.id);
+    }
+
     /** Sub-sections shown under «خزانه‌داری». */
     public static boolean isTreasurySection(String section) {
         return "دریافتی‌ها و پرداخت".equals(section) || "چک‌ها".equals(section)
@@ -73,8 +96,8 @@ public final class ReportCatalog {
     }
 
     public static final Spec[] ALL = {
-            // ---- ویژه مدیر (v22: the vital few, checked every morning) ----
-            s("today_top", "پرفروش‌ترین‌های امروز", "ویژه مدیر", "کالاهای دارای بیشترین فروش ریالی امروز", false,
+            // ---- company-manager control reports; sales leaders are grouped under Sales below ----
+            s("today_top", "پرفروش‌ترین‌های امروز", "فروش", "کالاهای دارای بیشترین فروش ریالی امروز", false,
                     new Col[]{c("label", "کالا", T_TEXT), c("qty", "مقدار", T_NUM), c("total", "جمع فروش", T_MONEY), c("docs", "ردیف", T_NUM)},
                     C_BARS, "label", "total"),
             s("cheques_today", "سررسیدهای امروز و فردا", "ویژه مدیر", "چک‌های دریافتی با سررسید امروز یا فردا — اقدام فوری", false,
@@ -90,12 +113,12 @@ public final class ReportCatalog {
                             c("lastSale", "آخرین خرید", T_DATE)},
                     C_NONE, "", ""),
             // ---- هوشمند (v13) ----
-            s("fleeing_customers", "مشتریان در حال فرار", "هوشمند", "خریداران منظمی که بیش از ۴۵ روز است نیامده‌اند + زیان تقریبی", false,
+            s("fleeing_customers", "مشتریان در حال فرار", "مشتریان", "خریداران منظمی که بیش از ۴۵ روز است نیامده‌اند + زیان تقریبی", false,
                     new Col[]{c("name", "مشتری", T_TEXT), c("cell", "همراه", T_TEXT), c("balance", "مانده", T_MONEY),
                             c("lastBuy", "آخرین خرید", T_DATE), c("daysAway", "روز غیبت", T_NUM), c("invoices", "فاکتور سال", T_NUM),
                             c("avgBuy", "میانگین سبد", T_MONEY), c("lostEst", "زیان تقریبی", T_MONEY)},
                     C_BARS, "name", "lostEst"),
-            s("lost_basket", "سبد گمشده", "هوشمند", "کالای مکملی که مشتری نخریده ولی مشابه‌خریداران خریده‌اند + ارزش فرصت", false,
+            s("lost_basket", "سبد گمشده", "فروش", "کالای مکملی که مشتری نخریده ولی مشابه‌خریداران خریده‌اند + ارزش فرصت", false,
                     new Col[]{c("customer", "مشتری", T_TEXT), c("bought", "خریده", T_TEXT), c("missed", "نخریده", T_TEXT),
                             c("together", "همراه‌خرید", T_NUM), c("missedValue", "ارزش فرصت", T_MONEY)},
                     C_NONE, "", ""),
@@ -109,7 +132,15 @@ public final class ReportCatalog {
                             c("churned", "ریزش", T_NUM), c("invoices", "فاکتور", T_NUM), c("sales", "فروش", T_MONEY),
                             c("perCust", "فاکتور/مشتری", T_NUM)},
                     C_BARS, "name", "sales"),
-            s("golden_hours", "ساعت طلایی فروش", "هوشمند", "پرفروش‌ترین ساعت‌ها (یا روزهای هفته، اگر ساعت ثبت نشده باشد)", true,
+            s("visitor_scorecard", "امتیاز و اقدام ویزیتورها", "تحلیل ویزیتور و مسیر",
+                    "هدف ریالی عمومیِ فعال متناسب با روزهای هم‌پوشان محاسبه می‌شود؛ امتیاز تحقق فروش نسبت به هدف (سقف ۱۰۰): ۱۰۰٪ به بالا پیشتاز، ۸۰–۹۹ نزدیک هدف، ۶۰–۷۹ جبرانی، کمتر از ۶۰ مداخله فوری. اهداف تفکیکی جمع نمی‌شوند؛ پوشش و رشد فروش مکمل‌اند، وصول/سود در امتیاز نیست.", true,
+                    new Col[]{c("name", "ویزیتور", T_TEXT), c("action", "گروه اقدام", T_TEXT),
+                            c("score", "امتیاز /۱۰۰", T_TEXT), c("attainment", "تحقق هدف", T_TEXT),
+                            c("sales", "فروش", T_MONEY), c("target", "هدف متناسب", T_MONEY),
+                            c("portfolio", "خریدار/منتسب • پوشش", T_TEXT), c("invoices", "فاکتور", T_NUM),
+                            c("growth", "تغییر با دوره قبل", T_TEXT)},
+                    C_NONE, "", ""),
+            s("golden_hours", "ساعت طلایی فروش", "فروش", "پرفروش‌ترین ساعت‌ها (یا روزهای هفته، اگر ساعت ثبت نشده باشد)", true,
                     new Col[]{c("slot", "بازه", T_TEXT), c("total", "جمع فروش", T_MONEY), c("docs", "اسناد", T_NUM)},
                     C_BARS, "slot", "total"),
             s("sleeping_capital", "سرمایه خوابیده", "هوشمند", "کالاهای بدون فروش ۹۰ روزه + سرمایه قفل‌شده (پیشنهاد: تسویه پلکانی)", false,
@@ -242,8 +273,14 @@ public final class ReportCatalog {
             s("stock_value", "ارزش موجودی گروه‌ها", "کالا و انبار", "ارزش ریالی موجودی به تفکیک گروه کالا", false,
                     new Col[]{c("label", "گروه", T_TEXT), c("value", "ارزش", T_MONEY), c("count", "اقلام", T_NUM)},
                     C_DONUT, "label", "value"),
+            s("expiry_watch", "هشدار انقضای موجودی", "کالا و انبار",
+                    "موجودی دارای تاریخ انقضای ثبت‌شده در پرونده کالا؛ کالاهای منقضی و حداکثر ۹۰ روز آینده به‌ترتیب فوریت. تاریخ در سطح کالا است، نه بچ/لات.", false,
+                    new Col[]{c("name", "کالا", T_TEXT), c("code", "کد", T_TEXT), c("expiry", "تاریخ انقضا", T_DATE),
+                            c("daysLeft", "روز مانده", T_NUM), c("qty", "موجودی قطعه‌ای", T_NUM),
+                            c("exposureValue", "ارزش بهای در معرض", T_MONEY), c("status", "اقدام", T_TEXT)},
+                    C_NONE, "", ""),
             // ---- مشتریان ----
-            s("debtors", "بدهکاران", "تحلیل ویزیتور و مسیر", "مشتریان دارای مانده بدهی، مرتب‌شده", false,
+            s("debtors", "بدهکاران", "مشتریان", "مشتریان دارای مانده بدهی، مرتب‌شده", false,
                     new Col[]{c("name", "مشتری", T_TEXT), c("cell", "همراه", T_TEXT), c("balance", "مانده", T_MONEY),
                             c("salesTotal", "جمع فروش", T_MONEY), c("lastSale", "آخرین خرید", T_DATE)},
                     C_NONE, "", ""),
@@ -254,7 +291,7 @@ public final class ReportCatalog {
             s("new_customers", "مشتریان جدید", "مشتریان", "مشتریان ثبت‌شده در بازه", true,
                     new Col[]{c("code", "کد", T_TEXT), c("name", "مشتری", T_TEXT), c("date", "تاریخ ثبت", T_DATE), c("visitor", "ویزیتور", T_TEXT)},
                     C_NONE, "", ""),
-            s("inactive_customers", "مشتریان بدون خرید", "تحلیل ویزیتور و مسیر", "مشتریان بدون هیچ فاکتور فروش", false,
+            s("inactive_customers", "مشتریان بدون خرید", "مشتریان", "مشتریان بدون هیچ فاکتور فروش", false,
                     new Col[]{c("code", "کد", T_TEXT), c("party", "مشتری", T_TEXT)},
                     C_NONE, "", ""),
             // ---- ویزیتور ----
@@ -271,12 +308,18 @@ public final class ReportCatalog {
                             c("invoices", "فاکتور", T_NUM), c("customers", "مشتری فعال", T_NUM), c("goals", "هدف", T_MONEY)},
                     C_BARS, "name", "sales"),
             // ---- کاربران ----
-            s("users", "کاربران و آخرین ورود", "کاربران و نظارت", "کاربران سیستم، نقش و آخرین ورود", false,
+            s("users", "کاربران و آخرین ورود", "پرسنل و نظارت", "کاربران سیستم، نقش و آخرین ورود", false,
                     new Col[]{c("name", "کاربر", T_TEXT), c("role", "نقش", T_TEXT), c("active", "فعال", T_TEXT),
                             c("lastLogin", "آخرین ورود", T_TEXT), c("todayN", "امروز", T_NUM)},
                     C_NONE, "", ""),
-            s("changes", "تغییرات ثبت‌شده", "کاربران و نظارت", "آخرین تغییرات ثبت‌شده در سیستم", true,
+            s("changes", "تغییرات ثبت‌شده", "پرسنل و نظارت", "آخرین تغییرات ثبت‌شده در سیستم", true,
                     new Col[]{c("at", "زمان", T_TEXT), c("tableName", "جدول", T_TEXT), c("username", "کاربر", T_TEXT), c("descrip", "شرح", T_TEXT)},
+                    C_NONE, "", ""),
+            s("staff_attendance", "ممیزی حضور و تردد پرسنل", "پرسنل و نظارت",
+                    "رویدادهای ورود/خروج، منبع ثبت، تأیید زیستی، فاصله و اصلاح/ابطال‌های مدیر؛ تأخیر یا غیبت بدون برنامه شیفت اعلام نمی‌شود.", true,
+                    new Col[]{c("person", "پرسنل", T_TEXT), c("username", "شناسه", T_TEXT), c("event", "رویداد", T_TEXT),
+                            c("eventTime", "زمان شمسی", T_TEXT), c("source", "منبع", T_TEXT), c("distance", "فاصله متر", T_NUM),
+                            c("accuracy", "دقت متر", T_NUM), c("bio", "تأیید", T_TEXT), c("audit", "ممیزی/یادداشت", T_TEXT)},
                     C_NONE, "", ""),
             // ---- سود ----
             s("profit_daily", "سود روزانه", "سود و زیان", "فروش و بهای تمام‌شده هر روز (مبنای قیمت خرید)", true,
@@ -380,11 +423,11 @@ public final class ReportCatalog {
                     new Col[]{c("name", "مشتری", T_TEXT), c("docs", "فاکتور", T_NUM), c("avg", "میانگین فاکتور", T_MONEY),
                             c("total", "جمع فروش", T_MONEY)},
                     C_NONE, "", ""),
-            s("uniq_retention", "ماتریس بازگشت مشتری", "گزارش‌های اختصاصی", "درصد مشتریانی که این ماه خرید کرده‌اند و ماه قبل هم خرید داشته‌اند — ماه اول دوره بدون داده ماه قبل است", true,
+            s("uniq_retention", "ماتریس بازگشت مشتری", "مشتریان", "درصد مشتریانی که این ماه خرید کرده‌اند و ماه قبل هم خرید داشته‌اند — ماه اول دوره بدون داده ماه قبل است", true,
                     new Col[]{c("month", "ماه", T_TEXT), c("active", "مشتریان فعال", T_NUM), c("back", "بازگشتی", T_NUM),
                             c("rate", "نرخ بازگشت (٪)", T_NUM)},
                     C_LINE, "month", "rate"),
-            s("uniq_basket", "کالاهایی که با هم خریده می‌شوند", "گزارش‌های اختصاصی", "جفت کالاهایی که در یک فاکتور فروش با هم آمده‌اند؛ درصد، سهم فاکتورهای دارای آن جفت است", true,
+            s("uniq_basket", "کالاهایی که با هم خریده می‌شوند", "فروش", "جفت کالاهایی که در یک فاکتور فروش با هم آمده‌اند؛ درصد، سهم فاکتورهای دارای آن جفت است", true,
                     new Col[]{c("first", "کالای اول", T_TEXT), c("second", "کالای دوم", T_TEXT), c("together", "دفعات", T_NUM),
                             c("pct", "سهم فاکتورها (٪)", T_NUM)},
                     C_NONE, "", ""),
@@ -398,7 +441,7 @@ public final class ReportCatalog {
                             c("gain", "سود", T_MONEY), c("cash", "دریافت نقد", T_MONEY), c("pos", "دریافت پوز", T_MONEY),
                             c("cheque", "دریافت چک", T_MONEY)},
                     C_BARS, "name", "balance"),
-            s("uniq_declining", "افت خرید مشتریان وفادار", "گزارش‌های اختصاصی", "مشتریانی که ۹۰ روز اخیرشان کمتر از نصف ۹۰ روز قبل خرید داشته‌اند — زودتر از ریزش به سراغشان بروید", false,
+            s("uniq_declining", "افت خرید مشتریان وفادار", "مشتریان", "مشتریانی که ۹۰ روز اخیرشان کمتر از نصف ۹۰ روز قبل خرید داشته‌اند — زودتر از ریزش به سراغشان بروید", false,
                     new Col[]{c("name", "مشتری", T_TEXT), c("code", "کد", T_TEXT), c("prevTotal", "۹۰ روز قبل", T_MONEY),
                             c("curTotal", "۹۰ روز اخیر", T_MONEY), c("dropPct", "افت (٪)", T_NUM)},
                     C_NONE, "", ""),
@@ -617,6 +660,9 @@ public final class ReportCatalog {
         if ("lost_basket".equals(id)) return MasterQueries.lostBasket(m, ff);
         if ("cheque_reliability".equals(id)) return MasterQueries.chequeReliability(m, ff);
         if ("visitor_yield".equals(id)) return MasterQueries.visitorYield(m, ff);
+        if ("visitor_scorecard".equals(id)) return VisitorScorecard.query(m, ff);
+        if ("expiry_watch".equals(id)) return AtiranSpecialReports.expiryWatch(m, ff);
+        if ("staff_attendance".equals(id)) return AtiranSpecialReports.attendanceAudit(m, ff);
         if ("golden_hours".equals(id)) return MasterQueries.goldenHours(m, ff);
         if ("sleeping_capital".equals(id)) return MasterQueries.deadStock(m, 90, 200);
         if ("stock_forecast".equals(id)) return MasterQueries.stockForecast(m, ff);

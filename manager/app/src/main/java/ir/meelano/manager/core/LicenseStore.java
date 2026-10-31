@@ -248,7 +248,7 @@ public final class LicenseStore {
 
     // ---------------- distributor identity (report branding) ----------------
 
-    /** «نام پخش» typed at activation — brands every PDF/Excel/Word/image. */
+    /** Legacy optional report brand from older activation forms; blank falls back to company name. */
     public static String distName(Context c) {
         try {
             String d = prefs(c).getString("dist_name", "");
@@ -274,7 +274,7 @@ public final class LicenseStore {
             String n = Company.get(c).name;
             if (n != null && !n.trim().isEmpty()) return n.trim();
         } catch (Exception ignored) { Diag.ignored("LicenseStore:271", ignored); }
-        return "میلانو زرین‌فرمان";
+        return "میلانو";
     }
 
     /** Customer contact number, remembered for request resends. */

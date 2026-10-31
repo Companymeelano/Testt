@@ -4,6 +4,8 @@ import ir.meelano.manager.core.Diag;
 import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.graphics.Canvas;
+import android.graphics.Paint;
 import android.text.InputType;
 import android.text.TextUtils;
 import android.view.Gravity;
@@ -63,7 +65,13 @@ public final class Kit {
         t.setTextSize(base * grow);
         t.setTextColor(color);
         t.setTypeface(Theme.face(bold));
+        t.setFontFeatureSettings("tnum");
         t.setLineSpacing(Theme.dp(1.5f), 1.0f);
+        // Lock the paragraph direction to RTL: a pure-digit value («۱۴۰۵/۰۸/۰۳», «۹٫۸»)
+        // has no strong directional character, so first-strong heuristics fall back to
+        // LTR and the value would slide to the left edge - visible inside dialogs where
+        // the stock resolution differs from the activity window.
+        t.setTextDirection(View.TEXT_DIRECTION_RTL);
         MeelanoIcons.iconize(t);
         return t;
     }
@@ -149,10 +157,22 @@ public final class Kit {
         c.setBackground(Theme.hero(accent));
         c.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(15));
         LinearLayout head = h();
-        TextView g = text(glyph, 30, accent, true);
-        g.setGravity(Gravity.CENTER);
-        g.setBackground(Theme.avatar(Theme.alpha(accent, 60)));
-        head.addView(g, new LinearLayout.LayoutParams(Theme.dp(58), Theme.dp(58)));
+        int heroVector = MeelanoIcons.iconFor(glyph);
+        // The emblem of a title follows the skin: the nut look shows the emerald artwork.
+        int hero3d = heroVector == 0 ? 0 : Theme.chrome3d(heroVector);
+        boolean use3dHero = heroVector != 0 && Theme.isIcon3d(hero3d);
+        if (use3dHero) {
+            ImageView emblem = new ImageView(a);
+            emblem.setImageResource(hero3d);
+            emblem.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            emblem.setContentDescription(null);
+            head.addView(emblem, new LinearLayout.LayoutParams(Theme.dp(58), Theme.dp(58)));
+        } else {
+            TextView g = text(glyph, 30, accent, true);
+            g.setGravity(Gravity.CENTER);
+            g.setBackground(Theme.avatar(Theme.alpha(accent, 60)));
+            head.addView(g, new LinearLayout.LayoutParams(Theme.dp(58), Theme.dp(58)));
+        }
         head.addView(space(10));
         LinearLayout copy = v();
         copy.setPadding(Theme.dp(2), 0, 0, 0);
@@ -169,12 +189,17 @@ public final class Kit {
         r.setGravity(Gravity.CENTER_VERTICAL);
         r.setPadding(Theme.dp(3), Theme.dp(4), Theme.dp(3), Theme.dp(7));
 
+        int sectionGlyph = sectionIcon(title);
+        boolean useLarge3d = Theme.isIcon3d(Theme.icon3d(sectionGlyph));
         FrameLayout badge = new FrameLayout(a);
         badge.setBackground(Theme.avatar(Theme.alpha(accent, Theme.isLight() ? 38 : 48)));
-        ImageView symbol = icon(sectionIcon(title), accent, 17);
-        FrameLayout.LayoutParams sp = new FrameLayout.LayoutParams(Theme.dp(20), Theme.dp(20), Gravity.CENTER);
+        ImageView symbol = icon(sectionGlyph, accent, useLarge3d ? 28 : 17);
+        int symbolSize = useLarge3d ? 30 : 20;
+        FrameLayout.LayoutParams sp = new FrameLayout.LayoutParams(
+                Theme.dp(symbolSize), Theme.dp(symbolSize), Gravity.CENTER);
         badge.addView(symbol, sp);
-        r.addView(badge, new LinearLayout.LayoutParams(Theme.dp(34), Theme.dp(34)));
+        int badgeSize = useLarge3d ? 42 : 34;
+        r.addView(badge, new LinearLayout.LayoutParams(Theme.dp(badgeSize), Theme.dp(badgeSize)));
         r.addView(space(8));
 
         TextView t = text(title, 14f, accent, true);
@@ -197,20 +222,25 @@ public final class Kit {
     private int sectionIcon(String title) {
         String s = title == null ? "" : title.replace('ي', 'ی').replace('ك', 'ک');
         if (s.contains("هشدار")) return R.drawable.mi_warning;
-        if (s.contains("برگشت")) return R.drawable.mi_assignment_return;
-        if (s.contains("ویزیتور")) return R.drawable.mi_person_search;
+        // Dashboard comparisons and trends are analytics sections, not sale-category labels.
+        if (s.contains("روند") || s.contains("مقایسه")) return R.drawable.mi_bar_chart;
+        // Use mapped 3D concepts for section-specific glyphs that have no dedicated gold artwork.
+        if (s.contains("برگشت")) return R.drawable.mi_refresh;
+        if (s.contains("ویزیتور")) return R.drawable.mi_group;
         if (s.contains("مشتری") || s.contains("بدهکار") || s.contains("طرف‌حساب")) return R.drawable.mi_group;
         if (s.contains("انبار") || s.contains("موجودی") || s.contains("کالا")) return R.drawable.mi_inventory_2;
-        if (s.contains("دریافت")) return R.drawable.mi_payments;
-        if (s.contains("پرداخت") || s.contains("نقدینگی")) return R.drawable.mi_account_balance_wallet;
-        if (s.contains("چک") || s.contains("سررسید")) return R.drawable.mi_receipt_long;
+        if (s.contains("دریافت")) return R.drawable.mi_receipt_long;
+        if (s.contains("پرداخت")) return R.drawable.mi_payments;
+        if (s.contains("نقدینگی")) return R.drawable.mi_trending_up;
+        if (s.contains("چک")) return R.drawable.mi_cheque;
+        if (s.contains("سررسید")) return R.drawable.mi_calendar_month;
         if (s.contains("خرید")) return R.drawable.mi_shopping_cart;
         if (s.contains("فروش")) return R.drawable.mi_sell;
         if (s.contains("فاکتور")) return R.drawable.mi_receipt_long;
         if (s.contains("کاربر")) return R.drawable.mi_person;
         if (s.contains("گزارش") || s.contains("تحلیل") || s.contains("روند") || s.contains("عملکرد")) return R.drawable.mi_bar_chart;
         if (s.contains("تنظیم")) return R.drawable.mi_settings;
-        if (s.contains("پیگیری")) return R.drawable.mi_schedule;
+        if (s.contains("پیگیری")) return R.drawable.mi_calendar_month;
         if (s.contains("روز")) return R.drawable.mi_calendar_month;
         return R.drawable.mi_star_shine;
     }
@@ -234,12 +264,18 @@ public final class Kit {
         public final String sub;
         public final int accent;
         public final Runnable action;
+        /** Optional unabridged value announced by TalkBack and shown on long-press. */
+        public String fullValue;
         /** When not NaN, the tile counts up from 0 to this number. */
         public final double countTo;
         /** Optional daily series (oldest first) drawn as a sparkline under the value. */
         public double[] spark;
         /** Optional drawable shown above the label (0 = none). */
         public int icon = 0;
+        /** True when the tile wears the emerald family of the manager's board. Off by default. */
+        public boolean emeraldIcon = false;
+        /** Optional explicit note colour (0 = the accent, or the trend rule below). */
+        public int subColor = 0;
 
         public Kpi(String label, String value, String sub, int accent) {
             this(label, value, sub, accent, null);
@@ -271,13 +307,15 @@ public final class Kit {
         // Centred composition like the reference: icon, label, value and note share one axis.
         t.setGravity(Gravity.CENTER_HORIZONTAL);
         if (k.icon != 0) {
-            // Optional gold glyph above the label (dashboard tiles).
+            // Optional gold glyph above the label (dashboard tiles). The manager's own
+            // board asks for the emerald twin; every other tile keeps the gold set.
+            int ico = k.emeraldIcon ? Theme.emerald3d(k.icon) : Theme.icon3d(k.icon);
             android.widget.ImageView ic = new android.widget.ImageView(a);
             try {
-                ic.setImageResource(Theme.icon3d(k.icon));
-                if (!Theme.isIcon3d(Theme.icon3d(k.icon))) ic.setColorFilter(Theme.GOLD);
+                ic.setImageResource(ico);
+                if (!Theme.isIcon3d(ico)) ic.setColorFilter(Theme.GOLD);
             } catch (Exception ignored) { Diag.ignored("Kit:kpiIcon", ignored); }
-            int isz = Theme.isIcon3d(Theme.icon3d(k.icon)) ? (Theme.isNuts() ? 60 : 30) : 24;
+            int isz = Theme.isIcon3d(ico) ? (Theme.isNuts() ? 60 : 30) : 24;
             LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(Theme.dp(isz), Theme.dp(isz));
             ip.gravity = Gravity.CENTER_HORIZONTAL;
             ip.bottomMargin = Theme.dp(4);
@@ -321,7 +359,8 @@ public final class Kit {
         // Trend notes read green when up and red when down, as in the reference market tiles.
         String sub0 = k.sub == null ? "" : k.sub.trim();
         int subColor = k.accent;
-        if (sub0.startsWith("▲") || sub0.startsWith("↗") || sub0.startsWith("+")) subColor = Theme.SUCCESS;
+        if (k.subColor != 0) subColor = k.subColor;
+        else if (sub0.startsWith("▲") || sub0.startsWith("↗") || sub0.startsWith("+")) subColor = Theme.SUCCESS;
         else if (sub0.startsWith("▼") || sub0.startsWith("↘") || sub0.startsWith("-")) subColor = Theme.DANGER;
         TextView s = text(k.sub == null || k.sub.isEmpty() ? " " : k.sub, 10f, subColor, true);
         s.setGravity(Gravity.CENTER_HORIZONTAL);
@@ -332,6 +371,17 @@ public final class Kit {
         more.setGravity(Gravity.CENTER_HORIZONTAL);
         more.setSingleLine(true);
         t.addView(more, lp(-1, -2));
+        String complete = k.fullValue == null || k.fullValue.trim().isEmpty() ? k.value : k.fullValue;
+        String spoken = k.label + ": " + (complete == null ? "" : complete);
+        t.setContentDescription(spoken);
+        if (android.os.Build.VERSION.SDK_INT >= 26) t.setTooltipText(spoken);
+        View.OnLongClickListener reveal = vw -> {
+            Toast.makeText(a, spoken, Toast.LENGTH_LONG).show();
+            return true;
+        };
+        t.setOnLongClickListener(reveal);
+        v.setContentDescription(complete == null ? "" : complete);
+        v.setOnLongClickListener(reveal);
         if (k.action != null) {
             Theme.pressable(t);
             t.setOnClickListener(vw -> k.action.run());
@@ -390,10 +440,12 @@ public final class Kit {
         LinearLayout r = v();
         r.setPadding(0, Theme.dp(7), 0, Theme.dp(7));
         TextView key = text(k, 11f, Theme.MUTED, false);
-        key.setGravity(Gravity.START);
+        key.setGravity(Gravity.RIGHT);
         r.addView(key, lp(-1, -2));
         TextView val = text(v == null || v.isEmpty() ? "—" : v, 13f, vColor, true);
-        val.setGravity(Gravity.START);
+        // Absolute RIGHT (not START): inside dialog windows START may resolve against
+        // a non-RTL layout direction and pure-numeric values would drift to the left.
+        val.setGravity(Gravity.RIGHT);
         val.setPadding(0, Theme.dp(2), 0, 0);
         r.addView(val, lp(-1, -2));
         return r;
@@ -525,26 +577,66 @@ public final class Kit {
         return c;
     }
 
+    /** Fraction bar: track + fill drawn in onDraw — exact at any size, no layout races. */
+    public static final class FracBar extends View {
+        private final Paint trackPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final android.graphics.RectF box = new android.graphics.RectF();
+        private float frac;
+
+        public FracBar(Activity a) {
+            super(a);
+            setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+        }
+
+        /** Fill grows smoothly from the right edge (RTL) when motion is allowed. */
+        public void set(float target, int color, boolean animate) {
+            final float f = Math.max(0f, Math.min(1f, target));
+            fillPaint.setColor(color);
+            trackPaint.setColor(Theme.alpha(color, 55));
+            if (!animate || !ir.meelano.manager.ui.Ui.motionOk((Activity) getContext())) {
+                frac = f;
+                invalidate();
+                return;
+            }
+            ValueAnimator anim = ValueAnimator.ofFloat(0f, f);
+            anim.setDuration(520);
+            anim.setInterpolator(new android.view.animation.DecelerateInterpolator());
+            anim.addUpdateListener(v -> {
+                frac = (float) v.getAnimatedValue();
+                invalidate();
+            });
+            anim.start();
+        }
+
+        @Override
+        protected void onDraw(Canvas g) {
+            super.onDraw(g);
+            float w = getWidth(), h = getHeight();
+            if (w <= 0 || h <= 0) return;
+            float r = h / 2f;
+            box.set(0, 0, w, h);
+            g.drawRoundRect(box, r, r, trackPaint);
+            float fw = frac >= 0.999f ? w : w * frac;
+            if (fw > 0 && frac > 0f) {
+                fw = Math.max(fw, Math.min(w, r)); // keep the rounded cap visible
+                box.set(w - fw, 0, w, h);
+                g.drawRoundRect(box, r, r, fillPaint);
+            }
+        }
+    }
+
     public View progressLine(String label, String value, double frac, int color) {
         LinearLayout root = v();
         LinearLayout head = h();
         head.addView(text(label, 11.5f, Theme.MUTED, false), wlp(1f));
         head.addView(text(value, 11.5f, color, true), lp(-2, -2));
         root.addView(head, lp(-1, -2));
-        FrameLayout track = new FrameLayout(a);
-        track.setBackground(Theme.pill(Theme.alpha(color, 60)));
-        final View fill = new View(a);
-        fill.setBackground(Theme.pill(color));
-        track.addView(fill, new FrameLayout.LayoutParams(-1, -1));
-        final float fr = (float) Math.max(0, Math.min(1, frac));
-        track.post(() -> {
-            android.view.ViewGroup.LayoutParams p = fill.getLayoutParams();
-            p.width = Math.max(Theme.dp(6), (int) (track.getWidth() * fr));
-            fill.setLayoutParams(p);
-        });
+        FracBar bar = new FracBar(a);
+        bar.set((float) frac, color, true);
         LinearLayout.LayoutParams tp = lp(-1, Theme.dp(7));
         tp.setMargins(0, Theme.dp(5), 0, 0);
-        root.addView(track, tp);
+        root.addView(bar, tp);
         return root;
     }
 
@@ -601,21 +693,63 @@ public final class Kit {
     }
 
     public View chipsRow(java.util.List<String> items, int selected, int accent, final ChipsListener l) {
+        return chipsRow(items, selected, accent, null, l);
+    }
+
+    /** Theme choices with matching, untinted 3D icons and a shared touch height. */
+    public View chipsWithIcons(String[] items, int selected, int[] iconRes,
+                               int accent, final ChipsListener l) {
+        return chipsRow(java.util.Arrays.asList(items), selected, accent, iconRes, l);
+    }
+
+    private View chipsRow(java.util.List<String> items, int selected, int accent,
+                          int[] icons, final ChipsListener l) {
         HorizontalScrollView sv = new HorizontalScrollView(a);
         sv.setHorizontalScrollBarEnabled(false);
         sv.setClipToPadding(false);
+        // A chip that is cut off by the edge must read as "there is more", not as a broken
+        // layout, so the content fades out where it leaves the row.
+        sv.setHorizontalFadingEdgeEnabled(true);
+        sv.setFadingEdgeLength(Theme.dp(22));
         sv.setPadding(Theme.dp(2), 0, Theme.dp(2), 0);
         LinearLayout r = h();
         r.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         for (int i = 0; i < items.size(); i++) {
             final int idx = i;
-            View ch = chip(items.get(i), i == selected, accent, v -> l.onPick(idx));
+            boolean chosen = i == selected;
+            int iconRes = icons != null && i < icons.length ? icons[i] : 0;
+            View ch = iconRes != 0
+                    ? chipWithIcon(items.get(i), chosen, accent, iconRes, v -> l.onPick(idx))
+                    : chip(items.get(i), chosen, accent, v -> l.onPick(idx));
+            if (icons != null) ch.setMinimumHeight(Theme.dp(48));
             LinearLayout.LayoutParams p = lp(-2, -2);
             p.setMarginEnd(Theme.dp(8));
             r.addView(ch, p);
         }
         sv.addView(r, new HorizontalScrollView.LayoutParams(-2, -2));
         return sv;
+    }
+
+    private View chipWithIcon(String label, boolean selected, int accent, int iconRes,
+                              View.OnClickListener onClick) {
+        int ink = selected ? Theme.onAccent(accent) : accent;
+        LinearLayout c = h();
+        c.setGravity(Gravity.CENTER_VERTICAL);
+        c.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        c.setBackground(Theme.chip(selected, selected ? accent : Theme.alpha(accent, 255)));
+        c.setPadding(Theme.dp(10), Theme.dp(5), Theme.dp(12), Theme.dp(5));
+        ImageView artwork = icon(iconRes, ink, 26);
+        c.addView(artwork, lp(Theme.dp(26), Theme.dp(26)));
+        c.addView(space(5), lp(Theme.dp(5), 1));
+        TextView title = text(label, 11.5f, ink, true);
+        title.setSingleLine(true);
+        c.addView(title, lp(-2, -2));
+        c.setContentDescription(label);
+        c.setSelected(selected);
+        c.setFocusable(true);
+        Theme.pressable(c);
+        c.setOnClickListener(onClick);
+        return c;
     }
 
     public interface ChipsListener {
@@ -820,6 +954,22 @@ public final class Kit {
     }
 
     public View pager(int page, boolean hasMore, final Runnable prev, final Runnable next) {
+        return pagerRow(page, "صفحه " + Money.fa(String.valueOf(page + 1)), hasMore, prev, next);
+    }
+
+    /** Pager label backed by an exact filtered count when available. */
+    public View pager(int page, long total, int pageSize, boolean totalKnown, boolean fallbackHasMore,
+                      final Runnable prev, final Runnable next) {
+        if (!totalKnown || pageSize <= 0) return pager(page, fallbackHasMore, prev, next);
+        long pages = total <= 0 ? 0 : (total + pageSize - 1L) / pageSize;
+        boolean hasMore = page + 1L < pages;
+        String label = pages == 0 ? "بدون نتیجه"
+                : "صفحه " + Money.fa(String.valueOf(page + 1)) + " از " + Money.fa(String.valueOf(pages));
+        return pagerRow(page, label, hasMore, prev, next);
+    }
+
+    private View pagerRow(int page, String label, boolean hasMore,
+                          final Runnable prev, final Runnable next) {
         LinearLayout r = h();
         r.setGravity(Gravity.CENTER);
         Button p = btnGhost("‹ قبلی", Theme.GOLD, v -> prev.run());
@@ -827,7 +977,7 @@ public final class Kit {
         p.setAlpha(page > 0 ? 1f : 0.4f);
         r.addView(p, lp(-2, -2));
         r.addView(space(10));
-        TextView t = text("صفحه " + Money.fa(String.valueOf(page + 1)), 12f, Theme.MUTED, true);
+        TextView t = text(label, 12f, Theme.MUTED, true);
         r.addView(t, lp(-2, -2));
         r.addView(space(10));
         Button n = btnGhost("بعدی ›", Theme.GOLD, v -> next.run());
@@ -1037,6 +1187,7 @@ public final class Kit {
         tv.setGravity(Gravity.CENTER);
         int pad = Theme.dp(14);
         tv.setPadding(pad, pad, pad, Theme.dp(4));
+        if (body != null) body.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         AlertDialog d = new AlertDialog.Builder(a)
                 .setCustomTitle(tv)
                 .setView(body)
@@ -1267,13 +1418,27 @@ public final class Kit {
 
     public View invRowTone(String name, String code, String extra, String qty, String price,
                            String status, int tone, View.OnClickListener onClick) {
+        return invRowTone(name, code, extra, qty, price, status, tone, Theme.GOLD_SOFT, onClick);
+    }
+
+    public View invRowTone(String name, String code, String extra, String qty, String price,
+                           String status, int tone, int priceColor, View.OnClickListener onClick) {
+        return invRowTone(name, code, extra, qty, price, status, tone, priceColor, false, onClick);
+    }
+
+    /** Compact catalogue row: less padding, while preserving a large-font 48dp touch target. */
+    public View invRowTone(String name, String code, String extra, String qty, String price,
+                           String status, int tone, int priceColor, boolean compact,
+                           View.OnClickListener onClick) {
         LinearLayout c = v();
         c.setBackground(Theme.card());
-        c.setPadding(Theme.dp(12), Theme.dp(11), Theme.dp(12), Theme.dp(11));
+        c.setMinimumHeight(Theme.dp(48));
+        int padV = compact ? 8 : 11;
+        c.setPadding(Theme.dp(12), Theme.dp(padV), Theme.dp(12), Theme.dp(padV));
         LinearLayout head = h();
         LinearLayout copy = v();
-        TextView n = text(name, 14f, Theme.TEXT, true);
-        n.setSingleLine(true);
+        TextView n = text(name, compact ? 13.5f : 14f, Theme.TEXT, true);
+        n.setMaxLines(compact ? 2 : 1);
         n.setEllipsize(TextUtils.TruncateAt.END);
         copy.addView(n, lp(-1, -2));
         String sub = code == null ? "" : code;
@@ -1291,10 +1456,16 @@ public final class Kit {
             side.addView(stockChip(status, tone), lp(-2, -2));
             side.addView(space(0), lp(-2, Theme.dp(4)));
         }
-        if (qty != null && !qty.isEmpty()) side.addView(text(qty, 12.5f, Theme.TEXT, true), lp(-2, -2));
-        if (price != null && !price.isEmpty()) side.addView(text(price, 11f, Theme.GOLD_SOFT, false), lp(-2, -2));
+        if (qty != null && !qty.isEmpty()) side.addView(text(qty, compact ? 12f : 12.5f, Theme.TEXT, true), lp(-2, -2));
+        if (price != null && !price.isEmpty()) side.addView(text(price, compact ? 10.5f : 11f, priceColor, false), lp(-2, -2));
         head.addView(side, lp(-2, -2));
         c.addView(head, lp(-1, -2));
+        StringBuilder spoken = new StringBuilder(name == null ? "" : name);
+        if (code != null && !code.isEmpty()) spoken.append(". ").append(code);
+        if (qty != null && !qty.isEmpty()) spoken.append(". ").append(qty);
+        if (price != null && !price.isEmpty()) spoken.append(". ").append(price);
+        if (status != null && !status.isEmpty()) spoken.append(". ").append(status);
+        c.setContentDescription(spoken.toString());
         if (onClick != null) {
             Theme.pressable(c);
             c.setOnClickListener(onClick);

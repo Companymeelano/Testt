@@ -51,7 +51,7 @@ public class ResidScreen extends Screen {
     public String title() { return "رسید کالا"; }
 
     @Override
-    public String glyph() { return "📥"; }
+    public String glyph() { return Theme.isLight() ? "📥" : "📦"; }
 
     @Override
     public int accent() { return Theme.INFO; }

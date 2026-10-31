@@ -48,7 +48,7 @@ public class MoneyScreen extends Screen {
     public String title() { return p == 0 ? "دریافت‌ها" : "پرداخت‌ها"; }
 
     @Override
-    public String glyph() { return p == 0 ? "↓" : "↑"; }
+    public String glyph() { return Theme.isLight() ? (p == 0 ? "↓" : "↑") : (p == 0 ? "🪙" : "💸"); }
 
     @Override
     public int accent() { return p == 0 ? Theme.SUCCESS : Theme.WARNING; }
@@ -170,7 +170,7 @@ public class MoneyScreen extends Screen {
             List<Charts.Point> pts = new ArrayList<>();
             for (Row r : d.daily) pts.add(new Charts.Point(Jalali.shortLabel(r.s("day")), r.d("total")));
             final TextView cap = a.kit.text("", 11f, Theme.MUTED, false);
-            ch.setData(pts, accent(), Charts.COMPACT);
+            ch.setData(pts, accent(), Charts.MONEY);
             ch.setListener((idx, pt) -> cap.setText(Money.fa(pt.label) + " • " + Money.rial(pt.value)));
             c.addView(ch, new LinearLayout.LayoutParams(-1, Theme.dp(175)));
             c.addView(cap, a.kit.lp(-1, -2));

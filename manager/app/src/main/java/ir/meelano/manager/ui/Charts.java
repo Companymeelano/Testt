@@ -49,6 +49,21 @@ public final class Charts {
 
     public static final Formatter COMPACT = Money::compact;
     public static final Formatter FULL = Money::rial;
+    /**
+     * Money axis in the DISPLAY unit (Toman by default): the rest of the app shows
+     * Toman, so an axis of raw Rial magnitudes used to read ten times too large.
+     */
+    public static final Formatter MONEY = v -> Money.compact(Money.toUnit(v));
+
+    /** 1 / 2 / 2.5 / 5 × 10ⁿ — the friendliest step that covers the raw span. */
+    private static double niceStep(double raw) {
+        if (!(raw > 0) || Double.isNaN(raw)) return 1;
+        double exp = Math.floor(Math.log10(raw));
+        double base = Math.pow(10, exp);
+        double f = raw / base;
+        double n = f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10;
+        return n * base;
+    }
 
     private static final int[] PALETTE = {
             0xFFD9AE5A, 0xFF4FA3FF, 0xFF35C26E, 0xFF9A7BFF, 0xFFF5A524,
@@ -127,13 +142,29 @@ public final class Charts {
         Base(Context c) {
             super(c);
             text.setTypeface(Theme.face(false));
-            text.setTextSize(Theme.dp(10));
+            text.setTextSize(chartTextPx(10));
             setMinimumHeight(Theme.dp(120));
             try {
                 touchSlop = android.view.ViewConfiguration.get(c).getScaledTouchSlop();
             } catch (Exception e) {
                 touchSlop = Theme.dp(12);
             }
+        }
+
+        /** Canvas text must follow both Android's font scale and the app's zoom/type scale. */
+        float chartTextPx(float sp) {
+            android.util.DisplayMetrics dm = getResources().getDisplayMetrics();
+            float scaledDensity = dm.scaledDensity > 0 ? dm.scaledDensity : dm.density;
+            return sp * scaledDensity * Theme.fontScale() * Theme.typeScale();
+        }
+
+        float axisLabelPad(double minValue, double maxValue, int widthPx) {
+            text.setTypeface(Theme.face(false));
+            text.setTextSize(chartTextPx(10));
+            float label = Math.max(text.measureText(Money.fa(fmt.format(minValue))),
+                    text.measureText(Money.fa(fmt.format(maxValue))));
+            float preferred = Math.max(Theme.dp(46), label + Theme.dp(8));
+            return Math.min(Math.max(Theme.dp(40), widthPx * 0.42f), preferred);
         }
 
         /** True when the gesture is a horizontal scrub (selection); vertical drags scroll. */
@@ -165,6 +196,8 @@ public final class Charts {
 
         public void setListener(PickListener l) {
             listener = l;
+            setClickable(l != null);
+            setFocusable(l != null);
         }
 
         void fire(int idx) {
@@ -189,23 +222,39 @@ public final class Charts {
         return s.length() <= n ? s : s.substring(0, n) + "…";
     }
 
+    static String fitText(String s, Paint paint, float maxWidth) {
+        String value = s == null ? "" : s;
+        if (paint.measureText(value) <= maxWidth) return value;
+        String prefix = value;
+        while (prefix.codePointCount(0, prefix.length()) > 1 && paint.measureText(prefix + "…") > maxWidth) {
+            int lastCodePoint = prefix.offsetByCodePoints(0, prefix.codePointCount(0, prefix.length()) - 1);
+            prefix = prefix.substring(0, lastCodePoint);
+        }
+        return prefix.codePointCount(0, prefix.length()) <= 1
+                && paint.measureText(prefix + "…") > maxWidth ? "…" : prefix + "…";
+    }
+
     /** Gold tooltip bubble with theme-aware text, clamped inside [0, maxW]. */
-    static void bubble(Canvas g, Paint paint, Paint text, String s, float cx, float yText, float maxW) {
-        text.setTextSize(Theme.dp(10.5f));
+    static void bubble(Canvas g, Paint paint, Paint text, String s, float cx, float yText,
+                       float maxW, float fontSize) {
+        text.setTextSize(fontSize);
         text.setTypeface(Theme.face(true));
         text.setTextAlign(Paint.Align.CENTER);
-        float tw = Math.min(text.measureText(s), maxW - Theme.dp(24));
-        float bx = Math.max(tw / 2f + Theme.dp(14), Math.min(maxW - tw / 2f - Theme.dp(4), cx));
-        float by = Math.max(yText, Theme.dp(16));
-        RectF bb = new RectF(bx - tw / 2f - Theme.dp(10), by - Theme.dp(13),
-                bx + tw / 2f + Theme.dp(10), by + Theme.dp(9));
+        float innerMax = Math.max(Theme.dp(24), maxW - Theme.dp(28));
+        String shown = fitText(s, text, innerMax);
+        float tw = Math.min(text.measureText(shown), innerMax);
+        float bx = Math.max(tw / 2f + Theme.dp(14), Math.min(maxW - tw / 2f - Theme.dp(14), cx));
+        float padV = Theme.dp(4);
+        float by = Math.max(yText + fontSize * 0.38f, fontSize * 0.9f + padV);
+        RectF bb = new RectF(bx - tw / 2f - Theme.dp(10), by - fontSize * 0.9f - padV,
+                bx + tw / 2f + Theme.dp(10), by + fontSize * 0.35f + padV);
         paint.setStyle(Paint.Style.FILL);
         paint.setShader(null);
         paint.setColor(Theme.GOLD);
         g.drawRoundRect(bb, Theme.dp(10), Theme.dp(10), paint);
         int oldC = text.getColor();
         text.setColor(Theme.onAccent());
-        g.drawText(s, bx, by + Theme.dp(4), text);
+        g.drawText(shown, bx, by, text);
         text.setColor(oldC);
         text.setTypeface(Theme.face(false));
     }
@@ -233,11 +282,10 @@ public final class Charts {
             super.onDraw(g);
             int w = getWidth(), h = getHeight();
             if (w <= 0 || h <= 0) return;
-            float padL = Theme.dp(46), padR = Theme.dp(10), padT = Theme.dp(12), padB = Theme.dp(24);
-            plot.set(padL, padT, w - padR, h - padB);
+            float padR = Theme.dp(10), padT = Theme.dp(12), padB = Theme.dp(24);
             if (data.isEmpty()) {
                 paint.setColor(Theme.MUTED);
-                paint.setTextSize(Theme.dp(11));
+                paint.setTextSize(chartTextPx(11));
                 paint.setTextAlign(Paint.Align.CENTER);
                 g.drawText("داده‌ای برای نمایش نیست", w / 2f, h / 2f, paint);
                 return;
@@ -245,6 +293,8 @@ public final class Charts {
             double mx = Math.max(0, max());
             double mn = Math.min(0, min());
             if (mx - mn <= 0) mx = mn + 1;
+            float padL = axisLabelPad(mn, mx, w);
+            plot.set(padL, padT, w - padR, h - padB);
             int n = data.size();
             float[] xs = new float[n];
             float[] ys = new float[n];
@@ -254,16 +304,19 @@ public final class Charts {
                 ys[i] = (float) (plot.bottom - plot.height() * ((data.get(i).value - mn) / (mx - mn)) * progress);
             }
             float zeroY = (float) (plot.bottom - plot.height() * ((0 - mn) / (mx - mn)) * progress);
-            // grid + y labels
+            // grid + y labels — round steps read better than thirds of the max.
             paint.setStyle(Paint.Style.STROKE);
             paint.setStrokeWidth(1);
             paint.setColor(Theme.alpha(Theme.TEXT, 22));
             text.setColor(Theme.MUTED);
             text.setTextAlign(Paint.Align.RIGHT);
-            for (int k = 0; k <= 3; k++) {
-                float y = plot.bottom - plot.height() * k / 3f;
+            double valStep = niceStep((mx - mn) / 3.0);
+            double lo = Math.floor(mn / valStep) * valStep;
+            int guard = 0;
+            for (double v = lo; v <= mx + valStep * 0.5 && guard < 8; v += valStep, guard++) {
+                float y = (float) (plot.bottom - plot.height() * ((v - mn) / (mx - mn)));
                 g.drawLine(plot.left, y, plot.right, y, paint);
-                g.drawText(Money.fa(fmt.format(mn + (mx - mn) * k / 3.0)), plot.left - Theme.dp(4), y + Theme.dp(4), text);
+                g.drawText(Money.fa(fmt.format(v)), plot.left - Theme.dp(4), y + Theme.dp(4), text);
             }
             if (mn < 0) {
                 paint.setColor(Theme.alpha(Theme.TEXT, 80));
@@ -297,8 +350,11 @@ public final class Charts {
             text.setColor(Theme.MUTED);
             text.setTextAlign(Paint.Align.CENTER);
             int step = Math.max(1, (n + 5) / 6);
+            int xLabelCount = Math.max(1, (n + step - 1) / step);
+            float xLabelWidth = Math.max(Theme.dp(24), plot.width() / xLabelCount - Theme.dp(4));
             for (int i = 0; i < n; i += step) {
-                g.drawText(Money.fa(ellipsize(data.get(i).label, 8)), xs[i], plot.bottom + Theme.dp(16), text);
+                String label = fitText(data.get(i).label, text, xLabelWidth);
+                g.drawText(Money.fa(label), xs[i], plot.bottom + Theme.dp(16), text);
             }
             // selected dot + tooltip bubble
             if (selected >= 0 && selected < n) {
@@ -310,7 +366,7 @@ public final class Charts {
                 g.drawCircle(xs[selected], ys[selected], Theme.dp(2.6f), paint);
                 Point sp = data.get(selected);
                 bubble(g, paint, text, Money.fa(sp.label + "  •  " + fmt.format(sp.value)),
-                        xs[selected], ys[selected] - Theme.dp(26), w);
+                        xs[selected], ys[selected] - Theme.dp(26), w, chartTextPx(10.5f));
             }
         }
 
@@ -376,11 +432,10 @@ public final class Charts {
             super.onDraw(g);
             int w = getWidth(), h = getHeight();
             if (w <= 0 || h <= 0) return;
-            float padL = Theme.dp(46), padR = Theme.dp(10), padT = Theme.dp(12), padB = Theme.dp(24);
-            plot.set(padL, padT, w - padR, h - padB);
+            float padR = Theme.dp(10), padT = Theme.dp(12), padB = Theme.dp(24);
             if (data.isEmpty()) {
                 paint.setColor(Theme.MUTED);
-                paint.setTextSize(Theme.dp(11));
+                paint.setTextSize(chartTextPx(11));
                 paint.setTextAlign(Paint.Align.CENTER);
                 g.drawText("داده‌ای برای نمایش نیست", w / 2f, h / 2f, paint);
                 return;
@@ -388,6 +443,8 @@ public final class Charts {
             double mx = Math.max(0, max());
             double mn = Math.min(0, min());
             if (mx - mn <= 0) mx = mn + 1;
+            float padL = axisLabelPad(mn, mx, w);
+            plot.set(padL, padT, w - padR, h - padB);
             int n = data.size();
             paint.setStyle(Paint.Style.STROKE);
             paint.setStrokeWidth(1);
@@ -423,9 +480,10 @@ public final class Charts {
                 drawBar3D(g, r, col, Theme.dp(6));
                 if (i % step == 0) {
                     text.setColor(Theme.MUTED);
-                    // Label length follows the bar slot, so neighbouring labels never overlap or leave the plot.
-                    int maxChars = (int) Math.max(4, Math.min(12, slot / Theme.dp(6)));
-                    g.drawText(Money.fa(ellipsize(p.label, maxChars)), cx, plot.bottom + Theme.dp(16), text);
+                    // Label width follows the bar slot and scales with accessibility text.
+                    float maxLabelWidth = Math.max(Theme.dp(24), slot - Theme.dp(6));
+                    g.drawText(Money.fa(fitText(p.label, text, maxLabelWidth)),
+                            cx, plot.bottom + Theme.dp(16), text);
                 }
             }
             // tooltip bubble over the selected bar
@@ -434,7 +492,7 @@ public final class Charts {
                 float cx = plot.right - slot * selected - slot / 2f;
                 float yv = (float) (plot.bottom - plot.height() * ((sp.value - mn) / (mx - mn)) * progress);
                 bubble(g, paint, text, Money.fa(sp.label + "  •  " + fmt.format(sp.value)),
-                        cx, Math.min(yv, zeroY) - Theme.dp(12), w);
+                        cx, Math.min(yv, zeroY) - Theme.dp(12), w, chartTextPx(10.5f));
             }
         }
 
@@ -504,6 +562,27 @@ public final class Charts {
             animateIn();
         }
 
+        /** Ring radius depends on width only, so measurement and drawing agree. */
+        private static float ringRadius(int w) {
+            return Math.min(w - Theme.dp(24), Theme.dp(170)) / 2f - Theme.dp(8);
+        }
+
+        private float legendRowHeight() {
+            return Math.max(Theme.dp(18), chartTextPx(10) + Theme.dp(6));
+        }
+
+        /** Height must fit the ring AND every font-scaled legend row. */
+        @Override
+        protected void onMeasure(int wSpec, int hSpec) {
+            int w = MeasureSpec.getSize(wSpec);
+            int shown = Math.max(1, Math.min(8, data.size()));
+            int rows = (shown + 1) / 2;
+            float radius = ringRadius(w);
+            int want = (int) Math.ceil(radius * 2 + Theme.dp(10) + Theme.dp(20)
+                    + rows * legendRowHeight() + Theme.dp(10));
+            super.onMeasure(wSpec, MeasureSpec.makeMeasureSpec(want, MeasureSpec.EXACTLY));
+        }
+
         @Override
         protected void onDraw(Canvas g) {
             super.onDraw(g);
@@ -512,11 +591,11 @@ public final class Charts {
             double sum = 0;
             for (Point p : data) sum += Math.max(0, p.value);
             float cx = w / 2f;
-            float radius = Math.min(w, h - Theme.dp(46)) / 2f - Theme.dp(8);
+            float radius = ringRadius(w);
             float cy = radius + Theme.dp(10);
             if (data.isEmpty() || sum <= 0) {
                 paint.setColor(Theme.MUTED);
-                paint.setTextSize(Theme.dp(11));
+                paint.setTextSize(chartTextPx(11));
                 paint.setTextAlign(Paint.Align.CENTER);
                 g.drawText("داده‌ای برای نمایش نیست", cx, h / 2f, paint);
                 return;
@@ -548,39 +627,50 @@ public final class Charts {
                 if (sweep > 1f) g.drawArc(o, start + 1.2f, sweep - 2.4f, false, paint);
                 start += (float) (360.0 * Math.max(0, p.value) / sum);
             }
-            // center
+            // center text follows large/system fonts without overlapping in the ring's hole.
             paint.setStyle(Paint.Style.FILL);
             paint.setTextAlign(Paint.Align.CENTER);
-            paint.setColor(Theme.MUTED);
-            paint.setTextSize(Theme.dp(10));
-            paint.setTypeface(Theme.face(false));
-            g.drawText(Money.fa(centerTop), cx, cy - Theme.dp(2), paint);
-            paint.setColor(Theme.TEXT);
-            paint.setTypeface(Theme.face(true));
             String cb = Money.fa(centerBottom);
             float holeW = radius * 1.15f;
-            float ts = Theme.dp(15);
-            paint.setTextSize(ts);
-            while (ts > Theme.dp(9) && paint.measureText(cb) > holeW) { ts -= 1; paint.setTextSize(ts); }
-            g.drawText(cb, cx, cy + Theme.dp(17), paint);
+            float topSize = chartTextPx(10);
+            float bottomSize = chartTextPx(15);
+            paint.setTypeface(Theme.face(true));
+            paint.setTextSize(bottomSize);
+            while (bottomSize > chartTextPx(9) && paint.measureText(cb) > holeW) {
+                bottomSize = Math.max(chartTextPx(9), bottomSize - chartTextPx(1));
+                paint.setTextSize(bottomSize);
+            }
+            float centerGap = (topSize + bottomSize) * 0.45f;
+            paint.setColor(Theme.MUTED);
             paint.setTypeface(Theme.face(false));
-            // legend (two columns, up to 8)
+            paint.setTextSize(topSize);
+            g.drawText(fitText(Money.fa(centerTop), paint, holeW), cx, cy - centerGap, paint);
+            paint.setColor(Theme.TEXT);
+            paint.setTypeface(Theme.face(true));
+            paint.setTextSize(bottomSize);
+            g.drawText(cb, cx, cy + centerGap, paint);
+            paint.setTypeface(Theme.face(false));
+            // legend (two columns, up to 8); fit text to the actual column at the user's zoom.
             float ly = cy + radius + Theme.dp(20);
-            paint.setTextSize(Theme.dp(10));
+            float rowHeight = legendRowHeight();
+            paint.setTextSize(chartTextPx(10));
             int shown = Math.min(8, data.size());
+            float columnWidth = Math.max(Theme.dp(54), w / 2f - Theme.dp(30));
             for (int i = 0; i < shown; i++) {
                 Point p = data.get(i);
                 int col = p.color != 0 ? p.color : palette(i);
                 boolean right = i % 2 == 0;
                 float lx = right ? w - Theme.dp(14) : w / 2f - Theme.dp(8);
-                float row = ly + (i / 2) * Theme.dp(18);
+                float row = ly + (i / 2) * rowHeight;
                 if (row > h - Theme.dp(2)) break;
                 paint.setColor(col);
-                g.drawCircle(lx - Theme.dp(5), row - Theme.dp(3.5f), Theme.dp(4), paint);
+                g.drawCircle(lx - Theme.dp(5), row - paint.getTextSize() * 0.35f, Theme.dp(4), paint);
                 paint.setColor(Theme.TEXT);
                 paint.setTextAlign(Paint.Align.RIGHT);
-                String leg = ellipsize(p.label, 16) + "  " + Money.pct(sum > 0 ? Math.max(0, p.value) * 100.0 / sum : 0);
-                g.drawText(Money.fa(leg), lx - Theme.dp(13), row, paint);
+                String percentage = Money.pct(sum > 0 ? Math.max(0, p.value) * 100.0 / sum : 0);
+                float labelWidth = Math.max(Theme.dp(24), columnWidth - paint.measureText(percentage) - Theme.dp(8));
+                String label = fitText(p.label, paint, labelWidth);
+                g.drawText(Money.fa(label + "  " + percentage), lx - Theme.dp(13), row, paint);
             }
         }
     }
@@ -595,15 +685,26 @@ public final class Charts {
             data.clear();
             if (pts != null) data.addAll(pts.subList(0, Math.min(10, pts.size())));
             if (f != null) fmt = f;
+            selected = -1;
             animateIn();
         }
 
-        private static final int ROW_H = 56;
+        private float labelBaselineOffset() {
+            return Math.max(Theme.dp(12), chartTextPx(11) * 0.9f);
+        }
+
+        private float trackTopOffset() {
+            return labelBaselineOffset() + chartTextPx(11) * 0.25f + Theme.dp(4);
+        }
+
+        private float rowHeightPx() {
+            return Math.max(Theme.dp(56), trackTopOffset() + Theme.dp(15) + Theme.dp(10));
+        }
 
         @Override
         protected void onMeasure(int wSpec, int hSpec) {
             int rows = Math.max(1, data.size());
-            int want = rows * Theme.dp(ROW_H) + Theme.dp(10);
+            int want = (int) Math.ceil(rows * rowHeightPx() + Theme.dp(10));
             super.onMeasure(wSpec, MeasureSpec.makeMeasureSpec(want, MeasureSpec.EXACTLY));
         }
 
@@ -614,7 +715,7 @@ public final class Charts {
             if (w <= 0) return;
             if (data.isEmpty()) {
                 paint.setColor(Theme.MUTED);
-                paint.setTextSize(Theme.dp(11));
+                paint.setTextSize(chartTextPx(11));
                 paint.setTextAlign(Paint.Align.CENTER);
                 g.drawText("داده‌ای برای نمایش نیست", w / 2f, getHeight() / 2f, paint);
                 return;
@@ -622,14 +723,23 @@ public final class Charts {
             double mx = Math.max(0, max());
             double mn = Math.min(0, min());
             if (mx - mn <= 0) mx = mn + 1;
+            float rowHeight = rowHeightPx();
+            float labelBaseline = labelBaselineOffset();
             float barH = Theme.dp(15);
             for (int i = 0; i < data.size(); i++) {
                 Point p = data.get(i);
-                float top = Theme.dp(8) + i * Theme.dp(ROW_H);
+                float top = Theme.dp(8) + i * rowHeight;
+                if (selected == i) {
+                    paint.setStyle(Paint.Style.FILL);
+                    paint.setShader(null);
+                    paint.setColor(Theme.alpha(Theme.GOLD, Theme.DARK ? 28 : 18));
+                    g.drawRoundRect(new RectF(Theme.dp(2), top - Theme.dp(4),
+                            w - Theme.dp(2), top + rowHeight - Theme.dp(2)), Theme.dp(8), Theme.dp(8), paint);
+                }
                 // rank medal (gold / silver / bronze / outline)
                 float mr = Theme.dp(9);
                 float mCx = w - Theme.dp(8) - mr;
-                float mCy = top + Theme.dp(7);
+                float mCy = top + Math.max(Theme.dp(7), labelBaseline - chartTextPx(11) * 0.45f);
                 int mCol = i == 0 ? 0xFFFFD166 : i == 1 ? 0xFFC9D2DE : i == 2 ? 0xFFE0A066 : 0;
                 paint.setStyle(Paint.Style.FILL);
                 paint.setShader(null);
@@ -643,22 +753,28 @@ public final class Charts {
                     g.drawCircle(mCx, mCy, mr, paint);
                     paint.setStyle(Paint.Style.FILL);
                 }
-                text.setTextSize(Theme.dp(10));
+                text.setTextSize(chartTextPx(10));
                 text.setTypeface(Theme.face(true));
                 text.setTextAlign(Paint.Align.CENTER);
                 text.setColor(mCol != 0 ? 0xFF232323 : Theme.MUTED);
-                g.drawText(Money.fa(String.valueOf(i + 1)), mCx, mCy + Theme.dp(3.5f), text);
-                // line 1: label (right of medal) + value (left) — never overlapping the bar
-                text.setTextSize(Theme.dp(11));
+                g.drawText(Money.fa(String.valueOf(i + 1)), mCx, mCy + chartTextPx(10) * 0.34f, text);
+                // line 1: label (right of medal) + value (left), both fitted to the available width
+                text.setTextSize(chartTextPx(11));
+                String valueLabel = Money.fa(fmt.format(p.value));
+                valueLabel = fitText(valueLabel, text, Math.max(Theme.dp(28), w * 0.34f));
+                float valueWidth = text.measureText(valueLabel);
+                float labelRight = mCx - mr - Theme.dp(6);
+                float labelLeft = Theme.dp(8) + valueWidth + Theme.dp(12);
+                float labelWidth = Math.max(Theme.dp(24), labelRight - labelLeft);
                 text.setTextAlign(Paint.Align.RIGHT);
-                text.setColor(Theme.TEXT);
-                g.drawText(Money.fa(ellipsize(p.label, 22)), mCx - mr - Theme.dp(6), top + Theme.dp(12), text);
+                text.setColor(selected == i ? Theme.GOLD_SOFT : Theme.TEXT);
+                g.drawText(Money.fa(fitText(p.label, text, labelWidth)), labelRight, top + labelBaseline, text);
                 text.setTextAlign(Paint.Align.LEFT);
                 text.setColor(Theme.GOLD_SOFT);
-                g.drawText(Money.fa(fmt.format(p.value)), Theme.dp(8), top + Theme.dp(12), text);
+                g.drawText(valueLabel, Theme.dp(8), top + labelBaseline, text);
                 text.setTypeface(Theme.face(false));
                 // line 2: full-width track + fill
-                float bTop = top + Theme.dp(19);
+                float bTop = top + trackTopOffset();
                 RectF track = new RectF(Theme.dp(8), bTop, w - Theme.dp(8), bTop + barH);
                 paint.setStyle(Paint.Style.FILL);
                 paint.setColor(Theme.alpha(Theme.TEXT, 46));
@@ -668,6 +784,7 @@ public final class Charts {
                 float xv = track.right - track.width() * (float) ((p.value - mn) / (mx - mn));
                 xv = zx + (xv - zx) * progress;
                 int col = p.color != 0 ? p.color : (p.value < 0 ? Theme.DANGER : palette(i));
+                if (selected >= 0 && selected != i) col = Theme.alpha(col, 100);
                 float fl = Math.max(track.left, Math.min(xv, zx));
                 float fr = Math.min(track.right, Math.max(xv, zx));
                 if (p.value != 0 && fr - fl < Theme.dp(8)) {
@@ -680,6 +797,39 @@ public final class Charts {
                 g.drawRoundRect(fill, Theme.dp(7), Theme.dp(7), paint);
                 paint.setShader(null);
             }
+        }
+
+        @Override
+        public boolean performClick() {
+            if (listener == null || data.isEmpty()) return super.performClick();
+            if (selected < 0 || selected >= data.size()) selected = 0;
+            invalidate();
+            sendAccessibilityEvent(android.view.accessibility.AccessibilityEvent.TYPE_VIEW_CLICKED);
+            fire(selected);
+            return true;
+        }
+
+        @Override
+        public boolean onTouchEvent(MotionEvent e) {
+            if (listener == null || data.isEmpty()) return super.onTouchEvent(e);
+            int action = e.getAction();
+            if (action == MotionEvent.ACTION_DOWN) {
+                downX = e.getX();
+                downY = e.getY();
+                tracking = true;
+                return true;
+            }
+            if (action == MotionEvent.ACTION_UP && tracking && tapped(e.getX(), e.getY())) {
+                float rowY = e.getY() - Theme.dp(8);
+                int index = (int) (rowY / rowHeightPx());
+                if (rowY >= 0 && index >= 0 && index < data.size()) {
+                    selected = index;
+                    invalidate();
+                    performClick();
+                }
+            }
+            if (action == MotionEvent.ACTION_CANCEL || action == MotionEvent.ACTION_UP) tracking = false;
+            return true;
         }
     }
 
@@ -740,12 +890,15 @@ public final class Charts {
             paint.setTextAlign(Paint.Align.CENTER);
             paint.setTypeface(Theme.face(true));
             paint.setColor(Theme.TEXT);
-            paint.setTextSize(Theme.dp(17));
-            g.drawText(Money.fa(center), cx, cy - Theme.dp(20), paint);
+            float centerSize = chartTextPx(17);
+            paint.setTextSize(centerSize);
+            g.drawText(fitText(Money.fa(center), paint, Math.max(Theme.dp(30), w - Theme.dp(32))),
+                    cx, cy - Math.max(Theme.dp(20), centerSize * 1.2f), paint);
             paint.setTypeface(Theme.face(false));
             paint.setColor(Theme.MUTED);
-            paint.setTextSize(Theme.dp(10.5f));
-            g.drawText(Money.fa(caption), cx, cy - Theme.dp(4), paint);
+            paint.setTextSize(chartTextPx(10.5f));
+            g.drawText(fitText(Money.fa(caption), paint, Math.max(Theme.dp(30), w - Theme.dp(32))),
+                    cx, cy - Theme.dp(4), paint);
         }
     }
 }

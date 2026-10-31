@@ -109,6 +109,19 @@ public final class SmsIo {
     }
 
     /**
+     * Normalize a mobile number to the canonical 09xxxxxxxxx form used by the
+     * activation fields: +98912…, 98912… and 912… all collapse to 0912….
+     * Land lines and unknown shapes are returned cleaned but unchanged.
+     */
+    public static String normalizeMobile(String raw) {
+        String t = cleanPhone(raw);
+        if (t.startsWith("+98")) t = "0" + t.substring(3);
+        else if (t.startsWith("98") && t.length() == 12) t = "0" + t.substring(2);
+        else if (t.startsWith("9") && t.length() == 10) t = "0" + t;
+        return t;
+    }
+
+    /**
      * Send (possibly long) text as one SMS — multipart when needed — with a
      * real sent-confirmation from the radio. cb always fires exactly once.
      */

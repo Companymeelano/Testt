@@ -7,12 +7,14 @@ name: MEELANO v7 — unified licensed app + edition APKs
 
 on:
   push:
-    branches: ["arena/c192ed08-testt"]
+    branches: ["arena/29e01a09-testt"]
     paths:
       - "app/**"
       - "gradle/**"
       - "*.gradle"
       - "gradle.properties"
+      - "requirements-audit.txt"
+      - "tools/**"
       - ".github/workflows/build-apk.yml"
   workflow_dispatch:
 
@@ -24,6 +26,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Run repository-wide static audit
+        run: |
+          python3 -m pip install -r requirements-audit.txt
+          python3 tools/verify_all.py
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
@@ -64,44 +71,63 @@ jobs:
       - name: Build debug editions + release of the original licensed all-in-one app
         run: |
           set -o pipefail
-          gradle assembleDebug assembleUnifiedRelease --stacktrace --no-daemon 2>&1 | tee build-full.log | tail -80
+          gradle testUnifiedDebugUnitTest assembleDebug assembleUnifiedRelease --stacktrace --no-daemon 2>&1 | tee build-full.log | tail -80
 
       - name: Collect APKs and verify original installation identity/signature
         run: |
           set -euo pipefail
           mkdir -p dist
-          rm -f dist/*.apk dist/latest-unified.json
+          rm -f dist/app-*-debug.apk dist/MEELANO-v*-release.apk dist/latest-unified.json
           find app/build/outputs/apk -path '*/debug/*.apk' -type f -print -exec cp -t dist/ {} +
-          cp app/build/outputs/apk/unified/release/app-unified-release.apk dist/MEELANO-v7.0.0-release.apk
+          cp app/build/outputs/apk/unified/release/app-unified-release.apk dist/MEELANO-v7.0.3-release.apk
+          APK=dist/MEELANO-v7.0.3-release.apk
+          python3 - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          apk=Path('dist/MEELANO-v7.0.3-release.apk')
+          descriptor=b'Lir/meelano/android/ProductionActivity;'
+          with ZipFile(apk) as archive:
+              dex=[name for name in archive.namelist() if name == 'classes.dex' or (name.startswith('classes') and name.endswith('.dex'))]
+              if not any(descriptor in archive.read(name) for name in dex):
+                  raise SystemExit('Manager-only production activity is missing from the final unified APK')
+          print('Manager-only production activity is packaged in the final unified APK.')
+          PY
           BT="$ANDROID_HOME/build-tools/36.0.0"
-          "$BT/aapt" dump badging dist/MEELANO-v7.0.0-release.apk | grep -F "package: name='ir.meelano.visitor' versionCode='200' versionName='7.0.0'"
-          "$BT/apksigner" verify --verbose --print-certs dist/MEELANO-v7.0.0-release.apk > signing-check.txt
+          "$BT/aapt" dump badging "$APK" | grep -F "package: name='ir.meelano.visitor' versionCode='203' versionName='7.0.3'"
+          "$BT/apksigner" verify --verbose --print-certs "$APK" > signing-check.txt
           grep -F "Signer #1 certificate SHA-256 digest: 1a2ed0dd70759d6e10c77a4641eeeb8f15972b76d99af351470216955b46d616" signing-check.txt
-          printf '{"versionCode":200,"versionName":"7.0.0","url":"https://github.com/Companymeelano/Testt/releases/download/apk-v7-c192ed08/MEELANO-v7.0.0-release.apk"}\n' > dist/latest-unified.json
+          SHA256=$(sha256sum "$APK" | cut -d' ' -f1)
+          SIZE=$(stat -c %s "$APK")
+          printf '{"versionCode":203,"versionName":"7.0.3","packageName":"ir.meelano.visitor","url":"https://github.com/Companymeelano/Testt/releases/download/apk-v7-0-3/MEELANO-v7.0.3-release.apk","sha256":"%s","signerSha256":"1a2ed0dd70759d6e10c77a4641eeeb8f15972b76d99af351470216955b46d616","size":%s}\n' "$SHA256" "$SIZE" > dist/latest-unified.json
+          python3 -m json.tool dist/latest-unified.json >/dev/null
           ls -la dist/
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: meelano-v7-apks-debug-and-unified-release
-          path: dist/*.apk
+          path: |
+            dist/*.apk
+            dist/latest-unified.json
           if-no-files-found: warn
 
       - name: Publish rolling release (download link for the phone)
         if: success()
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: apk-v7-c192ed08
+          tag_name: apk-v7-0-3
           prerelease: true
-          name: MEELANO v7.0.0 — برنامهٔ یکپارچهٔ امضاشده + نسخه‌های تخصصی
+          name: MEELANO v7.0.3 — برنامهٔ یکپارچهٔ امضاشده + نسخه‌های تخصصی
           body: |
             ## نسخهٔ اصلاح‌شدهٔ برنامهٔ اصلیِ یکپارچه و لایسنس‌دار
-            **`MEELANO-v7.0.0-release.apk` — فایل اصلی برای به‌روزرسانی نصب فعلی**
+            **`MEELANO-v7.0.3-release.apk` — فایل اصلی برای به‌روزرسانی نصب فعلی**
 
-            این APK با همان شناسهٔ بستهٔ نسخهٔ یکپارچهٔ قبلی (`ir.meelano.visitor`) و همان گواهی امضای نصب قبلی ساخته شده است؛ آیکون اصلی حرف طلایی D حفظ می‌شود و نصب روی نسخهٔ قبلی باید بدون حذف برنامه/پاک‌شدن داده‌ها انجام شود. صفحهٔ مدیریت، فروش، انبار و مالی داخل همین برنامه است.
+            این APK با همان شناسهٔ بستهٔ نسخهٔ یکپارچهٔ قبلی (`ir.meelano.visitor`) و همان گواهی امضای نصب قبلی ساخته شده است؛ آیکون اصلی حرف طلایی D حفظ می‌شود و نصب روی نسخهٔ قبلی باید بدون حذف برنامه/پاک‌شدن داده‌ها انجام شود. صفحهٔ تولیدِ محدود به مدیر، مدیریت، فروش، انبار و مالی داخل همین APK است.
 
             `app-manager-debug.apk` یک برنامهٔ مدیرِ جداگانه با شناسه و آیکون متفاوت است؛ **برای ارتقای نصب اصلی از آن استفاده نکنید**. نسخه‌های پرسنل/فروشگاه/مودیان هم همچنان جداگانه‌اند.
-          files: dist/*.apk
+          files: |
+            dist/*.apk
+            dist/latest-unified.json
 
       - name: Commit APKs + build info to dist/ (delivery into the session branch)
         if: success()
@@ -109,9 +135,9 @@ jobs:
           git config user.name "arena-ci"
           git config user.email "arena-ci@local"
           {
-            echo "نسخهٔ برنامهٔ یکپارچه: 7.0.0 (versionCode 200; package ir.meelano.visitor)"
+            echo "نسخهٔ برنامهٔ یکپارچه: 7.0.3 (versionCode 203; package ir.meelano.visitor)"
             echo "گواهی امضا: نسخهٔ نصب فعلی / Pakhsh Derakhshan (fingerprint را CI بررسی می‌کند)"
-            echo "APK اصلی: MEELANO-v7.0.0-release.apk"
+            echo "APK اصلی: MEELANO-v7.0.3-release.apk"
             echo "کامیت: $(git rev-parse --short HEAD)"
             echo "تاریخ build: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
             echo "Gradle: $(gradle --version | grep Gradle | head -1)"
@@ -123,9 +149,18 @@ jobs:
           git rm -q --cached build-error-tail.txt 2>/dev/null || true
           rm -f build-error-tail.txt
           git add -A -f dist/
-          git commit -m "dist: APKهای نسخهٔ ۷.۰.۰ (ساخت خودکار CI)" || true
-          git pull --rebase --strategy-option=ours origin arena/c192ed08-testt || true
-          git push origin HEAD:arena/c192ed08-testt || true
+          git commit -m "dist: publish verified unified APKs from CI"
+          for attempt in 1 2 3 4 5; do
+            git fetch origin arena/29e01a09-testt
+            git rebase origin/arena/29e01a09-testt
+            if git push origin HEAD:arena/29e01a09-testt; then
+              exit 0
+            fi
+            echo "Push attempt ${attempt} failed; retrying after syncing with the session branch."
+            sleep $((attempt * 2))
+          done
+          echo "Could not publish verified APKs to the session branch after five attempts." >&2
+          exit 1
 
       - name: Save diagnostics on failure (so the agent can read the real error)
         if: failure()
@@ -135,5 +170,5 @@ jobs:
           git config user.email "arena-ci@local"
           git add -f build-error-tail.txt
           git commit -m "CI diagnostics: build failure tail (temporary)" || true
-          git pull --rebase --strategy-option=ours origin arena/c192ed08-testt || true
-          git push origin HEAD:arena/c192ed08-testt || true
+          git pull --rebase --strategy-option=ours origin arena/29e01a09-testt || true
+          git push origin HEAD:arena/29e01a09-testt || true

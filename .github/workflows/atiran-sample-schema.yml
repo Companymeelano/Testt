@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - arena/c192ed08-testt
+      - arena/29e01a09-testt
     paths:
       - Atiran2-1405-7-14-15-21-49.zip
       - tools/probe_atiran_backup.py
@@ -84,7 +84,7 @@ jobs:
             echo "Sample schema manifest is unchanged." >> "$GITHUB_STEP_SUMMARY"
           else
             git commit -m "schema: snapshot Atiran sample metadata"
-            git push origin HEAD:arena/c192ed08-testt
+            git push origin HEAD:arena/29e01a09-testt
           fi
 
       - name: Attach metadata-only report
@@ -130,7 +130,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -- atiran-schema-probe-diagnostics.txt
           git commit -m "ci: capture Atiran schema probe diagnostics"
-          git push origin HEAD:arena/c192ed08-testt
+          git push origin HEAD:arena/29e01a09-testt
 
       - name: Remove disposable SQL Server
         if: always()

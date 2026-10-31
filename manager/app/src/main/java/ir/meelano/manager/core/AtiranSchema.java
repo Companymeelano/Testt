@@ -50,7 +50,7 @@ public final class AtiranSchema {
             {"forosh_price", "قیمت‌های فروش"},     // 1795
             {"visitors", "ویزیتورها"},             // 10 — vis_rdf/vis_name/vis_man/active/…
             {"vis_goals", "اهداف ویزیتور"},        // 4 — baze_rdf/vis_rdf/mab/ted/…
-            {"sys_vis", "دسترسی ویزیتور به سیستم"}, // 10
+            {"sys_vis", "دسترسی ویزیتور به سیستم"}, // 10 — SysID→osystems, shvis→visitors.vis_rdf, UserID→sys_users.user_id
             {"masir", "مسیرها"},                   // 4
             {"regions", "منطقه‌ها"},               // 3
             {"CITYS", "شهرها"},                    // 2

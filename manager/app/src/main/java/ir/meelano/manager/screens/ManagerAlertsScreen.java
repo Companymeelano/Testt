@@ -56,7 +56,7 @@ public class ManagerAlertsScreen extends Screen {
     public ManagerAlertsScreen(MainActivity a) { super(a); }
     @Override public String id() { return "manager_alerts"; }
     @Override public String title() { return "هشدارهای مدیر"; }
-    @Override public String glyph() { return "⚑"; }
+    @Override public String glyph() { return Theme.isLight() ? "⚑" : "⚠"; }
     @Override public int accent() { return Theme.WARNING; }
 
     @Override public void render(LinearLayout content) {

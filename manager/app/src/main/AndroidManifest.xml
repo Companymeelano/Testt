@@ -6,9 +6,13 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <!-- Direct license SMS: request goes straight to the seller, the reply is auto-applied. -->
-    <uses-permission android:name="android.permission.SEND_SMS" />
-    <uses-permission android:name="android.permission.RECEIVE_SMS" />
+        <!-- Direct license SMS: request goes straight to the seller, the reply is auto-applied. -->
+        <uses-permission android:name="android.permission.SEND_SMS" />
+        <uses-permission android:name="android.permission.RECEIVE_SMS" />
+        <!-- License recovery after reinstall: only M1… license tokens are matched in the inbox. -->
+        <uses-permission android:name="android.permission.READ_SMS" />
+        <!-- Auto-fill the contact number from the phone/SIM during activation. -->
+        <uses-permission android:name="android.permission.READ_PHONE_NUMBERS" />
     <!-- In-app update: install a verified newer release downloaded from our release page. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
@@ -32,7 +36,7 @@
 
     <application
         android:name=".ManagerApplication"
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:fullBackupContent="@xml/backup_rules"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:hardwareAccelerated="true"
@@ -70,7 +74,7 @@
         <receiver
             android:name=".widget.CashWidget"
             android:exported="false"
-            android:label="میلانو زرین‌فرمان • امروز">
+            android:label="میلانو • امروز">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
@@ -93,8 +97,10 @@
             android:name=".LicenseActivity"
             android:configChanges="keyboard|keyboardHidden|screenSize|uiMode"
             android:exported="true"
-            android:label="فعال‌سازی میلانو زرین‌فرمان"
             android:windowSoftInputMode="adjustResize">
+            <!-- No android:label here on purpose: the launcher label would override
+                 the application name on the phone's home screen (it used to show
+                 «فعال‌سازی میلانو» instead of «میلانو»). -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

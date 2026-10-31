@@ -18,6 +18,8 @@ public final class RoleStore {
     private RoleStore() { }
 
     public static final String ADMIN = "admin";
+    /** Sales manager: selling, customer/visitor performance and the curated sales report set. */
+    public static final String SALES_MANAGER = "sales_manager";
     public static final String SELLER = "seller";
     public static final String ACCOUNTANT = "accountant";
     public static final String VISITOR = "visitor";
@@ -26,8 +28,12 @@ public final class RoleStore {
     public static final String MOADIAN = "moadian";
 
     public static final String[] ALL = {
-            ADMIN, SELLER, ACCOUNTANT, VISITOR, DISTRIBUTOR, WAREHOUSE, MOADIAN};
+            ADMIN, SALES_MANAGER, SELLER, ACCOUNTANT, VISITOR, DISTRIBUTOR, WAREHOUSE, MOADIAN};
 
+    /** Sales leadership: sales analytics and curated sales reports; no system, profit or ledger access. */
+    private static final String[] SALES_MANAGER_OK = {
+            "home", "sales", "customers", "products", "visitors", "analytics", "reports",
+            "dues", "search", "voice", "more"};
     /** Seller side: everything except profit / reports / users / settings. */
     private static final String[] SELLER_OK = {
             "home", "sales", "buy", "customers", "products", "visitors",
@@ -37,8 +43,8 @@ public final class RoleStore {
             "home", "customers", "cheques", "dues", "cash", "dar_in", "dar_out",
             "reports", "takmil", "search", "voice", "more"};
     /** Visitor side: showcase + his trade world. */
-    private static final String[] VISITOR_OK = {
-            "home", "customers", "products", "sales", "dues", "search", "voice", "more"};
+    /** Visitor edition is intentionally scoped to its own Atiran identity, assigned customers and orders. */
+    private static final String[] VISITOR_OK = {"visitor_work", "more"};
     /** Distributor side: delivery + collection on the road. */
     private static final String[] DISTRIBUTOR_OK = {
             "home", "sales", "customers", "products", "cheques", "dues", "cash",
@@ -91,17 +97,20 @@ public final class RoleStore {
     }
 
     public static String faName(String role) {
+        if (ADMIN.equals(role)) return "مدیر مجموعه";
+        if (SALES_MANAGER.equals(role)) return "مدیر فروش";
         if (SELLER.equals(role)) return "فروشنده";
         if (ACCOUNTANT.equals(role)) return "حسابدار";
         if (VISITOR.equals(role)) return "ویزیتور";
         if (DISTRIBUTOR.equals(role)) return "موزع";
         if (WAREHOUSE.equals(role)) return "انباردار";
         if (MOADIAN.equals(role)) return "مودیان";
-        return "مدیر";
+        return "مدیر مجموعه";
     }
 
     /** Short Persian description of what the role sees. */
     public static String faDesc(String role) {
+        if (SALES_MANAGER.equals(role)) return "داشبورد فروش، عملکرد ویزیتورها و گزارش‌های فروش";
         if (SELLER.equals(role)) return "فروش، مشتریان، کالاها و چک‌ها";
         if (ACCOUNTANT.equals(role)) return "چک‌ها، مطالبات و گزارش‌های مالی";
         if (VISITOR.equals(role)) return "مشتریان، کالاها و فروش";
@@ -121,12 +130,14 @@ public final class RoleStore {
         // counts, supplier score and the rest remain one tap away in «همه بخش‌ها».
         if (WAREHOUSE.equals(role))
             return new String[]{"anbar", "tahvil", "resid", "more"};
+        if (SALES_MANAGER.equals(role))
+            return new String[]{"home", "sales", "customers", "visitors", "reports", "more"};
         if (SELLER.equals(role))
             return new String[]{"home", "sales", "customers", "products", "dues", "more"};
         if (ACCOUNTANT.equals(role))
             return new String[]{"home", "customers", "cheques", "dues", "reports", "more"};
         if (VISITOR.equals(role))
-            return new String[]{"customers", "products", "sales", "dues", "more"};
+            return new String[]{"visitor_work", "more"};
         if (DISTRIBUTOR.equals(role))
             return new String[]{"sales", "customers", "cheques", "dues", "more"};
         if (MOADIAN.equals(role))
@@ -154,7 +165,7 @@ public final class RoleStore {
 
     /** Landing screen per role (fresh launch with an Atiran session). */
     public static String homeFor(String role) {
-        if (VISITOR.equals(role)) return "customers";
+        if (VISITOR.equals(role)) return "visitor_work";
         if (DISTRIBUTOR.equals(role)) return "sales";
         if (WAREHOUSE.equals(role)) return "anbar";
         if (MOADIAN.equals(role)) return "sales";
@@ -172,6 +183,9 @@ public final class RoleStore {
         }
     }
 
+    /** Legacy single-iteration verifier namespace (fixed prefix), kept only for verification. */
+    private static final String LEGACY_PIN_PREFIX = "meelano_role:";
+
     public static boolean checkRole(Context c, String role, String pin) {
         try {
             String saved = prefs(c).getString(pinKey(role), "");
@@ -182,7 +196,14 @@ public final class RoleStore {
                 }
                 return true;
             }
-            return pin != null && sha(Money.en(pin).trim()).equals(saved);
+            if (pin == null) return false;
+            String norm = Money.en(pin).trim();
+            if (!PinHash.verify(norm, saved, LEGACY_PIN_PREFIX)) return false;
+            if (PinHash.legacy(saved)) {
+                String h = PinHash.hash(norm);
+                if (!h.isEmpty()) prefs(c).edit().putString(pinKey(role), h).apply();
+            }
+            return true;
         } catch (Exception e) {
             return false;
         }
@@ -195,7 +216,7 @@ public final class RoleStore {
             SharedPreferences.Editor e = prefs(c).edit();
             if (ADMIN.equals(role)) e.putBoolean("pin_admin_touched", true);
             if (pin.length() < 4) e.putString(pinKey(role), "");
-            else e.putString(pinKey(role), sha(pin));
+            else e.putString(pinKey(role), PinHash.hash(pin)); // "" on failure → no PIN stored (fail closed)
             e.apply();
         } catch (Exception ignored) { Diag.ignored("RoleStore:198", ignored); }
     }
@@ -216,14 +237,20 @@ public final class RoleStore {
     }
 
     private static boolean inList(String role, String screenId) {
+        return allowedForRole(role,screenId);
+    }
+
+    /** Pure role policy, shared by navigation and unit tests. */
+    public static boolean allowedForRole(String role,String screenId) {
         if (ADMIN.equals(role)) return true;
-        String[] ok = listFor(role);
-        if (ok == null) return true;
-        for (String s : ok) if (s.equals(screenId)) return true;
+        String[] ok=listFor(role);
+        if(ok==null)return true;
+        for(String s:ok)if(s.equals(screenId))return true;
         return false;
     }
 
     private static String[] listFor(String role) {
+        if (SALES_MANAGER.equals(role)) return SALES_MANAGER_OK;
         if (SELLER.equals(role)) return SELLER_OK;
         if (ACCOUNTANT.equals(role)) return ACCOUNTANT_OK;
         if (VISITOR.equals(role)) return VISITOR_OK;
@@ -234,6 +261,7 @@ public final class RoleStore {
     }
 
     private static String pinKey(String role) {
+        if (SALES_MANAGER.equals(role)) return "pin_sales_manager";
         if (SELLER.equals(role)) return "pin_seller";
         if (ACCOUNTANT.equals(role)) return "pin_accountant";
         if (VISITOR.equals(role)) return "pin_visitor";
@@ -241,17 +269,5 @@ public final class RoleStore {
         if (WAREHOUSE.equals(role)) return "pin_warehouse";
         if (MOADIAN.equals(role)) return "pin_moadian";
         return "pin_admin";
-    }
-
-    private static String sha(String s) {
-        try {
-            java.security.MessageDigest d = java.security.MessageDigest.getInstance("SHA-256");
-            byte[] h = d.digest(("meelano_role:" + s).getBytes("UTF-8"));
-            StringBuilder b = new StringBuilder();
-            for (byte x : h) b.append(String.format("%02x", x));
-            return b.toString();
-        } catch (Exception e) {
-            return "x" + s;
-        }
     }
 }

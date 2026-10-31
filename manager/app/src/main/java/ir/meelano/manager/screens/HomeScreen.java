@@ -1667,6 +1667,7 @@ public class HomeScreen extends Screen {
         else if ("cash_position".equals(key)) secCashPosition(content, d);
         else if ("top_performers".equals(key)) secTopPerformers(content, d);
         else if ("sales_goal".equals(key)) secMonthlySalesGoal(content, d);
+        else if ("gross_profit".equals(key)) secGrossProfit(content, d);
         else if ("kpis".equals(key)) secKpis(content, d);
         else if ("alerts".equals(key)) secAlerts(content, d);
         else if ("sales_insight".equals(key)) secSalesInsight(content, d);
@@ -1903,6 +1904,7 @@ public class HomeScreen extends Screen {
         if (vector == R.drawable.mi_account_balance_wallet) return Theme.SECTION_CASH_POSITION;
         if (vector == R.drawable.mi_military_tech) return Theme.SECTION_TOP_PERFORMERS;
         if (vector == R.drawable.mi_track_changes) return Theme.SECTION_SALES_GOAL;
+        if (vector == R.drawable.mi_profit) return Theme.SECTION_GROSS_PROFIT;
         if (vector == R.drawable.mi_shopping_cart || vector == R.drawable.mi_add_shopping_cart)
             return Theme.SECTION_PURCHASE;
         if (vector == R.drawable.mi_receipt_long || vector == R.drawable.mi_cheque)
@@ -2890,6 +2892,40 @@ public class HomeScreen extends Screen {
         row.setContentDescription("رتبهٔ " + HomeNumberFormatter.integer(rank) + "، " + name
                 + "، " + sub + "، " + HomeNumberFormatter.money(total));
         return row;
+    }
+
+    private void secGrossProfit(LinearLayout content, Data d) {
+        if (!RoleStore.allowed(a, "closeout")) return;
+        LinearLayout card = a.kit.card(Theme.SECTION_GROSS_PROFIT);
+        card.addView(boardHead("سود ناخالص", "ماه جاری تا " + snapshotDay(d) + " • برآوردی",
+                R.drawable.mi_profit, null), a.kit.lp(-1, -2));
+        if (d == null || !d.grossProfitAvailable || d.grossProfitDaily == null) {
+            card.addView(a.kit.emptyRow("مبنای بهای خرید برای برآورد سود ناخالص در دسترس نیست."),
+                    a.kit.lp(-1, -2));
+        } else if (d.grossProfitDaily.isEmpty()) {
+            card.addView(a.kit.emptyRow("برای ماه جاری فروش قابل محاسبه‌ای ثبت نشده است."),
+                    a.kit.lp(-1, -2));
+        } else {
+            double sales = sumField(d.grossProfitDaily, "sales");
+            double cogs = sumField(d.grossProfitDaily, "cogs");
+            double profit = sumField(d.grossProfitDaily, "profit");
+            double todayProfit = grossProfitOnDay(d, snapshotDay(d));
+            card.addView(statRow(R.drawable.mi_sell, "فروش ماه تا امروز",
+                    HomeNumberFormatter.money(sales), Theme.SECTION_GROSS_PROFIT), a.kit.lp(-1, -2));
+            card.addView(a.kit.gap(6));
+            card.addView(statRow(R.drawable.mi_shopping_cart, "بهای تمام‌شدهٔ برآوردشده",
+                    HomeNumberFormatter.money(cogs), Theme.SECTION_GROSS_PROFIT), a.kit.lp(-1, -2));
+            card.addView(a.kit.gap(6));
+            card.addView(statRow(R.drawable.mi_profit, "سود ناخالص ماه تا امروز",
+                    HomeNumberFormatter.money(profit), Theme.SECTION_GROSS_PROFIT), a.kit.lp(-1, -2));
+            card.addView(a.kit.gap(6));
+            card.addView(statRow(R.drawable.mi_event, "سود ناخالص امروز",
+                    HomeNumberFormatter.money(todayProfit), Theme.SECTION_GROSS_PROFIT),
+                    a.kit.lp(-1, -2));
+            card.addView(a.kit.hint("این برآورد از مبلغ فروش و بهای خرید ذخیره‌شده ساخته می‌شود؛ هزینه‌های عملیاتی، مالی و مالیاتی را ندارد. در کوئری فعلی، بهای خریدِ خالی صفر محسوب می‌شود؛ پس با قیمت خرید ناقص، سود کم‌اتکاست."),
+                    a.kit.lp(-1, -2));
+        }
+        a.kit.addCard(content, card);
     }
 
     private void secMonthlySalesGoal(LinearLayout content, Data d) {

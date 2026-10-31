@@ -83,7 +83,7 @@ public final class HomeDashboardScreenshotTest {
         InstrumentationRegistry.getInstrumentation().waitForIdleSync();
         Bitmap screenshot = InstrumentationRegistry.getInstrumentation().getUiAutomation().takeScreenshot();
         assertNotNull("Android UI screenshot was empty", screenshot);
-        File directory = new File(target.getExternalFilesDir(null), "home-dashboard-screenshots");
+        File directory = new File(target.getFilesDir(), "home-dashboard-screenshots");
         if (!directory.exists() && !directory.mkdirs()) throw new IllegalStateException("Cannot create screenshot directory");
         File output = new File(directory, filename);
         try (FileOutputStream stream = new FileOutputStream(output)) {

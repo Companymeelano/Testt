@@ -82,16 +82,15 @@ PY
 fi
 
 mkdir -p ../design/screenshots
-screenshot_dir="/sdcard/Android/data/ir.meelano.manager.debug/files/home-dashboard-screenshots"
-remote_files="$(adb shell "find '$screenshot_dir' -type f -print 2>/dev/null" 2>&1 | tr '\r\n' ' ' || true)"
-echo "::notice title=Screenshot capture output::$remote_files"
-if ! adb pull "$screenshot_dir/home-dashboard-light.png" ../design/screenshots/home-dashboard-light.png; then
-  echo "::error title=Light screenshot pull failed::Expected file missing. Emulator files: $remote_files"
-  exit 1
-fi
-if ! adb pull "$screenshot_dir/home-dashboard-dark.png" ../design/screenshots/home-dashboard-dark.png; then
-  echo "::error title=Dark screenshot pull failed::Expected file missing. Emulator files: $remote_files"
-  exit 1
-fi
-test -s ../design/screenshots/home-dashboard-light.png
-test -s ../design/screenshots/home-dashboard-dark.png
+screenshot_dir="files/home-dashboard-screenshots"
+for theme in light dark; do
+  if ! adb exec-out run-as ir.meelano.manager.debug cat "$screenshot_dir/home-dashboard-$theme.png" > "../design/screenshots/home-dashboard-$theme.png"; then
+    app_files="$(adb shell run-as ir.meelano.manager.debug ls -laR "$screenshot_dir" 2>&1 | tr '\r\n' ' ' || true)"
+    echo "::error title=$theme screenshot extraction failed::Could not read the app-private PNG. run-as output: $app_files"
+    exit 1
+  fi
+  if [ ! -s "../design/screenshots/home-dashboard-$theme.png" ]; then
+    echo "::error title=$theme screenshot is empty::App-private screenshot output was empty."
+    exit 1
+  fi
+done

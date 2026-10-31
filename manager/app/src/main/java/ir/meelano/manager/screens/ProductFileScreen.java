@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * پروندهٔ کالا: مشخصات، موجودی، نمودار گردش، و کاردکس کامل. هر حرکت را می‌توان باز کرد و اگر
+ * پروندهٔ کالا: مشخصات، موجودی، نمودار و حرکت‌های اخیرِ کاردکس. هر حرکت را می‌توان باز کرد و اگر
  * حرکت مربوط به فاکتور فروش یا خرید باشد، همان فاکتور نمایش داده می‌شود.
  */
 public class ProductFileScreen extends Screen {
@@ -78,7 +78,7 @@ public class ProductFileScreen extends Screen {
             Meta m = new Meta(c);
             Data d = new Data();
             d.head = Repo.one(c, MasterQueries.productHeader(m, shka));
-            d.kardex = soft(d.notes, "گردش", () -> Repo.exec(c, MasterQueries.productKardex(m, shka, 1500)));
+            d.kardex = soft(d.notes, "گردش", () -> Repo.exec(c, MasterQueries.productKardex(m, shka, 500)));
             if (d.kardex == null) d.kardex = new ArrayList<>();
             if (d.head == null) throw new Exception("کالا یافت نشد");
             return d;
@@ -143,10 +143,14 @@ public class ProductFileScreen extends Screen {
         Kit.Kpi currentStock = new Kit.Kpi("موجودی کنونی", stockText, unit, Theme.VIOLET);
         currentStock.fullValue = stockText;
         kpis.add(currentStock);
-        kpis.add(new Kit.Kpi("ورود (ثبت‌شده)", Money.qtyText(in), "", Theme.SUCCESS));
-        kpis.add(new Kit.Kpi("خروج (ثبت‌شده)", Money.qtyText(out), "", Theme.DANGER));
-        kpis.add(new Kit.Kpi("تعداد حرکت", Money.num(d.kardex.size()), "سند", Theme.INFO));
+        String unitCaption = unit.isEmpty() ? "" : "واحد " + unit;
+        kpis.add(new Kit.Kpi("ورود اخیر", Money.qtyText(in), unitCaption, Theme.SUCCESS));
+        kpis.add(new Kit.Kpi("خروج اخیر", Money.qtyText(out), unitCaption, Theme.DANGER));
+        kpis.add(new Kit.Kpi("تعداد حرکت", Money.num(d.kardex.size()), "ردیف", Theme.INFO));
         content.addView(a.kit.kpiGrid(kpis, 2), a.kit.lp(-1, -2));
+        content.addView(a.kit.hint("جمع ورود و خروج و نمودار بر پایهٔ " + Money.num(d.kardex.size())
+                + " ردیف گردش دریافت‌شده است؛ درخواست حداکثر ۵۰۰ حرکت اخیر را می‌خواند و این عدد، سندهای یکتا یا کل تاریخچه نیست."),
+                a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
 
         // ---- specification card ----
@@ -187,35 +191,50 @@ public class ProductFileScreen extends Screen {
             run.add(new Charts.Point(Jalali.shortLabel(r.s("date")), acc));
         }
         LinearLayout ch = a.kit.card(Theme.VIOLET);
-        ch.addView(a.kit.text("روند تجمعی موجودی در دفتر گردش", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
-        ch.addView(a.kit.hint("نمودار مقدار خالص ورود منهای خروج از اولین حرکت ثبت‌شدهٔ این کالا"), a.kit.lp(-1, -2));
+        ch.addView(a.kit.text("خالص گردش در حرکت‌های اخیر", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        ch.addView(a.kit.hint("جمع ورود منهای خروج در ردیف‌های دریافت‌شده؛ ماندهٔ افتتاحیه در نمودار لحاظ نشده است."),
+                a.kit.lp(-1, -2));
         Charts.Area area = new Charts.Area(a);
         area.setData(run, Theme.VIOLET, Charts.COMPACT);
+        Charts.Point firstMovement = run.get(0);
+        Charts.Point lastMovement = run.get(run.size() - 1);
+        area.setContentDescription("نمودار تجمعی خالص ورود منهای خروج در حرکت‌های بارگیری‌شده؛ ماندهٔ افتتاحیه منظور نشده است. "
+                + "قدیمی‌ترین ردیف " + firstMovement.label + ": "
+                + Money.qtyText(firstMovement.value) + "؛ جدیدترین ردیف " + lastMovement.label
+                + ": " + Money.qtyText(lastMovement.value) + (unit.isEmpty() ? " واحد." : " " + unit + "."));
+        area.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
         ch.addView(area, a.kit.lp(-1, Theme.dp(190)));
         a.kit.addCard(content, ch);
 
         // ---- distribution by operation ----
         Map<String, Double> byOp = new LinkedHashMap<>();
         for (Row r : d.kardex) {
-            String k = r.s("opLabel").isEmpty() ? "عملیات" : r.s("opLabel");
-            byOp.put(k, (byOp.containsKey(k) ? byOp.get(k) : 0) + Math.abs(r.d("qty")));
+            String operation = PersianText.cleanDisplayLabel(r.s("opLabel"));
+            if (operation.isEmpty()) operation = AtiranSchema.actNameFallback(r.s("act"));
+            if (operation.isEmpty()) operation = "عملیات";
+            byOp.put(operation, (byOp.containsKey(operation) ? byOp.get(operation) : 0) + Math.abs(r.d("qty")));
         }
         List<Charts.Point> pts = new ArrayList<>();
-        for (Map.Entry<String, Double> e : byOp.entrySet()) pts.add(new Charts.Point(e.getKey(), e.getValue()));
+        for (Map.Entry<String, Double> entry : byOp.entrySet()) {
+            if (entry.getValue() > 0) pts.add(new Charts.Point(entry.getKey(), entry.getValue()));
+        }
         LinearLayout dc = a.kit.card(Theme.GOLD);
-        dc.addView(a.kit.text("ترکیب گردش بر اساس عملیات", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        dc.addView(a.kit.text("سهم مقدار گردش بر اساس عملیات", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
         Charts.Donut donut = new Charts.Donut(a);
-        donut.setData(pts, "گردش", Money.fa(String.valueOf(d.kardex.size())) + " سند");
+        donut.setData(pts, "مقدار", Money.num(d.kardex.size()) + " حرکت");
+        donut.setContentDescription(movementDonutDescription(pts, d.kardex.size(), unit));
+        donut.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
         dc.addView(donut, a.kit.lp(-1, -2));
         a.kit.addCard(content, dc);
 
         // ---- movement list (newest first, tap a movement) ----
-        content.addView(a.kit.sectionHead("کاردکس کالا", Money.fa(String.valueOf(d.kardex.size())) + " حرکت", null),
-                a.kit.lp(-1, -2));
+        int shown = Math.min(d.kardex.size(), 300);
+        String movementRange = "نمایش " + Money.num(shown) + " از " + Money.num(d.kardex.size()) + " حرکتِ دریافت‌شده";
+        content.addView(a.kit.sectionHead("کاردکس کالا", null, null), a.kit.lp(-1, -2));
+        content.addView(a.kit.hint(movementRange), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(6));
-        int shown = 0;
-        for (final Row r : d.kardex) {
-            if (shown++ >= 300) break;
+        for (int i = 0; i < shown; i++) {
+            final Row r = d.kardex.get(i);
             boolean outFlag = r.l("outFlag") == 1;
             String opLabel = r.s("opLabel").isEmpty() ? AtiranSchema.actNameFallback(r.s("act")) : r.s("opLabel");
             String mid = (r.s("doc").isEmpty() ? "بدون شماره سند" : "سند " + Money.fa(r.s("doc")))
@@ -229,8 +248,38 @@ public class ProductFileScreen extends Screen {
             content.addView(row, p);
         }
         if (d.kardex.size() > shown)
-            content.addView(a.kit.hint("برای " + Money.fa(String.valueOf(shown)) + " حرکت اول نمایش داده شد"), a.kit.lp(-1, -2));
+            content.addView(a.kit.hint("فقط " + Money.num(shown) + " حرکت از " + Money.num(d.kardex.size())
+                    + " ردیف دریافت‌شده نمایش داده شد."), a.kit.lp(-1, -2));
         renderNotes(content, d.notes);
+    }
+
+    private String movementDonutDescription(List<Charts.Point> points, int movementCount, String unit) {
+        List<Charts.Point> sorted = new ArrayList<>(points);
+        java.util.Collections.sort(sorted, (left, right) -> Double.compare(right.value, left.value));
+        double total = 0;
+        for (Charts.Point point : sorted) total += Math.max(0, point.value);
+        StringBuilder description = new StringBuilder("دونات سهم مقدار مطلق گردش بر اساس نوع عملیات؛ مقدارها ");
+        description.append(unit.isEmpty() ? "بر حسب واحد کالا هستند. " : "بر حسب " + unit + " هستند. ");
+        if (sorted.isEmpty()) {
+            description.append("مقداری برای ترسیم ثبت نشده است.");
+        } else {
+            int top = Math.min(7, sorted.size());
+            for (int i = 0; i < top; i++) {
+                Charts.Point point = sorted.get(i);
+                if (i > 0) description.append("؛ ");
+                description.append(point.label).append(": ").append(Money.qtyText(point.value))
+                        .append("، ").append(Money.pct(total > 0 ? point.value * 100.0 / total : 0));
+            }
+            double rest = 0;
+            for (int i = top; i < sorted.size(); i++) rest += sorted.get(i).value;
+            if (rest > 0.5) {
+                if (top > 0) description.append("؛ ");
+                description.append("سایر: ").append(Money.qtyText(rest))
+                        .append("، ").append(Money.pct(total > 0 ? rest * 100.0 / total : 0));
+            }
+        }
+        description.append(". تعداد ردیف‌های گردش: ").append(Money.num(movementCount)).append(".");
+        return description.toString();
     }
 
     private int stockTone(ProductStockStatus.Band band) {
@@ -250,6 +299,13 @@ public class ProductFileScreen extends Screen {
         if (act == 20 || act == 22) return "sales";
         if (act == 11) return "buy";
         return null;
+    }
+
+    private int movementSheetMaxDp() {
+        android.util.DisplayMetrics metrics = a.getResources().getDisplayMetrics();
+        float density = metrics.density > 0 ? metrics.density : 1f;
+        int screenHeightDp = Math.round(metrics.heightPixels / density);
+        return Math.max(160, Math.min(480, Math.round(screenHeightDp * 0.62f)));
     }
 
     private void openMovement(final Row r) {
@@ -307,7 +363,7 @@ public class ProductFileScreen extends Screen {
         }), a.kit.wlp(1f));
         body.addView(acts, a.kit.lp(-1, -2));
 
-        holder[0] = a.kit.dialog("گردش کالا", body, true);
+        holder[0] = a.kit.dialog("جزئیات حرکت کالا", a.kit.scrollWrap(body, movementSheetMaxDp()), true);
         holder[0].show();
     }
 }

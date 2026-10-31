@@ -605,12 +605,28 @@ public class ProductsScreen extends Screen {
         c.addView(a.kit.text("ارزش موجودی به تفکیک گروه", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
         Charts.Donut dn = new Charts.Donut(a);
         List<Charts.Point> pts = new ArrayList<>();
-        for (int i = 0; i < Math.min(8, d.groups.size()); i++)
-            pts.add(new Charts.Point(d.groups.get(i).s("label"), d.groups.get(i).d("value"), Charts.palette(i)));
-        double sum = 0;
-        for (Row r : d.groups) sum += r.d("value");
-        dn.setData(pts, "ارزش کل", Money.compactRial(sum));
+        double positiveTotal = 0;
+        boolean hasNegative = false;
+        for (Row row : d.groups) {
+            double value = row.d("value");
+            if (value < 0) {
+                hasNegative = true;
+                continue;
+            }
+            if (value <= 0) continue;
+            String label = PersianText.cleanGroupLabel(row.s("label"));
+            if (label.isEmpty()) label = "بدون گروه";
+            pts.add(new Charts.Point(label, value, Charts.palette(pts.size())));
+            positiveTotal += value;
+        }
+        dn.setData(pts, hasNegative ? "ارزش مثبت" : "ارزش کل", Money.compactRial(positiveTotal));
+        dn.setContentDescription(groupDonutDescription(pts, positiveTotal, hasNegative));
+        dn.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
         c.addView(dn, new LinearLayout.LayoutParams(-1, Theme.dp(300)));
+        if (hasNegative) {
+            c.addView(a.kit.hint("گروه‌های با ارزش منفی از سهم‌های نمودار کنار گذاشته شده‌اند؛ مقدار دقیق همه گروه‌ها در جدول آمده است."),
+                    a.kit.lp(-1, -2));
+        }
         ReportCatalog.Col[] cols = new ReportCatalog.Col[]{
                 new ReportCatalog.Col("label", "گروه", ReportCatalog.T_TEXT),
                 new ReportCatalog.Col("value", "ارزش", ReportCatalog.T_MONEY),
@@ -618,6 +634,33 @@ public class ProductsScreen extends Screen {
         };
         c.addView(a.kit.dataTable(cols, d.groups, null), a.kit.lp(-1, -2));
         a.kit.addCard(content, c);
+    }
+
+    private String groupDonutDescription(List<Charts.Point> points, double total, boolean hasNegative) {
+        StringBuilder description = new StringBuilder("سهم مثبت ارزش موجودی به تفکیک گروه. ");
+        if (points.isEmpty()) {
+            description.append("مقدار مثبتی برای نمایش نیست.");
+        } else {
+            List<Charts.Point> sorted = new ArrayList<>(points);
+            java.util.Collections.sort(sorted, (left, right) -> Double.compare(right.value, left.value));
+            int top = Math.min(7, sorted.size());
+            for (int i = 0; i < top; i++) {
+                Charts.Point point = sorted.get(i);
+                if (i > 0) description.append("؛ ");
+                description.append(point.label).append(": ").append(Money.rialText(point.value))
+                        .append("، ").append(Money.pct(total > 0 ? point.value * 100.0 / total : 0));
+            }
+            double rest = 0;
+            for (int i = top; i < sorted.size(); i++) rest += sorted.get(i).value;
+            if (rest > 0.5) {
+                if (top > 0) description.append("؛ ");
+                description.append("سایر: ").append(Money.rialText(rest))
+                        .append("، ").append(Money.pct(total > 0 ? rest * 100.0 / total : 0));
+            }
+        }
+        description.append(". مجموع سهم‌های مثبت: ").append(Money.rialText(total)).append(".");
+        if (hasNegative) description.append(" گروه‌های منفی در جدول زیر دیده می‌شوند، نه در دونات.");
+        return description.toString();
     }
 
     private void buildTop(LinearLayout content, Data d) {

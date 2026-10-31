@@ -41,16 +41,23 @@ public final class SalesSnapshot {
 
     private final Map<String, Day> byDay;
     private final String asOfDate;
+    private final String historyStart;
     private final boolean available;
 
-    private SalesSnapshot(Map<String, Day> byDay, String asOfDate, boolean available) {
+    private SalesSnapshot(Map<String, Day> byDay, String asOfDate, String historyStart, boolean available) {
         this.byDay = Collections.unmodifiableMap(new TreeMap<>(byDay));
         this.asOfDate = Jalali.disp(asOfDate);
+        this.historyStart = Jalali.disp(historyStart);
         this.available = available;
     }
 
-    /** Build the snapshot from the read-only `factorDaily` rows (`day,total,docs`). */
+    /** Build from the read-only `factorDaily` rows, inferring a conservative history start. */
     public static SalesSnapshot fromRows(List<Row> rows, String asOfDate) {
+        return fromRows(rows, asOfDate, inferredStart(rows, asOfDate));
+    }
+
+    /** Build from `factorDaily` rows and the exact lower bound used by the query. */
+    public static SalesSnapshot fromRows(List<Row> rows, String asOfDate, String historyStart) {
         TreeMap<String, Day> merged = new TreeMap<>();
         if (rows != null) {
             for (Row row : rows) {
@@ -63,15 +70,26 @@ public final class SalesSnapshot {
                 merged.put(day, new Day(day, amount, docs));
             }
         }
-        return new SalesSnapshot(merged, asOfDate, rows != null);
+        return new SalesSnapshot(merged, asOfDate, historyStart, rows != null);
+    }
+
+    private static String inferredStart(List<Row> rows, String asOfDate) {
+        String first = "";
+        if (rows != null) for (Row row : rows) {
+            if (row == null) continue;
+            String day = Jalali.disp(row.s("day"));
+            if (!day.isEmpty() && (first.isEmpty() || day.compareTo(first) < 0)) first = day;
+        }
+        return first.isEmpty() ? asOfDate : first;
     }
 
     public static SalesSnapshot empty(String asOfDate) {
-        return new SalesSnapshot(Collections.<String, Day>emptyMap(), asOfDate, false);
+        return new SalesSnapshot(Collections.<String, Day>emptyMap(), asOfDate, "", false);
     }
 
     public boolean isAvailable() { return available; }
     public String asOfDate() { return asOfDate; }
+    public String historyStart() { return historyStart; }
 
     /** Missing calendar days are known zeroes when the source query succeeded. */
     public Day day(String date) {
@@ -111,6 +129,9 @@ public final class SalesSnapshot {
         if (!available || days <= 0) return 0;
         String end = Jalali.addDays(date, -1);
         String start = Jalali.addDays(date, -days);
+        int first = Jalali.parse(start);
+        int history = Jalali.parse(historyStart);
+        if (first < 0 || history < 0 || first < history) return 0;
         return salesRialsBetween(start, end) / days;
     }
 

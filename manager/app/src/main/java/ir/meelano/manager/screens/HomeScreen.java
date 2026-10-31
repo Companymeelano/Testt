@@ -31,6 +31,7 @@ import ir.meelano.manager.core.RoleStore;
 import ir.meelano.manager.core.MoneyQueries;
 import ir.meelano.manager.R;
 import ir.meelano.manager.core.Queries;
+import ir.meelano.manager.core.SalesComparison;
 import ir.meelano.manager.core.SalesSnapshot;
 import ir.meelano.manager.data.Meta;
 import ir.meelano.manager.data.Company;
@@ -75,6 +76,7 @@ public class HomeScreen extends Screen {
         List<Row> salesDaily = new ArrayList<>();
         SalesSnapshot salesSnapshot;
         boolean salesTrendAvailable;
+        String salesHistoryFrom = "";
         List<Row> topItems = new ArrayList<>();
         List<Row> monthlySales = new ArrayList<>();
         List<Row> dueIn = new ArrayList<>();
@@ -463,6 +465,7 @@ public class HomeScreen extends Screen {
         Data d = new Data();
         final String to = Jalali.todayStr();
         final String from = chartsFrom(to);
+        d.salesHistoryFrom = from;
         d.salesDaily = liveL(token, L, d.notes, "روند فروش", () -> Repo.exec(L.c, Queries.factorDaily(L.m, true, from, to)));
         d.salesTrendAvailable = d.salesDaily != null;
         Filter todayFilter = new Filter();
@@ -493,7 +496,9 @@ public class HomeScreen extends Screen {
             d.monthlySales = new ArrayList<>();
             return;
         }
-        d.salesSnapshot = SalesSnapshot.fromRows(d.salesDaily, d.snapshotDay);
+        d.salesSnapshot = d.salesHistoryFrom == null || d.salesHistoryFrom.isEmpty()
+                ? SalesSnapshot.fromRows(d.salesDaily, d.snapshotDay)
+                : SalesSnapshot.fromRows(d.salesDaily, d.snapshotDay, d.salesHistoryFrom);
         d.salesDay = d.salesSnapshot.row(d.snapshotDay);
         List<Row> months = new ArrayList<>();
         for (SalesSnapshot.Month month : d.salesSnapshot.months()) {
@@ -519,6 +524,7 @@ public class HomeScreen extends Screen {
     private static void mergeCharts(Data s, Data g) {
         s.salesDaily = g.salesDaily;
         s.salesTrendAvailable = g.salesTrendAvailable;
+        s.salesHistoryFrom = g.salesHistoryFrom;
         s.topItems = g.topItems;
         s.monthlySales = g.monthlySales;
         s.dueIn = g.dueIn;
@@ -560,7 +566,8 @@ public class HomeScreen extends Screen {
                     .append("|buy=").append(rowStr(d.buyDay))
                     .append("|in=").append(rowStr(d.inDay))
                     .append("|out=").append(rowStr(d.outDay))
-                    .append("|trendok=").append(d.salesSnapshot != null && d.salesSnapshot.isAvailable() ? "1" : "0");
+                    .append("|trendok=").append(d.salesSnapshot != null && d.salesSnapshot.isAvailable() ? "1" : "0")
+                    .append("|trendfrom=").append(esc(d.salesHistoryFrom == null ? "" : d.salesHistoryFrom));
             if (d.topItems != null) {
                 for (int i = 0; i < Math.min(5, d.topItems.size()); i++)
                     s.append("|top").append(i).append('=').append(rowStr(d.topItems.get(i)));
@@ -613,6 +620,7 @@ public class HomeScreen extends Screen {
                 else if ("in".equals(k)) { d.inDay = rowFrom(v); any = true; }
                 else if ("out".equals(k)) { d.outDay = rowFrom(v); any = true; }
                 else if ("trendok".equals(k)) d.salesTrendAvailable = "1".equals(v);
+                else if ("trendfrom".equals(k)) d.salesHistoryFrom = Jalali.disp(unesc(v));
                 else if (k.matches("top[0-4]")) { d.topItems.add(rowFrom(v)); any = true; }
                 else if (k.matches("trend(?:[0-9]|[1-5][0-9]|6[01])")) {
                     d.salesDaily.add(rowFrom(v)); d.salesTrendAvailable = true; any = true;
@@ -1350,25 +1358,35 @@ public class HomeScreen extends Screen {
         // The comparison card: the day against the recent days, as compact tiles.
         if (d.salesSnapshot != null && d.salesSnapshot.isAvailable()) {
             String compareDay = snapshotDay(d);
-            double todaySales = salesOnDay(d, compareDay);
-            double yesterday = salesOnDay(d, Jalali.addDays(compareDay, -1));
-            double avg7 = averageSalesBefore(d, compareDay, 7);
-            double avg30 = averageSalesBefore(d, compareDay, 30);
             boolean running = compareDay.equals(Jalali.todayStr());
-            String delta = avg7 > 0 ? Money.pct((todaySales - avg7) * 100.0 / avg7) : "—";
+            int elapsedMinute = running ? currentMinuteOfDay() : SalesComparison.MINUTES_PER_DAY;
+            SalesComparison.DayResult dayComparison = SalesComparison.evaluate(d.salesSnapshot, compareDay,
+                    elapsedMinute, SalesComparison.DEFAULT_COMPARABLE_WEEKS);
+            double todaySales = dayComparison.actualRials;
+            double yesterday = salesOnDay(d, Jalali.addDays(compareDay, -1));
+            double avg30 = averageSalesBefore(d, compareDay, 30);
+            String weekday = Jalali.weekday(compareDay);
             LinearLayout compare = a.kit.card(Theme.GOLD);
             compare.addView(boardHead("فروش " + snapshotLabel(d) + " در مقایسه",
                     "میانگین و مقایسه با روزهای قبل", R.drawable.mi_bar_chart,
                     navChip("گزارش فروش", "sales")), a.kit.lp(-1, -2));
             List<Mini> cmp = new ArrayList<>();
+            String todayNote = running ? partialTodayNote()
+                    : (dayComparison.hasBaseline() ? "مقایسهٔ روز کامل" : "بدون مبنای هم‌روز");
             cmp.add(new Mini(R.drawable.mi_point_of_sale, snapshotLabel(d),
-                    todaySales > 0 ? Money.compactRial(todaySales) : "—",
-                    todaySales > 0 ? (running ? partialTodayNote() : "تغییر ۷ روزه " + delta)
-                            : (running ? "هنوز فروشی ثبت نشده" : "بدون فروش"),
-                    Theme.TEXT));
+                    Money.compactRial(todaySales), todayNote, Theme.TEXT));
             cmp.add(new Mini(R.drawable.mi_calendar_month, "دیروز", Money.compactRial(yesterday), null, Theme.TEXT));
             cmp.add(new Mini(R.drawable.mi_bar_chart, "میانگین ۳۰ روز", Money.compactRial(avg30), null, Theme.TEXT));
-            cmp.add(new Mini(R.drawable.mi_refresh, "میانگین ۷ روز", Money.compactRial(avg7), null, Theme.TEXT));
+            cmp.add(new Mini(R.drawable.mi_refresh, "میانگین ۴ " + weekday + " گذشته",
+                    Money.compactRial(dayComparison.sameWeekdayAverageRials), "روزهای هم‌هفته", Theme.TEXT));
+            if (dayComparison.projectionAvailable) {
+                String forecastNote = dayComparison.hasBaseline()
+                        ? "در برابر " + weekday + "ها: " + Money.pct(dayComparison.changePercent())
+                        : "مبنای هم‌روز کافی نیست";
+                if (running) forecastNote = "برآورد ناقص · " + forecastNote;
+                cmp.add(new Mini(R.drawable.mi_trending_up, "پیش‌بینی پایان روز",
+                        Money.compactRial(dayComparison.projectedRials), forecastNote, Theme.TEXT));
+            }
             compare.addView(miniGrid(cmp, 2), a.kit.lp(-1, -2));
             a.kit.addCard(content, compare);
         }
@@ -1587,7 +1605,8 @@ public class HomeScreen extends Screen {
             }
             tile.addView(v, a.kit.lp(-1, -2));
             if (m.note != null && !m.note.isEmpty()) {
-                TextView n = a.kit.text(m.note, 10.5f, Theme.SUCCESS, true);
+                int noteColor = m.note.contains("ناقص") ? Theme.MUTED : Theme.SUCCESS;
+                TextView n = a.kit.text(m.note, 10.5f, noteColor, true);
                 n.setGravity(Gravity.CENTER_HORIZONTAL);
                 n.setSingleLine(true);
                 n.setEllipsize(TextUtils.TruncateAt.END);
@@ -1598,6 +1617,11 @@ public class HomeScreen extends Screen {
             row.addView(tile, tp);
         }
         return root;
+    }
+
+    private int currentMinuteOfDay() {
+        Calendar c = Calendar.getInstance();
+        return c.get(Calendar.HOUR_OF_DAY) * 60 + c.get(Calendar.MINUTE);
     }
 
     /** «تا ۱۱:۵۵ • ناقص»: the day is still running, so the number is partial. */
@@ -1758,25 +1782,31 @@ public class HomeScreen extends Screen {
         if (hasDaily) {
             String endDay = snapshotDay(d);
             List<Charts.Point> points = filled(d.salesSnapshot, endDay);
-            double today = salesOnDay(d, endDay);
-            double avg7 = averageSalesBefore(d, endDay, 7);
+            SalesComparison.DayResult dayComparison = SalesComparison.evaluate(d.salesSnapshot, endDay,
+                    endDay.equals(Jalali.todayStr()) ? currentMinuteOfDay() : SalesComparison.MINUTES_PER_DAY,
+                    SalesComparison.DEFAULT_COMPARABLE_WEEKS);
+            double today = dayComparison.actualRials;
             LinearLayout trend = a.kit.card(Theme.GOLD);
             trend.addView(boardHead("روند ۱۴ روزه فروش تا " + snapshotLabel(d),
                     "فروش روزانه، روز به روز", R.drawable.mi_refresh,
                     navChip("گزارش فروش", "sales")), a.kit.lp(-1, -2));
-            if (avg7 > 0) {
-                double change = (today - avg7) * 100.0 / avg7;
-                int color = today >= avg7 ? Theme.SUCCESS : Theme.WARNING;
-                String direction = today >= avg7 ? "بالاتر" : "پایین‌تر";
+            if (dayComparison.hasBaseline() && dayComparison.projectionAvailable) {
+                double change = dayComparison.changePercent();
+                int color = dayComparison.complete
+                        ? (change >= 0 ? Theme.SUCCESS : Theme.WARNING) : Theme.INFO;
+                String direction = change >= 0 ? "بالاتر" : "پایین‌تر";
+                String basis = dayComparison.weeklyHoliday ? "جمعه‌های پیشین" : Jalali.weekday(endDay) + "های پیشین";
+                String metric = dayComparison.complete ? "فروش " : "پیش‌بینی امروز ";
+                double comparisonValue = dayComparison.complete ? today : dayComparison.projectedRials;
                 LinearLayout pulse = a.kit.h();
                 pulse.setGravity(Gravity.CENTER_VERTICAL);
                 pulse.setPadding(Theme.dp(9), Theme.dp(7), Theme.dp(9), Theme.dp(7));
                 pulse.setBackground(Theme.kpi(color));
-                pulse.addView(a.kit.text("فروش " + snapshotLabel(d), 10.5f, Theme.MUTED, false), a.kit.lp(-2, -2));
+                pulse.addView(a.kit.text(metric + snapshotLabel(d), 10.5f, Theme.MUTED, false), a.kit.lp(-2, -2));
                 pulse.addView(a.kit.space(7));
-                pulse.addView(a.kit.text(today > 0 ? Money.compactRial(today) : "—",
+                pulse.addView(a.kit.text(Money.compactRial(comparisonValue),
                         11.5f, Theme.TEXT, true), a.kit.wlp(1f));
-                pulse.addView(a.kit.text(Money.pct(Math.abs(change)) + " " + direction + " از میانگین ۷ روز",
+                pulse.addView(a.kit.text(Money.pct(Math.abs(change)) + " " + direction + " از " + basis,
                         10.5f, color, true), a.kit.lp(-2, -2));
                 trend.addView(pulse, a.kit.lp(-1, -2));
                 trend.addView(a.kit.gap(4));

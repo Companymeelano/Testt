@@ -398,6 +398,8 @@ public class MainActivity extends Activity {
     /** Paint status/navigation bars for the current skin. */
     private void styleBars() {
         try {
+            // Keep the app shell inside system-bar insets (including Android 15+ devices).
+            if (android.os.Build.VERSION.SDK_INT >= 30) getWindow().setDecorFitsSystemWindows(true);
             getWindow().setStatusBarColor(Theme.statusBar());
             getWindow().setNavigationBarColor(Theme.navBar());
             int vis = getWindow().getDecorView().getSystemUiVisibility();
@@ -770,14 +772,12 @@ public class MainActivity extends Activity {
         root.addView(productStickyWrap, kit.lp(-1, -2));
         refreshLicChip();
 
-        // content (centered max-width column on tablets / wide screens)
+        // Center the content on wide screens. The scroll viewport uses only the remaining space
+        // above the sibling dock; decor fitting handles system bars, so don't add a duplicate inset.
         scroll = new PullToRefreshScrollView(this);
         scroll.setOnRefreshListener(() -> {
             if ("home".equals(currentId)) renderCurrent();
         });
-        // A small end inset keeps the final action fully scrollable above the fixed navigation dock.
-        scroll.setClipToPadding(false);
-        scroll.setPadding(0, 0, 0, Theme.dp(14));
         scroll.setOnScrollChangeListener((v, x, y, oldX, oldY) -> {
             setBrandHeaderCollapsed("products".equals(currentId) && y > Theme.dp(48));
         });
@@ -1415,8 +1415,9 @@ public class MainActivity extends Activity {
     /** Builds an empty, centred page column and puts it on screen in place of the previous one. */
     private LinearLayout newPage() {
         LinearLayout page = kit.v();
-        // Bottom room so the back capsule never covers the last row.
-        page.setPadding(Theme.dp(12), Theme.dp(4), Theme.dp(12), Theme.dp(128));
+        // The dock is a separate sibling below the scroll viewport, not an overlay on page rows.
+        // Keep just a compact end gutter rather than the old 128dp spacer, which created a blank tail.
+        page.setPadding(Theme.dp(12), Theme.dp(4), Theme.dp(12), Theme.dp(20));
         int sw = getResources().getDisplayMetrics().widthPixels;
         if (contentWrap != null) {
             contentWrap.removeAllViews();

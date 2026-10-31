@@ -21,6 +21,7 @@ import android.widget.TextView;
 
 import ir.meelano.manager.core.AtiranAuth;
 import ir.meelano.manager.core.AtiranSchema;
+import ir.meelano.manager.core.AlertEngine;
 import ir.meelano.manager.core.Filter;
 import ir.meelano.manager.core.FollowUps;
 import ir.meelano.manager.core.HomeRange;
@@ -78,9 +79,16 @@ public class HomeScreen extends Screen {
         boolean salesTrendAvailable;
         String salesHistoryFrom = "";
         List<Row> topItems = new ArrayList<>();
+        List<Row> stockAlerts = new ArrayList<>();
+        List<Row> purchasePriceTrend = new ArrayList<>();
+        boolean stockAlertsAvailable;
+        boolean reorderPointAvailable;
+        boolean purchasePriceTrendAvailable;
         List<Row> monthlySales = new ArrayList<>();
         List<Row> dueIn = new ArrayList<>();
         List<Row> dueOut = new ArrayList<>();
+        boolean dueInAvailable;
+        boolean dueOutAvailable;
         /** Return documents (اسناد برگشتی) of the last 30 days, grouped by type. */
         List<Row> returns = new ArrayList<>();
         Map<String, String> notes = new LinkedHashMap<>();
@@ -478,10 +486,34 @@ public class HomeScreen extends Screen {
         todayFilter.top = 5;
         d.topItems = liveL(token, L, d.notes, "پرفروش‌ترین کالاهای امروز",
                 () -> Repo.exec(L.c, Queries.factorTopProducts(L.m, true, todayFilter, 5)));
+        if (RoleStore.allowed(a, "products")) {
+            d.reorderPointAvailable = L.m.col("inventory", "reopoint", "reorder_point") != null;
+            d.stockAlerts = liveL(token, L, d.notes, "هشدار موجودی کالا",
+                    () -> Repo.exec(L.c, MasterQueries.stockAlerts(L.m, 20)));
+            d.stockAlertsAvailable = d.stockAlerts != null;
+        } else {
+            d.stockAlerts = null;
+            d.stockAlertsAvailable = false;
+        }
+        // No date bounds: the query compares each item's two most recent purchase records,
+        // rather than requiring both purchases to fall inside an arbitrary dashboard range.
+        if (RoleStore.allowed(a, "buy")) {
+            Filter priceHistory = new Filter();
+            priceHistory.from = "";
+            priceHistory.to = "";
+            d.purchasePriceTrend = liveL(token, L, d.notes, "انحراف بهای خرید",
+                    () -> Repo.exec(L.c, Queries.buyPriceTrend(L.m, priceHistory, 20)));
+            d.purchasePriceTrendAvailable = d.purchasePriceTrend != null;
+        } else {
+            d.purchasePriceTrend = null;
+            d.purchasePriceTrendAvailable = false;
+        }
         // Monthly comparison is built from this same daily snapshot after both parallel
         // query groups settle, so it cannot drift from the chart or KPI.
         d.dueIn = liveL(token, L, d.notes, "سررسید دریافتی", () -> Repo.exec(L.c, MoneyQueries.chequeDue(L.m, true, 3)));
+        d.dueInAvailable = d.dueIn != null;
         d.dueOut = liveL(token, L, d.notes, "سررسید پرداختی", () -> Repo.exec(L.c, MoneyQueries.chequeDue(L.m, false, 3)));
+        d.dueOutAvailable = d.dueOut != null;
         return d;
     }
 
@@ -530,9 +562,16 @@ public class HomeScreen extends Screen {
         s.salesTrendAvailable = g.salesTrendAvailable;
         s.salesHistoryFrom = g.salesHistoryFrom;
         s.topItems = g.topItems;
+        s.stockAlerts = g.stockAlerts;
+        s.stockAlertsAvailable = g.stockAlertsAvailable;
+        s.reorderPointAvailable = g.reorderPointAvailable;
+        s.purchasePriceTrend = g.purchasePriceTrend;
+        s.purchasePriceTrendAvailable = g.purchasePriceTrendAvailable;
         s.monthlySales = g.monthlySales;
         s.dueIn = g.dueIn;
         s.dueOut = g.dueOut;
+        s.dueInAvailable = g.dueInAvailable;
+        s.dueOutAvailable = g.dueOutAvailable;
         s.notes.putAll(g.notes);
     }
 
@@ -571,10 +610,35 @@ public class HomeScreen extends Screen {
                     .append("|in=").append(rowStr(d.inDay))
                     .append("|out=").append(rowStr(d.outDay))
                     .append("|trendok=").append(d.salesSnapshot != null && d.salesSnapshot.isAvailable() ? "1" : "0")
-                    .append("|trendfrom=").append(esc(d.salesHistoryFrom == null ? "" : d.salesHistoryFrom));
+                    .append("|trendfrom=").append(esc(d.salesHistoryFrom == null ? "" : d.salesHistoryFrom))
+                    .append("|stockok=").append(d.stockAlertsAvailable ? "1" : "0")
+                    .append("|reorderok=").append(d.reorderPointAvailable ? "1" : "0")
+                    .append("|priceok=").append(d.purchasePriceTrendAvailable ? "1" : "0")
+                    .append("|dueinok=").append(d.dueInAvailable ? "1" : "0")
+                    .append("|dueoutok=").append(d.dueOutAvailable ? "1" : "0");
             if (d.topItems != null) {
                 for (int i = 0; i < Math.min(5, d.topItems.size()); i++)
                     s.append("|top").append(i).append('=').append(rowStr(d.topItems.get(i)));
+            }
+            if (d.stockAlerts != null) {
+                for (int i = 0; i < Math.min(20, d.stockAlerts.size()); i++)
+                    s.append("|stock").append(i).append('=').append(rowStr(cacheFields(d.stockAlerts.get(i),
+                            "shka", "name", "stockPieces", "reorderPoint", "reorderKnown", "isOut")));
+            }
+            if (d.purchasePriceTrend != null) {
+                for (int i = 0; i < Math.min(20, d.purchasePriceTrend.size()); i++)
+                    s.append("|price").append(i).append('=').append(rowStr(cacheFields(d.purchasePriceTrend.get(i),
+                            "label", "lastUnit", "prevUnit", "change")));
+            }
+            if (d.dueIn != null) {
+                for (int i = 0; i < Math.min(20, d.dueIn.size()); i++)
+                    s.append("|duein").append(i).append('=').append(rowStr(cacheFields(d.dueIn.get(i),
+                            "amount", "sardate")));
+            }
+            if (d.dueOut != null) {
+                for (int i = 0; i < Math.min(20, d.dueOut.size()); i++)
+                    s.append("|dueout").append(i).append('=').append(rowStr(cacheFields(d.dueOut.get(i),
+                            "amount", "sardate")));
             }
             if (d.salesDaily != null) {
                 for (int i = 0; i < Math.min(62, d.salesDaily.size()); i++)
@@ -625,7 +689,16 @@ public class HomeScreen extends Screen {
                 else if ("out".equals(k)) { d.outDay = v.isEmpty() ? null : rowFrom(v); any = true; }
                 else if ("trendok".equals(k)) d.salesTrendAvailable = "1".equals(v);
                 else if ("trendfrom".equals(k)) d.salesHistoryFrom = Jalali.disp(unesc(v));
+                else if ("stockok".equals(k)) d.stockAlertsAvailable = "1".equals(v);
+                else if ("reorderok".equals(k)) d.reorderPointAvailable = "1".equals(v);
+                else if ("priceok".equals(k)) d.purchasePriceTrendAvailable = "1".equals(v);
+                else if ("dueinok".equals(k)) d.dueInAvailable = "1".equals(v);
+                else if ("dueoutok".equals(k)) d.dueOutAvailable = "1".equals(v);
                 else if (k.matches("top[0-4]")) { d.topItems.add(rowFrom(v)); any = true; }
+                else if (k.matches("stock(?:[0-9]|1[0-9])")) { d.stockAlerts.add(rowFrom(v)); any = true; }
+                else if (k.matches("price(?:[0-9]|1[0-9])")) { d.purchasePriceTrend.add(rowFrom(v)); any = true; }
+                else if (k.matches("duein(?:[0-9]|1[0-9])")) { d.dueIn.add(rowFrom(v)); any = true; }
+                else if (k.matches("dueout(?:[0-9]|1[0-9])")) { d.dueOut.add(rowFrom(v)); any = true; }
                 else if (k.matches("trend(?:[0-9]|[1-5][0-9]|6[01])")) {
                     d.salesDaily.add(rowFrom(v)); d.salesTrendAvailable = true; any = true;
                 }
@@ -646,6 +719,15 @@ public class HomeScreen extends Screen {
             b.append(e.getKey()).append('=').append(esc(String.valueOf(e.getValue())));
         }
         return b.toString();
+    }
+
+    private static Row cacheFields(Row source, String... keys) {
+        Row row = new Row();
+        if (source == null || keys == null) return row;
+        for (String key : keys) {
+            if (source.containsKey(key) && source.get(key) != null) row.put(key, source.get(key));
+        }
+        return row;
     }
 
     private static Row rowFrom(String s) {
@@ -1711,8 +1793,9 @@ public class HomeScreen extends Screen {
         // ---- alerts ----
         LinearLayout alerts = a.kit.card(Theme.GOLD);
         LinearLayout rows = a.kit.v();
-        int n = 0;
-        n += alert(rows, d, n);
+        int n = addEngineAlerts(rows, d, 0);
+        n = alert(rows, d, n);
+        List<String> unavailableSources = unavailableAlertSources(d);
         List<FollowUps.Due> dues = FollowUps.dueToday(a);
         if (!dues.isEmpty() && RoleStore.allowed(a, "customers")) {
             final FollowUps.Due fd = dues.get(0);
@@ -1721,10 +1804,14 @@ public class HomeScreen extends Screen {
                     Theme.GOLD, v -> gotoCustomer(fd.code)), padTop(n));
             n++;
         }
-        // The badge names the section (a bell, not a magnifier); the chip counts the alerts.
+        // The badge distinguishes a clean check from a partial check; missing sources are
+        // never presented as confirmation that the business has no alerts.
+        boolean incomplete = !unavailableSources.isEmpty();
+        String badge = n == 0 ? (incomplete ? "بررسی ناقص" : "بدون هشدار")
+                : Money.fa(String.valueOf(n)) + " مورد";
+        int badgeTone = n == 0 && !incomplete ? Theme.SUCCESS : Theme.WARNING;
         alerts.addView(boardHead("هشدار امروز", null, R.drawable.mi_warning,
-                statusChip(n == 0 ? "بدون هشدار" : Money.fa(String.valueOf(n)) + " مورد",
-                        n == 0 ? Theme.SUCCESS : Theme.WARNING)), a.kit.lp(-1, -2));
+                statusChip(badge, badgeTone)), a.kit.lp(-1, -2));
         // Each alert view still belongs to the temporary rows container. Detach it before
         // inserting it into the card; Android rejects a ViewGroup child with two parents.
         while (rows.getChildCount() > 0) {
@@ -1732,8 +1819,177 @@ public class HomeScreen extends Screen {
             rows.removeViewAt(0);
             alerts.addView(row);
         }
-        if (n == 0) alerts.addView(a.kit.text("فعلاً هشدار مهمی وجود ندارد.", 11.5f, Theme.MUTED, false), a.kit.lp(-1, -2));
+        if (n == 0) alerts.addView(a.kit.text(incomplete
+                        ? "وضعیت بدون هشدار تأیید نشد؛ بعضی داده‌ها در دسترس نیستند."
+                        : "فعلاً هشدار مهمی وجود ندارد.",
+                11.5f, incomplete ? Theme.WARNING : Theme.MUTED, false), a.kit.lp(-1, -2));
+        if (incomplete) alerts.addView(a.kit.hint("بررسی ناقص بخش‌های: "
+                        + joinAlertSources(unavailableSources)), a.kit.lp(-1, -2));
         a.kit.addCard(content, alerts);
+    }
+
+    /** Convert the dashboard's available, read-only query results into shared alert rules. */
+    private int addEngineAlerts(LinearLayout rows, Data d, int firstIndex) {
+        List<AlertEngine.StockItem> stock = null;
+        if (RoleStore.allowed(a, "products") && d.stockAlertsAvailable) {
+            stock = new ArrayList<>();
+            if (d.stockAlerts != null) for (Row r : d.stockAlerts) {
+                stock.add(new AlertEngine.StockItem(r.s("shka"), r.s("name"), r.d("stockPieces"),
+                        r.d("reorderPoint"), r.l("reorderKnown") == 1));
+            }
+        }
+
+        List<AlertEngine.PriceChange> prices = null;
+        if (RoleStore.allowed(a, "buy") && d.purchasePriceTrendAvailable) {
+            prices = new ArrayList<>();
+            if (d.purchasePriceTrend != null) for (Row r : d.purchasePriceTrend) {
+                prices.add(new AlertEngine.PriceChange(r.s("label"), r.d("prevUnit"), r.d("lastUnit")));
+            }
+        }
+
+        SalesComparison.DayResult sales = null;
+        if (RoleStore.allowed(a, "sales") && d.salesSnapshot != null && d.salesSnapshot.isAvailable()) {
+            String day = snapshotDay(d);
+            int minute = day.equals(Jalali.todayStr()) ? currentMinuteOfDay() : SalesComparison.MINUTES_PER_DAY;
+            sales = SalesComparison.evaluate(d.salesSnapshot, day, minute,
+                    SalesComparison.DEFAULT_COMPARABLE_WEEKS);
+        }
+
+        List<AlertEngine.DueItem> due = null;
+        if (RoleStore.allowed(a, "cheques")) {
+            due = new ArrayList<>();
+            String today = Jalali.todayStr();
+            if (d.dueInAvailable) addDueItems(due, d.dueIn, true, today);
+            if (d.dueOutAvailable) addDueItems(due, d.dueOut, false, today);
+        }
+
+        List<AlertEngine.Alert> evaluated = AlertEngine.evaluate(stock, prices, sales,
+                ManagerAlertsScreen.salesDropThreshold(a), due);
+        List<AlertEngine.Alert> visible = new ArrayList<>();
+        for (AlertEngine.Alert alert : evaluated) if (canOpenAlert(alert)) visible.add(alert);
+        int shown = 0;
+        int index = firstIndex;
+        for (AlertEngine.Alert item : visible) {
+            if (shown >= 6) break;
+            rows.addView(a.kit.alertRow(engineAlertTitle(item), engineAlertDetail(item),
+                    severityColor(item.severity), v -> openHomeAlert(item, d)), padTop(index++));
+            shown++;
+        }
+        if (visible.size() > shown) {
+            rows.addView(a.kit.hint("+" + Money.fa(String.valueOf(visible.size() - shown))
+                    + " هشدار دیگر در فهرست امروز"), padTop(index));
+        }
+        return index - firstIndex;
+    }
+
+    private void addDueItems(List<AlertEngine.DueItem> target, List<Row> rows,
+                             boolean incoming, String today) {
+        if (target == null || rows == null) return;
+        for (Row row : rows) {
+            String date = Jalali.disp(row.s("sardate"));
+            if (date.isEmpty()) continue;
+            int days = Jalali.diffDays(today, date);
+            target.add(new AlertEngine.DueItem(incoming, days, row.d("amount")));
+        }
+    }
+
+    private boolean canOpenAlert(AlertEngine.Alert alert) {
+        if (alert == null) return false;
+        switch (alert.action) {
+            case PRODUCT_FILE: return RoleStore.allowed(a, "products");
+            case SALES: return RoleStore.allowed(a, "sales");
+            case PURCHASES: return RoleStore.allowed(a, "buy");
+            case CHEQUES: return RoleStore.allowed(a, "cheques");
+            default: return false;
+        }
+    }
+
+    private int severityColor(AlertEngine.Severity severity) {
+        if (severity == AlertEngine.Severity.CRITICAL) return Theme.DANGER;
+        if (severity == AlertEngine.Severity.WARNING) return Theme.WARNING;
+        return Theme.INFO;
+    }
+
+    private String engineAlertTitle(AlertEngine.Alert alert) {
+        String product = alert.subject == null || alert.subject.isEmpty()
+                ? "کالای " + Money.fa(alert.actionValue) : alert.subject;
+        switch (alert.code) {
+            case "stock_out": return "ناموجود: " + product;
+            case "stock_low": return "کم‌موجودی: " + product;
+            case "sales_drop": return "افت غیرعادی فروش امروز";
+            case "purchase_price_drift": return "انحراف بهای خرید: " + product;
+            case "cheque_out_due": return "سررسید چک پرداختی";
+            case "cheque_in_due": return "سررسید چک دریافتی";
+            default: return "هشدار مدیریتی";
+        }
+    }
+
+    private String engineAlertDetail(AlertEngine.Alert alert) {
+        switch (alert.code) {
+            case "stock_out":
+                return "کد " + Money.fa(alert.actionValue) + " • موجودی " + Money.qty(alert.value);
+            case "stock_low":
+                return "کد " + Money.fa(alert.actionValue) + " • موجودی " + Money.qty(alert.value)
+                        + " • نقطه سفارش " + Money.qty(alert.referenceValue);
+            case "sales_drop":
+                return "پیش‌بینی پایان روز " + Money.compactRial(alert.value)
+                        + " • میانگین روز مشابه هفته " + Money.compactRial(alert.referenceValue)
+                        + " • افت " + Money.pct(Math.abs(alert.changePercent));
+            case "purchase_price_drift":
+                return "دو خرید آخر: " + Money.compactRial(alert.referenceValue) + " ← "
+                        + Money.compactRial(alert.value) + " • تغییر " + Money.pct(alert.changePercent);
+            case "cheque_out_due":
+            case "cheque_in_due":
+                String dueDay = alert.daysUntilDue == 0 ? "امروز"
+                        : "تا " + Money.fa(String.valueOf(alert.daysUntilDue)) + " روز";
+                String amount = alert.value > 0 ? " • مبلغ " + Money.compactRial(alert.value) : "";
+                return Money.fa(String.valueOf(alert.count)) + " فقره • " + dueDay + amount;
+            default:
+                return "برای بررسی، این بخش را باز کنید.";
+        }
+    }
+
+    private void openHomeAlert(AlertEngine.Alert alert, Data d) {
+        if (alert == null) return;
+        switch (alert.action) {
+            case PRODUCT_FILE:
+                ProductFileScreen.open(a, alert.actionValue);
+                break;
+            case SALES:
+                Row today = new Row();
+                today.put("d", snapshotDay(d));
+                gotoDay("sales", today);
+                break;
+            case PURCHASES:
+                a.nav("buy");
+                break;
+            case CHEQUES:
+                a.nav("cheques");
+                break;
+            default:
+                break;
+        }
+    }
+
+    private List<String> unavailableAlertSources(Data d) {
+        List<String> missing = new ArrayList<>();
+        if (RoleStore.allowed(a, "products") && !d.stockAlertsAvailable) missing.add("موجودی کالا");
+        else if (RoleStore.allowed(a, "products") && !d.reorderPointAvailable) missing.add("نقطه سفارش کالا");
+        if (RoleStore.allowed(a, "buy") && !d.purchasePriceTrendAvailable) missing.add("دو خرید آخر");
+        if (RoleStore.allowed(a, "sales") && (d.salesSnapshot == null || !d.salesSnapshot.isAvailable()))
+            missing.add("مقایسه فروش");
+        if (RoleStore.allowed(a, "cheques") && (!d.dueInAvailable || !d.dueOutAvailable))
+            missing.add("سررسید چک");
+        return missing;
+    }
+
+    private String joinAlertSources(List<String> sources) {
+        StringBuilder joined = new StringBuilder();
+        for (String source : sources) {
+            if (joined.length() > 0) joined.append("، ");
+            joined.append(source);
+        }
+        return joined.toString();
     }
 
     /**
@@ -2031,13 +2287,6 @@ public class HomeScreen extends Screen {
                 && d.salesDay.d("total") > 0 && d.buyDay.d("total") > d.salesDay.d("total") * 1.15) {
             box.addView(a.kit.alertRow("فشار نقدینگی", "خرید روز از فروش جلو زده؛ پرداخت‌ها را کنترل کنید.",
                     Theme.GOLD, v -> a.nav("buy")), padTop(n));
-            n++;
-        }
-        // due cheques
-        int dueN = (d.dueIn == null ? 0 : d.dueIn.size()) + (d.dueOut == null ? 0 : d.dueOut.size());
-        if (!isSalesManager() && RoleStore.allowed(a, "cheques") && dueN > 0) {
-            box.addView(a.kit.alertRow("سررسید چک", Money.fa(String.valueOf(dueN)) + " فقره چک در ۳ روز آینده سررسید می‌شود.",
-                    Theme.INFO, v -> a.nav("cheques")), padTop(n));
             n++;
         }
         return n;

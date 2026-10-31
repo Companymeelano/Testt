@@ -46,6 +46,38 @@ public class AtiranSampleSchemaTest {
         assertFalse(sql, sql.contains("linesum"));
     }
 
+    @Test public void homePriceDriftUsesTheTwoLatestPurchasesWithoutAnArbitraryDateWindow() throws Exception {
+        Meta meta = new Meta(connection(loadManifest()));
+        Filter allHistory = new Filter();
+        allHistory.from = "";
+        allHistory.to = "";
+        Queries.Q q = Queries.buyPriceTrend(meta, allHistory, 20);
+        String sql = q.sql.toLowerCase(Locale.ROOT);
+        assertTrue(sql, sql.contains("row_number() over (partition by k order by dk desc)"));
+        assertTrue(sql, sql.contains("r1.rn=1"));
+        assertTrue(sql, sql.contains("r1.rn=2"));
+        assertTrue(q.binds.isEmpty());
+        assertFalse(sql, sql.contains("update dbo."));
+        assertFalse(sql, sql.contains("delete from "));
+    }
+
+    @Test public void homeStockAlertsAreReadOnlyAndRequireARealReorderPoint() throws Exception {
+        Meta meta = new Meta(connection(loadManifest()));
+        String sql = MasterQueries.stockAlerts(meta, 20).sql.toLowerCase(Locale.ROOT);
+        assertTrue(sql, sql.contains("as stockpieces"));
+        assertTrue(sql, sql.contains("as reorderpoint"));
+        assertTrue(sql, sql.contains("as reorderknown"));
+        assertTrue(sql, sql.contains("mojkavah"));
+        assertTrue(sql, sql.contains("mojkajoz"));
+        assertTrue(sql, sql.contains("reopoint"));
+        assertTrue(sql, sql.contains("active"));
+        assertTrue(sql, sql.contains("<=0"));
+        assertTrue(sql, sql.contains("where "));
+        assertFalse(sql, sql.contains("insert into "));
+        assertFalse(sql, sql.contains("update dbo."));
+        assertFalse(sql, sql.contains("delete from "));
+    }
+
     /** Stock value counts loose pieces (mojkajoz) at inventory_price for active items only. */
     @Test public void stockValueCountsPiecesAtInventoryPrice() throws Exception {
         Meta meta = new Meta(connection(loadManifest()));

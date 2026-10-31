@@ -22,14 +22,6 @@ while [ "$attempt" -le 3 ]; do
 done
 
 if [ "$result" -ne 0 ]; then
-  diagnostics="$(grep -A3 -E 'FAILURE:|Execution failed|Could not |Caused by:|error:|AssertionFailedError|AssertionError|FAILED$|No tests found' "$log_file" | tail -n 24 || true)"
-  if [ -z "$diagnostics" ]; then diagnostics="$(tail -n 12 "$log_file")"; fi
-  while IFS= read -r line; do
-    [ -n "$line" ] || continue
-    safe_line="$(printf '%s' "$line" | sed 's/%/%25/g; s/:/%3A/g')"
-    echo "::error title=Screenshot instrumentation diagnostics::$safe_line"
-  done <<< "$diagnostics"
-
   report_file="$(mktemp)"
   python3 - <<'PY' > "$report_file"
 from pathlib import Path
@@ -65,9 +57,17 @@ PY
     echo "::error title=Screenshot test report::$safe_line"
   done < "$report_file"
 
+  diagnostics="$(grep -E 'FAILURE:|Execution failed|Could not |Caused by:|error:|AssertionFailedError|AssertionError|FAILED$|No tests found|ErrorName:|ErrorCode:|There were failing tests' "$log_file" | tail -n 3 || true)"
+  if [ -z "$diagnostics" ]; then diagnostics="$(tail -n 3 "$log_file")"; fi
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    safe_line="$(printf '%s' "$line" | sed 's/%/%25/g; s/:/%3A/g')"
+    echo "::error title=Screenshot Gradle diagnostics::$safe_line"
+  done <<< "$diagnostics"
+
   logcat_file="$(mktemp)"
   if adb logcat -d -t 2000 > "$logcat_file" 2>/dev/null; then
-    grep -E 'FATAL EXCEPTION|AndroidRuntime|INSTRUMENTATION_STATUS|INSTRUMENTATION_FAILED|AssertionError' "$logcat_file" | tail -n 12 | while IFS= read -r line; do
+    grep -E 'FATAL EXCEPTION|AndroidRuntime|INSTRUMENTATION_STATUS|INSTRUMENTATION_FAILED|AssertionError' "$logcat_file" | tail -n 2 | while IFS= read -r line; do
       safe_line="$(printf '%s' "$line" | sed 's/%/%25/g; s/:/%3A/g')"
       echo "::error title=Screenshot emulator log::$safe_line"
     done || true

@@ -262,9 +262,11 @@ public class HomeScreen extends Screen {
                 content.addView(salesHero(null, SyncState.REFRESHING), a.kit.lp(-1, -2));
                 content.addView(a.kit.gap(8));
             }
-            // Market data is independent of the Atiran dashboard query and can render immediately.
-            content.addView(marketCard(), a.kit.lp(-1, -2));
-            content.addView(a.kit.gap(8));
+            // Market data is independent of Atiran; keep its first paint within the user's Home layout.
+            if (homeSectionVisible("market")) {
+                content.addView(marketCard(), a.kit.lp(-1, -2));
+                content.addView(a.kit.gap(8));
+            }
             content.addView(a.kit.loading("در حال دریافت داشبورد مدیریتی…"), a.kit.lp(-1, -2));
         }
         localizeHomeNumbers(content);
@@ -514,8 +516,10 @@ public class HomeScreen extends Screen {
             content.addView(salesHero(null, failureState), a.kit.lp(-1, -2));
             content.addView(a.kit.gap(8));
         }
-        content.addView(marketCard(), a.kit.lp(-1, -2));
-        content.addView(a.kit.gap(8));
+        if (homeSectionVisible("market")) {
+            content.addView(marketCard(), a.kit.lp(-1, -2));
+            content.addView(a.kit.gap(8));
+        }
         content.addView(a.kit.error(faError, () -> render(content)), a.kit.lp(-1, -2));
         localizeHomeNumbers(content);
     }
@@ -1451,19 +1455,14 @@ public class HomeScreen extends Screen {
         secKpis(kpiSection, d);
         if (kpiSection.getChildCount() > 0) content.addView(kpiSection, a.kit.lp(-1, -2));
 
-        // The former "dashboard details" accordion is gone. Operational and analytical
-        // sections now have a clear, compact hierarchy and remain directly discoverable.
+        // Sales and KPIs stay pinned above; lower modules follow the saved visibility/order.
         for (String key : orderedKeys()) {
-            if ("sales_insight".equals(key) || "kpis".equals(key) || "returns".equals(key)
-                    || "due".equals(key) || "eod".equals(key))
-                continue; // Sales and returns are consolidated; cheque due is surfaced by AlertEngine.
+            if ("sales_insight".equals(key) || "kpis".equals(key) || !homeSectionVisible(key)) continue;
             LinearLayout block = a.kit.v();
             renderHomeSection(block, d, key);
             if (block.getChildCount() == 0) continue;
             content.addView(block, a.kit.lp(-1, -2));
         }
-        // Market/weather stays independent of Atiran SQL and below the business snapshot.
-        content.addView(marketCard(), a.kit.lp(-1, -2));
         renderNotes(content, d.notes);
         localizeHomeNumbers(content);
         staggerIn(content);
@@ -1531,6 +1530,7 @@ public class HomeScreen extends Screen {
         else if ("due".equals(key)) secDue(content, d);
         else if ("returns".equals(key)) secReturns(content, d);
         else if ("eod".equals(key)) secEod(content);
+        else if ("market".equals(key)) content.addView(marketCard(), a.kit.lp(-1, -2));
     }
 
     private String currentRole() {
@@ -1547,13 +1547,11 @@ public class HomeScreen extends Screen {
     private List<String> orderedKeys() {
         if (isSalesManager()) {
             List<String> salesOrder = new ArrayList<>();
-            salesOrder.add("kpis");
             salesOrder.add("alerts");
-            salesOrder.add("sales_insight");
             return salesOrder;
         }
         List<String> out = new ArrayList<>();
-        String[] known = {"kpis", "alerts", "due", "returns", "sales_insight", "cash_mix", "eod"};
+        String[] known = {"alerts", "cash_mix", "market", "due", "returns", "eod"};
         for (String k : a.settings.homeOrder().split(",")) {
             String t = k == null ? "" : k.trim();
             if (!t.isEmpty() && !out.contains(t)) {
@@ -1562,6 +1560,26 @@ public class HomeScreen extends Screen {
         }
         for (String k2 : known) if (!out.contains(k2)) out.add(k2);
         return out;
+    }
+
+    private boolean homeSectionSelected(String key) {
+        if (key == null) return false;
+        for (String selected : a.settings.homeSections().split(","))
+            if (key.equals(selected.trim())) return true;
+        return false;
+    }
+
+    /** In simple mode, the two compact modules plus the fixed greeting/sales/KPI make five sections. */
+    private boolean homeSectionVisible(String key) {
+        if (!homeSectionSelected(key)) return false;
+        if (!a.settings.homeSimpleMode()) return true;
+        int shown = 0;
+        for (String ordered : orderedKeys()) {
+            if (!homeSectionSelected(ordered)) continue;
+            if (ordered.equals(key)) return shown < 2;
+            shown++;
+        }
+        return false;
     }
 
     private void secKpis(LinearLayout content, Data d) {

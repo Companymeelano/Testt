@@ -376,8 +376,11 @@ public final class Settings {
     public void setWhDirect(boolean on) { p.edit().putBoolean("wh_direct", on).apply(); }
 
     // ---------------- home dashboard order ----------------
-    /** Manager-first order: daily flow and actions, then trends and product analysis. */
-    public static final String HOME_ORDER_DEFAULT = "kpis,alerts,due,returns,sales_insight,cash_mix,eod";
+    /** Orderable lower Home modules; sales Hero and KPI stay pinned at the top. */
+    public static final String HOME_ORDER_DEFAULT = "alerts,cash_mix,market,due,returns,eod";
+    /** The simple dashboard starts with exactly five primary sections: greeting, sales, KPI, alerts, and receipt mix. */
+    public static final String HOME_SECTIONS_DEFAULT = "alerts,cash_mix,market";
+    private static final String[] HOME_SECTION_KEYS = {"alerts", "cash_mix", "market", "due", "returns", "eod"};
 
     public String homeOrder() {
         String stored = p.getString("home_order", null);
@@ -413,6 +416,38 @@ public final class Settings {
 
     public void setHomeOrder(String csv) {
         p.edit().putString("home_order", csv == null ? HOME_ORDER_DEFAULT : csv).apply();
+    }
+
+    /** Selected lower Home modules; an empty stored value intentionally hides them all. */
+    public String homeSections() {
+        String stored = p.getString("home_sections", null);
+        return normalizeHomeSections(stored == null ? HOME_SECTIONS_DEFAULT : stored);
+    }
+
+    public void setHomeSections(String csv) {
+        p.edit().putString("home_sections", normalizeHomeSections(csv == null ? "" : csv)).apply();
+    }
+
+    private static String normalizeHomeSections(String csv) {
+        StringBuilder normalized = new StringBuilder();
+        java.util.HashSet<String> seen = new java.util.HashSet<>();
+        if (csv != null) for (String key : csv.split(",")) {
+            String candidate = key == null ? "" : key.trim();
+            boolean known = false;
+            for (String valid : HOME_SECTION_KEYS) if (valid.equals(candidate)) { known = true; break; }
+            if (known && seen.add(candidate)) {
+                if (normalized.length() > 0) normalized.append(',');
+                normalized.append(candidate);
+            }
+        }
+        return normalized.toString();
+    }
+
+    /** Simple mode is the compact five-section dashboard; full mode shows every selected module. */
+    public boolean homeSimpleMode() { return p.getBoolean("home_simple", true); }
+
+    public void setHomeSimpleMode(boolean simple) {
+        p.edit().putBoolean("home_simple", simple).apply();
     }
 
     // ---------------- stock alerts + auto backup (v18) ----------------

@@ -67,8 +67,8 @@ public final class HomeCashWaterfall extends View {
         float chartHeight = chartBottom - chartTop;
         double min = 0, max = 0;
         for (CashWaterfallEngine.Step step : steps) {
-            min = Math.min(min, step.lowRials);
-            max = Math.max(max, step.highRials);
+            min = Math.min(min, step.lowRials());
+            max = Math.max(max, step.highRials());
         }
         double span = max - min;
         if (!(span > 0)) span = Math.max(1d, Math.abs(max) * 0.1d);
@@ -93,8 +93,8 @@ public final class HomeCashWaterfall extends View {
                 float connectorY = yFor(previousEnd, rangeMin, range, chartBottom, chartHeight);
                 canvas.drawLine(previousX, connectorY, x + barWidth, connectorY, connector);
             }
-            float top = yFor(step.highRials, rangeMin, range, chartBottom, chartHeight);
-            float bottom = yFor(step.lowRials, rangeMin, range, chartBottom, chartHeight);
+            float top = yFor(step.highRials(), rangeMin, range, chartBottom, chartHeight);
+            float bottom = yFor(step.lowRials(), rangeMin, range, chartBottom, chartHeight);
             if (bottom - top < Theme.dp(2)) bottom = top + Theme.dp(2);
             rect.set(x, top, x + barWidth, bottom);
             int color = i == 1 ? Theme.SECTION_RECEIVE

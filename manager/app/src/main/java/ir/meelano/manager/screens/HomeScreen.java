@@ -51,6 +51,7 @@ import ir.meelano.manager.data.Row;
 import ir.meelano.manager.ui.Charts;
 import ir.meelano.manager.ui.HomeCashWaterfall;
 import ir.meelano.manager.ui.HomeGoalGauge;
+import ir.meelano.manager.ui.HomeQuickActionArc;
 import ir.meelano.manager.ui.HomePaymentMixBar;
 import ir.meelano.manager.ui.HomeSalesChart;
 import ir.meelano.manager.ui.Kit;
@@ -937,6 +938,7 @@ public class HomeScreen extends Screen {
     private int selectedSalesRange;
     private int selectedPerformerRange;
     private int selectedSeasonalMonth;
+    private boolean quickActionsExpanded;
 
     private static final class SalesDisplay {
         String date;
@@ -1671,6 +1673,7 @@ public class HomeScreen extends Screen {
         else if ("sales_goal".equals(key)) secMonthlySalesGoal(content, d);
         else if ("gross_profit".equals(key)) secGrossProfit(content, d);
         else if ("seasonal_calendar".equals(key)) secSeasonalCalendar(content);
+        else if ("quick_actions".equals(key)) secQuickActions(content);
         else if ("kpis".equals(key)) secKpis(content, d);
         else if ("alerts".equals(key)) secAlerts(content, d);
         else if ("sales_insight".equals(key)) secSalesInsight(content, d);
@@ -1909,6 +1912,8 @@ public class HomeScreen extends Screen {
         if (vector == R.drawable.mi_track_changes) return Theme.SECTION_SALES_GOAL;
         if (vector == R.drawable.mi_profit) return Theme.SECTION_GROSS_PROFIT;
         if (vector == R.drawable.mi_calendar_month) return Theme.SECTION_SEASONAL_CALENDAR;
+        if (vector == R.drawable.mi_bolt) return Theme.SECTION_MARKET;
+        if (vector == R.drawable.mi_add) return Theme.SECTION_QUICK_ACTIONS;
         if (vector == R.drawable.mi_shopping_cart || vector == R.drawable.mi_add_shopping_cart)
             return Theme.SECTION_PURCHASE;
         if (vector == R.drawable.mi_receipt_long || vector == R.drawable.mi_cheque)
@@ -3016,6 +3021,81 @@ public class HomeScreen extends Screen {
             });
         });
         dialog.show();
+    }
+
+    private void secQuickActions(LinearLayout content) {
+        final int accent = Theme.SECTION_QUICK_ACTIONS;
+        String[] targets = {"sales", "search", "customers", "reports"};
+        String[] labels = {"فروش‌ها", "جستجو", "مشتری‌ها", "گزارش‌ها"};
+        int[] icons = {R.drawable.mi_sell, R.drawable.mi_search,
+                R.drawable.mi_person, R.drawable.mi_bar_chart};
+        List<Integer> allowed = new ArrayList<>();
+        for (int i = 0; i < targets.length; i++)
+            if (RoleStore.allowed(a, targets[i])) allowed.add(i);
+
+        LinearLayout card = a.kit.card(accent);
+        card.addView(boardHead("میان‌برهای سریع",
+                HomeNumberFormatter.integer(allowed.size()) + " مقصد در دسترس نقش شما",
+                R.drawable.mi_add, null), a.kit.lp(-1, -2));
+        if (allowed.isEmpty()) {
+            card.addView(a.kit.emptyRow("برای نقش فعلی مقصد میان‌بر مجازی وجود ندارد."),
+                    a.kit.lp(-1, -2));
+        } else {
+            final HomeQuickActionArc arc = new HomeQuickActionArc(a, accent);
+            for (int index : allowed)
+                arc.addArcAction(quickActionNode(labels[index], targets[index], icons[index], accent));
+
+            FrameLayout fab = new FrameLayout(a);
+            fab.setBackground(Theme.accentAvatar(accent));
+            Theme.lift(fab, Theme.dp(2));
+            ImageView glyph = a.kit.icon(R.drawable.mi_add, Theme.onAccent(accent), 24);
+            glyph.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+            fab.addView(glyph, new FrameLayout.LayoutParams(Theme.dp(24), Theme.dp(24), Gravity.CENTER));
+            fab.setContentDescription(quickActionsExpanded
+                    ? "بستن میان‌برهای سریع" : "نمایش میان‌برهای سریع");
+            fab.setFocusable(true);
+            fab.setSelected(quickActionsExpanded);
+            Theme.pressable(fab);
+            fab.setOnClickListener(v -> {
+                quickActionsExpanded = !quickActionsExpanded;
+                arc.setExpanded(quickActionsExpanded);
+                int icon = quickActionsExpanded ? R.drawable.mi_close : R.drawable.mi_add;
+                glyph.setImageResource(icon);
+                glyph.setColorFilter(Theme.onAccent(accent));
+                fab.setContentDescription(quickActionsExpanded
+                        ? "بستن میان‌برهای سریع" : "نمایش میان‌برهای سریع");
+                fab.setSelected(quickActionsExpanded);
+            });
+            arc.setMainAction(fab);
+            arc.setExpanded(quickActionsExpanded);
+            card.addView(arc, a.kit.lp(-1, -2));
+            card.addView(a.kit.hint("هر دکمه فقط صفحهٔ مربوط را باز می‌کند؛ هیچ ثبت فروش یا تغییری در دیتابیس با میان‌بر انجام نمی‌شود."),
+                    a.kit.lp(-1, -2));
+        }
+        a.kit.addCard(content, card);
+    }
+
+    private View quickActionNode(String label, String screenId, int icon, int accent) {
+        LinearLayout node = a.kit.v();
+        node.setGravity(Gravity.CENTER);
+        node.setMinimumHeight(Theme.dp(62));
+        FrameLayout badge = new FrameLayout(a);
+        badge.setBackground(Theme.chip(true, accent));
+        badge.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        ImageView glyph = a.kit.icon(icon, Theme.onAccent(accent), 20);
+        badge.addView(glyph, new FrameLayout.LayoutParams(Theme.dp(40), Theme.dp(40), Gravity.CENTER));
+        node.addView(badge, a.kit.lp(Theme.dp(40), Theme.dp(40)));
+        TextView title = a.kit.text(label, 9.5f, Theme.TEXT, true);
+        title.setGravity(Gravity.CENTER);
+        title.setSingleLine(true);
+        title.setEllipsize(TextUtils.TruncateAt.END);
+        title.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        node.addView(title, a.kit.lp(-1, -2));
+        node.setContentDescription(label + "؛ بازکردن صفحهٔ " + label);
+        node.setFocusable(true);
+        Theme.pressable(node);
+        node.setOnClickListener(v -> a.nav(screenId));
+        return node;
     }
 
     private void secGrossProfit(LinearLayout content, Data d) {

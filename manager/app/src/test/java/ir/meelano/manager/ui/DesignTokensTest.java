@@ -34,6 +34,7 @@ public class DesignTokensTest {
         assertEquals(DesignTokens.SALES_GOAL, DesignTokens.sectionAccent("هدف فروش ماهانه"));
         assertEquals(DesignTokens.GROSS_PROFIT, DesignTokens.sectionAccent("سود ناخالص"));
         assertEquals(DesignTokens.SEASONAL_CALENDAR, DesignTokens.sectionAccent("تقویم فصلی خشکبار"));
+        assertEquals(DesignTokens.QUICK_ACTIONS, DesignTokens.sectionAccent("میان‌برهای سریع"));
     }
 
     @Test public void accessibleSectionTextPassesAaOnBothPaletteSurfaces() {
@@ -41,7 +42,7 @@ public class DesignTokensTest {
                 DesignTokens.PAY, DesignTokens.RETURNS, DesignTokens.ALERT,
                 DesignTokens.MARKET, DesignTokens.WAREHOUSE, DesignTokens.CLOSEOUT,
                 DesignTokens.CASH_POSITION, DesignTokens.TOP_PERFORMERS, DesignTokens.SALES_GOAL,
-                DesignTokens.GROSS_PROFIT, DesignTokens.SEASONAL_CALENDAR};
+                DesignTokens.GROSS_PROFIT, DesignTokens.SEASONAL_CALENDAR, DesignTokens.QUICK_ACTIONS};
         for (int accent : accents) {
             assertTrue("light contrast for " + Integer.toHexString(accent),
                     DesignTokens.contrastRatio(DesignTokens.accessibleAccent(accent, false),
@@ -73,7 +74,7 @@ public class DesignTokensTest {
                 DesignTokens.PAY, DesignTokens.RETURNS, DesignTokens.ALERT, DesignTokens.WAREHOUSE,
                 DesignTokens.CLOSEOUT, DesignTokens.CASH_POSITION,
                 DesignTokens.TOP_PERFORMERS, DesignTokens.SALES_GOAL, DesignTokens.GROSS_PROFIT,
-                DesignTokens.SEASONAL_CALENDAR};
+                DesignTokens.SEASONAL_CALENDAR, DesignTokens.QUICK_ACTIONS};
         for (int accent : accents) {
             assertTrue("solid accent text contrast for " + Integer.toHexString(accent),
                     DesignTokens.contrastRatio(DesignTokens.accentTextColor(accent), accent) >= 4.5);
@@ -111,7 +112,7 @@ public class DesignTokensTest {
                 DesignTokens.PAY, DesignTokens.RETURNS, DesignTokens.ALERT,
                 DesignTokens.MARKET, DesignTokens.WAREHOUSE, DesignTokens.CLOSEOUT,
                 DesignTokens.CASH_POSITION, DesignTokens.TOP_PERFORMERS, DesignTokens.SALES_GOAL,
-                DesignTokens.GROSS_PROFIT, DesignTokens.SEASONAL_CALENDAR};
+                DesignTokens.GROSS_PROFIT, DesignTokens.SEASONAL_CALENDAR, DesignTokens.QUICK_ACTIONS};
         for (int outcome : outcomes) for (int section : sections)
             assertTrue("outcome and section hues are distinct",
                     outcome != section);

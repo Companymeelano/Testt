@@ -180,6 +180,8 @@ public final class Charts {
 
         public void setListener(PickListener l) {
             listener = l;
+            setClickable(l != null);
+            setFocusable(l != null);
         }
 
         void fire(int idx) {
@@ -631,6 +633,7 @@ public final class Charts {
             data.clear();
             if (pts != null) data.addAll(pts.subList(0, Math.min(10, pts.size())));
             if (f != null) fmt = f;
+            selected = -1;
             animateIn();
         }
 
@@ -662,6 +665,13 @@ public final class Charts {
             for (int i = 0; i < data.size(); i++) {
                 Point p = data.get(i);
                 float top = Theme.dp(8) + i * Theme.dp(ROW_H);
+                if (selected == i) {
+                    paint.setStyle(Paint.Style.FILL);
+                    paint.setShader(null);
+                    paint.setColor(Theme.alpha(Theme.GOLD, Theme.DARK ? 28 : 18));
+                    g.drawRoundRect(new RectF(Theme.dp(2), top - Theme.dp(4),
+                            w - Theme.dp(2), top + Theme.dp(ROW_H - 2)), Theme.dp(8), Theme.dp(8), paint);
+                }
                 // rank medal (gold / silver / bronze / outline)
                 float mr = Theme.dp(9);
                 float mCx = w - Theme.dp(8) - mr;
@@ -687,7 +697,7 @@ public final class Charts {
                 // line 1: label (right of medal) + value (left) — never overlapping the bar
                 text.setTextSize(Theme.dp(11));
                 text.setTextAlign(Paint.Align.RIGHT);
-                text.setColor(Theme.TEXT);
+                text.setColor(selected == i ? Theme.GOLD_SOFT : Theme.TEXT);
                 g.drawText(Money.fa(ellipsize(p.label, 22)), mCx - mr - Theme.dp(6), top + Theme.dp(12), text);
                 text.setTextAlign(Paint.Align.LEFT);
                 text.setColor(Theme.GOLD_SOFT);
@@ -704,6 +714,7 @@ public final class Charts {
                 float xv = track.right - track.width() * (float) ((p.value - mn) / (mx - mn));
                 xv = zx + (xv - zx) * progress;
                 int col = p.color != 0 ? p.color : (p.value < 0 ? Theme.DANGER : palette(i));
+                if (selected >= 0 && selected != i) col = Theme.alpha(col, 100);
                 float fl = Math.max(track.left, Math.min(xv, zx));
                 float fr = Math.min(track.right, Math.max(xv, zx));
                 if (p.value != 0 && fr - fl < Theme.dp(8)) {
@@ -716,6 +727,39 @@ public final class Charts {
                 g.drawRoundRect(fill, Theme.dp(7), Theme.dp(7), paint);
                 paint.setShader(null);
             }
+        }
+
+        @Override
+        public boolean performClick() {
+            if (listener == null || data.isEmpty()) return super.performClick();
+            if (selected < 0 || selected >= data.size()) selected = 0;
+            invalidate();
+            sendAccessibilityEvent(android.view.accessibility.AccessibilityEvent.TYPE_VIEW_CLICKED);
+            fire(selected);
+            return true;
+        }
+
+        @Override
+        public boolean onTouchEvent(MotionEvent e) {
+            if (listener == null || data.isEmpty()) return super.onTouchEvent(e);
+            int action = e.getAction();
+            if (action == MotionEvent.ACTION_DOWN) {
+                downX = e.getX();
+                downY = e.getY();
+                tracking = true;
+                return true;
+            }
+            if (action == MotionEvent.ACTION_UP && tracking && tapped(e.getX(), e.getY())) {
+                float rowY = e.getY() - Theme.dp(8);
+                int index = (int) (rowY / Theme.dp(ROW_H));
+                if (rowY >= 0 && index >= 0 && index < data.size()) {
+                    selected = index;
+                    invalidate();
+                    performClick();
+                }
+            }
+            if (action == MotionEvent.ACTION_CANCEL || action == MotionEvent.ACTION_UP) tracking = false;
+            return true;
         }
     }
 

@@ -1423,13 +1423,22 @@ public final class Kit {
 
     public View invRowTone(String name, String code, String extra, String qty, String price,
                            String status, int tone, int priceColor, View.OnClickListener onClick) {
+        return invRowTone(name, code, extra, qty, price, status, tone, priceColor, false, onClick);
+    }
+
+    /** Compact catalogue row: less padding, while preserving a large-font 48dp touch target. */
+    public View invRowTone(String name, String code, String extra, String qty, String price,
+                           String status, int tone, int priceColor, boolean compact,
+                           View.OnClickListener onClick) {
         LinearLayout c = v();
         c.setBackground(Theme.card());
-        c.setPadding(Theme.dp(12), Theme.dp(11), Theme.dp(12), Theme.dp(11));
+        c.setMinimumHeight(Theme.dp(48));
+        int padV = compact ? 8 : 11;
+        c.setPadding(Theme.dp(12), Theme.dp(padV), Theme.dp(12), Theme.dp(padV));
         LinearLayout head = h();
         LinearLayout copy = v();
-        TextView n = text(name, 14f, Theme.TEXT, true);
-        n.setSingleLine(true);
+        TextView n = text(name, compact ? 13.5f : 14f, Theme.TEXT, true);
+        n.setMaxLines(compact ? 2 : 1);
         n.setEllipsize(TextUtils.TruncateAt.END);
         copy.addView(n, lp(-1, -2));
         String sub = code == null ? "" : code;
@@ -1447,10 +1456,16 @@ public final class Kit {
             side.addView(stockChip(status, tone), lp(-2, -2));
             side.addView(space(0), lp(-2, Theme.dp(4)));
         }
-        if (qty != null && !qty.isEmpty()) side.addView(text(qty, 12.5f, Theme.TEXT, true), lp(-2, -2));
-        if (price != null && !price.isEmpty()) side.addView(text(price, 11f, priceColor, false), lp(-2, -2));
+        if (qty != null && !qty.isEmpty()) side.addView(text(qty, compact ? 12f : 12.5f, Theme.TEXT, true), lp(-2, -2));
+        if (price != null && !price.isEmpty()) side.addView(text(price, compact ? 10.5f : 11f, priceColor, false), lp(-2, -2));
         head.addView(side, lp(-2, -2));
         c.addView(head, lp(-1, -2));
+        StringBuilder spoken = new StringBuilder(name == null ? "" : name);
+        if (code != null && !code.isEmpty()) spoken.append(". ").append(code);
+        if (qty != null && !qty.isEmpty()) spoken.append(". ").append(qty);
+        if (price != null && !price.isEmpty()) spoken.append(". ").append(price);
+        if (status != null && !status.isEmpty()) spoken.append(". ").append(status);
+        c.setContentDescription(spoken.toString());
         if (onClick != null) {
             Theme.pressable(c);
             c.setOnClickListener(onClick);

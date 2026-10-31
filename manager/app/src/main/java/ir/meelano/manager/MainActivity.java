@@ -97,6 +97,13 @@ public class MainActivity extends Activity {
     /** Incremented on every render. Async work captures it and stops once it changes. */
     private int renderGen = 0;
     private ScrollView scroll;
+    /** Product search/scanner stays visible above the scrolling catalogue. */
+    private LinearLayout productStickyHost;
+    /** Brand row collapses while browsing products; toolbar remains reachable. */
+    private View brandHeaderBlock;
+    private int brandHeaderExpandedHeight;
+    private boolean brandHeaderCollapsed;
+    private android.animation.ValueAnimator brandHeaderAnimator;
     private LinearLayout bottomBar;
     /** Host of the bottom bar: holds the sliding selection capsule behind the tabs. */
     private android.widget.FrameLayout bottomHost;
@@ -557,6 +564,10 @@ public class MainActivity extends Activity {
 
     // ================= shell =================
     private void shell() {
+        if (brandHeaderAnimator != null) {
+            brandHeaderAnimator.cancel();
+            brandHeaderAnimator = null;
+        }
         if (!shellStarted) {
             shellStarted = true;
             AtiranAuth.applySessionRole(this);
@@ -684,7 +695,16 @@ public class MainActivity extends Activity {
         status.addView(tagBadge, new LinearLayout.LayoutParams(Theme.dp(30), Theme.dp(30)));
         titleCol.addView(status, kit.lp(-2, -2));
         brand.addView(titleCol, new LinearLayout.LayoutParams(Theme.dp(nameRoomDp), -2));
-        header.addView(brand, kit.lp(-1, -2));
+        LinearLayout brandBlock = kit.v();
+        brandBlock.addView(brand, kit.lp(-1, -2));
+        brandHeaderBlock = brandBlock;
+        brandHeaderExpandedHeight = 0;
+        brandHeaderCollapsed = false;
+        brandBlock.post(() -> {
+            if (brandHeaderBlock == brandBlock && brandBlock.getHeight() > 0)
+                brandHeaderExpandedHeight = brandBlock.getHeight();
+        });
+        header.addView(brandBlock, kit.lp(-1, -2));
         refreshUserChip();
         header.addView(kit.space(compact ? 5 : 8));
 
@@ -733,6 +753,10 @@ public class MainActivity extends Activity {
         header.addView(tools, kit.lp(-1, -2));
         refreshUserChip();
         root.addView(header, kit.lp(-1, -2));
+        productStickyHost = kit.v();
+        productStickyHost.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        productStickyHost.setVisibility(View.GONE);
+        root.addView(productStickyHost, kit.lp(-1, -2));
         refreshLicChip();
 
         // content (centered max-width column on tablets / wide screens)
@@ -740,6 +764,9 @@ public class MainActivity extends Activity {
         // A small end inset keeps the final action fully scrollable above the fixed navigation dock.
         scroll.setClipToPadding(false);
         scroll.setPadding(0, 0, 0, Theme.dp(14));
+        scroll.setOnScrollChangeListener((v, x, y, oldX, oldY) -> {
+            setBrandHeaderCollapsed("products".equals(currentId) && y > Theme.dp(48));
+        });
         contentWrap = kit.h();
         contentWrap.setGravity(Gravity.CENTER_HORIZONTAL);
         scroll.addView(contentWrap, new ScrollView.LayoutParams(-1, -2));
@@ -1084,6 +1111,54 @@ public class MainActivity extends Activity {
         }
     }
 
+    /** Install the product search/scanner in the shell, outside the catalogue ScrollView. */
+    public void setProductStickyBar(View bar) {
+        if (productStickyHost == null) return;
+        productStickyHost.removeAllViews();
+        if (bar == null) {
+            productStickyHost.setVisibility(View.GONE);
+            return;
+        }
+        productStickyHost.addView(bar, kit.lp(-1, -2));
+        productStickyHost.setVisibility(View.VISIBLE);
+    }
+
+    private void setBrandHeaderCollapsed(boolean collapsed) {
+        final View block = brandHeaderBlock;
+        if (block == null || brandHeaderCollapsed == collapsed) return;
+        if (brandHeaderExpandedHeight <= 0 && block.getHeight() > 0)
+            brandHeaderExpandedHeight = block.getHeight();
+        if (brandHeaderExpandedHeight <= 0) return;
+
+        if (brandHeaderAnimator != null) {
+            brandHeaderAnimator.cancel();
+            brandHeaderAnimator = null;
+        }
+        final android.view.ViewGroup.LayoutParams params = block.getLayoutParams();
+        if (params == null) return;
+        final int start = Math.max(0, block.getHeight());
+        final int target = collapsed ? 0 : brandHeaderExpandedHeight;
+        brandHeaderCollapsed = collapsed;
+        block.setImportantForAccessibility(collapsed
+                ? View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+                : View.IMPORTANT_FOR_ACCESSIBILITY_AUTO);
+        if (start == target || !ir.meelano.manager.ui.Ui.motionOk(this)) {
+            params.height = target;
+            block.setLayoutParams(params);
+            block.setAlpha(collapsed ? 0f : 1f);
+            return;
+        }
+        brandHeaderAnimator = android.animation.ValueAnimator.ofInt(start, target);
+        brandHeaderAnimator.setDuration(180);
+        brandHeaderAnimator.addUpdateListener(anim -> {
+            params.height = (Integer) anim.getAnimatedValue();
+            block.setLayoutParams(params);
+            block.setAlpha(Math.min(1f, Math.max(0f,
+                    (float) params.height / (float) brandHeaderExpandedHeight)));
+        });
+        brandHeaderAnimator.start();
+    }
+
     public void nav(String id) {
         if (!screens.containsKey(id)) return;
         if (!RoleStore.allowed(this, id)) {
@@ -1270,6 +1345,10 @@ public class MainActivity extends Activity {
     private void renderCurrent() {
         Screen s = screens.get(currentId);
         if (s == null) return;
+        if (!"products".equals(currentId)) {
+            setProductStickyBar(null);
+            setBrandHeaderCollapsed(false);
+        }
         renderGen++;
         // A new page for every render: a slow query that returns after the user has moved to
         // another section fills the old, detached page and can no longer repaint the screen on display.
@@ -1337,6 +1416,12 @@ public class MainActivity extends Activity {
 
     /** Id of the screen that is on display right now. */
     public String currentScreenId() { return currentId; }
+
+    /** Reset the product list and expand its brand row after an in-place page change. */
+    public void scrollProductsToTop() {
+        if (scroll != null) scroll.scrollTo(0, 0);
+        setBrandHeaderCollapsed(false);
+    }
 
     /** Repaint bottom bar + back control (screens call this after internal state changes). */
     public void refreshChrome() {

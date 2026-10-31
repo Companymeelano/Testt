@@ -1,11 +1,16 @@
 package ir.meelano.manager.screens;
 
-import android.app.AlertDialog;
+import android.text.Editable;
+import android.text.InputType;
+import android.text.TextWatcher;
+import android.view.Gravity;
 import android.view.View;
+import android.view.inputmethod.EditorInfo;
+import android.widget.Button;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import ir.meelano.manager.core.AtiranSchema;
 import ir.meelano.manager.core.CacheStore;
-import android.widget.ScrollView;
 
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.core.Filter;
@@ -33,6 +38,8 @@ import java.util.Map;
 public class ProductsScreen extends Screen {
     private final Filter filter = new Filter();
     private int tab;
+    /** Reject stale async results after tab/filter/page changes. */
+    private int loadGen;
 
     public ProductsScreen(MainActivity a) {
         super(a);
@@ -57,29 +64,189 @@ public class ProductsScreen extends Screen {
 
     @Override
     public FilterSheet.Config filterConfig() {
+        if (tab == 2 || tab == 4) return null;
         FilterSheet.Config c = new FilterSheet.Config();
+        boolean catalogue = tab == 0 || tab == 1;
         c.searchHint = "نام، کد یا شِکالا…";
-        c.range = true;
-        c.warehouses = true;
-        c.kalaGroups = true;
-        c.statusTitle = "وضعیت موجودی";
-        c.status = new FilterSheet.Opt[]{
-                // FilterSheet adds «همه»; active is the safe default for the product catalogue.
-                new FilterSheet.Opt("active", "فعال"),
-                new FilterSheet.Opt("inactive", "غیرفعال"),
-                new FilterSheet.Opt("low", "کم‌موجودی"),
-                new FilterSheet.Opt("out", "ناموجود"),
-                new FilterSheet.Opt("ok", "موجودی سالم"),
-                new FilterSheet.Opt("reorder", "زیر نقطه سفارش"),
-        };
-        c.sortTitle = "مرتب‌سازی";
-        c.sort = new FilterSheet.Opt[]{
-                new FilterSheet.Opt("", "نام کالا"),
-                new FilterSheet.Opt("stock_asc", "کمترین موجودی"),
-                new FilterSheet.Opt("stock_desc", "بیشترین موجودی"),
-                new FilterSheet.Opt("price_desc", "گران‌ترین"),
-        };
+        c.search = catalogue;
+        c.range = tab == 3;
+        c.warehouses = catalogue;
+        c.kalaGroups = catalogue;
+        if (tab == 0) {
+            c.statusTitle = "وضعیت موجودی";
+            c.status = new FilterSheet.Opt[]{
+                    // FilterSheet adds «همه»; active is the safe default for the product catalogue.
+                    new FilterSheet.Opt("active", "فعال"),
+                    new FilterSheet.Opt("inactive", "غیرفعال"),
+                    new FilterSheet.Opt("low", "کم‌موجودی"),
+                    new FilterSheet.Opt("out", "ناموجود"),
+                    new FilterSheet.Opt("ok", "موجودی سالم"),
+                    new FilterSheet.Opt("reorder", "زیر نقطه سفارش"),
+            };
+            c.sortTitle = "مرتب‌سازی";
+            c.sort = new FilterSheet.Opt[]{
+                    new FilterSheet.Opt("", "نام کالا"),
+                    new FilterSheet.Opt("stock_asc", "کمترین موجودی"),
+                    new FilterSheet.Opt("stock_desc", "بیشترین موجودی"),
+                    new FilterSheet.Opt("price_desc", "گران‌ترین"),
+            };
+        }
         return c;
+    }
+
+    /** Product-specific summary avoids repeating the date, connection and status line. */
+    @Override
+    protected View heroCard() {
+        LinearLayout w = a.kit.v();
+        String sub = tab == 3 ? "گردش فروش کالا" : tab == 2 ? "ارزش موجودی به تفکیک گروه"
+                : tab == 4 ? "بدون فروش در ۹۰ روز" : "فهرست، جست‌وجو و وضعیت موجودی";
+        w.addView(a.kit.hero(glyph(), title(), sub, accent()), a.kit.lp(-1, -2));
+        if (filterConfig() != null) {
+            w.addView(a.kit.gap(8));
+            w.addView(a.kit.filterBar(productFilterSummary(), productFiltersActive(),
+                    v -> a.openFilter()), a.kit.lp(-1, -2));
+        }
+        return w;
+    }
+
+    private boolean productFiltersActive() {
+        if (tab == 0) {
+            boolean statusChanged = filter.status != null && !filter.status.isEmpty()
+                    && !"active".equals(filter.status);
+            return statusChanged || (filter.search != null && !filter.search.trim().isEmpty())
+                    || filter.kalaGroup >= 0 || filter.warehouse >= 0
+                    || (filter.sort != null && !filter.sort.isEmpty());
+        }
+        if (tab == 1) return (filter.search != null && !filter.search.trim().isEmpty())
+                || filter.kalaGroup >= 0 || filter.warehouse >= 0;
+        return tab == 3 && filter.preset != filter.defaultPreset;
+    }
+
+    private String productFilterSummary() {
+        List<String> labels = new ArrayList<>();
+        if (tab == 3) {
+            labels.add(filter.rangeFa());
+        } else if (tab == 0 || tab == 1) {
+            if (filter.search != null && !filter.search.trim().isEmpty())
+                labels.add("«" + filter.search.trim() + "»");
+            if (tab == 0 && filter.status != null && !filter.status.isEmpty()) {
+                String status;
+                switch (filter.status) {
+                    case "active": status = "فعال"; break;
+                    case "inactive": status = "غیرفعال"; break;
+                    case "low": status = "کم‌موجودی"; break;
+                    case "out": status = "ناموجود"; break;
+                    case "ok": status = "موجودی سالم"; break;
+                    case "reorder": status = "زیر نقطه سفارش"; break;
+                    default: status = "وضعیت انتخابی"; break;
+                }
+                labels.add(status);
+            } else if (tab == 1) {
+                labels.add("کم‌موجودی");
+            }
+            if (filter.kalaGroup >= 0) labels.add("گروه انتخاب‌شده");
+            if (filter.warehouse >= 0) labels.add("انبار انتخاب‌شده");
+            if (tab == 0 && filter.sort != null && !filter.sort.isEmpty()) {
+                String sort = "stock_asc".equals(filter.sort) ? "کمترین موجودی"
+                        : "stock_desc".equals(filter.sort) ? "بیشترین موجودی"
+                        : "price_desc".equals(filter.sort) ? "گران‌ترین" : "مرتب‌سازی انتخابی";
+                labels.add(sort);
+            }
+        } else if (tab == 2) {
+            labels.add("ارزش کل موجودی");
+        } else {
+            labels.add("۹۰ روز بدون فروش");
+        }
+        if (labels.isEmpty()) return "فهرست کالاها";
+        StringBuilder summary = new StringBuilder();
+        for (String label : labels) {
+            if (summary.length() > 0) summary.append(" • ");
+            summary.append(label);
+        }
+        return summary.toString();
+    }
+
+    /** Sticky search, explicit submit, clear, and barcode scan in one compact control. */
+    private View productStickySearch(final LinearLayout content) {
+        LinearLayout row = a.kit.h();
+        row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(Theme.dp(10), Theme.dp(7), Theme.dp(10), Theme.dp(7));
+        row.setBackground(Theme.card());
+
+        final EditText input = new EditText(a);
+        input.setHint("نام، کد یا بارکد کالا…");
+        input.setText(filter.search == null ? "" : filter.search);
+        input.setTextSize(14f * Theme.fontScale());
+        input.setTextColor(Theme.TEXT);
+        input.setHintTextColor(Theme.MUTED);
+        input.setTypeface(Theme.face(false));
+        input.setBackground(Theme.searchBar());
+        input.setPadding(Theme.dp(12), Theme.dp(8), Theme.dp(12), Theme.dp(8));
+        input.setMinimumHeight(Theme.dp(48));
+        input.setSingleLine(true);
+        input.setTextDirection(View.TEXT_DIRECTION_RTL);
+        input.setTextAlignment(View.TEXT_ALIGNMENT_VIEW_START);
+        input.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
+        input.setInputType(InputType.TYPE_CLASS_TEXT);
+        input.setContentDescription("جست‌وجوی نام، کد یا بارکد کالا");
+        row.addView(input, a.kit.wlp(1f));
+        row.addView(a.kit.space(6));
+
+        Button clear = a.kit.btnGhost("×", Theme.MUTED, v -> {
+            input.setText("");
+            filter.search = "";
+            filter.page = 0;
+            a.kit.hideKeyboard(input);
+            a.refreshChrome();
+            render(content);
+        });
+        clear.setContentDescription("پاک کردن جست‌وجو");
+        clear.setVisibility(filter.search == null || filter.search.isEmpty() ? View.GONE : View.VISIBLE);
+        row.addView(clear, a.kit.lp(-2, -2));
+        row.addView(a.kit.space(6));
+
+        Button search = a.kit.btn("⌕", v -> applyProductSearch(input, content));
+        search.setContentDescription("اجرای جست‌وجوی کالا");
+        row.addView(search, a.kit.lp(-2, -2));
+        row.addView(a.kit.space(6));
+
+        Button scan = a.kit.btnGhost("▦", Theme.VIOLET, v -> {
+            a.kit.hideKeyboard(input);
+            a.startScan(code -> {
+                if (code == null || !id().equals(a.currentScreenId())) return;
+                filter.search = code.trim();
+                filter.page = 0;
+                a.refreshChrome();
+                render(content);
+            });
+        });
+        scan.setContentDescription("اسکن بارکد کالا");
+        row.addView(scan, a.kit.lp(-2, -2));
+
+        input.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                clear.setVisibility(s == null || s.length() == 0 ? View.GONE : View.VISIBLE);
+            }
+            @Override public void afterTextChanged(Editable s) { }
+        });
+        input.setOnEditorActionListener((v, actionId, event) -> {
+            if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                applyProductSearch(input, content);
+                return true;
+            }
+            return false;
+        });
+        return row;
+    }
+
+    private void applyProductSearch(EditText input, LinearLayout content) {
+        filter.search = input.getText() == null ? "" : input.getText().toString().trim();
+        filter.page = 0;
+        a.kit.hideKeyboard(input);
+        a.refreshChrome();
+        render(content);
     }
 
     private static final class Data {
@@ -97,16 +264,12 @@ public class ProductsScreen extends Screen {
 
     @Override
     public void render(final LinearLayout content) {
+        final int requestGen = ++loadGen;
+        a.scrollProductsToTop();
         content.removeAllViews();
+        a.setProductStickyBar(tab == 0 || tab == 1 ? productStickySearch(content) : null);
         content.addView(heroCard(), a.kit.lp(-1, -2));
-        content.addView(a.kit.hint("آستانه کم‌موجودی: ۵ واحد • گردش کالا بر اساس بازه فیلتر"), a.kit.lp(-1, -2));
-        content.addView(a.kit.btnGhost("▦ اسکن بارکد کالا", Theme.VIOLET, v -> a.startScan(code -> {
-            filter.search = code;
-            filter.page = 0;
-            a.refreshChrome();
-            render(content);
-        })), a.kit.lp(-1, -2));
-        content.addView(a.kit.gap(12));
+        content.addView(a.kit.gap(10));
         content.addView(a.kit.loading("در حال دریافت کالاها…"), a.kit.lp(-1, -2));
         final int myTab = tab;
         final Filter f = filter.copy();
@@ -140,12 +303,14 @@ public class ProductsScreen extends Screen {
         }, new Repo.Cb<Data>() {
             @Override
             public void ok(Data d) {
+                if (!isCurrentRequest(requestGen)) return;
                 saveCache(d);
                 build(content, d);
             }
 
             @Override
             public void fail(String faError) {
+                if (!isCurrentRequest(requestGen)) return;
                 String[] lab = {""};
                 Data cached = loadCache(lab);
                 if (cached != null) {
@@ -157,8 +322,21 @@ public class ProductsScreen extends Screen {
                 content.addView(heroCard(), a.kit.lp(-1, -2));
                 content.addView(a.kit.gap(12));
                 content.addView(a.kit.error(faError, () -> render(content)), a.kit.lp(-1, -2));
+                revealContent(content);
             }
         });
+    }
+
+    private boolean isCurrentRequest(int requestGen) {
+        return requestGen == loadGen && id().equals(a.currentScreenId());
+    }
+
+    private void revealContent(LinearLayout content) {
+        if (!ir.meelano.manager.ui.Ui.motionOk(a)) return;
+        content.animate().cancel();
+        content.setAlpha(0f);
+        content.animate().alpha(1f).setDuration(180)
+                .setInterpolator(new android.view.animation.DecelerateInterpolator()).start();
     }
 
     private static String productFilterKey(Filter filter) {
@@ -211,21 +389,14 @@ public class ProductsScreen extends Screen {
         d.listTotal = m.containsKey("total") ? CacheStore.num(m, "total") : -1;
         d.listFilterKey = String.valueOf(m.get("listFilterKey") == null ? "" : m.get("listFilterKey"));
         d.snapTab = (int) CacheStore.num(m, "tab");
+        if (d.snapTab != tab) return null;
         if (d.snapTab == 0 && !productFilterKey(filter).equals(d.listFilterKey)) return null;
         return d;
     }
     private void build(LinearLayout content, Data d) {
         content.removeAllViews();
         content.addView(heroCard(), a.kit.lp(-1, -2));
-        content.addView(a.kit.hint("آستانه کم‌موجودی: ۵ واحد • گردش کالا بر اساس بازه فیلتر"), a.kit.lp(-1, -2));
-        content.addView(a.kit.btnGhost("▦ اسکن بارکد کالا", Theme.VIOLET, v -> a.startScan(code -> {
-            filter.search = code;
-            filter.page = 0;
-            a.refreshChrome();
-            render(content);
-        })), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
-        addSearchRow(content);
 
         Row s = d.summary == null ? new Row() : d.summary;
         boolean activeKnown = s.i("activeKnown") != 0;
@@ -268,6 +439,7 @@ public class ProductsScreen extends Screen {
         else buildDead(content, d);
 
         renderNotes(content, d.notes);
+        revealContent(content);
     }
 
     private void showListStatus(LinearLayout content, String status) {
@@ -340,9 +512,9 @@ public class ProductsScreen extends Screen {
                     : priceWarning ? Theme.WARNING : Theme.GOLD_SOFT;
 
             View v = a.kit.invRowTone(name, "کد کالا " + Money.ltrIsolate(Money.fa(code)), extra, stock,
-                    price, status, tone, priceTone, v2 -> openProduct(shka));
+                    price, status, tone, priceTone, true, v2 -> openProduct(shka));
             LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
-            p.setMargins(0, 0, 0, Theme.dp(10));
+            p.setMargins(0, 0, 0, Theme.dp(8));
             content.addView(v, p);
         }
         boolean hasMore = d.listTotal >= 0
@@ -385,6 +557,30 @@ public class ProductsScreen extends Screen {
             content.addView(a.kit.empty("کالای کم‌موجودی وجود ندارد", "موجودی همه اقلام بالای آستانه است"), a.kit.lp(-1, -2));
             return;
         }
+        final List<Row> chartRows = new ArrayList<>(d.low.subList(0, Math.min(10, d.low.size())));
+        LinearLayout chartCard = a.kit.card(Theme.WARNING);
+        chartCard.addView(a.kit.text("نمودار موجودی اقلام کم‌موجود", 13.5f, Theme.TEXT, true),
+                a.kit.lp(-1, -2));
+        chartCard.addView(a.kit.hint("برای باز کردن شناسنامه، یک نوار را لمس کنید"), a.kit.lp(-1, -2));
+        Charts.HBars stockChart = new Charts.HBars(a);
+        List<Charts.Point> stockPoints = new ArrayList<>();
+        StringBuilder chartDescription = new StringBuilder("نمودار تعاملی موجودی کالاهای کم‌موجود. ");
+        for (int i = 0; i < chartRows.size(); i++) {
+            Row row = chartRows.get(i);
+            String name = PersianText.cleanDisplayLabel(row.s("naka"));
+            stockPoints.add(new Charts.Point(name, row.d("vah"),
+                    row.d("vah") < 0 ? Theme.DANGER : Charts.palette(i)));
+            if (i > 0) chartDescription.append("؛ ");
+            chartDescription.append(name).append(": ").append(Money.qtyText(row.d("vah")));
+        }
+        stockChart.setData(stockPoints, Charts.COMPACT);
+        stockChart.setContentDescription(chartDescription.toString());
+        stockChart.setListener((idx, point) -> {
+            if (idx >= 0 && idx < chartRows.size()) openProduct(chartRows.get(idx).s("shka"));
+        });
+        chartCard.addView(stockChart, a.kit.lp(-1, -2));
+        a.kit.addCard(content, chartCard);
+
         int cap = Math.min(d.low.size(), 120);
         for (int i = 0; i < cap; i++) {
             Row r = d.low.get(i);

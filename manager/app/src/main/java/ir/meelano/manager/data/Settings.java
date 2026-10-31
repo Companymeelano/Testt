@@ -484,6 +484,36 @@ public final class Settings {
         return "home_sales_goal_" + normalized.substring(0, 7).replace('/', '_');
     }
 
+    /** Seasonal buying/stock planning notes keyed by Jalali month; they remain on this device. */
+    public String homeSeasonalPlan(String jalaliMonth) {
+        String key = homeSeasonalPlanKey(jalaliMonth);
+        return key == null ? "" : p.getString(key, "");
+    }
+
+    public void setHomeSeasonalPlan(String jalaliMonth, String note) {
+        String key = homeSeasonalPlanKey(jalaliMonth);
+        if (key == null) return;
+        String value = note == null ? "" : note.trim();
+        if (value.isEmpty()) {
+            p.edit().remove(key).apply();
+            return;
+        }
+        if (value.length() > 600) {
+            int end = 600;
+            if (Character.isHighSurrogate(value.charAt(end - 1))) end--;
+            value = value.substring(0, end);
+        }
+        p.edit().putString(key, value).apply();
+    }
+
+    private String homeSeasonalPlanKey(String jalaliMonth) {
+        String month = jalaliMonth == null ? "" : jalaliMonth.trim();
+        if (!month.matches("\\d{4}/\\d{2}")) return null;
+        String normalized = ir.meelano.manager.core.Jalali.disp(month + "/01");
+        if (normalized.isEmpty()) return null;
+        return "home_seasonal_plan_" + normalized.substring(0, 7).replace('/', '_');
+    }
+
     /** Local till observations keyed by Jalali day; they never leave this device or alter Atiran. */
     public String closeoutCashOpening(String day) { return p.getString(closeoutCashKey("open", day), ""); }
     public String closeoutCashCounted(String day) { return p.getString(closeoutCashKey("counted", day), ""); }

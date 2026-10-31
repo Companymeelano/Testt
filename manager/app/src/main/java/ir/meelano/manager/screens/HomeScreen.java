@@ -37,6 +37,7 @@ import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.RoleStore;
 import ir.meelano.manager.core.MoneyQueries;
 import ir.meelano.manager.core.MonthlyGoalEngine;
+import ir.meelano.manager.core.SeasonalCalendarEngine;
 import ir.meelano.manager.R;
 import ir.meelano.manager.core.Queries;
 import ir.meelano.manager.core.SalesComparison;
@@ -935,6 +936,7 @@ public class HomeScreen extends Screen {
     private static final String[] PERFORMER_RANGES = {"امروز", "این ماه"};
     private int selectedSalesRange;
     private int selectedPerformerRange;
+    private int selectedSeasonalMonth;
 
     private static final class SalesDisplay {
         String date;
@@ -1668,6 +1670,7 @@ public class HomeScreen extends Screen {
         else if ("top_performers".equals(key)) secTopPerformers(content, d);
         else if ("sales_goal".equals(key)) secMonthlySalesGoal(content, d);
         else if ("gross_profit".equals(key)) secGrossProfit(content, d);
+        else if ("seasonal_calendar".equals(key)) secSeasonalCalendar(content);
         else if ("kpis".equals(key)) secKpis(content, d);
         else if ("alerts".equals(key)) secAlerts(content, d);
         else if ("sales_insight".equals(key)) secSalesInsight(content, d);
@@ -1905,6 +1908,7 @@ public class HomeScreen extends Screen {
         if (vector == R.drawable.mi_military_tech) return Theme.SECTION_TOP_PERFORMERS;
         if (vector == R.drawable.mi_track_changes) return Theme.SECTION_SALES_GOAL;
         if (vector == R.drawable.mi_profit) return Theme.SECTION_GROSS_PROFIT;
+        if (vector == R.drawable.mi_calendar_month) return Theme.SECTION_SEASONAL_CALENDAR;
         if (vector == R.drawable.mi_shopping_cart || vector == R.drawable.mi_add_shopping_cart)
             return Theme.SECTION_PURCHASE;
         if (vector == R.drawable.mi_receipt_long || vector == R.drawable.mi_cheque)
@@ -2892,6 +2896,126 @@ public class HomeScreen extends Screen {
         row.setContentDescription("رتبهٔ " + HomeNumberFormatter.integer(rank) + "، " + name
                 + "، " + sub + "، " + HomeNumberFormatter.money(total));
         return row;
+    }
+
+    private void secSeasonalCalendar(LinearLayout content) {
+        String today = Jalali.disp(Jalali.todayStr());
+        if (today.length() < 7) return;
+        final int year;
+        final int currentMonth;
+        try {
+            year = Integer.parseInt(today.substring(0, 4));
+            currentMonth = Integer.parseInt(today.substring(5, 7));
+        } catch (Exception invalid) {
+            return;
+        }
+        final int selectedMonth = selectedSeasonalMonth >= 1 && selectedSeasonalMonth <= 12
+                ? selectedSeasonalMonth : currentMonth;
+        final int season = SeasonalCalendarEngine.seasonIndex(selectedMonth);
+        if (season < 0) return;
+        final int accent = Theme.SECTION_SEASONAL_CALENDAR;
+        LinearLayout card = a.kit.card(accent);
+        String yearLabel = HomeNumberFormatter.localizeText(String.valueOf(year));
+        card.addView(boardHead("تقویم فصلی خشکبار", "گاه‌شمار جلالی " + yearLabel
+                        + " • برنامه‌ریزی محلی خرید و موجودی",
+                R.drawable.mi_calendar_month, null), a.kit.lp(-1, -2));
+
+        String[] seasonNames = {"بهار", "تابستان", "پاییز", "زمستان"};
+        card.addView(a.kit.segmentedControl(seasonNames, season, null, accent, index -> {
+            selectedSeasonalMonth = SeasonalCalendarEngine.firstMonth(index);
+            content.removeAllViews();
+            secSeasonalCalendar(content);
+            localizeHomeNumbers(content);
+        }), a.kit.lp(-1, -2));
+        card.addView(a.kit.gap(8));
+
+        LinearLayout months = a.kit.h();
+        months.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        for (int position = 0; position < 3; position++) {
+            final int month = SeasonalCalendarEngine.monthAt(season, position);
+            String date = String.format(Locale.US, "%04d/%02d/01", year, month);
+            String name = Jalali.monthName(date);
+            final boolean chosen = month == selectedMonth;
+            TextView monthChip = a.kit.text(name, 11f,
+                    chosen ? Theme.onAccent(accent) : Theme.TEXT, true);
+            monthChip.setGravity(Gravity.CENTER);
+            monthChip.setMinHeight(Theme.dp(48));
+            monthChip.setBackground(Theme.chip(chosen, accent));
+            monthChip.setContentDescription(name + " " + yearLabel + (chosen ? "، انتخاب‌شده" : ""));
+            monthChip.setSelected(chosen);
+            monthChip.setFocusable(true);
+            Theme.pressable(monthChip);
+            monthChip.setOnClickListener(v -> {
+                selectedSeasonalMonth = month;
+                content.removeAllViews();
+                secSeasonalCalendar(content);
+                localizeHomeNumbers(content);
+            });
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, -2, 1f);
+            if (position > 0) params.setMarginStart(Theme.dp(6));
+            months.addView(monthChip, params);
+        }
+        card.addView(months, a.kit.lp(-1, -2));
+        card.addView(a.kit.gap(8));
+
+        String monthKey = String.format(Locale.US, "%04d/%02d", year, selectedMonth);
+        String monthName = Jalali.monthName(monthKey + "/01");
+        String note = a.settings.homeSeasonalPlan(monthKey);
+        card.addView(a.kit.text("برنامهٔ " + monthName + " " + yearLabel,
+                12f, Theme.sectionText(accent), true), a.kit.lp(-1, -2));
+        if (note == null || note.trim().isEmpty()) {
+            card.addView(a.kit.emptyRow("برای این ماه هنوز برنامهٔ محلی ثبت نشده است."),
+                    a.kit.lp(-1, -2));
+        } else {
+            TextView plan = a.kit.text(note, 11.5f, Theme.TEXT, false);
+            plan.setPadding(Theme.dp(10), Theme.dp(8), Theme.dp(10), Theme.dp(8));
+            plan.setBackground(Theme.kpi(accent));
+            plan.setContentDescription("برنامهٔ محلی " + monthName + " " + yearLabel + ": " + note);
+            card.addView(plan, a.kit.lp(-1, -2));
+        }
+        card.addView(a.kit.btnGhost(note == null || note.trim().isEmpty()
+                        ? "ثبت برنامهٔ این ماه" : "ویرایش برنامهٔ این ماه", accent,
+                v -> showSeasonalPlanDialog(content, monthKey, note)), a.kit.lp(-1, -2));
+        card.addView(a.kit.hint("این گاه‌شمار فقط ماه‌های جلالی را در چهار فصل گروه‌بندی می‌کند؛ فصل برداشت، قیمت، تعطیلی یا مناسبت رسمی حدس زده نمی‌شود. یادداشت‌ها فقط روی همین دستگاه می‌مانند."),
+                a.kit.lp(-1, -2));
+        a.kit.addCard(content, card);
+    }
+
+    private void showSeasonalPlanDialog(LinearLayout content, String monthKey, String currentNote) {
+        LinearLayout form = a.kit.v();
+        form.setPadding(Theme.dp(20), Theme.dp(10), Theme.dp(20), Theme.dp(8));
+        form.addView(a.kit.hint("یادداشت برنامهٔ خرید، نگهداری یا آماده‌سازی؛ فقط در تنظیمات محلی ذخیره می‌شود."),
+                a.kit.lp(-1, -2));
+        android.widget.EditText input = a.kit.edit("یادداشت این ماه", currentNote);
+        input.setSingleLine(false);
+        input.setMinLines(3);
+        input.setMaxLines(8);
+        input.setGravity(Gravity.TOP | Gravity.RIGHT);
+        input.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        input.setContentDescription("یادداشت فصلی خشکبار برای " + monthKey);
+        form.addView(input, a.kit.lp(-1, -2));
+        android.app.AlertDialog dialog = new android.app.AlertDialog.Builder(a)
+                .setTitle("برنامهٔ فصلی خشکبار")
+                .setView(form)
+                .setNegativeButton("انصراف", null)
+                .setNeutralButton("پاک‌کردن", null)
+                .setPositiveButton("ذخیره روی دستگاه", null)
+                .create();
+        dialog.setOnShowListener(ignored -> {
+            dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+                a.settings.setHomeSeasonalPlan(monthKey, input.getText().toString());
+                dialog.dismiss();
+                render(content);
+            });
+            dialog.getButton(android.app.AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v -> {
+                a.settings.setHomeSeasonalPlan(monthKey, "");
+                dialog.dismiss();
+                render(content);
+            });
+        });
+        dialog.show();
     }
 
     private void secGrossProfit(LinearLayout content, Data d) {

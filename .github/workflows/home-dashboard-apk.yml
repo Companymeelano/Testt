@@ -12,6 +12,7 @@ on:
       - "manager/gradle.properties"
       - ".github/workflows/home-dashboard-apk.yml"
       - ".github/scripts/**"
+      - "design/home-dashboard-data.md"
 
 permissions:
   contents: write

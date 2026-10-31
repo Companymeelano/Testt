@@ -11,6 +11,7 @@ on:
       - "manager/settings.gradle"
       - "manager/gradle.properties"
       - ".github/workflows/home-dashboard-apk.yml"
+      - ".github/scripts/**"
 
 permissions:
   contents: write

@@ -5,6 +5,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import android.app.Activity;
+import android.app.Instrumentation;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
@@ -69,14 +70,23 @@ public final class HomeDashboardScreenshotTest {
         Intent launch = new Intent(target, MainActivity.class);
         launch.putExtra("ir.meelano.manager.HOME_SCREENSHOT_PREVIEW", true);
         launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        Activity activity = InstrumentationRegistry.getInstrumentation().startActivitySync(launch);
+        Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
+        Instrumentation.ActivityMonitor monitor = instrumentation.addMonitor(
+                MainActivity.class.getName(), null, false);
+        Activity activity;
+        try {
+            target.startActivity(launch);
+            activity = instrumentation.waitForMonitorWithTimeout(monitor, 20_000L);
+        } finally {
+            instrumentation.removeMonitor(monitor);
+        }
         assertNotNull("Manager shell did not start", activity);
 
         String[] visibleText = {""};
         long deadline = SystemClock.uptimeMillis() + 20_000L;
         while (SystemClock.uptimeMillis() < deadline) {
-            InstrumentationRegistry.getInstrumentation().waitForIdleSync();
-            InstrumentationRegistry.getInstrumentation().runOnMainSync(() ->
+            visibleText[0] = "";
+            instrumentation.runOnMainSync(() ->
                     collectText(activity.getWindow().getDecorView(), visibleText));
             if (visibleText[0].contains("شاخص‌های مالی")) break;
             SystemClock.sleep(250L);
@@ -85,11 +95,10 @@ public final class HomeDashboardScreenshotTest {
                 visibleText[0].contains("شاخص‌های مالی"));
         assertFalse("Preview screenshot contains a live connection error",
                 visibleText[0].contains("جزئیات اتصال"));
-        // Let the intro transition finish before recording the first viewport.
+        // Do not wait for global UI idleness: the live chart may animate continuously.
         SystemClock.sleep(500L);
-        InstrumentationRegistry.getInstrumentation().waitForIdleSync();
         final Bitmap[] captured = {null};
-        InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> {
+        instrumentation.runOnMainSync(() -> {
             View decor = activity.getWindow().getDecorView();
             if (decor.getWidth() <= 0 || decor.getHeight() <= 0) return;
             Bitmap bitmap = Bitmap.createBitmap(decor.getWidth(), decor.getHeight(), Bitmap.Config.ARGB_8888);

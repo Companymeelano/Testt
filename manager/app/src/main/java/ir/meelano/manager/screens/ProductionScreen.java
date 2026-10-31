@@ -91,23 +91,15 @@ public final class ProductionScreen extends Screen {
     @Override public String glyph() { return Theme.isLight() ? "⚙" : "🏭"; }
     @Override public int accent() { return Theme.GOLD; }
 
-    /** The approved 3D production emblem is exclusive to the dark gold skin. */
+    /** Calm section hero with the shared warehouse duotone mark. */
     private View productionHero(String subtitle) {
         LinearLayout card = a.kit.v();
         card.setBackground(Theme.hero(accent()));
         card.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(15));
         LinearLayout head = a.kit.h();
         head.setGravity(Gravity.CENTER_VERTICAL);
-        if (!Theme.isLight() && !Theme.isNuts()) {
-            android.widget.ImageView emblem = new android.widget.ImageView(a);
-            emblem.setImageResource(R.drawable.icon3d_production);
-            emblem.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
-            emblem.setContentDescription(null);
-            head.addView(emblem, new LinearLayout.LayoutParams(Theme.dp(58), Theme.dp(58)));
-        } else {
-            head.addView(a.kit.icon(R.drawable.mi_warehouse, accent(), 30),
-                    new LinearLayout.LayoutParams(Theme.dp(58), Theme.dp(58)));
-        }
+        head.addView(a.kit.iconBadge(R.drawable.mi_warehouse, accent(), 44),
+                new LinearLayout.LayoutParams(Theme.dp(44), Theme.dp(44)));
         head.addView(a.kit.space(10));
         LinearLayout copy = a.kit.v();
         copy.addView(a.kit.title(title()), a.kit.lp(-1, -2));

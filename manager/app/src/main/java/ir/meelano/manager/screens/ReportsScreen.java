@@ -90,25 +90,18 @@ public class ReportsScreen extends Screen {
     }
 
     private int sectionAccent(String section) {
-        if ("ویژه مدیر".equals(section)) return Theme.GOLD;
-        if ("فروش".equals(section)) return Theme.SALES_HUE;
-        if ("خرید".equals(section)) return Theme.BUY_HUE;
-        if ("دریافتی‌ها و پرداخت".equals(section)) return Theme.SUCCESS;
-        if ("چک‌ها".equals(section)) return Theme.INFO;
-        if ("عملکرد صندوق".equals(section)) return Theme.GOLD;
-        if ("خزانه‌داری".equals(section)) return Theme.GOLD;
-        if ("کالا و انبار".equals(section)) return Theme.VIOLET;
-        if ("مشتریان".equals(section)) return Theme.SUCCESS;
-        if ("ویزیتورها".equals(section)) return Theme.WARNING;
-        if ("سود و زیان".equals(section)) return Theme.GOLD;
-        if ("بانک و صندوق".equals(section)) return Theme.INFO;
-        if ("پرسنل و نظارت".equals(section)) return Theme.STEEL;
-        if ("هوشمند".equals(section)) return Theme.VIOLET;
-        if ("هزینه‌ها".equals(section)) return Theme.ROSE;
-        if ("برگشتی و ابطالی".equals(section)) return Theme.DANGER;
-        if ("تحلیل ویزیتور و مسیر".equals(section)) return Theme.WARNING;
-        if ("سرفصل‌ها".equals(section)) return Theme.GOLD_SOFT;
-        return Theme.MUTED;
+        if (section == null) return Theme.SECTION_SALES;
+        if (section.contains("فروش")) return Theme.SECTION_SALES;
+        if (section.contains("خرید")) return Theme.SECTION_PURCHASE;
+        if (section.contains("دریافت") || section.contains("چک")) return Theme.SECTION_RECEIVE;
+        if (section.contains("پرداخت") || section.contains("هزینه")) return Theme.SECTION_PAY;
+        if (section.contains("برگشت") || section.contains("ابطال")) return Theme.SECTION_RETURNS;
+        if (section.contains("کالا") || section.contains("انبار")) return Theme.SECTION_WAREHOUSE;
+        if (section.contains("بازار") || section.contains("سود") || section.contains("تحلیل")
+                || section.contains("خزانه") || section.contains("بانک")) return Theme.SECTION_MARKET;
+        if (section.contains("هشدار")) return Theme.SECTION_ALERT;
+        if (section.contains("مشتری")) return Theme.SECTION_PURCHASE;
+        return Theme.EMERALD_DEEP;
     }
 
     private int sectionIcon(String section) {
@@ -401,19 +394,8 @@ public class ReportsScreen extends Screen {
         c.setPadding(Theme.dp(12), Theme.dp(11), Theme.dp(12), Theme.dp(11));
         Theme.lift(c, Theme.cardElevation());
 
-        ImageView icon = new ImageView(a);
-        int reportVector = reportIcon(spec);
-        int reportArt = Theme.icon3d(reportVector);
-        if (!Theme.isIcon3d(reportArt)) {
-            int categoryArt = Theme.icon3d(sectionIcon(spec.section));
-            if (Theme.isIcon3d(categoryArt)) reportArt = categoryArt;
-        }
-        icon.setImageResource(reportArt);
-        if (Theme.isIcon3d(reportArt)) icon.clearColorFilter();
-        else icon.setColorFilter(color);
-        icon.setBackground(Theme.avatar(Theme.alpha(color, 48)));
-        icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        c.addView(icon, new LinearLayout.LayoutParams(Theme.dp(48), Theme.dp(48)));
+        View icon = a.kit.iconBadge(reportIcon(spec), color, 40);
+        c.addView(icon, new LinearLayout.LayoutParams(Theme.dp(40), Theme.dp(40)));
         c.addView(a.kit.space(10));
 
         LinearLayout copy = a.kit.v();
@@ -511,14 +493,8 @@ public class ReportsScreen extends Screen {
         LinearLayout c = a.kit.card(sectionAccent(section));
         c.setGravity(Gravity.CENTER_HORIZONTAL);
         c.setMinimumHeight(Theme.dp(122));
-        ImageView iv = new ImageView(a);
-        try {
-            int art = Theme.icon3d(sectionIcon(section));
-            iv.setImageResource(art);
-            if (Theme.isIcon3d(art)) iv.clearColorFilter();
-            else iv.setColorFilter(sectionAccent(section));
-        } catch (Exception ignored) { Diag.ignored("ReportsScreen:349", ignored); }
-        int sz = Theme.dp(44);
+        View iv = a.kit.iconBadge(sectionIcon(section), sectionAccent(section), 40);
+        int sz = Theme.dp(40);
         c.addView(iv, new LinearLayout.LayoutParams(sz, sz));
         c.addView(a.kit.gap(6));
         android.widget.TextView t = a.kit.text(section, 14f, Theme.TEXT, true);

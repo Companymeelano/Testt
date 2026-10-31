@@ -333,7 +333,7 @@ public class CloseoutScreen extends Screen {
         boolean canClose = d.closeTable && (d.closed == null || d.closeHistoryTable);
         String closeLabel = !d.closeTable ? "ثبت مرکزی در دسترس نیست"
                 : d.closed == null ? "☑ تأیید و بستن روز"
-                : d.closeHistoryTable ? "⟳ ثبت اصلاحیهٔ بستن روز" : "اصلاحیه تا فعال‌شدن تاریخچه قفل است";
+                : d.closeHistoryTable ? "✎ ثبت اصلاحیهٔ بستن روز" : "اصلاحیه تا فعال‌شدن تاریخچه قفل است";
         card.addView(a.kit.btn(closeLabel, v -> { if (canClose) confirmClose(d); }), a.kit.lp(-1, -2));
         if (!d.closeTable) {
             card.addView(a.kit.hint("جدول جانبی قابل نوشتن نیست؛ پس بدون تأیید سرور، روز بسته اعلام نمی‌شود."),

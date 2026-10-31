@@ -46,6 +46,38 @@ public class AtiranSampleSchemaTest {
         assertFalse(sql, sql.contains("linesum"));
     }
 
+    @Test public void homePriceDriftUsesTheTwoLatestPurchasesWithoutAnArbitraryDateWindow() throws Exception {
+        Meta meta = new Meta(connection(loadManifest()));
+        Filter allHistory = new Filter();
+        allHistory.from = "";
+        allHistory.to = "";
+        Queries.Q q = Queries.buyPriceTrend(meta, allHistory, 20);
+        String sql = q.sql.toLowerCase(Locale.ROOT);
+        assertTrue(sql, sql.contains("row_number() over (partition by k order by dk desc)"));
+        assertTrue(sql, sql.contains("r1.rn=1"));
+        assertTrue(sql, sql.contains("r1.rn=2"));
+        assertTrue(q.binds.isEmpty());
+        assertFalse(sql, sql.contains("update dbo."));
+        assertFalse(sql, sql.contains("delete from "));
+    }
+
+    @Test public void homeStockAlertsAreReadOnlyAndRequireARealReorderPoint() throws Exception {
+        Meta meta = new Meta(connection(loadManifest()));
+        String sql = MasterQueries.stockAlerts(meta, 20).sql.toLowerCase(Locale.ROOT);
+        assertTrue(sql, sql.contains("as stockpieces"));
+        assertTrue(sql, sql.contains("as reorderpoint"));
+        assertTrue(sql, sql.contains("as reorderknown"));
+        assertTrue(sql, sql.contains("mojkavah"));
+        assertTrue(sql, sql.contains("mojkajoz"));
+        assertTrue(sql, sql.contains("reopoint"));
+        assertTrue(sql, sql.contains("active"));
+        assertTrue(sql, sql.contains("<=0"));
+        assertTrue(sql, sql.contains("where "));
+        assertFalse(sql, sql.contains("insert into "));
+        assertFalse(sql, sql.contains("update dbo."));
+        assertFalse(sql, sql.contains("delete from "));
+    }
+
     /** Stock value counts loose pieces (mojkajoz) at inventory_price for active items only. */
     @Test public void stockValueCountsPiecesAtInventoryPrice() throws Exception {
         Meta meta = new Meta(connection(loadManifest()));
@@ -112,6 +144,29 @@ public class AtiranSampleSchemaTest {
         assertTrue(sql, sql.contains("try_convert(int,[active])=1"));
         assertTrue(sql, sql.contains("mojkavah"));
         assertTrue(sql, sql.contains("reopoint"));
+    }
+
+    @Test public void homeDailyKpisUseOneExplicitJalaliDayForPurchasesReceiptsAndPayments() throws Exception {
+        Meta meta = new Meta(connection(loadManifest()));
+        String day = "1405/07/22";
+
+        Queries.Q purchases = Queries.factorDaily(meta, false, day, day);
+        Queries.Q receipts = MoneyQueries.darDay(meta, 0, day);
+        Queries.Q payments = MoneyQueries.darDay(meta, 1, day);
+
+        assertTrue(purchases.binds.contains(day));
+        assertTrue(purchases.binds.contains(Jalali.toGregorian(day)));
+        assertEquals(Integer.valueOf(0), receipts.binds.get(0));
+        assertEquals(day, receipts.binds.get(1));
+        assertEquals(Jalali.toGregorian(day), receipts.binds.get(2));
+        assertEquals(Integer.valueOf(1), payments.binds.get(0));
+        assertEquals(day, payments.binds.get(1));
+        assertEquals(Jalali.toGregorian(day), payments.binds.get(2));
+        assertTrue(receipts.sql.toLowerCase(Locale.ROOT).startsWith("select "));
+        // POS detail revisions use MAX(Rdf_), but the explicit Home day must not select
+        // its date by querying a different latest day from dbo.dar.
+        assertFalse(receipts.sql.toLowerCase(Locale.ROOT).contains("select max(left(try_convert"));
+        assertFalse(payments.sql.toLowerCase(Locale.ROOT).contains("select max(left(try_convert"));
     }
 
     @Test public void productListAndCountShareNormalizedReadOnlyFiltersAndExactPaging() throws Exception {

@@ -376,8 +376,13 @@ public final class Settings {
     public void setWhDirect(boolean on) { p.edit().putBoolean("wh_direct", on).apply(); }
 
     // ---------------- home dashboard order ----------------
-    /** Manager-first order: daily flow and actions, then trends and product analysis. */
-    public static final String HOME_ORDER_DEFAULT = "kpis,alerts,due,returns,sales_insight,cash_mix,eod";
+    /** Orderable lower Home modules; sales Hero and KPI stay pinned at the top. */
+    public static final String HOME_ORDER_DEFAULT = "smart_report,closeout,cash_position,top_performers,sales_goal,gross_profit,seasonal_calendar,quick_actions,forecast_7d,alerts,cash_mix,market,due,returns,eod";
+    /** First three new modules are enabled by default; existing compact modules remain available. */
+    public static final String HOME_SECTIONS_DEFAULT = "smart_report,closeout,cash_position";
+    private static final String[] HOME_SECTION_KEYS = {"smart_report", "closeout", "cash_position",
+            "top_performers", "sales_goal", "gross_profit", "seasonal_calendar", "quick_actions",
+            "forecast_7d", "alerts", "cash_mix", "market", "due", "returns", "eod"};
 
     public String homeOrder() {
         String stored = p.getString("home_order", null);
@@ -413,6 +418,69 @@ public final class Settings {
 
     public void setHomeOrder(String csv) {
         p.edit().putString("home_order", csv == null ? HOME_ORDER_DEFAULT : csv).apply();
+    }
+
+    /** Selected lower Home modules; an empty stored value intentionally hides them all. */
+    public String homeSections() {
+        String stored = p.getString("home_sections", null);
+        return normalizeHomeSections(stored == null ? HOME_SECTIONS_DEFAULT : stored);
+    }
+
+    public void setHomeSections(String csv) {
+        p.edit().putString("home_sections", normalizeHomeSections(csv == null ? "" : csv)).apply();
+    }
+
+    private static String normalizeHomeSections(String csv) {
+        StringBuilder normalized = new StringBuilder();
+        java.util.HashSet<String> seen = new java.util.HashSet<>();
+        if (csv != null) for (String key : csv.split(",")) {
+            String candidate = key == null ? "" : key.trim();
+            boolean known = false;
+            for (String valid : HOME_SECTION_KEYS) if (valid.equals(candidate)) { known = true; break; }
+            if (known && seen.add(candidate)) {
+                if (normalized.length() > 0) normalized.append(',');
+                normalized.append(candidate);
+            }
+        }
+        return normalized.toString();
+    }
+
+    /** Simple mode shows the first three selected modules; full mode shows every selected module. */
+    public boolean homeSimpleMode() { return p.getBoolean("home_simple", true); }
+
+    public void setHomeSimpleMode(boolean simple) {
+        p.edit().putBoolean("home_simple", simple).apply();
+    }
+
+    /** Local till observations keyed by Jalali day; they never leave this device or alter Atiran. */
+    public String closeoutCashOpening(String day) { return p.getString(closeoutCashKey("open", day), ""); }
+    public String closeoutCashCounted(String day) { return p.getString(closeoutCashKey("counted", day), ""); }
+    public void setCloseoutCashOpening(String day, String rials) {
+        saveCloseoutCash("open", day, rials);
+    }
+    public void setCloseoutCashCounted(String day, String rials) {
+        saveCloseoutCash("counted", day, rials);
+    }
+
+    private String closeoutCashKey(String kind, String day) {
+        String normalized = ir.meelano.manager.core.Jalali.disp(day);
+        if (normalized.isEmpty()) return "home_cash_" + kind + "_unknown";
+        return "home_cash_" + kind + "_" + normalized.replace('/', '_');
+    }
+
+    private void saveCloseoutCash(String kind, String day, String raw) {
+        String normalized = ir.meelano.manager.core.Jalali.disp(day);
+        if (normalized.isEmpty()) return;
+        String value = Money.en(raw == null ? "" : raw.trim()).replace(",", "")
+                .replace("٬", "").replace('٫', '.').trim();
+        try {
+            java.math.BigDecimal amount = new java.math.BigDecimal(value);
+            if (amount.signum() < 0) return;
+            value = amount.stripTrailingZeros().toPlainString();
+        } catch (Exception invalid) {
+            if (!value.isEmpty()) return;
+        }
+        p.edit().putString(closeoutCashKey(kind, normalized), value).apply();
     }
 
     // ---------------- stock alerts + auto backup (v18) ----------------

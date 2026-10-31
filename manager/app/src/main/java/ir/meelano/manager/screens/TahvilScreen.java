@@ -343,8 +343,7 @@ if (!items.isEmpty()) {
                 tally.setText(Money.fa(String.valueOf(n)) + " از "
                         + Money.fa(String.valueOf(items.size())));
                 // رنگِ شمارنده وضعیت را می‌گوید: کامل، ناقص، یا خالی
-                tally.setTextColor(n == 0 ? Theme.WARNING
-                        : (n == items.size() ? Theme.SUCCESS : Theme.INFO));
+                tally.setTextColor(Theme.TEXT);
             };
             paintRef[0] = repaint;
             repaint.run();

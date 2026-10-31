@@ -202,7 +202,7 @@ public final class AiSettings {
             rerender.run();
         }), a.kit.lp(-1, -2));
         card.addView(a.kit.gap(6));
-        card.addView(a.kit.btnGhost("⟳ آزمایش اتصال", Theme.GOLD, v -> testConnection(a, provider,
+        card.addView(a.kit.btnGhost("⇅ آزمایش اتصال", Theme.GOLD, v -> testConnection(a, provider,
                 key.getText().toString().trim())), a.kit.lp(-1, -2));
         card.addView(a.kit.gap(6));
         card.addView(a.kit.btnGhost("🗑 حذف کلید و خاموش کردن", Theme.DANGER, v -> {

@@ -24,7 +24,7 @@ public class SyncQueueScreen extends Screen {
     public SyncQueueScreen(MainActivity a) { super(a); }
     @Override public String id() { return "sync_queue"; }
     @Override public String title() { return "صف همگام‌سازی"; }
-    @Override public String glyph() { return "⟳"; }
+    @Override public String glyph() { return "⇅"; }
     @Override public int accent() { return Theme.INFO; }
 
     @Override public void render(LinearLayout content) {
@@ -48,7 +48,7 @@ public class SyncQueueScreen extends Screen {
                 pending == 0 ? Theme.SUCCESS : Theme.WARNING, true), a.kit.lp(-1, -2));
         status.addView(a.kit.hint("تحویل‌های آفلاین و گزارش شمارش کور تا تأیید سرور روی دستگاه می‌مانند؛ خطای شبکه هیچ‌کدام را حذف نمی‌کند."),
                 a.kit.lp(-1, -2));
-        status.addView(a.kit.btnGold(running ? "در حال تلاش…" : "⟳ تلاش دوباره برای همه", v -> retry()),
+        status.addView(a.kit.btnGold(running ? "در حال تلاش…" : "⇅ تلاش دوباره برای همه", v -> retry()),
                 a.kit.lp(-1, -2));
         content.addView(status, a.kit.lp(-1, -2));
         content.addView(a.kit.gap(8));

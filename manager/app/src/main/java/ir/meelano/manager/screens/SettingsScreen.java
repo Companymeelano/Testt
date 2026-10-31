@@ -20,10 +20,11 @@ import ir.meelano.manager.data.Company;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.data.NetRoute;
 import ir.meelano.manager.data.Repo;
+import ir.meelano.manager.ui.DesignGallery;
 import ir.meelano.manager.ui.Theme;
 
 /**
- * Settings, grouped into nine sections. Only one section is on screen at a time, so
+ * Settings, grouped into eleven sections. Only one section is on screen at a time, so
  * the page no longer stacks every option into one long scroll. Each switch is a row
  * with a title, a one-line explanation and a coloured on/off badge.
  */
@@ -33,6 +34,7 @@ public class SettingsScreen extends Screen {
     private static final String[][] SECTIONS = {
             {"connection", "اتصال", "🔌"},
             {"theme", "ظاهر", "🎨"},
+            {"preview", "گالری طراحی", "◐"},
             {"ai", "هوش مصنوعی", "✦"},
             {"alerts", "هشدارها", "🔔"},
             {"shop", "فروشگاه", "🏪"},
@@ -78,6 +80,7 @@ public class SettingsScreen extends Screen {
         content.addView(a.kit.gap(10));
         switch (section) {
             case "theme": buildTheme(content); break;
+            case "preview": buildPreview(content); break;
             case "ai": AiSettings.build(a, content, () -> render(content)); break;
             case "alerts": buildAlerts(content); break;
             case "shop": buildShop(content); break;
@@ -138,45 +141,18 @@ public class SettingsScreen extends Screen {
         return out.toArray(new String[0][]);
     }
 
-    /** Section header inside the open section: a title and one line of guidance. */
-    /** 3D dark-skin icon for a settings section title that starts with its emoji (0 = none). */
-    private static int sectionIcon3d(String title) {
-        if (title == null) return 0;
-        if (title.startsWith("🔌")) return R.drawable.icon3d_dark_plug;
-        if (title.startsWith("🎨")) return R.drawable.icon3d_dark_palette;
-        if (title.startsWith("🔔")) return R.drawable.icon3d_dark_bell;
-        if (title.startsWith("🏪")) return R.drawable.icon3d_dark_shop;
-        if (title.startsWith("💾")) return R.drawable.icon3d_dark_backup;
-        if (title.startsWith("🔐")) return R.drawable.icon3d_dark_lock;
-        if (title.startsWith("👥")) return R.drawable.icon3d_dark_roles;
-        if (title.startsWith("🧭")) return R.drawable.icon3d_dark_compass;
-        if (title.startsWith("ℹ")) return R.drawable.icon3d_dark_info;
-        return 0;
-    }
-
+    /** Shared section header: one duotone icon, title and one line of guidance. */
     private LinearLayout sectionHead(String title, String subtitle, int accent) {
-        LinearLayout h = a.kit.card(accent);
-        int ic = Theme.isLight() ? 0 : sectionIcon3d(title);
-        if (ic != 0) {
-            // Dark skin: the emoji becomes a 3D gold icon; the title keeps its words.
-            LinearLayout hr = a.kit.h();
-            hr.setGravity(android.view.Gravity.CENTER_VERTICAL);
-            android.widget.ImageView iv = new android.widget.ImageView(a);
-            iv.setImageResource(ic);
-            iv.setScaleType(android.widget.ImageView.ScaleType.CENTER_INSIDE);
-            iv.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-            hr.addView(iv, new LinearLayout.LayoutParams(Theme.dp(34), Theme.dp(34)));
-            hr.addView(a.kit.space(10));
-            int sp = title.indexOf(' ');
-            String words = sp > 0 ? title.substring(sp + 1) : title;
-            hr.addView(a.kit.text(words, 15f, Theme.TEXT, true), a.kit.wlp(1f));
-            h.addView(hr, a.kit.lp(-1, -2));
-        } else {
-            h.addView(a.kit.text(title, 15f, Theme.TEXT, true), a.kit.lp(-1, -2));
-        }
+        int split = title == null ? -1 : title.indexOf(' ');
+        String glyph = split > 0 ? title.substring(0, split) : "";
+        String words = split > 0 ? title.substring(split + 1) : (title == null ? "" : title);
+        int icon = ir.meelano.manager.ui.MeelanoIcons.iconFor(glyph);
+        int sectionHue = a.kit.visualAccent(words, accent);
+        LinearLayout card = a.kit.luxCard(sectionHue);
+        card.addView(a.kit.sectionHeader(words, icon, sectionHue, null, null), a.kit.lp(-1, -2));
         if (subtitle != null && !subtitle.isEmpty())
-            h.addView(a.kit.hint(subtitle), a.kit.lp(-1, -2));
-        return h;
+            card.addView(a.kit.hint(subtitle), a.kit.lp(-1, -2));
+        return card;
     }
 
     // ================= reusable rows =================
@@ -307,10 +283,10 @@ public class SettingsScreen extends Screen {
         final boolean isLight = "light".equals(a.settings.themeMode());
         final boolean isNuts = "nuts".equals(a.settings.themeMode());
         final int themeIdx = isNuts ? 2 : isLight ? 1 : 0;
-        th.addView(a.kit.chipsWithIcons(
+        th.addView(a.kit.segmentedControl(
                 new String[]{"تیره • ابسیدین طلایی", "روشن • عاج سلطنتی", "آجیل و خشکبار"},
                 themeIdx,
-                new int[]{R.drawable.icon3d_dark_theme, R.drawable.icon3d_theme, R.drawable.icon3d_nut_theme},
+                new int[]{R.drawable.mi_dark_mode, R.drawable.mi_light_mode, R.drawable.mi_storefront},
                 Theme.GOLD, idx -> {
                     a.settings.setThemeMode(idx == 2 ? "nuts" : idx == 1 ? "light" : "dark");
                     a.refreshTheme();
@@ -330,9 +306,18 @@ public class SettingsScreen extends Screen {
             a.refreshTheme();
         }), a.kit.lp(-1, -2));
         th.addView(a.kit.gap(6));
-        th.addView(a.kit.hint("برای دیدن همهٔ قالب‌ها ردیف را افقی بکشید. انتخاب قالب فوراً روی همهٔ بخش‌ها، جدول‌ها، نمودارها و آیکن‌ها اعمال می‌شود."),
+        th.addView(a.kit.hint("قالب انتخاب‌شده فوراً روی همهٔ بخش‌ها، جدول‌ها، نمودارها و آیکن‌ها اعمال می‌شود."),
                 a.kit.lp(-1, -2));
         a.kit.addCard(content, th);
+    }
+
+    private void buildPreview(final LinearLayout content) {
+        content.addView(a.kit.sectionHeader("پیش‌نمایش Light و Dark",
+                R.drawable.mi_contrast, Theme.GOLD, null, null), a.kit.lp(-1, -2));
+        content.addView(a.kit.hint("هدر جمع‌شونده، داک پنج‌مقصدی و اجزای مشترک را در هر دو پالت ببینید. "
+                + "این نمونه‌ها تنظیم فعلی دستگاه را تغییر نمی‌دهند."), a.kit.lp(-1, -2));
+        content.addView(a.kit.gap(8));
+        DesignGallery.addPreviews(a, content);
     }
 
     private void buildAlerts(final LinearLayout content) {
@@ -583,40 +568,161 @@ public class SettingsScreen extends Screen {
     }
 
     private void buildDashboard(final LinearLayout content) {
-        content.addView(sectionHead("🧭 ترتیب داشبورد خانه",
-                "بخش‌های فعال را با ↑ و ↓ بر اساس اولویت روزانه مرتب کنید.",
+        content.addView(sectionHead("🧭 ویرایش خانه",
+                "خوش‌آمد، Hero فروش و KPI در ابتدای صفحه ثابت‌اند؛ بخش‌های پایین را بکشید، مرتب کنید یا پنهان کنید.",
                 Theme.GOLD), a.kit.lp(-1, -2));
-        LinearLayout ho = a.kit.card(Theme.GOLD);
-        final String[][] secs = {
-                {"kpis", "گردش امروز"},
-                {"alerts", "هشدار امروز"},
-                {"due", "سررسید چک‌ها"},
-                {"returns", "برگشتی‌های فعال"},
-                {"sales_insight", "نبض فروش (نمودار، کالاها و مقایسه ماهانه)"},
-                {"cash_mix", "ترکیب دریافت"},
-                {"eod", "جمع‌بندی پایان روز"},
-        };
+        LinearLayout editor = a.kit.card(Theme.GOLD);
+        final boolean simple = a.settings.homeSimpleMode();
+        addRow(editor, toggleRow(simple ? "حالت ساده روشن" : "حالت کامل روشن",
+                simple ? "نمای ساده تا سه بخش انتخابیِ پایین را نشان می‌دهد؛ سایر کارت‌ها در حالت کامل دیده می‌شوند."
+                        : "نمای کامل همهٔ بخش‌های انتخاب‌شده را نشان می‌دهد.",
+                simple, Theme.GOLD, v -> {
+                    a.settings.setHomeSimpleMode(!simple);
+                    render(content);
+                }));
+        editor.addView(a.kit.hint("تغییرات خودکار ذخیره می‌شوند. برای جابه‌جایی، دستگیره را لمس طولانی کنید و بکشید؛ فلش‌ها جایگزین دسترس‌پذیر هستند."),
+                a.kit.lp(-1, -2));
+
         final java.util.List<String> order = new java.util.ArrayList<>();
-        for (String k : a.settings.homeOrder().split(","))
-            if (k != null && !k.trim().isEmpty() && !order.contains(k.trim())) order.add(k.trim());
-        for (String[] s2 : secs) if (!order.contains(s2[0])) order.add(s2[0]);
-        for (int i = 0; i < order.size(); i++) {
-            final int idx = i;
-            String ot = order.get(i);
-            for (String[] s2 : secs) if (s2[0].equals(ot)) ot = s2[1];
-            LinearLayout orow = a.kit.h();
-            orow.setGravity(Gravity.CENTER_VERTICAL);
-            orow.setPadding(0, Theme.dp(3), 0, Theme.dp(3));
-            orow.addView(a.kit.text(Money.fa(String.valueOf(i + 1)) + " • " + ot, 12.5f, Theme.TEXT, true), a.kit.wlp(1f));
-            orow.addView(a.kit.btnGhost("↑", Theme.GOLD, v -> moveHome(order, idx, -1, content)), a.kit.lp(Theme.dp(52), -2));
-            orow.addView(a.kit.btnGhost("↓", Theme.GOLD, v -> moveHome(order, idx, 1, content)), a.kit.lp(Theme.dp(52), -2));
-            ho.addView(orow, a.kit.lp(-1, -2));
+        for (String key : a.settings.homeOrder().split(",")) {
+            String clean = key == null ? "" : key.trim();
+            if (!clean.isEmpty() && !order.contains(clean)) order.add(clean);
         }
-        ho.addView(a.kit.btnGhost("بازنشانی ترتیب پیش‌فرض", Theme.MUTED, v -> {
+        for (String key : ir.meelano.manager.data.Settings.HOME_ORDER_DEFAULT.split(","))
+            if (!order.contains(key)) order.add(key);
+        final java.util.List<String> selected = new java.util.ArrayList<>();
+        for (String key : a.settings.homeSections().split(",")) {
+            String clean = key == null ? "" : key.trim();
+            if (!clean.isEmpty() && !selected.contains(clean)) selected.add(clean);
+        }
+
+        for (int i = 0; i < order.size(); i++) {
+            final int index = i;
+            final String key = order.get(i);
+            final String label = homeSectionLabel(key);
+            final boolean enabled = selected.contains(key);
+            int selectedBefore = 0;
+            for (int j = 0; j < i; j++) if (selected.contains(order.get(j))) selectedBefore++;
+            boolean beyondSimpleLimit = simple && enabled && selectedBefore >= 3;
+            LinearLayout row = a.kit.h();
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+            row.setPadding(Theme.dp(4), Theme.dp(3), Theme.dp(4), Theme.dp(3));
+            LinearLayout copy = a.kit.v();
+            copy.addView(a.kit.text(Money.fa(String.valueOf(i + 1)) + " · " + label,
+                    11.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
+            TextView state = a.kit.text(!enabled ? "پنهان"
+                            : beyondSimpleLimit ? "فعال · در حالت کامل نمایش داده می‌شود" : "نمایش داده می‌شود",
+                    9f, Theme.MUTED, false);
+            copy.addView(state, a.kit.lp(-1, -2));
+            row.addView(copy, a.kit.wlp(1f));
+
+            View handle = a.kit.iconBadge(R.drawable.mi_swap_vert, Theme.GOLD, 28);
+            handle.setMinimumWidth(Theme.dp(48));
+            handle.setMinimumHeight(Theme.dp(48));
+            handle.setFocusable(true);
+            handle.setContentDescription("دستگیرهٔ جابه‌جایی «" + label + "»؛ لمس طولانی و کشیدن");
+            Theme.pressable(handle);
+            handle.setOnLongClickListener(v -> startHomeDrag(row, key));
+            row.addView(handle, a.kit.lp(Theme.dp(48), Theme.dp(48)));
+
+            android.widget.Button up = a.kit.btnGhost("↑", Theme.GOLD,
+                    v -> moveHome(order, index, -1, content));
+            up.setContentDescription("جابجایی «" + label + "» به جایگاه بالاتر");
+            row.addView(up, a.kit.lp(Theme.dp(48), Theme.dp(48)));
+            android.widget.Button down = a.kit.btnGhost("↓", Theme.GOLD,
+                    v -> moveHome(order, index, 1, content));
+            down.setContentDescription("جابجایی «" + label + "» به جایگاه پایین‌تر");
+            row.addView(down, a.kit.lp(Theme.dp(48), Theme.dp(48)));
+
+            android.widget.Button visibility = a.kit.btnGhost(enabled ? "✓" : "×",
+                    enabled ? Theme.GOLD : Theme.MUTED, v -> {
+                        if (selected.contains(key)) selected.remove(key);
+                        else selected.add(key);
+                        a.settings.setHomeSections(joinHomeKeys(selected));
+                        if (simple && selected.size() > 3)
+                            a.kit.toast("بخش ذخیره شد؛ سه بخش نخست پایین در نمای ساده دیده می‌شوند. برای نمایش همه، حالت کامل را روشن کنید.");
+                        render(content);
+                    });
+            visibility.setContentDescription((enabled ? "پنهان‌کردن " : "نمایش ") + label);
+            row.addView(visibility, a.kit.lp(Theme.dp(48), Theme.dp(48)));
+            row.setOnDragListener((target, event) -> handleHomeDrop(event, key, order, content, target));
+            addRow(editor, row);
+        }
+
+        editor.addView(a.kit.btnGhost("بازنشانی خانه", Theme.MUTED, v -> {
             a.settings.setHomeOrder(ir.meelano.manager.data.Settings.HOME_ORDER_DEFAULT);
+            a.settings.setHomeSections(ir.meelano.manager.data.Settings.HOME_SECTIONS_DEFAULT);
+            a.settings.setHomeSimpleMode(true);
             render(content);
         }), a.kit.lp(-1, -2));
-        a.kit.addCard(content, ho);
+        a.kit.addCard(content, editor);
+    }
+
+    private String homeSectionLabel(String key) {
+        if ("smart_report".equals(key)) return "گزارش هوشمند امروز";
+        if ("closeout".equals(key)) return "بستن روز";
+        if ("cash_position".equals(key)) return "موقعیت نقدی";
+        if ("top_performers".equals(key)) return "بهترین مشتری‌ها و کالاها";
+        if ("sales_goal".equals(key)) return "هدف فروش ماه";
+        if ("gross_profit".equals(key)) return "سود ناخالص";
+        if ("seasonal_calendar".equals(key)) return "تقویم آجیل‌وفروشی";
+        if ("quick_actions".equals(key)) return "اقدام سریع";
+        if ("forecast_7d".equals(key)) return "پیش‌بینی فروش ۷روزه";
+        if ("alerts".equals(key)) return "مرکز توجه";
+        if ("cash_mix".equals(key)) return "ترکیب دریافت";
+        if ("market".equals(key)) return "بازار (جمع‌شده پیش‌فرض)";
+        if ("due".equals(key)) return "جزئیات سررسید چک‌ها";
+        if ("returns".equals(key)) return "جزئیات برگشتی‌ها";
+        if ("eod".equals(key)) return "جمع‌بندی پایان روز";
+        return key;
+    }
+
+    private String joinHomeKeys(java.util.List<String> keys) {
+        StringBuilder csv = new StringBuilder();
+        for (String key : keys) {
+            if (csv.length() > 0) csv.append(',');
+            csv.append(key);
+        }
+        return csv.toString();
+    }
+
+    private boolean startHomeDrag(View row, String key) {
+        row.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+        android.content.ClipData data = android.content.ClipData.newPlainText("home-section", key);
+        View.DragShadowBuilder shadow = new View.DragShadowBuilder(row);
+        return row.startDragAndDrop(data, shadow, key, 0);
+    }
+
+    private boolean handleHomeDrop(android.view.DragEvent event, String targetKey,
+                                  java.util.List<String> order, LinearLayout content, View target) {
+        switch (event.getAction()) {
+            case android.view.DragEvent.ACTION_DRAG_STARTED:
+                return event.getLocalState() instanceof String;
+            case android.view.DragEvent.ACTION_DRAG_ENTERED:
+                target.setAlpha(0.78f);
+                return true;
+            case android.view.DragEvent.ACTION_DRAG_EXITED:
+            case android.view.DragEvent.ACTION_DRAG_ENDED:
+                target.setAlpha(1f);
+                return true;
+            case android.view.DragEvent.ACTION_DROP:
+                target.setAlpha(1f);
+                Object state = event.getLocalState();
+                if (!(state instanceof String)) return false;
+                int from = order.indexOf((String) state);
+                int targetIndex = order.indexOf(targetKey);
+                if (from < 0 || targetIndex < 0 || from == targetIndex) return true;
+                int insertAt = targetIndex + (event.getY() >= target.getHeight() / 2f ? 1 : 0);
+                String moved = order.remove(from);
+                if (from < insertAt) insertAt--;
+                order.add(Math.max(0, Math.min(insertAt, order.size())), moved);
+                a.settings.setHomeOrder(joinHomeKeys(order));
+                render(content);
+                return true;
+            default:
+                return true;
+        }
     }
 
     private void buildAbout(final LinearLayout content) {
@@ -686,10 +792,7 @@ public class SettingsScreen extends Screen {
         ab.addView(a.kit.gap(6), a.kit.lp(-1, -2));
         LinearLayout updateHead = a.kit.h();
         updateHead.setGravity(Gravity.CENTER_VERTICAL);
-        ImageView updateArt = new ImageView(a);
-        int updateIcon = Theme.icon3d(R.drawable.mi_refresh);
-        updateArt.setImageResource(updateIcon);
-        updateArt.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        View updateArt = a.kit.iconBadge(R.drawable.mi_cloud_download, Theme.GOLD_METAL, 34);
         updateHead.addView(updateArt, a.kit.lp(Theme.dp(34), Theme.dp(34)));
         updateHead.addView(a.kit.space(8));
         updateHead.addView(a.kit.text("بروزرسانی برنامه", 14f, Theme.GOLD, true), a.kit.wlp(1f));
@@ -702,7 +805,7 @@ public class SettingsScreen extends Screen {
         }
         ab.addView(a.kit.hint(ir.meelano.manager.core.UpdateCenter.statusLine(a)), a.kit.lp(-1, -2));
         ab.addView(a.kit.hint(ir.meelano.manager.core.UpdateCenter.lastCheckLine(a)), a.kit.lp(-1, -2));
-        ab.addView(a.kit.btnGold("⟳  بررسی و دریافت نسخه جدید", v ->
+        ab.addView(a.kit.btnGold("📥  بررسی و دریافت نسخه جدید", v ->
                 ir.meelano.manager.core.UpdateCenter.manualCheck(a)), a.kit.lp(-1, -2));
         ab.addView(a.kit.btnGhost("📦  صفحه نسخه‌های منتشرشده", Theme.GOLD, v -> openReleasesPage()),
                 a.kit.lp(-1, -2));
@@ -766,7 +869,7 @@ public class SettingsScreen extends Screen {
             nt.addView(a.kit.kv("کد اقتصادی", Money.fa(co.egh.trim()), Theme.MUTED), a.kit.lp(-1, -2));
         if (co.pos != null && !co.pos.trim().isEmpty())
             nt.addView(a.kit.kv("کد پستی", Money.fa(co.pos.trim()), Theme.MUTED), a.kit.lp(-1, -2));
-        nt.addView(a.kit.btnGhost("⟳ به‌روزرسانی از آتیران", Theme.GOLD, v -> {
+        nt.addView(a.kit.btnGhost("⇅ به‌روزرسانی از آتیران", Theme.GOLD, v -> {
             a.kit.toast("در حال به‌روزرسانی مشخصات…");
             a.refreshCompany(() -> render(content));
         }), a.kit.lp(-1, -2));
@@ -781,7 +884,8 @@ public class SettingsScreen extends Screen {
         final AlertDialog dlg = a.kit.dialog("بکاپ هوشمند", body, false);
         dlg.show();
         Backup.export(a, a.settings, (fa, doneN, total) ->
-                st.setText("در حال ذخیره " + fa + " (" + Money.fa(doneN + " از " + total) + ")"), new Backup.Done() {
+                st.setText(a.getString(R.string.backup_progress, fa,
+                        Money.fa(doneN + " از " + total))), new Backup.Done() {
             @Override
             public void onDone(java.io.File zip, long bytes, String notes) {
                 try {

@@ -46,6 +46,36 @@ public final class MasterQueries {
                 + " FROM dbo.inventory");
     }
 
+    /**
+     * Compact, read-only list of active products that are out of stock or at/below a known
+     * reorder point. If the schema has no reorder-point column, only confirmed stock-outs
+     * are returned; unknown reorder data is never treated as a zero threshold.
+     */
+    public static Queries.Q stockAlerts(Meta m, int top) throws Queries.Missing {
+        String shka = m.must("inventory", "کد کالا", "shka");
+        String name = m.must("inventory", "نام کالا", "naka", "NAKA");
+        String active = m.col("inventory", "active", "Active");
+        String reorder = m.col("inventory", "reopoint", "reorder_point");
+        String pieces = stockPieces(m, "i.");
+        String reorderExpr = reorder == null ? "CAST(NULL AS decimal(19,3))"
+                : "TRY_CONVERT(decimal(19,3),i.[" + reorder + "])";
+        String stockCondition = pieces + "<=0";
+        if (reorder != null)
+            stockCondition = "(" + stockCondition + " OR (" + reorderExpr + ">0 AND "
+                    + pieces + "<=" + reorderExpr + "))";
+        String where = " WHERE " + (active == null ? "" : boolTrue("i.[" + active + "]") + " AND ")
+                + stockCondition;
+        String sql = "SELECT TOP (" + Queries.clampTop(top) + ") "
+                + Sql.txt("i", shka, 100) + " AS shka, "
+                + Sql.txt("i", name, 250) + " AS name, "
+                + pieces + " AS stockPieces, " + reorderExpr + " AS reorderPoint, "
+                + "CAST(" + (reorder == null ? "0" : "1") + " AS int) AS reorderKnown, "
+                + "CAST(CASE WHEN " + pieces + "<=0 THEN 1 ELSE 0 END AS int) AS isOut "
+                + "FROM dbo.inventory i" + where
+                + " ORDER BY CASE WHEN " + pieces + "<=0 THEN 0 ELSE 1 END, " + pieces + " ASC, i.[" + name + "] ASC";
+        return new Queries.Q(sql);
+    }
+
     public static Queries.Q stockValueByGroup(Meta m) throws Queries.Missing {
         String cost = m.col("inventory", "inventory_price", "buy_price", "pure_buy_price", "ImPureBuyPrice");
         String active = m.col("inventory", "active", "Active");

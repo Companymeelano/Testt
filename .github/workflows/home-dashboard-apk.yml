@@ -1,0 +1,274 @@
+name: Home dashboard PR build
+
+on:
+  push:
+    branches:
+      - arena/e7d9f96e-testt
+    paths:
+      - "manager/app/**"
+      - "manager/gradle/**"
+      - "manager/build.gradle"
+      - "manager/settings.gradle"
+      - "manager/gradle.properties"
+      - ".github/workflows/home-dashboard-apk.yml"
+      - ".github/scripts/**"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Test, lint, and package Manager debug APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Audit required manager columns against the Atiran sample schema
+        run: python3 tools/audit_manager_schema.py --manifest manager/app/src/test/resources/atiran/sample-schema.json
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: "17"
+          distribution: temurin
+
+      - name: Install Android SDK 35
+        run: |
+          SDKMAN="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMAN" --licenses > /dev/null || true
+          "$SDKMAN" "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+
+      - name: Set up Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.11.1
+
+      - name: Fetch pinned offline Persian voice engine
+        run: |
+          mkdir -p manager/app/libs
+          curl -fsSL -o manager/app/libs/sherpa-onnx-1.13.8.aar https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-1.13.8.aar
+          echo "633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96  manager/app/libs/sherpa-onnx-1.13.8.aar" | sha256sum -c -
+
+      - name: Run unit tests, lint, and build debug APK
+        working-directory: manager
+        shell: bash
+        run: |
+          set -o pipefail
+          attempt=1
+          result=1
+          while [ "$attempt" -le 3 ]; do
+            set +e
+            gradle clean :app:testDebugUnitTest :app:lintDebug :app:assembleDebug -Pandroid.useAndroidX=true --console=plain --stacktrace --no-daemon 2>&1 | tee ../manager-home-build.log
+            result=${PIPESTATUS[0]}
+            set -e
+            [ "$result" -eq 0 ] && break
+            if [ "$attempt" -ge 3 ] || ! grep -Eq 'Could not resolve|Could not GET|Could not download|Could not find' ../manager-home-build.log; then
+              break
+            fi
+            attempt=$((attempt + 1))
+            echo "::warning::Gradle dependency resolution failed; retrying (${attempt}/3)."
+            sleep 15
+          done
+          if [ "$result" -ne 0 ]; then
+            python3 - <<'PY' > "$RUNNER_TEMP/gradle-diagnostic.txt"
+          from pathlib import Path
+          import re
+          text = Path("../manager-home-build.log").read_text(errors="replace")
+          start = text.rfind("FAILURE:")
+          if start < 0:
+              start = max(text.rfind("* What went wrong:"), text.rfind("> Task "))
+          if start < 0:
+              start = max(0, len(text) - 9000)
+          end = text.rfind("BUILD FAILED")
+          if end < start:
+              end = len(text)
+          snippet = text[start:end + len("BUILD FAILED")]
+          details = (snippet[:700] or text[-700:])
+
+          # Lint's failure summary is terse; surface every error plus warnings in the
+          # touched UI files so the check run contains actionable diagnostics without
+          # downloading runner-only artifacts.
+          report = Path("app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt")
+          if report.exists():
+              lines = report.read_text(errors="replace").splitlines()
+              matcher = re.compile(r"^(.*?):(\d+): (Error|Warning):")
+              touched = ("MainActivity.java", "SettingsScreen.java", "DesignGallery.java",
+                         "DesignTokens.java", "Theme.java")
+              findings = []
+              errors = 0
+              touched_warnings = 0
+              for index, line in enumerate(lines):
+                  match = matcher.match(line)
+                  if not match:
+                      continue
+                  severity = match.group(3)
+                  path = match.group(1)
+                  if severity == "Error":
+                      errors += 1
+                  elif severity == "Warning" and any(name in path for name in touched):
+                      touched_warnings += 1
+                  else:
+                      continue
+                  rule = re.search(r"\[([A-Za-z0-9_]+)\]\s*$", line)
+                  rule_id = rule.group(1) if rule else "Lint"
+                  finding = f"{Path(path).name}:{match.group(2)} [{rule_id}] {severity}"
+                  if rule_id == "FullBackupContent":
+                      description = re.sub(r"\s*\[[^]]+\]\s*$", "", line[match.end():]).strip()
+                      finding += ": " + description[:120]
+                  findings.append(finding)
+              if findings:
+                  details += (f"\n\nLint findings: {errors} errors; "
+                              f"{touched_warnings} warnings in changed UI files.\n")
+                  details += "\n".join(findings)
+              else:
+                  details += "\n\nLint report exists but no source findings were parsed."
+          else:
+              details += "\n\nLint text report was not generated at the expected path."
+          print(details[:9000])
+          PY
+            summary=$(cat "$RUNNER_TEMP/gradle-diagnostic.txt")
+            summary=${summary//'%'/'%25'}
+            summary=${summary//$'\r'/'%0D'}
+            summary=${summary//$'\n'/'%0A'}
+            echo "::error title=Gradle failure details::$summary"
+            {
+              echo '### Gradle failure details'
+              echo '```text'
+              cat "$RUNNER_TEMP/gradle-diagnostic.txt"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit "$result"
+
+      - name: Summarize failing unit tests
+        if: failure()
+        working-directory: manager
+        shell: bash
+        run: |
+          python3 - <<'PY' > "$RUNNER_TEMP/test-failures.txt"
+          from pathlib import Path
+          from xml.etree import ElementTree
+
+          reports = Path("app/build/test-results/testDebugUnitTest").glob("TEST-*.xml")
+          lines = []
+          for report in reports:
+              try:
+                  root = ElementTree.parse(report).getroot()
+              except Exception as error:
+                  lines.append(f"Could not parse {report}: {error}")
+                  continue
+              for case in root.iter("testcase"):
+                  failure = case.find("failure")
+                  if failure is None:
+                      failure = case.find("error")
+                  if failure is None:
+                      continue
+                  lines.append(f"{case.get('classname', '')}.{case.get('name', '')}: {failure.get('message', '')}")
+                  detail = (failure.text or "").strip()
+                  if detail:
+                      lines.append(detail[:1200])
+          if not lines:
+              lines.append("No failing JUnit XML cases were found; inspect the Gradle diagnostic above.")
+          print("\n".join(lines)[:9000])
+          PY
+          summary=$(cat "$RUNNER_TEMP/test-failures.txt")
+          summary=${summary//'%'/'%25'}
+          summary=${summary//$'\r'/'%0D'}
+          summary=${summary//$'\n'/'%0A'}
+          echo "::error title=JUnit failure details::$summary"
+          {
+            echo '### JUnit failure details'
+            echo '```text'
+            cat "$RUNNER_TEMP/test-failures.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload installable debug APK
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: meelano-manager-home-dashboard-${{ github.sha }}
+          path: manager/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      # Explicit opt-in: include [publish-apk] in a push commit to create a debug prerelease.
+      - name: Publish direct-download debug APK
+        if: ${{ success() && github.event_name == 'push' && contains(github.event.head_commit.message, '[publish-apk]') && hashFiles('manager/app/build/outputs/apk/debug/app-debug.apk') != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          apk="manager/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$apk"
+          short_sha="${GITHUB_SHA:0:7}"
+          tag="manager-home-debug-${short_sha}"
+          asset="meelano-manager-home-dashboard-debug-${short_sha}.apk"
+          cp "$apk" "$asset"
+          gh release create "$tag" "$asset" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "MEELANO Manager Home Dashboard Debug ${short_sha}" \
+            --notes "Installable debug APK built from ${GITHUB_SHA}. This is not a production-signed release." \
+            --prerelease
+
+  screenshots:
+    name: Capture Light and Dark Home screenshots
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: "17"
+          distribution: temurin
+
+      - name: Install Android SDK 35
+        run: |
+          SDKMAN="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMAN" --licenses > /dev/null || true
+          "$SDKMAN" "platforms;android-30" "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+
+      - name: Set up Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.11.1
+
+      - name: Fetch pinned offline Persian voice engine
+        run: |
+          mkdir -p manager/app/libs
+          curl -fsSL -o manager/app/libs/sherpa-onnx-1.13.8.aar https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-1.13.8.aar
+          echo "633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96  manager/app/libs/sherpa-onnx-1.13.8.aar" | sha256sum -c -
+
+      - name: Run the real Home Views on an Android emulator and save both themes
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          target: default
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          script: bash .github/scripts/capture-home-dashboard.sh
+
+      - name: Upload screenshot pair
+        uses: actions/upload-artifact@v4
+        with:
+          name: home-dashboard-screenshots-${{ github.sha }}
+          path: design/screenshots/home-dashboard-*.png
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Add screenshots to the Home dashboard PR
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add design/screenshots/home-dashboard-light.png design/screenshots/home-dashboard-dark.png
+          git commit -m "docs(home): add Light and Dark dashboard screenshots"
+          git fetch origin arena/e7d9f96e-testt
+          git rebase origin/arena/e7d9f96e-testt
+          git push origin HEAD:arena/e7d9f96e-testt

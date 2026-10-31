@@ -1109,14 +1109,12 @@ public final class AtiranAuth {
     }
 
     private static String str(ResultSet rs, String alias) throws Exception {
-        Object o = rs.getObject(alias);
-        return o == null ? "" : String.valueOf(o).trim();
+        return readSqlText(rs.getObject(alias));
     }
 
     private static String col(ResultSet rs, String alias) {
         try {
-            Object o = rs.getObject(alias);
-            return o == null ? "" : String.valueOf(o).trim();
+            return readSqlText(rs.getObject(alias));
         } catch (Exception e) {
             return "";
         }

@@ -65,6 +65,7 @@ public final class Kit {
         t.setTextSize(base * grow);
         t.setTextColor(color);
         t.setTypeface(Theme.face(bold));
+        t.setFontFeatureSettings("tnum");
         t.setLineSpacing(Theme.dp(1.5f), 1.0f);
         // Lock the paragraph direction to RTL: a pure-digit value («۱۴۰۵/۰۸/۰۳», «۹٫۸»)
         // has no strong directional character, so first-strong heuristics fall back to
@@ -263,6 +264,8 @@ public final class Kit {
         public final String sub;
         public final int accent;
         public final Runnable action;
+        /** Optional unabridged value announced by TalkBack and shown on long-press. */
+        public String fullValue;
         /** When not NaN, the tile counts up from 0 to this number. */
         public final double countTo;
         /** Optional daily series (oldest first) drawn as a sparkline under the value. */
@@ -368,6 +371,17 @@ public final class Kit {
         more.setGravity(Gravity.CENTER_HORIZONTAL);
         more.setSingleLine(true);
         t.addView(more, lp(-1, -2));
+        String complete = k.fullValue == null || k.fullValue.trim().isEmpty() ? k.value : k.fullValue;
+        String spoken = k.label + ": " + (complete == null ? "" : complete);
+        t.setContentDescription(spoken);
+        if (android.os.Build.VERSION.SDK_INT >= 26) t.setTooltipText(spoken);
+        View.OnLongClickListener reveal = vw -> {
+            Toast.makeText(a, spoken, Toast.LENGTH_LONG).show();
+            return true;
+        };
+        t.setOnLongClickListener(reveal);
+        v.setContentDescription(complete == null ? "" : complete);
+        v.setOnLongClickListener(reveal);
         if (k.action != null) {
             Theme.pressable(t);
             t.setOnClickListener(vw -> k.action.run());
@@ -940,6 +954,22 @@ public final class Kit {
     }
 
     public View pager(int page, boolean hasMore, final Runnable prev, final Runnable next) {
+        return pagerRow(page, "صفحه " + Money.fa(String.valueOf(page + 1)), hasMore, prev, next);
+    }
+
+    /** Pager label backed by an exact filtered count when available. */
+    public View pager(int page, long total, int pageSize, boolean totalKnown, boolean fallbackHasMore,
+                      final Runnable prev, final Runnable next) {
+        if (!totalKnown || pageSize <= 0) return pager(page, fallbackHasMore, prev, next);
+        long pages = total <= 0 ? 0 : (total + pageSize - 1L) / pageSize;
+        boolean hasMore = page + 1L < pages;
+        String label = pages == 0 ? "بدون نتیجه"
+                : "صفحه " + Money.fa(String.valueOf(page + 1)) + " از " + Money.fa(String.valueOf(pages));
+        return pagerRow(page, label, hasMore, prev, next);
+    }
+
+    private View pagerRow(int page, String label, boolean hasMore,
+                          final Runnable prev, final Runnable next) {
         LinearLayout r = h();
         r.setGravity(Gravity.CENTER);
         Button p = btnGhost("‹ قبلی", Theme.GOLD, v -> prev.run());
@@ -947,7 +977,7 @@ public final class Kit {
         p.setAlpha(page > 0 ? 1f : 0.4f);
         r.addView(p, lp(-2, -2));
         r.addView(space(10));
-        TextView t = text("صفحه " + Money.fa(String.valueOf(page + 1)), 12f, Theme.MUTED, true);
+        TextView t = text(label, 12f, Theme.MUTED, true);
         r.addView(t, lp(-2, -2));
         r.addView(space(10));
         Button n = btnGhost("بعدی ›", Theme.GOLD, v -> next.run());
@@ -1388,6 +1418,11 @@ public final class Kit {
 
     public View invRowTone(String name, String code, String extra, String qty, String price,
                            String status, int tone, View.OnClickListener onClick) {
+        return invRowTone(name, code, extra, qty, price, status, tone, Theme.GOLD_SOFT, onClick);
+    }
+
+    public View invRowTone(String name, String code, String extra, String qty, String price,
+                           String status, int tone, int priceColor, View.OnClickListener onClick) {
         LinearLayout c = v();
         c.setBackground(Theme.card());
         c.setPadding(Theme.dp(12), Theme.dp(11), Theme.dp(12), Theme.dp(11));
@@ -1413,7 +1448,7 @@ public final class Kit {
             side.addView(space(0), lp(-2, Theme.dp(4)));
         }
         if (qty != null && !qty.isEmpty()) side.addView(text(qty, 12.5f, Theme.TEXT, true), lp(-2, -2));
-        if (price != null && !price.isEmpty()) side.addView(text(price, 11f, Theme.GOLD_SOFT, false), lp(-2, -2));
+        if (price != null && !price.isEmpty()) side.addView(text(price, 11f, priceColor, false), lp(-2, -2));
         head.addView(side, lp(-2, -2));
         c.addView(head, lp(-1, -2));
         if (onClick != null) {

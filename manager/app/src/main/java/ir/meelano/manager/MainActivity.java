@@ -23,6 +23,7 @@ import ir.meelano.manager.core.SmartLink;
 import ir.meelano.manager.ui.LinkPanel;
 import ir.meelano.manager.data.NetRoute;
 import ir.meelano.manager.core.Money;
+import ir.meelano.manager.core.PersianText;
 import ir.meelano.manager.core.Notify;
 import ir.meelano.manager.core.Queries;
 import ir.meelano.manager.core.WarehouseSync;
@@ -1711,20 +1712,17 @@ public class MainActivity extends Activity {
     }
 
     /**
-     * A name worth showing: at least one real letter. Databases sometimes hand back
-     * placeholder runs like «؟؟؟؟؟؟؟؟» — those must never reach the header chip.
+     * Reject empty placeholders and JDBC's Unicode replacement marker. A damaged display name
+     * falls back to the account name/role label; the persisted Atiran value is never rewritten.
      */
     private static String cleanName(String s) {
-        if (s == null) return "";
-        String t = s.trim();
-        for (int i = 0; i < t.length(); i++) if (Character.isLetter(t.charAt(i))) return t;
-        return "";
+        return PersianText.isUsablePersonName(s) ? s.trim() : "";
     }
 
     private String displayName() {
         String nm = cleanName(AtiranAuth.sessionName(this));
         if (nm.isEmpty()) nm = cleanName(AtiranAuth.sessionUser(this));
-        if (nm.isEmpty()) nm = RoleStore.faName(AtiranAuth.sessionRole(this));
+        if (nm.isEmpty()) nm = cleanName(RoleStore.faName(AtiranAuth.sessionRole(this)));
         return nm;
     }
 
@@ -1736,7 +1734,11 @@ public class MainActivity extends Activity {
                     userChip.setVisibility(View.GONE);
                 } else {
                     userChip.setVisibility(View.VISIBLE);
-                    ir.meelano.manager.ui.MeelanoIcons.set(userChip, "\uD83D\uDC64 " + displayName());
+                    String fullName = displayName();
+                    ir.meelano.manager.ui.MeelanoIcons.set(userChip, "\uD83D\uDC64 " + fullName);
+                    userChip.setTextDirection(View.TEXT_DIRECTION_RTL);
+                    userChip.setContentDescription("کاربر، " + fullName + "؛ لمس برای اطلاعات حساب");
+                    if (android.os.Build.VERSION.SDK_INT >= 26) userChip.setTooltipText(fullName);
                 }
             }
             if (compactUserAction != null) {

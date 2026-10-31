@@ -9,6 +9,8 @@ import ir.meelano.manager.core.AtiranSchema;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.Money;
+import ir.meelano.manager.core.PersianText;
+import ir.meelano.manager.core.ProductStockStatus;
 import ir.meelano.manager.data.Meta;
 import ir.meelano.manager.data.Repo;
 import ir.meelano.manager.data.Row;
@@ -99,10 +101,33 @@ public class ProductFileScreen extends Screen {
         content.removeAllViews();
         addBack(content);
         Row h = d.head;
-        String name = h.s("naka");
-        String group = h.s("groupName");
-        content.addView(a.kit.hero(glyph(), name.isEmpty() ? "کالا" : name,
-                (group.isEmpty() ? "" : group + "  •  ") + "شِکالا " + Money.fa(h.s("shka")), accent()), a.kit.lp(-1, -2));
+        String name = PersianText.cleanDisplayLabel(h.s("naka"));
+        if (name.isEmpty()) name = "کالا";
+        String group = PersianText.cleanGroupLabel(h.s("groupName"));
+        String code = PersianText.cleanDisplayLabel(h.s("StuffCode"));
+        if (code.isEmpty()) code = PersianText.cleanDisplayLabel(h.s("coka"));
+        if (code.isEmpty()) code = h.s("shka");
+        String heroSub = (group.isEmpty() ? "" : group + "  •  ")
+                + "کد کالا " + Money.ltrIsolate(Money.fa(code));
+        content.addView(a.kit.hero(glyph(), name, heroSub, accent()), a.kit.lp(-1, -2));
+
+        boolean stockKnown = h.has("mojkavah");
+        double stock = h.d("mojkavah");
+        double packSize = h.has("mohvah") ? h.d("mohvah") : 1d;
+        double loose = h.d("mojkajoz");
+        double pieces = stockKnown ? stock * packSize + loose : 0;
+        ProductStockStatus.Band stockBand = ProductStockStatus.classify(stockKnown, stock, pieces,
+                h.d("reopoint"), AtiranSchema.LOW_STOCK_VAH);
+        LinearLayout badges = a.kit.h();
+        badges.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        badges.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        badges.addView(a.kit.stockChip(ProductStockStatus.label(stockBand), stockTone(stockBand)), a.kit.lp(-2, -2));
+        if (h.i("activeKnown") != 0) {
+            badges.addView(a.kit.space(6));
+            boolean active = ProductStockStatus.isActive(h.s("active"));
+            badges.addView(a.kit.stockChip(active ? "فعال" : "غیرفعال", active ? Theme.SUCCESS : Theme.MUTED), a.kit.lp(-2, -2));
+        }
+        content.addView(badges, a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
 
         // ---- movement totals (counting units) ----
@@ -111,29 +136,35 @@ public class ProductFileScreen extends Screen {
             if (r.l("outFlag") == 1) out += Math.abs(r.d("qty"));
             else in += Math.abs(r.d("qty"));
         }
-        double stock = h.d("mojkavah");
+        String unit = PersianText.cleanDisplayLabel(h.s("vahsanj"));
+        String stockText = stockKnown ? Money.qtyText(stock) : "نامشخص";
+        if (stockKnown && Math.abs(loose) > 0.000001d) stockText += " + " + Money.qtyText(loose) + " عدد";
         List<Kit.Kpi> kpis = new ArrayList<>();
-        kpis.add(new Kit.Kpi("موجودی کنونی", Money.qty(stock), h.s("vahsanj"), Theme.VIOLET));
-        kpis.add(new Kit.Kpi("ورود (کل ثبت‌شده)", Money.qty(in), "", Theme.SUCCESS));
-        kpis.add(new Kit.Kpi("خروج (کل ثبت‌شده)", Money.qty(out), "", Theme.DANGER));
-        kpis.add(new Kit.Kpi("تعداد حرکت", Money.fa(String.valueOf(d.kardex.size())), "سند", Theme.INFO));
+        Kit.Kpi currentStock = new Kit.Kpi("موجودی کنونی", stockText, unit, Theme.VIOLET);
+        currentStock.fullValue = stockText;
+        kpis.add(currentStock);
+        kpis.add(new Kit.Kpi("ورود (ثبت‌شده)", Money.qtyText(in), "", Theme.SUCCESS));
+        kpis.add(new Kit.Kpi("خروج (ثبت‌شده)", Money.qtyText(out), "", Theme.DANGER));
+        kpis.add(new Kit.Kpi("تعداد حرکت", Money.num(d.kardex.size()), "سند", Theme.INFO));
         content.addView(a.kit.kpiGrid(kpis, 2), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
 
         // ---- specification card ----
         LinearLayout spec = a.kit.card(Theme.VIOLET);
         spec.addView(a.kit.text("مشخصات کالا", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
-        String code = h.has("StuffCode") ? h.s("StuffCode") : h.s("coka");
-        if (!code.isEmpty()) spec.addView(a.kit.kv("کد", Money.fa(code), Theme.TEXT), a.kit.lp(-1, -2));
-        if (!h.s("vahsanj").isEmpty()) spec.addView(a.kit.kv("واحد", h.s("vahsanj"), Theme.TEXT), a.kit.lp(-1, -2));
-        if (h.has("mojkajoz") && Math.abs(h.d("mojkajoz")) > 0.0005)
-            spec.addView(a.kit.kv("موجودی جزء", Money.qty(h.d("mojkajoz")), Theme.TEXT), a.kit.lp(-1, -2));
+        if (!code.isEmpty()) spec.addView(a.kit.kv("کد کالا", Money.ltrIsolate(Money.fa(code)), Theme.TEXT), a.kit.lp(-1, -2));
+        if (!unit.isEmpty()) spec.addView(a.kit.kv("واحد", unit, Theme.TEXT), a.kit.lp(-1, -2));
+        if (h.has("mojkajoz") && Math.abs(loose) > 0.0005)
+            spec.addView(a.kit.kv("موجودی جزء", Money.qtyText(loose), Theme.TEXT), a.kit.lp(-1, -2));
         if (h.has("reopoint") && Math.abs(h.d("reopoint")) > 0.0005)
-            spec.addView(a.kit.kv("نقطه سفارش", Money.qty(h.d("reopoint")), Theme.WARNING), a.kit.lp(-1, -2));
+            spec.addView(a.kit.kv("نقطه سفارش", Money.qtyText(h.d("reopoint")), Theme.WARNING), a.kit.lp(-1, -2));
         double buy = h.has("buy_price") ? h.d("buy_price") : (h.has("pure_buy_price") ? h.d("pure_buy_price") : 0);
-        if (buy > 0) spec.addView(a.kit.kv("قیمت خرید", Money.rial(buy), Theme.TEXT), a.kit.lp(-1, -2));
-        if (h.has("FinalSalePrice") && h.d("FinalSalePrice") > 0)
-            spec.addView(a.kit.kv("قیمت فروش", Money.rial(h.d("FinalSalePrice")), Theme.GOLD_SOFT), a.kit.lp(-1, -2));
+        if (buy > 0) spec.addView(a.kit.kv("قیمت خرید", Money.rialText(buy), Theme.TEXT), a.kit.lp(-1, -2));
+        if (h.i("saleKnown") != 0) {
+            if (h.has("FinalSalePrice") && h.d("FinalSalePrice") > 0)
+                spec.addView(a.kit.kv("قیمت فروش", Money.rialText(h.d("FinalSalePrice")), Theme.GOLD_SOFT), a.kit.lp(-1, -2));
+            else spec.addView(a.kit.kv("هشدار قیمت", "قیمت فروش ثبت نشده", Theme.WARNING), a.kit.lp(-1, -2));
+        }
         if (h.has("sharh") && !h.s("sharh").isEmpty())
             spec.addView(a.kit.kv("شرح", h.s("sharh"), Theme.MUTED), a.kit.lp(-1, -2));
         a.kit.addCard(content, spec);
@@ -202,6 +233,18 @@ public class ProductFileScreen extends Screen {
         renderNotes(content, d.notes);
     }
 
+    private int stockTone(ProductStockStatus.Band band) {
+        switch (band) {
+            case NEGATIVE:
+            case OUT: return Theme.DANGER;
+            case REORDER: return Theme.INFO;
+            case LOW: return Theme.WARNING;
+            case NORMAL: return Theme.SUCCESS;
+            case UNKNOWN:
+            default: return Theme.MUTED;
+        }
+    }
+
     /** Sales and purchase acts link to their invoice; the rest show the document number only. */
     private static String invoiceScreenFor(int act) {
         if (act == 20 || act == 22) return "sales";
@@ -227,10 +270,10 @@ public class ProductFileScreen extends Screen {
         body.addView(a.kit.gap(6));
 
         // facts — quantity first, then price and the line value it adds up to
-        body.addView(a.kit.kv("مقدار", Money.qty(q), accent), a.kit.lp(-1, -2));
+        body.addView(a.kit.kv("مقدار", Money.qtyText(q), accent), a.kit.lp(-1, -2));
         if (r.d("price") > 0) {
-            body.addView(a.kit.kv("فی", Money.rial(r.d("price")), Theme.GOLD_SOFT), a.kit.lp(-1, -2));
-            body.addView(a.kit.kv("ارزش", Money.rial(r.d("price") * q), Theme.GOLD_SOFT), a.kit.lp(-1, -2));
+            body.addView(a.kit.kv("فی", Money.rialText(r.d("price")), Theme.GOLD_SOFT), a.kit.lp(-1, -2));
+            body.addView(a.kit.kv("ارزش", Money.rialText(r.d("price") * q), Theme.GOLD_SOFT), a.kit.lp(-1, -2));
         }
         if (!r.s("warehouse").isEmpty())
             body.addView(a.kit.kv("انبار", Money.fa(r.s("warehouse")), Theme.TEXT), a.kit.lp(-1, -2));

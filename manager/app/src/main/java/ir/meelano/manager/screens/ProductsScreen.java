@@ -3,6 +3,7 @@ package ir.meelano.manager.screens;
 import android.app.AlertDialog;
 import android.view.View;
 import android.widget.LinearLayout;
+import ir.meelano.manager.core.AtiranSchema;
 import ir.meelano.manager.core.CacheStore;
 import android.widget.ScrollView;
 
@@ -11,6 +12,8 @@ import ir.meelano.manager.core.Filter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.Money;
+import ir.meelano.manager.core.PersianText;
+import ir.meelano.manager.core.ProductStockStatus;
 import ir.meelano.manager.core.Queries;
 import ir.meelano.manager.core.ReportCatalog;
 import ir.meelano.manager.data.Meta;
@@ -34,6 +37,7 @@ public class ProductsScreen extends Screen {
     public ProductsScreen(MainActivity a) {
         super(a);
         filter.top = 50;
+        filter.status = "active";
     }
 
     @Override
@@ -60,11 +64,12 @@ public class ProductsScreen extends Screen {
         c.kalaGroups = true;
         c.statusTitle = "وضعیت موجودی";
         c.status = new FilterSheet.Opt[]{
-                // «همه» is added by FilterSheet itself; listing it here showed it twice.
+                // FilterSheet adds «همه»; active is the safe default for the product catalogue.
+                new FilterSheet.Opt("active", "فعال"),
+                new FilterSheet.Opt("inactive", "غیرفعال"),
                 new FilterSheet.Opt("low", "کم‌موجودی"),
                 new FilterSheet.Opt("out", "ناموجود"),
                 new FilterSheet.Opt("ok", "موجودی سالم"),
-                new FilterSheet.Opt("inactive", "غیرفعال"),
                 new FilterSheet.Opt("reorder", "زیر نقطه سفارش"),
         };
         c.sortTitle = "مرتب‌سازی";
@@ -79,6 +84,8 @@ public class ProductsScreen extends Screen {
 
     private static final class Data {
         int snapTab;
+        String listFilterKey = "";
+        long listTotal = -1;
         Row summary = new Row();
         List<Row> list = new ArrayList<>();
         List<Row> low = new ArrayList<>();
@@ -110,7 +117,10 @@ public class ProductsScreen extends Screen {
             d.snapTab = myTab;
             d.summary = soft(d.notes, "خلاصه", () -> Repo.one(c, MasterQueries.productsSummary(m)));
             if (myTab == 0) {
+                d.listFilterKey = productFilterKey(f);
                 d.list = soft(d.notes, "فهرست", () -> Repo.exec(c, MasterQueries.productsList(m, f)));
+                Row total = soft(d.notes, "شمارش فهرست", () -> Repo.one(c, MasterQueries.productsCount(m, f)));
+                if (total != null) d.listTotal = Math.max(0, total.l("total"));
             } else if (myTab == 1) {
                 final Filter lf = f.copy();
                 lf.status = "low";
@@ -151,6 +161,24 @@ public class ProductsScreen extends Screen {
         });
     }
 
+    private static String productFilterKey(Filter filter) {
+        Filter f = filter == null ? new Filter() : filter;
+        StringBuilder key = new StringBuilder();
+        appendKeyPart(key, f.status);
+        appendKeyPart(key, f.search);
+        appendKeyPart(key, String.valueOf(f.kalaGroup));
+        appendKeyPart(key, String.valueOf(f.warehouse));
+        appendKeyPart(key, f.sort);
+        appendKeyPart(key, String.valueOf(f.top));
+        appendKeyPart(key, String.valueOf(f.page));
+        return key.toString();
+    }
+
+    private static void appendKeyPart(StringBuilder key, String value) {
+        String part = value == null ? "" : value;
+        key.append(part.length()).append(':').append(part).append(';');
+    }
+
     private String firstNote(Map<String, String> notes) {
         for (String v : notes.values()) return v;
         return "داده‌ای دریافت نشد";
@@ -165,6 +193,8 @@ public class ProductsScreen extends Screen {
         m.put("top", d.top);
         m.put("dead", d.dead);
         m.put("tab", d.snapTab);
+        if (d.snapTab == 0) m.put("listFilterKey", d.listFilterKey);
+        if (d.listTotal >= 0) m.put("total", d.listTotal);
         CacheStore.saveData(a, "cx_prod", cacheNow(), m);
     }
 
@@ -178,7 +208,10 @@ public class ProductsScreen extends Screen {
         d.groups = CacheStore.rows(m, "groups");
         d.top = CacheStore.rows(m, "top");
         d.dead = CacheStore.rows(m, "dead");
+        d.listTotal = m.containsKey("total") ? CacheStore.num(m, "total") : -1;
+        d.listFilterKey = String.valueOf(m.get("listFilterKey") == null ? "" : m.get("listFilterKey"));
         d.snapTab = (int) CacheStore.num(m, "tab");
+        if (d.snapTab == 0 && !productFilterKey(filter).equals(d.listFilterKey)) return null;
         return d;
     }
     private void build(LinearLayout content, Data d) {
@@ -195,12 +228,30 @@ public class ProductsScreen extends Screen {
         addSearchRow(content);
 
         Row s = d.summary == null ? new Row() : d.summary;
+        boolean activeKnown = s.i("activeKnown") != 0;
+        boolean reorderKnown = s.i("reorderKnown") != 0;
         List<Kit.Kpi> kpis = new ArrayList<>();
-        kpis.add(new Kit.Kpi("اقلام", Money.fa(String.valueOf(s.l("count"))), "", accent()));
-        kpis.add(new Kit.Kpi("ارزش موجودی", Money.compactRial(s.d("value")), "به قیمت خرید", Theme.GOLD));
-        kpis.add(new Kit.Kpi("ناموجود", Money.fa(String.valueOf(s.l("out"))), "قلم", Theme.DANGER));
-        kpis.add(new Kit.Kpi("کم‌موجودی", Money.fa(String.valueOf(s.l("low"))), "قلم", Theme.WARNING));
+        kpis.add(new Kit.Kpi(activeKnown ? "کالای فعال" : "اقلام",
+                Money.num(activeKnown ? s.l("active") : s.l("count")), "نمایش فهرست",
+                accent(), activeKnown ? () -> showListStatus(content, "active") : null));
+        if (activeKnown) {
+            long inactive = Math.max(0, s.l("count") - s.l("active"));
+            kpis.add(new Kit.Kpi("کالای غیرفعال", Money.num(inactive), "نمایش فهرست",
+                    Theme.MUTED, () -> showListStatus(content, "inactive")));
+        }
+        Kit.Kpi stockValue = new Kit.Kpi("ارزش موجودی", Money.compactRial(s.d("value")), "به قیمت خرید", Theme.GOLD);
+        stockValue.fullValue = Money.rialText(s.d("value"));
+        kpis.add(stockValue);
+        kpis.add(new Kit.Kpi("ناموجود", Money.num(s.l("out")), "فهرست ناموجودها", Theme.DANGER,
+                () -> showListStatus(content, "out")));
+        kpis.add(new Kit.Kpi("کم‌موجودی", Money.num(s.l("low")), "فهرست کم‌موجودها", Theme.WARNING,
+                () -> showListStatus(content, "low")));
+        if (reorderKnown) kpis.add(new Kit.Kpi("نقطه سفارش", Money.num(s.l("reorderN")), "زیر نقطه سفارش", Theme.INFO,
+                () -> showListStatus(content, "reorder")));
         content.addView(a.kit.kpiGrid(kpis, 2), a.kit.lp(-1, -2));
+        if (!activeKnown) {
+            content.addView(a.kit.hint("ستون وضعیت فعال در این دیتابیس موجود نیست؛ شمارش کلی به‌جای شمارش فعال نمایش داده می‌شود."), a.kit.lp(-1, -2));
+        }
         content.addView(a.kit.gap(12));
 
         content.addView(a.kit.chips(new String[]{"فهرست", "کم‌موجودی", "ارزش گروه‌ها", "پرفروش‌ها", "راکد"}, d.snapTab, idx -> {
@@ -219,41 +270,108 @@ public class ProductsScreen extends Screen {
         renderNotes(content, d.notes);
     }
 
+    private void showListStatus(LinearLayout content, String status) {
+        tab = 0;
+        filter.status = status;
+        filter.page = 0;
+        render(content);
+    }
+
     private void buildList(LinearLayout content, Data d) {
-        if (d.list == null || d.list.isEmpty()) {
-            content.addView(a.kit.empty("کالایی یافت نشد", "فیلتر را تغییر دهید"), a.kit.lp(-1, -2));
+        List<Row> rows = d.list == null ? new ArrayList<>() : d.list;
+        int pageSize = Queries.clampTop(filter.top);
+        long pageOffset = (long) Math.max(0, filter.page) * pageSize;
+        if (d.listTotal >= 0) {
+            long first = rows.isEmpty() ? 0 : pageOffset + 1;
+            long last = rows.isEmpty() ? 0 : Math.min(d.listTotal, pageOffset + rows.size());
+            content.addView(a.kit.hint("نمایش " + Money.num(first) + " تا " + Money.num(last)
+                    + " از " + Money.num(d.listTotal) + " کالا"), a.kit.lp(-1, -2));
+        } else {
+            content.addView(a.kit.hint(Money.num(rows.size()) + " کالا در این صفحه • شمارش کل در دسترس نیست"), a.kit.lp(-1, -2));
+        }
+        if (rows.isEmpty()) {
+            boolean laterPage = d.listTotal > 0 && filter.page > 0;
+            content.addView(a.kit.empty(laterPage ? "در این صفحه کالایی نیست" : "کالایی یافت نشد",
+                    laterPage ? "صفحه قبل یا فیلتر دیگری را امتحان کنید" : "فیلتر را تغییر دهید"), a.kit.lp(-1, -2));
+            if (filter.page > 0) content.addView(a.kit.pager(filter.page, d.listTotal, pageSize,
+                    d.listTotal >= 0, false,
+                    () -> { filter.page = Math.max(0, filter.page - 1); render(content); },
+                    () -> { filter.page = filter.page + 1; render(content); }), a.kit.lp(-1, -2));
             return;
         }
-        for (Row r : d.list) {
+        for (Row r : rows) {
             final String shka = r.s("shka");
-            String stock = "موجودی " + Money.qty(r.d("vah"));
-            if (filter.warehouse >= 0 && r.has("anbarQty"))
-                stock = "انبار " + Money.qty(r.d("anbarQty"));
-            String extra = r.s("groupName");
-            if (!r.s("unit").isEmpty()) extra += (extra.isEmpty() ? "" : " • ") + r.s("unit");
-            // Stock tone uses the same threshold the screen states above (5 units).
-            double qtyNow = filter.warehouse >= 0 && r.has("anbarQty") ? r.d("anbarQty") : r.d("vah");
-            String status = qtyNow <= 0 ? "ناموجود" : (qtyNow <= 5 ? "کم‌موجود" : "موجود");
-            int tone = qtyNow <= 0 ? Theme.DANGER : (qtyNow <= 5 ? Theme.WARNING : Theme.SUCCESS);
-            View v = a.kit.invRowTone(r.s("naka"), "کد " + Money.fa(r.s("code").isEmpty() ? shka : r.s("code")),
-                    extra, stock, Money.rial(r.d("sale")), status, tone, v2 -> openProduct(shka));
+            String name = PersianText.cleanDisplayLabel(r.s("naka"));
+            if (name.isEmpty()) name = "بدون نام کالا";
+            String unit = PersianText.cleanDisplayLabel(r.s("unit"));
+            String group = PersianText.cleanGroupLabel(r.s("groupName"));
+            String extra = group;
+            if (!unit.isEmpty()) extra += (extra.isEmpty() ? "" : " • ") + unit;
+
+            boolean warehouse = filter.warehouse >= 0;
+            double majorQty = warehouse ? r.d("anbarQty") : r.d("vah");
+            double looseQty = warehouse ? r.d("anbarJoz") : r.d("joz");
+            double pieces = warehouse ? r.d("anbarPieces") : r.d("stockPieces");
+            boolean stockKnown = warehouse ? (r.has("anbarQty") || r.has("anbarJoz"))
+                    : (r.has("vah") || r.has("stockPieces"));
+            String stock = stockKnown ? (warehouse ? "انبار " : "موجودی ") + Money.qtyText(majorQty)
+                    : "موجودی نامشخص";
+            if (stockKnown && !unit.isEmpty()) stock += " " + unit;
+            if (stockKnown && Math.abs(looseQty) > 0.000001d)
+                stock += " + " + Money.qtyText(looseQty) + " عدد";
+
+            ProductStockStatus.Band band = ProductStockStatus.classify(stockKnown, majorQty, pieces,
+                    r.d("reorderPoint"), AtiranSchema.LOW_STOCK_VAH);
+            boolean activeKnownForRow = r.i("activeKnown") != 0;
+            boolean inactive = activeKnownForRow && !ProductStockStatus.isActive(r.s("active"));
+            String status = inactive ? "غیرفعال" : ProductStockStatus.label(band);
+            int tone = inactive ? Theme.MUTED : stockTone(band);
+
+            String code = PersianText.cleanDisplayLabel(r.s("code"));
+            if (code.isEmpty() || "--".equals(code) || "—".equals(code) || "-".equals(code)) code = shka;
+            boolean saleKnown = r.i("saleKnown") != 0;
+            boolean priceWarning = !saleKnown || !r.has("sale") || r.d("sale") <= 0;
+            String price;
+            if (!saleKnown) price = "قیمت فروش نامشخص";
+            else if (!r.has("sale") || r.d("sale") <= 0)
+                price = r.d("sale") < 0 ? "قیمت فروش نامعتبر" : "قیمت فروش ثبت نشده";
+            else price = Money.rialText(r.d("sale"));
+            int priceTone = r.has("sale") && r.d("sale") < 0 ? Theme.DANGER
+                    : priceWarning ? Theme.WARNING : Theme.GOLD_SOFT;
+
+            View v = a.kit.invRowTone(name, "کد کالا " + Money.ltrIsolate(Money.fa(code)), extra, stock,
+                    price, status, tone, priceTone, v2 -> openProduct(shka));
             LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
             p.setMargins(0, 0, 0, Theme.dp(10));
             content.addView(v, p);
         }
-        final boolean hasMore = d.list.size() >= Math.max(1, filter.top);
-        content.addView(a.kit.pager(filter.page, hasMore,
+        boolean hasMore = d.listTotal >= 0
+                ? pageOffset + rows.size() < d.listTotal
+                : rows.size() >= pageSize;
+        content.addView(a.kit.pager(filter.page, d.listTotal, pageSize, d.listTotal >= 0, hasMore,
                 () -> { filter.page = Math.max(0, filter.page - 1); render(content); },
-                () -> { filter.page = filter.page + 1; render(content); }), a.kit.lp(-1, -2));
+                () -> { if (hasMore) { filter.page = filter.page + 1; render(content); } }), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(8));
         ReportCatalog.Col[] expCols = new ReportCatalog.Col[]{
                 new ReportCatalog.Col("naka", "کالا", ReportCatalog.T_TEXT),
-                new ReportCatalog.Col("shka", "کد", ReportCatalog.T_TEXT),
+                new ReportCatalog.Col("shka", "کد کالا", ReportCatalog.T_TEXT),
                 new ReportCatalog.Col("groupName", "گروه", ReportCatalog.T_TEXT),
                 new ReportCatalog.Col("vah", "موجودی", ReportCatalog.T_NUM),
                 new ReportCatalog.Col("sale", "قیمت فروش", ReportCatalog.T_MONEY),
         };
-        content.addView(a.exportBar("فهرست کالاها", "", expCols, d.list), a.kit.lp(-1, -2));
+        content.addView(a.exportBar("فهرست کالاها", "", expCols, rows), a.kit.lp(-1, -2));
+    }
+
+    private int stockTone(ProductStockStatus.Band band) {
+        switch (band) {
+            case NEGATIVE:
+            case OUT: return Theme.DANGER;
+            case REORDER: return Theme.INFO;
+            case LOW: return Theme.WARNING;
+            case NORMAL: return Theme.SUCCESS;
+            case UNKNOWN:
+            default: return Theme.MUTED;
+        }
     }
 
     private void buildLow(LinearLayout content, Data d) {

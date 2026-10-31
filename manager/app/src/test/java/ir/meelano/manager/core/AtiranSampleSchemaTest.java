@@ -103,6 +103,48 @@ public class AtiranSampleSchemaTest {
         assertEquals("[dbo].[dif_date_alan]", meta.qFunction("dif_date_alan"));
     }
 
+    @Test public void productsSummaryMarksActiveAndReorderKpisAsKnownAndScopesStockAlerts() throws Exception {
+        Meta meta = new Meta(connection(loadManifest()));
+        String sql = MasterQueries.productsSummary(meta).sql.toLowerCase(Locale.ROOT);
+        assertTrue(sql, sql.contains("as activeknown"));
+        assertTrue(sql, sql.contains("as reorderknown"));
+        assertTrue(sql, sql.contains("as reordern"));
+        assertTrue(sql, sql.contains("try_convert(int,[active])=1"));
+        assertTrue(sql, sql.contains("mojkavah"));
+        assertTrue(sql, sql.contains("reopoint"));
+    }
+
+    @Test public void productListAndCountShareNormalizedReadOnlyFiltersAndExactPaging() throws Exception {
+        Meta meta = new Meta(connection(loadManifest()));
+        Filter filter = new Filter();
+        filter.status = "low";
+        filter.search = "علي کالا* ۱۲۳";
+        filter.kalaGroup = 4;
+        filter.warehouse = 5;
+        filter.top = 30;
+        filter.page = 2;
+
+        Queries.Q list = MasterQueries.productsList(meta, filter);
+        Queries.Q count = MasterQueries.productsCount(meta, filter);
+        String listSql = list.sql.toLowerCase(Locale.ROOT);
+        String countSql = count.sql.toLowerCase(Locale.ROOT);
+        assertTrue(listSql, listSql.contains("offset ? rows fetch next ? rows only"));
+        assertTrue(listSql, listSql.contains("nchar(8204)"));
+        assertTrue(listSql, listSql.contains("as stockpieces"));
+        assertTrue(listSql, listSql.contains("as reorderpoint"));
+        assertTrue(listSql, listSql.contains("as anbarpieces"));
+        assertTrue(listSql, listSql.contains("active"));
+        assertTrue(countSql, countSql.startsWith("select count_big(distinct i.[shka]) as total"));
+        assertFalse(countSql, countSql.contains("offset"));
+        assertEquals(count.binds.size() + 2, list.binds.size());
+        for (int i = 0; i < count.binds.size(); i++) assertEquals(count.binds.get(i), list.binds.get(i));
+        assertEquals(60L, ((Number) list.binds.get(list.binds.size() - 2)).longValue());
+        assertEquals(30, ((Number) list.binds.get(list.binds.size() - 1)).intValue());
+        assertTrue(list.binds.contains("علی"));
+        assertTrue(list.binds.contains("کالا"));
+        assertTrue(list.binds.contains("123"));
+    }
+
     @Test public void userQueriesUseTheSampleSchemasForRolesAndAuditTables() throws Exception {
         Meta meta = new Meta(connection(loadManifest()));
         Queries.Q users = MasterQueries.usersList(meta);

@@ -2,10 +2,10 @@
 
 ## نسخهٔ فعلی
 - **MEELANO Manager v36.42.0** — package `ir.meelano.manager` — versionCode **75**.
-- APK مستقل: `dist/meelano-manager-v36-debug-24.apk`؛ SHA-256: `4e6774bcefc008a2ba218f9c6f3da773f4851729b613c086b1359c0110921d08` (`dist/manager-v36-build-info.txt`).
+- APK مستقل: `dist/meelano-manager-v36-debug-24.apk`؛ SHA-256: `845ff41251cb05183715f392617aed71fe58a19270464f9d5841fafbcb61c02d` (`dist/manager-v36-build-info.txt`).
 - لینک مستقیم Manager:
   `https://github.com/Companymeelano/Testt/raw/arena/29e01a09-testt/dist/meelano-manager-v36-debug-24.apk`
-- ابزار فروشندهٔ صدور لایسنس **v1.9.1 (11)**: `dist/meelano-admin-v1.9.1-debug.apk`؛ SHA-256: `2d284c4b48971fc1c1374b3fcf33e6b5fa8cfa0b19ce1655d1f625d4b9629e39` (`dist/admin-license-build-info.txt`).
+- ابزار فروشندهٔ صدور لایسنس **v1.9.1 (11)**: `dist/meelano-admin-v1.9.1-debug.apk`؛ SHA-256: `a20372cd5afc0712840f22a25cb8780f18b8697492dffe98f4dfe0d4542ca46f` (`dist/admin-license-build-info.txt`).
   لینک مستقیم:
   `https://github.com/Companymeelano/Testt/raw/arena/29e01a09-testt/dist/meelano-admin-v1.9.1-debug.apk`
 
@@ -17,7 +17,7 @@
 - تست پروتکل درخواست بی‌نام + سازگاری درخواست نام‌دار قدیمی افزوده شد.
 - **علت crash قبلی هنوز با قطعیت مشخص نیست** چون گزارش/stack trace از گوشی در دسترس نبود؛
   کد برای جلوگیری از crash UI و گرفتن گزارش امن اصلاح شده تا در صورت تکرار علت دقیق روشن شود.
-- CI **41155921188 success**؛ تست Manager + build/verify دو APK سبز. این دور فقط APKهای debug تحویل شدند؛ release امضاشده جداگانه منتشر نشد.
+- CI **41156568125 success**؛ تست Manager + build/verify دو APK سبز. این دور فقط APKهای debug تحویل شدند؛ release امضاشده جداگانه منتشر نشد.
 - گزارش کامل و لینک‌ها: `manager/DEVELOPMENT-ROUND-14-login-and-license-flow-fa.md`.
 
 ## دور ۱۲ — دقت اعداد داشبورد + ارتقای لاکچری

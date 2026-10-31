@@ -82,7 +82,16 @@ PY
 fi
 
 mkdir -p ../design/screenshots
-adb pull /sdcard/Android/data/ir.meelano.manager.debug/files/home-dashboard-screenshots/home-dashboard-light.png ../design/screenshots/home-dashboard-light.png
-adb pull /sdcard/Android/data/ir.meelano.manager.debug/files/home-dashboard-screenshots/home-dashboard-dark.png ../design/screenshots/home-dashboard-dark.png
+screenshot_dir="/sdcard/Android/data/ir.meelano.manager.debug/files/home-dashboard-screenshots"
+remote_files="$(adb shell "find '$screenshot_dir' -type f -print 2>/dev/null" 2>&1 | tr '\r\n' ' ' || true)"
+echo "::notice title=Screenshot capture output::$remote_files"
+if ! adb pull "$screenshot_dir/home-dashboard-light.png" ../design/screenshots/home-dashboard-light.png; then
+  echo "::error title=Light screenshot pull failed::Expected file missing. Emulator files: $remote_files"
+  exit 1
+fi
+if ! adb pull "$screenshot_dir/home-dashboard-dark.png" ../design/screenshots/home-dashboard-dark.png; then
+  echo "::error title=Dark screenshot pull failed::Expected file missing. Emulator files: $remote_files"
+  exit 1
+fi
 test -s ../design/screenshots/home-dashboard-light.png
 test -s ../design/screenshots/home-dashboard-dark.png

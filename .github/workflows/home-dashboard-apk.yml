@@ -85,7 +85,51 @@ jobs:
           fi
           exit "$result"
 
+      - name: Summarize failing unit tests
+        if: failure()
+        working-directory: manager
+        shell: bash
+        run: |
+          python3 - <<'PY' > "$RUNNER_TEMP/test-failures.txt"
+          from pathlib import Path
+          from xml.etree import ElementTree
+
+          reports = Path("app/build/test-results/testDebugUnitTest").glob("TEST-*.xml")
+          lines = []
+          for report in reports:
+              try:
+                  root = ElementTree.parse(report).getroot()
+              except Exception as error:
+                  lines.append(f"Could not parse {report}: {error}")
+                  continue
+              for case in root.iter("testcase"):
+                  failure = case.find("failure")
+                  if failure is None:
+                      failure = case.find("error")
+                  if failure is None:
+                      continue
+                  lines.append(f"{case.get('classname', '')}.{case.get('name', '')}: {failure.get('message', '')}")
+                  detail = (failure.text or "").strip()
+                  if detail:
+                      lines.append(detail[:1200])
+          if not lines:
+              lines.append("No failing JUnit XML cases were found; inspect the Gradle diagnostic above.")
+          print("\n".join(lines)[:9000])
+          PY
+          summary=$(cat "$RUNNER_TEMP/test-failures.txt")
+          summary=${summary//'%'/'%25'}
+          summary=${summary//$'\r'/'%0D'}
+          summary=${summary//$'\n'/'%0A'}
+          echo "::error title=JUnit failure details::$summary"
+          {
+            echo '### JUnit failure details'
+            echo '```text'
+            cat "$RUNNER_TEMP/test-failures.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload installable debug APK
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: meelano-manager-home-dashboard-${{ github.sha }}

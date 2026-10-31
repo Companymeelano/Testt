@@ -33,6 +33,15 @@ public final class Finger {
 
     /** Show the system fingerprint prompt; callbacks run on the main thread. */
     public static void auth(final Activity a, final Cb cb) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
+            cb.fail("اثر انگشت در این نسخه پشتیبانی نمی‌شود");
+            return;
+        }
+        authApi28(a, cb);
+    }
+
+    @android.annotation.TargetApi(Build.VERSION_CODES.P)
+    private static void authApi28(final Activity a, final Cb cb) {
         try {
             final Executor ex = a.getMainExecutor();
             BiometricPrompt bp = new BiometricPrompt.Builder(a)

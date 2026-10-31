@@ -98,7 +98,11 @@ jobs:
                       continue
                   rule = re.search(r"\[([A-Za-z0-9_]+)\]\s*$", line)
                   rule_id = rule.group(1) if rule else "Lint"
-                  findings.append(f"{Path(path).name}:{match.group(2)} [{rule_id}] {severity}")
+                  finding = f"{Path(path).name}:{match.group(2)} [{rule_id}] {severity}"
+                  if rule_id == "FullBackupContent":
+                      description = re.sub(r"\s*\[[^]]+\]\s*$", "", line[match.end():]).strip()
+                      finding += ": " + description[:120]
+                  findings.append(finding)
               if findings:
                   details += (f"\n\nLint findings: {errors} errors; "
                               f"{touched_warnings} warnings in changed UI files.\n")

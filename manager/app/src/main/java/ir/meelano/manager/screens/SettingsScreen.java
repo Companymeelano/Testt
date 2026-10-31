@@ -763,7 +763,8 @@ public class SettingsScreen extends Screen {
         final AlertDialog dlg = a.kit.dialog("بکاپ هوشمند", body, false);
         dlg.show();
         Backup.export(a, a.settings, (fa, doneN, total) ->
-                st.setText("در حال ذخیره " + fa + " (" + Money.fa(doneN + " از " + total) + ")"), new Backup.Done() {
+                st.setText(a.getString(R.string.backup_progress, fa,
+                        Money.fa(doneN + " از " + total))), new Backup.Done() {
             @Override
             public void onDone(java.io.File zip, long bytes, String notes) {
                 try {

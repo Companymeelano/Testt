@@ -205,7 +205,7 @@ public class LicenseActivity extends Activity {
             }
             IntentFilter ff = new IntentFilter(SmsReceiver.ACTION_INTERNAL);
             if (Build.VERSION.SDK_INT >= 33) registerReceiver(smsPing, ff, Context.RECEIVER_NOT_EXPORTED);
-            else registerReceiver(smsPing, ff);
+            else registerLegacySmsReceiver(ff);
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:193", ignored); }
         // A reply SMS may have landed while we were away — apply it instantly.
         consumeSms();
@@ -215,6 +215,12 @@ public class LicenseActivity extends Activity {
                 uiHandler.post(dotsTick);
             }
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:201", ignored); }
+    }
+
+    /** The flag overload was added in API 33; this path only runs on older supported releases. */
+    @android.annotation.SuppressLint("UnspecifiedRegisterReceiverFlag")
+    private void registerLegacySmsReceiver(IntentFilter filter) {
+        registerReceiver(smsPing, filter);
     }
 
     @Override
@@ -2006,6 +2012,9 @@ public class LicenseActivity extends Activity {
     private String simPhone() {
         try {
             if (!phoneGranted()) return "";
+            if (Build.VERSION.SDK_INT >= 26
+                    && checkSelfPermission(android.Manifest.permission.READ_PHONE_NUMBERS)
+                    != PackageManager.PERMISSION_GRANTED) return "";
             android.telephony.TelephonyManager tm = (android.telephony.TelephonyManager)
                     getSystemService(TELEPHONY_SERVICE);
             if (tm == null) return "";

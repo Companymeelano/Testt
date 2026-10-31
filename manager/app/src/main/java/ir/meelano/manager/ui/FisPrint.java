@@ -118,13 +118,18 @@ public final class FisPrint {
 
     private static void send(final MainActivity a, final BluetoothDevice dev,
                              final Row head, final List<Row> lines, final boolean sales) {
+        if (Build.VERSION.SDK_INT >= 31 && a.checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            a.kit.toast("برای اتصال به چاپگر، دسترسی بلوتوث لازم است");
+            return;
+        }
         a.kit.toast("در حال اتصال به چاپگر…");
         new Thread(() -> {
             android.bluetooth.BluetoothSocket sock = null;
             try {
-                try {
-                    BluetoothAdapter.getDefaultAdapter().cancelDiscovery();
-                } catch (Exception ignored) { Diag.ignored("FisPrint:126", ignored); }
+                if (Build.VERSION.SDK_INT >= 31 && a.checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
+                        != android.content.pm.PackageManager.PERMISSION_GRANTED)
+                    throw new SecurityException("BLUETOOTH_CONNECT permission revoked");
                 sock = dev.createRfcommSocketToServiceRecord(SPP);
                 sock.connect();
                 OutputStream out = sock.getOutputStream();

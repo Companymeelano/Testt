@@ -69,8 +69,6 @@ public final class Theme {
 
     /** MEELANO crest: gold on emerald in the nut theme, the classic black-and-gold badge otherwise. */
     public static int logoRes() { return nuts ? R.drawable.meelano_nuts : R.drawable.meelano_3d; }
-    /** Application context, used only to load the light skin artwork. */
-    private static Context appCtx;
     /** Mirror of !light for call sites (charts, tables). */
     public static boolean DARK = true;
     private static float fontScale = 1f;
@@ -120,44 +118,6 @@ public final class Theme {
         if (vector == R.drawable.mi_diamond) return R.drawable.icon3d_medal_goldbar;
         if (vector == R.drawable.mi_trending_up) return R.drawable.icon3d_medal_dollar;
         return 0;
-    }
-
-    /**
-     * Header toolbar and bottom nav icons. In the nut theme they use the emerald set, pulled from
-     * the emerald of the MEELANO nut crest, so the chrome and the logo read as one colour family.
-     * Content icons keep the gold set. Falls back to the gold icon if no emerald twin exists.
-     */
-    public static int chrome3d(int vector) {
-        int base = icon3d(vector);
-        if (!nuts || NUT_MEDALLIONS || appCtx == null || !isIcon3d(base)) return base;
-        try {
-            String n = appCtx.getResources().getResourceEntryName(base);
-            // The medallions of the gold set have their own name; the emerald twin is the same
-            // subject in the emerald set (icon3d_medal_sales -> icon3d_emerald_sales).
-            String twin = ir.meelano.manager.core.IconArt.emeraldName(n);
-            if (twin.isEmpty()) return base;
-            int e = appCtx.getResources().getIdentifier(twin, "drawable", appCtx.getPackageName());
-            return e != 0 ? e : base;
-        } catch (Exception ignored) { return base; }
-    }
-
-    /**
-     * The 3D icon of the manager's board in the nut theme: the emerald twin of the
-     * section's icon, so the board, the header and the tab bar read as one family.
-     * The medallion names are folded to their plain twin (medal_sales -> sales).
-     * The other skins keep the gold set, and a section without a twin keeps its icon.
-     */
-    public static int emerald3d(int vector) {
-        int base = icon3d(vector);
-        if (!nuts || NUT_MEDALLIONS || appCtx == null || !isIcon3d(base)) return base;
-        try {
-            String n = appCtx.getResources().getResourceEntryName(base);
-            if (!n.startsWith("icon3d_")) return base;
-            String key = n.substring(7);
-            if (key.startsWith("medal_")) key = key.substring(6);
-            int e = appCtx.getResources().getIdentifier("icon3d_emerald_" + key, "drawable", appCtx.getPackageName());
-            return e != 0 ? e : base;
-        } catch (Exception ignored) { return base; }
     }
 
     public static int icon3d(int vector) {
@@ -236,9 +196,7 @@ public final class Theme {
         if (res == R.drawable.visitor3d_assistant || res == R.drawable.visitor3d_customers
                 || res == R.drawable.visitor3d_prefactor || res == R.drawable.visitor3d_products
                 || res == R.drawable.visitor3d_receipt) return true;
-        // The emerald set is the nut theme's own 3D artwork. It is produced by chrome3d(),
-        // so it must be recognised as 3D as well - otherwise it would be tinted like a flat
-        // glyph and lose the colour of the skin it belongs to.
+        // Emerald artwork must not be tinted like a flat glyph or it loses its theme colours.
         if (res == R.drawable.icon3d_emerald_account || res == R.drawable.icon3d_emerald_assistant
                 || res == R.drawable.icon3d_emerald_cash_in || res == R.drawable.icon3d_emerald_cash_out
                 || res == R.drawable.icon3d_emerald_cheque || res == R.drawable.icon3d_emerald_coin
@@ -316,7 +274,6 @@ public final class Theme {
 
     /** Re-read theme settings and repaint the whole palette. Call before any render. */
     public static void apply(Context c) {
-        appCtx = c.getApplicationContext();
         Settings s = new Settings(c);
         String tm = s.themeMode();
         nuts = "nuts".equals(tm);
@@ -399,18 +356,16 @@ public final class Theme {
         Typeface preferred = face(isBold);
         if (text == null || text.isEmpty()) return preferred;
         try {
-            if (android.os.Build.VERSION.SDK_INT >= 23) {
-                Paint probe = new Paint();
-                probe.setTypeface(preferred);
-                // Check code points separately: a Persian word is several glyphs shaped as
-                // a run, so Paint.hasGlyph("علی") is not a valid whole-name coverage test.
-                for (int i = 0; i < text.length();) {
-                    int cp = text.codePointAt(i);
-                    i += Character.charCount(cp);
-                    if (Character.isWhitespace(cp) || Character.isSpaceChar(cp)
-                            || Character.getType(cp) == Character.FORMAT) continue;
-                    if (!probe.hasGlyph(new String(Character.toChars(cp)))) return systemTypeface(isBold);
-                }
+            Paint probe = new Paint();
+            probe.setTypeface(preferred);
+            // Check code points separately: a Persian word is several glyphs shaped as
+            // a run, so Paint.hasGlyph("علی") is not a valid whole-name coverage test.
+            for (int i = 0; i < text.length();) {
+                int cp = text.codePointAt(i);
+                i += Character.charCount(cp);
+                if (Character.isWhitespace(cp) || Character.isSpaceChar(cp)
+                        || Character.getType(cp) == Character.FORMAT) continue;
+                if (!probe.hasGlyph(new String(Character.toChars(cp)))) return systemTypeface(isBold);
             }
         } catch (Exception ignored) {
             return systemTypeface(isBold);
@@ -786,6 +741,8 @@ public final class Theme {
         return d;
     }
 
+    /** Listener returns false so framework click/keyboard/TalkBack actions remain untouched. */
+    @android.annotation.SuppressLint("ClickableViewAccessibility")
     public static void pressable(View v) {
         v.setClickable(true);
         v.setFocusable(true);

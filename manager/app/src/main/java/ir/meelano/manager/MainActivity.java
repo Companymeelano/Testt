@@ -808,7 +808,7 @@ public class MainActivity extends Activity {
         navCapsule.setBackground(Theme.bottomNavSelected());
         navCapsule.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         bottomHost.addView(navCapsule, new android.widget.FrameLayout.LayoutParams(Theme.dp(40), Theme.dp(40),
-                Gravity.TOP | Gravity.LEFT));
+                Gravity.TOP | Gravity.START));
         bottomHost.addView(bottomBar, new android.widget.FrameLayout.LayoutParams(-1, -2));
         LinearLayout.LayoutParams hostLp = kit.lp(-1, -2);
         if (Theme.isNuts()) hostLp.setMargins(Theme.dp(10), 0, Theme.dp(10), Theme.dp(6));
@@ -1115,6 +1115,8 @@ public class MainActivity extends Activity {
             lp.leftMargin = 0;
             navCapsule.setLayoutParams(lp);
             float x = tab.getLeft() + Theme.dp(4);
+            if (bottomHost.getLayoutDirection() == View.LAYOUT_DIRECTION_RTL)
+                x -= bottomHost.getWidth() - lp.width;
             navCapsule.setVisibility(View.VISIBLE);
             if (animate && ir.meelano.manager.ui.Ui.motionOk(this)) {
                 navCapsule.animate().cancel();

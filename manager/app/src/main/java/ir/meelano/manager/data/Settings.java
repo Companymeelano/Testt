@@ -302,6 +302,13 @@ public final class Settings {
 
     public void setNotifOn(boolean on) { p.edit().putBoolean("notif_on", on).apply(); }
 
+    /** Per-category Home due notification switch; enabled by default under the master switch. */
+    public boolean homeDueAlertsOn() { return p.getBoolean("home_due_alerts_on", true); }
+
+    public void setHomeDueAlertsOn(boolean on) {
+        p.edit().putBoolean("home_due_alerts_on", on).apply();
+    }
+
     /** Optional local quiet window for Home AlertEngine notifications; disabled until chosen. */
     public boolean homeQuietHoursOn() { return p.getBoolean("home_quiet_on", false); }
     public int homeQuietStartMinute() { return clampMinute(p.getInt("home_quiet_start", 22 * 60)); }

@@ -344,6 +344,13 @@ public class SettingsScreen extends Screen {
             a.kit.toast(!mon ? "گزارش صبحگاهی روشن شد" : "گزارش صبحگاهی خاموش شد");
             render(content);
         }));
+        final boolean dueOn = a.settings.homeDueAlertsOn();
+        addRow(nt, toggleRow("اعلان سررسیدهای مالی", "چک‌های دریافتی/پرداختی تا سه روز و فاکتورهای معوق", dueOn, Theme.WARNING, v -> {
+            a.settings.setHomeDueAlertsOn(!dueOn);
+            a.kit.toast(!dueOn ? "اعلان سررسیدها روشن شد" : "اعلان سررسیدها خاموش شد");
+            ir.meelano.manager.core.Notify.checkNow(a.getApplicationContext());
+            render(content);
+        }));
         final boolean quiet = a.settings.homeQuietHoursOn();
         final int quietStart = a.settings.homeQuietStartMinute();
         final int quietEnd = a.settings.homeQuietEndMinute();

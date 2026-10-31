@@ -21,7 +21,7 @@ The Home additions use the app's existing, read-only Atiran SQL connection and q
 
 ## Local-only inputs
 
-Home section order/visibility, monthly sales target, closeout opening/counted cash, market-rate comparison history, notification enablement, quiet-hours interval, and alert thresholds are stored by the existing app settings/preferences layer on the device. They are not written to the Atiran database. Navigation shortcuts and the seasonal-calendar display require no data endpoint. The cash-flow view is not described as a bank-balance reconciliation.
+Home section order/visibility, monthly sales target, closeout opening/counted cash, market-rate comparison history, notification master switch, morning-summary and due-alert switches, quiet-hours interval, and alert thresholds are stored by the existing app settings/preferences layer on the device. A zero sales-drop threshold disables that alert. They are not written to the Atiran database. Navigation shortcuts and the seasonal-calendar display require no data endpoint. The cash-flow view is not described as a bank-balance reconciliation.
 
 ## Required API/endpoint fields
 

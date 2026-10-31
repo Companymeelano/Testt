@@ -478,6 +478,7 @@ public final class Notify {
         try {
             Settings s = new Settings(c);
             if (!s.notifOn()) return;
+            final boolean dueAlertsOn = s.homeDueAlertsOn();
             final Repo repo = new Repo(c, s);
             repo.run(conn -> {
                 Meta m = new Meta(conn);
@@ -485,21 +486,23 @@ public final class Notify {
                 double inSum = 0, outSum = 0, odSum = 0;
                 List<Row> incoming = null;
                 List<Row> outgoing = null;
-                try {
-                    incoming = Repo.exec(conn, MoneyQueries.chequeDue(m, true, 3));
-                    inN = incoming.size();
-                    for (Row r : incoming) inSum += r.d("amount");
-                } catch (Exception ignored) { Diag.ignored("Notify:445", ignored); }
-                try {
-                    outgoing = Repo.exec(conn, MoneyQueries.chequeDue(m, false, 3));
-                    outN = outgoing.size();
-                    for (Row r : outgoing) outSum += r.d("amount");
-                } catch (Exception ignored) { Diag.ignored("Notify:450", ignored); }
-                try {
-                    List<Row> od = Repo.exec(conn, Queries.overdueInvoices(m, 200));
-                    odN = od.size();
-                    for (Row r : od) odSum += r.d("amount");
-                } catch (Exception ignored) { Diag.ignored("Notify:455", ignored); }
+                if (dueAlertsOn) {
+                    try {
+                        incoming = Repo.exec(conn, MoneyQueries.chequeDue(m, true, 3));
+                        inN = incoming.size();
+                        for (Row r : incoming) inSum += r.d("amount");
+                    } catch (Exception ignored) { Diag.ignored("Notify:445", ignored); }
+                    try {
+                        outgoing = Repo.exec(conn, MoneyQueries.chequeDue(m, false, 3));
+                        outN = outgoing.size();
+                        for (Row r : outgoing) outSum += r.d("amount");
+                    } catch (Exception ignored) { Diag.ignored("Notify:450", ignored); }
+                    try {
+                        List<Row> od = Repo.exec(conn, Queries.overdueInvoices(m, 200));
+                        odN = od.size();
+                        for (Row r : od) odSum += r.d("amount");
+                    } catch (Exception ignored) { Diag.ignored("Notify:455", ignored); }
+                }
                 String yesterday = Jalali.addDays(Jalali.todayStr(), -1);
                 double ySales = 0, yIn = 0;
                 boolean ySalesAvailable = false, yInAvailable = false;
@@ -540,6 +543,18 @@ public final class Notify {
                     if (result == null || result.values == null || result.values.length < 12) return;
                     long[] v = result.values;
                     Settings s2 = new Settings(c);
+                    boolean dueAlertsOn = s2.homeDueAlertsOn();
+                    List<AlertEngine.Alert> homeAlerts = result.alerts;
+                    if (!dueAlertsOn) {
+                        v = v.clone();
+                        v[0] = v[1] = v[2] = v[3] = v[4] = v[5] = 0;
+                        List<AlertEngine.Alert> withoutDue = new java.util.ArrayList<>();
+                        if (homeAlerts != null) for (AlertEngine.Alert alert : homeAlerts) {
+                            if (!"cheque_in_due".equals(alert.code)
+                                    && !"cheque_out_due".equals(alert.code)) withoutDue.add(alert);
+                        }
+                        homeAlerts = withoutDue;
+                    }
                     long lastB = s2.lastBouncedN();
                     long bNew = lastB < 0 ? 0 : Math.max(0, v[8] - lastB);
                     s2.setLastBouncedN(v[8]);
@@ -548,17 +563,20 @@ public final class Notify {
                     boolean showStock = s2.stockOn() && RoleStore.allowed(c, "products")
                             && v[10] + v[11] > 0;
                     boolean canCheques = RoleStore.allowed(c, "cheques");
-                    boolean showDue = canCheques && (v[3] > 0 || v[4] > 0);
-                    boolean showOverdue = RoleStore.allowed(c, "sales") && v[5] > 0;
+                    boolean showDue = dueAlertsOn && canCheques && (v[3] > 0 || v[4] > 0);
+                    boolean showOverdue = dueAlertsOn && RoleStore.allowed(c, "sales") && v[5] > 0;
                     boolean showBounced = canCheques && bNew > 0;
-                    boolean hasHomeAlert = result.alerts != null && !result.alerts.isEmpty();
+                    boolean hasHomeAlert = homeAlerts != null && !homeAlerts.isEmpty();
                     if (!showDue && !showOverdue && !showBounced && !morning
-                            && !showStock && !hasHomeAlert) return;
+                            && !showStock && !hasHomeAlert) {
+                        cancelSmartNotification(c);
+                        return;
+                    }
                     Calendar now = Calendar.getInstance();
                     int minute = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE);
                     if (HomeNotificationPolicy.isQuietTime(s2.homeQuietHoursOn(),
                             s2.homeQuietStartMinute(), s2.homeQuietEndMinute(), minute)) return;
-                    show(c, v, bNew, morning, result.alerts);
+                    show(c, v, bNew, morning, homeAlerts);
                 }
 
                 @Override
@@ -615,6 +633,14 @@ public final class Notify {
         try {
             if (r != null) r.run();
         } catch (Exception ignored) { Diag.ignored("Notify:512", ignored); }
+    }
+
+    private static void cancelSmartNotification(Context context) {
+        try {
+            NotificationManager manager = (NotificationManager)
+                    context.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (manager != null) manager.cancel(NOTIF_ID);
+        } catch (Exception ignored) { Diag.ignored("Notify:smartCancel", ignored); }
     }
 
     private static void show(Context c, long[] v, long bNew, boolean morning,

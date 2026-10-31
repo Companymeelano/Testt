@@ -12,7 +12,7 @@ attempt=1
 result=1
 while [ "$attempt" -le 3 ]; do
   set +e
-  gradle :app:connectedDebugAndroidTest -PhomeScreenshotAbi=true -Pandroid.useAndroidX=true --console=plain --stacktrace --no-daemon 2>&1 | tee "$log_file"
+  gradle :app:connectedDebugAndroidTest -PhomeScreenshotAbi=true -Pandroid.useAndroidX=true --console=plain --info --stacktrace --no-daemon 2>&1 | tee "$log_file"
   result=${PIPESTATUS[0]}
   set -e
   [ "$result" -eq 0 ] && break
@@ -63,8 +63,15 @@ PY
     report_count=$((report_count + 1))
   done < "$report_file"
 
-  diagnostics="$(grep -E 'FAILURE:|Execution failed|Could not |Caused by:|error:|AssertionFailedError|AssertionError|FAILED$|No tests found|ErrorName:|ErrorCode:|There were failing tests' "$log_file" | tail -n 3 || true)"
-  if [ -z "$diagnostics" ]; then diagnostics="$(tail -n 3 "$log_file")"; fi
+  device_diagnostics="$(grep -Ei 'Skipping device|Unknown API|No compatible devices|Found [0-9]+ connected|incompatible|ABI|API Level|ShellCommandUnresponsive|properties for device' "$log_file" | tail -n 4 || true)"
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    safe_line="$(printf '%s' "$line" | sed 's/%/%25/g; s/:/%3A/g')"
+    echo "::error title=Screenshot device compatibility::$safe_line"
+  done <<< "$device_diagnostics"
+
+  diagnostics="$(grep -E 'FAILURE:|Execution failed|Could not |Caused by:|error:|AssertionFailedError|AssertionError|FAILED$|No tests found|ErrorName:|ErrorCode:|There were failing tests' "$log_file" | tail -n 2 || true)"
+  if [ -z "$diagnostics" ]; then diagnostics="$(tail -n 2 "$log_file")"; fi
   while IFS= read -r line; do
     [ -n "$line" ] || continue
     safe_line="$(printf '%s' "$line" | sed 's/%/%25/g; s/:/%3A/g')"

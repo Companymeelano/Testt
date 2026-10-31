@@ -22,7 +22,7 @@ while [ "$attempt" -le 3 ]; do
 done
 
 if [ "$result" -ne 0 ]; then
-  diagnostics="$(grep -E 'FAILURE:|Execution failed|Could not |Caused by:|error:|AssertionFailedError|AssertionError|FAILED$|No tests found' "$log_file" | tail -n 8 || true)"
+  diagnostics="$(grep -A3 -E 'FAILURE:|Execution failed|Could not |Caused by:|error:|AssertionFailedError|AssertionError|FAILED$|No tests found' "$log_file" | tail -n 24 || true)"
   if [ -z "$diagnostics" ]; then diagnostics="$(tail -n 12 "$log_file")"; fi
   while IFS= read -r line; do
     [ -n "$line" ] || continue

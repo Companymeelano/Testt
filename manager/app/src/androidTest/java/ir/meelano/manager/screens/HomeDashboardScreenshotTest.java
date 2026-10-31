@@ -1,5 +1,8 @@
 package ir.meelano.manager.screens;
 
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;

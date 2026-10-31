@@ -57,16 +57,29 @@ jobs:
           gradle clean :app:testDebugUnitTest :app:lintDebug :app:assembleDebug --console=plain --stacktrace --no-daemon 2>&1 | tee ../manager-home-build.log
           result=${PIPESTATUS[0]}
           if [ "$result" -ne 0 ]; then
-            tail -n 35 ../manager-home-build.log > "$RUNNER_TEMP/gradle-tail.txt"
-            summary=$(cat "$RUNNER_TEMP/gradle-tail.txt")
+            python3 - <<'PY' > "$RUNNER_TEMP/gradle-diagnostic.txt"
+          from pathlib import Path
+          text = Path("../manager-home-build.log").read_text(errors="replace")
+          start = text.rfind("FAILURE:")
+          if start < 0:
+              start = max(text.rfind("* What went wrong:"), text.rfind("> Task "))
+          if start < 0:
+              start = max(0, len(text) - 9000)
+          end = text.rfind("BUILD FAILED")
+          if end < start:
+              end = len(text)
+          snippet = text[start:end + len("BUILD FAILED")]
+          print(snippet[:9000] or text[-9000:])
+          PY
+            summary=$(cat "$RUNNER_TEMP/gradle-diagnostic.txt")
             summary=${summary//'%'/'%25'}
             summary=${summary//$'\r'/'%0D'}
             summary=${summary//$'\n'/'%0A'}
             echo "::error title=Gradle failure details::$summary"
             {
-              echo '### Gradle failure details (last 35 lines)'
+              echo '### Gradle failure details'
               echo '```text'
-              cat "$RUNNER_TEMP/gradle-tail.txt"
+              cat "$RUNNER_TEMP/gradle-diagnostic.txt"
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
           fi

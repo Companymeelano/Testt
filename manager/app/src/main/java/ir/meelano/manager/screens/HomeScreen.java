@@ -104,6 +104,12 @@ public class HomeScreen extends Screen {
         String salesHistoryFrom = "";
         List<Row> topItems = new ArrayList<>();
         boolean topItemsAvailable;
+        List<Row> topItemsMonth = new ArrayList<>();
+        List<Row> topCustomersToday = new ArrayList<>();
+        List<Row> topCustomersMonth = new ArrayList<>();
+        boolean topItemsMonthAvailable;
+        boolean topCustomersTodayAvailable;
+        boolean topCustomersMonthAvailable;
         List<Row> stockAlerts = new ArrayList<>();
         List<Row> purchasePriceTrend = new ArrayList<>();
         boolean stockAlertsAvailable;
@@ -442,6 +448,21 @@ public class HomeScreen extends Screen {
         d.topItems = liveL(token, L, d.notes, "پرفروش‌ترین کالاهای امروز",
                 () -> Repo.exec(L.c, Queries.factorTopProducts(L.m, true, todayFilter, 5)));
         d.topItemsAvailable = d.topItems != null;
+        if (homeSectionSelected("top_performers") && RoleStore.allowed(a, "sales")) {
+            Filter monthFilter = new Filter();
+            monthFilter.from = Jalali.monthStart(to);
+            monthFilter.to = to;
+            monthFilter.top = 5;
+            d.topCustomersToday = liveL(token, L, d.notes, "مشتری‌های برتر امروز",
+                    () -> Repo.exec(L.c, Queries.factorByCustomer(L.m, true, todayFilter, 5)));
+            d.topCustomersTodayAvailable = d.topCustomersToday != null;
+            d.topCustomersMonth = liveL(token, L, d.notes, "مشتری‌های برتر ماه",
+                    () -> Repo.exec(L.c, Queries.factorByCustomer(L.m, true, monthFilter, 5)));
+            d.topCustomersMonthAvailable = d.topCustomersMonth != null;
+            d.topItemsMonth = liveL(token, L, d.notes, "کالاهای برتر ماه",
+                    () -> Repo.exec(L.c, Queries.factorTopProducts(L.m, true, monthFilter, 5)));
+            d.topItemsMonthAvailable = d.topItemsMonth != null;
+        }
         if (RoleStore.allowed(a, "products")) {
             d.reorderPointAvailable = L.m.col("inventory", "reopoint", "reorder_point") != null;
             d.stockAlerts = liveL(token, L, d.notes, "هشدار موجودی کالا",
@@ -541,6 +562,12 @@ public class HomeScreen extends Screen {
         s.salesHistoryFrom = g.salesHistoryFrom;
         s.topItems = g.topItems;
         s.topItemsAvailable = g.topItemsAvailable;
+        s.topItemsMonth = g.topItemsMonth;
+        s.topCustomersToday = g.topCustomersToday;
+        s.topCustomersMonth = g.topCustomersMonth;
+        s.topItemsMonthAvailable = g.topItemsMonthAvailable;
+        s.topCustomersTodayAvailable = g.topCustomersTodayAvailable;
+        s.topCustomersMonthAvailable = g.topCustomersMonthAvailable;
         s.stockAlerts = g.stockAlerts;
         s.stockAlertsAvailable = g.stockAlertsAvailable;
         s.reorderPointAvailable = g.reorderPointAvailable;
@@ -612,6 +639,9 @@ public class HomeScreen extends Screen {
                     .append("|dueinok=").append(d.dueInAvailable ? "1" : "0")
                     .append("|dueoutok=").append(d.dueOutAvailable ? "1" : "0")
                     .append("|topok=").append(d.topItemsAvailable ? "1" : "0")
+                    .append("|topmonthok=").append(d.topItemsMonthAvailable ? "1" : "0")
+                    .append("|topcusttodayok=").append(d.topCustomersTodayAvailable ? "1" : "0")
+                    .append("|topcustmonthok=").append(d.topCustomersMonthAvailable ? "1" : "0")
                     .append("|overdueok=").append(d.overdueAvailable ? "1" : "0")
                     .append("|retodayok=").append(d.returnsTodayAvailable ? "1" : "0")
                     .append("|cashinok=").append(d.cashReceiptsAvailable ? "1" : "0")
@@ -633,6 +663,12 @@ public class HomeScreen extends Screen {
                 for (int i = 0; i < Math.min(5, d.topItems.size()); i++)
                     s.append("|top").append(i).append('=').append(rowStr(d.topItems.get(i)));
             }
+            if (d.topItemsMonth != null) for (int i = 0; i < Math.min(5, d.topItemsMonth.size()); i++)
+                s.append("|topmonth").append(i).append('=').append(rowStr(d.topItemsMonth.get(i)));
+            if (d.topCustomersToday != null) for (int i = 0; i < Math.min(5, d.topCustomersToday.size()); i++)
+                s.append("|topcusttoday").append(i).append('=').append(rowStr(d.topCustomersToday.get(i)));
+            if (d.topCustomersMonth != null) for (int i = 0; i < Math.min(5, d.topCustomersMonth.size()); i++)
+                s.append("|topcustmonth").append(i).append('=').append(rowStr(d.topCustomersMonth.get(i)));
             if (d.overdue != null) {
                 for (int i = 0; i < Math.min(5, d.overdue.size()); i++)
                     s.append("|overdue").append(i).append('=').append(rowStr(cacheFields(d.overdue.get(i),
@@ -735,6 +771,9 @@ public class HomeScreen extends Screen {
                 else if ("dueinok".equals(k)) d.dueInAvailable = "1".equals(v);
                 else if ("dueoutok".equals(k)) d.dueOutAvailable = "1".equals(v);
                 else if ("topok".equals(k)) d.topItemsAvailable = "1".equals(v);
+                else if ("topmonthok".equals(k)) d.topItemsMonthAvailable = "1".equals(v);
+                else if ("topcusttodayok".equals(k)) d.topCustomersTodayAvailable = "1".equals(v);
+                else if ("topcustmonthok".equals(k)) d.topCustomersMonthAvailable = "1".equals(v);
                 else if ("overdueok".equals(k)) d.overdueAvailable = "1".equals(v);
                 else if ("retodayok".equals(k)) d.returnsTodayAvailable = "1".equals(v);
                 else if ("cashinok".equals(k)) d.cashReceiptsAvailable = "1".equals(v);
@@ -742,6 +781,9 @@ public class HomeScreen extends Screen {
                 else if ("gpok".equals(k)) d.grossProfitAvailable = "1".equals(v);
                 else if ("cashin".equals(k)) { d.cashReceipts = rowFrom(v); any = true; }
                 else if ("cashout".equals(k)) { d.cashPayments = rowFrom(v); any = true; }
+                else if (k.matches("topmonth[0-4]")) { d.topItemsMonth.add(rowFrom(v)); any = true; }
+                else if (k.matches("topcusttoday[0-4]")) { d.topCustomersToday.add(rowFrom(v)); any = true; }
+                else if (k.matches("topcustmonth[0-4]")) { d.topCustomersMonth.add(rowFrom(v)); any = true; }
                 else if (k.matches("top[0-4]")) { d.topItems.add(rowFrom(v)); any = true; }
                 else if (k.matches("overdue[0-4]")) { d.overdue.add(rowFrom(v)); any = true; }
                 else if (k.matches("retoday(?:[0-9]|1[0-9])")) { d.returnsToday.add(rowFrom(v)); any = true; }
@@ -888,7 +930,9 @@ public class HomeScreen extends Screen {
     }
 
     private static final String[] SALES_RANGES = {"امروز", "دیروز", "۷ روز", "ماه"};
+    private static final String[] PERFORMER_RANGES = {"امروز", "این ماه"};
     private int selectedSalesRange;
+    private int selectedPerformerRange;
 
     private static final class SalesDisplay {
         String date;
@@ -1619,6 +1663,7 @@ public class HomeScreen extends Screen {
         if ("smart_report".equals(key)) secSmartReport(content, d);
         else if ("closeout".equals(key)) secHomeCloseout(content, d);
         else if ("cash_position".equals(key)) secCashPosition(content, d);
+        else if ("top_performers".equals(key)) secTopPerformers(content, d);
         else if ("kpis".equals(key)) secKpis(content, d);
         else if ("alerts".equals(key)) secAlerts(content, d);
         else if ("sales_insight".equals(key)) secSalesInsight(content, d);
@@ -1853,6 +1898,7 @@ public class HomeScreen extends Screen {
     private int dashboardAccent(int vector) {
         if (vector == R.drawable.mi_point_of_sale) return Theme.SECTION_CLOSEOUT;
         if (vector == R.drawable.mi_account_balance_wallet) return Theme.SECTION_CASH_POSITION;
+        if (vector == R.drawable.mi_military_tech) return Theme.SECTION_TOP_PERFORMERS;
         if (vector == R.drawable.mi_shopping_cart || vector == R.drawable.mi_add_shopping_cart)
             return Theme.SECTION_PURCHASE;
         if (vector == R.drawable.mi_receipt_long || vector == R.drawable.mi_cheque)
@@ -2723,6 +2769,123 @@ public class HomeScreen extends Screen {
                 Theme.SECTION_CASH_POSITION, v -> showCloseoutCashDialog(content, d, day)),
                 a.kit.lp(-1, -2));
         a.kit.addCard(content, card);
+    }
+
+    private void secTopPerformers(LinearLayout content, Data d) {
+        if (!RoleStore.allowed(a, "sales")) return;
+        final int selected = selectedPerformerRange == 1 ? 1 : 0;
+        final boolean month = selected == 1;
+        final String period = month ? "این ماه" : "امروز";
+        LinearLayout card = a.kit.card(Theme.SECTION_TOP_PERFORMERS);
+        card.addView(boardHead("برترین‌ها", "پنج مشتری و پنج کالای برتر • " + period,
+                R.drawable.mi_military_tech, null), a.kit.lp(-1, -2));
+        card.addView(a.kit.segmentedControl(PERFORMER_RANGES, selected, null,
+                Theme.SECTION_TOP_PERFORMERS, index -> {
+                    selectedPerformerRange = index == 1 ? 1 : 0;
+                    content.removeAllViews();
+                    secTopPerformers(content, d);
+                    localizeHomeNumbers(content);
+                }), a.kit.lp(-1, -2));
+        card.addView(a.kit.gap(8));
+
+        List<Row> customers = month ? d.topCustomersMonth : d.topCustomersToday;
+        boolean customersAvailable = d != null && (month
+                ? d.topCustomersMonthAvailable : d.topCustomersTodayAvailable);
+        card.addView(topPerformerSubhead("مشتری‌های برتر", R.drawable.mi_person_search),
+                a.kit.lp(-1, -2));
+        addTopPerformerRows(card, customers, customersAvailable, false, "مشتری");
+        card.addView(a.kit.gap(8));
+
+        List<Row> products = month ? d.topItemsMonth : d.topItems;
+        boolean productsAvailable = d != null && (month
+                ? d.topItemsMonthAvailable : d.topItemsAvailable);
+        card.addView(topPerformerSubhead("کالاهای برتر", R.drawable.mi_inventory_2),
+                a.kit.lp(-1, -2));
+        addTopPerformerRows(card, products, productsAvailable, true, "کالا");
+        a.kit.addCard(content, card);
+    }
+
+    private View topPerformerSubhead(String title, int icon) {
+        LinearLayout row = a.kit.h();
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        ImageView image = a.kit.icon(icon, Theme.sectionText(Theme.SECTION_TOP_PERFORMERS), 22);
+        image.setBackground(Theme.avatar(Theme.alpha(Theme.SECTION_TOP_PERFORMERS,
+                Theme.isLight() ? 24 : 38)));
+        int inset = Theme.dp(5);
+        image.setPadding(inset, inset, inset, inset);
+        image.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        row.addView(image, a.kit.lp(Theme.dp(30), Theme.dp(30)));
+        row.addView(a.kit.space(6));
+        TextView label = a.kit.text(title, 11.5f,
+                Theme.sectionText(Theme.SECTION_TOP_PERFORMERS), true);
+        row.addView(label, a.kit.wlp(1f));
+        return row;
+    }
+
+    private void addTopPerformerRows(LinearLayout card, List<Row> rows,
+                                     boolean available, boolean products, String noun) {
+        if (!available) {
+            card.addView(a.kit.emptyRow("فهرست " + noun + " برای این بازه در دسترس نیست."),
+                    a.kit.lp(-1, -2));
+            return;
+        }
+        if (rows == null || rows.isEmpty()) {
+            String empty = "مشتری".equals(noun)
+                    ? "برای این بازه هنوز مشتری‌ای در فروش ثبت نشده است."
+                    : "برای این بازه هنوز کالایی در فروش ثبت نشده است.";
+            card.addView(a.kit.emptyRow(empty), a.kit.lp(-1, -2));
+            return;
+        }
+        int count = Math.min(5, rows.size());
+        for (int i = 0; i < count; i++) {
+            Row item = rows.get(i);
+            if (item == null) continue;
+            card.addView(topPerformerRow(item, i + 1, products), a.kit.lp(-1, -2));
+            if (i + 1 < count) card.addView(a.kit.gap(4));
+        }
+    }
+
+    private View topPerformerRow(Row item, int rank, boolean product) {
+        String name = item.s("label", "بدون نام");
+        long docs = item.l("docs");
+        String sub = product
+                ? HomeNumberFormatter.compactUnit(item.d("qty")) + " واحد • "
+                        + HomeNumberFormatter.integer(docs) + " فاکتور"
+                : HomeNumberFormatter.integer(docs) + " فاکتور";
+        double total = item.d("total");
+
+        LinearLayout row = a.kit.h();
+        row.setMinimumHeight(Theme.dp(56));
+        row.setPadding(Theme.dp(5), Theme.dp(5), Theme.dp(5), Theme.dp(5));
+        row.setBackground(Theme.kpi(Theme.SECTION_TOP_PERFORMERS));
+        TextView rankView = a.kit.text(HomeNumberFormatter.integer(rank), 11f,
+                Theme.onAccent(Theme.SECTION_TOP_PERFORMERS), true);
+        rankView.setGravity(Gravity.CENTER);
+        rankView.setBackground(Theme.chip(true, Theme.SECTION_TOP_PERFORMERS));
+        rankView.setContentDescription("رتبهٔ " + HomeNumberFormatter.integer(rank));
+        row.addView(rankView, new LinearLayout.LayoutParams(Theme.dp(30), Theme.dp(30)));
+        row.addView(a.kit.space(8));
+
+        LinearLayout info = a.kit.v();
+        TextView title = a.kit.text(name, 11f, Theme.TEXT, true);
+        title.setSingleLine(true);
+        title.setEllipsize(TextUtils.TruncateAt.END);
+        TextView detail = a.kit.text(sub, 9.5f, Theme.MUTED, false);
+        detail.setSingleLine(true);
+        detail.setEllipsize(TextUtils.TruncateAt.END);
+        info.addView(title, a.kit.lp(-1, -2));
+        info.addView(detail, a.kit.lp(-1, -2));
+        row.addView(info, a.kit.wlp(1f));
+
+        View amount = a.kit.amountLine(HomeNumberFormatter.compactMoney(total), 10.5f,
+                Gravity.END);
+        LinearLayout.LayoutParams amountParams = new LinearLayout.LayoutParams(
+                Theme.dp(112), -2);
+        amountParams.setMarginStart(Theme.dp(6));
+        row.addView(amount, amountParams);
+        row.setContentDescription("رتبهٔ " + HomeNumberFormatter.integer(rank) + "، " + name
+                + "، " + sub + "، " + HomeNumberFormatter.money(total));
+        return row;
     }
 
     private void secHomeCloseout(LinearLayout content, Data d) {

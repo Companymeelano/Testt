@@ -38,6 +38,7 @@ public final class DesignTokens {
     public static final int WAREHOUSE = 0xFF1F8A8A;
     public static final int CLOSEOUT = 0xFF7D5E3C;
     public static final int CASH_POSITION = 0xFF3F6F78;
+    public static final int TOP_PERFORMERS = 0xFF4E715E;
 
     // Outcome colors are independent of the section palette and text-safe after accessibility adjustment.
     public static final int POSITIVE = 0xFF26784F;

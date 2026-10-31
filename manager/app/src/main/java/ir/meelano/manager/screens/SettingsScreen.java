@@ -20,10 +20,11 @@ import ir.meelano.manager.data.Company;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.data.NetRoute;
 import ir.meelano.manager.data.Repo;
+import ir.meelano.manager.ui.DesignGallery;
 import ir.meelano.manager.ui.Theme;
 
 /**
- * Settings, grouped into nine sections. Only one section is on screen at a time, so
+ * Settings, grouped into eleven sections. Only one section is on screen at a time, so
  * the page no longer stacks every option into one long scroll. Each switch is a row
  * with a title, a one-line explanation and a coloured on/off badge.
  */
@@ -33,6 +34,7 @@ public class SettingsScreen extends Screen {
     private static final String[][] SECTIONS = {
             {"connection", "اتصال", "🔌"},
             {"theme", "ظاهر", "🎨"},
+            {"preview", "گالری طراحی", "◐"},
             {"ai", "هوش مصنوعی", "✦"},
             {"alerts", "هشدارها", "🔔"},
             {"shop", "فروشگاه", "🏪"},
@@ -78,6 +80,7 @@ public class SettingsScreen extends Screen {
         content.addView(a.kit.gap(10));
         switch (section) {
             case "theme": buildTheme(content); break;
+            case "preview": buildPreview(content); break;
             case "ai": AiSettings.build(a, content, () -> render(content)); break;
             case "alerts": buildAlerts(content); break;
             case "shop": buildShop(content); break;
@@ -306,6 +309,15 @@ public class SettingsScreen extends Screen {
         th.addView(a.kit.hint("قالب انتخاب‌شده فوراً روی همهٔ بخش‌ها، جدول‌ها، نمودارها و آیکن‌ها اعمال می‌شود."),
                 a.kit.lp(-1, -2));
         a.kit.addCard(content, th);
+    }
+
+    private void buildPreview(final LinearLayout content) {
+        content.addView(a.kit.sectionHeader("پیش‌نمایش Light و Dark",
+                R.drawable.mi_contrast, Theme.GOLD, null, null), a.kit.lp(-1, -2));
+        content.addView(a.kit.hint("هدر جمع‌شونده، داک پنج‌مقصدی و اجزای مشترک را در هر دو پالت ببینید. "
+                + "این نمونه‌ها تنظیم فعلی دستگاه را تغییر نمی‌دهند."), a.kit.lp(-1, -2));
+        content.addView(a.kit.gap(8));
+        DesignGallery.addPreviews(a, content);
     }
 
     private void buildAlerts(final LinearLayout content) {

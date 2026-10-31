@@ -86,7 +86,6 @@ public final class Theme {
     private static Typeface bold;
 
     /** Deep ink and warm ivory chosen to keep accent controls legible in both skins. */
-    private static final int ACCENT_INK = DesignTokens.INK;
     private static final int ACCENT_PAPER = DesignTokens.IVORY;
 
     public static boolean isLight() { return light; }
@@ -339,7 +338,7 @@ public final class Theme {
             GOLD_SOFT = DesignTokens.GOLD_DARK;
             PRIMARY = DesignTokens.EMERALD;
             TEXT = DesignTokens.INK;
-            MUTED = 0xFF52655D;
+            MUTED = DesignTokens.LIGHT_MUTED;
             SUCCESS = DesignTokens.accessibleAccent(DesignTokens.POSITIVE, false);
             DANGER = DesignTokens.accessibleAccent(DesignTokens.NEGATIVE, false);
             WARNING = DesignTokens.accessibleAccent(DesignTokens.WARNING, false);
@@ -352,7 +351,7 @@ public final class Theme {
             SURFACE2 = DesignTokens.NIGHT_PAPER;
             GOLD = DesignTokens.GOLD_LIGHT;
             GOLD_SOFT = DesignTokens.GOLD_LIGHT;
-            PRIMARY = 0xFF2D9A73;
+            PRIMARY = DesignTokens.NIGHT_EMERALD;
             TEXT = DesignTokens.NIGHT_TEXT;
             MUTED = DesignTokens.NIGHT_MUTED;
             SUCCESS = DesignTokens.accessibleAccent(DesignTokens.POSITIVE, true);
@@ -373,7 +372,7 @@ public final class Theme {
 
     /** Choose the foreground with the stronger contrast against an accent surface. */
     public static int onAccent(int background) {
-        return darkAccentInk(background) ? ACCENT_INK : ACCENT_PAPER;
+        return DesignTokens.accentTextColor(background);
     }
 
     /** Text color readable on the current accent. */

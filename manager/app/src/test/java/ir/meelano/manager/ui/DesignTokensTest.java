@@ -15,6 +15,8 @@ public class DesignTokensTest {
         assertEquals(0xFFFBF7EE, DesignTokens.IVORY);
         assertEquals(0xFFF4EEDC, DesignTokens.PAPER);
         assertEquals(0xFF1B2B26, DesignTokens.INK);
+        assertEquals(0xFF52655D, DesignTokens.LIGHT_MUTED);
+        assertEquals(0xFF2D9A73, DesignTokens.NIGHT_EMERALD);
     }
 
     @Test public void sectionHuesAreIndependentAndLocalized() {
@@ -35,10 +37,59 @@ public class DesignTokensTest {
         for (int accent : accents) {
             assertTrue("light contrast for " + Integer.toHexString(accent),
                     DesignTokens.contrastRatio(DesignTokens.accessibleAccent(accent, false),
-                            DesignTokens.IVORY) >= 4.5);
+                            DesignTokens.IVORY) >= 4.8);
             assertTrue("dark contrast for " + Integer.toHexString(accent),
                     DesignTokens.contrastRatio(DesignTokens.accessibleAccent(accent, true),
-                            DesignTokens.NIGHT_SURFACE) >= 4.5);
+                            DesignTokens.NIGHT_SURFACE) >= 4.8);
+        }
+    }
+
+    @Test public void tintedComponentPreviewTextPassesAaInLightAndDarkModes() {
+        int[] tones = {DesignTokens.EMERALD, DesignTokens.POSITIVE, DesignTokens.NEGATIVE,
+                DesignTokens.WARNING, DesignTokens.INFO};
+        for (int tone : tones) {
+            int lightSurface = DesignTokens.surfaceTint(tone, false);
+            int darkSurface = DesignTokens.surfaceTint(tone, true);
+            assertTrue("light tinted surface contrast for " + Integer.toHexString(tone),
+                    DesignTokens.contrastRatio(
+                            DesignTokens.textSafeColor(tone, lightSurface, false), lightSurface) >= 4.8);
+            assertTrue("dark tinted surface contrast for " + Integer.toHexString(tone),
+                    DesignTokens.contrastRatio(
+                            DesignTokens.textSafeColor(tone, darkSurface, true), darkSurface) >= 4.8);
+        }
+    }
+
+    @Test public void solidAccentLabelsChooseHighContrastInkAcrossPalette() {
+        int[] accents = {DesignTokens.EMERALD, DesignTokens.NIGHT_EMERALD, DesignTokens.GOLD,
+                DesignTokens.GOLD_LIGHT, DesignTokens.GOLD_DARK, DesignTokens.PURCHASE,
+                DesignTokens.PAY, DesignTokens.RETURNS, DesignTokens.ALERT, DesignTokens.WAREHOUSE};
+        for (int accent : accents) {
+            assertTrue("solid accent text contrast for " + Integer.toHexString(accent),
+                    DesignTokens.contrastRatio(DesignTokens.accentTextColor(accent), accent) >= 4.5);
+        }
+    }
+
+    @Test public void mutedCopyPassesAaOnBothPreviewCards() {
+        int lightCard = DesignTokens.surfaceTint(DesignTokens.EMERALD, false);
+        int darkCard = DesignTokens.surfaceTint(DesignTokens.NIGHT_EMERALD, true);
+        assertTrue("light muted copy contrast",
+                DesignTokens.contrastRatio(DesignTokens.LIGHT_MUTED, lightCard) >= 4.8);
+        assertTrue("dark muted copy contrast",
+                DesignTokens.contrastRatio(DesignTokens.NIGHT_MUTED, darkCard) >= 4.8);
+    }
+
+    @Test public void selectedDockInkPassesAaOnBothPreviewSurfaces() {
+        int[] accents = {DesignTokens.EMERALD, DesignTokens.NIGHT_EMERALD};
+        boolean[] darkModes = {false, true};
+        for (int i = 0; i < accents.length; i++) {
+            boolean dark = darkModes[i];
+            int surface = DesignTokens.surfaceTint(accents[i], dark);
+            int dockInk = DesignTokens.textSafeColor(accents[i], surface, dark);
+            assertTrue("selected dock ink contrast",
+                    DesignTokens.contrastRatio(dockInk, surface) >= 4.8);
+            int segmentInk = DesignTokens.accentTextColor(accents[i]);
+            assertTrue("selected segmented-control ink contrast",
+                    DesignTokens.contrastRatio(segmentInk, accents[i]) >= 4.8);
         }
     }
 
@@ -53,9 +104,9 @@ public class DesignTokensTest {
                     outcome != section);
         for (int outcome : outcomes) {
             assertTrue("light semantic contrast", DesignTokens.contrastRatio(
-                    DesignTokens.accessibleAccent(outcome, false), DesignTokens.IVORY) >= 4.5);
+                    DesignTokens.accessibleAccent(outcome, false), DesignTokens.IVORY) >= 4.8);
             assertTrue("dark semantic contrast", DesignTokens.contrastRatio(
-                    DesignTokens.accessibleAccent(outcome, true), DesignTokens.NIGHT_SURFACE) >= 4.5);
+                    DesignTokens.accessibleAccent(outcome, true), DesignTokens.NIGHT_SURFACE) >= 4.8);
         }
         int tint = DesignTokens.surfaceTint(DesignTokens.EMERALD, false);
         assertEquals(0xFF, (tint >>> 24) & 0xFF);

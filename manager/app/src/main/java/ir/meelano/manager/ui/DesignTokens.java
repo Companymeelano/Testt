@@ -17,10 +17,12 @@ public final class DesignTokens {
     public static final int IVORY = 0xFFFBF7EE;
     public static final int PAPER = 0xFFF4EEDC;
     public static final int INK = 0xFF1B2B26;
+    public static final int LIGHT_MUTED = 0xFF52655D;
 
     // Emerald-night surfaces
     public static final int NIGHT_BG = 0xFF071A14;
     public static final int NIGHT_SURFACE = 0xFF0E241D;
+    public static final int NIGHT_EMERALD = 0xFF2D9A73;
     public static final int NIGHT_PAPER = 0xFF15372B;
     public static final int NIGHT_TEXT = 0xFFF6F4EC;
     public static final int NIGHT_MUTED = 0xFFB8C5BE;
@@ -64,12 +66,39 @@ public final class DesignTokens {
 
     /** Find a text-safe variant of an accent without changing the accent used by its icon. */
     public static int accessibleAccent(int accent, boolean dark) {
-        int background = dark ? NIGHT_SURFACE : IVORY;
+        return textSafeColor(accent, dark ? NIGHT_SURFACE : IVORY, dark);
+    }
+
+    /** Highest-contrast palette ink for text rendered directly on a solid accent fill. */
+    public static int accentTextColor(int accent) {
+        int best = INK;
+        double bestRatio = contrastRatio(best, accent);
+        double ratio = contrastRatio(IVORY, accent);
+        if (ratio > bestRatio) {
+            best = IVORY;
+            bestRatio = ratio;
+        }
+        ratio = contrastRatio(0xFF000000, accent);
+        if (ratio > bestRatio) {
+            best = 0xFF000000;
+            bestRatio = ratio;
+        }
+        ratio = contrastRatio(0xFFFFFFFF, accent);
+        if (ratio > bestRatio) best = 0xFFFFFFFF;
+        return best;
+    }
+
+    /**
+     * Adjust a requested foreground to a 4.8:1 contrast target on its actual surface. This is
+     * useful for tinted chips/cards as well as untinted palette surfaces; icon accents stay intact.
+     */
+    public static int textSafeColor(int preferred, int background, boolean dark) {
         int target = dark ? 0xFFFFFFFF : 0xFF000000;
-        int result = accent;
-        for (int i = 0; i < 24 && contrastRatio(result, background) < 4.5; i++) {
+        int result = preferred;
+        for (int i = 0; i < 24 && contrastRatio(result, background) < 4.8; i++) {
             result = mix(result, target, 0.08f);
         }
+        if (contrastRatio(result, background) < 4.8) return target;
         return result;
     }
 

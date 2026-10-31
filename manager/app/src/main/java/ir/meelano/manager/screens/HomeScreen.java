@@ -38,6 +38,7 @@ import ir.meelano.manager.R;
 import ir.meelano.manager.core.Queries;
 import ir.meelano.manager.core.SalesComparison;
 import ir.meelano.manager.core.SalesSnapshot;
+import ir.meelano.manager.core.SmartReportEngine;
 import ir.meelano.manager.core.SyncState;
 import ir.meelano.manager.data.Meta;
 import ir.meelano.manager.data.Company;
@@ -48,6 +49,7 @@ import ir.meelano.manager.ui.HomePaymentMixBar;
 import ir.meelano.manager.ui.HomeSalesChart;
 import ir.meelano.manager.ui.Kit;
 import ir.meelano.manager.ui.MeelanoIcons;
+import ir.meelano.manager.ui.SmartReportImage;
 import ir.meelano.manager.ui.Theme;
 
 import java.util.ArrayList;
@@ -92,11 +94,13 @@ public class HomeScreen extends Screen {
         boolean returnsAvailable;
         boolean returnsPreviousAvailable;
         List<Row> overdue = new ArrayList<>();
+        boolean overdueAvailable;
         List<Row> salesDaily = new ArrayList<>();
         SalesSnapshot salesSnapshot;
         boolean salesTrendAvailable;
         String salesHistoryFrom = "";
         List<Row> topItems = new ArrayList<>();
+        boolean topItemsAvailable;
         List<Row> stockAlerts = new ArrayList<>();
         List<Row> purchasePriceTrend = new ArrayList<>();
         boolean stockAlertsAvailable;
@@ -369,6 +373,7 @@ public class HomeScreen extends Screen {
         d.inMixAvailable = d.inMix != null;
         d.outDay = liveL(token, L, d.notes, "پرداخت امروز", () -> Repo.one(L.c, MoneyQueries.darDay(L.m, 1, todayRange.to)));
         d.overdue = liveL(token, L, d.notes, "معوق‌ها", () -> Repo.exec(L.c, Queries.overdueInvoices(L.m, 5)));
+        d.overdueAvailable = d.overdue != null;
         String stFrom = Jalali.addDays(to, -29);
         Filter rf = new Filter();
         rf.from = stFrom;
@@ -401,6 +406,7 @@ public class HomeScreen extends Screen {
         todayFilter.top = 5;
         d.topItems = liveL(token, L, d.notes, "پرفروش‌ترین کالاهای امروز",
                 () -> Repo.exec(L.c, Queries.factorTopProducts(L.m, true, todayFilter, 5)));
+        d.topItemsAvailable = d.topItems != null;
         if (RoleStore.allowed(a, "products")) {
             d.reorderPointAvailable = L.m.col("inventory", "reopoint", "reorder_point") != null;
             d.stockAlerts = liveL(token, L, d.notes, "هشدار موجودی کالا",
@@ -481,6 +487,7 @@ public class HomeScreen extends Screen {
         s.returnsAvailable = g.returnsAvailable;
         s.returnsPreviousAvailable = g.returnsPreviousAvailable;
         s.overdue = g.overdue;
+        s.overdueAvailable = g.overdueAvailable;
         s.returns = g.returns;
         s.notes.putAll(g.notes);
     }
@@ -490,6 +497,7 @@ public class HomeScreen extends Screen {
         s.salesTrendAvailable = g.salesTrendAvailable;
         s.salesHistoryFrom = g.salesHistoryFrom;
         s.topItems = g.topItems;
+        s.topItemsAvailable = g.topItemsAvailable;
         s.stockAlerts = g.stockAlerts;
         s.stockAlertsAvailable = g.stockAlertsAvailable;
         s.reorderPointAvailable = g.reorderPointAvailable;
@@ -559,7 +567,9 @@ public class HomeScreen extends Screen {
                     .append("|reorderok=").append(d.reorderPointAvailable ? "1" : "0")
                     .append("|priceok=").append(d.purchasePriceTrendAvailable ? "1" : "0")
                     .append("|dueinok=").append(d.dueInAvailable ? "1" : "0")
-                    .append("|dueoutok=").append(d.dueOutAvailable ? "1" : "0");
+                    .append("|dueoutok=").append(d.dueOutAvailable ? "1" : "0")
+                    .append("|topok=").append(d.topItemsAvailable ? "1" : "0")
+                    .append("|overdueok=").append(d.overdueAvailable ? "1" : "0");
             if (d.buyDaily != null) for (int i = 0; i < Math.min(7, d.buyDaily.size()); i++)
                 s.append("|buytrend").append(i).append('=').append(rowStr(d.buyDaily.get(i)));
             if (d.inDaily != null) for (int i = 0; i < Math.min(7, d.inDaily.size()); i++)
@@ -575,6 +585,11 @@ public class HomeScreen extends Screen {
             if (d.topItems != null) {
                 for (int i = 0; i < Math.min(5, d.topItems.size()); i++)
                     s.append("|top").append(i).append('=').append(rowStr(d.topItems.get(i)));
+            }
+            if (d.overdue != null) {
+                for (int i = 0; i < Math.min(5, d.overdue.size()); i++)
+                    s.append("|overdue").append(i).append('=').append(rowStr(cacheFields(d.overdue.get(i),
+                            "code", "party", "amount", "dueDate", "days", "visitor", "invoice")));
             }
             if (d.stockAlerts != null) {
                 for (int i = 0; i < Math.min(20, d.stockAlerts.size()); i++)
@@ -662,7 +677,10 @@ public class HomeScreen extends Screen {
                 else if ("priceok".equals(k)) d.purchasePriceTrendAvailable = "1".equals(v);
                 else if ("dueinok".equals(k)) d.dueInAvailable = "1".equals(v);
                 else if ("dueoutok".equals(k)) d.dueOutAvailable = "1".equals(v);
+                else if ("topok".equals(k)) d.topItemsAvailable = "1".equals(v);
+                else if ("overdueok".equals(k)) d.overdueAvailable = "1".equals(v);
                 else if (k.matches("top[0-4]")) { d.topItems.add(rowFrom(v)); any = true; }
+                else if (k.matches("overdue[0-4]")) { d.overdue.add(rowFrom(v)); any = true; }
                 else if (k.matches("stock(?:[0-9]|1[0-9])")) { d.stockAlerts.add(rowFrom(v)); any = true; }
                 else if (k.matches("price(?:[0-9]|1[0-9])")) { d.purchasePriceTrend.add(rowFrom(v)); any = true; }
                 else if (k.matches("duein(?:[0-9]|1[0-9])")) { d.dueIn.add(rowFrom(v)); any = true; }
@@ -1533,7 +1551,8 @@ public class HomeScreen extends Screen {
     }
 
     private void renderHomeSection(LinearLayout content, Data d, String key) {
-        if ("kpis".equals(key)) secKpis(content, d);
+        if ("smart_report".equals(key)) secSmartReport(content, d);
+        else if ("kpis".equals(key)) secKpis(content, d);
         else if ("alerts".equals(key)) secAlerts(content, d);
         else if ("sales_insight".equals(key)) secSalesInsight(content, d);
         else if ("cash_mix".equals(key)) secCashMix(content, d);
@@ -1561,7 +1580,7 @@ public class HomeScreen extends Screen {
             return salesOrder;
         }
         List<String> out = new ArrayList<>();
-        String[] known = {"alerts", "cash_mix", "market", "due", "returns", "eod"};
+        String[] known = ir.meelano.manager.data.Settings.HOME_ORDER_DEFAULT.split(",");
         for (String k : a.settings.homeOrder().split(",")) {
             String t = k == null ? "" : k.trim();
             if (!t.isEmpty() && !out.contains(t)) {
@@ -1579,14 +1598,14 @@ public class HomeScreen extends Screen {
         return false;
     }
 
-    /** In simple mode, the two compact modules plus the fixed greeting/sales/KPI make five sections. */
+    /** In simple mode, the first three selected lower modules are visible; remaining features stay tucked away. */
     private boolean homeSectionVisible(String key) {
         if (!homeSectionSelected(key)) return false;
         if (!a.settings.homeSimpleMode()) return true;
         int shown = 0;
         for (String ordered : orderedKeys()) {
             if (!homeSectionSelected(ordered)) continue;
-            if (ordered.equals(key)) return shown < 2;
+            if (ordered.equals(key)) return shown < 3;
             shown++;
         }
         return false;
@@ -2582,6 +2601,73 @@ public class HomeScreen extends Screen {
                         HomeNumberFormatter.money(dueOutSum), Theme.SECTION_PAY), a.kit.lp(-1, -2));
             a.kit.addCard(content, c);
         }
+    }
+
+    private void secSmartReport(LinearLayout content, Data d) {
+        if (!RoleStore.allowed(a, "sales")) return;
+        final List<String> sentences = smartReportSentences(d);
+        LinearLayout card = a.kit.card(Theme.SECTION_SALES);
+        card.addView(boardHead("گزارش هوشمند امروز", "سه نکته بر پایهٔ داده‌های ثبت‌شده",
+                R.drawable.mi_star_shine, null), a.kit.lp(-1, -2));
+        for (String sentence : sentences) {
+            LinearLayout line = a.kit.h();
+            line.setGravity(Gravity.TOP);
+            TextView star = a.kit.text("✦", 14f, Theme.GOLD, true);
+            star.setContentDescription(null);
+            line.addView(star, a.kit.lp(Theme.dp(24), -2));
+            TextView copy = a.kit.text(sentence, 11.5f, Theme.TEXT, false);
+            copy.setMaxLines(3);
+            copy.setEllipsize(TextUtils.TruncateAt.END);
+            line.addView(copy, a.kit.wlp(1f));
+            line.setContentDescription(sentence);
+            LinearLayout.LayoutParams lineParams = a.kit.lp(-1, -2);
+            lineParams.topMargin = Theme.dp(5);
+            card.addView(line, lineParams);
+        }
+        card.addView(a.kit.btnGhost("اشتراک تصویر برندشده", Theme.GOLD, v -> {
+            try {
+                a.shareImage(SmartReportImage.create(a, d == null ? Jalali.todayStr() : d.snapshotDay,
+                        sentences), "گزارش هوشمند امروز میلانو");
+            } catch (Exception e) {
+                a.kit.toast("ساخت تصویر ممکن نشد");
+            }
+        }), a.kit.lp(-1, -2));
+        card.setContentDescription("گزارش هوشمند امروز؛ " + sentences.get(0) + " "
+                + sentences.get(1) + " " + sentences.get(2));
+        a.kit.addCard(content, card);
+    }
+
+    private List<String> smartReportSentences(Data d) {
+        SmartReportEngine.Input input = new SmartReportEngine.Input();
+        if (d != null && d.salesSnapshot != null && d.salesSnapshot.isAvailable()
+                && RoleStore.allowed(a, "sales")) {
+            String today = snapshotDay(d);
+            input.salesAvailable = true;
+            input.salesRials = d.salesSnapshot.salesRialsOn(today);
+            input.documents = d.salesSnapshot.documentsOn(today);
+            int elapsed = today.equals(Jalali.todayStr())
+                    ? minuteOfDay() : SalesComparison.MINUTES_PER_DAY;
+            SalesComparison.DayResult comparison = SalesComparison.evaluate(d.salesSnapshot, today,
+                    elapsed, SalesComparison.DEFAULT_COMPARABLE_WEEKS);
+            input.comparisonAvailable = comparison.hasBaseline() && comparison.projectionAvailable;
+            input.changePercent = comparison.changePercent();
+        }
+        if (d != null && RoleStore.allowed(a, "sales")) {
+            input.productsAvailable = d.topItemsAvailable;
+            if (d.topItemsAvailable && d.topItems != null && !d.topItems.isEmpty()) {
+                Row leading = d.topItems.get(0);
+                input.leadingProduct = leading.s("label");
+                input.leadingProductSalesRials = leading.d("total");
+            }
+            input.overdueAvailable = d.overdueAvailable;
+            input.overdueInvoices = d.overdue == null ? 0 : d.overdue.size();
+            input.dueChequesAvailable = d.dueInAvailable && d.dueOutAvailable;
+            input.dueCheques = (d.dueIn == null ? 0 : d.dueIn.size())
+                    + (d.dueOut == null ? 0 : d.dueOut.size());
+            input.returnsAvailable = d.returnsAvailable;
+            input.returnDocuments = sumLongField(d.returns, "docs");
+        }
+        return SmartReportEngine.compose(input);
     }
 
     private void secEod(LinearLayout content) {

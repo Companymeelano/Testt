@@ -377,10 +377,12 @@ public final class Settings {
 
     // ---------------- home dashboard order ----------------
     /** Orderable lower Home modules; sales Hero and KPI stay pinned at the top. */
-    public static final String HOME_ORDER_DEFAULT = "alerts,cash_mix,market,due,returns,eod";
-    /** The simple dashboard starts with exactly five primary sections: greeting, sales, KPI, alerts, and receipt mix. */
-    public static final String HOME_SECTIONS_DEFAULT = "alerts,cash_mix,market";
-    private static final String[] HOME_SECTION_KEYS = {"alerts", "cash_mix", "market", "due", "returns", "eod"};
+    public static final String HOME_ORDER_DEFAULT = "smart_report,closeout,cash_position,top_performers,sales_goal,gross_profit,seasonal_calendar,quick_actions,forecast_7d,alerts,cash_mix,market,due,returns,eod";
+    /** First three new modules are enabled by default; existing compact modules remain available. */
+    public static final String HOME_SECTIONS_DEFAULT = "smart_report,closeout,cash_position";
+    private static final String[] HOME_SECTION_KEYS = {"smart_report", "closeout", "cash_position",
+            "top_performers", "sales_goal", "gross_profit", "seasonal_calendar", "quick_actions",
+            "forecast_7d", "alerts", "cash_mix", "market", "due", "returns", "eod"};
 
     public String homeOrder() {
         String stored = p.getString("home_order", null);
@@ -443,7 +445,7 @@ public final class Settings {
         return normalized.toString();
     }
 
-    /** Simple mode is the compact five-section dashboard; full mode shows every selected module. */
+    /** Simple mode shows the first three selected modules; full mode shows every selected module. */
     public boolean homeSimpleMode() { return p.getBoolean("home_simple", true); }
 
     public void setHomeSimpleMode(boolean simple) {

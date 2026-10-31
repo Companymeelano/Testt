@@ -120,7 +120,10 @@ public final class HomeDashboardScreenshotTest {
                 .append("|buytrendok=1|intrendok=1|outtrendok=1|inmixok=1")
                 .append("|returnsok=1|returnsprevok=1|trendok=1")
                 .append("|trendfrom=").append(Jalali.addDays(today, -13))
-                .append("|stockok=1|reorderok=1|priceok=1|dueinok=1|dueoutok=1");
+                .append("|stockok=1|reorderok=1|priceok=1|dueinok=1|dueoutok=1|topok=1|overdueok=1")
+                .append("|top0=label=پستهٔ نمونه;total=2400000000;qty=18;docs=7")
+                .append("|overdue0=party=مشتری نمونه;amount=730000000;dueDate=").append(today)
+                .append(";days=2;invoice=۴۸۲۱");
 
         for (int i = 0; i < 14; i++) {
             String day = Jalali.addDays(today, i - 13);

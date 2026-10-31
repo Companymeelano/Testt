@@ -574,7 +574,7 @@ public class SettingsScreen extends Screen {
         LinearLayout editor = a.kit.card(Theme.GOLD);
         final boolean simple = a.settings.homeSimpleMode();
         addRow(editor, toggleRow(simple ? "حالت ساده روشن" : "حالت کامل روشن",
-                simple ? "نمای ساده دقیقاً تا دو بخش انتخابیِ پایین را نشان می‌دهد؛ با سه کارت ثابت، پیش‌فرض حداکثر پنج بخش است."
+                simple ? "نمای ساده تا سه بخش انتخابیِ پایین را نشان می‌دهد؛ سایر کارت‌ها در حالت کامل دیده می‌شوند."
                         : "نمای کامل همهٔ بخش‌های انتخاب‌شده را نشان می‌دهد.",
                 simple, Theme.GOLD, v -> {
                     a.settings.setHomeSimpleMode(!simple);
@@ -603,7 +603,7 @@ public class SettingsScreen extends Screen {
             final boolean enabled = selected.contains(key);
             int selectedBefore = 0;
             for (int j = 0; j < i; j++) if (selected.contains(order.get(j))) selectedBefore++;
-            boolean beyondSimpleLimit = simple && enabled && selectedBefore >= 2;
+            boolean beyondSimpleLimit = simple && enabled && selectedBefore >= 3;
             LinearLayout row = a.kit.h();
             row.setGravity(Gravity.CENTER_VERTICAL);
             row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
@@ -640,8 +640,8 @@ public class SettingsScreen extends Screen {
                         if (selected.contains(key)) selected.remove(key);
                         else selected.add(key);
                         a.settings.setHomeSections(joinHomeKeys(selected));
-                        if (simple && selected.size() > 2)
-                            a.kit.toast("بخش ذخیره شد؛ نمای ساده دو بخش پایین را نشان می‌دهد. برای نمایش همه، حالت کامل را روشن کنید.");
+                        if (simple && selected.size() > 3)
+                            a.kit.toast("بخش ذخیره شد؛ سه بخش نخست پایین در نمای ساده دیده می‌شوند. برای نمایش همه، حالت کامل را روشن کنید.");
                         render(content);
                     });
             visibility.setContentDescription((enabled ? "پنهان‌کردن " : "نمایش ") + label);
@@ -660,6 +660,15 @@ public class SettingsScreen extends Screen {
     }
 
     private String homeSectionLabel(String key) {
+        if ("smart_report".equals(key)) return "گزارش هوشمند امروز";
+        if ("closeout".equals(key)) return "بستن روز";
+        if ("cash_position".equals(key)) return "موقعیت نقدی";
+        if ("top_performers".equals(key)) return "بهترین مشتری‌ها و کالاها";
+        if ("sales_goal".equals(key)) return "هدف فروش ماه";
+        if ("gross_profit".equals(key)) return "سود ناخالص";
+        if ("seasonal_calendar".equals(key)) return "تقویم آجیل‌وفروشی";
+        if ("quick_actions".equals(key)) return "اقدام سریع";
+        if ("forecast_7d".equals(key)) return "پیش‌بینی فروش ۷روزه";
         if ("alerts".equals(key)) return "مرکز توجه";
         if ("cash_mix".equals(key)) return "ترکیب دریافت";
         if ("market".equals(key)) return "بازار (جمع‌شده پیش‌فرض)";

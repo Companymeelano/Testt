@@ -899,7 +899,7 @@ public final class Kit {
             segment.setGravity(Gravity.CENTER);
             segment.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
             segment.setPadding(Theme.dp(4), Theme.dp(4), Theme.dp(4), Theme.dp(4));
-            segment.setMinimumHeight(Theme.dp(64));
+            segment.setMinimumHeight(Theme.dp(48));
             segment.setBackground(chosen ? Theme.chip(true, accent)
                     : new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
             int vector = iconRes != null && i < iconRes.length ? iconRes[i] : 0;

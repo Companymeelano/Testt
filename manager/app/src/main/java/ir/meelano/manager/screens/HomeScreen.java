@@ -43,6 +43,7 @@ import ir.meelano.manager.data.Company;
 import ir.meelano.manager.data.Repo;
 import ir.meelano.manager.data.Row;
 import ir.meelano.manager.ui.Charts;
+import ir.meelano.manager.ui.HomeSalesChart;
 import ir.meelano.manager.ui.Kit;
 import ir.meelano.manager.ui.MeelanoIcons;
 import ir.meelano.manager.ui.Theme;
@@ -245,6 +246,10 @@ public class HomeScreen extends Screen {
             content.addView(a.kit.gap(8));
             content.addView(greetingHero(cached), a.kit.lp(-1, -2));
             content.addView(a.kit.gap(8));
+            if (RoleStore.allowed(a, "sales")) {
+                content.addView(salesHero(null, SyncState.REFRESHING), a.kit.lp(-1, -2));
+                content.addView(a.kit.gap(8));
+            }
             // Market data is independent of the Atiran dashboard query and can render immediately.
             content.addView(marketCard(), a.kit.lp(-1, -2));
             content.addView(a.kit.gap(8));
@@ -459,6 +464,10 @@ public class HomeScreen extends Screen {
         content.addView(a.kit.gap(8));
         content.addView(greetingHero(null), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(8));
+        if (RoleStore.allowed(a, "sales")) {
+            content.addView(salesHero(null, failureState), a.kit.lp(-1, -2));
+            content.addView(a.kit.gap(8));
+        }
         content.addView(marketCard(), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(8));
         content.addView(a.kit.error(faError, () -> render(content)), a.kit.lp(-1, -2));
@@ -703,6 +712,271 @@ public class HomeScreen extends Screen {
                 && data.salesSnapshot.documentsOn(snapshotDay(data)) == 0)
             return "هنوز فاکتوری برای امروز ثبت نشده است";
         return "نمای امروز در کارت‌های زیر جمع شده است";
+    }
+
+    private static final String[] SALES_RANGES = {"امروز", "دیروز", "۷ روز", "ماه"};
+    private int selectedSalesRange;
+
+    private static final class SalesDisplay {
+        String date;
+        String rangeLabel;
+        String comparisonLabel;
+        String forecastLabel;
+        double amountRials;
+        long documents;
+        double changePct = Double.NaN;
+        double forecastRials;
+        boolean showForecast;
+    }
+
+    /** All figures come from the same read-only daily snapshot used by the existing Home queries. */
+    private SalesDisplay salesDisplay(Data data, int rangeIndex) {
+        if (data == null || data.salesSnapshot == null || !data.salesSnapshot.isAvailable()) return null;
+        SalesSnapshot snapshot = data.salesSnapshot;
+        String end = snapshotDay(data);
+        SalesDisplay display = new SalesDisplay();
+        display.date = end;
+        switch (rangeIndex) {
+            case 1: {
+                String date = Jalali.addDays(end, -1);
+                SalesComparison.DayResult comparison = SalesComparison.evaluate(snapshot, date,
+                        SalesComparison.MINUTES_PER_DAY, SalesComparison.DEFAULT_COMPARABLE_WEEKS);
+                display.date = date;
+                display.rangeLabel = "دیروز";
+                display.comparisonLabel = "همین روز هفته‌های گذشته";
+                display.amountRials = comparison.actualRials;
+                display.documents = snapshot.documentsOn(date);
+                display.changePct = comparison.changePercent();
+                break;
+            }
+            case 2: {
+                HomeRange current = HomeRange.last7Days(end);
+                String previousFrom = Jalali.addDays(current.from, -7);
+                String previousTo = Jalali.addDays(current.to, -7);
+                display.rangeLabel = "۷ روز گذشته";
+                display.comparisonLabel = "۷ روز پیش از این بازه";
+                display.amountRials = snapshot.salesRialsBetween(current.from, current.to);
+                display.documents = snapshot.documentsBetween(current.from, current.to);
+                if (hasHistory(snapshot, previousFrom)) {
+                    double previous = snapshot.salesRialsBetween(previousFrom, previousTo);
+                    if (previous > 0) display.changePct = (display.amountRials - previous) * 100d / previous;
+                }
+                break;
+            }
+            case 3: {
+                HomeRange current = HomeRange.monthToDate(end);
+                HomeRange previous = HomeRange.previousMonthSamePeriod(end);
+                display.rangeLabel = "ماه تا امروز";
+                display.comparisonLabel = "ماه قبل تا همین روز";
+                display.amountRials = snapshot.salesRialsBetween(current.from, current.to);
+                display.documents = snapshot.documentsBetween(current.from, current.to);
+                if (hasHistory(snapshot, previous.from)) {
+                    double previousTotal = snapshot.salesRialsBetween(previous.from, previous.to);
+                    if (previousTotal > 0) display.changePct = (display.amountRials - previousTotal) * 100d / previousTotal;
+                }
+                if (end.equals(Jalali.todayStr())) {
+                    display.forecastRials = HomeRange.projectMonthEnd(display.amountRials, end);
+                    display.forecastLabel = "پیش‌بینی پایان ماه";
+                    display.showForecast = true;
+                }
+                break;
+            }
+            case 0:
+            default: {
+                int elapsed = end.equals(Jalali.todayStr()) ? minuteOfDay() : SalesComparison.MINUTES_PER_DAY;
+                SalesComparison.DayResult comparison = SalesComparison.evaluate(snapshot, end,
+                        elapsed, SalesComparison.DEFAULT_COMPARABLE_WEEKS);
+                display.rangeLabel = end.equals(Jalali.todayStr()) ? "امروز" : "آخرین روز";
+                display.comparisonLabel = "همین روز در هفته‌های قبل";
+                display.amountRials = comparison.actualRials;
+                display.documents = snapshot.documentsOn(end);
+                display.changePct = comparison.changePercent();
+                if (comparison.projectionAvailable && !comparison.complete) {
+                    display.forecastRials = comparison.projectedRials;
+                    display.forecastLabel = "پیش‌بینی پایان روز · بر پایهٔ روز تقویمی ۰۰ تا ۲۴";
+                    display.showForecast = true;
+                }
+                break;
+            }
+        }
+        return display;
+    }
+
+    private static boolean hasHistory(SalesSnapshot snapshot, String from) {
+        int lower = Jalali.parse(from);
+        int availableFrom = Jalali.parse(snapshot == null ? "" : snapshot.historyStart());
+        return lower >= 0 && availableFrom >= 0 && lower >= availableFrom;
+    }
+
+    private static int minuteOfDay() {
+        Calendar now = Calendar.getInstance();
+        return now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE);
+    }
+
+    private View salesHero(final Data data, final SyncState syncState) {
+        final LinearLayout card = a.kit.card(Theme.SECTION_SALES);
+        card.setPadding(Theme.dp(14), Theme.dp(10), Theme.dp(14), Theme.dp(12));
+        card.addView(a.kit.sectionHeader("فروش", R.drawable.mi_point_of_sale,
+                Theme.SECTION_SALES, "جزئیات ›", navAction("sales")), a.kit.lp(-1, -2));
+
+        final LinearLayout amountPanel = a.kit.v();
+        final android.animation.ValueAnimator[] amountAnimator = {null};
+        final HomeSalesChart.Area chart = new HomeSalesChart.Area(a);
+        View selector = salesRangeSelector(card, amountPanel, data, chart, amountAnimator);
+        LinearLayout.LayoutParams selectorParams = a.kit.lp(-1, -2);
+        selectorParams.topMargin = Theme.dp(8);
+        card.addView(selector, selectorParams);
+
+        LinearLayout.LayoutParams amountParams = a.kit.lp(-1, -2);
+        amountParams.topMargin = Theme.dp(8);
+        card.addView(amountPanel, amountParams);
+        renderSalesSummary(amountPanel, data, selectedSalesRange, false, amountAnimator);
+
+        if (data != null && data.salesSnapshot != null && data.salesSnapshot.isAvailable()) {
+            String end = snapshotDay(data);
+            List<SalesSnapshot.Day> series = data.salesSnapshot.dailySeries(end, 14);
+            double average = 0;
+            for (SalesSnapshot.Day day : series) average += day.salesRials;
+            if (!series.isEmpty()) average /= series.size();
+            chart.setData(series, average);
+            chart.setSelectedDate(selectedSalesRange == 1 ? Jalali.addDays(end, -1) : end);
+            final TextView chartHint = a.kit.text("۱۴ روز · قدیمی‌تر از راست به چپ · جمعه با زمینهٔ کم‌رنگ",
+                    9.5f, Theme.MUTED, false);
+            chartHint.setGravity(Gravity.END);
+            chart.setSelectionListener(day -> chartHint.setText(Jalali.weekday(day.date) + "، "
+                    + Jalali.dispFa(day.date) + " · " + HomeNumberFormatter.compactMoney(day.salesRials)));
+            LinearLayout.LayoutParams chartParams = a.kit.lp(-1, Theme.dp(188));
+            chartParams.topMargin = Theme.dp(8);
+            card.addView(chart, chartParams);
+            card.addView(chartHint, a.kit.lp(-1, -2));
+        } else {
+            String problem = data != null && data.notes != null && data.notes.containsKey("روند فروش")
+                    ? "گزارش فروش در دسترس نیست" : "هنوز داده‌ای برای روند فروش ثبت نشده است";
+            LinearLayout empty = a.kit.v();
+            empty.addView(a.kit.emptyRow(problem), a.kit.lp(-1, -2));
+            if (syncState == SyncState.REFRESHING)
+                empty.addView(a.kit.loading("در حال دریافت روند فروش"), a.kit.lp(-1, -2));
+            card.addView(empty, a.kit.lp(-1, -2));
+        }
+
+        if (syncState == SyncState.STALE || syncState == SyncState.OFFLINE) {
+            TextView age = a.kit.text(syncState == SyncState.OFFLINE
+                    ? "نمایش آخرین دادهٔ ذخیره‌شده" : "فروش بر اساس آخرین دریافت موفق",
+                    9.5f, Theme.MUTED, false);
+            age.setGravity(Gravity.END);
+            card.addView(age, a.kit.lp(-1, -2));
+        }
+        return card;
+    }
+
+    private View salesRangeSelector(final LinearLayout card, final LinearLayout amountPanel,
+                                    final Data data, final HomeSalesChart.Area chart,
+                                    final android.animation.ValueAnimator[] amountAnimator) {
+        final View[] selector = new View[1];
+        selector[0] = a.kit.segmentedControl(SALES_RANGES, selectedSalesRange, null,
+                Theme.SECTION_SALES, index -> {
+                    selectedSalesRange = index;
+                    renderSalesSummary(amountPanel, data, index, true, amountAnimator);
+                    if (data != null && data.salesSnapshot != null && data.salesSnapshot.isAvailable()) {
+                        String end = snapshotDay(data);
+                        chart.setSelectedDate(index == 1 ? Jalali.addDays(end, -1) : end);
+                    }
+                    int position = card.indexOfChild(selector[0]);
+                    if (position >= 0) {
+                        View old = selector[0];
+                        LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) old.getLayoutParams();
+                        card.removeViewAt(position);
+                        selector[0] = salesRangeSelector(card, amountPanel, data, chart, amountAnimator);
+                        card.addView(selector[0], position, params);
+                    }
+                });
+        selector[0].setTag("sales-range-selector");
+        return selector[0];
+    }
+
+    private void renderSalesSummary(LinearLayout panel, Data data, int range,
+                                    boolean animate, android.animation.ValueAnimator[] animator) {
+        if (animator[0] != null) {
+            animator[0].cancel();
+            animator[0] = null;
+        }
+        panel.removeAllViews();
+        SalesDisplay display = salesDisplay(data, range);
+        if (display == null) {
+            String message = data != null && data.notes != null && data.notes.containsKey("روند فروش")
+                    ? "فروش در این دریافت در دسترس نیست" : "دادهٔ فروش موجود نیست";
+            panel.addView(a.kit.emptyRow(message), a.kit.lp(-1, -2));
+            return;
+        }
+
+        LinearLayout valueRow = a.kit.h();
+        valueRow.setGravity(Gravity.CENTER_VERTICAL);
+        valueRow.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        TextView amount = a.kit.text(HomeNumberFormatter.compactUnit(0), 29f, Theme.TEXT, true);
+        amount.setSingleLine(true);
+        amount.setEllipsize(TextUtils.TruncateAt.END);
+        amount.setFontFeatureSettings("tnum");
+        amount.setContentDescription(HomeNumberFormatter.money(display.amountRials));
+        valueRow.addView(amount, a.kit.wlp(1f));
+        TextView unit = a.kit.text(ir.meelano.manager.core.Money.unitName(), 10.5f, Theme.MUTED, false);
+        unit.setSingleLine(true);
+        unit.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        valueRow.addView(a.kit.space(5));
+        valueRow.addView(unit, a.kit.lp(-2, -2));
+        panel.addView(valueRow, a.kit.lp(-1, -2));
+
+        if (animate && ir.meelano.manager.ui.Ui.motionOk(a)) {
+            final double target = ir.meelano.manager.core.Money.toUnit(display.amountRials);
+            animator[0] = android.animation.ValueAnimator.ofFloat(0f, 1f);
+            animator[0].setDuration(600);
+            animator[0].setInterpolator(new android.view.animation.DecelerateInterpolator());
+            animator[0].addUpdateListener(animation -> amount.setText(HomeNumberFormatter.compactUnit(
+                    target * (float) animation.getAnimatedValue())));
+            animator[0].start();
+        } else {
+            amount.setText(HomeNumberFormatter.compactUnit(
+                    ir.meelano.manager.core.Money.toUnit(display.amountRials)));
+        }
+
+        LinearLayout detail = a.kit.h();
+        detail.setGravity(Gravity.CENTER_VERTICAL);
+        TextView documents = a.kit.text(HomeNumberFormatter.integer(display.documents) + " فاکتور",
+                10.5f, Theme.MUTED, false);
+        documents.setContentDescription(HomeNumberFormatter.integer(display.documents) + " فاکتور در "
+                + display.rangeLabel);
+        detail.addView(documents, a.kit.wlp(1f));
+        if (!Double.isNaN(display.changePct) && !Double.isInfinite(display.changePct)) {
+            int direction = Math.abs(display.changePct) < 0.05d ? 0 : display.changePct > 0 ? 1 : -1;
+            int tone = direction > 0 ? Theme.SUCCESS : direction < 0 ? Theme.DANGER : Theme.MUTED;
+            TextView delta = a.kit.deltaBadge(HomeNumberFormatter.signedPercent(display.changePct),
+                    direction, tone, "تغییر " + HomeNumberFormatter.signedPercent(display.changePct)
+                            + "؛ " + display.comparisonLabel);
+            detail.addView(delta, a.kit.lp(-2, -2));
+        } else {
+            TextView noBaseline = a.kit.text("مبنای مقایسه کافی نیست", 9.5f, Theme.MUTED, false);
+            noBaseline.setGravity(Gravity.END);
+            detail.addView(noBaseline, a.kit.lp(-2, -2));
+        }
+        panel.addView(detail, a.kit.lp(-1, -2));
+        TextView comparison = a.kit.text(display.comparisonLabel, 9.5f, Theme.MUTED, false);
+        comparison.setGravity(Gravity.END);
+        panel.addView(comparison, a.kit.lp(-1, -2));
+
+        if (display.showForecast) {
+            LinearLayout forecast = a.kit.h();
+            forecast.setGravity(Gravity.CENTER_VERTICAL);
+            forecast.setPadding(Theme.dp(9), Theme.dp(5), Theme.dp(9), Theme.dp(5));
+            forecast.setBackground(Theme.pill(Theme.SECTION_SALES));
+            TextView projected = a.kit.text(display.forecastLabel + "  ·  "
+                    + HomeNumberFormatter.compactMoney(display.forecastRials), 9.5f,
+                    Theme.sectionText(Theme.SECTION_SALES), false);
+            projected.setMaxLines(2);
+            projected.setEllipsize(TextUtils.TruncateAt.END);
+            forecast.addView(projected, a.kit.wlp(1f));
+            LinearLayout.LayoutParams fp = a.kit.lp(-1, -2);
+            fp.topMargin = Theme.dp(6);
+            panel.addView(forecast, fp);
+        }
     }
 
     /** Compact rates + optional device-location weather. Cached values show while refresh runs. */
@@ -1033,19 +1307,23 @@ public class HomeScreen extends Screen {
         content.addView(a.kit.gap(8));
         content.addView(greetingHero(d), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(8));
-        // The requested live market/weather strip sits directly under the manager greeting.
-        // It is independent of Atiran SQL, so it remains visible when the business link is offline.
-        content.addView(marketCard(), a.kit.lp(-1, -2));
-        content.addView(a.kit.gap(10));
+        if (RoleStore.allowed(a, "sales")) {
+            content.addView(salesHero(d, syncState), a.kit.lp(-1, -2));
+            content.addView(a.kit.gap(10));
+        }
 
         // The former "dashboard details" accordion is gone. Operational and analytical
         // sections now have a clear, compact hierarchy and remain directly discoverable.
         for (String key : orderedKeys()) {
+            if ("sales_insight".equals(key) || "kpis".equals(key))
+                continue; // The sales Hero owns all sales figures; KPI strip is rebuilt in its dedicated section.
             LinearLayout block = a.kit.v();
             renderHomeSection(block, d, key);
             if (block.getChildCount() == 0) continue;
             content.addView(block, a.kit.lp(-1, -2));
         }
+        // Market/weather stays independent of Atiran SQL and below the business snapshot.
+        content.addView(marketCard(), a.kit.lp(-1, -2));
         renderNotes(content, d.notes);
         localizeHomeNumbers(content);
         staggerIn(content);

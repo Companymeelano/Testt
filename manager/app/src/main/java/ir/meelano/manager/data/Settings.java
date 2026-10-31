@@ -302,6 +302,21 @@ public final class Settings {
 
     public void setNotifOn(boolean on) { p.edit().putBoolean("notif_on", on).apply(); }
 
+    /** Optional local quiet window for Home AlertEngine notifications; disabled until chosen. */
+    public boolean homeQuietHoursOn() { return p.getBoolean("home_quiet_on", false); }
+    public int homeQuietStartMinute() { return clampMinute(p.getInt("home_quiet_start", 22 * 60)); }
+    public int homeQuietEndMinute() { return clampMinute(p.getInt("home_quiet_end", 8 * 60)); }
+
+    public void setHomeQuietHours(boolean enabled, int startMinute, int endMinute) {
+        p.edit().putBoolean("home_quiet_on", enabled)
+                .putInt("home_quiet_start", clampMinute(startMinute))
+                .putInt("home_quiet_end", clampMinute(endMinute)).apply();
+    }
+
+    private static int clampMinute(int minute) {
+        return Math.max(0, Math.min(23 * 60 + 59, minute));
+    }
+
     // ---------------- shop card ----------------
     public String shopName() { return p.getString("shop_name", "").trim(); }
 

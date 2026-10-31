@@ -327,7 +327,7 @@ public class SettingsScreen extends Screen {
         LinearLayout nt = a.kit.card(Theme.INFO);
 
         final boolean non = a.settings.notifOn();
-        addRow(nt, toggleRow("هشدار هوشمند سررسید", "هر روز ساعت ۸: سررسیدها، معوق‌ها، چک‌های برگشتی", non, Theme.INFO, v -> {
+        addRow(nt, toggleRow("اعلان‌های هوشمند روزانه", "هنگام بازشدن و هر روز ساعت ۸: خلاصهٔ صبح، افت غیرعادی فروش و سررسیدها", non, Theme.INFO, v -> {
             a.settings.setNotifOn(!non);
             if (!non) {
                 ir.meelano.manager.core.Notify.boot(a);
@@ -344,6 +344,20 @@ public class SettingsScreen extends Screen {
             a.kit.toast(!mon ? "گزارش صبحگاهی روشن شد" : "گزارش صبحگاهی خاموش شد");
             render(content);
         }));
+        final boolean quiet = a.settings.homeQuietHoursOn();
+        final int quietStart = a.settings.homeQuietStartMinute();
+        final int quietEnd = a.settings.homeQuietEndMinute();
+        final String quietWindow = notificationTime(quietStart) + " تا " + notificationTime(quietEnd);
+        addRow(nt, toggleRow("ساعت سکوت اعلان‌های هوشمند",
+                quiet ? "روشن • " + quietWindow + "؛ خلاصه، افت فروش و سررسید در این بازه نمایش داده نمی‌شوند"
+                        : "خاموش • بازهٔ ذخیره‌شده: " + quietWindow,
+                quiet, Theme.INFO, v -> {
+                    a.settings.setHomeQuietHours(!quiet, quietStart, quietEnd);
+                    a.kit.toast(!quiet ? "ساعت سکوت روشن شد" : "ساعت سکوت خاموش شد");
+                    render(content);
+                }));
+        addRow(nt, a.kit.btnGhost("تنظیم بازهٔ سکوت: " + quietWindow, Theme.INFO,
+                v -> showHomeQuietHoursDialog(content)));
         final boolean bkp = a.settings.backupOn();
         addRow(nt, toggleRow("یادآوری پشتیبان‌گیری هفتگی", "جمعه‌ها ساعت ۹", bkp, Theme.GOLD, v -> {
             a.settings.setBackupOn(!bkp);
@@ -398,6 +412,34 @@ public class SettingsScreen extends Screen {
                     }));
         }
         a.kit.addCard(content, nt);
+    }
+
+    private String notificationTime(int minuteOfDay) {
+        return ir.meelano.manager.core.HomeNumberFormatter.time(minuteOfDay / 60, minuteOfDay % 60);
+    }
+
+    private void showHomeQuietHoursDialog(final LinearLayout content) {
+        final int start = a.settings.homeQuietStartMinute();
+        final int end = a.settings.homeQuietEndMinute();
+        android.app.TimePickerDialog chooseStart = new android.app.TimePickerDialog(a,
+                (picker, hour, minute) -> {
+                    final int chosenStart = hour * 60 + minute;
+                    android.app.TimePickerDialog chooseEnd = new android.app.TimePickerDialog(a,
+                            (endPicker, endHour, endMinute) -> {
+                                int chosenEnd = endHour * 60 + endMinute;
+                                if (chosenStart == chosenEnd) {
+                                    a.kit.toast("زمان پایان باید با زمان آغاز متفاوت باشد");
+                                    return;
+                                }
+                                a.settings.setHomeQuietHours(a.settings.homeQuietHoursOn(),
+                                        chosenStart, chosenEnd);
+                                render(content);
+                            }, end / 60, end % 60, true);
+                    chooseEnd.setTitle("پایان ساعت سکوت");
+                    chooseEnd.show();
+                }, start / 60, start % 60, true);
+        chooseStart.setTitle("آغاز ساعت سکوت");
+        chooseStart.show();
     }
 
     private void buildShop(final LinearLayout content) {

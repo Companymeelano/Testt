@@ -7,20 +7,20 @@ emulator_abi="$(adb shell getprop ro.product.cpu.abi | tr -d '\r')"
 emulator_api="$(adb shell getprop ro.build.version.sdk | tr -d '\r')"
 echo "::notice title=Dashboard emulator::API ${emulator_api}, ABI ${emulator_abi}"
 
-log_file="$(mktemp)"
+build_log="$(mktemp)"
 attempt=1
 result=1
 while [ "$attempt" -le 3 ]; do
   set +e
-  gradle :app:connectedDebugAndroidTest -PhomeScreenshotAbi=true -Pandroid.useAndroidX=true --console=plain --info --stacktrace --no-daemon 2>&1 | tee "$log_file"
+  gradle :app:assembleDebug :app:assembleDebugAndroidTest -PhomeScreenshotAbi=true -Pandroid.useAndroidX=true --console=plain --stacktrace --no-daemon 2>&1 | tee "$build_log"
   result=${PIPESTATUS[0]}
   set -e
   [ "$result" -eq 0 ] && break
-  if [ "$attempt" -ge 3 ] || ! grep -Eq 'Could not resolve|Could not GET|Could not download|Could not find' "$log_file"; then
+  if [ "$attempt" -ge 3 ] || ! grep -Eq 'Could not resolve|Could not GET|Could not download|Could not find' "$build_log"; then
     break
   fi
   attempt=$((attempt + 1))
-  echo "::warning::Screenshot test dependency resolution failed; retrying (${attempt}/3)."
+  echo "::warning::Screenshot APK dependency resolution failed; retrying (${attempt}/3)."
   sleep 15
 done
 
@@ -59,34 +59,56 @@ PY
     [ "$report_count" -ge 5 ] && break
     [ -n "$line" ] || continue
     safe_line="$(printf '%s' "$line" | sed 's/%/%25/g; s/:/%3A/g')"
-    echo "::error title=Screenshot test report::$safe_line"
+    echo "::error title=Screenshot APK build report::$safe_line"
     report_count=$((report_count + 1))
   done < "$report_file"
 
-  device_diagnostics="$(grep -Ei 'Skipping device|Unknown API|No compatible devices|Found [0-9]+ connected|incompatible|ABI|API Level|ShellCommandUnresponsive|properties for device' "$log_file" | tail -n 4 || true)"
+  diagnostics="$(grep -E 'FAILURE:|Execution failed|Could not |Caused by:|error:|FAILED$|ErrorName:|ErrorCode:' "$build_log" | tail -n 4 || true)"
+  if [ -z "$diagnostics" ]; then diagnostics="$(tail -n 4 "$build_log")"; fi
   while IFS= read -r line; do
     [ -n "$line" ] || continue
     safe_line="$(printf '%s' "$line" | sed 's/%/%25/g; s/:/%3A/g')"
-    echo "::error title=Screenshot device compatibility::$safe_line"
-  done <<< "$device_diagnostics"
-
-  diagnostics="$(grep -E 'FAILURE:|Execution failed|Could not |Caused by:|error:|AssertionFailedError|AssertionError|FAILED$|No tests found|ErrorName:|ErrorCode:|There were failing tests' "$log_file" | tail -n 2 || true)"
-  if [ -z "$diagnostics" ]; then diagnostics="$(tail -n 2 "$log_file")"; fi
-  while IFS= read -r line; do
-    [ -n "$line" ] || continue
-    safe_line="$(printf '%s' "$line" | sed 's/%/%25/g; s/:/%3A/g')"
-    echo "::error title=Screenshot Gradle diagnostics::$safe_line"
+    echo "::error title=Screenshot APK build diagnostics::$safe_line"
   done <<< "$diagnostics"
-
-  logcat_file="$(mktemp)"
-  if adb logcat -d -t 2000 > "$logcat_file" 2>/dev/null; then
-    grep -E 'FATAL EXCEPTION|AndroidRuntime|INSTRUMENTATION_STATUS|INSTRUMENTATION_FAILED|AssertionError' "$logcat_file" | tail -n 2 | while IFS= read -r line; do
-      safe_line="$(printf '%s' "$line" | sed 's/%/%25/g; s/:/%3A/g')"
-      echo "::error title=Screenshot emulator log::$safe_line"
-    done || true
-  fi
   exit 1
 fi
+
+app_apk="app/build/outputs/apk/debug/app-debug.apk"
+test_apk="app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk"
+for apk in "$app_apk" "$test_apk"; do
+  if [ ! -s "$apk" ]; then
+    echo "::error title=Screenshot APK missing::$apk was not produced by the Android build."
+    exit 1
+  fi
+done
+
+adb uninstall ir.meelano.manager.debug.test >/dev/null 2>&1 || true
+adb uninstall ir.meelano.manager.debug >/dev/null 2>&1 || true
+for apk in "$app_apk" "$test_apk"; do
+  install_log="$(mktemp)"
+  if ! adb install -r "$apk" > "$install_log" 2>&1; then
+    install_output="$(tail -n 8 "$install_log" | tr '\r\n' ' ' | sed 's/%/%25/g; s/:/%3A/g')"
+    echo "::error title=Screenshot APK install failed::$apk: $install_output"
+    exit 1
+  fi
+  cat "$install_log"
+done
+
+instrumentation_log="$(mktemp)"
+set +e
+adb shell am instrument -w -r ir.meelano.manager.debug.test/androidx.test.runner.AndroidJUnitRunner 2>&1 | tee "$instrumentation_log"
+instrumentation_result=${PIPESTATUS[0]}
+set -e
+if [ "$instrumentation_result" -ne 0 ] \
+  || ! grep -Eq 'OK \([1-9][0-9]* tests?\)|INSTRUMENTATION_STATUS: numtests=[1-9]' "$instrumentation_log" \
+  || grep -Eq 'INSTRUMENTATION_FAILED|INSTRUMENTATION_STATUS_CODE: -2|FAILURES!!!|Tests run: [0-9]+, Failures: [1-9]' "$instrumentation_log"; then
+  grep -E 'INSTRUMENTATION_STATUS|INSTRUMENTATION_RESULT|INSTRUMENTATION_CODE|INSTRUMENTATION_FAILED|FAILURES!!!|Tests run:|AssertionError|Exception|Error:' "$instrumentation_log" | tail -n 10 | while IFS= read -r line; do
+    safe_line="$(printf '%s' "$line" | sed 's/%/%25/g; s/:/%3A/g')"
+    echo "::error title=Home screenshot instrumentation::$safe_line"
+  done || true
+  exit 1
+fi
+echo "::notice title=Home screenshot instrumentation::Instrumented Light and Dark rendering test passed."
 
 mkdir -p ../design/screenshots
 screenshot_dir="files/home-dashboard-screenshots"

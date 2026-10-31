@@ -1,5 +1,6 @@
 package ir.meelano.manager.screens;
 
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
@@ -64,6 +65,7 @@ public final class HomeDashboardScreenshotTest {
         AtiranAuth.saveSession(target, 1, "arena-preview", "مدیر نمونه", RoleStore.ADMIN, true, true);
 
         Intent launch = new Intent(target, MainActivity.class);
+        launch.putExtra("ir.meelano.manager.HOME_SCREENSHOT_PREVIEW", true);
         launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         Activity activity = InstrumentationRegistry.getInstrumentation().startActivitySync(launch);
         assertNotNull("Manager shell did not start", activity);
@@ -79,6 +81,8 @@ public final class HomeDashboardScreenshotTest {
         }
         assertTrue("Home dashboard was not visible; current UI text: " + visibleText[0],
                 visibleText[0].contains("شاخص‌های مالی"));
+        assertFalse("Preview screenshot contains a live connection error",
+                visibleText[0].contains("جزئیات اتصال"));
         // Let the intro transition finish before recording the first viewport.
         SystemClock.sleep(500L);
         InstrumentationRegistry.getInstrumentation().waitForIdleSync();

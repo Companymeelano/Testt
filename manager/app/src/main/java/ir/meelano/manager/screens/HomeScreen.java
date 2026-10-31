@@ -249,6 +249,14 @@ public class HomeScreen extends Screen {
         // Smart first paint: the last saved dashboard appears at once and live data replaces it when ready.
         final String[] cachedTs = {""};
         final Data cached = loadCached(cachedTs);
+        // Instrumentation-only preview: render its seeded cache without attempting a live DB refresh.
+        // The intent flag is ignored in non-debug builds, so normal users always get live refreshes.
+        if (cached != null && ir.meelano.manager.BuildConfig.DEBUG && a.getIntent() != null
+                && a.getIntent().getBooleanExtra("ir.meelano.manager.HOME_SCREENSHOT_PREVIEW", false)) {
+            syncWasRefreshing = false;
+            build(content, cached, SyncState.FRESH, cachedTs[0]);
+            return;
+        }
         if (cached != null) {
             syncWasRefreshing = true;
             build(content, cached, SyncState.REFRESHING, cachedTs[0]);

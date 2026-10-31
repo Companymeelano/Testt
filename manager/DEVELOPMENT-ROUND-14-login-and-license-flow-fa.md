@@ -33,8 +33,14 @@
 
 ## فایل‌ها و نسخه
 
-- برنامهٔ اصلی مستقل Manager: **v36.42.0 (versionCode 75)**، APK تستی `dist/meelano-manager-v36-debug-24.apk`.
-- ابزار فروشندهٔ صدور لایسنس: **v1.9.1 (versionCode 11)**، APK `dist/meelano-admin-v1.9.1-debug.apk`.
+- برنامهٔ اصلی مستقل Manager: **v36.42.0 (versionCode 75)**، APK تستی `dist/meelano-manager-v36-debug-24.apk`؛
+  SHA-256: `4e6774bcefc008a2ba218f9c6f3da773f4851729b613c086b1359c0110921d08`.
+- ابزار فروشندهٔ صدور لایسنس: **v1.9.1 (versionCode 11)**، APK `dist/meelano-admin-v1.9.1-debug.apk`؛
+  SHA-256: `2d284c4b48971fc1c1374b3fcf33e6b5fa8cfa0b19ce1655d1f625d4b9629e39`.
+- لینک مستقیم Manager:
+  `https://github.com/Companymeelano/Testt/raw/arena/29e01a09-testt/dist/meelano-manager-v36-debug-24.apk`
+- لینک مستقیم ابزار صدور:
+  `https://github.com/Companymeelano/Testt/raw/arena/29e01a09-testt/dist/meelano-admin-v1.9.1-debug.apk`
 - تغییرهای اصلی کد: `LoginActivity.java` (صفحهٔ فعال‌سازی)، `AdminActivity.java` (دریافت/ثبت نام)، `HomeScreen.java` و `MainActivity.java` (محافظت و بازیابی خطا)، `CrashReporter.java` (گزارش handled/fatal)، `LicenseRequestFlowTest.java`.
 
 ## آزمون‌ها و انتشار
@@ -43,6 +49,6 @@
 - `tools/verify_all.py`: **۲۴/۲۴** کنترل موفق؛ نحو ۲۴۶ فایل Java، XML، منابع و ارجاع‌ها پاک.
 - `tools/audit_manager_schema.py`: **۰ خطا**؛ ۲۸۷ نگاشت literal و ۲۳۸ ارجاع `dbo` بازبینی شد.
 - YAML workflow معتبر است و گام‌های نسخهٔ Manager 36.42.0 و ابزار فروشنده 1.9.1 را دارد.
-- build هر دو APK و اجرای تست‌های کامل Manager از workflow رسمی GitHub Actions انجام می‌شود؛ به‌دلیل نبود JDK/Android SDK محلی، build محلی ادعا نمی‌شود.
-- وضعیت نهایی CI، SHA-256 و لینک‌های APK پس از اتمام workflow در همین گزارش و جمع‌بندی آخرین وضعیت ثبت می‌شوند.
-- این‌ها APKهای **debug مستقل** هستند. انتشار signed/release جداگانه فقط در صورت فعال‌بودن secrets امضای release ممکن است؛ هیچ تغییر یا دورزدنی در امنیت آتیران/لایسنس انجام نشده است.
+- workflow **41155921188** با نتیجهٔ **success**: تست‌های واحد Manager و APK اصلی build/verify شد؛ ابزار فروشنده هم build، شناسه/نسخه و امضا بررسی شد. لینکی به اجرای CI: `https://github.com/Companymeelano/Testt/actions/runs/41155921188`.
+- SHAها در `dist/manager-v36-build-info.txt` و `dist/admin-license-build-info.txt` نیز ثبت‌اند.
+- تحویل این دور دو APK **debug مستقل** است. نسخهٔ signed/release جداگانه منتشر نشد؛ workflow انتشار release از workflow و اسرار امضای جداگانه استفاده می‌کند. هیچ تغییر یا دورزدنی در امنیت آتیران/لایسنس انجام نشده است.

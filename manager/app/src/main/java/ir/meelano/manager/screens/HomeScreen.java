@@ -1,6 +1,9 @@
 package ir.meelano.manager.screens;
 
+import android.text.SpannableString;
+import android.text.Spanned;
 import android.text.TextUtils;
+import android.view.ViewGroup;
 import java.util.Locale;
 import ir.meelano.manager.core.MarketWeather;
 import ir.meelano.manager.core.Diag;
@@ -25,9 +28,9 @@ import ir.meelano.manager.core.AlertEngine;
 import ir.meelano.manager.core.Filter;
 import ir.meelano.manager.core.FollowUps;
 import ir.meelano.manager.core.HomeRange;
+import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.MasterQueries;
-import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.RoleStore;
 import ir.meelano.manager.core.MoneyQueries;
 import ir.meelano.manager.R;
@@ -386,6 +389,7 @@ public class HomeScreen extends Screen {
             content.addView(a.kit.gap(8));
             content.addView(a.kit.loading("در حال دریافت داشبورد مدیریتی…"), a.kit.lp(-1, -2));
         }
+        localizeHomeNumbers(content);
 
         // Two groups run in parallel on their own connections (the runner has three workers).
         final Data shared = new Data();
@@ -584,6 +588,7 @@ public class HomeScreen extends Screen {
             bc.addView(a.kit.btn("تلاش مجدد", v -> render(content)), a.kit.lp(-1, -2));
             content.addView(bc, 2);
             content.addView(a.kit.gap(8), 3);
+            localizeHomeNumbers(content);
             return;
         }
         content.removeAllViews();
@@ -594,6 +599,7 @@ public class HomeScreen extends Screen {
         content.addView(marketCard(), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(8));
         content.addView(a.kit.error(faError, () -> render(content)), a.kit.lp(-1, -2));
+        localizeHomeNumbers(content);
     }
 
     // ---------------- offline cache (manager cues, top items, sales history and timestamp) ----------------
@@ -762,13 +768,14 @@ public class HomeScreen extends Screen {
     private String snapshotLabel(Data d) {
         String day = d == null ? "" : Jalali.disp(d.snapshotDay);
         if (day.isEmpty()) return "آخرین داده";
-        return day.equals(Jalali.todayStr()) ? "امروز" : "روز " + Jalali.shortLabel(day);
+        return day.equals(Jalali.todayStr()) ? "امروز"
+                : HomeNumberFormatter.localizeText("روز " + Jalali.shortLabel(day));
     }
 
     private String monthLabel(String monthStart) {
         String day = Jalali.disp(monthStart);
         if (day.isEmpty()) return "ماه نامشخص";
-        return Jalali.monthName(day) + " " + Money.fa(day.substring(0, 4));
+        return Jalali.monthName(day) + " " + HomeNumberFormatter.localizeText(day.substring(0, 4));
     }
 
     /** Depth layer behind the hero: two gold light sources, a glossy top sheen, a thin ring and a rim highlight. */
@@ -818,13 +825,13 @@ public class HomeScreen extends Screen {
     private String dateLine() {
         String t = Jalali.todayStr();
         String[] p = t.split("/");
-        if (p.length != 3) return a.kit.todayLine();
+        if (p.length != 3) return HomeNumberFormatter.localizeText(a.kit.todayLine());
         try {
             int day = Integer.parseInt(p[2].trim());
-            return Jalali.weekday(t) + "، " + Money.fa(String.valueOf(day)) + " " + Jalali.monthName(t)
-                    + " " + Money.fa(p[0].trim());
+            return Jalali.weekday(t) + "، " + HomeNumberFormatter.integer(day) + " " + Jalali.monthName(t)
+                    + " " + HomeNumberFormatter.localizeText(p[0].trim());
         } catch (NumberFormatException e) {
-            return a.kit.todayLine();
+            return HomeNumberFormatter.localizeText(a.kit.todayLine());
         }
     }
 
@@ -1133,14 +1140,14 @@ public class HomeScreen extends Screen {
             wr.addView(wi, a.kit.lp(Theme.dp(44), Theme.dp(44)));
             wr.addView(a.kit.space(8));
             LinearLayout wc = a.kit.v();
-            TextView line = a.kit.text(weatherPlace + " • " + Money.fa(String.valueOf(Math.round(w.temp))) + "°  "
+            TextView line = a.kit.text(weatherPlace + " • " + HomeNumberFormatter.integer(Math.round(w.temp)) + "°  "
                     + MarketWeather.describe(w.code), 12f, Theme.TEXT, true);
             line.setMaxLines(1);
             line.setEllipsize(TextUtils.TruncateAt.END);
             wc.addView(line, a.kit.lp(-1, -2));
             LinearLayout weatherMeta = a.kit.h();
             weatherMeta.setGravity(Gravity.CENTER_VERTICAL);
-            weatherMeta.addView(a.kit.text("رطوبت " + Money.fa(String.valueOf(w.humidity)) + "٪", 10.5f, Theme.MUTED, false),
+            weatherMeta.addView(a.kit.text("رطوبت " + HomeNumberFormatter.percent(w.humidity), 10.5f, Theme.MUTED, false),
                     a.kit.wlp(1f));
             weatherMeta.addView(a.kit.pill(wLive ? "آب‌وهوا زنده" : "آب‌وهوا ذخیره‌شده",
                     wLive ? Theme.SUCCESS : Theme.MUTED), a.kit.lp(-2, -2));
@@ -1173,8 +1180,9 @@ public class HomeScreen extends Screen {
         card.addView(rule, a.kit.lp(-1, Theme.dp(1)));
         card.addView(a.kit.gap(6));
         card.addView(a.kit.hint("منبع قیمت: TGJU · واحد: تومان\nزمان منبع: "
-                + Money.fa(stamp == null || stamp.isEmpty() ? "نامشخص" : stamp)
+                + HomeNumberFormatter.localizeText(stamp == null || stamp.isEmpty() ? "نامشخص" : stamp)
                 + " · دریافت برنامه: " + marketFreshness(MarketWeather.ratesKey(), rLive)), a.kit.lp(-1, -2));
+        localizeHomeNumbers(card);
     }
 
     /** A truthful local cache timestamp, separately reported from the source's own timestamp. */
@@ -1189,8 +1197,8 @@ public class HomeScreen extends Screen {
         String today = Jalali.todayStr();
         String day = date.equals(today) ? "امروز" : date.equals(Jalali.addDays(today, -1))
                 ? "دیروز" : Jalali.shortLabel(date);
-        String time = String.format(Locale.US, "%02d:%02d", saved.get(Calendar.HOUR_OF_DAY), saved.get(Calendar.MINUTE));
-        return (live ? "هم‌اکنون · " : "ذخیره‌شده · ") + day + " " + Money.fa(time);
+        String time = HomeNumberFormatter.time(saved.get(Calendar.HOUR_OF_DAY), saved.get(Calendar.MINUTE));
+        return (live ? "هم‌اکنون · " : "ذخیره‌شده · ") + day + " " + time;
     }
 
     private View rateTile(MarketWeather.Rate r) {
@@ -1214,7 +1222,7 @@ public class HomeScreen extends Screen {
         // Prices are always in toman (the source's unit), whatever unit the rest of the app uses.
         // A zero price means the source has no figure — never show it as a real «۰ تومان».
         boolean hasPrice = r.toman > 0;
-        TextView price = a.kit.text(hasPrice ? Money.fa(Money.num(r.toman)) : "ناموجود",
+        TextView price = a.kit.text(hasPrice ? HomeNumberFormatter.rounded(r.toman) : "ناموجود",
                 hasPrice ? 18f : 13f, hasPrice ? Theme.TEXT : Theme.MUTED, true);
         price.setMaxLines(1);
         price.setGravity(Gravity.CENTER_HORIZONTAL);
@@ -1231,9 +1239,8 @@ public class HomeScreen extends Screen {
             unit.setGravity(Gravity.CENTER_HORIZONTAL);
             t.addView(unit, a.kit.lp(-1, -2));
             int color = r.changePct > 0 ? Theme.SUCCESS : (r.changePct < 0 ? Theme.DANGER : Theme.MUTED);
-            String arrow = r.changePct > 0 ? "↗ +" : (r.changePct < 0 ? "↘ −" : "");
             String changeText = Math.abs(r.changePct) < 0.05 ? "بدون تغییر"
-                    : arrow + Money.fa(String.format(Locale.US, "%.1f", Math.abs(r.changePct))) + "٪";
+                    : HomeNumberFormatter.directionalPercent(r.changePct);
             TextView ch = a.kit.text(changeText, 10f, color, true);
             ch.setMaxLines(1);
             ch.setGravity(Gravity.CENTER_HORIZONTAL);
@@ -1247,17 +1254,17 @@ public class HomeScreen extends Screen {
         String trendDescription = !hasPrice ? "قیمت در دسترس نیست"
                 : Math.abs(r.changePct) < 0.05 ? "بدون تغییر"
                 : (r.changePct > 0 ? "افزایش " : "کاهش ")
-                + Money.fa(String.format(Locale.US, "%.1f", Math.abs(r.changePct))) + " درصد";
+                + HomeNumberFormatter.decimal(Math.abs(r.changePct)) + " درصد";
         t.setContentDescription(r.label + "، " + (hasPrice
-                ? Money.fa(Money.num(r.toman)) + " تومان، " + trendDescription
+                ? HomeNumberFormatter.rounded(r.toman) + " تومان، " + trendDescription
                 : trendDescription));
         return t;
     }
 
     private String currentTimeLabel() {
         Calendar now = Calendar.getInstance();
-        return a.kit.todayLine() + " ساعت " + Money.fa(String.format(Locale.US, "%02d:%02d",
-                now.get(Calendar.HOUR_OF_DAY), now.get(Calendar.MINUTE)));
+        return HomeNumberFormatter.localizeText(a.kit.todayLine()) + " ساعت "
+                + HomeNumberFormatter.time(now.get(Calendar.HOUR_OF_DAY), now.get(Calendar.MINUTE));
     }
 
     private void build(LinearLayout content, Data d, BannerState bannerState, String bannerTime) {
@@ -1288,7 +1295,38 @@ public class HomeScreen extends Screen {
             content.addView(block, a.kit.lp(-1, -2));
         }
         renderNotes(content, d.notes);
+        localizeHomeNumbers(content);
         staggerIn(content);
+    }
+
+    /** Convert any remaining server/cache digits in Home labels and accessibility text. */
+    private void localizeHomeNumbers(View root) {
+        if (root == null) return;
+        CharSequence description = root.getContentDescription();
+        CharSequence localizedDescription = localizeHomeText(description);
+        if (localizedDescription != description) root.setContentDescription(localizedDescription);
+        if (root instanceof TextView) {
+            TextView text = (TextView) root;
+            CharSequence original = text.getText();
+            CharSequence localized = localizeHomeText(original);
+            if (localized != original) text.setText(localized, TextView.BufferType.SPANNABLE);
+        }
+        if (root instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) root;
+            for (int i = 0; i < group.getChildCount(); i++) localizeHomeNumbers(group.getChildAt(i));
+        }
+    }
+
+    private static CharSequence localizeHomeText(CharSequence value) {
+        if (value == null) return null;
+        String source = value.toString();
+        String localized = HomeNumberFormatter.localizeText(source);
+        if (source.equals(localized)) return value;
+        SpannableString result = new SpannableString(localized);
+        if (value instanceof Spanned) {
+            TextUtils.copySpansFrom((Spanned) value, 0, source.length(), Object.class, result, 0);
+        }
+        return result;
     }
 
     /**
@@ -1464,20 +1502,20 @@ public class HomeScreen extends Screen {
             String todayNote = running ? partialTodayNote()
                     : (dayComparison.hasBaseline() ? "مقایسهٔ روز کامل" : "بدون مبنای هم‌روز");
             cmp.add(new Mini(R.drawable.mi_point_of_sale, snapshotLabel(d),
-                    Money.compactRial(todaySales), todayNote, Theme.TEXT));
-            cmp.add(new Mini(R.drawable.mi_calendar_month, "دیروز", Money.compactRial(yesterday), null, Theme.TEXT));
-            cmp.add(new Mini(R.drawable.mi_bar_chart, "فروش ۷ روز اخیر", Money.compactRial(last7Sales),
+                    HomeNumberFormatter.compactMoney(todaySales), todayNote, Theme.TEXT));
+            cmp.add(new Mini(R.drawable.mi_calendar_month, "دیروز", HomeNumberFormatter.compactMoney(yesterday), null, Theme.TEXT));
+            cmp.add(new Mini(R.drawable.mi_bar_chart, "فروش ۷ روز اخیر", HomeNumberFormatter.compactMoney(last7Sales),
                     running ? "روز جاری ناقص است" : null, Theme.TEXT));
-            cmp.add(new Mini(R.drawable.mi_bar_chart, "میانگین ۳۰ روز", Money.compactRial(avg30), null, Theme.TEXT));
+            cmp.add(new Mini(R.drawable.mi_bar_chart, "میانگین ۳۰ روز", HomeNumberFormatter.compactMoney(avg30), null, Theme.TEXT));
             cmp.add(new Mini(R.drawable.mi_refresh, "میانگین ۴ " + weekday + " گذشته",
-                    Money.compactRial(dayComparison.sameWeekdayAverageRials), "روزهای هم‌هفته", Theme.TEXT));
+                    HomeNumberFormatter.compactMoney(dayComparison.sameWeekdayAverageRials), "روزهای هم‌هفته", Theme.TEXT));
             if (dayComparison.projectionAvailable) {
                 String forecastNote = dayComparison.hasBaseline()
-                        ? "در برابر " + weekday + "ها: " + Money.pct(dayComparison.changePercent())
+                        ? "در برابر " + weekday + "ها: " + HomeNumberFormatter.signedPercent(dayComparison.changePercent())
                         : "مبنای هم‌روز کافی نیست";
                 if (running) forecastNote = "برآورد ناقص · " + forecastNote;
                 cmp.add(new Mini(R.drawable.mi_trending_up, "پیش‌بینی پایان روز",
-                        Money.compactRial(dayComparison.projectedRials), forecastNote, Theme.TEXT));
+                        HomeNumberFormatter.compactMoney(dayComparison.projectedRials), forecastNote, Theme.TEXT));
             }
             compare.addView(miniGrid(cmp, 2), a.kit.lp(-1, -2));
             a.kit.addCard(content, compare);
@@ -1719,9 +1757,8 @@ public class HomeScreen extends Screen {
     /** «تا ۱۱:۵۵ • ناقص»: the day is still running, so the number is partial. */
     private String partialTodayNote() {
         Calendar c = Calendar.getInstance();
-        String hm = String.format(Locale.US, "%02d:%02d",
-                c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE));
-        return "تا " + Money.fa(hm) + " • ناقص";
+        return "تا " + HomeNumberFormatter.time(c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE))
+                + " • ناقص";
     }
 
     /**
@@ -1742,12 +1779,12 @@ public class HomeScreen extends Screen {
             int sp = raw.lastIndexOf(' ');
             if (sp > 0) { date = raw.substring(0, sp).trim(); time = raw.substring(sp + 1).trim(); }
         }
-        TextView d = a.kit.text(label + Money.fa(dropYear(date)), 11f, ink, false);
+        TextView d = a.kit.text(label + HomeNumberFormatter.localizeText(dropYear(date)), 11f, ink, false);
         d.setSingleLine(true);
         d.setEllipsize(TextUtils.TruncateAt.END);
         row.addView(d, a.kit.wlp(1f));
         if (!time.isEmpty()) {
-            TextView t = a.kit.text(Money.fa(time), 11f, ink, true);
+            TextView t = a.kit.text(HomeNumberFormatter.time(time), 11f, ink, true);
             t.setSingleLine(true);
             row.addView(t, a.kit.lp(-2, -2));
         }
@@ -1784,8 +1821,8 @@ public class HomeScreen extends Screen {
             unavailable.subColor = Theme.MUTED;
             return unavailable;
         }
-        return new Kit.Kpi(label, Money.compactRial(row.d("total")),
-                Money.fa(String.valueOf(row.l(countKey))) + " " + countLabel, accent,
+        return new Kit.Kpi(label, HomeNumberFormatter.compactMoney(row.d("total")),
+                HomeNumberFormatter.integer(row.l(countKey)) + " " + countLabel, accent,
                 () -> gotoDay(target, row));
     }
 
@@ -1799,7 +1836,7 @@ public class HomeScreen extends Screen {
         List<FollowUps.Due> dues = FollowUps.dueToday(a);
         if (!dues.isEmpty() && RoleStore.allowed(a, "customers")) {
             final FollowUps.Due fd = dues.get(0);
-            String who = dues.size() == 1 ? fd.note.name : Money.fa(String.valueOf(dues.size())) + " یادداشت";
+            String who = dues.size() == 1 ? fd.note.name : HomeNumberFormatter.integer(dues.size()) + " یادداشت";
             rows.addView(a.kit.alertRow("پیگیری مشتری", who + " • سررسید یادداشت",
                     Theme.GOLD, v -> gotoCustomer(fd.code)), padTop(n));
             n++;
@@ -1808,7 +1845,7 @@ public class HomeScreen extends Screen {
         // never presented as confirmation that the business has no alerts.
         boolean incomplete = !unavailableSources.isEmpty();
         String badge = n == 0 ? (incomplete ? "بررسی ناقص" : "بدون هشدار")
-                : Money.fa(String.valueOf(n)) + " مورد";
+                : HomeNumberFormatter.integer(n) + " مورد";
         int badgeTone = n == 0 && !incomplete ? Theme.SUCCESS : Theme.WARNING;
         alerts.addView(boardHead("هشدار امروز", null, R.drawable.mi_warning,
                 statusChip(badge, badgeTone)), a.kit.lp(-1, -2));
@@ -1876,7 +1913,7 @@ public class HomeScreen extends Screen {
             shown++;
         }
         if (visible.size() > shown) {
-            rows.addView(a.kit.hint("+" + Money.fa(String.valueOf(visible.size() - shown))
+            rows.addView(a.kit.hint("+" + HomeNumberFormatter.integer(visible.size() - shown)
                     + " هشدار دیگر در فهرست امروز"), padTop(index));
         }
         return index - firstIndex;
@@ -1912,7 +1949,7 @@ public class HomeScreen extends Screen {
 
     private String engineAlertTitle(AlertEngine.Alert alert) {
         String product = alert.subject == null || alert.subject.isEmpty()
-                ? "کالای " + Money.fa(alert.actionValue) : alert.subject;
+                ? "کالای " + HomeNumberFormatter.localizeText(alert.actionValue) : alert.subject;
         switch (alert.code) {
             case "stock_out": return "ناموجود: " + product;
             case "stock_low": return "کم‌موجودی: " + product;
@@ -1927,23 +1964,23 @@ public class HomeScreen extends Screen {
     private String engineAlertDetail(AlertEngine.Alert alert) {
         switch (alert.code) {
             case "stock_out":
-                return "کد " + Money.fa(alert.actionValue) + " • موجودی " + Money.qty(alert.value);
+                return "کد " + HomeNumberFormatter.localizeText(alert.actionValue) + " • موجودی " + HomeNumberFormatter.decimal(alert.value);
             case "stock_low":
-                return "کد " + Money.fa(alert.actionValue) + " • موجودی " + Money.qty(alert.value)
-                        + " • نقطه سفارش " + Money.qty(alert.referenceValue);
+                return "کد " + HomeNumberFormatter.localizeText(alert.actionValue) + " • موجودی " + HomeNumberFormatter.decimal(alert.value)
+                        + " • نقطه سفارش " + HomeNumberFormatter.decimal(alert.referenceValue);
             case "sales_drop":
-                return "پیش‌بینی پایان روز " + Money.compactRial(alert.value)
-                        + " • میانگین روز مشابه هفته " + Money.compactRial(alert.referenceValue)
-                        + " • افت " + Money.pct(Math.abs(alert.changePercent));
+                return "پیش‌بینی پایان روز " + HomeNumberFormatter.compactMoney(alert.value)
+                        + " • میانگین روز مشابه هفته " + HomeNumberFormatter.compactMoney(alert.referenceValue)
+                        + " • افت " + HomeNumberFormatter.percentMagnitude(alert.changePercent);
             case "purchase_price_drift":
-                return "دو خرید آخر: " + Money.compactRial(alert.referenceValue) + " ← "
-                        + Money.compactRial(alert.value) + " • تغییر " + Money.pct(alert.changePercent);
+                return "دو خرید آخر: " + HomeNumberFormatter.compactMoney(alert.referenceValue) + " ← "
+                        + HomeNumberFormatter.compactMoney(alert.value) + " • تغییر " + HomeNumberFormatter.signedPercent(alert.changePercent);
             case "cheque_out_due":
             case "cheque_in_due":
                 String dueDay = alert.daysUntilDue == 0 ? "امروز"
-                        : "تا " + Money.fa(String.valueOf(alert.daysUntilDue)) + " روز";
-                String amount = alert.value > 0 ? " • مبلغ " + Money.compactRial(alert.value) : "";
-                return Money.fa(String.valueOf(alert.count)) + " فقره • " + dueDay + amount;
+                        : "تا " + HomeNumberFormatter.integer(alert.daysUntilDue) + " روز";
+                String amount = alert.value > 0 ? " • مبلغ " + HomeNumberFormatter.compactMoney(alert.value) : "";
+                return HomeNumberFormatter.integer(alert.count) + " فقره • " + dueDay + amount;
             default:
                 return "برای بررسی، این بخش را باز کنید.";
         }
@@ -2014,7 +2051,7 @@ public class HomeScreen extends Screen {
         } else {
             // One wide summary line, then one compact tile per kind of return.
             card.addView(statRow(R.drawable.mi_refresh, "برگشتی ۳۰ روز اخیر",
-                    Money.fa(String.valueOf(docs)) + " سند • " + Money.compactMoney(total), Theme.GOLD),
+                    HomeNumberFormatter.integer(docs) + " سند • " + HomeNumberFormatter.compactMoney(total), Theme.GOLD),
                     a.kit.lp(-1, -2));
             card.addView(a.kit.gap(10));
             List<Mini> tiles = new ArrayList<>();
@@ -2024,7 +2061,7 @@ public class HomeScreen extends Screen {
                 String label = r.s("label");
                 if (label == null || label.trim().isEmpty()) continue;
                 tiles.add(new Mini(returnIcon(label), label,
-                        Money.fa(String.valueOf(r.l("docs"))) + " سند", Money.compactMoney(r.d("total")), Theme.TEXT));
+                        HomeNumberFormatter.integer(r.l("docs")) + " سند", HomeNumberFormatter.compactMoney(r.d("total")), Theme.TEXT));
             }
             if (!tiles.isEmpty()) card.addView(miniGrid(tiles, 3), a.kit.lp(-1, -2));
         }
@@ -2072,17 +2109,17 @@ public class HomeScreen extends Screen {
                 pulse.setBackground(Theme.kpi(color));
                 pulse.addView(a.kit.text(metric + snapshotLabel(d), 10.5f, Theme.MUTED, false), a.kit.lp(-2, -2));
                 pulse.addView(a.kit.space(7));
-                pulse.addView(a.kit.text(Money.compactRial(comparisonValue),
+                pulse.addView(a.kit.text(HomeNumberFormatter.compactMoney(comparisonValue),
                         11.5f, Theme.TEXT, true), a.kit.wlp(1f));
-                pulse.addView(a.kit.text(Money.pct(Math.abs(change)) + " " + direction + " از " + basis,
+                pulse.addView(a.kit.text(HomeNumberFormatter.percentMagnitude(change) + " " + direction + " از " + basis,
                         10.5f, color, true), a.kit.lp(-2, -2));
                 trend.addView(pulse, a.kit.lp(-1, -2));
                 trend.addView(a.kit.gap(4));
             }
             Charts.Area chart = new Charts.Area(a);
             TextView caption = a.kit.text(points.isEmpty() ? "" : lastCap(points), 10f, Theme.MUTED, false);
-            chart.setData(points, Theme.GOLD, Charts.MONEY);
-            chart.setListener((idx, point) -> caption.setText(Money.fa(point.label) + " • " + Money.rial(point.value)));
+            chart.setData(points, Theme.GOLD, HomeNumberFormatter::chartMoney);
+            chart.setListener((idx, point) -> caption.setText(HomeNumberFormatter.localizeText(point.label) + " • " + HomeNumberFormatter.money(point.value)));
             trend.addView(chart, new LinearLayout.LayoutParams(-1, Theme.dp(126)));
             trend.addView(caption, a.kit.lp(-1, -2));
             a.kit.addCard(content, trend);
@@ -2102,11 +2139,11 @@ public class HomeScreen extends Screen {
                     Row item = d.topItems.get(i);
                     String label = item.s("label");
                     if (label == null || label.trim().isEmpty()) label = "کالای بدون نام";
-                    card.addView(a.kit.progressLine(Money.fa(String.valueOf(i + 1)) + " • " + label,
-                            Money.compactRial(item.d("total")), max > 0 ? item.d("total") / max : 0, Theme.GOLD),
+                    card.addView(a.kit.progressLine(HomeNumberFormatter.integer(i + 1) + " • " + label,
+                            HomeNumberFormatter.compactMoney(item.d("total")), max > 0 ? item.d("total") / max : 0, Theme.GOLD),
                             a.kit.lp(-1, -2));
-                    TextView quantity = a.kit.text(Money.qty(item.d("qty")) + " واحد • "
-                            + Money.fa(String.valueOf(item.l("docs"))) + " ردیف", 9.5f, Theme.MUTED, false);
+                    TextView quantity = a.kit.text(HomeNumberFormatter.decimal(item.d("qty")) + " واحد • "
+                            + HomeNumberFormatter.integer(item.l("docs")) + " ردیف", 9.5f, Theme.MUTED, false);
                     quantity.setGravity(Gravity.END);
                     card.addView(quantity, a.kit.lp(-1, -2));
                 }
@@ -2120,24 +2157,24 @@ public class HomeScreen extends Screen {
                 int elapsed = HomeRange.dayOfMonth(today);
                 int monthDays = HomeRange.daysInMonth(today);
                 double forecast = HomeRange.projectMonthEnd(currentMtd, today);
-                String currentLabel = monthLabel(currentRange.from) + " • روز ۱ تا " + Money.fa(String.valueOf(elapsed));
+                String currentLabel = monthLabel(currentRange.from) + " • روز ۱ تا " + HomeNumberFormatter.integer(elapsed);
                 String previousLabel = monthLabel(previousRange.from) + " • هم‌بازه";
 
                 if (hasProducts) card.addView(a.kit.gap(7));
                 card.addView(insightSubhead("مقایسهٔ ماهانه", R.drawable.mi_sell, Theme.GOLD),
                         a.kit.lp(-1, -2));
                 LinearLayout months = a.kit.h();
-                months.addView(insightMetric(currentLabel, Money.compactRial(currentMtd), Theme.GOLD),
+                months.addView(insightMetric(currentLabel, HomeNumberFormatter.compactMoney(currentMtd), Theme.GOLD),
                         a.kit.wlp(1f));
                 months.addView(a.kit.space(7));
-                months.addView(insightMetric(previousLabel, Money.compactRial(previousComparable), Theme.INFO),
+                months.addView(insightMetric(previousLabel, HomeNumberFormatter.compactMoney(previousComparable), Theme.INFO),
                         a.kit.wlp(1f));
                 card.addView(months, a.kit.lp(-1, -2));
 
                 if (previousComparable > 0) {
                     double change = (currentMtd - previousComparable) * 100.0 / previousComparable;
                     int color = currentMtd >= previousComparable ? Theme.SUCCESS : Theme.WARNING;
-                    card.addView(a.kit.text("تغییر هم‌بازه: " + Money.pct(change),
+                    card.addView(a.kit.text("تغییر هم‌بازه: " + HomeNumberFormatter.signedPercent(change),
                             10f, color, true), a.kit.lp(-1, -2));
                 } else {
                     card.addView(a.kit.text("برای این مقایسه، فروش هم‌بازه‌ای در ماه قبل ثبت نشده است.",
@@ -2145,8 +2182,8 @@ public class HomeScreen extends Screen {
                 }
 
                 String forecastText = "پیش‌بینی پایان " + monthLabel(currentRange.from) + " بر پایهٔ "
-                        + Money.fa(String.valueOf(elapsed)) + " روز از " + Money.fa(String.valueOf(monthDays))
-                        + " روز تقویمی: " + Money.compactRial(forecast);
+                        + HomeNumberFormatter.integer(elapsed) + " روز از " + HomeNumberFormatter.integer(monthDays)
+                        + " روز تقویمی: " + HomeNumberFormatter.compactMoney(forecast);
                 card.addView(a.kit.text(forecastText, 10f, Theme.INFO, true), a.kit.lp(-1, -2));
             }
             a.kit.addCard(content, card);
@@ -2162,7 +2199,7 @@ public class HomeScreen extends Screen {
         double total = d.inDay.d("total");
         double cash = d.inDay.d("cash"), pos = d.inDay.d("pos"),
                 havaleh = d.inDay.d("havaleh"), cheque = d.inDay.d("cheque");
-        card.addView(a.kit.text("جمع " + Money.compactRial(total),
+        card.addView(a.kit.text("جمع " + HomeNumberFormatter.compactMoney(total),
                 11f, Theme.TEXT, true), a.kit.lp(-1, -2));
         addPaymentMix(card, "نقد", cash, total, Theme.SUCCESS);
         addPaymentMix(card, "کارت", pos, total, Theme.INFO);
@@ -2182,8 +2219,8 @@ public class HomeScreen extends Screen {
 
     private void addPaymentMix(LinearLayout card, String label, double amount, double total, int color) {
         if (amount <= 0) return;
-        String share = total > 0 ? " · " + Money.pct(amount * 100.0 / total) : "";
-        card.addView(a.kit.progressLine(label, Money.compactRial(amount) + share, amount / total, color),
+        String share = total > 0 ? " · " + HomeNumberFormatter.percent(amount * 100.0 / total) : "";
+        card.addView(a.kit.progressLine(label, HomeNumberFormatter.compactMoney(amount) + share, amount / total, color),
                 a.kit.lp(-1, -2));
     }
 
@@ -2221,13 +2258,13 @@ public class HomeScreen extends Screen {
             c.addView(boardHead("سررسید ۳ روز آینده", "چک‌های دریافتی و پرداختی",
                     R.drawable.mi_cheque, navChip("گزارش چک‌ها", "cheques")), a.kit.lp(-1, -2));
             if (d.dueIn != null && !d.dueIn.isEmpty()) {
-                c.addView(statRow(R.drawable.mi_cheque, "دریافتی " + Money.fa(String.valueOf(d.dueIn.size())) + " فقره",
-                        Money.rial(dueInSum), Theme.GOLD), a.kit.lp(-1, -2));
+                c.addView(statRow(R.drawable.mi_cheque, "دریافتی " + HomeNumberFormatter.integer(d.dueIn.size()) + " فقره",
+                        HomeNumberFormatter.money(dueInSum), Theme.GOLD), a.kit.lp(-1, -2));
                 c.addView(a.kit.gap(8));
             }
             if (d.dueOut != null && !d.dueOut.isEmpty())
-                c.addView(statRow(R.drawable.mi_cheque, "پرداختی " + Money.fa(String.valueOf(d.dueOut.size())) + " فقره",
-                        Money.rial(dueOutSum), Theme.GOLD), a.kit.lp(-1, -2));
+                c.addView(statRow(R.drawable.mi_cheque, "پرداختی " + HomeNumberFormatter.integer(d.dueOut.size()) + " فقره",
+                        HomeNumberFormatter.money(dueOutSum), Theme.GOLD), a.kit.lp(-1, -2));
             a.kit.addCard(content, c);
         }
     }
@@ -2250,13 +2287,14 @@ public class HomeScreen extends Screen {
         } catch (Exception ignored) { Diag.ignored("HomeScreen:800", ignored); }
         c.addView(a.kit.sectionHead("🌙 جمع‌بندی پایان روز" + (when.isEmpty() ? "" : " • " + when),
                 null, null), a.kit.lp(-1, -2));
-        TextView summary = a.kit.text(txt, 12f, Theme.TEXT, false);
+        String displayText = HomeNumberFormatter.localizeText(txt);
+        TextView summary = a.kit.text(displayText, 12f, Theme.TEXT, false);
         summary.setMaxLines(3);
         summary.setEllipsize(TextUtils.TruncateAt.END);
         c.addView(summary, a.kit.lp(-1, -2));
         c.addView(a.kit.gap(6));
         final String share = "🌙 جمع‌بندی پایان روز میلانو" + (when.isEmpty() ? "" : " (" + when + ")")
-                + "\n" + txt;
+                + "\n" + displayText;
         c.addView(a.kit.btnGhost("↗ اشتراک‌گذاری", Theme.GOLD, v -> {
             try {
                 android.content.Intent i = new android.content.Intent(android.content.Intent.ACTION_SEND);
@@ -2277,8 +2315,8 @@ public class HomeScreen extends Screen {
             long dd = o.l("days");
             // Without dif_date_alan the server sends −1: derive the delay from the due date.
             if (dd < 0) dd = Jalali.diffDays(o.s("dueDate"), Jalali.todayStr());
-            String days = dd >= 0 ? " • تأخیر " + Money.fa(String.valueOf(dd)) + " روز" : "";
-            box.addView(a.kit.alertRow("فاکتور معوق", o.s("party") + " • " + Money.rial(o.d("amount")) + days,
+            String days = dd >= 0 ? " • تأخیر " + HomeNumberFormatter.integer(dd) + " روز" : "";
+            box.addView(a.kit.alertRow("فاکتور معوق", o.s("party") + " • " + HomeNumberFormatter.money(o.d("amount")) + days,
                     Theme.GOLD, v -> gotoUnsettled()), padTop(n));
             n++;
         }
@@ -2305,7 +2343,7 @@ public class HomeScreen extends Screen {
         String today = Jalali.todayStr();
         if (d.equals(today)) return "امروز";
         if (d.equals(Jalali.addDays(today, -1))) return "دیروز";
-        return Jalali.shortLabel(d);
+        return HomeNumberFormatter.localizeText(Jalali.shortLabel(d));
     }
 
     /** Open a section narrowed to the KPI day (custom 1-day range). */
@@ -2347,13 +2385,13 @@ public class HomeScreen extends Screen {
         String to = Jalali.disp(endDay);
         if (to.isEmpty()) to = Jalali.todayStr();
         for (SalesSnapshot.Day day : snapshot.dailySeries(to, 14))
-            out.add(new Charts.Point(Jalali.shortLabel(day.date), day.salesRials));
+            out.add(new Charts.Point(HomeNumberFormatter.localizeText(Jalali.shortLabel(day.date)), day.salesRials));
         return out;
     }
 
     private String lastCap(List<Charts.Point> pts) {
         Charts.Point p = pts.get(pts.size() - 1);
-        return Money.fa(p.label) + " • " + Money.rial(p.value);
+        return HomeNumberFormatter.localizeText(p.label) + " • " + HomeNumberFormatter.money(p.value);
     }
 
     private void gotoUnsettled() {

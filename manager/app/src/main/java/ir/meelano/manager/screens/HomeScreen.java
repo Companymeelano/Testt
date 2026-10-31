@@ -41,6 +41,7 @@ import ir.meelano.manager.core.SeasonalCalendarEngine;
 import ir.meelano.manager.R;
 import ir.meelano.manager.core.Queries;
 import ir.meelano.manager.core.SalesComparison;
+import ir.meelano.manager.core.SalesForecastEngine;
 import ir.meelano.manager.core.SalesSnapshot;
 import ir.meelano.manager.core.SmartReportEngine;
 import ir.meelano.manager.core.SyncState;
@@ -52,6 +53,7 @@ import ir.meelano.manager.ui.Charts;
 import ir.meelano.manager.ui.HomeCashWaterfall;
 import ir.meelano.manager.ui.HomeGoalGauge;
 import ir.meelano.manager.ui.HomeQuickActionArc;
+import ir.meelano.manager.ui.HomeForecastChart;
 import ir.meelano.manager.ui.HomePaymentMixBar;
 import ir.meelano.manager.ui.HomeSalesChart;
 import ir.meelano.manager.ui.Kit;
@@ -1674,6 +1676,7 @@ public class HomeScreen extends Screen {
         else if ("gross_profit".equals(key)) secGrossProfit(content, d);
         else if ("seasonal_calendar".equals(key)) secSeasonalCalendar(content);
         else if ("quick_actions".equals(key)) secQuickActions(content);
+        else if ("forecast_7d".equals(key)) secSalesForecast(content, d);
         else if ("kpis".equals(key)) secKpis(content, d);
         else if ("alerts".equals(key)) secAlerts(content, d);
         else if ("sales_insight".equals(key)) secSalesInsight(content, d);
@@ -1933,7 +1936,10 @@ public class HomeScreen extends Screen {
 
     /** Vector icon in a quiet accent circle; data cards never use the 3D artwork set. */
     private ImageView dashboardArt(int iconVector) {
-        int accent = dashboardAccent(iconVector);
+        return dashboardArt(iconVector, dashboardAccent(iconVector));
+    }
+
+    private ImageView dashboardArt(int iconVector, int accent) {
         ImageView image = a.kit.icon(iconVector, Theme.sectionText(accent), 24);
         image.setBackground(Theme.avatar(Theme.alpha(accent, Theme.isLight() ? 26 : 40)));
         int inset = Theme.dp(6);
@@ -1951,12 +1957,15 @@ public class HomeScreen extends Screen {
 
     /** Section heading: a duotone icon, title, optional subtitle and action. */
     private View boardHead(String title, String subtitle, int iconVector, View end) {
+        return boardHead(title, subtitle, iconVector, end, dashboardAccent(iconVector));
+    }
+
+    private View boardHead(String title, String subtitle, int iconVector, View end, int accent) {
         LinearLayout box = a.kit.v();
         LinearLayout row = a.kit.h();
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(Theme.dp(3), Theme.dp(4), Theme.dp(3), Theme.dp(7));
-        int accent = dashboardAccent(iconVector);
-        row.addView(dashboardArt(iconVector),
+        row.addView(dashboardArt(iconVector, accent),
                 new LinearLayout.LayoutParams(Theme.dp(36), Theme.dp(36)));
         row.addView(a.kit.space(8));
         TextView label = a.kit.text(title, 15f, Theme.sectionText(accent), true);
@@ -3096,6 +3105,36 @@ public class HomeScreen extends Screen {
         Theme.pressable(node);
         node.setOnClickListener(v -> a.nav(screenId));
         return node;
+    }
+
+    private void secSalesForecast(LinearLayout content, Data d) {
+        final int accent = Theme.SECTION_SALES_FORECAST;
+        SalesForecastEngine.Result forecast = d == null || d.salesSnapshot == null
+                ? SalesForecastEngine.forecast(null) : SalesForecastEngine.forecast(d.salesSnapshot);
+        LinearLayout card = a.kit.card(accent);
+        card.addView(boardHead("پیش‌بینی فروش هفت‌روزه",
+                "روزهای تقویمی آینده • روزهای نزدیک‌تر سمت راست",
+                R.drawable.mi_bar_chart, null, accent), a.kit.lp(-1, -2));
+        if (!forecast.available) {
+            card.addView(a.kit.emptyRow("برای پیش‌بینی، دست‌کم دو مشاهده از هر روز هفته در روند فروش لازم است."),
+                    a.kit.lp(-1, -2));
+        } else {
+            card.addView(a.kit.text("برآورد نقطه‌ای مجموع هفت روز", 10.5f, Theme.MUTED, false),
+                    a.kit.lp(-1, -2));
+            card.addView(a.kit.amountLine(HomeNumberFormatter.money(forecast.expectedTotalRials),
+                    16f, Gravity.START), a.kit.lp(-1, -2));
+            card.addView(a.kit.gap(3));
+            card.addView(a.kit.text("دامنهٔ نوسان تجربی مجموع: "
+                            + HomeNumberFormatter.money(forecast.lowerTotalRials) + " تا "
+                            + HomeNumberFormatter.money(forecast.upperTotalRials),
+                    10.5f, Theme.TEXT, false), a.kit.lp(-1, -2));
+            HomeForecastChart chart = new HomeForecastChart(a);
+            chart.setData(forecast.days, accent);
+            card.addView(chart, new LinearLayout.LayoutParams(-1, Theme.dp(220)));
+            card.addView(a.kit.hint("نوار رنگی میانگین روزهای هم‌نام ± انحراف معیار نمونه در چهار هفتهٔ گذشته است؛ جمعه‌ها از دادهٔ همان روز محاسبه می‌شوند و تعطیلات رسمی استنباط نمی‌شوند."),
+                    a.kit.lp(-1, -2));
+        }
+        a.kit.addCard(content, card);
     }
 
     private void secGrossProfit(LinearLayout content, Data d) {

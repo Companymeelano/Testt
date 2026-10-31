@@ -43,6 +43,7 @@ public final class DesignTokens {
     public static final int GROSS_PROFIT = 0xFF2D7468;
     public static final int SEASONAL_CALENDAR = 0xFF8A5D47;
     public static final int QUICK_ACTIONS = 0xFF62679A;
+    public static final int SALES_FORECAST = 0xFF4D7694;
 
     // Outcome colors are independent of the section palette and text-safe after accessibility adjustment.
     public static final int POSITIVE = 0xFF26784F;
@@ -59,6 +60,7 @@ public final class DesignTokens {
         if (containsAny(s, "سود ناخالص", "gross profit")) return GROSS_PROFIT;
         if (containsAny(s, "تقویم فصلی", "فصلی خشکبار", "seasonal calendar")) return SEASONAL_CALENDAR;
         if (containsAny(s, "میان‌بر", "میانبر", "quick action")) return QUICK_ACTIONS;
+        if (containsAny(s, "پیش‌بینی فروش", "پیشبینی فروش", "sales forecast")) return SALES_FORECAST;
         if (containsAny(s, "برترین", "top performer")) return TOP_PERFORMERS;
         if (containsAny(s, "خرید", "purchase", "بهای خرید")) return PURCHASE;
         if (containsAny(s, "دریافت", "وصول", "receive", "cash in")) return RECEIVE;

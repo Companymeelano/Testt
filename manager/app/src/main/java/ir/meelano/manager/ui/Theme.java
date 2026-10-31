@@ -48,6 +48,7 @@ public final class Theme {
     public static final int SECTION_GROSS_PROFIT = DesignTokens.GROSS_PROFIT;
     public static final int SECTION_SEASONAL_CALENDAR = DesignTokens.SEASONAL_CALENDAR;
     public static final int SECTION_QUICK_ACTIONS = DesignTokens.QUICK_ACTIONS;
+    public static final int SECTION_SALES_FORECAST = DesignTokens.SALES_FORECAST;
 
     public static int BG = DesignTokens.NIGHT_BG;
     public static int SURFACE = DesignTokens.NIGHT_SURFACE;

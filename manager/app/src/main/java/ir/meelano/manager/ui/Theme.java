@@ -42,6 +42,7 @@ public final class Theme {
     public static final int SECTION_MARKET = DesignTokens.MARKET;
     public static final int SECTION_WAREHOUSE = DesignTokens.WAREHOUSE;
     public static final int SECTION_CLOSEOUT = DesignTokens.CLOSEOUT;
+    public static final int SECTION_CASH_POSITION = DesignTokens.CASH_POSITION;
 
     public static int BG = DesignTokens.NIGHT_BG;
     public static int SURFACE = DesignTokens.NIGHT_SURFACE;

@@ -27,6 +27,7 @@ import ir.meelano.manager.core.AtiranAuth;
 import ir.meelano.manager.core.AtiranSchema;
 import ir.meelano.manager.core.AlertEngine;
 import ir.meelano.manager.core.CashCloseMath;
+import ir.meelano.manager.core.CashWaterfallEngine;
 import ir.meelano.manager.core.Filter;
 import ir.meelano.manager.core.FollowUps;
 import ir.meelano.manager.core.HomeRange;
@@ -46,6 +47,7 @@ import ir.meelano.manager.data.Company;
 import ir.meelano.manager.data.Repo;
 import ir.meelano.manager.data.Row;
 import ir.meelano.manager.ui.Charts;
+import ir.meelano.manager.ui.HomeCashWaterfall;
 import ir.meelano.manager.ui.HomePaymentMixBar;
 import ir.meelano.manager.ui.HomeSalesChart;
 import ir.meelano.manager.ui.Kit;
@@ -116,8 +118,8 @@ public class HomeScreen extends Screen {
         List<Row> returns = new ArrayList<>();
         List<Row> returnsToday = new ArrayList<>();
         boolean returnsTodayAvailable;
-        Row cashReceipts = new Row();
-        Row cashPayments = new Row();
+        Row cashReceipts;
+        Row cashPayments;
         boolean cashReceiptsAvailable;
         boolean cashPaymentsAvailable;
         List<Row> grossProfitDaily = new ArrayList<>();
@@ -396,13 +398,17 @@ public class HomeScreen extends Screen {
                 () -> Repo.exec(L.c, MasterQueries.returnsByKind(L.m, previousReturns)));
         d.returnsPreviousAvailable = d.returnsPrevious != null;
         boolean canCloseout = RoleStore.allowed(a, "closeout");
-        if (canCloseout && (homeSectionSelected("closeout") || homeSectionSelected("gross_profit"))) {
+        boolean needsCashFlow = (canCloseout && homeSectionSelected("closeout"))
+                || (RoleStore.allowed(a, "cash") && homeSectionSelected("cash_position"));
+        if (needsCashFlow) {
             d.cashReceipts = liveL(token, L, d.notes, "تفکیک نقد دریافتی امروز",
                     () -> Repo.one(L.c, MoneyQueries.darSummary(L.m, todayMix, 0)));
             d.cashReceiptsAvailable = d.cashReceipts != null && d.cashReceipts.l("breakdownAvailable") > 0;
             d.cashPayments = liveL(token, L, d.notes, "تفکیک نقد پرداختی امروز",
                     () -> Repo.one(L.c, MoneyQueries.darSummary(L.m, todayMix, 1)));
             d.cashPaymentsAvailable = d.cashPayments != null && d.cashPayments.l("breakdownAvailable") > 0;
+        }
+        if (canCloseout && (homeSectionSelected("closeout") || homeSectionSelected("gross_profit"))) {
             Filter profitRange = new Filter();
             profitRange.from = Jalali.monthStart(to);
             profitRange.to = to;
@@ -1612,6 +1618,7 @@ public class HomeScreen extends Screen {
     private void renderHomeSection(LinearLayout content, Data d, String key) {
         if ("smart_report".equals(key)) secSmartReport(content, d);
         else if ("closeout".equals(key)) secHomeCloseout(content, d);
+        else if ("cash_position".equals(key)) secCashPosition(content, d);
         else if ("kpis".equals(key)) secKpis(content, d);
         else if ("alerts".equals(key)) secAlerts(content, d);
         else if ("sales_insight".equals(key)) secSalesInsight(content, d);
@@ -1845,6 +1852,7 @@ public class HomeScreen extends Screen {
     /** Select a stable jewel hue by section; outcome colors stay reserved for deltas only. */
     private int dashboardAccent(int vector) {
         if (vector == R.drawable.mi_point_of_sale) return Theme.SECTION_CLOSEOUT;
+        if (vector == R.drawable.mi_account_balance_wallet) return Theme.SECTION_CASH_POSITION;
         if (vector == R.drawable.mi_shopping_cart || vector == R.drawable.mi_add_shopping_cart)
             return Theme.SECTION_PURCHASE;
         if (vector == R.drawable.mi_receipt_long || vector == R.drawable.mi_cheque)
@@ -1854,8 +1862,7 @@ public class HomeScreen extends Screen {
         if (vector == R.drawable.mi_assignment_return) return Theme.SECTION_RETURNS;
         if (vector == R.drawable.mi_warning || vector == R.drawable.mi_error)
             return Theme.SECTION_ALERT;
-        if (vector == R.drawable.mi_diamond || vector == R.drawable.mi_trending_up
-                || vector == R.drawable.mi_account_balance_wallet)
+        if (vector == R.drawable.mi_diamond || vector == R.drawable.mi_trending_up)
             return Theme.SECTION_MARKET;
         if (vector == R.drawable.mi_inventory_2 || vector == R.drawable.mi_grid_view
                 || vector == R.drawable.mi_warehouse)
@@ -2664,6 +2671,60 @@ public class HomeScreen extends Screen {
         }
     }
 
+    private void secCashPosition(LinearLayout content, Data d) {
+        if (!RoleStore.allowed(a, "cash")) return;
+        final String day = snapshotDay(d);
+        boolean receiptsAvailable = d != null && d.cashReceiptsAvailable && d.cashReceipts != null;
+        boolean paymentsAvailable = d != null && d.cashPaymentsAvailable && d.cashPayments != null;
+        boolean flowAvailable = receiptsAvailable && paymentsAvailable;
+        Double opening = parseLocalRials(a.settings.closeoutCashOpening(day));
+        double receipts = receiptsAvailable ? d.cashReceipts.d("cash") : Double.NaN;
+        double payments = paymentsAvailable ? d.cashPayments.d("cash") : Double.NaN;
+        List<CashWaterfallEngine.Step> steps = flowAvailable && opening != null
+                ? CashWaterfallEngine.build(opening, receipts, payments)
+                : java.util.Collections.emptyList();
+
+        LinearLayout card = a.kit.card(Theme.SECTION_CASH_POSITION);
+        card.addView(boardHead("موقعیت نقدی", "گردش نقد صندوق به‌صورت آبشاری • " + day,
+                R.drawable.mi_account_balance_wallet, null), a.kit.lp(-1, -2));
+        card.addView(statRow(R.drawable.mi_receipt_long, "دریافت نقد امروز",
+                receiptsAvailable ? HomeNumberFormatter.money(receipts) : "تفکیک نقد موجود نیست",
+                Theme.SECTION_RECEIVE), a.kit.lp(-1, -2));
+        card.addView(a.kit.gap(6));
+        card.addView(statRow(R.drawable.mi_payments, "پرداخت نقد امروز",
+                paymentsAvailable ? HomeNumberFormatter.money(payments) : "تفکیک نقد موجود نیست",
+                Theme.SECTION_PAY), a.kit.lp(-1, -2));
+        card.addView(a.kit.gap(5));
+
+        if (steps.isEmpty()) {
+            String reason = !flowAvailable
+                    ? "دادهٔ تفکیک نقد دریافت یا پرداخت در دسترس نیست."
+                    : "موجودی آغاز روز ثبت نشده است.";
+            card.addView(a.kit.emptyRow(reason), a.kit.lp(-1, -2));
+        } else {
+            double expectedClosing = steps.get(steps.size() - 1).endRials;
+            card.addView(statRow(R.drawable.mi_account_balance_wallet, "ماندهٔ نقد مورد انتظار",
+                    HomeNumberFormatter.money(expectedClosing), Theme.SECTION_CASH_POSITION),
+                    a.kit.lp(-1, -2));
+        }
+
+        HomeCashWaterfall waterfall = new HomeCashWaterfall(a);
+        waterfall.setSteps(steps);
+        card.addView(waterfall, a.kit.lp(-1, Theme.dp(220)));
+        card.addView(a.kit.hint("ماندهٔ پایان، برآوردِ ماندهٔ آغاز + دریافت نقد − پرداخت نقد است؛ موجودی حساب بانکی از گردش به‌تنهایی استنباط نمی‌شود."),
+                a.kit.lp(-1, -2));
+        String counted = a.settings.closeoutCashCounted(day);
+        if (counted != null && !counted.trim().isEmpty()) {
+            card.addView(a.kit.gap(5));
+            card.addView(statRow(R.drawable.mi_point_of_sale, "اختلاف با شمارش پایان صندوق",
+                    closeoutVarianceLabel(d, day), Theme.SECTION_CLOSEOUT), a.kit.lp(-1, -2));
+        }
+        card.addView(a.kit.btnGhost("ثبت ماندهٔ آغاز و شمارش پایان (فقط دستگاه)",
+                Theme.SECTION_CASH_POSITION, v -> showCloseoutCashDialog(content, d, day)),
+                a.kit.lp(-1, -2));
+        a.kit.addCard(content, card);
+    }
+
     private void secHomeCloseout(LinearLayout content, Data d) {
         if (!RoleStore.allowed(a, "closeout")) return;
         final String day = snapshotDay(d);
@@ -2677,11 +2738,11 @@ public class HomeScreen extends Screen {
                 salesAvailable ? HomeNumberFormatter.money(d.salesSnapshot.salesRialsOn(day))
                         : "داده در دسترس نیست", Theme.SECTION_SALES), a.kit.lp(-1, -2));
         card.addView(a.kit.gap(6));
-        card.addView(statRow(R.drawable.mi_payments, "دریافت ثبت‌شده",
+        card.addView(statRow(R.drawable.mi_receipt_long, "دریافت ثبت‌شده",
                 d.inDay == null ? "داده در دسترس نیست" : HomeNumberFormatter.money(d.inDay.d("total")),
                 Theme.SECTION_RECEIVE), a.kit.lp(-1, -2));
         card.addView(a.kit.gap(6));
-        card.addView(statRow(R.drawable.mi_account_balance_wallet, "پرداخت ثبت‌شده",
+        card.addView(statRow(R.drawable.mi_payments, "پرداخت ثبت‌شده",
                 d.outDay == null ? "داده در دسترس نیست" : HomeNumberFormatter.money(d.outDay.d("total")),
                 Theme.SECTION_PAY), a.kit.lp(-1, -2));
         card.addView(a.kit.gap(6));

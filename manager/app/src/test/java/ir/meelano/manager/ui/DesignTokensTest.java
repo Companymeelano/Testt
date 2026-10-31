@@ -28,12 +28,15 @@ public class DesignTokensTest {
         assertEquals(DesignTokens.ALERT, DesignTokens.sectionAccent("هشدارها"));
         assertEquals(DesignTokens.MARKET, DesignTokens.sectionAccent("بازار"));
         assertEquals(DesignTokens.WAREHOUSE, DesignTokens.sectionAccent("موجودی انبار"));
+        assertEquals(DesignTokens.CLOSEOUT, DesignTokens.sectionAccent("بستن روز"));
+        assertEquals(DesignTokens.CASH_POSITION, DesignTokens.sectionAccent("موقعیت نقدی"));
     }
 
     @Test public void accessibleSectionTextPassesAaOnBothPaletteSurfaces() {
         int[] accents = {DesignTokens.SALES, DesignTokens.PURCHASE, DesignTokens.RECEIVE,
                 DesignTokens.PAY, DesignTokens.RETURNS, DesignTokens.ALERT,
-                DesignTokens.MARKET, DesignTokens.WAREHOUSE};
+                DesignTokens.MARKET, DesignTokens.WAREHOUSE, DesignTokens.CLOSEOUT,
+                DesignTokens.CASH_POSITION};
         for (int accent : accents) {
             assertTrue("light contrast for " + Integer.toHexString(accent),
                     DesignTokens.contrastRatio(DesignTokens.accessibleAccent(accent, false),
@@ -62,7 +65,8 @@ public class DesignTokensTest {
     @Test public void solidAccentLabelsChooseHighContrastInkAcrossPalette() {
         int[] accents = {DesignTokens.EMERALD, DesignTokens.NIGHT_EMERALD, DesignTokens.GOLD,
                 DesignTokens.GOLD_LIGHT, DesignTokens.GOLD_DARK, DesignTokens.PURCHASE,
-                DesignTokens.PAY, DesignTokens.RETURNS, DesignTokens.ALERT, DesignTokens.WAREHOUSE};
+                DesignTokens.PAY, DesignTokens.RETURNS, DesignTokens.ALERT, DesignTokens.WAREHOUSE,
+                DesignTokens.CLOSEOUT, DesignTokens.CASH_POSITION};
         for (int accent : accents) {
             assertTrue("solid accent text contrast for " + Integer.toHexString(accent),
                     DesignTokens.contrastRatio(DesignTokens.accentTextColor(accent), accent) >= 4.5);
@@ -98,7 +102,8 @@ public class DesignTokensTest {
                 DesignTokens.INFO, DesignTokens.NEUTRAL};
         int[] sections = {DesignTokens.SALES, DesignTokens.PURCHASE, DesignTokens.RECEIVE,
                 DesignTokens.PAY, DesignTokens.RETURNS, DesignTokens.ALERT,
-                DesignTokens.MARKET, DesignTokens.WAREHOUSE};
+                DesignTokens.MARKET, DesignTokens.WAREHOUSE, DesignTokens.CLOSEOUT,
+                DesignTokens.CASH_POSITION};
         for (int outcome : outcomes) for (int section : sections)
             assertTrue("outcome and section hues are distinct",
                     outcome != section);

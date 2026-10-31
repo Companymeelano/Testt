@@ -37,6 +37,7 @@ public final class DesignTokens {
     public static final int MARKET = 0xFFA8864F;
     public static final int WAREHOUSE = 0xFF1F8A8A;
     public static final int CLOSEOUT = 0xFF7D5E3C;
+    public static final int CASH_POSITION = 0xFF3F6F78;
 
     // Outcome colors are independent of the section palette and text-safe after accessibility adjustment.
     public static final int POSITIVE = 0xFF26784F;
@@ -48,6 +49,7 @@ public final class DesignTokens {
     public static int sectionAccent(String title) {
         String s = normalize(title);
         if (containsAny(s, "بستن روز", "تطبیق صندوق", "closeout")) return CLOSEOUT;
+        if (containsAny(s, "موقعیت نقدی", "نقد در دست", "cash position")) return CASH_POSITION;
         if (containsAny(s, "خرید", "purchase", "بهای خرید")) return PURCHASE;
         if (containsAny(s, "دریافت", "وصول", "receive", "cash in")) return RECEIVE;
         if (containsAny(s, "پرداخت", "نقدینگی", "cash out")) return PAY;

@@ -7,6 +7,31 @@ emulator_abi="$(adb shell getprop ro.product.cpu.abi | tr -d '\r')"
 emulator_api="$(adb shell getprop ro.build.version.sdk | tr -d '\r')"
 echo "::notice title=Dashboard emulator::API ${emulator_api}, ABI ${emulator_abi}"
 
+wait_for_package_service() {
+  local seconds="${1:-90}"
+  local elapsed=0
+  while [ "$elapsed" -lt "$seconds" ]; do
+    local booted
+    booted="$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
+    if [ "$booted" = "1" ]; then
+      local service_status
+      service_status="$(adb shell service check package 2>/dev/null | tr -d '\r' || true)"
+      if printf '%s' "$service_status" | grep -Eqi 'service package: found'; then
+        return 0
+      fi
+    fi
+    sleep 2
+    elapsed=$((elapsed + 2))
+  done
+  return 1
+}
+
+if ! wait_for_package_service 120; then
+  service_status="$(adb shell service check package 2>&1 | tr '\r\n' ' ' || true)"
+  echo "::error title=Dashboard emulator not ready::Android package service did not become available within 120 seconds. $service_status"
+  exit 1
+fi
+
 build_log="$(mktemp)"
 attempt=1
 result=1
@@ -82,11 +107,24 @@ for apk in "$app_apk" "$test_apk"; do
   fi
 done
 
+adb wait-for-device
 adb uninstall ir.meelano.manager.debug.test >/dev/null 2>&1 || true
 adb uninstall ir.meelano.manager.debug >/dev/null 2>&1 || true
 for apk in "$app_apk" "$test_apk"; do
   install_log="$(mktemp)"
-  if ! adb install -r "$apk" > "$install_log" 2>&1; then
+  installed=0
+  for install_attempt in 1 2 3; do
+    if wait_for_package_service 60 && adb install -r "$apk" > "$install_log" 2>&1; then
+      installed=1
+      break
+    fi
+    if [ "$install_attempt" -lt 3 ]; then
+      echo "::warning::Android package service was temporarily unavailable while installing $apk; retry $((install_attempt + 1))/3."
+      adb wait-for-device
+      sleep 5
+    fi
+  done
+  if [ "$installed" -ne 1 ]; then
     install_output="$(tail -n 8 "$install_log" | tr '\r\n' ' ' | sed 's/%/%25/g; s/:/%3A/g')"
     echo "::error title=Screenshot APK install failed::$apk: $install_output"
     exit 1

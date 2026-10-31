@@ -1059,6 +1059,8 @@ public class HomeScreen extends Screen {
     private String weatherPlace = "";
     /** True only when the user opted in and the weather card uses a device fix. */
     private boolean weatherFromDevice = false;
+    /** Ticker details and optional weather stay tucked away until the manager opens them. */
+    private boolean marketExpanded;
 
     private LinearLayout marketView;
     private int marketViewGeneration = Integer.MIN_VALUE;
@@ -1177,131 +1179,164 @@ public class HomeScreen extends Screen {
         try {
             if (rJson != null) rates = MarketWeather.parseRates(rJson, MarketWeather.previousRates(a));
         } catch (Exception e) { Diag.warn("Home:parseRates", e); }
-        try { if (wJson != null) w = MarketWeather.parseWeather(wJson); } catch (Exception e) { Diag.warn("Home:parseWeather", e); }
+        try { if (wJson != null) w = MarketWeather.parseWeather(wJson); }
+        catch (Exception e) { Diag.warn("Home:parseWeather", e); }
 
+        boolean hasRates = rates != null && !rates.isEmpty();
+        String state = !hasRates ? "ناموجود" : rLive ? "آنلاین" : "ذخیره‌شده";
+        int stateTone = !hasRates ? Theme.WARNING : rLive ? Theme.SUCCESS : Theme.MUTED;
         LinearLayout head = a.kit.h();
         head.setGravity(Gravity.CENTER_VERTICAL);
-        head.addView(a.kit.text("بازار و هوای امروز", 14f,
-                Theme.sectionText(Theme.SECTION_MARKET), true), a.kit.wlp(1f));
-        android.widget.Button refresh = a.kit.btnGhost("⟳", Theme.GOLD, v -> a.nav("home"));
-        refresh.setContentDescription("تازه‌سازی قیمت بازار و آب‌وهوا");
+        head.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        head.addView(a.kit.iconBadge(R.drawable.mi_storefront, Theme.SECTION_MARKET, 30),
+                a.kit.lp(Theme.dp(30), Theme.dp(30)));
+        head.addView(a.kit.space(7));
+        LinearLayout title = a.kit.v();
+        title.addView(a.kit.text("بازار", 13f, Theme.sectionText(Theme.SECTION_MARKET), true),
+                a.kit.lp(-1, -2));
+        title.addView(a.kit.text("دلار · طلای ۱۸ · سکه", 9f, Theme.MUTED, false), a.kit.lp(-1, -2));
+        head.addView(title, a.kit.wlp(1f));
+        TextView status = a.kit.pill(state, stateTone);
+        status.setContentDescription("وضعیت قیمت بازار: " + state);
+        head.addView(status, a.kit.lp(-2, -2));
+        Button toggle = a.kit.btnGhost(marketExpanded ? "جمع‌کردن" : "نمایش",
+                Theme.SECTION_MARKET, v -> {
+                    marketExpanded = !marketExpanded;
+                    renderMarket(card, rJson, wJson, rLive, wLive);
+                });
+        toggle.setTextSize(10.5f * Theme.fontScale());
+        toggle.setPadding(Theme.dp(8), Theme.dp(4), Theme.dp(8), Theme.dp(4));
+        toggle.setContentDescription(marketExpanded
+                ? "جمع‌کردن جزئیات بازار و آب‌وهوا" : "نمایش جزئیات بازار و آب‌وهوا");
+        toggle.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+        LinearLayout.LayoutParams toggleParams = a.kit.lp(-2, Theme.dp(48));
+        toggleParams.setMarginEnd(Theme.dp(4));
+        head.addView(toggle, toggleParams);
+        Button refresh = a.kit.btnGhost("⟳", Theme.SECTION_MARKET, v -> a.nav("home"));
+        refresh.setContentDescription("تازه‌سازی قیمت‌های بازار؛ نماد تازه‌سازی");
         refresh.setMinWidth(Theme.dp(48));
         refresh.setMinHeight(Theme.dp(48));
         head.addView(refresh, a.kit.lp(Theme.dp(48), Theme.dp(48)));
-        head.addView(a.kit.space(4));
-        String marketState = rates == null || rates.isEmpty() ? "قیمت ناموجود"
-                : rLive ? "قیمت آنلاین" : "قیمت ذخیره‌شده";
-        int marketStateColor = rates == null || rates.isEmpty() ? Theme.WARNING : rLive ? Theme.SUCCESS : Theme.MUTED;
-        head.addView(a.kit.pill(marketState, marketStateColor), a.kit.lp(-2, -2));
         card.addView(head, a.kit.lp(-1, -2));
-        card.addView(a.kit.gap(8));
-        if (rates != null && rates.size() > 2) {
-            TextView tickerHint = a.kit.text("برای دیدن نرخ سکه، افقی به چپ بکشید ←", 10f, Theme.MUTED, false);
-            tickerHint.setSingleLine(true);
-            tickerHint.setEllipsize(TextUtils.TruncateAt.END);
-            tickerHint.setGravity(Gravity.END);
-            card.addView(tickerHint, a.kit.lp(-1, -2));
-            card.addView(a.kit.gap(4));
-        }
 
-        if (rates == null || rates.isEmpty()) {
-            card.addView(a.kit.hint("قیمت‌ها در دسترس نیست؛ اتصال اینترنت را بررسی کنید."), a.kit.lp(-1, -2));
+        if (!hasRates) {
+            card.addView(a.kit.emptyRow("قیمت‌های بازار موقتاً در دسترس نیستند"), a.kit.lp(-1, -2));
+            card.addView(a.kit.text("اتصال را بررسی کنید؛ آخرین قیمت معتبر هنگام دسترس‌بودن نمایش داده می‌شود.",
+                    9f, Theme.MUTED, false), a.kit.lp(-1, -2));
         } else {
             HorizontalScrollView ticker = new HorizontalScrollView(a);
             ticker.setHorizontalScrollBarEnabled(false);
             ticker.setFillViewport(false);
             ticker.setClipToPadding(false);
-            ticker.setContentDescription("قیمت‌های بازار؛ برای دیدن همهٔ کالاها افقی پیمایش کنید");
+            ticker.setHorizontalFadingEdgeEnabled(true);
+            ticker.setFadingEdgeLength(Theme.dp(12));
+            ticker.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+            ticker.setContentDescription("قیمت دلار آزاد، طلای ۱۸ عیار و سکه امامی");
             LinearLayout row = a.kit.h();
             row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+            int screenDp = Math.round(a.getResources().getDisplayMetrics().widthPixels
+                    / a.getResources().getDisplayMetrics().density);
+            int tileWidth = Math.max(94, Math.min(122, (screenDp - 64) / 3));
             for (int i = 0; i < rates.size(); i++) {
-                if (i > 0) row.addView(a.kit.space(8));
-                int screenDp = Math.round(a.getResources().getDisplayMetrics().widthPixels
-                        / a.getResources().getDisplayMetrics().density);
-                // Show a slim edge of the third tile so horizontal scrolling is discoverable.
-                int tileWidth = Math.max(116, Math.min(156, (screenDp - 96) / 2));
+                if (i > 0) row.addView(a.kit.space(6));
                 row.addView(rateTile(rates.get(i)), new LinearLayout.LayoutParams(Theme.dp(tileWidth), -2));
             }
             ticker.addView(row, new android.view.ViewGroup.LayoutParams(-2, -2));
-            card.addView(ticker, a.kit.lp(-1, -2));
+            LinearLayout.LayoutParams tickerParams = a.kit.lp(-1, -2);
+            tickerParams.topMargin = Theme.dp(6);
+            card.addView(ticker, tickerParams);
         }
 
-        if (w != null) {
-            card.addView(a.kit.gap(8));
-            LinearLayout wr = a.kit.h();
-            wr.setGravity(Gravity.CENTER_VERTICAL);
-            int wRes = w.code <= 1 ? R.drawable.mi_light_mode
-                    : w.code <= 3 ? R.drawable.mi_wb_twilight
-                    : (w.code >= 95 ? R.drawable.mi_bolt
-                    : (w.code >= 51 ? R.drawable.mi_beach_access : R.drawable.mi_wb_twilight));
-            wr.addView(a.kit.iconBadge(wRes, Theme.SECTION_MARKET, 36),
-                    a.kit.lp(Theme.dp(36), Theme.dp(36)));
-            wr.addView(a.kit.space(8));
-            LinearLayout wc = a.kit.v();
-            TextView line = a.kit.text(weatherPlace + " • " + HomeNumberFormatter.integer(Math.round(w.temp)) + "°  "
-                    + MarketWeather.describe(w.code), 12f, Theme.TEXT, true);
-            line.setMaxLines(1);
-            line.setEllipsize(TextUtils.TruncateAt.END);
-            wc.addView(line, a.kit.lp(-1, -2));
-            LinearLayout weatherMeta = a.kit.h();
-            weatherMeta.setGravity(Gravity.CENTER_VERTICAL);
-            weatherMeta.addView(a.kit.text("رطوبت " + HomeNumberFormatter.percent(w.humidity), 10.5f, Theme.MUTED, false),
-                    a.kit.wlp(1f));
-            weatherMeta.addView(a.kit.pill(wLive ? "آب‌وهوا زنده" : "آب‌وهوا ذخیره‌شده",
-                    wLive ? Theme.SUCCESS : Theme.MUTED), a.kit.lp(-2, -2));
-            wc.addView(weatherMeta, a.kit.lp(-1, -2));
-            wr.addView(wc, a.kit.wlp(1f));
-            card.addView(wr, a.kit.lp(-1, -2));
-        } else {
+        String stamp = hasRates ? rates.get(0).asOf : "";
+        String sourceTime = stamp == null || stamp.trim().isEmpty()
+                ? "زمان منبع نامشخص" : "زمان منبع " + HomeNumberFormatter.localizeText(stamp);
+        String basis = hasRates && rates.get(0).comparesWithPreviousFetch
+                ? "تغییر نسبت به دریافت قبلی" : "درصد تغییر اعلامی TGJU";
+        TextView freshness = a.kit.text("منبع TGJU · واحد تومان · " + sourceTime + " · "
+                + marketFreshness(MarketWeather.ratesKey(), rLive), 9f, Theme.MUTED, false);
+        freshness.setMaxLines(2);
+        freshness.setEllipsize(TextUtils.TruncateAt.END);
+        LinearLayout.LayoutParams freshnessParams = a.kit.lp(-1, -2);
+        freshnessParams.topMargin = Theme.dp(5);
+        card.addView(freshness, freshnessParams);
+
+        if (marketExpanded) {
+            card.addView(a.kit.divider(), a.kit.lp(-1, Theme.dp(1)));
+            card.addView(a.kit.gap(6));
+            if (w != null) {
+                LinearLayout wr = a.kit.h();
+                wr.setGravity(Gravity.CENTER_VERTICAL);
+                int wRes = w.code <= 1 ? R.drawable.mi_light_mode
+                        : w.code <= 3 ? R.drawable.mi_wb_twilight
+                        : (w.code >= 95 ? R.drawable.mi_bolt
+                        : (w.code >= 51 ? R.drawable.mi_beach_access : R.drawable.mi_wb_twilight));
+                wr.addView(a.kit.iconBadge(wRes, Theme.SECTION_MARKET, 32),
+                        a.kit.lp(Theme.dp(32), Theme.dp(32)));
+                wr.addView(a.kit.space(8));
+                LinearLayout wc = a.kit.v();
+                String place = weatherPlace == null || weatherPlace.isEmpty() ? "موقعیت شما" : weatherPlace;
+                TextView line = a.kit.text(place + " · " + HomeNumberFormatter.integer(Math.round(w.temp)) + "° · "
+                        + MarketWeather.describe(w.code), 11.5f, Theme.TEXT, true);
+                line.setMaxLines(1);
+                line.setEllipsize(TextUtils.TruncateAt.END);
+                wc.addView(line, a.kit.lp(-1, -2));
+                LinearLayout weatherMeta = a.kit.h();
+                weatherMeta.setGravity(Gravity.CENTER_VERTICAL);
+                weatherMeta.addView(a.kit.text("رطوبت " + HomeNumberFormatter.percent(w.humidity),
+                        9.5f, Theme.MUTED, false), a.kit.wlp(1f));
+                weatherMeta.addView(a.kit.pill(wLive ? "زنده" : "ذخیره‌شده",
+                        wLive ? Theme.SUCCESS : Theme.MUTED), a.kit.lp(-2, -2));
+                wc.addView(weatherMeta, a.kit.lp(-1, -2));
+                wr.addView(wc, a.kit.wlp(1f));
+                card.addView(wr, a.kit.lp(-1, -2));
+            } else {
+                boolean locationEnabled = MarketWeather.weatherLocationEnabled(a);
+                boolean locationGranted = ir.meelano.manager.core.DeviceLocation.granted(a);
+                String weatherHint = !locationEnabled
+                        ? "آب‌وهوا خاموش است؛ موقعیت دستگاه بدون انتخاب شما ارسال نمی‌شود."
+                        : !locationGranted
+                        ? "مجوز موقعیت در دسترس نیست؛ بدون اجازهٔ شما موقعیتی ارسال نمی‌شود."
+                        : "موقعیت تازه‌ای به‌دست نیامد؛ برای تلاش دوباره تازه‌سازی کنید.";
+                card.addView(a.kit.hint(weatherHint), a.kit.lp(-1, -2));
+            }
+
             boolean locationEnabled = MarketWeather.weatherLocationEnabled(a);
             boolean locationGranted = ir.meelano.manager.core.DeviceLocation.granted(a);
-            String weatherHint = !locationEnabled
-                    ? "آب‌وهوا بر اساس موقعیت خاموش است؛ برای فعال‌سازی، «استفاده از موقعیت من» را انتخاب کنید. تا آن زمان موقعیت شما ارسال نمی‌شود."
-                    : !locationGranted
-                    ? "مجوز موقعیت در دسترس نیست؛ بدون اجازهٔ شما هیچ موقعیتی ارسال نمی‌شود."
-                    : "موقعیت تازه‌ای به‌دست نیامد؛ برای تلاش دوباره تازه‌سازی کنید. موقعیت فقط برای دریافت آب‌وهوا استفاده می‌شود.";
-            card.addView(a.kit.hint(weatherHint), a.kit.lp(-1, -2));
+            boolean removeLocation = locationEnabled && locationGranted;
+            Button loc = a.kit.btnGhost(removeLocation ? "خاموش‌کردن آب‌وهوا" : "فعال‌سازی آب‌وهوا",
+                    Theme.SECTION_MARKET, v -> {
+                        if (removeLocation) {
+                            MarketWeather.setWeatherLocationEnabled(a, false);
+                            weatherPlace = "";
+                            weatherFromDevice = false;
+                            a.nav("home");
+                        } else if (locationGranted) {
+                            MarketWeather.setWeatherLocationEnabled(a, true);
+                            a.nav("home");
+                        } else {
+                            a.requestLocationAccess();
+                        }
+                    });
+            loc.setContentDescription(removeLocation
+                    ? "خاموش‌کردن آب‌وهوا با موقعیت و حذف دادهٔ ذخیره‌شده"
+                    : "فعال‌کردن آب‌وهوا با موقعیت دستگاه؛ ارسال موقعیت تنها با اجازهٔ شما انجام می‌شود");
+            loc.setSingleLine(true);
+            loc.setTextSize(10.5f * Theme.fontScale());
+            loc.setPadding(Theme.dp(10), Theme.dp(4), Theme.dp(10), Theme.dp(4));
+            loc.setMinHeight(Theme.dp(48));
+            LinearLayout.LayoutParams locationParams = a.kit.lp(-2, -2);
+            locationParams.setMargins(0, Theme.dp(5), 0, 0);
+            locationParams.gravity = Gravity.END;
+            card.addView(loc, locationParams);
+
+            TextView detail = a.kit.text("مبنای تغییر: " + basis + " · قیمت‌های بازار فقط خواندنی‌اند.",
+                    9f, Theme.MUTED, false);
+            detail.setMaxLines(2);
+            LinearLayout.LayoutParams detailParams = a.kit.lp(-1, -2);
+            detailParams.topMargin = Theme.dp(4);
+            card.addView(detail, detailParams);
         }
-
-        boolean locationEnabled = MarketWeather.weatherLocationEnabled(a);
-        boolean locationGranted = ir.meelano.manager.core.DeviceLocation.granted(a);
-        boolean removeLocation = locationEnabled && locationGranted;
-        android.widget.Button loc = a.kit.btnGhost(removeLocation
-                        ? "خاموش‌کردن موقعیت" : "📍 استفاده از موقعیت من",
-                Theme.GOLD, v -> {
-                    if (removeLocation) {
-                        MarketWeather.setWeatherLocationEnabled(a, false);
-                        weatherPlace = "";
-                        weatherFromDevice = false;
-                        a.nav("home");
-                    } else if (locationGranted) {
-                        MarketWeather.setWeatherLocationEnabled(a, true);
-                        a.nav("home");
-                    } else {
-                        a.requestLocationAccess();
-                    }
-                });
-        loc.setContentDescription(removeLocation
-                ? "خاموش‌کردن آب‌وهوا با موقعیت و حذف دادهٔ ذخیره‌شده؛ مجوز سیستم‌عامل را می‌توان در تنظیمات گوشی لغو کرد."
-                : "فعال‌کردن آب‌وهوا با موقعیت دستگاه؛ بدون اجازهٔ شما موقعیتی ارسال نمی‌شود.");
-        loc.setSingleLine(true);
-        loc.setTextSize(11f * Theme.fontScale());
-        loc.setPadding(Theme.dp(10), Theme.dp(4), Theme.dp(10), Theme.dp(4));
-        loc.setMinHeight(Theme.dp(48));
-        LinearLayout.LayoutParams lp = a.kit.lp(-2, -2);
-        lp.setMargins(0, Theme.dp(6), 0, 0);
-        lp.gravity = Gravity.END;
-        card.addView(loc, lp);
-
-        String stamp = rates != null && !rates.isEmpty() ? rates.get(0).asOf : "";
-        card.addView(a.kit.goldHairline(), a.kit.lp(-1, Theme.dp(1)));
-        card.addView(a.kit.gap(6));
-        String changeBasis = rates != null && !rates.isEmpty() && rates.get(0).comparesWithPreviousFetch
-                ? "تغییر نسبت به دریافت قبلی" : "درصد تغییر اعلامی TGJU";
-        card.addView(a.kit.hint("منبع قیمت: TGJU · واحد: تومان · " + changeBasis
-                + "\nزمان منبع: "
-                + HomeNumberFormatter.localizeText(stamp == null || stamp.isEmpty() ? "نامشخص" : stamp)
-                + " · دریافت برنامه: " + marketFreshness(MarketWeather.ratesKey(), rLive)), a.kit.lp(-1, -2));
         localizeHomeNumbers(card);
     }
 
@@ -1322,32 +1357,55 @@ public class HomeScreen extends Screen {
     }
 
     private View rateTile(MarketWeather.Rate r) {
-        // The market card belongs to the manager's board; icons are vector and 24dp duotone.
         String label = r.label == null ? "" : r.label;
+        String shortLabel = label.contains("دلار") ? "دلار آزاد"
+                : label.contains("طلا") ? "طلای ۱۸" : "سکه امامی";
         int tileIcon = label.contains("دلار") ? R.drawable.mi_trending_up
-                : (label.contains("طلا") ? R.drawable.mi_diamond : R.drawable.mi_account_balance_wallet);
-        // Prices are always in toman (the source's unit), whatever unit the rest of the app uses.
-        // A zero price means the source has no figure — never show it as a real «۰ تومان».
+                : label.contains("طلا") ? R.drawable.mi_diamond : R.drawable.mi_account_balance_wallet;
         boolean hasPrice = r.toman > 0;
-        LinearLayout tile = (LinearLayout) a.kit.kpiChip(label,
-                hasPrice ? HomeNumberFormatter.rounded(r.toman) : "ناموجود",
-                hasPrice ? "تومان" : "", Theme.SECTION_MARKET, tileIcon);
+        LinearLayout tile = a.kit.v();
+        tile.setGravity(Gravity.CENTER);
+        tile.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        tile.setPadding(Theme.dp(7), Theme.dp(6), Theme.dp(7), Theme.dp(7));
+        tile.setBackground(Theme.kpi(Theme.SECTION_MARKET));
+
+        LinearLayout heading = a.kit.h();
+        heading.setGravity(Gravity.CENTER);
+        heading.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        heading.addView(a.kit.iconBadge(tileIcon, Theme.SECTION_MARKET, 22),
+                a.kit.lp(Theme.dp(22), Theme.dp(22)));
+        heading.addView(a.kit.space(4));
+        TextView name = a.kit.text(shortLabel, 9.5f, Theme.TEXT, true);
+        name.setSingleLine(true);
+        name.setEllipsize(TextUtils.TruncateAt.END);
+        heading.addView(name, a.kit.lp(-2, -2));
+        tile.addView(heading, a.kit.lp(-1, -2));
+
+        String priceText = hasPrice ? HomeNumberFormatter.rounded(r.toman) + " تومان" : "ناموجود";
+        LinearLayout.LayoutParams priceParams = a.kit.lp(-1, -2);
+        priceParams.topMargin = Theme.dp(3);
+        View price = a.kit.amountLine(priceText, 12.5f, Gravity.CENTER);
+        tile.addView(price, priceParams);
         if (hasPrice) {
             int direction = Math.abs(r.changePct) < 0.05 ? 0 : r.changePct > 0 ? 1 : -1;
             int tone = direction > 0 ? Theme.SUCCESS : direction < 0 ? Theme.DANGER : Theme.MUTED;
-            String badgeText = direction == 0 ? "بدون تغییر"
-                    : HomeNumberFormatter.percentMagnitude(r.changePct);
+            String badgeText = direction == 0 ? "بدون تغییر" : HomeNumberFormatter.percentMagnitude(r.changePct);
             String comparisonBasis = r.comparesWithPreviousFetch
                     ? "نسبت به دریافت قبلی" : "بر اساس تغییر اعلام‌شده توسط TGJU";
             String spokenDelta = direction == 0 ? "بدون تغییر " + comparisonBasis
                     : (direction > 0 ? "افزایش " : "کاهش ")
                     + HomeNumberFormatter.decimal(Math.abs(r.changePct)) + " درصد " + comparisonBasis;
             View badge = a.kit.deltaBadge(badgeText, direction, tone, spokenDelta);
-            LinearLayout.LayoutParams dp = a.kit.lp(-2, -2);
-            dp.gravity = Gravity.CENTER_HORIZONTAL;
-            dp.topMargin = Theme.dp(6);
-            tile.addView(badge, dp);
+            LinearLayout.LayoutParams badgeParams = a.kit.lp(-2, -2);
+            badgeParams.gravity = Gravity.CENTER_HORIZONTAL;
+            badgeParams.topMargin = Theme.dp(4);
+            tile.addView(badge, badgeParams);
+        } else {
+            TextView unavailable = a.kit.text("قیمت ناموجود", 9f, Theme.MUTED, false);
+            unavailable.setGravity(Gravity.CENTER);
+            tile.addView(unavailable, a.kit.lp(-1, -2));
         }
+
         String comparisonBasis = r.comparesWithPreviousFetch
                 ? "نسبت به دریافت قبلی" : "بر اساس تغییر اعلام‌شده توسط TGJU";
         String trendDescription = !hasPrice ? "قیمت در دسترس نیست"
@@ -1356,9 +1414,11 @@ public class HomeScreen extends Screen {
                 + HomeNumberFormatter.decimal(Math.abs(r.changePct)) + " درصد " + comparisonBasis;
         String previousPrice = r.comparesWithPreviousFetch
                 ? "؛ نرخ قبلی " + HomeNumberFormatter.rounded(r.previousToman) + " تومان" : "";
-        tile.setContentDescription(label + "، " + (hasPrice
+        String sourceTime = r.asOf == null || r.asOf.trim().isEmpty()
+                ? "" : "؛ زمان منبع " + HomeNumberFormatter.localizeText(r.asOf);
+        tile.setContentDescription(shortLabel + "، " + (hasPrice
                 ? HomeNumberFormatter.rounded(r.toman) + " تومان، " + trendDescription + previousPrice
-                : trendDescription));
+                : trendDescription) + sourceTime);
         return tile;
     }
 

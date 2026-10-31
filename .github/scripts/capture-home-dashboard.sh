@@ -30,12 +30,12 @@ if [ "$result" -ne 0 ]; then
     echo "::error title=Screenshot instrumentation diagnostics::$safe_line"
   done <<< "$diagnostics"
 
-  python3 - <<'PY' > "$RUNNER_TEMP/home-screenshot-test-failures.txt"
+  report_file="$(mktemp)"
+  python3 - <<'PY' > "$report_file"
 from pathlib import Path
 from xml.etree import ElementTree
 
-reports = [p for p in Path("app/build").rglob("TEST-*.xml")
-           if "androidTest-results" in str(p) or "connected" in p.parts]
+reports = sorted(Path("app/build").rglob("TEST-*.xml"))
 failures = []
 for report in reports:
     try:
@@ -49,20 +49,29 @@ for report in reports:
             if result is None:
                 continue
             name = f"{case.get('classname', '')}.{case.get('name', '')}"
-            failures.append(f"{name}: {result.get('message', '')}")
+            failures.append(f"{report}: {name}: {result.get('message', '')}")
             detail = (result.text or "").strip()
             if detail:
                 failures.append(detail[:2500])
             break
 if not failures:
-    failures.append("No failing Android instrumentation XML report was found.")
+    failures.append("No failed JUnit XML case was found. XML reports: "
+                    + (", ".join(str(p) for p in reports) or "none"))
 print("\n".join(failures)[:8000])
 PY
   while IFS= read -r line; do
     [ -n "$line" ] || continue
     safe_line="$(printf '%s' "$line" | sed 's/%/%25/g; s/:/%3A/g')"
     echo "::error title=Screenshot test report::$safe_line"
-  done < "$RUNNER_TEMP/home-screenshot-test-failures.txt"
+  done < "$report_file"
+
+  logcat_file="$(mktemp)"
+  if adb logcat -d -t 2000 > "$logcat_file" 2>/dev/null; then
+    grep -E 'FATAL EXCEPTION|AndroidRuntime|INSTRUMENTATION_STATUS|INSTRUMENTATION_FAILED|AssertionError' "$logcat_file" | tail -n 12 | while IFS= read -r line; do
+      safe_line="$(printf '%s' "$line" | sed 's/%/%25/g; s/:/%3A/g')"
+      echo "::error title=Screenshot emulator log::$safe_line"
+    done || true
+  fi
   exit 1
 fi
 

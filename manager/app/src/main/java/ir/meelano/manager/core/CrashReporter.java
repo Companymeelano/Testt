@@ -15,7 +15,7 @@ import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Small, private crash breadcrumb for the standalone manager. It records the
+ * Small, private runtime-diagnostic breadcrumb for the standalone manager. It records the
  * exception type and code frames, but deliberately omits exception messages,
  * database addresses, queries, account names and credentials. The original
  * Android uncaught-exception handler still receives every crash.
@@ -36,7 +36,7 @@ public final class CrashReporter {
                 Thread.getDefaultUncaughtExceptionHandler();
         Thread.setDefaultUncaughtExceptionHandler((thread, error) -> {
             try {
-                writeReport(app, thread, error);
+                writeReport(app, thread, error, "uncaught", true);
             } catch (Throwable ignored) {
                 // A diagnostic failure must never replace the original crash.
             }
@@ -49,12 +49,24 @@ public final class CrashReporter {
         });
     }
 
-    private static void writeReport(Context context, Thread thread, Throwable error) {
+    /** Persist a handled UI/render failure so support can inspect it without the app exiting. */
+    public static void recordHandled(Context context, String area, Throwable error) {
+        try {
+            if (context == null || error == null) return;
+            writeReport(context.getApplicationContext(), Thread.currentThread(), error,
+                    "handled:" + safe(area), false);
+        } catch (Throwable ignored) {
+            // Diagnostic logging must never break the recovery path.
+        }
+    }
+
+    private static void writeReport(Context context, Thread thread, Throwable error,
+                                    String source, boolean fatal) {
         if (context == null || error == null || !WRITING.compareAndSet(false, true)) return;
         try {
             File dir = context.getNoBackupFilesDir();
             if (dir == null || (!dir.exists() && !dir.mkdirs())) return;
-            String report = format(context, thread, error);
+            String report = format(context, thread, error, source, fatal);
             byte[] bytes = report.getBytes(StandardCharsets.UTF_8);
             if (bytes.length > MAX_REPORT_BYTES) {
                 byte[] clipped = new byte[MAX_REPORT_BYTES];
@@ -73,9 +85,12 @@ public final class CrashReporter {
         }
     }
 
-    private static String format(Context context, Thread thread, Throwable error) {
+    private static String format(Context context, Thread thread, Throwable error,
+                                 String source, boolean fatal) {
         StringBuilder b = new StringBuilder(2048);
-        b.append("MEELANO Manager crash diagnostics\n");
+        b.append("MEELANO Manager diagnostics\n");
+        b.append("fatal: ").append(fatal ? "yes" : "no").append('\n');
+        b.append("source: ").append(safe(source)).append('\n');
         b.append("time: ").append(new SimpleDateFormat(
                 "yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US).format(new Date())).append('\n');
         b.append("sdk: ").append(Build.VERSION.SDK_INT).append('\n');

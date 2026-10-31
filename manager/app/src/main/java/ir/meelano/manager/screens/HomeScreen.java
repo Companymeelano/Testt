@@ -381,11 +381,17 @@ public class HomeScreen extends Screen {
         final String[] kpiErr = {null};
         final Runnable settle = () -> {
             if (a.renderGen() != token) return;
-            if (kpiOk[0]) {
-                saveCache(shared);
-                build(content, shared, BannerState.UPDATED, currentTimeLabel());
-            } else {
-                showFailure(content, kpiErr[0], cached, cachedTs[0]);
+            try {
+                if (kpiOk[0]) {
+                    saveCache(shared);
+                    build(content, shared, BannerState.UPDATED, currentTimeLabel());
+                } else {
+                    showFailure(content, kpiErr[0], cached, cachedTs[0]);
+                }
+            } catch (RuntimeException renderError) {
+                // Data/query failures are already reported by Repo. Keep an unexpected
+                // dashboard rendering error from terminating the main/UI thread.
+                a.reportRenderFailure(content, "HomeScreen:settle", renderError);
             }
         };
         final Runnable[] done = {null};
@@ -930,8 +936,24 @@ public class HomeScreen extends Screen {
                     if (target == null || target.getParent() == null) return;
                     weatherPlace = fp;
                     weatherFromDevice = fd;
-                    renderMarket(target, fr, fw, rLive, wLive);
+                    try {
+                        renderMarket(target, fr, fw, rLive, wLive);
+                    } catch (RuntimeException renderError) {
+                        Diag.warn("HomeScreen:marketRender", renderError);
+                        ir.meelano.manager.core.CrashReporter.recordHandled(
+                                a, "HomeScreen:marketRender", renderError);
+                        try {
+                            target.removeAllViews();
+                            target.addView(a.kit.hint("نمایش اطلاعات بازار موقتاً ممکن نشد؛ سایر بخش‌های برنامه در دسترس‌اند."),
+                                    a.kit.lp(-1, -2));
+                        } catch (RuntimeException fallbackError) {
+                            Diag.warn("HomeScreen:marketRenderFallback", fallbackError);
+                        }
+                    }
                 });
+            } catch (Exception refreshError) {
+                // This independent ticker/weather worker must never take down the app.
+                Diag.warn("HomeScreen:marketRefresh", refreshError);
             } finally {
                 endMarketRefresh();
             }

@@ -1,4 +1,4 @@
-name: MEELANO Manager v36.41.0 debug APK
+name: MEELANO Manager v36.42.0 debug APK
 
 on:
   push:
@@ -47,7 +47,7 @@ jobs:
           curl -fsSL -o manager/app/libs/sherpa-onnx-1.13.8.aar https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-1.13.8.aar
           echo "633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96  manager/app/libs/sherpa-onnx-1.13.8.aar" | sha256sum -c -
 
-      - name: Run manager unit tests and build v36.41.0
+      - name: Run manager unit tests and build v36.42.0
         working-directory: manager
         run: |
           set -o pipefail
@@ -111,19 +111,26 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
-      - name: Compile admin licence app (debug APK, artifact only)
+      - name: Compile and verify seller license app v1.9.1
         working-directory: manager
         run: |
-          set -o pipefail
+          set -euo pipefail
           gradle :admin:assembleDebug --no-daemon 2>&1 | tee ../admin-build.log | tail -40
+          mkdir -p ../dist
+          cp admin/build/outputs/apk/debug/admin-debug.apk ../dist/meelano-admin-v1.9.1-debug.apk
+          BT="$ANDROID_HOME/build-tools/35.0.0"
+          "$BT/aapt" dump badging ../dist/meelano-admin-v1.9.1-debug.apk | grep -F "package: name='ir.meelano.admin.debug' versionCode='11' versionName='1.9.1'"
+          "$BT/apksigner" verify --verbose --print-certs ../dist/meelano-admin-v1.9.1-debug.apk
+          unzip -t ../dist/meelano-admin-v1.9.1-debug.apk | tail -1
+          sha256sum ../dist/meelano-admin-v1.9.1-debug.apk
 
-      - name: Upload admin debug APK
+      - name: Upload seller license app debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: meelano-admin-debug
-          path: manager/admin/build/outputs/apk/debug/*.apk
+          name: meelano-admin-v1.9.1-debug
+          path: dist/meelano-admin-v1.9.1-debug.apk
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 30
 
       - name: Verify update descriptor tool (MAC round-trip, no publishing)
         run: |
@@ -131,29 +138,29 @@ jobs:
           mkdir -p "$RUNNER_TEMP/reldesc"
           javac -d "$RUNNER_TEMP/reldesc" manager/licensing/src/main/java/ir/meelano/licensing/License.java tools/release/ReleaseDescriptor.java
           SHA=$(printf 'meelano' | sha256sum | cut -d' ' -f1)
-          java -cp "$RUNNER_TEMP/reldesc" ReleaseDescriptor 74 36.41.0 meelano-manager-v36.41.0-release.apk 1000 "$SHA" https://github.com/Companymeelano/Testt/releases/download/manager-v36.41.0/meelano-manager-v36.41.0-release.apk "test" | tee descriptor-check.json
-          grep -F '"code": 74' descriptor-check.json
+          java -cp "$RUNNER_TEMP/reldesc" ReleaseDescriptor 75 36.42.0 meelano-manager-v36.42.0-release.apk 1000 "$SHA" https://github.com/Companymeelano/Testt/releases/download/manager-v36.42.0/meelano-manager-v36.42.0-release.apk "test" | tee descriptor-check.json
+          grep -F '"code": 75' descriptor-check.json
 
       - name: Verify APK identity, version and signature
         run: |
           set -euo pipefail
           mkdir -p dist
-          cp manager/app/build/outputs/apk/debug/app-debug.apk dist/meelano-manager-v36-debug-23.apk
+          cp manager/app/build/outputs/apk/debug/app-debug.apk dist/meelano-manager-v36-debug-24.apk
           BT="$ANDROID_HOME/build-tools/35.0.0"
-          "$BT/aapt" dump badging dist/meelano-manager-v36-debug-23.apk | tee manager-badging.txt
-          grep -F "package: name='ir.meelano.manager.debug' versionCode='74' versionName='36.41.0'" manager-badging.txt
-          "$BT/apksigner" verify --verbose --print-certs dist/meelano-manager-v36-debug-23.apk | tee manager-signing.txt
-          unzip -t dist/meelano-manager-v36-debug-23.apk | tail -1
-          unzip -l dist/meelano-manager-v36-debug-23.apk | grep -F 'lib/arm64-v8a/libonnxruntime.so'
-          APK_SIZE=$(stat -c %s dist/meelano-manager-v36-debug-23.apk)
+          "$BT/aapt" dump badging dist/meelano-manager-v36-debug-24.apk | tee manager-badging.txt
+          grep -F "package: name='ir.meelano.manager.debug' versionCode='75' versionName='36.42.0'" manager-badging.txt
+          "$BT/apksigner" verify --verbose --print-certs dist/meelano-manager-v36-debug-24.apk | tee manager-signing.txt
+          unzip -t dist/meelano-manager-v36-debug-24.apk | tail -1
+          unzip -l dist/meelano-manager-v36-debug-24.apk | grep -F 'lib/arm64-v8a/libonnxruntime.so'
+          APK_SIZE=$(stat -c %s dist/meelano-manager-v36-debug-24.apk)
           if [ "$APK_SIZE" -lt 60000000 ]; then echo "Expected the full offline-voice manager APK (~70 MB), got ${APK_SIZE} bytes"; exit 1; fi
-          sha256sum dist/meelano-manager-v36-debug-23.apk
+          sha256sum dist/meelano-manager-v36-debug-24.apk
 
       - name: Upload manager APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: meelano-manager-v36-debug-23
-          path: dist/meelano-manager-v36-debug-23.apk
+          name: meelano-manager-v36-debug-24
+          path: dist/meelano-manager-v36-debug-24.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -175,7 +182,7 @@ jobs:
           gradle :app:assembleRelease --no-daemon --stacktrace
           APK=$(ls app/build/outputs/apk/release/*.apk | head -1)
           BT="$ANDROID_HOME/build-tools/35.0.0"
-          "$BT/aapt" dump badging "$APK" | grep -F "package: name='ir.meelano.manager' versionCode='74' versionName='36.41.0'"
+          "$BT/aapt" dump badging "$APK" | grep -F "package: name='ir.meelano.manager' versionCode='75' versionName='36.42.0'"
           "$BT/apksigner" verify --verbose --print-certs "$APK" | tee ../release-signing.txt
           cp "$APK" ../meelano-manager-v36-release.apk
           sha256sum ../meelano-manager-v36-release.apk
@@ -199,22 +206,30 @@ jobs:
           git fetch origin arena/29e01a09-testt
           git reset --hard origin/arena/29e01a09-testt
           mkdir -p dist
-          cp manager/app/build/outputs/apk/debug/app-debug.apk dist/meelano-manager-v36-debug-23.apk
+          cp manager/app/build/outputs/apk/debug/app-debug.apk dist/meelano-manager-v36-debug-24.apk
+          cp manager/admin/build/outputs/apk/debug/admin-debug.apk dist/meelano-admin-v1.9.1-debug.apk
           {
-            echo "MEELANO Manager v36.41.0 (versionCode 74)"
+            echo "MEELANO Manager v36.42.0 (versionCode 75)"
             echo "Package: ir.meelano.manager.debug"
             echo "Build run: ${GITHUB_RUN_ID}"
             echo "Commit: ${SOURCE_COMMIT}"
-            echo "SHA-256: $(sha256sum dist/meelano-manager-v36-debug-23.apk | cut -d' ' -f1)"
+            echo "SHA-256: $(sha256sum dist/meelano-manager-v36-debug-24.apk | cut -d' ' -f1)"
           } > dist/manager-v36-build-info.txt
+          {
+            echo "MEELANO License Seller v1.9.1 (versionCode 11)"
+            echo "Package: ir.meelano.admin.debug"
+            echo "Build run: ${GITHUB_RUN_ID}"
+            echo "Commit: ${SOURCE_COMMIT}"
+            echo "SHA-256: $(sha256sum dist/meelano-admin-v1.9.1-debug.apk | cut -d' ' -f1)"
+          } > dist/admin-license-build-info.txt
           git config user.name "arena-ci"
           git config user.email "arena-ci@local"
-          git add -f dist/meelano-manager-v36-debug-23.apk dist/manager-v36-build-info.txt
+          git add -f dist/meelano-manager-v36-debug-24.apk dist/meelano-admin-v1.9.1-debug.apk dist/manager-v36-build-info.txt dist/admin-license-build-info.txt
           # A rebuild of the same sources produces the same bytes; committing it again would fail.
           if git diff --cached --quiet; then
             echo "APK and build info are unchanged; nothing to commit."
           else
-            git commit -m "dist: MEELANO Manager v36.41.0 debug APK"
+            git commit -m "dist: MEELANO Manager v36.42.0 debug APK"
           fi
           git push origin HEAD:arena/29e01a09-testt
 

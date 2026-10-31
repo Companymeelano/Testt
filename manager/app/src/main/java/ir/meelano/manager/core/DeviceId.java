@@ -6,7 +6,7 @@ import android.provider.Settings;
 
 import ir.meelano.licensing.License;
 
-/** Stable per-phone identity that licenses are bound to. */
+/** Privacy-preserving phone identity used for license binding (not the raw hardware serial or a person's name). */
 public final class DeviceId {
     private DeviceId() { }
 

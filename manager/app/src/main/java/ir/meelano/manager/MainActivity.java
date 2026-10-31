@@ -136,6 +136,7 @@ public class MainActivity extends Activity {
     private TextView userChip;
     private android.widget.ImageView compactUserAction;
     private boolean unlocked = false;
+    private boolean crashRecoveryMode;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -170,6 +171,13 @@ public class MainActivity extends Activity {
         // before anything renders so no screen shows the wrong one.
         Money.setUnit(settings.moneyUnit());
         repo = new Repo(this, settings);
+        // A previous fatal startup error would otherwise put the user straight back into
+        // the same crash loop. Let them copy the privacy-safe stack report before retrying.
+        if (ir.meelano.manager.core.CrashReporter.hasReport(this)) {
+            crashRecoveryMode = true;
+            showCrashRecovery();
+            return;
+        }
         splash();
     }
 
@@ -181,20 +189,19 @@ public class MainActivity extends Activity {
         if (!isFinishing() && !LicenseStore.unlocked(this)) toLicense();
         if (!isFinishing() && LicenseStore.unlocked(this)
                 && !new Settings(this).connConfigured()) toLicense();
-        // Secure updater: release builds check for a verified update after license validation;
-        // UpdateCenter intentionally no-ops for .debug packages.
-        if (!isFinishing() && LicenseStore.unlocked(this)) UpdateCenter.autoCheck(this);
-        // Persian voice is a prerequisite: guide the install before the app is used.
-        if (!isFinishing() && LicenseStore.unlocked(this) && new Settings(this).connConfigured()) {
+        // Secure updater / voice / sync run only after a normal launch; recovery stays quiet.
+        if (!crashRecoveryMode && !isFinishing() && LicenseStore.unlocked(this)) UpdateCenter.autoCheck(this);
+        if (!crashRecoveryMode && !isFinishing() && LicenseStore.unlocked(this)
+                && new Settings(this).connConfigured()) {
             ir.meelano.manager.core.Speaker.onResume(this);
         }
         if (!isFinishing() && AtiranAuth.gate(this)) toLogin();
-        Usage.touch(this);
-        if (repo != null && !isFinishing() && RoleStore.WAREHOUSE.equals(effRole()))
-            WarehouseSync.retry(this, null);
+        if (!crashRecoveryMode) Usage.touch(this);
+        if (!crashRecoveryMode && repo != null && !isFinishing()
+                && RoleStore.WAREHOUSE.equals(effRole())) WarehouseSync.retry(this, null);
         refreshLicChip();
         refreshUserChip();
-        dispatchShown(true);
+        if (!crashRecoveryMode) dispatchShown(true);
     }
 
     @Override
@@ -227,6 +234,65 @@ public class MainActivity extends Activity {
             startActivity(i);
         } catch (Exception ignored) { Diag.ignored("MainActivity:198", ignored); }
         finish();
+    }
+
+    /** A safe landing page after a previous crash; the report stays local until explicitly copied. */
+    private void showCrashRecovery() {
+        styleBars();
+        LinearLayout root = kit.v();
+        root.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        root.setGravity(Gravity.CENTER);
+        root.setPadding(Theme.dp(22), Theme.dp(24), Theme.dp(22), Theme.dp(24));
+        root.setBackgroundColor(Theme.BG);
+        root.addView(kit.logo(82), new LinearLayout.LayoutParams(Theme.dp(82), Theme.dp(82)));
+        TextView title = kit.text("گزارش فنی اجرای قبلی", 19f, Theme.TEXT, true);
+        title.setGravity(Gravity.CENTER);
+        root.addView(title, kit.lp(-1, -2));
+        TextView explain = kit.text(
+                "برنامه در اجرای قبلی با خطای فنی روبه‌رو شد. گزارش محلی فقط نسخه، نوع خطا و مسیر کد را دارد؛ رمز، نشانی سرور و اطلاعات فروش در آن نیست و چیزی خودکار ارسال نمی‌شود.",
+                12.5f, Theme.MUTED, false);
+        explain.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams ep = kit.lp(-1, -2);
+        ep.setMargins(0, Theme.dp(8), 0, Theme.dp(12));
+        root.addView(explain, ep);
+        LinearLayout card = kit.card(Theme.DANGER);
+        card.addView(kit.text("برای عیب‌یابی، ابتدا گزارش را کپی و برای پشتیبانی بفرستید.",
+                12f, Theme.TEXT, true), kit.lp(-1, -2));
+        card.addView(kit.btnGhost("کپی گزارش فنی", Theme.INFO, v -> copyCrashReport()),
+                kit.lp(-1, -2));
+        card.addView(kit.gap(6));
+        card.addView(kit.btnGold("ادامه و تلاش دوباره", v -> {
+            // Clear only the old report. If the retry crashes again, the uncaught handler
+            // writes a fresh report and this recovery screen appears again.
+            ir.meelano.manager.core.CrashReporter.clearReport(MainActivity.this);
+            crashRecoveryMode = false;
+            splash();
+        }), kit.lp(-1, -2));
+        root.addView(card, kit.lp(-1, -2));
+        ScrollView safeScroll = new ScrollView(this);
+        safeScroll.setFillViewport(true);
+        safeScroll.addView(root, new android.widget.FrameLayout.LayoutParams(-1, -2));
+        setContentView(safeScroll);
+    }
+
+    private void copyCrashReport() {
+        try {
+            String report = ir.meelano.manager.core.CrashReporter.readReport(this);
+            if (report.isEmpty()) {
+                kit.toast("گزارش فنی در دسترس نیست");
+                return;
+            }
+            android.content.ClipboardManager cm = (android.content.ClipboardManager)
+                    getSystemService(CLIPBOARD_SERVICE);
+            if (cm == null) {
+                kit.toast("کپی گزارش ممکن نشد");
+                return;
+            }
+            cm.setPrimaryClip(android.content.ClipData.newPlainText("گزارش فنی میلانو", report));
+            kit.toast("گزارش کپی شد؛ آن را برای پشتیبانی بفرستید");
+        } catch (Exception e) {
+            kit.toast("کپی گزارش ممکن نشد");
+        }
     }
 
     /** Log out the Atiran user and return to the login screen. */
@@ -993,6 +1059,30 @@ public class MainActivity extends Activity {
         return false;
     }
 
+    /** Capture a handled UI failure and leave a retry/copy path instead of closing the app. */
+    public void reportRenderFailure(LinearLayout target, String area, Throwable error) {
+        ir.meelano.manager.core.CrashReporter.recordHandled(this, area, error);
+        ir.meelano.manager.core.Diag.warn(area, error);
+        if (target == null || kit == null) return;
+        try {
+            target.removeAllViews();
+            LinearLayout card = kit.card(Theme.DANGER);
+            card.addView(kit.text("ساخت این صفحه با خطای فنی روبه‌رو شد؛ برنامه باز می‌ماند.",
+                    13f, Theme.TEXT, true), kit.lp(-1, -2));
+            card.addView(kit.hint("گزارش امن محلی ذخیره شد. اگر مشکل تکرار شد، گزارش را برای پشتیبانی کپی کنید."),
+                    kit.lp(-1, -2));
+            card.addView(kit.btnGhost("کپی گزارش فنی", Theme.INFO, v -> copyCrashReport()),
+                    kit.lp(-1, -2));
+            card.addView(kit.btnGold("تلاش دوباره", v -> {
+                ir.meelano.manager.core.CrashReporter.clearReport(MainActivity.this);
+                renderCurrent();
+            }), kit.lp(-1, -2));
+            target.addView(card, kit.lp(-1, -2));
+        } catch (RuntimeException fallbackError) {
+            ir.meelano.manager.core.Diag.warn("MainActivity:renderFailureFallback", fallbackError);
+        }
+    }
+
     public void nav(String id) {
         if (!screens.containsKey(id)) return;
         if (!RoleStore.allowed(this, id)) {
@@ -1185,7 +1275,11 @@ public class MainActivity extends Activity {
         content = newPage();
         refreshChrome();
         scroll.scrollTo(0, 0);
-        s.render(content);
+        try {
+            s.render(content);
+        } catch (RuntimeException renderError) {
+            reportRenderFailure(content, "MainActivity:renderCurrent", renderError);
+        }
         playPageIn(content);
         playEntrance(content);
     }

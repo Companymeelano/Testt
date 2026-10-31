@@ -452,6 +452,19 @@ public class AdminActivity extends Activity {
         ctx.city = req.city;
         ctx.inboxId = inboxId;
 
+        AdminDb.Customer dup = db.byDev(req.dev);
+        if (dup != null) {
+            ctx.customerId = dup.id;
+            // New client requests intentionally contain no name. Keep the saved customer
+            // profile when the same device asks for a renewal; blank request fields must
+            // never erase a name or contact already entered by the seller.
+            if (ctx.name.isEmpty()) ctx.name = dup.name;
+            if (ctx.family.isEmpty()) ctx.family = dup.family;
+            if (ctx.shop.isEmpty()) ctx.shop = dup.shop;
+            if (ctx.phone.isEmpty()) ctx.phone = dup.phone;
+            if (ctx.city.isEmpty()) ctx.city = dup.city;
+        }
+
         LinearLayout card = (LinearLayout) AdminKit.card(this);
         AdminKit.cardMargin(card, this);
         AdminKit.infoRow(card, this, "کد دستگاه", prettyDev(req.dev), true);
@@ -462,17 +475,16 @@ public class AdminActivity extends Activity {
         if (!req.city.isEmpty()) AdminKit.infoRow(card, this, "شهر", req.city, false);
         out.addView(card);
 
-        AdminDb.Customer dup = db.byDev(req.dev);
         if (dup != null) {
-            ctx.customerId = dup.id;
             TextView warn = AdminKit.text(this,
                     "⚠ این دستگاه قبلاً به نام «" + dup.full() + "» ثبت شده؛ صدور کد جدید برای همان مشتری انجام می‌شود.",
                     13.5f, AdminKit.GOLD_SOFT, false);
             warn.setPadding(0, 0, 0, AdminKit.dp(this, 8));
             out.addView(warn);
         } else {
-            out.addView(AdminKit.text(this, "✓ درخواست معتبر است؛ مشتری جدید.",
-                    14, AdminKit.GREEN, false));
+            out.addView(AdminKit.text(this,
+                    "✓ کد دستگاه دریافت شد. نام شخص از شناسهٔ گوشی قابل استخراج نیست؛ آن را در فرم صدور به‌صورت دستی ثبت کنید.",
+                    13, AdminKit.GREEN, false));
         }
         Button go = AdminKit.btn(this, "ادامه → انتخاب طرح و صدور کد", true);
         go.setOnClickListener(x -> show(() -> showMint(ctx)));
@@ -517,6 +529,11 @@ public class AdminActivity extends Activity {
         LinearLayout box = AdminKit.vbox(this);
         box.addView(AdminKit.titleBar(this,
                 ctx.extendOf > 0 ? "تمدید لایسنس" : "صدور کد فعال‌سازی", this::goBack));
+        if (ctx.name.trim().isEmpty()) {
+            box.addView(AdminKit.text(this,
+                    "شناسهٔ دستگاه به‌صورت خودکار دریافت شده است؛ نام شخص از کد گوشی خوانده نمی‌شود و باید اینجا دستی ثبت شود.",
+                    12.5f, AdminKit.MUTED, false));
+        }
 
         LinearLayout card = (LinearLayout) AdminKit.card(this);
         AdminKit.cardMargin(card, this);
@@ -524,7 +541,8 @@ public class AdminActivity extends Activity {
         fDev.setText(ctx.dev);
         fDev.setTypeface(AdminKit.mon(this));
         card.addView(fDev);
-        EditText fName = AdminKit.field(this, "نام");
+        EditText fName = AdminKit.field(this,
+                ctx.name.trim().isEmpty() ? "نام شخص (ورود دستی)" : "نام شخص");
         fName.setText(ctx.name);
         card.addView(fName);
         EditText fFamily = AdminKit.field(this, "نام خانوادگی");
@@ -618,6 +636,11 @@ public class AdminActivity extends Activity {
             ctx.city = AdminKit.txt(fCity);
             ctx.note = AdminKit.txt(fNote);
             if (fCustom != null) ctx.customDate = AdminKit.txt(fCustom);
+            if (ctx.name.trim().isEmpty()) {
+                AdminKit.toast(this, "نام شخص را در فرم صدور وارد کنید؛ نام خانوادگی اختیاری است");
+                fName.requestFocus();
+                return;
+            }
             if (!ctx.dev.matches("[0-9ABCDEFGHJKMNPQRSTVWXYZ]{8}")) {
                 AdminKit.toast(this, "کد دستگاه باید ۸ حرف/عدد باشد (همان کدی که در برنامه مشتری نشان داده می‌شود)");
                 return;

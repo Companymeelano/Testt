@@ -57,9 +57,9 @@ import ir.meelano.manager.ui.Theme;
 import ir.meelano.licensing.License;
 
 /**
- * Offline license gate (v31 steps): page 1 asks ONLY the name + contact
- * number, then a beautiful fixed waiting page holds until the license
- * lands; page 2 asks for the server address, lists compatible databases,
+ * Offline license gate: page 1 uses the device code automatically and asks only for a contact
+ * number; the seller records the customer's name while issuing the license. A fixed waiting page
+ * holds until the license arrives; page 2 asks for the server address and lists compatible databases,
  * and lets the user choose one before entering the app. Everything activates silently:
  * no mechanism talk, no notification. Remote revoke/block enforcement
  * stays, plus the luxury gold designer signature on every page.
@@ -251,8 +251,7 @@ public class LicenseActivity extends Activity {
                 if (g && t != null && !t.isEmpty()) doSmsSend(d, t);
                 else if (!g) {
                     if (SmsIo.permaDenied(LicenseActivity.this)) permSettingsDialog();
-                    else shareRequest(LicenseStore.distName(this),
-                            LicenseStore.contactPhone(this));
+                    else shareRequest(LicenseStore.contactPhone(this));
                 }
             } else if (req == REQ_RECV) {
                 updateRecvHint();
@@ -445,7 +444,7 @@ public class LicenseActivity extends Activity {
         return row;
     }
 
-    // ================= page 1: name + contact, nothing else =================
+    // ================= page 1: automatic device code + contact =================
 
     /** Brand header for the licence pages: framed gold logo, title and a muted subtitle. */
     private LinearLayout heroHeader(String title, String sub) {
@@ -476,42 +475,17 @@ public class LicenseActivity extends Activity {
     }
 
     private void buildRequestPage(LinearLayout box) {
-        box.addView(heroHeader("فعال‌سازی مجوز", "برای شروع، نام و شماره‌تان را ثبت کنید"), kit.lp(-1, -2));
+        box.addView(heroHeader("فعال‌سازی مجوز", "کد دستگاه خودکار است؛ نام را اینجا وارد نمی‌کنید"), kit.lp(-1, -2));
         box.addView(stepBar(1), kit.lp(-1, -2));
         box.addView(kit.gap(10));
         LinearLayout c = Card3D.card(this, CARD_EDGE);
         c.addView(sectionHead(R.drawable.mi_star_shine, Theme.GOLD, "خوش آمدید"), kit.lp(-1, -2));
-        c.addView(kit.text("نام و شماره‌تان را بنویسید؛ بقیه‌اش با ما.",
-                13f, Theme.TEXT, false), kit.lp(-1, -2));
+        c.addView(kit.text("شناسهٔ گوشی برای درخواست به‌صورت خودکار ساخته می‌شود. شمارهٔ تماس برای هماهنگی است؛ نام شخص را فروشنده هنگام صدور لایسنس ثبت می‌کند.",
+                12.5f, Theme.TEXT, false), kit.lp(-1, -2));
         c.addView(kit.gap(6));
         c.addView(deviceCodeView(), kit.lp(-1, -2));
         c.addView(kit.gap(6));
-        final TextView errName = errSlot();
         final TextView errPhone = errSlot();
-        final EditText fName = kit.editLux("نام", LicenseStore.distName(this));
-        try {
-            fName.setInputType(android.text.InputType.TYPE_CLASS_TEXT
-                    | android.text.InputType.TYPE_TEXT_VARIATION_PERSON_NAME);
-        } catch (Exception ignored) { Diag.ignored("LicenseActivity:404", ignored); }
-        fName.addTextChangedListener(new android.text.TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence x, int a, int b, int cc) { }
-            @Override
-            public void onTextChanged(CharSequence x, int a, int b, int cc) { }
-            @Override
-            public void afterTextChanged(android.text.Editable x) {
-                try {
-                    if (x != null && x.toString().trim().length() > 0
-                            && errName.getText().length() > 0) {
-                        errName.setText("");
-                        fName.setBackground(Theme.fieldBg());
-                    }
-                } catch (Exception ignored) { Diag.ignored("LicenseActivity:418", ignored); }
-            }
-        });
-        luxField(fName);
-        c.addView(iconField(fName, R.drawable.mi_person), kit.lp(-1, -2));
-        c.addView(errName, kit.lp(-1, -2));
         final EditText fPhone = kit.editLux("شماره تماس", autoPhone());
         try {
             if (autoPhone().isEmpty() && !phonePermAsked) {
@@ -548,7 +522,7 @@ public class LicenseActivity extends Activity {
                 } catch (Exception ignored) { Diag.ignored("LicenseActivity:450", ignored); }
             }
         });
-        // Same width as the name row: the validity tick used to narrow this field, so it is no longer placed here.
+        // Same width as the name row used to have: the validity tick never narrows the phone field.
         luxField(fPhone);
         LinearLayout prow = iconField(fPhone, R.drawable.mi_call);
         c.addView(prow, kit.lp(-1, -2));
@@ -561,8 +535,7 @@ public class LicenseActivity extends Activity {
             startBtn.setMinHeight(Theme.dp(52));
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:464", ignored); }
         glowBtn = startBtn;
-        startBtn.setOnClickListener(v -> requestStart(txt(fName), txt(fPhone),
-                fName, fPhone, errName, errPhone, startBtn));
+        startBtn.setOnClickListener(v -> requestStart(txt(fPhone), fPhone, errPhone, startBtn));
         c.addView(startBtn, kit.lp(-1, -2));
         try {
             if (!autoPhone().isEmpty())
@@ -813,26 +786,18 @@ public class LicenseActivity extends Activity {
         return card;
     }
 
-    private void requestStart(String dist, String phone, EditText fName, EditText fPhone,
-                                TextView errName, TextView errPhone, android.widget.Button btn) {
+    private void requestStart(String phone, EditText fPhone, TextView errPhone,
+                              android.widget.Button btn) {
         if (sending) return;
-        boolean badName = dist == null || dist.trim().isEmpty();
         boolean badPhone = SmsIo.cleanPhone(phone).length() < 10;
         try {
-            errName.setText(badName ? "نام را وارد کنید" : "");
             errPhone.setText(badPhone ? "شماره تماس معتبر وارد کنید (مثلاً 09123456789)" : "");
-            if (badName) fName.setBackground(Theme.fieldBgError()); else luxField(fName);
             if (badPhone) fPhone.setBackground(Theme.fieldBgError()); else luxField(fPhone);
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:551", ignored); }
-        if (badName || badPhone) {
+        if (badPhone) {
             try {
-                if (badName) {
-                    fName.requestFocus();
-                    Ui.announce(errName, "نام را وارد کنید");
-                } else {
-                    fPhone.requestFocus();
-                    Ui.announce(errPhone, "شماره تماس معتبر وارد کنید");
-                }
+                fPhone.requestFocus();
+                Ui.announce(errPhone, "شماره تماس معتبر وارد کنید");
             } catch (Exception ignored) { Diag.ignored("LicenseActivity:561", ignored); }
             return;
         }
@@ -841,10 +806,9 @@ public class LicenseActivity extends Activity {
             btn.setEnabled(false);
             btn.setText("در حال ارسال…");
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:568", ignored); }
-        LicenseStore.setDistName(this, dist);
         LicenseStore.setContactPhone(this, phone);
         LicenseStore.setRequested(this, true);
-        directSend(buildRequestMsg(dist, phone));
+        directSend(buildRequestMsg(phone));
         buildUi();
     }
 
@@ -869,8 +833,7 @@ public class LicenseActivity extends Activity {
 
             @Override
             public void fail(String fa) {
-                shareRequest(LicenseStore.distName(LicenseActivity.this),
-                        LicenseStore.contactPhone(LicenseActivity.this));
+                shareRequest(LicenseStore.contactPhone(LicenseActivity.this));
             }
         });
     }
@@ -893,8 +856,8 @@ public class LicenseActivity extends Activity {
         box[0].show();
     }
 
-    private void shareRequest(String name, String phone) {
-        String msg = buildRequestMsg(name, phone);
+    private void shareRequest(String phone) {
+        String msg = buildRequestMsg(phone);
         copyText("درخواست فعال‌سازی", msg);
         try {
             Intent i = new Intent(Intent.ACTION_SEND);
@@ -963,8 +926,8 @@ public class LicenseActivity extends Activity {
         c.addView(deviceCodeView(), kit.lp(-1, -2));
         c.addView(kit.gap(6));
         LinearLayout row = kit.h();
-        row.addView(kit.btnGhost("↻ ارسال مجدد", Theme.MUTED, v -> directSend(buildRequestMsg(
-                LicenseStore.distName(this), LicenseStore.contactPhone(this)))), kit.wlp(1f));
+        row.addView(kit.btnGhost("↻ ارسال مجدد", Theme.MUTED,
+                v -> directSend(buildRequestMsg(LicenseStore.contactPhone(this)))), kit.wlp(1f));
         row.addView(kit.space(8));
         final android.widget.Button[] recall = new android.widget.Button[1];
         recall[0] = kit.btnGold("✦ دریافت کلید", v -> recallFlow(recall[0]));
@@ -1884,13 +1847,16 @@ public class LicenseActivity extends Activity {
     // ---- the one luxury frame: request + receive + network, all in one ----
 
 
-    private String buildRequestMsg(String dist, String phone) {
-        String line = License.requestLine(device, dist, "", dist, phone, "");
+    private String buildRequestMsg(String phone) {
+        // The 8-character device code is created locally; a name cannot be derived from it.
+        // Keep the request protocol compatible, but leave customer-identification fields blank
+        // so the seller enters the person's name in the licensing tool.
+        String line = License.requestLine(device, "", "", "", phone, "");
         String use = Usage.reportLine(this, device);
         StringBuilder b = new StringBuilder("درخواست فعال‌سازی میلانو\n").append(line);
         if (!use.isEmpty()) b.append('\n').append(use);
-        b.append("\nنام: ").append(dist.trim());
-        b.append("\nتماس: ").append(phone.trim());
+        b.append("\nکد دستگاه: ").append(prettyDev(device));
+        if (phone != null && !phone.trim().isEmpty()) b.append("\nتماس: ").append(phone.trim());
         return b.toString();
     }
 

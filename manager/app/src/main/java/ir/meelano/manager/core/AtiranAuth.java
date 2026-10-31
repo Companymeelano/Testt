@@ -167,30 +167,26 @@ public final class AtiranAuth {
         String displayCol = meta.col("visitors", "vis_name", "visitor_name", "Name", "name", "FullName");
         if (visitorIdCol == null || loginCol == null || passwordCol == null) return null;
 
-        String sql = "SELECT TOP (2) TRY_CONVERT(int," + Sql.q(visitorIdCol) + "), "
-                + "TRY_CONVERT(nvarchar(200)," + Sql.q(loginCol) + "), "
-                + "TRY_CONVERT(nvarchar(4000)," + Sql.q(passwordCol) + "), "
-                + (activeCol == null ? "CAST(NULL AS nvarchar(32))" :
-                        "TRY_CONVERT(nvarchar(32)," + Sql.q(activeCol) + ")") + ", "
-                + (displayCol == null ? "CAST(N'' AS nvarchar(220))" :
-                        "TRY_CONVERT(nvarchar(220)," + Sql.q(displayCol) + ")")
-                + " FROM " + meta.qTable("visitors") + " WHERE LOWER(LTRIM(RTRIM(TRY_CONVERT(nvarchar(200),"
-                + Sql.q(loginCol) + "))))=LOWER(LTRIM(RTRIM(?)))";
+        String sql = visitorLookupSql(meta.qTable("visitors"), visitorIdCol, loginCol,
+                passwordCol, activeCol, displayCol);
 
         int visitorId;
         String storedUsername;
-        String storedPassword;
+        byte[] storedPassword;
         Object activeValue;
         String displayName;
         try (PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setString(1, username.trim());
             try (ResultSet rs = ps.executeQuery()) {
                 if (!rs.next()) return null;
-                visitorId = rs.getInt(1);
-                storedUsername = rs.getString(2);
-                storedPassword = rs.getString(3);
+                Integer parsedVisitorId = sqlInteger(rs.getObject(1));
+                if (parsedVisitorId == null)
+                    throw new VisitorLoginException("شناسهٔ ویزیتور در آتیران معتبر نیست.");
+                visitorId = parsedVisitorId;
+                storedUsername = readSqlText(rs.getObject(2));
+                storedPassword = passwordBytes(rs.getObject(3));
                 activeValue = rs.getObject(4);
-                displayName = rs.getString(5);
+                displayName = readSqlText(rs.getObject(5));
                 if (rs.next())
                     throw new VisitorLoginException("برای این نام کاربری چند ردیف ویزیتور پیدا شد؛ پیوندها باید یکتا شوند.");
             }
@@ -201,7 +197,7 @@ public final class AtiranAuth {
             throw new VisitorLoginException("حساب ویزیتور در آتیران غیرفعال است یا وضعیت فعال‌بودن آن قابل تأیید نیست.");
         String loginName = storedUsername == null || storedUsername.trim().isEmpty()
                 ? username.trim() : storedUsername.trim();
-        if (!verifyVisitorPassword(storedPassword, typedPassword, loginName))
+        if (!verifyPassword(storedPassword, typedPassword, loginName))
             throw new VisitorLoginException("رمز حساب ویزیتور آتیران تأیید نشد.");
 
         if (!meta.table("sys_vis"))
@@ -211,16 +207,19 @@ public final class AtiranAuth {
         String grantSystemCol = meta.col("sys_vis", "SysID", "sys_id", "system_id");
         if (grantVisitorCol == null || grantUserCol == null || grantSystemCol == null)
             throw new VisitorLoginException("ستون‌های پیوند ویزیتور در جدول sys_vis آتیران کامل نیستند.");
-        String grantSql = "SELECT DISTINCT TRY_CONVERT(int," + Sql.q(grantUserCol) + ") FROM "
-                + meta.qTable("sys_vis") + " WHERE TRY_CONVERT(int," + Sql.q(grantVisitorCol)
-                + ")=? AND TRY_CONVERT(int," + Sql.q(grantSystemCol) + ") IS NOT NULL";
+        String visitorKeyType = meta.columnType("sys_vis", grantVisitorCol);
+        String grantSql = visitorGrantSql(meta.qTable("sys_vis"), grantVisitorCol,
+                visitorKeyType, grantUserCol, grantSystemCol);
         int atiranUid = -1;
         try (PreparedStatement ps = c.prepareStatement(grantSql)) {
-            ps.setInt(1, visitorId);
+            if (isNumericSqlType(visitorKeyType)) ps.setInt(1, visitorId);
+            else ps.setString(1, String.valueOf(visitorId));
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
-                    int linkedUid = rs.getInt(1);
-                    if (rs.wasNull() || linkedUid <= 0) continue;
+                    Integer linkedUidValue = sqlInteger(rs.getObject(1));
+                    Integer linkedSystemValue = sqlInteger(rs.getObject(2));
+                    if (linkedSystemValue == null || linkedUidValue == null || linkedUidValue <= 0) continue;
+                    int linkedUid = linkedUidValue;
                     if (atiranUid > 0 && atiranUid != linkedUid)
                         throw new VisitorLoginException("پیوند این ویزیتور در sys_vis به چند کاربر آتیران می‌رسد؛ دسترسی حدسی داده نشد.");
                     atiranUid = linkedUid;
@@ -244,8 +243,107 @@ public final class AtiranAuth {
         visitor.appRole = byUser.isEmpty() ? RoleStore.VISITOR : byUser;
         visitor.active = true;
         visitor.pwColFound = true;
-        visitor.pw = storedPassword == null ? null : storedPassword.getBytes(StandardCharsets.UTF_8);
+        visitor.pw = storedPassword;
         return visitor;
+    }
+
+    /**
+     * SQL Server 2008-compatible visitor lookup. Read credential columns in their native types;
+     * only CAST the login key to text for a stable, case-insensitive comparison. TRY_CONVERT
+     * is intentionally absent because this query runs before we know which account type is logging in.
+     */
+    static String visitorLookupSql(String table, String idCol, String loginCol, String passwordCol,
+                                   String activeCol, String displayCol) {
+        String active = activeCol == null ? "CAST(NULL AS nvarchar(32))" : Sql.q(activeCol);
+        String display = displayCol == null ? "CAST(N'' AS nvarchar(220))" : Sql.q(displayCol);
+        String loginText = "CAST(" + Sql.q(loginCol) + " AS nvarchar(200))";
+        return "SELECT TOP (2) " + Sql.q(idCol) + ", " + Sql.q(loginCol) + ", " + Sql.q(passwordCol)
+                + ", " + active + ", " + display + " FROM " + table
+                + " WHERE LOWER(LTRIM(RTRIM(" + loginText + ")))="
+                + "LOWER(LTRIM(RTRIM(?)))";
+    }
+
+    /** Build the visitor grant query without SQL Server 2012-only TRY_CONVERT. */
+    static String visitorGrantSql(String table, String visitorCol, String visitorType,
+                                  String userCol, String systemCol) {
+        return "SELECT " + Sql.q(userCol) + ", " + Sql.q(systemCol) + " FROM " + table
+                + " WHERE " + integerKeyPredicate(visitorCol, visitorType);
+    }
+
+    /**
+     * Match an Atiran integer key using its catalog type. Text-backed legacy IDs are trimmed
+     * and compared as text; numeric columns keep a native indexed equality comparison.
+     */
+    static String integerKeyPredicate(String column, String sqlType) {
+        if (isNumericSqlType(sqlType)) return Sql.q(column) + "=?";
+        return "LTRIM(RTRIM(CAST(" + Sql.q(column) + " AS nvarchar(100))))=?";
+    }
+
+    static boolean isNumericSqlType(String sqlType) {
+        if (sqlType == null) return false;
+        String type = sqlType.trim().toLowerCase(Locale.US);
+        return "tinyint".equals(type) || "smallint".equals(type) || "int".equals(type)
+                || "bigint".equals(type) || "decimal".equals(type) || "numeric".equals(type)
+                || "money".equals(type) || "smallmoney".equals(type) || "float".equals(type)
+                || "real".equals(type) || "bit".equals(type);
+    }
+
+    /** Read common JDBC values without SQL-side TRY_CONVERT; invalid IDs fail closed. */
+    static Integer sqlInteger(Object value) {
+        if (value == null) return null;
+        if (value instanceof Boolean) return (Boolean) value ? 1 : 0;
+        String text;
+        if (value instanceof byte[]) text = new String((byte[]) value, StandardCharsets.UTF_8);
+        else text = String.valueOf(value);
+        text = Money.en(text).trim();
+        if (text.isEmpty()) return null;
+        try {
+            java.math.BigDecimal parsed = new java.math.BigDecimal(text);
+            if (parsed.stripTrailingZeros().scale() > 0) return null;
+            return parsed.intValueExact();
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    /** Convert a JDBC text value; binary-backed credentials remain byte arrays instead. */
+    private static String readSqlText(Object value) {
+        if (value == null) return "";
+        try {
+            if (value instanceof java.sql.Clob) {
+                java.sql.Clob c = (java.sql.Clob) value;
+                long len = c.length();
+                if (len > Integer.MAX_VALUE) return "";
+                return c.getSubString(1, (int) len).trim();
+            }
+            if (value instanceof byte[]) return new String((byte[]) value, StandardCharsets.UTF_8).trim();
+            return String.valueOf(value).trim();
+        } catch (Exception ignored) {
+            return "";
+        }
+    }
+
+    /** Preserve native binary hashes; text passwords are UTF-8 encoded as before. */
+    static byte[] passwordBytes(Object value) {
+        if (value == null) return null;
+        if (value instanceof byte[]) return ((byte[]) value).clone();
+        try {
+            if (value instanceof java.sql.Blob) {
+                java.sql.Blob b = (java.sql.Blob) value;
+                long len = b.length();
+                if (len > Integer.MAX_VALUE) return null;
+                return b.getBytes(1, (int) len);
+            }
+            if (value instanceof java.sql.Clob) {
+                java.sql.Clob c = (java.sql.Clob) value;
+                long len = c.length();
+                if (len > Integer.MAX_VALUE) return null;
+                return c.getSubString(1, (int) len).getBytes(StandardCharsets.UTF_8);
+            }
+        } catch (Exception ignored) {
+            return null;
+        }
+        return String.valueOf(value).getBytes(StandardCharsets.UTF_8);
     }
 
     /** Best-effort role-name lookup over the unknown Roles/role schema. */

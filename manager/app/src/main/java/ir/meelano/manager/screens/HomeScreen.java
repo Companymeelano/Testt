@@ -1688,7 +1688,13 @@ public class HomeScreen extends Screen {
         alerts.addView(boardHead("هشدار امروز", null, R.drawable.mi_warning,
                 statusChip(n == 0 ? "بدون هشدار" : Money.fa(String.valueOf(n)) + " مورد",
                         n == 0 ? Theme.SUCCESS : Theme.WARNING)), a.kit.lp(-1, -2));
-        while (rows.getChildCount() > 0) alerts.addView(rows.getChildAt(0));
+        // Each alert view still belongs to the temporary rows container. Detach it before
+        // inserting it into the card; Android rejects a ViewGroup child with two parents.
+        while (rows.getChildCount() > 0) {
+            View row = rows.getChildAt(0);
+            rows.removeViewAt(0);
+            alerts.addView(row);
+        }
         if (n == 0) alerts.addView(a.kit.text("فعلاً هشدار مهمی وجود ندارد.", 11.5f, Theme.MUTED, false), a.kit.lp(-1, -2));
         a.kit.addCard(content, alerts);
     }

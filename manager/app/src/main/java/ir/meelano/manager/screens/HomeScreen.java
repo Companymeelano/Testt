@@ -243,7 +243,7 @@ public class HomeScreen extends Screen {
             syncWasRefreshing = true;
             content.addView(syncStatus("", SyncState.REFRESHING, null, null), a.kit.lp(-1, -2));
             content.addView(a.kit.gap(8));
-            content.addView(greetingHero(), a.kit.lp(-1, -2));
+            content.addView(greetingHero(cached), a.kit.lp(-1, -2));
             content.addView(a.kit.gap(8));
             // Market data is independent of the Atiran dashboard query and can render immediately.
             content.addView(marketCard(), a.kit.lp(-1, -2));
@@ -457,7 +457,7 @@ public class HomeScreen extends Screen {
         content.removeAllViews();
         content.addView(syncStatus("", failureState, faError, v -> render(content)), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(8));
-        content.addView(greetingHero(), a.kit.lp(-1, -2));
+        content.addView(greetingHero(null), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(8));
         content.addView(marketCard(), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(8));
@@ -641,49 +641,6 @@ public class HomeScreen extends Screen {
         return Jalali.monthName(day) + " " + HomeNumberFormatter.localizeText(day.substring(0, 4));
     }
 
-    /** Depth layer behind the hero: two gold light sources, a glossy top sheen, a thin ring and a rim highlight. */
-    private static final class HeroDecor extends View {
-        private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final RectF box = new RectF();
-        private final float radius;
-
-        HeroDecor(Context c, float radiusPx) {
-            super(c);
-            this.radius = radiusPx;
-        }
-
-        @Override
-        protected void onDraw(Canvas g) {
-            super.onDraw(g);
-            float w = getWidth(), h = getHeight();
-            if (w <= 0 || h <= 0) return;
-            boolean light = Theme.isLight();
-            box.set(0, 0, w, h);
-            g.save();
-            android.graphics.Path clip = new android.graphics.Path();
-            clip.addRoundRect(box, radius, radius, android.graphics.Path.Direction.CW);
-            g.clipPath(clip);
-            p.setStyle(Paint.Style.FILL);
-            p.setShader(new RadialGradient(w * 0.92f, h * 0.02f, w * 0.60f,
-                    Theme.alpha(Theme.GOLD, light ? 70 : 110), Theme.alpha(Theme.GOLD, 0), Shader.TileMode.CLAMP));
-            g.drawRect(box, p);
-            p.setShader(new RadialGradient(w * 0.06f, h * 1.02f, w * 0.45f,
-                    Theme.alpha(Theme.GOLD_SOFT, light ? 40 : 46), Theme.alpha(Theme.GOLD_SOFT, 0), Shader.TileMode.CLAMP));
-            g.drawRect(box, p);
-            p.setShader(new LinearGradient(0, 0, 0, h * 0.5f,
-                    Theme.alpha(0xFFFFFFFF, light ? 110 : 26), 0x00FFFFFF, Shader.TileMode.CLAMP));
-            g.drawRect(box, p);
-            p.setShader(null);
-            g.restore();
-            // Rim: a light top edge makes the card read as a raised, glossy panel.
-            p.setStyle(Paint.Style.STROKE);
-            p.setStrokeWidth(Theme.dp(1));
-            p.setColor(Theme.alpha(0xFFFFFFFF, light ? 150 : 34));
-            box.set(Theme.dp(0.5f), Theme.dp(0.5f), w - Theme.dp(0.5f), h - Theme.dp(0.5f));
-            g.drawRoundRect(box, radius, radius, p);
-        }
-    }
-
     /** «شنبه، ۲۵ مهر ۱۴۰۵» in Persian digits; falls back to the short line when the date is unusual. */
     private String dateLine() {
         String t = Jalali.todayStr();
@@ -698,127 +655,54 @@ public class HomeScreen extends Screen {
         }
     }
 
-    private View greetingHero() {
+    /** Small greeting: keep the user's name and today's Persian date visible without repeating the brand mark. */
+    private View greetingHero(Data data) {
         int hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
         String greeting = hour < 5 ? "شب بخیر" : (hour < 12 ? "صبح بخیر"
                 : (hour < 15 ? "روز بخیر" : (hour < 19 ? "عصر بخیر" : "شب بخیر")));
-        String role = AtiranAuth.sessionRole(a);
-        if (role == null || role.isEmpty()) role = RoleStore.current(a);
-        String roleName = RoleStore.faName(role);
+        String name = AtiranAuth.sessionName(a);
+        if (name == null || name.trim().isEmpty()) name = AtiranAuth.sessionUser(a);
+        if (name == null || name.trim().isEmpty()) name = RoleStore.faName(currentRole());
+        name = HomeNumberFormatter.localizeText(name == null ? "مدیر" : name.trim());
 
-        final LinearLayout hero = a.kit.v();
-        hero.setBackground(Theme.executiveHero());
-        hero.setPadding(Theme.dp(16), Theme.dp(12), Theme.dp(16), Theme.dp(11));
-        Theme.lift(hero, Theme.cardElevation() + Theme.dp(2));
-
-        FrameLayout wrap = new FrameLayout(a);
-        wrap.addView(new HeroDecor(a, Theme.dp(28)), new FrameLayout.LayoutParams(-1, -1));
-        wrap.addView(hero, new FrameLayout.LayoutParams(-1, -2));
-
-        LinearLayout top = a.kit.h();
-        top.setGravity(Gravity.CENTER_VERTICAL);
-
-        // Crest: the company logo from the local cache (synced from the database), or a fine default mark.
-        FrameLayout crest = new FrameLayout(a);
-        android.graphics.drawable.GradientDrawable frame = new android.graphics.drawable.GradientDrawable();
-        frame.setCornerRadius(Theme.dp(18));
-        frame.setColor(Theme.BG);
-        frame.setStroke(Theme.dp(2), Theme.GOLD);
-        crest.setBackground(frame);
-        crest.setElevation(Theme.dp(3));
-        android.graphics.Bitmap logo = ir.meelano.manager.data.Company.logo(a);
-        if (logo != null) {
-            ImageView li = new ImageView(a);
-            li.setScaleType(ImageView.ScaleType.CENTER_CROP);
-            li.setImageBitmap(logo);
-            li.setClipToOutline(true);
-            li.setOutlineProvider(new android.view.ViewOutlineProvider() {
-                @Override
-                public void getOutline(View v, android.graphics.Outline o) {
-                    o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), Theme.dp(16));
-                }
-            });
-            crest.addView(li, new FrameLayout.LayoutParams(Theme.dp(44), Theme.dp(44), Gravity.CENTER));
-        } else {
-            ImageView mark = new ImageView(a);
-            mark.setImageResource(Theme.logoRes());
-            mark.setScaleType(ImageView.ScaleType.CENTER_CROP);
-            mark.setClipToOutline(true);
-            mark.setOutlineProvider(new android.view.ViewOutlineProvider() {
-                @Override
-                public void getOutline(View v, android.graphics.Outline o) {
-                    o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), Theme.dp(16));
-                }
-            });
-            crest.addView(mark, new FrameLayout.LayoutParams(Theme.dp(44), Theme.dp(44), Gravity.CENTER));
-        }
-        FrameLayout crestWrap = new FrameLayout(a);
-        android.graphics.drawable.GradientDrawable halo = new android.graphics.drawable.GradientDrawable(
-                android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
-                new int[]{Theme.alpha(Theme.GOLD, 90), Theme.alpha(Theme.GOLD, 0)});
-        halo.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-        View haloView = new View(a);
-        haloView.setBackground(halo);
-        crestWrap.addView(haloView, new FrameLayout.LayoutParams(-1, -1));
-        crestWrap.addView(crest, new FrameLayout.LayoutParams(Theme.dp(56), Theme.dp(56), Gravity.CENTER));
-        top.addView(crestWrap, new LinearLayout.LayoutParams(Theme.dp(64), Theme.dp(64)));
-        top.addView(a.kit.space(9));
+        LinearLayout card = a.kit.card(Theme.SECTION_SALES);
+        card.setPadding(Theme.dp(14), Theme.dp(10), Theme.dp(14), Theme.dp(10));
+        LinearLayout row = a.kit.h();
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.addView(a.kit.iconBadge(R.drawable.mi_wb_twilight, Theme.SECTION_SALES, 36),
+                a.kit.lp(Theme.dp(36), Theme.dp(36)));
+        row.addView(a.kit.space(10));
 
         LinearLayout copy = a.kit.v();
-        TextView overline = a.kit.text("میلانو  •  اتاق فرمان", 10.5f, Theme.GOLD_SOFT, true);
-        overline.setSingleLine(true);
-        copy.addView(overline, a.kit.lp(-1, -2));
-        TextView headline = a.kit.text(greeting + "، " + roleName, 23f, Theme.TEXT, true);
-        headline.setMaxLines(1);
-        // Long names shrink to fit the line instead of being cut off.
-        headline.setAutoSizeTextTypeUniformWithConfiguration(16, 23, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
-        LinearLayout.LayoutParams hp = a.kit.lp(-1, -2);
-        hp.setMargins(0, Theme.dp(2), 0, 0);
-        copy.addView(headline, hp);
-        TextView description = a.kit.text("تصویر روشن از فروش، مالی و عملیات", 11f, Theme.MUTED, false);
-        description.setSingleLine(true);
-        description.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        copy.addView(description, a.kit.lp(-1, -2));
-        top.addView(copy, a.kit.wlp(1f));
+        TextView title = a.kit.text(greeting + "، " + name, 16f, Theme.TEXT, true);
+        title.setSingleLine(true);
+        title.setEllipsize(TextUtils.TruncateAt.END);
+        title.setAutoSizeTextTypeUniformWithConfiguration(12, 16, 1,
+                android.util.TypedValue.COMPLEX_UNIT_SP);
+        copy.addView(title, a.kit.lp(-1, -2));
+        String summary = greetingSummary(data);
+        TextView detail = a.kit.text(dateLine() + "  ·  " + summary, 10.5f, Theme.MUTED, false);
+        detail.setSingleLine(true);
+        detail.setEllipsize(TextUtils.TruncateAt.END);
+        copy.addView(detail, a.kit.lp(-1, -2));
+        row.addView(copy, a.kit.wlp(1f));
+        card.addView(row, a.kit.lp(-1, -2));
+        card.setContentDescription(greeting + "، " + name + "؛ " + dateLine() + "؛ " + summary);
+        return card;
+    }
 
-        hero.addView(top, a.kit.lp(-1, -2));
-        hero.addView(a.kit.gap(9));
-        LinearLayout footer = a.kit.h();
-        footer.setGravity(Gravity.CENTER_VERTICAL);
-        footer.addView(a.kit.icon(R.drawable.mi_calendar_month, Theme.GOLD_SOFT, 18),
-                new LinearLayout.LayoutParams(Theme.dp(18), Theme.dp(18)));
-        footer.addView(a.kit.space(6));
-        TextView date = a.kit.text(dateLine(), 12f, Theme.TEXT, true);
-        date.setSingleLine(true);
-        date.setPadding(Theme.dp(10), Theme.dp(5), Theme.dp(10), Theme.dp(5));
-        date.setBackground(Theme.ghostButton(Theme.GOLD));
-        footer.addView(date, a.kit.lp(-2, -2));
-        footer.addView(a.kit.space(1), a.kit.wlp(1f));
-        TextView edition = a.kit.text(RoleStore.editionFa(role), 12f, Theme.GOLD_SOFT, true);
-        edition.setSingleLine(true);
-        edition.setPadding(Theme.dp(10), Theme.dp(5), Theme.dp(10), Theme.dp(5));
-        edition.setBackground(Theme.ghostButton(Theme.GOLD));
-        footer.addView(edition, a.kit.lp(-2, -2));
-        hero.addView(footer, a.kit.lp(-1, -2));
-
-        // Gentle float, only when the phone allows motion; it stops as soon as the card leaves the screen.
-        if (ir.meelano.manager.ui.Ui.motionOk(a)) {
-            final android.animation.ObjectAnimator float1 = android.animation.ObjectAnimator.ofFloat(
-                    hero, View.TRANSLATION_Y, 0f, -Theme.dp(3));
-            float1.setDuration(3600);
-            float1.setRepeatCount(android.animation.ObjectAnimator.INFINITE);
-            float1.setRepeatMode(android.animation.ObjectAnimator.REVERSE);
-            float1.setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator());
-            float1.start();
-            wrap.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
-                @Override
-                public void onViewAttachedToWindow(View v) { }
-
-                @Override
-                public void onViewDetachedFromWindow(View v) { float1.cancel(); }
-            });
-        }
-        return wrap;
+    /** One sentence of context, not another presentation of the sales total. */
+    private String greetingSummary(Data data) {
+        if (data == null) return "نمای کلی فروشگاه آماده می‌شود";
+        if (data.overdue != null && !data.overdue.isEmpty() && RoleStore.allowed(a, "sales"))
+            return "یک فاکتور معوق در مرکز توجه است";
+        if (data.notes != null && !data.notes.isEmpty())
+            return "برخی داده‌ها موقتاً در دسترس نیستند";
+        if (data.salesSnapshot != null && data.salesSnapshot.isAvailable()
+                && Jalali.todayStr().equals(snapshotDay(data))
+                && data.salesSnapshot.documentsOn(snapshotDay(data)) == 0)
+            return "هنوز فاکتوری برای امروز ثبت نشده است";
+        return "نمای امروز در کارت‌های زیر جمع شده است";
     }
 
     /** Compact rates + optional device-location weather. Cached values show while refresh runs. */
@@ -1147,7 +1031,7 @@ public class HomeScreen extends Screen {
         syncWasRefreshing = false;
         content.addView(status, a.kit.lp(-1, -2));
         content.addView(a.kit.gap(8));
-        content.addView(greetingHero(), a.kit.lp(-1, -2));
+        content.addView(greetingHero(d), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(8));
         // The requested live market/weather strip sits directly under the manager greeting.
         // It is independent of Atiran SQL, so it remains visible when the business link is offline.

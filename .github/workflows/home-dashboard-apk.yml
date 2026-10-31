@@ -59,6 +59,7 @@ jobs:
           if [ "$result" -ne 0 ]; then
             python3 - <<'PY' > "$RUNNER_TEMP/gradle-diagnostic.txt"
           from pathlib import Path
+          import re
           text = Path("../manager-home-build.log").read_text(errors="replace")
           start = text.rfind("FAILURE:")
           if start < 0:
@@ -69,7 +70,42 @@ jobs:
           if end < start:
               end = len(text)
           snippet = text[start:end + len("BUILD FAILED")]
-          print(snippet[:9000] or text[-9000:])
+          details = (snippet[:1400] or text[-1400:])
+
+          # Lint's failure summary is terse; surface every error plus warnings in the
+          # touched UI files so the check run contains actionable diagnostics without
+          # downloading runner-only artifacts.
+          report = Path("app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt")
+          if report.exists():
+              lines = report.read_text(errors="replace").splitlines()
+              matcher = re.compile(r"^(.*?):(\d+): (Error|Warning):")
+              touched = ("MainActivity.java", "SettingsScreen.java", "DesignGallery.java",
+                         "DesignTokens.java", "Theme.java")
+              findings = []
+              errors = 0
+              touched_warnings = 0
+              for index, line in enumerate(lines):
+                  match = matcher.match(line)
+                  if not match:
+                      continue
+                  severity = match.group(3)
+                  path = match.group(1)
+                  if severity == "Error":
+                      errors += 1
+                  elif severity == "Warning" and any(name in path for name in touched):
+                      touched_warnings += 1
+                  else:
+                      continue
+                  findings.append("\n".join(lines[index:min(index + 4, len(lines))]))
+              if findings:
+                  details += (f"\n\nLint findings: {errors} errors; "
+                              f"{touched_warnings} warnings in changed UI files.\n")
+                  details += "\n".join(findings)
+              else:
+                  details += "\n\nLint report exists but no source findings were parsed."
+          else:
+              details += "\n\nLint text report was not generated at the expected path."
+          print(details[:9000])
           PY
             summary=$(cat "$RUNNER_TEMP/gradle-diagnostic.txt")
             summary=${summary//'%'/'%25'}

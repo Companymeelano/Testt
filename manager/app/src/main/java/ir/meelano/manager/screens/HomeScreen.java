@@ -30,6 +30,7 @@ import ir.meelano.manager.core.RoleStore;
 import ir.meelano.manager.core.MoneyQueries;
 import ir.meelano.manager.R;
 import ir.meelano.manager.core.Queries;
+import ir.meelano.manager.core.SalesSnapshot;
 import ir.meelano.manager.data.Meta;
 import ir.meelano.manager.data.Company;
 import ir.meelano.manager.data.Repo;
@@ -41,7 +42,6 @@ import ir.meelano.manager.ui.Theme;
 
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -66,12 +66,14 @@ public class HomeScreen extends Screen {
 
     private static final class Data {
         String snapshotDay = "";
-        Row salesDay = new Row();
+        Row salesDay;
         Row buyDay = new Row();
         Row inDay = new Row();
         Row outDay = new Row();
         List<Row> overdue = new ArrayList<>();
         List<Row> salesDaily = new ArrayList<>();
+        SalesSnapshot salesSnapshot;
+        boolean salesTrendAvailable;
         List<Row> topItems = new ArrayList<>();
         List<Row> monthlySales = new ArrayList<>();
         List<Row> dueIn = new ArrayList<>();
@@ -378,11 +380,14 @@ public class HomeScreen extends Screen {
         final Data shared = new Data();
         final int[] left = {2};
         final boolean[] kpiOk = {false};
+        final boolean[] chartsOk = {false};
         final String[] kpiErr = {null};
         final Runnable settle = () -> {
             if (a.renderGen() != token) return;
             try {
-                if (kpiOk[0]) {
+                rebuildSalesSnapshot(shared);
+                if (kpiOk[0] || (chartsOk[0] && shared.salesSnapshot != null
+                        && shared.salesSnapshot.isAvailable())) {
                     saveCache(shared);
                     build(content, shared, BannerState.UPDATED, currentTimeLabel());
                 } else {
@@ -417,6 +422,7 @@ public class HomeScreen extends Screen {
             public void ok(Data g) {
                 if (a.renderGen() != token) return;
                 mergeCharts(shared, g);
+                chartsOk[0] = true;
                 done[0].run();
             }
 
@@ -434,7 +440,8 @@ public class HomeScreen extends Screen {
         Data d = new Data();
         final String to = Jalali.todayStr();
         d.snapshotDay = to;
-        d.salesDay = liveL(token, L, d.notes, "فروش روز", () -> Repo.one(L.c, Queries.homeSalesDay(L.m)));
+        // Sales are deliberately not queried through a separate latest-data KPI path:
+        // the daily snapshot below is the only source for every Home sales amount.
         d.buyDay = liveL(token, L, d.notes, "خرید روز", () -> Repo.one(L.c, Queries.homeBuyDay(L.m)));
         d.inDay = liveL(token, L, d.notes, "دریافت روز", () -> Repo.one(L.c, MoneyQueries.darDay(L.m, 0)));
         d.outDay = liveL(token, L, d.notes, "پرداخت روز", () -> Repo.one(L.c, MoneyQueries.darDay(L.m, 1)));
@@ -456,15 +463,15 @@ public class HomeScreen extends Screen {
         final String to = Jalali.todayStr();
         final String from = chartsFrom(to);
         d.salesDaily = liveL(token, L, d.notes, "روند فروش", () -> Repo.exec(L.c, Queries.factorDaily(L.m, true, from, to)));
+        d.salesTrendAvailable = d.salesDaily != null;
         Filter todayFilter = new Filter();
         todayFilter.from = to;
         todayFilter.to = to;
         todayFilter.top = 5;
         d.topItems = liveL(token, L, d.notes, "پرفروش‌ترین کالاهای امروز",
                 () -> Repo.exec(L.c, Queries.factorTopProducts(L.m, true, todayFilter, 5)));
-        // Monthly comparison is folded from the SAME daily rows the chart draws, so the
-        // month tiles can never disagree with the trend or the averages next to them.
-        d.monthlySales = monthlyFromDaily(d.salesDaily);
+        // Monthly comparison is built from this same daily snapshot after both parallel
+        // query groups settle, so it cannot drift from the chart or KPI.
         d.dueIn = liveL(token, L, d.notes, "سررسید دریافتی", () -> Repo.exec(L.c, MoneyQueries.chequeDue(L.m, true, 3)));
         d.dueOut = liveL(token, L, d.notes, "سررسید پرداختی", () -> Repo.exec(L.c, MoneyQueries.chequeDue(L.m, false, 3)));
         return d;
@@ -481,44 +488,30 @@ public class HomeScreen extends Screen {
         return base;
     }
 
-    /** Month buckets («1405/08», total, docs) from daily rows — newest month first. */
-    private static List<Row> monthlyFromDaily(List<Row> daily) {
-        java.util.TreeMap<String, Row> byMonth = new java.util.TreeMap<>(java.util.Collections.reverseOrder());
-        if (daily != null) for (Row r : daily) {
-            String day = Jalali.disp(r.s("day"));
-            if (day.length() < 7) continue;
-            String key = day.substring(0, 7);
-            Row acc = byMonth.get(key);
-            if (acc == null) {
-                acc = new Row();
-                acc.put("month", key);
-                acc.put("total", 0d);
-                acc.put("docs", 0L);
-                byMonth.put(key, acc);
-            }
-            acc.put("total", acc.d("total") + r.d("total"));
-            acc.put("docs", acc.l("docs") + r.l("docs"));
+    /** Build every Home sales figure and month bucket from the one read-only daily snapshot. */
+    private static void rebuildSalesSnapshot(Data d) {
+        if (d == null) return;
+        if (!d.salesTrendAvailable || d.salesDaily == null) {
+            d.salesSnapshot = SalesSnapshot.empty(d.snapshotDay);
+            d.salesDay = null;
+            d.monthlySales = new ArrayList<>();
+            return;
         }
-        return new ArrayList<>(byMonth.values());
-    }
-
-    /** Sum of the first {@code days} calendar days of a «YYYY/MM» bucket in the daily rows. */
-    private static double monthToDate(List<Row> daily, String monthKey, int days) {
-        if (daily == null || monthKey == null || days <= 0) return 0;
-        double total = 0;
-        for (Row r : daily) {
-            String day = Jalali.disp(r.s("day"));
-            if (day.length() < 10 || !day.startsWith(monthKey + "/")) continue;
-            try {
-                if (Integer.parseInt(day.substring(8).trim()) <= days) total += r.d("total");
-            } catch (Exception ignored) { Diag.ignored("HomeScreen:monthToDate", ignored); }
+        d.salesSnapshot = SalesSnapshot.fromRows(d.salesDaily, d.snapshotDay);
+        d.salesDay = d.salesSnapshot.row(d.snapshotDay);
+        List<Row> months = new ArrayList<>();
+        for (SalesSnapshot.Month month : d.salesSnapshot.months()) {
+            Row row = new Row();
+            row.put("month", month.key);
+            row.put("total", month.salesRials);
+            row.put("docs", month.documents);
+            months.add(row);
         }
-        return total;
+        d.monthlySales = months;
     }
 
     private static void mergeKpis(Data s, Data g) {
         s.snapshotDay = g.snapshotDay;
-        s.salesDay = g.salesDay;
         s.buyDay = g.buyDay;
         s.inDay = g.inDay;
         s.outDay = g.outDay;
@@ -529,6 +522,7 @@ public class HomeScreen extends Screen {
 
     private static void mergeCharts(Data s, Data g) {
         s.salesDaily = g.salesDaily;
+        s.salesTrendAvailable = g.salesTrendAvailable;
         s.topItems = g.topItems;
         s.monthlySales = g.monthlySales;
         s.dueIn = g.dueIn;
@@ -569,13 +563,14 @@ public class HomeScreen extends Screen {
                     .append("|sales=").append(rowStr(d.salesDay))
                     .append("|buy=").append(rowStr(d.buyDay))
                     .append("|in=").append(rowStr(d.inDay))
-                    .append("|out=").append(rowStr(d.outDay));
+                    .append("|out=").append(rowStr(d.outDay))
+                    .append("|trendok=").append(d.salesSnapshot != null && d.salesSnapshot.isAvailable() ? "1" : "0");
             if (d.topItems != null) {
                 for (int i = 0; i < Math.min(5, d.topItems.size()); i++)
                     s.append("|top").append(i).append('=').append(rowStr(d.topItems.get(i)));
             }
             if (d.salesDaily != null) {
-                for (int i = 0; i < Math.min(31, d.salesDaily.size()); i++)
+                for (int i = 0; i < Math.min(62, d.salesDaily.size()); i++)
                     s.append("|trend").append(i).append('=').append(rowStr(d.salesDaily.get(i)));
             }
             if (d.monthlySales != null) {
@@ -621,10 +616,14 @@ public class HomeScreen extends Screen {
                 else if ("buy".equals(k)) { d.buyDay = rowFrom(v); any = true; }
                 else if ("in".equals(k)) { d.inDay = rowFrom(v); any = true; }
                 else if ("out".equals(k)) { d.outDay = rowFrom(v); any = true; }
+                else if ("trendok".equals(k)) d.salesTrendAvailable = "1".equals(v);
                 else if (k.matches("top[0-4]")) { d.topItems.add(rowFrom(v)); any = true; }
-                else if (k.matches("trend(?:[0-9]|[12][0-9]|30)")) { d.salesDaily.add(rowFrom(v)); any = true; }
+                else if (k.matches("trend(?:[0-9]|[1-5][0-9]|6[01])")) {
+                    d.salesDaily.add(rowFrom(v)); d.salesTrendAvailable = true; any = true;
+                }
                 else if (k.matches("month(?:[0-9]|1[01])")) { d.monthlySales.add(rowFrom(v)); any = true; }
             }
+            rebuildSalesSnapshot(d);
             return any ? d : null;
         } catch (Exception e) {
             return null;
@@ -1347,12 +1346,12 @@ public class HomeScreen extends Screen {
         a.kit.addCard(content, card);
 
         // The comparison card: the day against the recent days, as compact tiles.
-        if (d.salesDaily != null && !d.salesDaily.isEmpty()) {
+        if (d.salesSnapshot != null && d.salesSnapshot.isAvailable()) {
             String compareDay = snapshotDay(d);
-            double todaySales = salesOnDay(d.salesDaily, compareDay);
-            double yesterday = salesOnDay(d.salesDaily, Jalali.addDays(compareDay, -1));
-            double avg7 = averageSalesBefore(d.salesDaily, compareDay, 7);
-            double avg30 = averageSalesBefore(d.salesDaily, compareDay, 30);
+            double todaySales = salesOnDay(d, compareDay);
+            double yesterday = salesOnDay(d, Jalali.addDays(compareDay, -1));
+            double avg7 = averageSalesBefore(d, compareDay, 7);
+            double avg30 = averageSalesBefore(d, compareDay, 30);
             boolean running = compareDay.equals(Jalali.todayStr());
             String delta = avg7 > 0 ? Money.pct((todaySales - avg7) * 100.0 / avg7) : "—";
             LinearLayout compare = a.kit.card(Theme.GOLD);
@@ -1749,16 +1748,16 @@ public class HomeScreen extends Screen {
 
     /** Compact sales pulse: one useful daily chart, ranked products and month-over-month context. */
     private void secSalesInsight(LinearLayout content, Data d) {
-        boolean hasDaily = d.salesDaily != null && !d.salesDaily.isEmpty();
+        boolean hasDaily = d.salesSnapshot != null && d.salesSnapshot.isAvailable();
         boolean hasProducts = d.topItems != null && !d.topItems.isEmpty();
         boolean hasMonths = d.monthlySales != null && !d.monthlySales.isEmpty();
         if (!hasDaily && !hasProducts && !hasMonths) return;
 
         if (hasDaily) {
             String endDay = snapshotDay(d);
-            List<Charts.Point> points = filled(d.salesDaily, endDay);
-            double today = salesOnDay(d.salesDaily, endDay);
-            double avg7 = averageSalesBefore(d.salesDaily, endDay, 7);
+            List<Charts.Point> points = filled(d.salesSnapshot, endDay);
+            double today = salesOnDay(d, endDay);
+            double avg7 = averageSalesBefore(d, endDay, 7);
             LinearLayout trend = a.kit.card(Theme.GOLD);
             trend.addView(boardHead("روند ۱۴ روزه فروش تا " + snapshotLabel(d),
                     "فروش روزانه، روز به روز", R.drawable.mi_refresh,
@@ -1841,7 +1840,7 @@ public class HomeScreen extends Screen {
                         if (running) {
                             try {
                                 int dom = Integer.parseInt(Jalali.todayStr().split("/")[2].trim());
-                                double same = monthToDate(d.salesDaily, prevKey, dom);
+                                double same = d.salesSnapshot == null ? 0 : d.salesSnapshot.monthToDateRials(prevKey, dom);
                                 if (same > 0) { prevBase = same; basis = "همین بازه از ماه قبل"; }
                             } catch (Exception ignored) { Diag.ignored("HomeScreen:monthCompare", ignored); }
                         }
@@ -2039,50 +2038,25 @@ public class HomeScreen extends Screen {
         return s;
     }
 
-    private double salesOnDay(List<Row> rows, String day) {
-        if (rows == null || day == null || day.isEmpty()) return 0;
-        String target = Jalali.disp(day);
-        double total = 0;
-        for (Row r : rows)
-            if (target.equals(Jalali.disp(r.s("day")))) total += r.d("total");
-        return total;
+    private double salesOnDay(Data data, String day) {
+        return data == null || data.salesSnapshot == null ? 0
+                : data.salesSnapshot.salesRialsOn(day);
     }
 
-    /** Average across calendar days before today, counting days without sales as zero. */
-    private double averageSalesBefore(List<Row> rows, String today, int days) {
-        if (rows == null || days <= 0) return 0;
-        Map<String, Double> byDay = new HashMap<>();
-        for (Row r : rows) {
-            String d = Jalali.disp(r.s("day"));
-            if (!d.isEmpty()) byDay.merge(d, r.d("total"), Double::sum);
-        }
-        int first = Jalali.parse(Jalali.addDays(today, -days));
-        if (first < 0) return 0;
-        double total = 0;
-        for (int i = 0; i < days; i++) {
-            Double amount = byDay.get(Jalali.format(first + i));
-            if (amount != null) total += amount;
-        }
-        return total / days;
+    /** Average across calendar days before the selected day; no-sale days count as zero. */
+    private double averageSalesBefore(Data data, String day, int days) {
+        return data == null || data.salesSnapshot == null ? 0
+                : data.salesSnapshot.averageCalendarDaysBefore(day, days);
     }
 
-    /** Fill missing days with 0 for a smooth 14-day chart ending on the saved snapshot day. */
-    private List<Charts.Point> filled(List<Row> rows, String endDay) {
-        Map<String, Double> map = new HashMap<>();
-        if (rows != null) for (Row r : rows) {
-            String k = Jalali.disp(r.s("day"));
-            if (!k.isEmpty()) map.merge(k, r.d("total"), Double::sum);
-        }
+    /** Fill missing days with zero for the 14-day chart, sourced only from SalesSnapshot. */
+    private List<Charts.Point> filled(SalesSnapshot snapshot, String endDay) {
         List<Charts.Point> out = new ArrayList<>();
+        if (snapshot == null || !snapshot.isAvailable()) return out;
         String to = Jalali.disp(endDay);
         if (to.isEmpty()) to = Jalali.todayStr();
-        String from = Jalali.addDays(to, -13);
-        int d0 = Jalali.parse(from);
-        for (int i = 0; i < 14 && d0 >= 0; i++) {
-            String day = Jalali.format(d0 + i);
-            Double v = map.get(day);
-            out.add(new Charts.Point(Jalali.shortLabel(day), v == null ? 0 : v));
-        }
+        for (SalesSnapshot.Day day : snapshot.dailySeries(to, 14))
+            out.add(new Charts.Point(Jalali.shortLabel(day.date), day.salesRials));
         return out;
     }
 

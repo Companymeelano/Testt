@@ -43,6 +43,7 @@ import ir.meelano.manager.data.Company;
 import ir.meelano.manager.data.Repo;
 import ir.meelano.manager.data.Row;
 import ir.meelano.manager.ui.Charts;
+import ir.meelano.manager.ui.HomePaymentMixBar;
 import ir.meelano.manager.ui.HomeSalesChart;
 import ir.meelano.manager.ui.Kit;
 import ir.meelano.manager.ui.MeelanoIcons;
@@ -81,10 +82,12 @@ public class HomeScreen extends Screen {
         List<Row> buyDaily = new ArrayList<>();
         List<Row> inDaily = new ArrayList<>();
         List<Row> outDaily = new ArrayList<>();
+        List<Row> inMix = new ArrayList<>();
         List<Row> returnsPrevious = new ArrayList<>();
         boolean buyTrendAvailable;
         boolean inTrendAvailable;
         boolean outTrendAvailable;
+        boolean inMixAvailable;
         boolean returnsAvailable;
         boolean returnsPreviousAvailable;
         List<Row> overdue = new ArrayList<>();
@@ -346,6 +349,12 @@ public class HomeScreen extends Screen {
                 () -> Repo.exec(L.c, MoneyQueries.darDaily(L.m, 1, sparkRange.from, sparkRange.to)));
         d.outTrendAvailable = d.outDaily != null;
         d.inDay = liveL(token, L, d.notes, "دریافت امروز", () -> Repo.one(L.c, MoneyQueries.darDay(L.m, 0, todayRange.to)));
+        Filter todayMix = new Filter();
+        todayMix.from = todayRange.from;
+        todayMix.to = todayRange.to;
+        d.inMix = liveL(token, L, d.notes, "ترکیب دریافت امروز",
+                () -> Repo.exec(L.c, MoneyQueries.paymentMix(L.m, todayMix)));
+        d.inMixAvailable = d.inMix != null;
         d.outDay = liveL(token, L, d.notes, "پرداخت امروز", () -> Repo.one(L.c, MoneyQueries.darDay(L.m, 1, todayRange.to)));
         d.overdue = liveL(token, L, d.notes, "معوق‌ها", () -> Repo.exec(L.c, Queries.overdueInvoices(L.m, 5)));
         String stFrom = Jalali.addDays(to, -29);
@@ -444,11 +453,15 @@ public class HomeScreen extends Screen {
     private static void mergeKpis(Data s, Data g) {
         s.snapshotDay = g.snapshotDay;
         s.buyDay = g.buyDay;
-        s.inDay = g.inDay;
+        if (g.inDay != null) s.inDay = g.inDay;
         s.outDay = g.outDay;
         s.buyDaily = g.buyDaily;
         s.inDaily = g.inDaily;
         s.outDaily = g.outDaily;
+        if (g.inMix != null) {
+            s.inMix = g.inMix;
+            s.inMixAvailable = g.inMixAvailable;
+        }
         s.returnsPrevious = g.returnsPrevious;
         s.buyTrendAvailable = g.buyTrendAvailable;
         s.inTrendAvailable = g.inTrendAvailable;
@@ -523,6 +536,7 @@ public class HomeScreen extends Screen {
                     .append("|buytrendok=").append(d.buyTrendAvailable ? "1" : "0")
                     .append("|intrendok=").append(d.inTrendAvailable ? "1" : "0")
                     .append("|outtrendok=").append(d.outTrendAvailable ? "1" : "0")
+                    .append("|inmixok=").append(d.inMixAvailable ? "1" : "0")
                     .append("|returnsok=").append(d.returnsAvailable ? "1" : "0")
                     .append("|returnsprevok=").append(d.returnsPreviousAvailable ? "1" : "0")
                     .append("|trendok=").append(d.salesSnapshot != null && d.salesSnapshot.isAvailable() ? "1" : "0")
@@ -538,6 +552,8 @@ public class HomeScreen extends Screen {
                 s.append("|intrend").append(i).append('=').append(rowStr(d.inDaily.get(i)));
             if (d.outDaily != null) for (int i = 0; i < Math.min(7, d.outDaily.size()); i++)
                 s.append("|outtrend").append(i).append('=').append(rowStr(d.outDaily.get(i)));
+            if (d.inMix != null) for (int i = 0; i < Math.min(4, d.inMix.size()); i++)
+                s.append("|inmix").append(i).append('=').append(rowStr(d.inMix.get(i)));
             if (d.returns != null) for (int i = 0; i < Math.min(20, d.returns.size()); i++)
                 s.append("|ret").append(i).append('=').append(rowStr(d.returns.get(i)));
             if (d.returnsPrevious != null) for (int i = 0; i < Math.min(20, d.returnsPrevious.size()); i++)
@@ -616,11 +632,13 @@ public class HomeScreen extends Screen {
                 else if ("buytrendok".equals(k)) d.buyTrendAvailable = "1".equals(v);
                 else if ("intrendok".equals(k)) d.inTrendAvailable = "1".equals(v);
                 else if ("outtrendok".equals(k)) d.outTrendAvailable = "1".equals(v);
+                else if ("inmixok".equals(k)) d.inMixAvailable = "1".equals(v);
                 else if ("returnsok".equals(k)) d.returnsAvailable = "1".equals(v);
                 else if ("returnsprevok".equals(k)) d.returnsPreviousAvailable = "1".equals(v);
                 else if (k.matches("buytrend[0-6]")) { d.buyDaily.add(rowFrom(v)); any = true; }
                 else if (k.matches("intrend[0-6]")) { d.inDaily.add(rowFrom(v)); any = true; }
                 else if (k.matches("outtrend[0-6]")) { d.outDaily.add(rowFrom(v)); any = true; }
+                else if (k.matches("inmix[0-3]")) { d.inMix.add(rowFrom(v)); any = true; }
                 else if (k.matches("ret[0-9]|ret1[0-9]")) { d.returns.add(rowFrom(v)); any = true; }
                 else if (k.matches("retprev[0-9]|retprev1[0-9]")) { d.returnsPrevious.add(rowFrom(v)); any = true; }
                 else if ("trendok".equals(k)) d.salesTrendAvailable = "1".equals(v);
@@ -1376,8 +1394,9 @@ public class HomeScreen extends Screen {
         // The former "dashboard details" accordion is gone. Operational and analytical
         // sections now have a clear, compact hierarchy and remain directly discoverable.
         for (String key : orderedKeys()) {
-            if ("sales_insight".equals(key) || "kpis".equals(key) || "returns".equals(key))
-                continue; // Sales lives in the Hero; returns are part of the KPI strip above.
+            if ("sales_insight".equals(key) || "kpis".equals(key) || "returns".equals(key)
+                    || "due".equals(key) || "eod".equals(key))
+                continue; // Sales and returns are consolidated; cheque due is surfaced by AlertEngine.
             LinearLayout block = a.kit.v();
             renderHomeSection(block, d, key);
             if (block.getChildCount() == 0) continue;
@@ -2307,38 +2326,132 @@ public class HomeScreen extends Screen {
         }
     }
 
-    /** Payment mix is easier to scan as four proportional rails than as another large chart. */
+    /** Compact, accessible receipt mix: one stacked strip with concise amount/percentage chips. */
     private void secCashMix(LinearLayout content, Data d) {
-        if (d.inDay == null || d.inDay.d("total") <= 0) return;
+        if (!RoleStore.allowed(a, "dar_in")) return;
         LinearLayout card = a.kit.card(Theme.SECTION_RECEIVE);
-        card.addView(dashboardSectionHead("ترکیب دریافت " + dayOf(d.inDay), R.drawable.mi_receipt_long,
+        card.setPadding(Theme.dp(13), Theme.dp(10), Theme.dp(13), Theme.dp(11));
+        card.addView(a.kit.sectionHeader("ترکیب دریافت", R.drawable.mi_receipt_long,
                 Theme.SECTION_RECEIVE, "دریافت‌ها ›", navAction("dar_in")), a.kit.lp(-1, -2));
-        double total = d.inDay.d("total");
-        double cash = d.inDay.d("cash"), pos = d.inDay.d("pos"),
-                havaleh = d.inDay.d("havaleh"), cheque = d.inDay.d("cheque");
-        card.addView(a.kit.text("جمع " + HomeNumberFormatter.compactMoney(total),
-                11f, Theme.TEXT, true), a.kit.lp(-1, -2));
-        addPaymentMix(card, "نقد", cash, total, Theme.SECTION_RECEIVE);
-        addPaymentMix(card, "کارت", pos, total, Theme.SECTION_RECEIVE);
-        addPaymentMix(card, "حواله", havaleh, total, Theme.SECTION_RECEIVE);
-        addPaymentMix(card, "چک", cheque, total, Theme.SECTION_RECEIVE);
-        // The booked voucher total (dar.mab) can carry a discount or other items beyond the
-        // four means of payment — show the difference instead of leaving the rails unexplained.
-        double other = total - (cash + pos + havaleh + cheque);
-        if (Math.abs(other) >= 500_000) {
-            addPaymentMix(card, other > 0 ? "سایر (تخفیف، کسورات و اقلام دیگر)" : "تعدیل/اضافهٔ سند",
-                    Math.abs(other), total, Theme.SECTION_RECEIVE);
-            card.addView(a.kit.text("تفاوت مجموع اجزا با کل قبض، ناشی از تخفیف یا اقلام دیگر است.",
-                    9f, Theme.MUTED, false), a.kit.lp(-1, -2));
+
+        if (d.inDay == null || !d.inMixAvailable || d.inMix == null) {
+            card.addView(a.kit.emptyRow("تفکیک روش‌های دریافت در دسترس نیست"), a.kit.lp(-1, -2));
+            card.addView(a.kit.hint("منبع دریافت ناقص است؛ مبلغ به اجزای ساختگی تقسیم نمی‌شود."),
+                    a.kit.lp(-1, -2));
+            a.kit.addCard(content, card);
+            return;
+        }
+        double total = Math.max(0, d.inDay.d("total"));
+        if (total <= 0) {
+            card.addView(a.kit.emptyRow("برای " + snapshotLabel(d) + " دریافتی ثبت نشده است"),
+                    a.kit.lp(-1, -2));
+            a.kit.addCard(content, card);
+            return;
+        }
+
+        double cash = 0, cardAmount = 0, transfer = 0, cheque = 0;
+        for (Row row : d.inMix) {
+            if (row == null) continue;
+            String label = row.s("label");
+            double amount = Math.max(0, row.d("amount"));
+            if (label.contains("نقد")) cash += amount;
+            else if (label.contains("حواله")) transfer += amount;
+            else if (label.contains("کارت")) cardAmount += amount;
+            else if (label.contains("چک")) cheque += amount;
+        }
+        double known = cash + cardAmount + transfer + cheque;
+        double other = Math.max(0, total - known);
+        double denominator = known > total ? known : total;
+        boolean mismatch = Math.abs(total - known) >= 500_000;
+
+        List<String> labels = new ArrayList<>();
+        List<Double> amounts = new ArrayList<>();
+        List<Integer> colors = new ArrayList<>();
+        labels.add("نقد"); amounts.add(cash); colors.add(Theme.SECTION_RECEIVE);
+        labels.add("کارت"); amounts.add(cardAmount); colors.add(Theme.SECTION_PURCHASE);
+        labels.add("حواله"); amounts.add(transfer); colors.add(Theme.SECTION_MARKET);
+        labels.add("چک"); amounts.add(cheque); colors.add(Theme.SECTION_ALERT);
+        if (other > 0) {
+            labels.add("سایر"); amounts.add(other); colors.add(Theme.MUTED);
+        }
+        double[] segments = new double[amounts.size()];
+        int[] accents = new int[amounts.size()];
+        StringBuilder accessible = new StringBuilder("ترکیب دریافت ").append(snapshotLabel(d));
+        for (int i = 0; i < amounts.size(); i++) {
+            segments[i] = amounts.get(i);
+            accents[i] = colors.get(i);
+            if (i > 0) accessible.append("؛ ");
+            accessible.append(labels.get(i)).append(' ')
+                    .append(HomeNumberFormatter.percent(denominator > 0 ? amounts.get(i) * 100d / denominator : 0))
+                    .append("، ").append(HomeNumberFormatter.compactMoney(amounts.get(i)));
+        }
+
+        LinearLayout totalRow = a.kit.h();
+        totalRow.setGravity(Gravity.CENTER_VERTICAL);
+        TextView period = a.kit.text("جمع " + snapshotLabel(d), 10f, Theme.MUTED, false);
+        totalRow.addView(period, a.kit.wlp(1f));
+        totalRow.addView(a.kit.amountLine(HomeNumberFormatter.compactMoney(total),
+                15f, Gravity.END), a.kit.lp(-2, -2));
+        card.addView(totalRow, a.kit.lp(-1, -2));
+
+        HomePaymentMixBar bar = new HomePaymentMixBar(a);
+        bar.setSegments(segments, accents, accessible.toString());
+        LinearLayout.LayoutParams barParams = a.kit.lp(-1, Theme.dp(9));
+        barParams.topMargin = Theme.dp(8);
+        card.addView(bar, barParams);
+
+        HorizontalScrollView legendScroll = new HorizontalScrollView(a);
+        legendScroll.setHorizontalScrollBarEnabled(false);
+        legendScroll.setHorizontalFadingEdgeEnabled(true);
+        legendScroll.setFadingEdgeLength(Theme.dp(14));
+        legendScroll.setClipToPadding(false);
+        legendScroll.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        LinearLayout legend = a.kit.h();
+        legend.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        legend.setGravity(Gravity.CENTER_VERTICAL);
+        for (int i = 0; i < labels.size(); i++) {
+            View item = mixLegendItem(labels.get(i), amounts.get(i), denominator, colors.get(i));
+            LinearLayout.LayoutParams itemParams = a.kit.lp(Theme.dp(104), -2);
+            if (i < labels.size() - 1) itemParams.setMarginEnd(Theme.dp(6));
+            legend.addView(item, itemParams);
+        }
+        legendScroll.addView(legend, new HorizontalScrollView.LayoutParams(-2, -2));
+        legendScroll.setContentDescription("تفکیک دریافت به نقد، کارت، حواله و چک");
+        LinearLayout.LayoutParams legendParams = a.kit.lp(-1, -2);
+        legendParams.topMargin = Theme.dp(7);
+        card.addView(legendScroll, legendParams);
+        if (mismatch) {
+            TextView note = a.kit.text("مجموع اجزا با کل قبض اختلاف دارد؛ درصدها بر پایهٔ مجموع اجزای قابل تفکیک‌اند.",
+                    9f, Theme.MUTED, false);
+            note.setMaxLines(2);
+            LinearLayout.LayoutParams noteParams = a.kit.lp(-1, -2);
+            noteParams.topMargin = Theme.dp(4);
+            card.addView(note, noteParams);
         }
         a.kit.addCard(content, card);
     }
 
-    private void addPaymentMix(LinearLayout card, String label, double amount, double total, int color) {
-        if (amount <= 0) return;
-        String share = total > 0 ? " · " + HomeNumberFormatter.percent(amount * 100.0 / total) : "";
-        card.addView(a.kit.progressLine(label, HomeNumberFormatter.compactMoney(amount) + share, amount / total, color),
+    private View mixLegendItem(String label, double amount, double denominator, int color) {
+        LinearLayout item = a.kit.v();
+        item.setGravity(Gravity.CENTER);
+        item.setPadding(Theme.dp(6), Theme.dp(5), Theme.dp(6), Theme.dp(5));
+        item.setBackground(Theme.kpi(Theme.SECTION_RECEIVE));
+        LinearLayout heading = a.kit.h();
+        heading.setGravity(Gravity.CENTER);
+        TextView dot = a.kit.text("●", 8f, color, true);
+        heading.addView(dot, a.kit.lp(-2, -2));
+        heading.addView(a.kit.space(4));
+        heading.addView(a.kit.text(label, 9.5f, Theme.TEXT, true), a.kit.lp(-2, -2));
+        item.addView(heading, a.kit.lp(-1, -2));
+        item.addView(a.kit.text(HomeNumberFormatter.percent(
+                denominator > 0 ? amount * 100d / denominator : 0), 10f, Theme.TEXT, true),
                 a.kit.lp(-1, -2));
+        item.addView(a.kit.text(HomeNumberFormatter.compactMoney(amount), 8.5f, Theme.MUTED, false),
+                a.kit.lp(-1, -2));
+        item.setContentDescription(label + "، "
+                + HomeNumberFormatter.percent(denominator > 0 ? amount * 100d / denominator : 0)
+                + "، " + HomeNumberFormatter.money(amount));
+        return item;
     }
 
     private View insightSubhead(String title, int icon, int accent) {

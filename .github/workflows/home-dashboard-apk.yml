@@ -179,6 +179,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      # Explicit opt-in: include [publish-apk] in a push commit to create a debug prerelease.
       - name: Publish direct-download debug APK
         if: ${{ always() && github.event_name == 'push' && contains(github.event.head_commit.message, '[publish-apk]') && hashFiles('manager/app/build/outputs/apk/debug/app-debug.apk') != '' }}
         env:

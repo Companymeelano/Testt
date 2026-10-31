@@ -753,10 +753,17 @@ public class MainActivity extends Activity {
         header.addView(tools, kit.lp(-1, -2));
         refreshUserChip();
         root.addView(header, kit.lp(-1, -2));
+        LinearLayout productStickyWrap = kit.h();
+        productStickyWrap.setGravity(Gravity.CENTER_HORIZONTAL);
         productStickyHost = kit.v();
         productStickyHost.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         productStickyHost.setVisibility(View.GONE);
-        root.addView(productStickyHost, kit.lp(-1, -2));
+        LinearLayout.LayoutParams stickyLp = new LinearLayout.LayoutParams(
+                widthDp > 720 ? Theme.dp(616) : -1, -2);
+        if (widthDp <= 720)
+            stickyLp.setMargins(Theme.dp(12), 0, Theme.dp(12), 0);
+        productStickyWrap.addView(productStickyHost, stickyLp);
+        root.addView(productStickyWrap, kit.lp(-1, -2));
         refreshLicChip();
 
         // content (centered max-width column on tablets / wide screens)

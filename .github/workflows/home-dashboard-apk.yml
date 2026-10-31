@@ -53,9 +53,21 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          set +e
-          gradle clean :app:testDebugUnitTest :app:lintDebug :app:assembleDebug --console=plain --stacktrace --no-daemon 2>&1 | tee ../manager-home-build.log
-          result=${PIPESTATUS[0]}
+          attempt=1
+          result=1
+          while [ "$attempt" -le 3 ]; do
+            set +e
+            gradle clean :app:testDebugUnitTest :app:lintDebug :app:assembleDebug --console=plain --stacktrace --no-daemon 2>&1 | tee ../manager-home-build.log
+            result=${PIPESTATUS[0]}
+            set -e
+            [ "$result" -eq 0 ] && break
+            if [ "$attempt" -ge 3 ] || ! grep -Eq 'Could not resolve|Could not GET|Could not download|Could not find' ../manager-home-build.log; then
+              break
+            fi
+            attempt=$((attempt + 1))
+            echo "::warning::Gradle dependency resolution failed; retrying (${attempt}/3)."
+            sleep 15
+          done
           if [ "$result" -ne 0 ]; then
             python3 - <<'PY' > "$RUNNER_TEMP/gradle-diagnostic.txt"
           from pathlib import Path
@@ -243,7 +255,22 @@ jobs:
             set -euo pipefail
             cd manager
             log_file="$(mktemp)"
-            if ! gradle :app:connectedDebugAndroidTest -PhomeScreenshotAbi=true --console=plain --stacktrace --no-daemon 2>&1 | tee "$log_file"; then
+            attempt=1
+            result=1
+            while [ "$attempt" -le 3 ]; do
+              set +e
+              gradle :app:connectedDebugAndroidTest -PhomeScreenshotAbi=true --console=plain --stacktrace --no-daemon 2>&1 | tee "$log_file"
+              result=${PIPESTATUS[0]}
+              set -e
+              [ "$result" -eq 0 ] && break
+              if [ "$attempt" -ge 3 ] || ! grep -Eq 'Could not resolve|Could not GET|Could not download|Could not find' "$log_file"; then
+                break
+              fi
+              attempt=$((attempt + 1))
+              echo "::warning::Screenshot test dependency resolution failed; retrying (${attempt}/3)."
+              sleep 15
+            done
+            if [ "$result" -ne 0 ]; then
               diagnostics="$(grep -E 'FAILURE:|Execution failed|Could not |Caused by:|error:|AssertionFailedError|AssertionError|FAILED$|No tests found' "$log_file" | tail -n 8 || true)"
               if [ -z "$diagnostics" ]; then diagnostics="$(tail -n 12 "$log_file")"; fi
               while IFS= read -r line; do

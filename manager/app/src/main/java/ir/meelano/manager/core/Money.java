@@ -74,6 +74,14 @@ public final class Money {
         return fa(group(v));
     }
 
+    /**
+     * Quantity with an explicit sign inside one LTR isolate, so the sign always hugs
+     * the digits («−۹٫۸») instead of drifting to the far side of an RTL line.
+     */
+    public static String signedQty(double v) {
+        return "\u2066" + (v < 0 ? "\u2212" : "+") + qty(Math.abs(v)) + "\u2069";
+    }
+
     /** Quantity with up to 3 decimals, trimmed: «۱۲٫۵». */
     public static String qty(double v) {
         if (Math.abs(v - Math.round(v)) < 0.0005) return fa(group(Math.round(v)));

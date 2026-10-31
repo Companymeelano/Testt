@@ -66,6 +66,11 @@ public final class Kit {
         t.setTextColor(color);
         t.setTypeface(Theme.face(bold));
         t.setLineSpacing(Theme.dp(1.5f), 1.0f);
+        // Lock the paragraph direction to RTL: a pure-digit value («۱۴۰۵/۰۸/۰۳», «۹٫۸»)
+        // has no strong directional character, so first-strong heuristics fall back to
+        // LTR and the value would slide to the left edge - visible inside dialogs where
+        // the stock resolution differs from the activity window.
+        t.setTextDirection(View.TEXT_DIRECTION_RTL);
         MeelanoIcons.iconize(t);
         return t;
     }
@@ -421,10 +426,12 @@ public final class Kit {
         LinearLayout r = v();
         r.setPadding(0, Theme.dp(7), 0, Theme.dp(7));
         TextView key = text(k, 11f, Theme.MUTED, false);
-        key.setGravity(Gravity.START);
+        key.setGravity(Gravity.RIGHT);
         r.addView(key, lp(-1, -2));
         TextView val = text(v == null || v.isEmpty() ? "—" : v, 13f, vColor, true);
-        val.setGravity(Gravity.START);
+        // Absolute RIGHT (not START): inside dialog windows START may resolve against
+        // a non-RTL layout direction and pure-numeric values would drift to the left.
+        val.setGravity(Gravity.RIGHT);
         val.setPadding(0, Theme.dp(2), 0, 0);
         r.addView(val, lp(-1, -2));
         return r;
@@ -1150,6 +1157,7 @@ public final class Kit {
         tv.setGravity(Gravity.CENTER);
         int pad = Theme.dp(14);
         tv.setPadding(pad, pad, pad, Theme.dp(4));
+        if (body != null) body.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         AlertDialog d = new AlertDialog.Builder(a)
                 .setCustomTitle(tv)
                 .setView(body)

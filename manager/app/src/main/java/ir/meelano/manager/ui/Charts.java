@@ -522,6 +522,24 @@ public final class Charts {
             animateIn();
         }
 
+        /** Ring radius depends on width only, so measurement and drawing agree. */
+        private static float ringRadius(int w) {
+            return Math.min(w - Theme.dp(24), Theme.dp(170)) / 2f - Theme.dp(8);
+        }
+
+        /** Height must fit the ring AND every legend row — the old fixed 150dp silently
+         *  truncated the legend to four entries while the ring kept its hidden slices. */
+        @Override
+        protected void onMeasure(int wSpec, int hSpec) {
+            int w = MeasureSpec.getSize(wSpec);
+            int shown = Math.max(1, Math.min(8, data.size()));
+            int rows = (shown + 1) / 2;
+            float radius = ringRadius(w);
+            int want = (int) Math.ceil(radius * 2 + Theme.dp(10) + Theme.dp(20)
+                    + rows * Theme.dp(18) + Theme.dp(10));
+            super.onMeasure(wSpec, MeasureSpec.makeMeasureSpec(want, MeasureSpec.EXACTLY));
+        }
+
         @Override
         protected void onDraw(Canvas g) {
             super.onDraw(g);
@@ -530,7 +548,7 @@ public final class Charts {
             double sum = 0;
             for (Point p : data) sum += Math.max(0, p.value);
             float cx = w / 2f;
-            float radius = Math.min(w, h - Theme.dp(46)) / 2f - Theme.dp(8);
+            float radius = ringRadius(w);
             float cy = radius + Theme.dp(10);
             if (data.isEmpty() || sum <= 0) {
                 paint.setColor(Theme.MUTED);
@@ -597,7 +615,7 @@ public final class Charts {
                 g.drawCircle(lx - Theme.dp(5), row - Theme.dp(3.5f), Theme.dp(4), paint);
                 paint.setColor(Theme.TEXT);
                 paint.setTextAlign(Paint.Align.RIGHT);
-                String leg = ellipsize(p.label, 16) + "  " + Money.pct(sum > 0 ? Math.max(0, p.value) * 100.0 / sum : 0);
+                String leg = ellipsize(p.label, 18) + "  " + Money.pct(sum > 0 ? Math.max(0, p.value) * 100.0 / sum : 0);
                 g.drawText(Money.fa(leg), lx - Theme.dp(13), row, paint);
             }
         }

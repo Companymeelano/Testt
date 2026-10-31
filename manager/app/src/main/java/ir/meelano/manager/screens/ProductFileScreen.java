@@ -1,5 +1,6 @@
 package ir.meelano.manager.screens;
 
+import android.view.Gravity;
 import android.view.View;
 import android.widget.LinearLayout;
 
@@ -189,7 +190,7 @@ public class ProductFileScreen extends Screen {
             String mid = (r.s("doc").isEmpty() ? "بدون شماره سند" : "سند " + Money.fa(r.s("doc")))
                     + (r.s("warehouse").isEmpty() ? "" : "  •  انبار " + Money.fa(r.s("warehouse")));
             View row = a.kit.docRow(opLabel, mid, Jalali.shortLabel(r.s("date")),
-                    (outFlag ? "−" : "+") + Money.qty(Math.abs(r.d("qty"))),
+                    Money.signedQty(outFlag ? -Math.abs(r.d("qty")) : Math.abs(r.d("qty"))),
                     outFlag ? "خروج" : "ورود", outFlag ? Theme.DANGER : Theme.SUCCESS,
                     v -> openMovement(r));
             LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
@@ -209,32 +210,61 @@ public class ProductFileScreen extends Screen {
     }
 
     private void openMovement(final Row r) {
-        LinearLayout body = a.kit.v();
         String opLabel = r.s("opLabel").isEmpty() ? AtiranSchema.actNameFallback(r.s("act")) : r.s("opLabel");
         boolean outFlag = r.l("outFlag") == 1;
-        body.addView(a.kit.kv("تاریخ", Jalali.dispFa(r.s("date")), Theme.TEXT), a.kit.lp(-1, -2));
-        body.addView(a.kit.kv("عملیات", opLabel, Theme.TEXT), a.kit.lp(-1, -2));
-        body.addView(a.kit.kv("جهت", outFlag ? "خروج از انبار" : "ورود به انبار",
-                outFlag ? Theme.DANGER : Theme.SUCCESS), a.kit.lp(-1, -2));
-        body.addView(a.kit.kv("مقدار", Money.qty(Math.abs(r.d("qty"))), Theme.TEXT), a.kit.lp(-1, -2));
-        if (r.d("price") > 0) body.addView(a.kit.kv("فی", Money.rial(r.d("price")), Theme.GOLD_SOFT), a.kit.lp(-1, -2));
-        if (!r.s("warehouse").isEmpty()) body.addView(a.kit.kv("انبار", Money.fa(r.s("warehouse")), Theme.TEXT), a.kit.lp(-1, -2));
-        if (!r.s("doc").isEmpty()) body.addView(a.kit.kv("شماره سند", Money.fa(r.s("doc")), Theme.TEXT), a.kit.lp(-1, -2));
-        if (!r.s("descrip").isEmpty()) body.addView(a.kit.kv("شرح", r.s("descrip"), Theme.MUTED), a.kit.lp(-1, -2));
+        double q = Math.abs(r.d("qty"));
+        int accent = outFlag ? Theme.DANGER : Theme.SUCCESS;
+        LinearLayout body = a.kit.v();
+
+        // header: direction pill, operation name and the document date
+        LinearLayout head = a.kit.h();
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        head.addView(a.kit.pill(outFlag ? "خروج از انبار" : "ورود به انبار", accent), a.kit.lp(-2, -2));
+        head.addView(a.kit.space(8));
+        head.addView(a.kit.text(opLabel, 15f, Theme.TEXT, true), a.kit.wlp(1f));
+        body.addView(head, a.kit.lp(-1, -2));
+        body.addView(a.kit.text(Jalali.dispFa(r.s("date")), 11.5f, Theme.MUTED, false), a.kit.lp(-1, -2));
+        body.addView(a.kit.gap(6));
+
+        // facts — quantity first, then price and the line value it adds up to
+        body.addView(a.kit.kv("مقدار", Money.qty(q), accent), a.kit.lp(-1, -2));
+        if (r.d("price") > 0) {
+            body.addView(a.kit.kv("فی", Money.rial(r.d("price")), Theme.GOLD_SOFT), a.kit.lp(-1, -2));
+            body.addView(a.kit.kv("ارزش", Money.rial(r.d("price") * q), Theme.GOLD_SOFT), a.kit.lp(-1, -2));
+        }
+        if (!r.s("warehouse").isEmpty())
+            body.addView(a.kit.kv("انبار", Money.fa(r.s("warehouse")), Theme.TEXT), a.kit.lp(-1, -2));
+        if (!r.s("doc").isEmpty())
+            body.addView(a.kit.kv("شماره سند", Money.fa(r.s("doc")), Theme.TEXT), a.kit.lp(-1, -2));
+        if (!r.s("descrip").isEmpty()) {
+            LinearLayout note = a.kit.card(Theme.MUTED);
+            note.addView(a.kit.text("شرح", 10.5f, Theme.MUTED, false), a.kit.lp(-1, -2));
+            note.addView(a.kit.text(r.s("descrip"), 12f, Theme.TEXT, false), a.kit.lp(-1, -2));
+            body.addView(note, a.kit.lp(-1, -2));
+        }
+
+        // actions — the sheet is always dismissible and links to the invoice when there is one
         final String screenId = invoiceScreenFor((int) r.l("act"));
         final String doc = r.s("doc");
         final android.app.AlertDialog[] holder = new android.app.AlertDialog[1];
-        if (screenId != null && !doc.isEmpty()) {
-            body.addView(a.kit.gap(10), a.kit.lp(-1, -2));
-            body.addView(a.kit.btn("نمایش فاکتور " + Money.fa(doc), v -> {
-                if (holder[0] != null) holder[0].dismiss();
-                Screen s = a.screen(screenId);
-                if (s instanceof TradeScreen) ((TradeScreen) s).openInvoice(doc);
-            }), a.kit.lp(-1, -2));
-        } else {
+        if (screenId == null || doc.isEmpty())
             body.addView(a.kit.hint("این حرکت به فاکتور فروش یا خرید مربوط نیست؛ فقط شماره سند ثبت شده است."), a.kit.lp(-1, -2));
+        body.addView(a.kit.gap(10), a.kit.lp(-1, -2));
+        LinearLayout acts = a.kit.h();
+        if (screenId != null && !doc.isEmpty()) {
+            acts.addView(a.kit.btn("نمایش فاکتور " + Money.fa(doc), v -> {
+                if (holder[0] != null) holder[0].dismiss();
+                Screen sc = a.screen(screenId);
+                if (sc instanceof TradeScreen) ((TradeScreen) sc).openInvoice(doc);
+            }), a.kit.wlp(1f));
+            acts.addView(a.kit.space(8));
         }
-        holder[0] = a.kit.dialog("گردش کالا", body, false);
+        acts.addView(a.kit.btn("بستن", v -> {
+            if (holder[0] != null) holder[0].dismiss();
+        }), a.kit.wlp(1f));
+        body.addView(acts, a.kit.lp(-1, -2));
+
+        holder[0] = a.kit.dialog("گردش کالا", body, true);
         holder[0].show();
     }
 }

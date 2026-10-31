@@ -57,7 +57,7 @@ jobs:
           result=1
           while [ "$attempt" -le 3 ]; do
             set +e
-            gradle clean :app:testDebugUnitTest :app:lintDebug :app:assembleDebug --console=plain --stacktrace --no-daemon 2>&1 | tee ../manager-home-build.log
+            gradle clean :app:testDebugUnitTest :app:lintDebug :app:assembleDebug -Pandroid.useAndroidX=true --console=plain --stacktrace --no-daemon 2>&1 | tee ../manager-home-build.log
             result=${PIPESTATUS[0]}
             set -e
             [ "$result" -eq 0 ] && break

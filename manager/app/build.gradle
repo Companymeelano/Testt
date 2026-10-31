@@ -24,7 +24,7 @@ android {
         targetSdk 34
         versionCode 76
         versionName '36.43.0'
-        testInstrumentationRunner 'android.test.InstrumentationTestRunner'
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
         // Built-in Persian voice (sherpa-onnx) ships for phones; CI may opt into x86_64 for UI screenshots.
         ndk { abiFilters(*managerAbis) }
     }
@@ -70,4 +70,7 @@ dependencies {
 
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.json:json:20240303'
+
+    androidTestImplementation 'androidx.test:runner:1.6.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
 }

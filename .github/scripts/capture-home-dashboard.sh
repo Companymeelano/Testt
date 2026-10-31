@@ -9,7 +9,7 @@ attempt=1
 result=1
 while [ "$attempt" -le 3 ]; do
   set +e
-  gradle :app:connectedDebugAndroidTest -PhomeScreenshotAbi=true --console=plain --stacktrace --no-daemon 2>&1 | tee "$log_file"
+  gradle :app:connectedDebugAndroidTest -PhomeScreenshotAbi=true -Pandroid.useAndroidX=true --console=plain --stacktrace --no-daemon 2>&1 | tee "$log_file"
   result=${PIPESTATUS[0]}
   set -e
   [ "$result" -eq 0 ] && break

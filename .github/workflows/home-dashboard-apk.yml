@@ -50,7 +50,27 @@ jobs:
 
       - name: Run unit tests, lint, and build debug APK
         working-directory: manager
-        run: gradle clean :app:testDebugUnitTest :app:lintDebug :app:assembleDebug --stacktrace --no-daemon
+        shell: bash
+        run: |
+          set -o pipefail
+          set +e
+          gradle clean :app:testDebugUnitTest :app:lintDebug :app:assembleDebug --console=plain --stacktrace --no-daemon 2>&1 | tee ../manager-home-build.log
+          result=${PIPESTATUS[0]}
+          if [ "$result" -ne 0 ]; then
+            tail -n 35 ../manager-home-build.log > "$RUNNER_TEMP/gradle-tail.txt"
+            summary=$(cat "$RUNNER_TEMP/gradle-tail.txt")
+            summary=${summary//'%'/'%25'}
+            summary=${summary//$'\r'/'%0D'}
+            summary=${summary//$'\n'/'%0A'}
+            echo "::error title=Gradle failure details::$summary"
+            {
+              echo '### Gradle failure details (last 35 lines)'
+              echo '```text'
+              cat "$RUNNER_TEMP/gradle-tail.txt"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit "$result"
 
       - name: Upload installable debug APK
         uses: actions/upload-artifact@v4

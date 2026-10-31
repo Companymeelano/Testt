@@ -984,15 +984,15 @@ public final class Kit {
     public View dataTable(ReportCatalog.Col[] cols, List<Row> rows, final RowClick click) {
         LinearLayout sv = v();
         sv.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        sv.setBackground(Theme.isNuts() ? Theme.nutPanel() : Theme.card());
+        sv.setBackground(Theme.card());
         sv.setPadding(Theme.dp(4), Theme.dp(4), Theme.dp(4), Theme.dp(4));
-        final int headInk = Theme.isNuts() ? 0xFFF3D98C : Theme.GOLD_SOFT;  // nut tables: gold ink on emerald header
+        final int headInk = Theme.sectionText(Theme.GOLD_METAL);
         LinearLayout t = v();
         t.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         t.setPadding(Theme.dp(2), Theme.dp(2), Theme.dp(2), Theme.dp(2));
         LinearLayout head = h();
         head.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        head.setBackground(Theme.isNuts() ? Theme.nutTableHeader() : Theme.tableHeader());
+        head.setBackground(Theme.tableHeader());
         head.setPadding(Theme.dp(4), Theme.dp(9), Theme.dp(4), Theme.dp(9));
         TextView rn0 = text("#", 11.5f, headInk, true);
         rn0.setGravity(Gravity.CENTER);

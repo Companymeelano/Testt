@@ -276,8 +276,6 @@ public class HomeScreen extends Screen {
     @Override
     public void render(final LinearLayout content) {
 
-        // Faint gold dot grid behind the dashboard (both skins; very low contrast, decorative only).
-        if (!(content.getBackground() instanceof DotGrid)) content.setBackground(new DotGrid());
         final int token = a.renderGen();
         // Smart first paint: the last saved dashboard appears at once and live data replaces it when ready.
         final String[] cachedTs = {""};
@@ -754,7 +752,7 @@ public class HomeScreen extends Screen {
         String roleName = RoleStore.faName(role);
 
         final LinearLayout hero = a.kit.v();
-        hero.setBackground(heroBackground());
+        hero.setBackground(Theme.executiveHero());
         hero.setPadding(Theme.dp(16), Theme.dp(12), Theme.dp(16), Theme.dp(11));
         Theme.lift(hero, Theme.cardElevation() + Theme.dp(2));
 
@@ -1266,53 +1264,6 @@ public class HomeScreen extends Screen {
             TextUtils.copySpansFrom((Spanned) value, 0, source.length(), Object.class, result, 0);
         }
         return result;
-    }
-
-    /**
-     * TRIAL (light skin only): a soft gold silk drape in the corner of the welcome card.
-     * Set HERO_SILK_TRIAL to false to return to the plain hero background.
-     */
-    private static final boolean HERO_SILK_TRIAL = false;
-
-    private android.graphics.drawable.Drawable heroBackground() {
-        android.graphics.drawable.Drawable base = Theme.executiveHero();
-        if (!HERO_SILK_TRIAL || !Theme.isLight()) return base;
-        try {
-            android.graphics.drawable.Drawable silk = a.getDrawable(R.drawable.home_hero_light);
-            if (silk == null) return base;
-            android.graphics.drawable.LayerDrawable ld = new android.graphics.drawable.LayerDrawable(
-                    new android.graphics.drawable.Drawable[]{base, silk});
-            ld.setLayerGravity(1, Gravity.END | Gravity.TOP);
-            ld.setLayerWidth(1, Theme.dp(260));
-            ld.setLayerHeight(1, Theme.dp(142));
-            return ld;
-        } catch (Exception e) {
-            Diag.ignored("HomeScreen:heroSilk", e);
-            return base;
-        }
-    }
-
-    /** Decorative dot grid drawn behind the home content. */
-    private static final class DotGrid extends android.graphics.drawable.Drawable {
-        private final android.graphics.Paint dot = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
-        private final float step = Theme.dp(22);
-
-        DotGrid() {
-            dot.setColor(Theme.alpha(Theme.GOLD, Theme.isLight() ? 26 : 16));
-        }
-
-        @Override
-        public void draw(android.graphics.Canvas c) {
-            android.graphics.Rect b = getBounds();
-            float r = Theme.dp(1f);
-            for (float y = b.top + step; y < b.bottom; y += step)
-                for (float x = b.left + step; x < b.right; x += step)
-                    c.drawCircle(x, y, r, dot);
-        }
-
-        @Override public void setAlpha(int alpha) { }
-        @Override public void setColorFilter(android.graphics.ColorFilter cf) { }
-        @Override public int getOpacity() { return android.graphics.PixelFormat.TRANSLUCENT; }
     }
 
     /** True while cached/empty data is being refreshed so the sync row can fade to its final state. */

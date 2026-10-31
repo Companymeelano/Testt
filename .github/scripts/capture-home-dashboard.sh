@@ -28,33 +28,36 @@ from pathlib import Path
 from xml.etree import ElementTree
 
 reports = sorted(Path("app/build").rglob("TEST-*.xml"))
-failures = []
+summary = []
 for report in reports:
     try:
         root = ElementTree.parse(report).getroot()
     except Exception as error:
-        failures.append(f"Could not parse {report}: {error}")
+        summary.append(f"Could not parse {report}: {error}")
         continue
-    for case in root.iter("testcase"):
-        for kind in ("failure", "error"):
-            result = case.find(kind)
-            if result is None:
-                continue
-            name = f"{case.get('classname', '')}.{case.get('name', '')}"
-            failures.append(f"{report}: {name}: {result.get('message', '')}")
-            detail = (result.text or "").strip()
-            if detail:
-                failures.append(detail[:2500])
-            break
-if not failures:
-    failures.append("No failed JUnit XML case was found. XML reports: "
-                    + (", ".join(str(p) for p in reports) or "none"))
-print("\n".join(failures)[:8000])
+    suites = [root] + [node for node in root.iter("testsuite") if node is not root]
+    for suite in suites:
+        summary.append(
+            f"{report}: {suite.tag} name={suite.get('name', '')} "
+            f"tests={suite.get('tests', '?')} failures={suite.get('failures', '?')} "
+            f"errors={suite.get('errors', '?')} skipped={suite.get('skipped', '?')}"
+        )
+    for node in root.iter():
+        if node.tag in ("failure", "error"):
+            summary.append(f"{node.tag}: {node.get('message', '')} {(node.text or '').strip()[:1800]}")
+        elif node.tag == "system-err" and (node.text or '').strip():
+            summary.append("system-err: " + (node.text or '').strip()[:1200])
+if not summary:
+    summary.append("No JUnit XML report was found under app/build.")
+print("\n".join(summary)[:8000])
 PY
+  report_count=0
   while IFS= read -r line; do
+    [ "$report_count" -ge 5 ] && break
     [ -n "$line" ] || continue
     safe_line="$(printf '%s' "$line" | sed 's/%/%25/g; s/:/%3A/g')"
     echo "::error title=Screenshot test report::$safe_line"
+    report_count=$((report_count + 1))
   done < "$report_file"
 
   diagnostics="$(grep -E 'FAILURE:|Execution failed|Could not |Caused by:|error:|AssertionFailedError|AssertionError|FAILED$|No tests found|ErrorName:|ErrorCode:|There were failing tests' "$log_file" | tail -n 3 || true)"

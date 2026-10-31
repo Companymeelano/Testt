@@ -163,8 +163,10 @@ public class AtiranSampleSchemaTest {
         assertEquals(day, payments.binds.get(1));
         assertEquals(Jalali.toGregorian(day), payments.binds.get(2));
         assertTrue(receipts.sql.toLowerCase(Locale.ROOT).startsWith("select "));
-        assertFalse(receipts.sql.toLowerCase(Locale.ROOT).contains("select max("));
-        assertFalse(payments.sql.toLowerCase(Locale.ROOT).contains("select max("));
+        // POS detail revisions use MAX(Rdf_), but the explicit Home day must not select
+        // its date by querying a different latest day from dbo.dar.
+        assertFalse(receipts.sql.toLowerCase(Locale.ROOT).contains("select max(left(try_convert"));
+        assertFalse(payments.sql.toLowerCase(Locale.ROOT).contains("select max(left(try_convert"));
     }
 
     @Test public void productListAndCountShareNormalizedReadOnlyFiltersAndExactPaging() throws Exception {

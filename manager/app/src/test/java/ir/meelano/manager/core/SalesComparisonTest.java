@@ -47,7 +47,7 @@ public class SalesComparisonTest {
         assertEquals(100d, result.sameWeekdayAverageRials, 0.001);
         assertEquals(4, result.comparableDays);
         assertEquals(0d, result.projectedRials, 0.001);
-        assertTrue(Double.isNaN(result.changePercent()));
+        assertEquals(-100d, result.changePercent(), 0.001);
     }
 
     @Test public void midnightHasNoProjectionAndCompletedDayEqualsActual() {

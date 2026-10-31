@@ -3,6 +3,9 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$repo_root/manager"
+emulator_abi="$(adb shell getprop ro.product.cpu.abi | tr -d '\r')"
+emulator_api="$(adb shell getprop ro.build.version.sdk | tr -d '\r')"
+echo "::notice title=Dashboard emulator::API ${emulator_api}, ABI ${emulator_abi}"
 
 log_file="$(mktemp)"
 attempt=1

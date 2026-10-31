@@ -3,7 +3,7 @@ plugins { id 'com.android.application' }
 // The regular APK omits emulator-only ABIs to stay compact. The screenshot CI job
 // opts into x86_64 so it can render real Android Views on a hosted emulator.
 def managerAbis = ['arm64-v8a', 'armeabi-v7a']
-if (project.hasProperty('homeScreenshotAbi')) managerAbis.add('x86_64')
+if (rootProject.hasProperty('homeScreenshotAbi')) managerAbis.add('x86_64')
 
 // ---- Optional release signing ----
 // Copy manager/keystore.properties.template → manager/keystore.properties (git-ignored)

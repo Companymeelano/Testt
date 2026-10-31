@@ -340,10 +340,10 @@ public final class Theme {
             PRIMARY = DesignTokens.EMERALD;
             TEXT = DesignTokens.INK;
             MUTED = 0xFF52655D;
-            SUCCESS = DesignTokens.POSITIVE;
-            DANGER = DesignTokens.NEGATIVE;
+            SUCCESS = DesignTokens.accessibleAccent(DesignTokens.POSITIVE, false);
+            DANGER = DesignTokens.accessibleAccent(DesignTokens.NEGATIVE, false);
             WARNING = DesignTokens.accessibleAccent(DesignTokens.WARNING, false);
-            INFO = DesignTokens.accessibleAccent(DesignTokens.PURCHASE, false);
+            INFO = DesignTokens.accessibleAccent(DesignTokens.INFO, false);
             VIOLET = DesignTokens.accessibleAccent(DesignTokens.RETURNS, false);
             STEEL = 0xFF59675F;
         } else {
@@ -355,10 +355,10 @@ public final class Theme {
             PRIMARY = 0xFF2D9A73;
             TEXT = DesignTokens.NIGHT_TEXT;
             MUTED = DesignTokens.NIGHT_MUTED;
-            SUCCESS = 0xFF64C99C;
-            DANGER = 0xFFF19AA0;
-            WARNING = 0xFFEAB776;
-            INFO = 0xFF8ABBDD;
+            SUCCESS = DesignTokens.accessibleAccent(DesignTokens.POSITIVE, true);
+            DANGER = DesignTokens.accessibleAccent(DesignTokens.NEGATIVE, true);
+            WARNING = DesignTokens.accessibleAccent(DesignTokens.WARNING, true);
+            INFO = DesignTokens.accessibleAccent(DesignTokens.INFO, true);
             VIOLET = 0xFFB5A0E5;
             STEEL = 0xFFB8C4BE;
         }
@@ -497,10 +497,7 @@ public final class Theme {
         }
     }
 
-    /**
-     * Glass surface: a translucent body with a bright top sheen fading out and a fine gold
-     * edge. Used by every card, so the whole app shares one material.
-     */
+    /** Legacy optional glass drawable; shared data cards use flat paper surfaces instead. */
     public static android.graphics.drawable.Drawable glass(int top, int bottom, float radiusDp, int edgeAlpha) {
         GradientDrawable body = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
                 new int[]{top, bottom});
@@ -525,7 +522,7 @@ public final class Theme {
     /** Accent card: solid surface tinted by 7%, with a one-dp section hairline. */
     public static GradientDrawable cardAccent(int accent) {
         int tint = DesignTokens.surfaceTint(accent, !light);
-        return base(tint, 20, dp(1), alpha(accent, light ? 132 : 154));
+        return base(tint, 20, dp(1), alpha(accent, light ? 72 : 92));
     }
 
     /** Stable section hue derived from its title; semantic outcomes use separate tokens. */
@@ -602,7 +599,7 @@ public final class Theme {
     /** Flat KPI surface with a restrained section tint and hairline. */
     public static GradientDrawable kpi(int accent) {
         return base(DesignTokens.surfaceTint(accent, !light), 20, dp(1),
-                alpha(accent, light ? 118 : 142));
+                alpha(accent, light ? 68 : 86));
     }
 
     /** Primary button gradient, toned toward a high-contrast ink/paper foreground. */

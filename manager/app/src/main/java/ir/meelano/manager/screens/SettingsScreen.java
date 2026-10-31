@@ -140,20 +140,13 @@ public class SettingsScreen extends Screen {
 
     /** Shared section header: one duotone icon, title and one line of guidance. */
     private LinearLayout sectionHead(String title, String subtitle, int accent) {
-        LinearLayout card = a.kit.card(accent);
-        LinearLayout row = a.kit.h();
-        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
         int split = title == null ? -1 : title.indexOf(' ');
         String glyph = split > 0 ? title.substring(0, split) : "";
         String words = split > 0 ? title.substring(split + 1) : (title == null ? "" : title);
         int icon = ir.meelano.manager.ui.MeelanoIcons.iconFor(glyph);
-        if (icon != 0) {
-            row.addView(a.kit.iconBadge(icon, accent, 36),
-                    new LinearLayout.LayoutParams(Theme.dp(36), Theme.dp(36)));
-            row.addView(a.kit.space(8));
-        }
-        row.addView(a.kit.text(words, 15f, Theme.sectionText(accent), true), a.kit.wlp(1f));
-        card.addView(row, a.kit.lp(-1, -2));
+        int sectionHue = a.kit.visualAccent(words, accent);
+        LinearLayout card = a.kit.luxCard(sectionHue);
+        card.addView(a.kit.sectionHeader(words, icon, sectionHue, null, null), a.kit.lp(-1, -2));
         if (subtitle != null && !subtitle.isEmpty())
             card.addView(a.kit.hint(subtitle), a.kit.lp(-1, -2));
         return card;
@@ -287,7 +280,7 @@ public class SettingsScreen extends Screen {
         final boolean isLight = "light".equals(a.settings.themeMode());
         final boolean isNuts = "nuts".equals(a.settings.themeMode());
         final int themeIdx = isNuts ? 2 : isLight ? 1 : 0;
-        th.addView(a.kit.chipsWithIcons(
+        th.addView(a.kit.segmentedControl(
                 new String[]{"تیره • ابسیدین طلایی", "روشن • عاج سلطنتی", "آجیل و خشکبار"},
                 themeIdx,
                 new int[]{R.drawable.mi_dark_mode, R.drawable.mi_light_mode, R.drawable.mi_storefront},
@@ -310,7 +303,7 @@ public class SettingsScreen extends Screen {
             a.refreshTheme();
         }), a.kit.lp(-1, -2));
         th.addView(a.kit.gap(6));
-        th.addView(a.kit.hint("برای دیدن همهٔ قالب‌ها ردیف را افقی بکشید. انتخاب قالب فوراً روی همهٔ بخش‌ها، جدول‌ها، نمودارها و آیکن‌ها اعمال می‌شود."),
+        th.addView(a.kit.hint("قالب انتخاب‌شده فوراً روی همهٔ بخش‌ها، جدول‌ها، نمودارها و آیکن‌ها اعمال می‌شود."),
                 a.kit.lp(-1, -2));
         a.kit.addCard(content, th);
     }
@@ -666,7 +659,7 @@ public class SettingsScreen extends Screen {
         ab.addView(a.kit.gap(6), a.kit.lp(-1, -2));
         LinearLayout updateHead = a.kit.h();
         updateHead.setGravity(Gravity.CENTER_VERTICAL);
-        View updateArt = a.kit.iconBadge(R.drawable.mi_refresh, Theme.GOLD_METAL, 34);
+        View updateArt = a.kit.iconBadge(R.drawable.mi_cloud_download, Theme.GOLD_METAL, 34);
         updateHead.addView(updateArt, a.kit.lp(Theme.dp(34), Theme.dp(34)));
         updateHead.addView(a.kit.space(8));
         updateHead.addView(a.kit.text("بروزرسانی برنامه", 14f, Theme.GOLD, true), a.kit.wlp(1f));
@@ -679,7 +672,7 @@ public class SettingsScreen extends Screen {
         }
         ab.addView(a.kit.hint(ir.meelano.manager.core.UpdateCenter.statusLine(a)), a.kit.lp(-1, -2));
         ab.addView(a.kit.hint(ir.meelano.manager.core.UpdateCenter.lastCheckLine(a)), a.kit.lp(-1, -2));
-        ab.addView(a.kit.btnGold("⟳  بررسی و دریافت نسخه جدید", v ->
+        ab.addView(a.kit.btnGold("📥  بررسی و دریافت نسخه جدید", v ->
                 ir.meelano.manager.core.UpdateCenter.manualCheck(a)), a.kit.lp(-1, -2));
         ab.addView(a.kit.btnGhost("📦  صفحه نسخه‌های منتشرشده", Theme.GOLD, v -> openReleasesPage()),
                 a.kit.lp(-1, -2));
@@ -743,7 +736,7 @@ public class SettingsScreen extends Screen {
             nt.addView(a.kit.kv("کد اقتصادی", Money.fa(co.egh.trim()), Theme.MUTED), a.kit.lp(-1, -2));
         if (co.pos != null && !co.pos.trim().isEmpty())
             nt.addView(a.kit.kv("کد پستی", Money.fa(co.pos.trim()), Theme.MUTED), a.kit.lp(-1, -2));
-        nt.addView(a.kit.btnGhost("⟳ به‌روزرسانی از آتیران", Theme.GOLD, v -> {
+        nt.addView(a.kit.btnGhost("⇅ به‌روزرسانی از آتیران", Theme.GOLD, v -> {
             a.kit.toast("در حال به‌روزرسانی مشخصات…");
             a.refreshCompany(() -> render(content));
         }), a.kit.lp(-1, -2));

@@ -219,7 +219,7 @@ public class AnbarScreen extends Screen {
                         a.kit.lp(-1, -2));
                 card.addView(a.kit.hint(faError == null || faError.trim().isEmpty()
                         ? "ارتباط را بررسی و دوباره تلاش کنید." : faError), a.kit.lp(-1, -2));
-                card.addView(a.kit.btnGhost("⟳ تلاش دوباره", Theme.DANGER,
+                card.addView(a.kit.btnGhost("⇅ تلاش دوباره", Theme.DANGER,
                         v -> loadShortage(box)), a.kit.lp(-1, -2));
                 a.kit.addCard(box, card);
             }

@@ -43,6 +43,23 @@ public final class Kit {
     }
 
     // ---------------- text ----------------
+    private boolean isOutcomeColor(int color) {
+        return color == Theme.SUCCESS || color == Theme.DANGER
+                || color == Theme.WARNING || color == Theme.INFO;
+    }
+
+    private boolean isDeltaCopy(String value) {
+        String probe = value == null ? "" : value.trim();
+        probe = probe.replace(String.valueOf((char) 0x2066), "")
+                .replace(String.valueOf((char) 0x2067), "")
+                .replace(String.valueOf((char) 0x2068), "")
+                .replace(String.valueOf((char) 0x2069), "").trim();
+        return probe.startsWith("▲") || probe.startsWith("▼") || probe.startsWith("↗")
+                || probe.startsWith("↘") || probe.contains("تغییر")
+                || probe.startsWith("افزایش") || probe.startsWith("کاهش")
+                || probe.startsWith("افت ") || probe.startsWith("رشد ");
+    }
+
     public TextView text(String s, float sp, int color, boolean bold) {
         TextView t = new TextView(a);
         t.setText(s == null ? "" : s);
@@ -63,7 +80,7 @@ public final class Kit {
         float base = micro ? (sp < 9f ? 9f : sp) : (sp < 12.5f ? 12.5f : sp);
         float grow = micro ? Theme.fontScale() : Theme.fontScale() * Theme.typeScale();
         t.setTextSize(base * grow);
-        t.setTextColor(color);
+        t.setTextColor(isOutcomeColor(color) && !isDeltaCopy(s) ? Theme.TEXT : color);
         t.setTypeface(Theme.face(bold));
         t.setFontFeatureSettings("tnum");
         t.setLineSpacing(Theme.dp(1.5f), 1.0f);
@@ -129,21 +146,21 @@ public final class Kit {
         return best;
     }
 
-    public LinearLayout card() {
+    /** Shared luxury card surface: flat paper, 20dp corners, a single hairline, and low lift. */
+    public LinearLayout luxCard() { return luxCard(0); }
+
+    /** Accent-tinted LuxCard; accents identify a section, never a positive/negative outcome. */
+    public LinearLayout luxCard(int accent) {
         LinearLayout c = v();
-        c.setBackground(Theme.card());
-        c.setPadding(Theme.dp(14), Theme.dp(13), Theme.dp(14), Theme.dp(13));
+        c.setBackground(accent == 0 ? Theme.card() : Theme.cardAccent(accent));
+        c.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(16));
         Theme.lift(c, Theme.cardElevation());
         return c;
     }
 
-    public LinearLayout card(int accent) {
-        LinearLayout c = v();
-        c.setBackground(Theme.cardAccent(accent));
-        c.setPadding(Theme.dp(14), Theme.dp(13), Theme.dp(14), Theme.dp(13));
-        Theme.lift(c, Theme.cardElevation());
-        return c;
-    }
+    /** Compatibility aliases: existing screens share the same LuxCard implementation. */
+    public LinearLayout card() { return luxCard(); }
+    public LinearLayout card(int accent) { return luxCard(accent); }
 
     public void addCard(LinearLayout parent, View card) {
         LinearLayout.LayoutParams p = lp(-1, -2);
@@ -177,32 +194,49 @@ public final class Kit {
         return c;
     }
 
-    public View sectionHead(String title, String actionLabel, View.OnClickListener action) {
-        final int accent = sectionAccent(title);
-        LinearLayout r = h();
-        r.setGravity(Gravity.CENTER_VERTICAL);
-        r.setPadding(Theme.dp(3), Theme.dp(4), Theme.dp(3), Theme.dp(7));
+    /** Shared SectionHeader: duotone mark, title, optional action, and one accent hairline. */
+    public View sectionHeader(String title, int iconRes, int accent,
+                              String actionLabel, View.OnClickListener action) {
+        final int sectionHue = visualAccent(title, accent);
+        LinearLayout root = v();
+        LinearLayout row = h();
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        row.setMinimumHeight(Theme.dp(48));
 
-        int sectionGlyph = sectionIcon(title);
-        r.addView(iconBadge(sectionGlyph, accent, 36),
-                new LinearLayout.LayoutParams(Theme.dp(36), Theme.dp(36)));
-        r.addView(space(8));
-
-        TextView t = text(title, 14f, Theme.sectionText(accent), true);
-        t.setMaxLines(2);
-        t.setEllipsize(TextUtils.TruncateAt.END);
-        r.addView(t, wlp(1f));
-        if (actionLabel != null && action != null) {
-            TextView b = text(actionLabel, 10.5f, accent, true);
-            b.setPadding(Theme.dp(9), Theme.dp(6), Theme.dp(9), Theme.dp(6));
-            b.setBackground(Theme.ghostButton(accent));
-            b.setContentDescription(actionLabel.replace("›", "") + "؛ باز کردن");
-            Theme.pressable(b);
-            b.setOnClickListener(action);
-            r.addView(space(6));
-            r.addView(b, lp(-2, -2));
+        if (iconRes != 0) {
+            row.addView(iconBadge(iconRes, sectionHue, 36),
+                    new LinearLayout.LayoutParams(Theme.dp(36), Theme.dp(36)));
+            row.addView(space(8));
         }
-        return r;
+        TextView heading = text(title, 14f, Theme.sectionText(sectionHue), true);
+        heading.setMaxLines(2);
+        heading.setEllipsize(TextUtils.TruncateAt.END);
+        row.addView(heading, wlp(1f));
+        if (actionLabel != null && action != null) {
+            TextView button = text(actionLabel, 10.5f, Theme.sectionText(sectionHue), true);
+            button.setGravity(Gravity.CENTER);
+            button.setPadding(Theme.dp(9), Theme.dp(4), Theme.dp(9), Theme.dp(4));
+            button.setMinHeight(Theme.dp(48));
+            button.setMinWidth(Theme.dp(48));
+            button.setBackground(Theme.ghostButton(sectionHue));
+            button.setContentDescription(actionLabel.replace("›", "").replace("‹", "").trim()
+                    + "؛ باز کردن");
+            Theme.pressable(button);
+            button.setOnClickListener(action);
+            row.addView(space(6));
+            row.addView(button, lp(-2, -2));
+        }
+        root.addView(row, lp(-1, -2));
+        LinearLayout.LayoutParams rule = lp(-1, Theme.dp(1));
+        rule.topMargin = Theme.dp(6);
+        root.addView(accentHairline(sectionHue), rule);
+        return root;
+    }
+
+    public View sectionHead(String title, String actionLabel, View.OnClickListener action) {
+        int accent = sectionAccent(title);
+        return sectionHeader(title, sectionIcon(title), accent, actionLabel, action);
     }
 
     private int sectionIcon(String title) {
@@ -234,6 +268,132 @@ public final class Kit {
         return Theme.sectionAccent(title);
     }
 
+    /** Keep legacy status hues out of section styling; outcome colors are reserved for deltas. */
+    public int visualAccent(String title, int requestedAccent) {
+        boolean outcome = requestedAccent == Theme.SUCCESS || requestedAccent == Theme.DANGER
+                || requestedAccent == Theme.WARNING || requestedAccent == Theme.INFO;
+        return outcome ? Theme.sectionAccent(title) : requestedAccent;
+    }
+
+    /** Compact shared KPI chip; money units stay smaller and quieter beside the value. */
+    public View kpiChip(String label, String value, String unit, int accent) {
+        return kpiChip(label, value, unit, accent, 0);
+    }
+
+    public View kpiChip(String label, String value, String unit, int accent, int iconRes) {
+        int sectionHue = visualAccent(label, accent);
+        LinearLayout chip = v();
+        chip.setGravity(Gravity.CENTER_HORIZONTAL);
+        chip.setBackground(Theme.kpi(sectionHue));
+        chip.setPadding(Theme.dp(8), Theme.dp(8), Theme.dp(8), Theme.dp(8));
+        if (iconRes != 0) {
+            LinearLayout.LayoutParams ip = lp(Theme.dp(32), Theme.dp(32));
+            ip.gravity = Gravity.CENTER_HORIZONTAL;
+            ip.bottomMargin = Theme.dp(4);
+            chip.addView(iconBadge(iconRes, sectionHue, 32), ip);
+        }
+        TextView name = text(label, 10.5f, Theme.MUTED, false);
+        name.setGravity(Gravity.CENTER);
+        name.setMinLines(1);
+        name.setMaxLines(2);
+        name.setEllipsize(TextUtils.TruncateAt.END);
+        chip.addView(name, lp(-1, -2));
+
+        LinearLayout amount = h();
+        amount.setGravity(Gravity.CENTER);
+        amount.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        TextView figure = text(value, 16f, Theme.TEXT, true);
+        figure.setSingleLine(true);
+        figure.setGravity(Gravity.CENTER);
+        float sizeScale = Theme.fontScale() * Theme.typeScale();
+        figure.setAutoSizeTextTypeUniformWithConfiguration(
+                Math.max(9, Math.round(10f * sizeScale)),
+                Math.max(10, Math.round(16f * sizeScale)), 1,
+                android.util.TypedValue.COMPLEX_UNIT_SP);
+        if (unit != null && !unit.trim().isEmpty()) {
+            amount.addView(figure, wlp(1f));
+            TextView unitView = text(unit, 9.5f, Theme.MUTED, false);
+            unitView.setSingleLine(true);
+            unitView.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+            amount.addView(space(4));
+            amount.addView(unitView, lp(-2, -2));
+        } else {
+            amount.addView(figure, lp(-1, -2));
+        }
+        chip.addView(amount, lp(-1, -2));
+        String spoken = (label == null ? "" : label) + ": " + (value == null ? "" : value)
+                + (unit == null || unit.trim().isEmpty() ? "" : " " + unit);
+        chip.setContentDescription(spoken);
+        figure.setContentDescription(spoken);
+        return chip;
+    }
+
+    /** Formatted monetary amount with a quieter, smaller toman/rial unit beside the figure. */
+    public View amountLine(String formattedValue, float numberSp, int gravity) {
+        return amountLine(formattedValue, numberSp, gravity, Theme.TEXT);
+    }
+
+    public View amountLine(String formattedValue, float numberSp, int gravity, int textColor) {
+        String full = formattedValue == null ? "" : formattedValue.trim();
+        String unit = "";
+        String number = full;
+        int split = full.lastIndexOf(' ');
+        if (split > 0) {
+            String tail = full.substring(split + 1).trim();
+            if ("تومان".equals(tail) || "ریال".equals(tail)) {
+                unit = tail;
+                number = full.substring(0, split).trim();
+            }
+        }
+        if (unit.isEmpty()) {
+            TextView value = text(full, numberSp, textColor, true);
+            value.setGravity(gravity);
+            value.setSingleLine(true);
+            value.setEllipsize(TextUtils.TruncateAt.END);
+            return value;
+        }
+        LinearLayout amount = h();
+        amount.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        amount.setGravity(gravity | Gravity.CENTER_VERTICAL);
+        TextView figure = text(number, numberSp, textColor, true);
+        figure.setGravity(gravity);
+        figure.setSingleLine(true);
+        if (android.os.Build.VERSION.SDK_INT >= 26) {
+            float sizeScale = numberSp < 12f
+                    ? Theme.fontScale() : Theme.fontScale() * Theme.typeScale();
+            int minimum = Math.max(9, Math.round(9f * sizeScale));
+            int maximum = Math.max(minimum, Math.round(numberSp * sizeScale));
+            figure.setAutoSizeTextTypeUniformWithConfiguration(minimum, maximum, 1,
+                    android.util.TypedValue.COMPLEX_UNIT_SP);
+        } else {
+            figure.setEllipsize(TextUtils.TruncateAt.END);
+        }
+        amount.addView(figure, wlp(1f));
+        amount.addView(space(4));
+        TextView unitText = text(unit, 9.5f, Theme.MUTED, false);
+        unitText.setSingleLine(true);
+        unitText.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        amount.addView(unitText, lp(-2, -2));
+        amount.setContentDescription(full);
+        figure.setContentDescription(full);
+        return amount;
+    }
+
+    /** A visual-only directional badge; callers supply direction and semantic tone. */
+    public TextView deltaBadge(String label, int direction, int tone, String spokenDescription) {
+        String marker = direction > 0 ? "▲ " : direction < 0 ? "▼ " : "";
+        TextView badge = text(marker + (label == null ? "" : label), 10.5f,
+                Theme.sectionText(tone), true);
+        badge.setGravity(Gravity.CENTER);
+        badge.setPadding(Theme.dp(8), Theme.dp(4), Theme.dp(8), Theme.dp(4));
+        badge.setMinHeight(Theme.dp(32));
+        badge.setBackground(Theme.pill(tone));
+        badge.setContentDescription(spokenDescription == null || spokenDescription.trim().isEmpty()
+                ? (direction > 0 ? "افزایش " : direction < 0 ? "کاهش " : "تغییر ") + label
+                : spokenDescription);
+        return badge;
+    }
+
     // ---------------- KPI ----------------
     public static final class Kpi {
         public final String label;
@@ -251,7 +411,7 @@ public final class Kit {
         public int icon = 0;
         /** True when the tile wears the emerald family of the manager's board. Off by default. */
         public boolean emeraldIcon = false;
-        /** Optional explicit note colour (0 = the accent, or the trend rule below). */
+        /** Optional semantic tone for a directional delta note; zero selects by direction. */
         public int subColor = 0;
 
         public Kpi(String label, String value, String sub, int accent) {
@@ -277,14 +437,19 @@ public final class Kit {
         }
     }
 
+    private int sectionAccentForKpi(Kpi k) {
+        return visualAccent(k.label, k.accent);
+    }
+
     public View kpiTile(Kpi k) {
+        final int accent = sectionAccentForKpi(k);
         LinearLayout t = v();
-        t.setBackground(Theme.kpi(k.accent));
+        t.setBackground(Theme.kpi(accent));
         t.setPadding(Theme.dp(12), Theme.dp(11), Theme.dp(12), Theme.dp(11));
         // Centred composition like the reference: icon, label, value and note share one axis.
         t.setGravity(Gravity.CENTER_HORIZONTAL);
         if (k.icon != 0) {
-            View badge = iconBadge(k.icon, k.accent, 32);
+            View badge = iconBadge(k.icon, accent, 32);
             LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(Theme.dp(32), Theme.dp(32));
             ip.gravity = Gravity.CENTER_HORIZONTAL;
             ip.bottomMargin = Theme.dp(4);
@@ -295,20 +460,49 @@ public final class Kit {
         l.setSingleLine(true);
         l.setEllipsize(TextUtils.TruncateAt.END);
         t.addView(l, lp(-1, -2));
-        TextView v = text(k.value, 16.5f, Theme.TEXT, true);
-        v.setGravity(Gravity.CENTER_HORIZONTAL);
+        String fullDisplayValue = k.value == null ? "" : k.value;
+        String moneyUnit = "";
+        String numberDisplayValue = fullDisplayValue;
+        int lastSpace = fullDisplayValue.lastIndexOf(' ');
+        if (lastSpace > 0) {
+            String possibleUnit = fullDisplayValue.substring(lastSpace + 1).trim();
+            if ("تومان".equals(possibleUnit) || "ریال".equals(possibleUnit)) {
+                moneyUnit = possibleUnit;
+                numberDisplayValue = fullDisplayValue.substring(0, lastSpace).trim();
+            }
+        }
+        final String stableNumberValue = numberDisplayValue;
+        LinearLayout amount = h();
+        amount.setGravity(Gravity.CENTER);
+        amount.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        TextView v = text(numberDisplayValue, 16.5f, Theme.TEXT, true);
+        v.setGravity(Gravity.CENTER);
         v.setSingleLine(true);
         // Large amounts shrink to fit the tile instead of ending in "…".
         if (android.os.Build.VERSION.SDK_INT >= 26) {
-            v.setAutoSizeTextTypeUniformWithConfiguration(10, 17, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
+            float valueScale = Theme.fontScale() * Theme.typeScale();
+            v.setAutoSizeTextTypeUniformWithConfiguration(
+                    Math.max(9, Math.round(10f * valueScale)),
+                    Math.max(10, Math.round(17f * valueScale)), 1,
+                    android.util.TypedValue.COMPLEX_UNIT_SP);
         } else {
             v.setEllipsize(TextUtils.TruncateAt.END);
         }
-        t.addView(v, lp(-1, -2));
+        if (!moneyUnit.isEmpty()) {
+            amount.addView(v, wlp(1f));
+            amount.addView(space(4));
+            TextView unit = text(moneyUnit, 9.5f, Theme.MUTED, false);
+            unit.setSingleLine(true);
+            unit.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+            amount.addView(unit, lp(-2, -2));
+        } else {
+            amount.addView(v, lp(-1, -2));
+        }
+        t.addView(amount, lp(-1, -2));
         if (k.spark != null && k.spark.length > 1) {
             LinearLayout.LayoutParams sp = lp(-1, Theme.dp(26));
             sp.setMargins(0, Theme.dp(4), 0, Theme.dp(2));
-            t.addView(new Sparkline(a, k.spark, k.accent), sp);
+            t.addView(new Sparkline(a, k.spark, accent), sp);
         }
         if (!Double.isNaN(k.countTo)) {
             ValueAnimator va = ValueAnimator.ofFloat(0f, 1f);
@@ -316,26 +510,41 @@ public final class Kit {
             va.setInterpolator(new android.view.animation.DecelerateInterpolator());
             va.addUpdateListener(an -> v.setText(Money.fa(Money.compact(k.countTo * (float) an.getAnimatedValue()))));
             va.addListener(new android.animation.AnimatorListenerAdapter() {
-                @Override public void onAnimationEnd(android.animation.Animator animation) { v.setText(k.value); }
+                @Override public void onAnimationEnd(android.animation.Animator animation) { v.setText(stableNumberValue); }
             });
             va.start();
         } else {
             v.setAlpha(0f);
             v.animate().alpha(1f).setDuration(350).start();
         }
-        // Every tile reserves the same lines (sub + action), so tiles in one row
-        // match in height and their values line up whether or not they have a note.
-        // Trend notes read green when up and red when down, as in the reference market tiles.
+        // Every tile reserves equal space; outcome colors are restricted to actual deltas.
         String sub0 = k.sub == null ? "" : k.sub.trim();
-        int subColor = k.accent;
-        if (k.subColor != 0) subColor = k.subColor;
-        else if (sub0.startsWith("▲") || sub0.startsWith("↗") || sub0.startsWith("+")) subColor = Theme.SUCCESS;
-        else if (sub0.startsWith("▼") || sub0.startsWith("↘") || sub0.startsWith("-")) subColor = Theme.DANGER;
-        TextView s = text(k.sub == null || k.sub.isEmpty() ? " " : k.sub, 10f, subColor, true);
-        s.setGravity(Gravity.CENTER_HORIZONTAL);
-        s.setSingleLine(true);
-        s.setEllipsize(TextUtils.TruncateAt.END);
-        t.addView(s, lp(-1, -2));
+        String probe = sub0.replace(String.valueOf((char) 0x2066), "")
+                .replace(String.valueOf((char) 0x2067), "")
+                .replace(String.valueOf((char) 0x2068), "")
+                .replace(String.valueOf((char) 0x2069), "").trim();
+        int direction = probe.startsWith("▲") || probe.startsWith("↗") || probe.startsWith("+") ? 1
+                : probe.startsWith("▼") || probe.startsWith("↘") || probe.startsWith("-")
+                || probe.startsWith("−") ? -1 : 0;
+        if (direction != 0) {
+            String detail = sub0.replaceFirst("^(▲|▼|↗|↘)\\s*", "").trim();
+            if (detail.startsWith("+") || detail.startsWith("−") || detail.startsWith("-"))
+                detail = detail.substring(1).trim();
+            int tone = k.subColor != 0 ? k.subColor
+                    : direction > 0 ? Theme.SUCCESS : Theme.DANGER;
+            TextView delta = deltaBadge(detail, direction, tone,
+                    k.label + (direction > 0 ? " افزایش " : " کاهش ") + detail);
+            delta.setSingleLine(true);
+            delta.setEllipsize(TextUtils.TruncateAt.END);
+            t.addView(delta, lp(-1, Theme.dp(32)));
+        } else {
+            TextView note = text(sub0.isEmpty() ? " " : sub0, 10f, Theme.MUTED, false);
+            note.setGravity(Gravity.CENTER_HORIZONTAL);
+            note.setSingleLine(true);
+            note.setEllipsize(TextUtils.TruncateAt.END);
+            note.setMinHeight(Theme.dp(32));
+            t.addView(note, lp(-1, -2));
+        }
         TextView more = text(k.action != null ? "مشاهده جزئیات ›" : " ", 9.5f, Theme.MUTED, true);
         more.setGravity(Gravity.CENTER_HORIZONTAL);
         more.setSingleLine(true);
@@ -411,27 +620,29 @@ public final class Kit {
         TextView key = text(k, 11f, Theme.MUTED, false);
         key.setGravity(Gravity.RIGHT);
         r.addView(key, lp(-1, -2));
-        TextView val = text(v == null || v.isEmpty() ? "—" : v, 13f, vColor, true);
-        // Absolute RIGHT (not START): inside dialog windows START may resolve against
-        // a non-RTL layout direction and pure-numeric values would drift to the left.
-        val.setGravity(Gravity.RIGHT);
+        View val = amountLine(v == null || v.isEmpty() ? "—" : v,
+                13f, Gravity.RIGHT, vColor);
         val.setPadding(0, Theme.dp(2), 0, 0);
         r.addView(val, lp(-1, -2));
         return r;
     }
 
-    public View divider() {
-        View v = new View(a);
-        // Gold hairline that fades out at both ends (no hard line across the card).
-        v.setBackground(new android.graphics.drawable.GradientDrawable(
-                android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
-                new int[]{Theme.alpha(Theme.GOLD, 0), Theme.alpha(Theme.GOLD, Theme.DARK ? 70 : 90), Theme.alpha(Theme.GOLD, 0)}));
-        v.setLayoutParams(new LinearLayout.LayoutParams(-1, Theme.dp(1)));
-        return v;
+    /** Shared one-dp hairline; decorative only and omitted from the accessibility tree. */
+    public View goldHairline() { return accentHairline(Theme.GOLD_METAL); }
+
+    public View accentHairline(int accent) {
+        View line = new View(a);
+        line.setBackground(Theme.accentHairline(accent));
+        line.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        line.setLayoutParams(new LinearLayout.LayoutParams(-1, Theme.dp(1)));
+        return line;
     }
 
+    public View divider() { return goldHairline(); }
+
     public View pill(String s, int color) {
-        TextView t = text(s, 10.5f, color, true);
+        // Outcome hue belongs to the quiet surface; its label remains high-contrast neutral text.
+        TextView t = text(s, 10.5f, Theme.TEXT, true);
         t.setPadding(Theme.dp(11), Theme.dp(5), Theme.dp(11), Theme.dp(5));
         t.setBackground(Theme.pill(color));
         t.setSingleLine(true);
@@ -599,7 +810,7 @@ public final class Kit {
         LinearLayout root = v();
         LinearLayout head = h();
         head.addView(text(label, 11.5f, Theme.MUTED, false), wlp(1f));
-        head.addView(text(value, 11.5f, color, true), lp(-2, -2));
+        head.addView(text(value, 11.5f, Theme.TEXT, true), lp(-2, -2));
         root.addView(head, lp(-1, -2));
         FracBar bar = new FracBar(a);
         bar.set((float) frac, color, true);
@@ -635,7 +846,7 @@ public final class Kit {
         Button b = new Button(a);
         b.setText(t);
         b.setTextSize(12.5f * Theme.fontScale());
-        b.setTextColor(accent);
+        b.setTextColor(isOutcomeColor(accent) ? Theme.TEXT : Theme.sectionText(accent));
         b.setTypeface(Theme.face(true));
         b.setBackground(Theme.stated(Theme.ghostButton(accent)));
         b.setGravity(Gravity.CENTER);
@@ -665,10 +876,57 @@ public final class Kit {
         return chipsRow(items, selected, accent, null, l);
     }
 
-    /** Theme choices with matching, untinted 3D icons and a shared touch height. */
+    /** Icon chips in a horizontally scrollable row for long, open-ended option lists. */
     public View chipsWithIcons(String[] items, int selected, int[] iconRes,
                                int accent, final ChipsListener l) {
         return chipsRow(java.util.Arrays.asList(items), selected, accent, iconRes, l);
+    }
+
+    /** Equal-width, accessible segmented selector for a small fixed set of choices. */
+    public View segmentedControl(String[] items, int selected, int[] iconRes,
+                                 int accent, final ChipsListener listener) {
+        LinearLayout group = h();
+        group.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        group.setGravity(Gravity.CENTER_VERTICAL);
+        group.setPadding(Theme.dp(4), Theme.dp(4), Theme.dp(4), Theme.dp(4));
+        group.setBackground(Theme.card());
+        if (items == null) return group;
+        for (int i = 0; i < items.length; i++) {
+            final int index = i;
+            final String label = items[i] == null ? "" : items[i];
+            boolean chosen = i == selected;
+            LinearLayout segment = v();
+            segment.setGravity(Gravity.CENTER);
+            segment.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+            segment.setPadding(Theme.dp(4), Theme.dp(4), Theme.dp(4), Theme.dp(4));
+            segment.setMinimumHeight(Theme.dp(64));
+            segment.setBackground(chosen ? Theme.chip(true, accent)
+                    : new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+            int vector = iconRes != null && i < iconRes.length ? iconRes[i] : 0;
+            if (vector != 0) {
+                View mark = iconBadge(vector, accent, 28);
+                LinearLayout.LayoutParams ip = lp(Theme.dp(28), Theme.dp(28));
+                ip.gravity = Gravity.CENTER_HORIZONTAL;
+                segment.addView(mark, ip);
+            }
+            TextView text = text(label, 10.5f, chosen ? Theme.onAccent(accent) : Theme.TEXT, true);
+            text.setGravity(Gravity.CENTER);
+            text.setMaxLines(2);
+            text.setEllipsize(TextUtils.TruncateAt.END);
+            text.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+            LinearLayout.LayoutParams tp = lp(-1, -2);
+            if (vector != 0) tp.topMargin = Theme.dp(3);
+            segment.addView(text, tp);
+            segment.setContentDescription(label);
+            segment.setSelected(chosen);
+            segment.setFocusable(true);
+            Theme.pressable(segment);
+            segment.setOnClickListener(v -> listener.onPick(index));
+            LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, -2, 1f);
+            if (i > 0) p.setMarginStart(Theme.dp(2));
+            group.addView(segment, p);
+        }
+        return group;
     }
 
     private View chipsRow(java.util.List<String> items, int selected, int accent,
@@ -803,6 +1061,104 @@ public final class Kit {
         return r;
     }
 
+    // ---------------- shared states ----------------
+    /** Compact SyncPill used by dashboard and the collapsible application header. */
+    public View syncPill(int iconRes, String title, String detail, int accent,
+                         boolean busy, View.OnClickListener retry) {
+        LinearLayout pill = h();
+        pill.setGravity(Gravity.CENTER_VERTICAL);
+        pill.setMinimumHeight(Theme.dp(48));
+        pill.setPadding(Theme.dp(10), Theme.dp(6), Theme.dp(10), Theme.dp(6));
+        pill.setBackground(Theme.kpi(accent));
+
+        FrameLayout badge = new FrameLayout(a);
+        badge.setBackground(Theme.avatar(Theme.alpha(accent, Theme.isLight() ? 25 : 36)));
+        ImageView symbol = icon(iconRes, Theme.sectionText(accent), 24);
+        symbol.setContentDescription(null);
+        badge.addView(symbol, new FrameLayout.LayoutParams(Theme.dp(24), Theme.dp(24), Gravity.CENTER));
+        pill.addView(badge, new LinearLayout.LayoutParams(Theme.dp(34), Theme.dp(34)));
+        pill.addView(space(8));
+
+        LinearLayout copy = v();
+        TextView heading = text(title, 11.5f, Theme.TEXT, true);
+        heading.setMaxLines(1);
+        heading.setEllipsize(TextUtils.TruncateAt.END);
+        copy.addView(heading, lp(-1, -2));
+        if (detail != null && !detail.trim().isEmpty()) {
+            TextView caption = text(detail, 9.5f, Theme.MUTED, false);
+            caption.setMaxLines(1);
+            caption.setEllipsize(TextUtils.TruncateAt.END);
+            copy.addView(caption, lp(-1, -2));
+        }
+        pill.addView(copy, wlp(1f));
+        String spoken = (title == null ? "" : title)
+                + (detail == null || detail.trim().isEmpty() ? "" : ". " + detail);
+        pill.setContentDescription(spoken + (retry == null ? "" : "؛ لمس کنید برای تلاش دوباره"));
+        if (busy && Ui.motionOk(a)) {
+            android.animation.ObjectAnimator rotation = android.animation.ObjectAnimator.ofFloat(
+                    symbol, View.ROTATION, 0f, 360f);
+            rotation.setDuration(1150);
+            rotation.setRepeatCount(android.animation.ObjectAnimator.INFINITE);
+            rotation.setInterpolator(new android.view.animation.LinearInterpolator());
+            rotation.start();
+            symbol.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
+                @Override public void onViewAttachedToWindow(View v) { }
+                @Override public void onViewDetachedFromWindow(View v) { rotation.cancel(); }
+            });
+        }
+        if (retry != null) {
+            Theme.pressable(pill);
+            pill.setOnClickListener(retry);
+        }
+        return pill;
+    }
+
+    /** Calm, tactile one-line empty row for a section with no matching records. */
+    public View emptyRow(String message) {
+        LinearLayout row = h();
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setMinimumHeight(Theme.dp(48));
+        row.setPadding(Theme.dp(8), Theme.dp(6), Theme.dp(8), Theme.dp(6));
+        row.addView(iconBadge(R.drawable.mi_check_circle, Theme.SUCCESS, 32),
+                new LinearLayout.LayoutParams(Theme.dp(32), Theme.dp(32)));
+        row.addView(space(8));
+        TextView text = text(message == null || message.trim().isEmpty()
+                ? "همه‌چیز مرتب است" : message, 11.5f, Theme.MUTED, false);
+        text.setMaxLines(2);
+        row.addView(text, wlp(1f));
+        row.setContentDescription(message == null || message.trim().isEmpty()
+                ? "همه‌چیز مرتب است" : message);
+        return row;
+    }
+
+    /** Skeleton shimmer block. Its width is a fraction of a horizontal row. */
+    public View skeletonBlock(int heightDp, float widthFraction) {
+        View block = new View(a);
+        int base = Theme.SURFACE2;
+        int highlight = Theme.alpha(Theme.GOLD_METAL, Theme.isLight() ? 28 : 34);
+        android.graphics.drawable.GradientDrawable shimmer = new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{Theme.alpha(base, 255), highlight, Theme.alpha(base, 255)});
+        shimmer.setCornerRadius(Theme.dp(Math.max(6, Math.min(12, heightDp / 2))));
+        shimmer.setStroke(Theme.dp(1), Theme.alpha(Theme.GOLD_METAL, Theme.isLight() ? 28 : 32));
+        block.setBackground(shimmer);
+        block.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        if (Ui.motionOk(a)) {
+            android.animation.ObjectAnimator pulse = android.animation.ObjectAnimator.ofFloat(
+                    block, View.ALPHA, 0.58f, 1f);
+            pulse.setDuration(1250);
+            pulse.setRepeatMode(ValueAnimator.REVERSE);
+            pulse.setRepeatCount(ValueAnimator.INFINITE);
+            block.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
+                @Override public void onViewAttachedToWindow(View v) { pulse.start(); }
+                @Override public void onViewDetachedFromWindow(View v) { pulse.cancel(); }
+            });
+        }
+        float width = Math.max(0.1f, Math.min(1f, widthFraction));
+        block.setLayoutParams(new LinearLayout.LayoutParams(0, Theme.dp(heightDp), width));
+        return block;
+    }
+
     // ---------------- states ----------------
     /** Fake search field (gold loupe + hint) that opens the filter sheet. */
     public View searchBar(String hint, View.OnClickListener onClick) {
@@ -825,31 +1181,21 @@ public final class Kit {
      * so the layout does not jump when content arrives.
      */
     public View loading(String msg) {
-        LinearLayout c = card();
-        TextView t = text(msg, 12f, Theme.MUTED, false);
-        c.addView(t, lp(-1, -2));
+        LinearLayout c = luxCard();
+        TextView title = text(msg, 12f, Theme.MUTED, false);
+        c.addView(title, lp(-1, -2));
         int[] heights = {16, 12, 12, 44};
         float[] widths = {0.55f, 0.85f, 0.4f, 1f};
         for (int i = 0; i < heights.length; i++) {
-            View bar = new View(a);
-            bar.setBackground(Theme.pill(Theme.alpha(Theme.GOLD, i == 3 ? 30 : 46)));
-            LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, Theme.dp(heights[i]), widths[i]);
-            p.setMargins(0, Theme.dp(i == 0 ? 12 : 8), 0, 0);
-            if (widths[i] < 1f) {
-                LinearLayout line = h();
-                line.addView(bar, p);
-                line.addView(new View(a), new LinearLayout.LayoutParams(0, 1, 1f - widths[i]));
-                c.addView(line, lp(-1, -2));
-            } else {
-                c.addView(bar, p);
-            }
-            android.animation.ObjectAnimator pulse = android.animation.ObjectAnimator.ofFloat(bar, View.ALPHA, 0.35f, 1f);
-            pulse.setDuration(900);
-            pulse.setStartDelay(i * 140L);
-            pulse.setRepeatMode(ValueAnimator.REVERSE);
-            pulse.setRepeatCount(ValueAnimator.INFINITE);
-            pulse.start();
+            LinearLayout line = h();
+            line.addView(skeletonBlock(heights[i], widths[i]));
+            if (widths[i] < 1f)
+                line.addView(new Space(a), new LinearLayout.LayoutParams(0, 1, 1f - widths[i]));
+            LinearLayout.LayoutParams p = lp(-1, -2);
+            p.topMargin = Theme.dp(i == 0 ? 12 : 8);
+            c.addView(line, p);
         }
+        c.setContentDescription(msg == null ? "در حال بارگذاری" : msg);
         return c;
     }
 
@@ -914,7 +1260,7 @@ public final class Kit {
         hp.setMargins(0, Theme.dp(6), 0, 0);
         c.addView(hint, hp);
         if (retry != null) {
-            Button r = btnGold("⟳ تلاش مجدد", v -> retry.run());
+            Button r = btnGold("⇅ تلاش مجدد", v -> retry.run());
             LinearLayout.LayoutParams p = lp(-1, -2);
             p.setMargins(0, Theme.dp(12), 0, 0);
             c.addView(r, p);

@@ -35,10 +35,11 @@ public final class DesignTokens {
     public static final int MARKET = 0xFFA8864F;
     public static final int WAREHOUSE = 0xFF1F8A8A;
 
-    // Outcome colors are separate from section accents.
-    public static final int POSITIVE = 0xFF137A5A;
-    public static final int NEGATIVE = 0xFFA8444B;
-    public static final int WARNING = 0xFFC4702F;
+    // Outcome colors are independent of the section palette and text-safe after accessibility adjustment.
+    public static final int POSITIVE = 0xFF26784F;
+    public static final int NEGATIVE = 0xFFB33A42;
+    public static final int WARNING = 0xFF9A5F12;
+    public static final int INFO = 0xFF396B8A;
     public static final int NEUTRAL = 0xFF746B59;
 
     public static int sectionAccent(String title) {

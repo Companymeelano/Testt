@@ -617,12 +617,12 @@ public class LicenseActivity extends Activity {
         }, delayMs);
     }
 
-    /** Small glass chip for the compact licence header: icon, caption and value. */
+    /** Flat accent chip for the compact licence header: icon, caption and value. */
     private LinearLayout miniChip(int iconRes, int iconColor, String caption, String value, int valueColor) {
         LinearLayout c = kit.v();
         c.setGravity(Gravity.CENTER_HORIZONTAL);
         c.setPadding(Theme.dp(6), Theme.dp(8), Theme.dp(6), Theme.dp(8));
-        c.setBackground(Theme.glass(0xFFFFFFFF, 0xFFF6EEDA, 14, 110));
+        c.setBackground(Theme.kpi(Theme.GOLD));
         c.addView(kit.icon(iconRes, iconColor, 20), new LinearLayout.LayoutParams(Theme.dp(20), Theme.dp(20)));
         TextView cap = kit.text(caption, 10f, Theme.MUTED, false);
         cap.setGravity(Gravity.CENTER_HORIZONTAL);
@@ -758,7 +758,7 @@ public class LicenseActivity extends Activity {
         copyNote.setVisibility(View.GONE);
         copyBtn.setOnClickListener(v -> {
             boolean ok = copyText("کد دستگاه میلانو", device);
-            copyNote.setTextColor(ok ? Theme.SUCCESS : Theme.DANGER);
+            copyNote.setTextColor(Theme.TEXT);
             copyNote.setText(ok ? "کد دستگاه کپی شد" : "کپی نشد؛ دوباره تلاش کنید");
             copyNote.setVisibility(View.VISIBLE);
             copyNote.postDelayed(() -> copyNote.setVisibility(View.GONE), 2500);
@@ -926,7 +926,7 @@ public class LicenseActivity extends Activity {
         c.addView(deviceCodeView(), kit.lp(-1, -2));
         c.addView(kit.gap(6));
         LinearLayout row = kit.h();
-        row.addView(kit.btnGhost("↻ ارسال مجدد", Theme.MUTED,
+        row.addView(kit.btnGhost("📲 ارسال مجدد", Theme.MUTED,
                 v -> directSend(buildRequestMsg(LicenseStore.contactPhone(this)))), kit.wlp(1f));
         row.addView(kit.space(8));
         final android.widget.Button[] recall = new android.widget.Button[1];
@@ -1074,8 +1074,8 @@ public class LicenseActivity extends Activity {
         int p = Theme.dp(8);
         v.setPadding(p, Theme.dp(2), p, Theme.dp(2));
         try {
-            v.setMinWidth(Theme.dp(44));
-            v.setMinHeight(Theme.dp(44));
+            v.setMinWidth(Theme.dp(48));
+            v.setMinHeight(Theme.dp(48));
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:840", ignored); }
         Theme.pressable(v);
         v.setOnClickListener(vv -> refreshFlow());
@@ -1123,7 +1123,7 @@ public class LicenseActivity extends Activity {
         details.addView(kit.btnGhost("کپی گزارش برای پشتیبانی", Theme.INFO, v -> {
             String report = CrashReporter.readReport(this);
             boolean ok = !report.isEmpty() && copyText("گزارش فنی میلانو", report);
-            reportNote.setTextColor(ok ? Theme.SUCCESS : Theme.DANGER);
+            reportNote.setTextColor(Theme.TEXT);
             reportNote.setText(report.isEmpty() ? "گزارش فنی در دسترس نیست"
                     : (ok ? "گزارش کپی شد؛ برای پشتیبانی بفرستید" : "کپی گزارش ممکن نشد"));
             reportNote.setVisibility(View.VISIBLE);

@@ -170,7 +170,7 @@ public class ManagerAlertsScreen extends Screen {
                 LinearLayout card = a.kit.card(Theme.DANGER);
                 card.addView(a.kit.text("بررسی هشدارها ناموفق بود", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
                 card.addView(a.kit.hint(faError), a.kit.lp(-1, -2));
-                card.addView(a.kit.btnGhost("⟳ تلاش دوباره", Theme.DANGER, v -> check()), a.kit.lp(-1, -2));
+                card.addView(a.kit.btnGhost("⇅ تلاش دوباره", Theme.DANGER, v -> check()), a.kit.lp(-1, -2));
                 results.addView(card, a.kit.lp(-1, -2));
             }
         });

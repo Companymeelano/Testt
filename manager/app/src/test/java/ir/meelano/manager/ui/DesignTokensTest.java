@@ -43,10 +43,20 @@ public class DesignTokensTest {
     }
 
     @Test public void outcomePaletteIsSeparateFromSectionPalette() {
-        assertEquals(DesignTokens.EMERALD, DesignTokens.POSITIVE);
-        assertEquals(DesignTokens.PAY, DesignTokens.NEGATIVE);
-        assertEquals(DesignTokens.ALERT, DesignTokens.WARNING);
-        assertEquals(0xFF746B59, DesignTokens.NEUTRAL);
+        int[] outcomes = {DesignTokens.POSITIVE, DesignTokens.NEGATIVE, DesignTokens.WARNING,
+                DesignTokens.INFO, DesignTokens.NEUTRAL};
+        int[] sections = {DesignTokens.SALES, DesignTokens.PURCHASE, DesignTokens.RECEIVE,
+                DesignTokens.PAY, DesignTokens.RETURNS, DesignTokens.ALERT,
+                DesignTokens.MARKET, DesignTokens.WAREHOUSE};
+        for (int outcome : outcomes) for (int section : sections)
+            assertTrue("outcome and section hues are distinct",
+                    outcome != section);
+        for (int outcome : outcomes) {
+            assertTrue("light semantic contrast", DesignTokens.contrastRatio(
+                    DesignTokens.accessibleAccent(outcome, false), DesignTokens.IVORY) >= 4.5);
+            assertTrue("dark semantic contrast", DesignTokens.contrastRatio(
+                    DesignTokens.accessibleAccent(outcome, true), DesignTokens.NIGHT_SURFACE) >= 4.5);
+        }
         int tint = DesignTokens.surfaceTint(DesignTokens.EMERALD, false);
         assertEquals(0xFF, (tint >>> 24) & 0xFF);
         assertTrue(tint != DesignTokens.IVORY);

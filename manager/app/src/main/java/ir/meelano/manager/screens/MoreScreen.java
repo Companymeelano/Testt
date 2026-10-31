@@ -151,7 +151,7 @@ public class MoreScreen extends Screen {
         if ("خزانه‌داری".equals(title)) return "🏦";
         if ("تحلیل ویزیتور و مسیر".equals(title)) return "🚚";
         if ("سود و زیان".equals(title)) return "💹";
-        if ("برگشتی و ابطالی".equals(title)) return "⟳";
+        if ("برگشتی و ابطالی".equals(title)) return "↪";
         if ("کاربران و نظارت".equals(title)) return "♛";
         return fallback;
     }

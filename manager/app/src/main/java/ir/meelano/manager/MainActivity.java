@@ -745,7 +745,7 @@ public class MainActivity extends Activity {
         if (RoleStore.allowed(this, "settings"))
             tools.addView(toolCell(toolIcon(R.drawable.mi_settings), "تنظیمات", "تنظیمات", () -> nav("settings")), toolLp());
 
-        // toolIcon() shows the 3D icon in both skins (and tints only flat vectors).
+        // Keep the account action in the same flat duotone icon family as the toolbar.
         android.widget.ImageView account = toolIcon(R.drawable.mi_person);
         compactUserAction = account;
         tools.addView(toolCell(account, "حساب", "حساب کاربری؛ خروج یا تغییر کاربر", () -> userMenu()), toolLp());
@@ -866,7 +866,7 @@ public class MainActivity extends Activity {
     }
 
     /** One toolbar cell: icon above a small Persian label, equal width via {@link #toolLp()}. */
-    /** Gold vector icon for the header toolbar (replaces text glyphs, which rendered unevenly). */
+    /** Consistent duotone vector icon for the header toolbar. */
     private android.widget.ImageView toolIcon(int res) {
         android.widget.ImageView iv = new android.widget.ImageView(this);
         try {
@@ -1750,10 +1750,10 @@ public class MainActivity extends Activity {
                 licChip.setTextColor(Theme.GOLD_SOFT);
             } else if (s.daysLeft <= 2) {
                 ir.meelano.manager.ui.MeelanoIcons.set(licChip, "📅 " + Money.fa(String.valueOf(s.daysLeft)) + " روز!");
-                licChip.setTextColor(Theme.DANGER);
+                licChip.setTextColor(Theme.TEXT);
             } else if (s.daysLeft <= 7) {
                 ir.meelano.manager.ui.MeelanoIcons.set(licChip, "📅 " + Money.fa(String.valueOf(s.daysLeft)) + " روز");
-                licChip.setTextColor(Theme.WARNING);
+                licChip.setTextColor(Theme.TEXT);
             } else {
                 ir.meelano.manager.ui.MeelanoIcons.set(licChip, "📅 " + Money.fa(String.valueOf(s.daysLeft)) + " روز");
                 licChip.setTextColor(Theme.GOLD_SOFT);
@@ -2134,7 +2134,9 @@ public class MainActivity extends Activity {
         b.setAllCaps(false);
         b.setSingleLine(true);
         b.setTextSize(12f * Theme.fontScale());
-        b.setTextColor(accent);
+        boolean outcome = accent == Theme.SUCCESS || accent == Theme.DANGER
+                || accent == Theme.WARNING || accent == Theme.INFO;
+        b.setTextColor(outcome ? Theme.TEXT : Theme.sectionText(accent));
         b.setTypeface(Theme.face(true));
         b.setBackground(Theme.ghostButton(accent));
         b.setGravity(android.view.Gravity.CENTER);

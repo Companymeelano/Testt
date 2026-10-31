@@ -98,7 +98,7 @@ public class MainActivity extends Activity {
     private LinearLayout contentWrap;
     /** Incremented on every render. Async work captures it and stops once it changes. */
     private int renderGen = 0;
-    private ScrollView scroll;
+    private PullToRefreshScrollView scroll;
     /** Product search/scanner stays visible above the scrolling catalogue. */
     private LinearLayout productStickyHost;
     /** Brand row collapses while browsing products; toolbar remains reachable. */
@@ -771,7 +771,10 @@ public class MainActivity extends Activity {
         refreshLicChip();
 
         // content (centered max-width column on tablets / wide screens)
-        scroll = new ScrollView(this);
+        scroll = new PullToRefreshScrollView(this);
+        scroll.setOnRefreshListener(() -> {
+            if ("home".equals(currentId)) renderCurrent();
+        });
         // A small end inset keeps the final action fully scrollable above the fixed navigation dock.
         scroll.setClipToPadding(false);
         scroll.setPadding(0, 0, 0, Theme.dp(14));
@@ -2194,4 +2197,54 @@ public class MainActivity extends Activity {
             }
         }).start();
     }
+
+    /** Detects a downward pull at the top without intercepting ordinary child gestures. */
+    private static final class PullToRefreshScrollView extends ScrollView {
+        private Runnable refreshListener;
+        private float startX;
+        private float startY;
+        private boolean startedAtTop;
+        private boolean pullReachedThreshold;
+        private final float triggerDistance;
+
+        PullToRefreshScrollView(android.content.Context context) {
+            super(context);
+            triggerDistance = 84f * getResources().getDisplayMetrics().density;
+        }
+
+        void setOnRefreshListener(Runnable listener) {
+            refreshListener = listener;
+        }
+
+        @Override
+        public boolean dispatchTouchEvent(android.view.MotionEvent event) {
+            int action = event.getActionMasked();
+            if (action == android.view.MotionEvent.ACTION_DOWN) {
+                startX = event.getX();
+                startY = event.getY();
+                startedAtTop = getScrollY() <= 0;
+                pullReachedThreshold = false;
+            } else if (action == android.view.MotionEvent.ACTION_MOVE
+                    && startedAtTop && getScrollY() <= 0) {
+                float dy = event.getY() - startY;
+                float dx = event.getX() - startX;
+                if (dy >= triggerDistance && dy > Math.abs(dx) * 1.2f) {
+                    pullReachedThreshold = true;
+                }
+            }
+
+            boolean shouldRefresh = action == android.view.MotionEvent.ACTION_UP
+                    && pullReachedThreshold && startedAtTop && refreshListener != null;
+            Runnable callback = shouldRefresh ? refreshListener : null;
+            boolean handled = super.dispatchTouchEvent(event);
+            if (action == android.view.MotionEvent.ACTION_UP
+                    || action == android.view.MotionEvent.ACTION_CANCEL) {
+                startedAtTop = false;
+                pullReachedThreshold = false;
+            }
+            if (callback != null) post(callback);
+            return handled;
+        }
+    }
+
 }

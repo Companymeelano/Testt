@@ -37,6 +37,7 @@ import ir.meelano.manager.R;
 import ir.meelano.manager.core.Queries;
 import ir.meelano.manager.core.SalesComparison;
 import ir.meelano.manager.core.SalesSnapshot;
+import ir.meelano.manager.core.SyncState;
 import ir.meelano.manager.data.Meta;
 import ir.meelano.manager.data.Company;
 import ir.meelano.manager.data.Repo;
@@ -176,188 +177,94 @@ public class HomeScreen extends Screen {
         }
     }
 
-    /**
-     * The gold clock artwork (drawn without hands) with the hour and minute hands drawn live,
-     * set to the phone's current time. Plain View: no drawable layering, so it always paints.
-     */
-    static final class ClockView extends View {
-        private static final float IMG_W = 1104f, IMG_H = 616f;
-        private static final float CX = 317f, CY = 309f;   // clock centre in artwork space
-        private static final float RING = 168f;            // dial radius (vertical) in artwork space
-        private static final float X_SQUASH = 0.79f;       // the dial is seen slightly turned
-        private final android.graphics.Bitmap bmp;
-        private final android.graphics.Paint art = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG | android.graphics.Paint.FILTER_BITMAP_FLAG);
-        private final android.graphics.Paint fade = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
-        private final android.graphics.Paint hand = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
-        private final android.graphics.Path path = new android.graphics.Path();
-        private final android.graphics.RectF dst = new android.graphics.RectF();
-        private final android.graphics.Paint rim = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
-        private final android.graphics.RectF panel = new android.graphics.RectF();
-
-        ClockView(android.content.Context c, android.graphics.Bitmap bmp) {
-            super(c);
-            this.bmp = bmp;
-            hand.setStyle(android.graphics.Paint.Style.FILL);
-            rim.setStyle(android.graphics.Paint.Style.STROKE);
-            rim.setStrokeWidth(Theme.dp(1.6f));
-            rim.setColor(Theme.GOLD);
-            rim.setShadowLayer(Theme.dp(6), 0, 0, Theme.alpha(Theme.GOLD, 150));
-            setLayerType(View.LAYER_TYPE_SOFTWARE, rim); // the glow needs a software layer
-        }
-
-        @Override
-        protected void onDraw(android.graphics.Canvas c) {
-            super.onDraw(c);
-            int h = getHeight();
-            if (bmp == null || h <= 0) return;
-            float s = h / IMG_H;
-            float w = IMG_W * s;
-            dst.set(0, 0, w, h);
-            c.drawBitmap(bmp, null, dst, art);
-            // Dissolve the artwork's right edge into the card colour so no box edge shows.
-            fade.setShader(new android.graphics.LinearGradient(w * 0.6f, 0, w, 0,
-                    0x000A0D13, 0xFF0A0D13, android.graphics.Shader.TileMode.CLAMP));
-            c.drawRect(w * 0.6f, 0, w, h, fade);
-            // Gold frame around the clock picture itself.
-            float inset = Theme.dp(4);
-            panel.set(inset, inset, w * 0.6f - inset / 2f, h - inset);
-            c.drawRoundRect(panel, Theme.dp(14), Theme.dp(14), rim);
-
-            java.util.Calendar now = java.util.Calendar.getInstance();
-            float minute = now.get(java.util.Calendar.MINUTE) + now.get(java.util.Calendar.SECOND) / 60f;
-            float hour = now.get(java.util.Calendar.HOUR) + minute / 60f;
-            float cx = CX * s, cy = CY * s;
-            drawHand(c, cx, cy, hour / 12f, RING * 0.52f * s, 5.2f * s, 0xFFFFE9A8);
-            drawHand(c, cx, cy, minute / 60f, RING * 0.84f * s, 3.4f * s, 0xFFFFD97A);
-            hand.setColor(0xFFFFF3CC);
-            c.drawCircle(cx, cy, 6.5f * s, hand);
-            hand.setColor(0xFF8A6418);
-            c.drawCircle(cx, cy, 3.2f * s, hand);
-        }
-
-        private void drawHand(android.graphics.Canvas c, float cx, float cy, float turn, float len, float wid, int color) {
-            double ang = turn * Math.PI * 2;
-            float dx = (float) Math.sin(ang) * X_SQUASH, dy = (float) -Math.cos(ang);
-            float tipX = cx + dx * len, tipY = cy + dy * len;
-            float tailX = cx - dx * len * 0.18f, tailY = cy - dy * len * 0.18f;
-            float nx = -dy * wid, ny = dx * wid;
-            path.reset();
-            path.moveTo(tipX, tipY);
-            path.lineTo(cx + nx, cy + ny);
-            path.lineTo(tailX, tailY);
-            path.lineTo(cx - nx, cy - ny);
-            path.close();
-            hand.setColor(0x66000000);
-            c.save();
-            c.translate(wid * 0.6f, wid * 0.6f);
-            c.drawPath(path, hand);
-            c.restore();
-            hand.setColor(color);
-            c.drawPath(path, hand);
-        }
-    }
-
-    private static android.graphics.Bitmap clockBitmap;
-
-    /**
-     * «در حال به‌روزرسانی» banner: clock artwork on the left, status text on the right.
-     * Shown on every dashboard load, cached or not.
-     */
-    /** Banner ink: dark-skin colour, or a light ink on the emerald banner in the light skin. */
-    private static int bannerInk(int dark, int light) {
-        return Theme.isLight() ? light : dark;
-    }
-
-    private enum BannerState { LOADING, UPDATED, OFFLINE }
-
-    /** Compact, truthful sync status; cached data is never presented as freshly updated. */
-    private View updateBanner(String savedTs, BannerState state, View.OnClickListener retry) {
-        LinearLayout box = a.kit.h();
-        box.setGravity(Gravity.CENTER_VERTICAL);
-        box.setPadding(Theme.dp(13), Theme.dp(9), Theme.dp(13), Theme.dp(9));
-        box.setMinimumHeight(Theme.dp(64));
-        int accent = state == BannerState.OFFLINE ? Theme.WARNING
-                : state == BannerState.UPDATED ? Theme.SUCCESS : Theme.GOLD;
-        android.graphics.drawable.GradientDrawable surface = new android.graphics.drawable.GradientDrawable(
-                android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
-                Theme.isLight() ? new int[]{0xFFF8F5EA, 0xFFF1EBDD} : new int[]{0xFF11151D, 0xFF0B0E14});
-        surface.setCornerRadius(Theme.dp(18));
-        surface.setStroke(Theme.dp(1), Theme.alpha(accent, Theme.isLight() ? 110 : 90));
-        box.setBackground(surface);
-
-        FrameLayout badge = new FrameLayout(a);
-        badge.setBackground(Theme.avatar(Theme.alpha(accent, Theme.isLight() ? 25 : 34)));
-        if (state == BannerState.LOADING) {
-            // A rotating gold refresh mark — device spinners render as a dark square on
-            // some One UI builds and never matched the board's art.
-            android.widget.ImageView spinner = new android.widget.ImageView(a);
-            spinner.setImageResource(R.drawable.mi_refresh);
-            spinner.setColorFilter(accent);
-            spinner.setContentDescription(null);
-            if (ir.meelano.manager.ui.Ui.motionOk(a)) {
-                android.animation.ObjectAnimator rot = android.animation.ObjectAnimator.ofFloat(
-                        spinner, View.ROTATION, 0f, 360f);
-                rot.setDuration(1150);
-                rot.setRepeatCount(android.animation.ObjectAnimator.INFINITE);
-                rot.setInterpolator(new android.view.animation.LinearInterpolator());
-                rot.start();
-                spinner.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
-                    @Override public void onViewAttachedToWindow(View v) { }
-                    @Override public void onViewDetachedFromWindow(View v) { rot.cancel(); }
-                });
-            }
-            badge.addView(spinner, new FrameLayout.LayoutParams(Theme.dp(24), Theme.dp(24), Gravity.CENTER));
-        } else {
-            android.widget.ImageView icon = new android.widget.ImageView(a);
-            icon.setImageResource(state == BannerState.UPDATED ? R.drawable.mi_check_circle : R.drawable.mi_wifi_off);
-            icon.setColorFilter(accent);
-            icon.setContentDescription(null);
-            badge.addView(icon, new FrameLayout.LayoutParams(Theme.dp(24), Theme.dp(24), Gravity.CENTER));
-        }
-        box.addView(badge, new LinearLayout.LayoutParams(Theme.dp(38), Theme.dp(38)));
-        box.addView(a.kit.space(11));
-
-        LinearLayout copy = a.kit.v();
+    /** Compact sync status: data age and refresh state stay visible without a tall hero banner. */
+    private View syncStatus(String lastReceived, SyncState state, String errorDetail,
+                            View.OnClickListener retry) {
+        String timestamp = lastReceived == null ? "" : lastReceived.trim();
+        int accent;
+        int iconRes;
         String title;
         String detail;
-        String stamp = "";
-        if (state == BannerState.LOADING) {
-            title = "در حال تازه‌سازی اطلاعات";
-            if (savedTs == null || savedTs.isEmpty()) {
-                detail = "آخرین اطلاعات فروشگاه در حال دریافت است…";
-            } else {
-                detail = "دادهٔ ذخیره‌شده نمایش داده می‌شود · آخرین دریافت";
-                stamp = savedTs;
-            }
-        } else if (state == BannerState.UPDATED) {
-            title = "داشبورد به‌روز شد";
-            detail = "آخرین دریافت زنده";
-            stamp = savedTs == null || savedTs.isEmpty() ? "" : savedTs;
-        } else if (savedTs == null || savedTs.isEmpty()) {
-            title = "اتصال برقرار نشد؛ دادهٔ ذخیره‌شده‌ای موجود نیست";
-            detail = "برای دریافت اطلاعات، اتصال را بررسی کنید و دوباره تلاش کنید.";
-        } else {
-            title = "اتصال برقرار نشد؛ دادهٔ ذخیره‌شده نمایش داده می‌شود";
-            detail = "آخرین دریافت موفق";
-            stamp = savedTs;
+        switch (state) {
+            case FRESH:
+                accent = Theme.SUCCESS;
+                iconRes = R.drawable.mi_check_circle;
+                title = "داشبورد به‌روز است";
+                detail = timestamp.isEmpty() ? "اطلاعات فروشگاه دریافت شد" : "آخرین دریافت · " + timestamp;
+                break;
+            case REFRESHING:
+                accent = Theme.GOLD;
+                iconRes = R.drawable.mi_refresh;
+                title = "در حال همگام‌سازی";
+                detail = timestamp.isEmpty() ? "داده‌های فروشگاه در حال دریافت است"
+                        : "آخرین دریافت · " + timestamp;
+                break;
+            case STALE:
+                accent = Theme.WARNING;
+                iconRes = R.drawable.mi_history;
+                title = "تازه‌سازی انجام نشد";
+                detail = timestamp.isEmpty() ? "داده‌ای برای نمایش ذخیره نشده است"
+                        : "آخرین دریافت · " + timestamp;
+                break;
+            case OFFLINE:
+                accent = Theme.MUTED;
+                iconRes = R.drawable.mi_wifi_off;
+                title = "آفلاین · دادهٔ ذخیره‌شده";
+                detail = timestamp.isEmpty() ? "شبکه در دسترس نیست؛ برای تلاش دوباره بکشید"
+                        : "آخرین دریافت · " + timestamp;
+                break;
+            case ERROR:
+            default:
+                accent = Theme.DANGER;
+                iconRes = R.drawable.mi_error;
+                title = "خطا در دریافت داشبورد";
+                detail = errorDetail == null || errorDetail.trim().isEmpty()
+                        ? "برای تلاش دوباره، صفحه را پایین بکشید"
+                        : errorDetail.trim();
+                break;
         }
-        TextView heading = a.kit.text(title, 12.5f, Theme.TEXT, true);
+
+        LinearLayout box = a.kit.h();
+        box.setGravity(Gravity.CENTER_VERTICAL);
+        box.setPadding(Theme.dp(10), Theme.dp(6), Theme.dp(10), Theme.dp(6));
+        box.setMinimumHeight(Theme.dp(50));
+        box.setBackground(Theme.kpi(accent));
+        FrameLayout badge = new FrameLayout(a);
+        badge.setBackground(Theme.avatar(Theme.alpha(accent, Theme.isLight() ? 25 : 34)));
+        android.widget.ImageView icon = new android.widget.ImageView(a);
+        icon.setImageResource(iconRes);
+        icon.setColorFilter(accent);
+        icon.setContentDescription(null);
+        FrameLayout.LayoutParams iconLp = new FrameLayout.LayoutParams(
+                Theme.dp(23), Theme.dp(23), Gravity.CENTER);
+        badge.addView(icon, iconLp);
+        if (state == SyncState.REFRESHING && ir.meelano.manager.ui.Ui.motionOk(a)) {
+            android.animation.ObjectAnimator rotation = android.animation.ObjectAnimator.ofFloat(
+                    icon, View.ROTATION, 0f, 360f);
+            rotation.setDuration(1150);
+            rotation.setRepeatCount(android.animation.ObjectAnimator.INFINITE);
+            rotation.setInterpolator(new android.view.animation.LinearInterpolator());
+            rotation.start();
+            icon.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
+                @Override public void onViewAttachedToWindow(View v) { }
+                @Override public void onViewDetachedFromWindow(View v) { rotation.cancel(); }
+            });
+        }
+        box.addView(badge, new LinearLayout.LayoutParams(Theme.dp(34), Theme.dp(34)));
+        box.addView(a.kit.space(8));
+
+        LinearLayout copy = a.kit.v();
+        TextView heading = a.kit.text(title, 11.5f, Theme.TEXT, true);
         heading.setMaxLines(1);
         heading.setEllipsize(TextUtils.TruncateAt.END);
         copy.addView(heading, a.kit.lp(-1, -2));
-        if (stamp.isEmpty()) {
-            TextView subtitle = a.kit.text(detail, 10.5f, Theme.MUTED, false);
-            subtitle.setMaxLines(1);
-            subtitle.setEllipsize(TextUtils.TruncateAt.END);
-            copy.addView(subtitle, a.kit.lp(-1, -2));
-        } else {
-            // Date on one side, time on the other: a long date used to push the time
-            // onto a second line where it read like a value of its own.
-            copy.addView(stampRow(detail + ": ", stamp, Theme.MUTED), a.kit.lp(-1, -2));
-        }
+        TextView subtitle = a.kit.text(detail, 9.5f, Theme.MUTED, false);
+        subtitle.setMaxLines(1);
+        subtitle.setEllipsize(TextUtils.TruncateAt.END);
+        copy.addView(subtitle, a.kit.lp(-1, -2));
         box.addView(copy, a.kit.wlp(1f));
         box.setContentDescription(title + ". " + detail
-                + (retry == null ? "" : " برای تلاش دوباره لمس کنید."));
+                + (retry == null ? "" : " برای تلاش دوباره لمس کنید یا صفحه را پایین بکشید."));
         if (retry != null) {
             box.setFocusable(true);
             Theme.pressable(box);
@@ -368,6 +275,7 @@ public class HomeScreen extends Screen {
 
     @Override
     public void render(final LinearLayout content) {
+
         // Faint gold dot grid behind the dashboard (both skins; very low contrast, decorative only).
         if (!(content.getBackground() instanceof DotGrid)) content.setBackground(new DotGrid());
         final int token = a.renderGen();
@@ -375,12 +283,12 @@ public class HomeScreen extends Screen {
         final String[] cachedTs = {""};
         final Data cached = loadCached(cachedTs);
         if (cached != null) {
-            bannerWasLoading = true;
-            build(content, cached, BannerState.LOADING, cachedTs[0]);
+            syncWasRefreshing = true;
+            build(content, cached, SyncState.REFRESHING, cachedTs[0]);
         } else {
             content.removeAllViews();
-            bannerWasLoading = true;
-            content.addView(updateBanner("", BannerState.LOADING, null), a.kit.lp(-1, -2));
+            syncWasRefreshing = true;
+            content.addView(syncStatus("", SyncState.REFRESHING, null, null), a.kit.lp(-1, -2));
             content.addView(a.kit.gap(8));
             content.addView(greetingHero(), a.kit.lp(-1, -2));
             content.addView(a.kit.gap(8));
@@ -404,7 +312,7 @@ public class HomeScreen extends Screen {
                 if (kpiOk[0] || (chartsOk[0] && shared.salesSnapshot != null
                         && shared.salesSnapshot.isAvailable())) {
                     saveCache(shared);
-                    build(content, shared, BannerState.UPDATED, currentTimeLabel());
+                    build(content, shared, SyncState.FRESH, currentTimeLabel());
                 } else {
                     showFailure(content, kpiErr[0], cached, cachedTs[0]);
                 }
@@ -580,8 +488,10 @@ public class HomeScreen extends Screen {
     }
 
     private void showFailure(final LinearLayout content, String faError, Data cached, String cachedTs) {
+        SyncState failureState = SyncState.afterFailure(cached != null,
+                ir.meelano.manager.core.Net.online(a));
         if (cached != null) {
-            build(content, cached, BannerState.OFFLINE, cachedTs);
+            build(content, cached, failureState, cachedTs);
             LinearLayout bc = a.kit.card(Theme.GOLD);
             bc.addView(a.kit.text("جزئیات اتصال", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
             bc.addView(a.kit.kv("خطا", faError == null ? "" : faError, Theme.MUTED), a.kit.lp(-1, -2));
@@ -592,7 +502,7 @@ public class HomeScreen extends Screen {
             return;
         }
         content.removeAllViews();
-        content.addView(updateBanner("", BannerState.OFFLINE, v -> render(content)), a.kit.lp(-1, -2));
+        content.addView(syncStatus("", failureState, faError, v -> render(content)), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(8));
         content.addView(greetingHero(), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(8));
@@ -1307,16 +1217,17 @@ public class HomeScreen extends Screen {
                 + HomeNumberFormatter.time(now.get(Calendar.HOUR_OF_DAY), now.get(Calendar.MINUTE));
     }
 
-    private void build(LinearLayout content, Data d, BannerState bannerState, String bannerTime) {
+    private void build(LinearLayout content, Data d, SyncState syncState, String syncTime) {
         content.removeAllViews();
-        View status = updateBanner(bannerTime, bannerState,
-                bannerState == BannerState.OFFLINE ? v -> render(content) : null);
+        View.OnClickListener retry = syncState == SyncState.STALE || syncState == SyncState.OFFLINE
+                || syncState == SyncState.ERROR ? v -> render(content) : null;
+        View status = syncStatus(syncTime, syncState, null, retry);
         // The compact status changes state in place after the first cache/live transition.
-        if (bannerWasLoading && entered) {
+        if (syncWasRefreshing && entered) {
             status.setAlpha(0f);
             status.animate().alpha(1f).setDuration(220).start();
         }
-        bannerWasLoading = false;
+        syncWasRefreshing = false;
         content.addView(status, a.kit.lp(-1, -2));
         content.addView(a.kit.gap(8));
         content.addView(greetingHero(), a.kit.lp(-1, -2));
@@ -1416,8 +1327,8 @@ public class HomeScreen extends Screen {
         @Override public int getOpacity() { return android.graphics.PixelFormat.TRANSLUCENT; }
     }
 
-    /** True while the clock card shows the loading state (so the finished state can fade in). */
-    private boolean bannerWasLoading;
+    /** True while cached/empty data is being refreshed so the sync row can fade to its final state. */
+    private boolean syncWasRefreshing;
 
     /** One-time staggered fade and slide for the first home cards (skipped when animations are off). */
     private boolean entered;
@@ -1799,56 +1710,6 @@ public class HomeScreen extends Screen {
         Calendar c = Calendar.getInstance();
         return "تا " + HomeNumberFormatter.time(c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE))
                 + " • ناقص";
-    }
-
-    /**
-     * The stamp line of the banner: the date on one side, the time on the other.
-     * A long date used to push the time onto a second line, where it read like a
-     * value of its own; the year is dropped because the day already names it.
-     */
-    private View stampRow(String label, String savedTs, int ink) {
-        LinearLayout row = a.kit.h();
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        String raw = savedTs == null ? "" : savedTs.trim();
-        String date = raw, time = "";
-        int at = raw.indexOf(" ساعت ");
-        if (at > 0) {
-            date = raw.substring(0, at).trim();
-            time = raw.substring(at + 5).trim();
-        } else {
-            int sp = raw.lastIndexOf(' ');
-            if (sp > 0) { date = raw.substring(0, sp).trim(); time = raw.substring(sp + 1).trim(); }
-        }
-        TextView d = a.kit.text(label + HomeNumberFormatter.localizeText(dropYear(date)), 11f, ink, false);
-        d.setSingleLine(true);
-        d.setEllipsize(TextUtils.TruncateAt.END);
-        row.addView(d, a.kit.wlp(1f));
-        if (!time.isEmpty()) {
-            TextView t = a.kit.text(HomeNumberFormatter.time(time), 11f, ink, true);
-            t.setSingleLine(true);
-            row.addView(t, a.kit.lp(-2, -2));
-        }
-        return row;
-    }
-
-    /** «پنجشنبه، ۷ آبان ۱۴۰۵» → «پنجشنبه، ۷ آبان»: the year only adds noise. */
-    private static String dropYear(String date) {
-        String s = date == null ? "" : date.trim();
-        String[] p = s.split("\\s+");
-        if (p.length < 2) return s;
-        String last = p[p.length - 1];
-        boolean year = last.length() == 4;
-        for (int i = 0; i < last.length(); i++) {
-            char c = last.charAt(i);
-            if (c < '0' || c > '9') { year = false; break; }
-        }
-        if (!year) return s;
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < p.length - 1; i++) {
-            if (i > 0) sb.append(' ');
-            sb.append(p[i]);
-        }
-        return sb.toString();
     }
 
     Kit.Kpi dayKpi(String title, String target, Row row, String countKey,

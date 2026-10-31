@@ -36,6 +36,7 @@ import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.RoleStore;
 import ir.meelano.manager.core.MoneyQueries;
+import ir.meelano.manager.core.MonthlyGoalEngine;
 import ir.meelano.manager.R;
 import ir.meelano.manager.core.Queries;
 import ir.meelano.manager.core.SalesComparison;
@@ -48,6 +49,7 @@ import ir.meelano.manager.data.Repo;
 import ir.meelano.manager.data.Row;
 import ir.meelano.manager.ui.Charts;
 import ir.meelano.manager.ui.HomeCashWaterfall;
+import ir.meelano.manager.ui.HomeGoalGauge;
 import ir.meelano.manager.ui.HomePaymentMixBar;
 import ir.meelano.manager.ui.HomeSalesChart;
 import ir.meelano.manager.ui.Kit;
@@ -1664,6 +1666,7 @@ public class HomeScreen extends Screen {
         else if ("closeout".equals(key)) secHomeCloseout(content, d);
         else if ("cash_position".equals(key)) secCashPosition(content, d);
         else if ("top_performers".equals(key)) secTopPerformers(content, d);
+        else if ("sales_goal".equals(key)) secMonthlySalesGoal(content, d);
         else if ("kpis".equals(key)) secKpis(content, d);
         else if ("alerts".equals(key)) secAlerts(content, d);
         else if ("sales_insight".equals(key)) secSalesInsight(content, d);
@@ -1899,6 +1902,7 @@ public class HomeScreen extends Screen {
         if (vector == R.drawable.mi_point_of_sale) return Theme.SECTION_CLOSEOUT;
         if (vector == R.drawable.mi_account_balance_wallet) return Theme.SECTION_CASH_POSITION;
         if (vector == R.drawable.mi_military_tech) return Theme.SECTION_TOP_PERFORMERS;
+        if (vector == R.drawable.mi_track_changes) return Theme.SECTION_SALES_GOAL;
         if (vector == R.drawable.mi_shopping_cart || vector == R.drawable.mi_add_shopping_cart)
             return Theme.SECTION_PURCHASE;
         if (vector == R.drawable.mi_receipt_long || vector == R.drawable.mi_cheque)
@@ -2886,6 +2890,161 @@ public class HomeScreen extends Screen {
         row.setContentDescription("رتبهٔ " + HomeNumberFormatter.integer(rank) + "، " + name
                 + "، " + sub + "، " + HomeNumberFormatter.money(total));
         return row;
+    }
+
+    private void secMonthlySalesGoal(LinearLayout content, Data d) {
+        if (!RoleStore.allowed(a, "sales")) return;
+        final String day = snapshotDay(d);
+        final String monthStart = Jalali.monthStart(day);
+        final String monthKey = monthStart != null && monthStart.length() >= 7
+                ? monthStart.substring(0, 7) : "";
+        final String periodLabel = monthLabel(monthStart);
+        Double target = parseLocalRials(a.settings.homeSalesGoalRials(monthKey));
+        if (target != null && target <= 0d) target = null;
+        SalesSnapshot snapshot = d == null ? null : d.salesSnapshot;
+        boolean salesAvailable = snapshot != null && snapshot.isAvailable();
+
+        LinearLayout card = a.kit.card(Theme.SECTION_SALES_GOAL);
+        card.addView(boardHead("هدف فروش ماهانه", periodLabel + " • تنظیم محلی روی این دستگاه",
+                R.drawable.mi_track_changes, null), a.kit.lp(-1, -2));
+
+        if (target == null) {
+            card.addView(a.kit.emptyRow("هدف فروش این ماه هنوز ثبت نشده است."),
+                    a.kit.lp(-1, -2));
+        } else if (!salesAvailable) {
+            card.addView(a.kit.emptyRow("فروش ماه تا امروز در دادهٔ فعلی در دسترس نیست."),
+                    a.kit.lp(-1, -2));
+        } else {
+            int elapsedDays = jalaliDayNumber(day);
+            int monthDays = jalaliDaysInMonth(monthStart);
+            double actual = snapshot.monthToDateRials(monthKey, elapsedDays);
+            MonthlyGoalEngine.Result result = MonthlyGoalEngine.evaluate(
+                    actual, target, elapsedDays, monthDays);
+            if (!result.available) {
+                card.addView(a.kit.emptyRow("برای این ماه، هدف یا بازهٔ روزهای تقویمی معتبر نیست."),
+                        a.kit.lp(-1, -2));
+            } else {
+                FrameLayout gaugeFrame = new FrameLayout(a);
+                gaugeFrame.setContentDescription("هدف فروش " + periodLabel + "، فروش تا امروز "
+                        + HomeNumberFormatter.money(result.salesRials) + "، هدف "
+                        + HomeNumberFormatter.money(result.targetRials) + "، تحقق "
+                        + HomeNumberFormatter.percent(result.achievementPercent) + "، برآورد پایان ماه "
+                        + HomeNumberFormatter.money(result.projectedMonthRials));
+                gaugeFrame.setFocusable(true);
+                HomeGoalGauge ring = new HomeGoalGauge(a);
+                ring.setProgress(result.gaugePercent, Theme.SECTION_SALES_GOAL);
+                FrameLayout.LayoutParams ringParams = new FrameLayout.LayoutParams(
+                        Theme.dp(164), Theme.dp(164), Gravity.CENTER);
+                gaugeFrame.addView(ring, ringParams);
+
+                LinearLayout center = a.kit.v();
+                center.setGravity(Gravity.CENTER);
+                center.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+                TextView percent = a.kit.text(HomeNumberFormatter.percent(result.achievementPercent),
+                        19f, Theme.TEXT, true);
+                percent.setGravity(Gravity.CENTER);
+                TextView caption = a.kit.text("تحقق هدف", 10f, Theme.MUTED, false);
+                caption.setGravity(Gravity.CENTER);
+                center.addView(percent, a.kit.lp(-1, -2));
+                center.addView(caption, a.kit.lp(-1, -2));
+                FrameLayout.LayoutParams centerParams = new FrameLayout.LayoutParams(
+                        -2, -2, Gravity.CENTER);
+                gaugeFrame.addView(center, centerParams);
+                card.addView(gaugeFrame, a.kit.lp(-1, Theme.dp(176)));
+
+                card.addView(a.kit.kv("فروش ماه تا روز " + HomeNumberFormatter.integer(elapsedDays),
+                        HomeNumberFormatter.money(result.salesRials), Theme.TEXT), a.kit.lp(-1, -2));
+                card.addView(a.kit.kv("هدف ثبت‌شدهٔ ماه", HomeNumberFormatter.money(result.targetRials),
+                        Theme.TEXT), a.kit.lp(-1, -2));
+                card.addView(a.kit.kv("برآورد پایان ماه با نرخ روز تقویمی",
+                        HomeNumberFormatter.money(result.projectedMonthRials), Theme.TEXT),
+                        a.kit.lp(-1, -2));
+                card.addView(a.kit.hint("برآورد خطی است: فروش ماه تا امروز ÷ روزهای تقویمی گذشته × تعداد روزهای ماه؛ جمعه و تعطیلات رسمی جداگانه از محاسبه کم نشده‌اند."),
+                        a.kit.lp(-1, -2));
+            }
+        }
+
+        card.addView(a.kit.btnGhost(target == null ? "ثبت هدف این ماه" : "ویرایش هدف این ماه",
+                Theme.SECTION_SALES_GOAL, v -> showMonthlySalesGoalDialog(content, monthKey, target)),
+                a.kit.lp(-1, -2));
+        a.kit.addCard(content, card);
+    }
+
+    private int jalaliDayNumber(String day) {
+        String normalized = Jalali.disp(day);
+        if (normalized.length() < 10) return 0;
+        try { return Integer.parseInt(normalized.substring(8, 10)); }
+        catch (Exception invalid) { return 0; }
+    }
+
+    private int jalaliDaysInMonth(String monthStart) {
+        String normalized = Jalali.disp(monthStart);
+        if (normalized.length() < 7) return 0;
+        try {
+            return Jalali.daysInMonth(Integer.parseInt(normalized.substring(0, 4)),
+                    Integer.parseInt(normalized.substring(5, 7)));
+        } catch (Exception invalid) {
+            return 0;
+        }
+    }
+
+    private String goalRialsFromDisplay(String raw) {
+        if (raw == null || raw.trim().isEmpty()) return null;
+        String normalized = ir.meelano.manager.core.Money.en(raw).replace(",", "")
+                .replace("٬", "").replace('٫', '.').trim();
+        try {
+            java.math.BigDecimal amount = new java.math.BigDecimal(normalized);
+            if (amount.signum() <= 0) return null;
+            if (ir.meelano.manager.core.Money.isToman()) amount = amount.multiply(java.math.BigDecimal.TEN);
+            return amount.stripTrailingZeros().toPlainString();
+        } catch (Exception invalid) {
+            return null;
+        }
+    }
+
+    private void showMonthlySalesGoalDialog(LinearLayout content, String monthKey, Double currentRials) {
+        LinearLayout form = a.kit.v();
+        form.setPadding(Theme.dp(20), Theme.dp(10), Theme.dp(20), Theme.dp(8));
+        form.addView(a.kit.hint("هدف فقط در تنظیمات همین دستگاه و برای این ماه ذخیره می‌شود؛ هیچ رکوردی در دیتابیس فروشگاه نوشته نمی‌شود."),
+                a.kit.lp(-1, -2));
+        String current = "";
+        if (currentRials != null) {
+            current = String.format(Locale.US, "%.1f",
+                    ir.meelano.manager.core.Money.toUnit(currentRials));
+            if (current.endsWith(".0")) current = current.substring(0, current.length() - 2);
+        }
+        android.widget.EditText input = a.kit.edit("مبلغ هدف به "
+                + ir.meelano.manager.core.Money.unitName(), current);
+        input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER
+                | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        input.setContentDescription("مبلغ هدف ماهانه به "
+                + ir.meelano.manager.core.Money.unitName());
+        form.addView(input, a.kit.lp(-1, -2));
+        android.app.AlertDialog dialog = new android.app.AlertDialog.Builder(a)
+                .setTitle("هدف فروش ماهانه")
+                .setView(form)
+                .setNegativeButton("انصراف", null)
+                .setNeutralButton("پاک‌کردن هدف", null)
+                .setPositiveButton("ذخیره", null)
+                .create();
+        dialog.setOnShowListener(ignored -> {
+            dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+                String rials = goalRialsFromDisplay(input.getText().toString());
+                if (rials == null) {
+                    input.setError("مبلغ معتبر و بزرگ‌تر از صفر وارد کنید");
+                    return;
+                }
+                a.settings.setHomeSalesGoalRials(monthKey, rials);
+                dialog.dismiss();
+                render(content);
+            });
+            dialog.getButton(android.app.AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v -> {
+                a.settings.setHomeSalesGoalRials(monthKey, "");
+                dialog.dismiss();
+                render(content);
+            });
+        });
+        dialog.show();
     }
 
     private void secHomeCloseout(LinearLayout content, Data d) {

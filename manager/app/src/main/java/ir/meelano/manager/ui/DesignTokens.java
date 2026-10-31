@@ -39,6 +39,7 @@ public final class DesignTokens {
     public static final int CLOSEOUT = 0xFF7D5E3C;
     public static final int CASH_POSITION = 0xFF3F6F78;
     public static final int TOP_PERFORMERS = 0xFF4E715E;
+    public static final int SALES_GOAL = 0xFF596E9C;
 
     // Outcome colors are independent of the section palette and text-safe after accessibility adjustment.
     public static final int POSITIVE = 0xFF26784F;
@@ -51,6 +52,8 @@ public final class DesignTokens {
         String s = normalize(title);
         if (containsAny(s, "بستن روز", "تطبیق صندوق", "closeout")) return CLOSEOUT;
         if (containsAny(s, "موقعیت نقدی", "نقد در دست", "cash position")) return CASH_POSITION;
+        if (containsAny(s, "هدف فروش", "sales goal")) return SALES_GOAL;
+        if (containsAny(s, "برترین", "top performer")) return TOP_PERFORMERS;
         if (containsAny(s, "خرید", "purchase", "بهای خرید")) return PURCHASE;
         if (containsAny(s, "دریافت", "وصول", "receive", "cash in")) return RECEIVE;
         if (containsAny(s, "پرداخت", "نقدینگی", "cash out")) return PAY;

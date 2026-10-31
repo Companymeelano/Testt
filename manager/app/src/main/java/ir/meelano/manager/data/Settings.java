@@ -452,6 +452,38 @@ public final class Settings {
         p.edit().putBoolean("home_simple", simple).apply();
     }
 
+    /** User-entered monthly sales targets keyed by Jalali month; local preferences only. */
+    public String homeSalesGoalRials(String jalaliMonth) {
+        String key = homeSalesGoalKey(jalaliMonth);
+        return key == null ? "" : p.getString(key, "");
+    }
+
+    public void setHomeSalesGoalRials(String jalaliMonth, String rawRials) {
+        String key = homeSalesGoalKey(jalaliMonth);
+        if (key == null) return;
+        String raw = rawRials == null ? "" : Money.en(rawRials).replace(",", "")
+                .replace("٬", "").replace('٫', '.').trim();
+        if (raw.isEmpty()) {
+            p.edit().remove(key).apply();
+            return;
+        }
+        try {
+            java.math.BigDecimal amount = new java.math.BigDecimal(raw);
+            if (amount.signum() < 0) return;
+            p.edit().putString(key, amount.stripTrailingZeros().toPlainString()).apply();
+        } catch (Exception invalid) {
+            Diag.ignored("Settings:homeSalesGoal", invalid);
+        }
+    }
+
+    private String homeSalesGoalKey(String jalaliMonth) {
+        String month = jalaliMonth == null ? "" : jalaliMonth.trim();
+        if (!month.matches("\\d{4}/\\d{2}")) return null;
+        String normalized = ir.meelano.manager.core.Jalali.disp(month + "/01");
+        if (normalized.isEmpty()) return null;
+        return "home_sales_goal_" + normalized.substring(0, 7).replace('/', '_');
+    }
+
     /** Local till observations keyed by Jalali day; they never leave this device or alter Atiran. */
     public String closeoutCashOpening(String day) { return p.getString(closeoutCashKey("open", day), ""); }
     public String closeoutCashCounted(String day) { return p.getString(closeoutCashKey("counted", day), ""); }

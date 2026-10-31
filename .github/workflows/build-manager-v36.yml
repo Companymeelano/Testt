@@ -4,7 +4,13 @@ on:
   push:
     branches: ["arena/29e01a09-testt"]
     paths:
-      - "manager/**"
+      - "manager/app/**"
+      - "manager/admin/**"
+      - "manager/licensing/**"
+      - "manager/gradle/**"
+      - "manager/build.gradle"
+      - "manager/settings.gradle"
+      - "manager/gradle.properties"
       - "tools/audit_manager_schema.py"
       - "tools/probe_buy_formula.py"
       - "tools/probe_money_structure.py"

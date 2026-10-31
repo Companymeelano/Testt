@@ -96,7 +96,7 @@ jobs:
                       touched_warnings += 1
                   else:
                       continue
-                  findings.append("\n".join(lines[index:min(index + 4, len(lines))]))
+                  findings.append(line)
               if findings:
                   details += (f"\n\nLint findings: {errors} errors; "
                               f"{touched_warnings} warnings in changed UI files.\n")

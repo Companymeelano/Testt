@@ -242,7 +242,19 @@ jobs:
           script: |
             set -euo pipefail
             cd manager
-            gradle :app:connectedDebugAndroidTest -PhomeScreenshotAbi=true --console=plain --stacktrace --no-daemon
+            log_file="$(mktemp)"
+            if ! gradle :app:connectedDebugAndroidTest -PhomeScreenshotAbi=true --console=plain --stacktrace --no-daemon 2>&1 | tee "$log_file"; then
+              diagnostics="$(grep -E 'FAILURE:|Execution failed|Could not |Caused by:|error:|AssertionFailedError|AssertionError|FAILED$|No tests found' "$log_file" | tail -n 8 || true)"
+              if [ -z "$diagnostics" ]; then diagnostics="$(tail -n 12 "$log_file")"; fi
+              while IFS= read -r line; do
+                [ -n "$line" ] || continue
+                line="${line//%/%25}"
+                line="${line//$'\r'/%0D}"
+                line="${line//:/%3A}"
+                echo "::error title=Screenshot instrumentation diagnostics::$line"
+              done <<< "$diagnostics"
+              exit 1
+            fi
             mkdir -p ../design/screenshots
             adb pull /sdcard/Android/data/ir.meelano.manager.debug/files/home-dashboard-screenshots/home-dashboard-light.png ../design/screenshots/home-dashboard-light.png
             adb pull /sdcard/Android/data/ir.meelano.manager.debug/files/home-dashboard-screenshots/home-dashboard-dark.png ../design/screenshots/home-dashboard-dark.png

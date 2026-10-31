@@ -28,6 +28,14 @@ import java.util.List;
 public final class HomeSalesChart {
     private HomeSalesChart() { }
 
+    private static Paint paint(Paint.Style style) {
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+        p.setStyle(style);
+        p.setStrokeCap(Paint.Cap.ROUND);
+        p.setStrokeJoin(Paint.Join.ROUND);
+        return p;
+    }
+
     /** Interactive 14-calendar-day area chart. Chronology is fixed: older days are on the right. */
     public static final class Area extends View {
         public interface SelectionListener { void onSelect(SalesSnapshot.Day day); }
@@ -81,14 +89,6 @@ public final class HomeSalesChart {
             setClickable(true);
             setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
             setMinimumHeight(Theme.dp(148));
-        }
-
-        private static Paint paint(Paint.Style style) {
-            Paint p = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
-            p.setStyle(style);
-            p.setStrokeCap(Paint.Cap.ROUND);
-            p.setStrokeJoin(Paint.Join.ROUND);
-            return p;
         }
 
         private float sp(float size) {

@@ -16,6 +16,7 @@ import android.graphics.RectF;
 import android.graphics.Shader;
 import android.view.Gravity;
 import android.view.View;
+import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
@@ -1200,7 +1201,7 @@ public class HomeScreen extends Screen {
                 a.kit.lp(-1, -2));
         title.addView(a.kit.text("دلار · طلای ۱۸ · سکه", 9f, Theme.MUTED, false), a.kit.lp(-1, -2));
         head.addView(title, a.kit.wlp(1f));
-        TextView status = a.kit.pill(state, stateTone);
+        View status = a.kit.pill(state, stateTone);
         status.setContentDescription("وضعیت قیمت بازار: " + state);
         head.addView(status, a.kit.lp(-2, -2));
         Button toggle = a.kit.btnGhost(marketExpanded ? "جمع‌کردن" : "نمایش",

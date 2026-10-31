@@ -1853,47 +1853,137 @@ public class HomeScreen extends Screen {
                 () -> gotoDay(target, row));
     }
 
-    private void secAlerts(LinearLayout content, Data d) {
-        // ---- alerts ----
-        LinearLayout alerts = a.kit.card(Theme.SECTION_ALERT);
-        LinearLayout rows = a.kit.v();
-        int n = addEngineAlerts(rows, d, 0);
-        n = alert(rows, d, n);
-        List<String> unavailableSources = unavailableAlertSources(d);
-        List<FollowUps.Due> dues = FollowUps.dueToday(a);
-        if (!dues.isEmpty() && RoleStore.allowed(a, "customers")) {
-            final FollowUps.Due fd = dues.get(0);
-            String who = dues.size() == 1 ? fd.note.name : HomeNumberFormatter.integer(dues.size()) + " یادداشت";
-            rows.addView(a.kit.alertRow("پیگیری مشتری", who + " • سررسید یادداشت",
-                    Theme.SECTION_ALERT, v -> gotoCustomer(fd.code)), padTop(n));
-            n++;
+    private static final class HomeAttention {
+        final int priority;
+        final int accent;
+        final String title;
+        final String detail;
+        final Runnable action;
+
+        HomeAttention(int priority, int accent, String title, String detail, Runnable action) {
+            this.priority = priority;
+            this.accent = accent;
+            this.title = title;
+            this.detail = detail;
+            this.action = action;
         }
-        // The badge distinguishes a clean check from a partial check; missing sources are
-        // never presented as confirmation that the business has no alerts.
-        boolean incomplete = !unavailableSources.isEmpty();
-        String badge = n == 0 ? (incomplete ? "بررسی ناقص" : "بدون هشدار")
-                : HomeNumberFormatter.integer(n) + " مورد";
-        int badgeTone = n == 0 && !incomplete ? Theme.SUCCESS : Theme.WARNING;
-        alerts.addView(boardHead("هشدار امروز", null, R.drawable.mi_warning,
-                statusChip(badge, badgeTone)), a.kit.lp(-1, -2));
-        // Each alert view still belongs to the temporary rows container. Detach it before
-        // inserting it into the card; Android rejects a ViewGroup child with two parents.
-        while (rows.getChildCount() > 0) {
-            View row = rows.getChildAt(0);
-            rows.removeViewAt(0);
-            alerts.addView(row);
-        }
-        if (n == 0) alerts.addView(a.kit.text(incomplete
-                        ? "وضعیت بدون هشدار تأیید نشد؛ بعضی داده‌ها در دسترس نیستند."
-                        : "فعلاً هشدار مهمی وجود ندارد.",
-                11.5f, incomplete ? Theme.WARNING : Theme.MUTED, false), a.kit.lp(-1, -2));
-        if (incomplete) alerts.addView(a.kit.hint("بررسی ناقص بخش‌های: "
-                        + joinAlertSources(unavailableSources)), a.kit.lp(-1, -2));
-        a.kit.addCard(content, alerts);
     }
 
-    /** Convert the dashboard's available, read-only query results into shared alert rules. */
-    private int addEngineAlerts(LinearLayout rows, Data d, int firstIndex) {
+    /** One copper-accented focus card, led by the highest-priority AlertEngine result. */
+    private void secAlerts(LinearLayout content, Data d) {
+        List<HomeAttention> items = homeAttentionItems(d);
+        List<String> unavailable = unavailableAlertSources(d);
+        LinearLayout card = a.kit.card(Theme.SECTION_ALERT);
+        card.setPadding(Theme.dp(13), Theme.dp(10), Theme.dp(13), Theme.dp(12));
+        card.addView(a.kit.sectionHeader("مرکز توجه", R.drawable.mi_priority_high,
+                Theme.SECTION_ALERT, null, null), a.kit.lp(-1, -2));
+
+        if (items.isEmpty()) {
+            String status = unavailable.isEmpty() ? "بدون هشدار مهم"
+                    : "بررسی هشدارها کامل نیست";
+            int tone = unavailable.isEmpty() ? Theme.SUCCESS : Theme.WARNING;
+            LinearLayout state = a.kit.h();
+            state.setGravity(Gravity.CENTER_VERTICAL);
+            state.addView(statusChip(status, tone), a.kit.lp(-2, -2));
+            card.addView(state, a.kit.lp(-1, -2));
+            card.addView(a.kit.emptyRow(unavailable.isEmpty()
+                    ? "فعلاً مورد مهمی برای پیگیری نیست"
+                    : "از داده‌های در دسترس، هشدار مهمی پیدا نشد"), a.kit.lp(-1, -2));
+        } else {
+            HomeAttention primary = items.get(0);
+            LinearLayout focus = a.kit.v();
+            focus.setPadding(Theme.dp(11), Theme.dp(10), Theme.dp(11), Theme.dp(10));
+            focus.setBackground(Theme.kpi(Theme.SECTION_ALERT));
+            LinearLayout heading = a.kit.h();
+            heading.setGravity(Gravity.CENTER_VERTICAL);
+            TextView title = a.kit.text(primary.title, 12.5f, Theme.TEXT, true);
+            title.setMaxLines(2);
+            title.setEllipsize(TextUtils.TruncateAt.END);
+            heading.addView(title, a.kit.wlp(1f));
+            heading.addView(statusChip(attentionLabel(primary.priority), primary.accent),
+                    a.kit.lp(-2, -2));
+            focus.addView(heading, a.kit.lp(-1, -2));
+            TextView detail = a.kit.text(primary.detail, 10.5f, Theme.MUTED, false);
+            detail.setMaxLines(3);
+            detail.setEllipsize(TextUtils.TruncateAt.END);
+            LinearLayout.LayoutParams detailParams = a.kit.lp(-1, -2);
+            detailParams.topMargin = Theme.dp(4);
+            focus.addView(detail, detailParams);
+            if (primary.action != null) {
+                android.widget.Button action = a.kit.btnGhost("بررسی مورد ›", primary.accent,
+                        v -> primary.action.run());
+                LinearLayout.LayoutParams actionParams = a.kit.lp(-2, -2);
+                actionParams.topMargin = Theme.dp(6);
+                focus.addView(action, actionParams);
+            }
+            focus.setContentDescription(primary.title + "؛ " + primary.detail + "؛ اولویت "
+                    + attentionLabel(primary.priority));
+            card.addView(focus, a.kit.lp(-1, -2));
+
+            int shown = Math.min(3, items.size());
+            for (int i = 1; i < shown; i++) {
+                final HomeAttention item = items.get(i);
+                View.OnClickListener action = item.action == null ? null : v -> item.action.run();
+                LinearLayout.LayoutParams rowParams = a.kit.lp(-1, -2);
+                rowParams.topMargin = Theme.dp(6);
+                card.addView(a.kit.alertRow(item.title, item.detail, item.accent, action), rowParams);
+            }
+            if (items.size() > shown) {
+                TextView more = a.kit.text("+" + HomeNumberFormatter.integer(items.size() - shown)
+                        + " هشدار دیگر در فهرست امروز", 9.5f, Theme.MUTED, false);
+                more.setGravity(Gravity.END);
+                LinearLayout.LayoutParams moreParams = a.kit.lp(-1, -2);
+                moreParams.topMargin = Theme.dp(4);
+                card.addView(more, moreParams);
+            }
+        }
+        if (!unavailable.isEmpty())
+            card.addView(a.kit.hint("بررسی ناقص بخش‌های: " + joinAlertSources(unavailable)), a.kit.lp(-1, -2));
+        a.kit.addCard(content, card);
+    }
+
+    private String attentionLabel(int priority) {
+        return priority == 0 ? "فوری" : priority == 1 ? "توجه" : "اطلاع";
+    }
+
+    private List<HomeAttention> homeAttentionItems(Data d) {
+        List<HomeAttention> items = new ArrayList<>();
+        for (AlertEngine.Alert alert : homeEngineAlerts(d)) {
+            int priority = alert.severity == AlertEngine.Severity.CRITICAL ? 0
+                    : alert.severity == AlertEngine.Severity.WARNING ? 1 : 2;
+            items.add(new HomeAttention(priority, severityColor(alert.severity),
+                    engineAlertTitle(alert), engineAlertDetail(alert), () -> openHomeAlert(alert, d)));
+        }
+
+        // Keep the existing manager-only operational cues, but place them in the same priority list.
+        if (d.overdue != null && !d.overdue.isEmpty() && RoleStore.allowed(a, "sales")) {
+            Row invoice = d.overdue.get(0);
+            long days = invoice.l("days");
+            if (days < 0) days = Jalali.diffDays(invoice.s("dueDate"), Jalali.todayStr());
+            String delay = days >= 0 ? " · تأخیر " + HomeNumberFormatter.integer(days) + " روز" : "";
+            items.add(new HomeAttention(1, Theme.WARNING, "فاکتور معوق",
+                    invoice.s("party") + " · " + HomeNumberFormatter.compactMoney(invoice.d("amount")) + delay,
+                    this::gotoUnsettled));
+        }
+        if (!isSalesManager() && RoleStore.allowed(a, "buy") && d.salesDay != null && d.buyDay != null
+                && d.salesDay.d("total") > 0 && d.buyDay.d("total") > d.salesDay.d("total") * 1.15) {
+            items.add(new HomeAttention(1, Theme.WARNING, "فشار نقدینگی",
+                    "خرید روز از فروش جلو زده؛ پرداخت‌ها را کنترل کنید.", () -> a.nav("buy")));
+        }
+        List<FollowUps.Due> due = FollowUps.dueToday(a);
+        if (!due.isEmpty() && RoleStore.allowed(a, "customers")) {
+            final FollowUps.Due first = due.get(0);
+            String subject = due.size() == 1 ? first.note.name
+                    : HomeNumberFormatter.integer(due.size()) + " یادداشت";
+            items.add(new HomeAttention(2, Theme.INFO, "پیگیری مشتری",
+                    subject + " · یادداشت سررسیدشده", () -> gotoCustomer(first.code)));
+        }
+        java.util.Collections.sort(items, (left, right) -> Integer.compare(left.priority, right.priority));
+        return items;
+    }
+
+    /** Build AlertEngine input from the same successful, read-only dashboard snapshots. */
+    private List<AlertEngine.Alert> homeEngineAlerts(Data d) {
         List<AlertEngine.StockItem> stock = null;
         if (RoleStore.allowed(a, "products") && d.stockAlertsAvailable) {
             stock = new ArrayList<>();
@@ -1931,19 +2021,7 @@ public class HomeScreen extends Screen {
                 ManagerAlertsScreen.salesDropThreshold(a), due);
         List<AlertEngine.Alert> visible = new ArrayList<>();
         for (AlertEngine.Alert alert : evaluated) if (canOpenAlert(alert)) visible.add(alert);
-        int shown = 0;
-        int index = firstIndex;
-        for (AlertEngine.Alert item : visible) {
-            if (shown >= 6) break;
-            rows.addView(a.kit.alertRow(engineAlertTitle(item), engineAlertDetail(item),
-                    severityColor(item.severity), v -> openHomeAlert(item, d)), padTop(index++));
-            shown++;
-        }
-        if (visible.size() > shown) {
-            rows.addView(a.kit.hint("+" + HomeNumberFormatter.integer(visible.size() - shown)
-                    + " هشدار دیگر در فهرست امروز"), padTop(index));
-        }
-        return index - firstIndex;
+        return visible;
     }
 
     private void addDueItems(List<AlertEngine.DueItem> target, List<Row> rows,
@@ -2342,34 +2420,6 @@ public class HomeScreen extends Screen {
             }
         }), a.kit.lp(-1, -2));
         a.kit.addCard(content, c);
-    }
-
-    private int alert(LinearLayout box, Data d, int n) {
-        // overdue top-1
-        if (d.overdue != null && !d.overdue.isEmpty() && RoleStore.allowed(a, "sales")) {
-            Row o = d.overdue.get(0);
-            long dd = o.l("days");
-            // Without dif_date_alan the server sends −1: derive the delay from the due date.
-            if (dd < 0) dd = Jalali.diffDays(o.s("dueDate"), Jalali.todayStr());
-            String days = dd >= 0 ? " • تأخیر " + HomeNumberFormatter.integer(dd) + " روز" : "";
-            box.addView(a.kit.alertRow("فاکتور معوق", o.s("party") + " • " + HomeNumberFormatter.money(o.d("amount")) + days,
-                    Theme.GOLD, v -> gotoUnsettled()), padTop(n));
-            n++;
-        }
-        // Company liquidity is visible only to the company manager.
-        if (!isSalesManager() && RoleStore.allowed(a, "buy") && d.salesDay != null && d.buyDay != null
-                && d.salesDay.d("total") > 0 && d.buyDay.d("total") > d.salesDay.d("total") * 1.15) {
-            box.addView(a.kit.alertRow("فشار نقدینگی", "خرید روز از فروش جلو زده؛ پرداخت‌ها را کنترل کنید.",
-                    Theme.GOLD, v -> a.nav("buy")), padTop(n));
-            n++;
-        }
-        return n;
-    }
-
-    private LinearLayout.LayoutParams padTop(int n) {
-        LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
-        p.setMargins(0, Theme.dp(8), 0, 0);
-        return p;
     }
 
     private String dayOf(Row day) {

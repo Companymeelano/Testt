@@ -48,7 +48,7 @@ public final class HomeForecastChart extends View {
         band.setColor(Theme.alpha(sectionAccent, Theme.isLight() ? 40 : 55));
         estimate.setColor(sectionAccent);
         estimate.setStrokeWidth(Theme.dp(2));
-        point.setColor(accent);
+        point.setColor(sectionAccent);
         StringBuilder description = new StringBuilder("پیش‌بینی فروش هفت روز آینده؛ تاریخ‌ها از راست به چپ. نوار رنگی دامنهٔ نوسان تاریخی است.");
         for (SalesForecastEngine.DayForecast day : days) {
             description.append(" ").append(Jalali.weekday(day.date)).append(" ")

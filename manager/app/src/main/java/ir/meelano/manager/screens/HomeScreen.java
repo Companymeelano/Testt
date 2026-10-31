@@ -69,9 +69,9 @@ public class HomeScreen extends Screen {
     private static final class Data {
         String snapshotDay = "";
         Row salesDay;
-        Row buyDay = new Row();
-        Row inDay = new Row();
-        Row outDay = new Row();
+        Row buyDay;
+        Row inDay;
+        Row outDay;
         List<Row> overdue = new ArrayList<>();
         List<Row> salesDaily = new ArrayList<>();
         SalesSnapshot salesSnapshot;
@@ -441,13 +441,17 @@ public class HomeScreen extends Screen {
     private Data loadKpis(final int token, java.sql.Connection c0) throws Exception {
         final Link L = new Link(c0);
         Data d = new Data();
-        final String to = Jalali.todayStr();
-        d.snapshotDay = to;
+        HomeRange todayRange = HomeRange.today(Jalali.todayStr());
+        final String to = todayRange.to;
+        d.snapshotDay = todayRange.to;
         // Sales are deliberately not queried through a separate latest-data KPI path:
         // the daily snapshot below is the only source for every Home sales amount.
-        d.buyDay = liveL(token, L, d.notes, "خرید روز", () -> Repo.one(L.c, Queries.homeBuyDay(L.m)));
-        d.inDay = liveL(token, L, d.notes, "دریافت روز", () -> Repo.one(L.c, MoneyQueries.darDay(L.m, 0)));
-        d.outDay = liveL(token, L, d.notes, "پرداخت روز", () -> Repo.one(L.c, MoneyQueries.darDay(L.m, 1)));
+        // Purchases, receipts and payments use this same explicit calendar day.
+        List<Row> purchaseDaily = liveL(token, L, d.notes, "خرید امروز",
+                () -> Repo.exec(L.c, Queries.factorDaily(L.m, false, todayRange.from, todayRange.to)));
+        d.buyDay = HomeRange.aggregateDay(purchaseDaily, todayRange.to);
+        d.inDay = liveL(token, L, d.notes, "دریافت امروز", () -> Repo.one(L.c, MoneyQueries.darDay(L.m, 0, todayRange.to)));
+        d.outDay = liveL(token, L, d.notes, "پرداخت امروز", () -> Repo.one(L.c, MoneyQueries.darDay(L.m, 1, todayRange.to)));
         d.overdue = liveL(token, L, d.notes, "معوق‌ها", () -> Repo.exec(L.c, Queries.overdueInvoices(L.m, 5)));
         String stFrom = Jalali.addDays(to, -29);
         Filter rf = new Filter();
@@ -615,10 +619,10 @@ public class HomeScreen extends Screen {
                 String v = part.substring(eq + 1);
                 if ("ts".equals(k)) tsOut[0] = unesc(v);
                 else if ("sd".equals(k)) d.snapshotDay = unesc(v);
-                else if ("sales".equals(k)) { d.salesDay = rowFrom(v); any = true; }
-                else if ("buy".equals(k)) { d.buyDay = rowFrom(v); any = true; }
-                else if ("in".equals(k)) { d.inDay = rowFrom(v); any = true; }
-                else if ("out".equals(k)) { d.outDay = rowFrom(v); any = true; }
+                else if ("sales".equals(k)) { d.salesDay = v.isEmpty() ? null : rowFrom(v); any = true; }
+                else if ("buy".equals(k)) { d.buyDay = v.isEmpty() ? null : rowFrom(v); any = true; }
+                else if ("in".equals(k)) { d.inDay = v.isEmpty() ? null : rowFrom(v); any = true; }
+                else if ("out".equals(k)) { d.outDay = v.isEmpty() ? null : rowFrom(v); any = true; }
                 else if ("trendok".equals(k)) d.salesTrendAvailable = "1".equals(v);
                 else if ("trendfrom".equals(k)) d.salesHistoryFrom = Jalali.disp(unesc(v));
                 else if (k.matches("top[0-4]")) { d.topItems.add(rowFrom(v)); any = true; }
@@ -1319,15 +1323,15 @@ public class HomeScreen extends Screen {
 
     private void secKpis(LinearLayout content, Data d) {
         LinearLayout card = a.kit.card(Theme.GOLD);
-        // The section names the day its tiles describe — «گردش دیروز» when yesterday is
-        // the latest day with documents, never a fixed «امروز» above «دیروز» tiles.
+        // Every daily KPI uses the same explicit HomeRange.today() date; do not label
+        // one metric with its own latest-transaction day while comparing another date.
         String kpiDay = dayOf(d.salesDay != null ? d.salesDay : d.inDay);
         card.addView(dashboardSectionHead(kpiDay.isEmpty() ? "گردش روز" : "گردش " + kpiDay,
                 R.drawable.mi_account_balance_wallet,
                 Theme.GOLD, "فروش ›", navAction("sales")), a.kit.lp(-1, -2));
         card.addView(a.kit.text(isSalesManager()
-                        ? "فروش روز و روند آن؛ لمس شاخص، ریز همان روز را باز می‌کند."
-                        : "چهار شاخص اصلی؛ لمس هر کارت، ریز همان روز را باز می‌کند.",
+                        ? "فروش امروز تا پایان شب ناقص است؛ لمس شاخص، ریز همان روز را باز می‌کند."
+                        : "چهار شاخص مالی امروز؛ فروش روز جاری تا ساعت ۲۴ کامل نمی‌شود.",
                 10.5f, Theme.MUTED, false), a.kit.lp(-1, -2));
         card.addView(a.kit.gap(8));
 
@@ -1349,7 +1353,8 @@ public class HomeScreen extends Screen {
                     tileCountKeys[i], tileCountLabels[i], Theme.GOLD);
             kpi.icon = icons[i];
             kpi.emeraldIcon = true;
-            kpi.subColor = Theme.SUCCESS;
+            // Document counts are informational; an in-progress day is not a success state.
+            kpi.subColor = Theme.MUTED;
             tiles.add(kpi);
         }
         if (!tiles.isEmpty()) card.addView(a.kit.kpiGrid(tiles, 2), a.kit.lp(-1, -2));
@@ -1363,7 +1368,10 @@ public class HomeScreen extends Screen {
             SalesComparison.DayResult dayComparison = SalesComparison.evaluate(d.salesSnapshot, compareDay,
                     elapsedMinute, SalesComparison.DEFAULT_COMPARABLE_WEEKS);
             double todaySales = dayComparison.actualRials;
-            double yesterday = salesOnDay(d, Jalali.addDays(compareDay, -1));
+            HomeRange yesterdayRange = HomeRange.yesterday(compareDay);
+            HomeRange last7Range = HomeRange.last7Days(compareDay);
+            double yesterday = salesOnDay(d, yesterdayRange.to);
+            double last7Sales = d.salesSnapshot.salesRialsBetween(last7Range.from, last7Range.to);
             double avg30 = averageSalesBefore(d, compareDay, 30);
             String weekday = Jalali.weekday(compareDay);
             LinearLayout compare = a.kit.card(Theme.GOLD);
@@ -1376,6 +1384,8 @@ public class HomeScreen extends Screen {
             cmp.add(new Mini(R.drawable.mi_point_of_sale, snapshotLabel(d),
                     Money.compactRial(todaySales), todayNote, Theme.TEXT));
             cmp.add(new Mini(R.drawable.mi_calendar_month, "دیروز", Money.compactRial(yesterday), null, Theme.TEXT));
+            cmp.add(new Mini(R.drawable.mi_bar_chart, "فروش ۷ روز اخیر", Money.compactRial(last7Sales),
+                    running ? "روز جاری ناقص است" : null, Theme.TEXT));
             cmp.add(new Mini(R.drawable.mi_bar_chart, "میانگین ۳۰ روز", Money.compactRial(avg30), null, Theme.TEXT));
             cmp.add(new Mini(R.drawable.mi_refresh, "میانگین ۴ " + weekday + " گذشته",
                     Money.compactRial(dayComparison.sameWeekdayAverageRials), "روزهای هم‌هفته", Theme.TEXT));
@@ -1687,8 +1697,10 @@ public class HomeScreen extends Screen {
         String day = dayOf(row);
         String label = day.isEmpty() ? title : title + " " + day;
         if (row == null) {
-            // No row for this day yet: a neutral dash, never an error-looking placeholder.
-            return new Kit.Kpi(label, "—", "هنوز ثبت نشده", accent);
+            // The explicit-day aggregate failed or is unavailable; never present it as a zero.
+            Kit.Kpi unavailable = new Kit.Kpi(label, "—", "داده در دسترس نیست", accent);
+            unavailable.subColor = Theme.MUTED;
+            return unavailable;
         }
         return new Kit.Kpi(label, Money.compactRial(row.d("total")),
                 Money.fa(String.valueOf(row.l(countKey))) + " " + countLabel, accent,

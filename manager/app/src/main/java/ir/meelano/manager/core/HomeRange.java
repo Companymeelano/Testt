@@ -1,5 +1,9 @@
 package ir.meelano.manager.core;
 
+import ir.meelano.manager.data.Row;
+
+import java.util.List;
+
 /**
  * The Home's calendar windows. All ranges are inclusive Jalali dates, use the phone's
  * local calendar, and are shared by the KPI, trend and month-comparison calculations.
@@ -66,7 +70,26 @@ public final class HomeRange {
         return previous.from.compareTo(fourteenDayStart) < 0 ? previous.from : fourteenDayStart;
     }
 
-    public static int calendarDays() {
+    /** Aggregate a successful per-day query after normalizing Jalali/Gregorian row dates. */
+    public static Row aggregateDay(List<Row> dailyRows, String date) {
+        String target = Jalali.disp(date);
+        if (dailyRows == null || target.isEmpty()) return null;
+        double total = 0;
+        long documents = 0;
+        for (Row row : dailyRows) {
+            if (row == null || !target.equals(Jalali.disp(row.s("day")))) continue;
+            total += row.d("total");
+            documents += row.l("docs");
+        }
+        Row result = new Row();
+        result.put("d", target);
+        result.put("day", target);
+        result.put("total", total);
+        result.put("docs", documents);
+        return result;
+    }
+
+    public int calendarDays() {
         int start = Jalali.parse(from);
         int end = Jalali.parse(to);
         return start < 0 || end < start ? 0 : end - start + 1;

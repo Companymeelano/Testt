@@ -114,6 +114,27 @@ public class AtiranSampleSchemaTest {
         assertTrue(sql, sql.contains("reopoint"));
     }
 
+    @Test public void homeDailyKpisUseOneExplicitJalaliDayForPurchasesReceiptsAndPayments() throws Exception {
+        Meta meta = new Meta(connection(loadManifest()));
+        String day = "1405/07/22";
+
+        Queries.Q purchases = Queries.factorDaily(meta, false, day, day);
+        Queries.Q receipts = MoneyQueries.darDay(meta, 0, day);
+        Queries.Q payments = MoneyQueries.darDay(meta, 1, day);
+
+        assertTrue(purchases.binds.contains(day));
+        assertTrue(purchases.binds.contains(Jalali.toGregorian(day)));
+        assertEquals(Integer.valueOf(0), receipts.binds.get(0));
+        assertEquals(day, receipts.binds.get(1));
+        assertEquals(Jalali.toGregorian(day), receipts.binds.get(2));
+        assertEquals(Integer.valueOf(1), payments.binds.get(0));
+        assertEquals(day, payments.binds.get(1));
+        assertEquals(Jalali.toGregorian(day), payments.binds.get(2));
+        assertTrue(receipts.sql.toLowerCase(Locale.ROOT).startsWith("select "));
+        assertFalse(receipts.sql.toLowerCase(Locale.ROOT).contains("select max("));
+        assertFalse(payments.sql.toLowerCase(Locale.ROOT).contains("select max("));
+    }
+
     @Test public void productListAndCountShareNormalizedReadOnlyFiltersAndExactPaging() throws Exception {
         Meta meta = new Meta(connection(loadManifest()));
         Filter filter = new Filter();

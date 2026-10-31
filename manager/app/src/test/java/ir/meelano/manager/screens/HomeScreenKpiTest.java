@@ -15,7 +15,7 @@ public class HomeScreenKpiTest {
 
         assertEquals("دریافت", kpi.label);
         assertEquals("—", kpi.value);
-        assertEquals("هنوز ثبت نشده", kpi.sub);
+        assertEquals("داده در دسترس نیست", kpi.sub);
         assertNull(kpi.action);
     }
 }

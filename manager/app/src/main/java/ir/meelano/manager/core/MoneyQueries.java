@@ -173,7 +173,6 @@ public final class MoneyQueries {
     /** Day block anchored on latest dar.date for p: d,total,cash,pos,havaleh,cheque,count. */
     public static Queries.Q darDay(Meta m, int p) throws Queries.Missing {
         Dar d = darCols(m);
-        Set<String> cols = m.columns("dar");
         String day = "";
         try (java.sql.PreparedStatement ps = m.connection().prepareStatement(
                 "SELECT MAX(LEFT(TRY_CONVERT(nvarchar(30),[" + d.date + "]),10)) FROM dbo.dar WHERE [p]=?")) {
@@ -182,12 +181,35 @@ public final class MoneyQueries {
                 if (r.next() && r.getString(1) != null) day = r.getString(1).trim();
             }
         } catch (Exception ignored) { Diag.ignored("MoneyQueries:184", ignored); }
+        return darDayAt(m, p, day, false);
+    }
+
+    /** Home variant: the requested day is explicit, so all dashboard KPIs share one date. */
+    public static Queries.Q darDay(Meta m, int p, String requestedDay) throws Queries.Missing {
+        String day = Jalali.disp(requestedDay);
+        if (day.isEmpty()) throw new Queries.Missing("تاریخ دریافت یا پرداخت معتبر نیست");
+        return darDayAt(m, p, day, true);
+    }
+
+    private static Queries.Q darDayAt(Meta m, int p, String day, boolean matchGregorian) throws Queries.Missing {
+        Dar d = darCols(m);
+        Set<String> cols = m.columns("dar");
         DarParts parts = darParts(m, d, "h", p);
         List<Object> binds = new ArrayList<>();
         binds.add(p);
-        binds.add(day);
+        String date = Sql.date10("h", d.date);
+        String dateWhere;
+        if (matchGregorian) {
+            String gregorian = Jalali.toGregorian(day);
+            binds.add(day);
+            binds.add(gregorian);
+            dateWhere = "(" + Sql.dateKey(date) + "=? OR " + date + "=?)";
+        } else {
+            binds.add(day);
+            dateWhere = Sql.dateKey(date) + "=?";
+        }
         String rows = darRows(d, m, parts, cols,
-                "h.[p]=? AND " + Sql.dateKey(Sql.date10("h", d.date)) + "=?");
+                "h.[p]=? AND " + dateWhere);
         String sql = "SELECT " + Sql.lit(day) + " AS d, ISNULL(SUM(x.tot),0) AS total"
                 + ", ISNULL(SUM(x.cash),0) AS cash"
                 + ", ISNULL(SUM(x.pos),0) AS pos"

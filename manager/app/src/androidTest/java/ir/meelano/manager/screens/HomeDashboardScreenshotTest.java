@@ -7,6 +7,7 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.os.SystemClock;
 import android.view.View;
 import android.view.ViewGroup;
@@ -81,8 +82,16 @@ public final class HomeDashboardScreenshotTest {
         // Let the intro transition finish before recording the first viewport.
         SystemClock.sleep(500L);
         InstrumentationRegistry.getInstrumentation().waitForIdleSync();
-        Bitmap screenshot = InstrumentationRegistry.getInstrumentation().getUiAutomation().takeScreenshot();
-        assertNotNull("Android UI screenshot was empty", screenshot);
+        final Bitmap[] captured = {null};
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> {
+            View decor = activity.getWindow().getDecorView();
+            if (decor.getWidth() <= 0 || decor.getHeight() <= 0) return;
+            Bitmap bitmap = Bitmap.createBitmap(decor.getWidth(), decor.getHeight(), Bitmap.Config.ARGB_8888);
+            decor.draw(new Canvas(bitmap));
+            captured[0] = bitmap;
+        });
+        Bitmap screenshot = captured[0];
+        assertNotNull("Home activity could not render a screenshot", screenshot);
         File directory = new File(target.getFilesDir(), "home-dashboard-screenshots");
         if (!directory.exists() && !directory.mkdirs()) throw new IllegalStateException("Cannot create screenshot directory");
         File output = new File(directory, filename);

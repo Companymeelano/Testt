@@ -386,11 +386,6 @@ public final class Theme {
         return Color.luminance(background) >= 0.195f;
     }
 
-    /** Foreground for the selected navigation capsule (neutral in light mode). */
-    public static int selectedNavInk() {
-        return light ? GOLD : onAccent(GOLD);
-    }
-
     public static int dp(float v) {
         return Math.round(v * density);
     }
@@ -565,35 +560,37 @@ public final class Theme {
         return hero;
     }
 
-    /** Selected destination on the premium bottom navigation rail. */
+    /** Accent shared by the dock; the preserved Nuts skin keeps its gold identity. */
+    public static int bottomNavAccent() { return nuts ? GOLD : PRIMARY; }
+
+    /** Contrast-safe foreground for the active dock item on its exact tinted surface. */
+    public static int selectedNavInk() {
+        int accent = bottomNavAccent();
+        int surface = DesignTokens.surfaceTint(accent, !light);
+        int target = light ? 0xFF000000 : 0xFFFFFFFF;
+        int ink = accent;
+        for (int i = 0; i < 24 && DesignTokens.contrastRatio(ink, surface) < 4.8; i++)
+            ink = DesignTokens.mix(ink, target, 0.08f);
+        return ink;
+    }
+
+    /** Selected destination: a flat seven-percent accent wash with a one-dp hairline. */
     public static GradientDrawable bottomNavSelected() {
-        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{alpha(GOLD, light ? 70 : 28), alpha(GOLD, light ? 40 : 12)});
-        d.setCornerRadius(dp(20));
-        d.setStroke(dp(1), alpha(GOLD, light ? 170 : 90));
-        return d;
+        int accent = bottomNavAccent();
+        return base(DesignTokens.surfaceTint(accent, !light), 20, dp(1),
+                alpha(accent, light ? 96 : 112));
     }
 
-    /** Active icon capsule in the bottom navigation. */
+    /** Quiet active icon capsule; the icon itself uses the contrast-safe dock foreground. */
     public static GradientDrawable bottomNavIconSelected() {
-        // Ivory Royal uses a neutral champagne capsule with the accent itself as
-        // the foreground; Midnight Gold uses a luminous accent capsule and ink.
-        // Three-stop gold: champagne highlight → accent → deep shade, with a bright rim.
-        int[] colors = light
-                ? new int[]{shade(SURFACE2, 0.05f), SURFACE2, shade(SURFACE2, -0.03f)}
-                : new int[]{shade(GOLD, 0.22f), GOLD, shade(GOLD, -0.2f)};
-        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR, colors);
-        d.setCornerRadius(dp(22));
-        d.setStroke(dp(1), alpha(0xFFFFFFFF, light ? 110 : 120));
-        return d;
+        int accent = bottomNavAccent();
+        return base(DesignTokens.surfaceTint(accent, !light), 999, dp(1),
+                alpha(accent, light ? 76 : 96));
     }
 
-    /** Small active marker under each bottom-nav label. */
+    /** Small, solid accent marker under the selected bottom-nav label. */
     public static GradientDrawable bottomNavMarker() {
-        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
-                new int[]{shade(GOLD, -0.08f), GOLD, shade(GOLD, 0.20f)});
-        d.setCornerRadius(dp(99));
-        return d;
+        return base(bottomNavAccent(), 999, 0, 0);
     }
 
     /** Flat KPI surface with a restrained section tint and hairline. */
@@ -733,22 +730,18 @@ public final class Theme {
         return d;
     }
 
-    /** Nut theme: a floating ivory dock with a gold hairline, like the reference bottom bar. */
+    /** Nuts keeps its ivory dock and gold outline while sharing the same low-noise surfaces. */
     public static GradientDrawable navDock() {
-        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{0xFFFFFFFF, 0xFFF4ECD6});
-        d.setCornerRadius(dp(28));
-        d.setStroke(dp(1), 0xFFC9A24A);
-        return d;
+        return base(SURFACE, 24, dp(1), alpha(bottomNavAccent(), 112));
     }
 
+    /** Flat app dock with a rounded upper edge and a restrained, one-dp section hairline. */
     public static GradientDrawable bottomBar() {
-        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                light ? new int[]{0xFFFFFFFF, 0xFFF4ECD6} : new int[]{0xFF0E121A, 0xFF07090E});
-        // Rounded top edge with a gold hairline: the bar reads as a floating luxury dock.
+        GradientDrawable d = new GradientDrawable();
+        d.setColor(SURFACE);
         float r = dp(22);
         d.setCornerRadii(new float[]{r, r, r, r, 0, 0, 0, 0});
-        d.setStroke(dp(1), alpha(GOLD, light ? 140 : 120));
+        d.setStroke(dp(1), alpha(bottomNavAccent(), light ? 72 : 64));
         return d;
     }
 

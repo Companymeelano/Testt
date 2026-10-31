@@ -129,7 +129,6 @@ public class MainActivity extends Activity {
     private TextView licChip;
     /** The back control of the tab bar (a gold disc), not a button floating over the content. */
     private LinearLayout backCell;
-    private TextView backLabel;
     private TextView companyName;
     private android.widget.FrameLayout logoBox;
     private android.widget.ImageView logoImg;
@@ -769,8 +768,8 @@ public class MainActivity extends Activity {
         root.addView(productStickyWrap, kit.lp(-1, -2));
         refreshLicChip();
 
-        // Center the content on wide screens. The scroll viewport uses only the remaining space
-        // above the sibling dock; decor fitting handles system bars, so don't add a duplicate inset.
+        // Center the content on wide screens. The sibling dock stays inside the system-safe
+        // app window; decor fitting supplies navigation-bar insets, so adding them here would double them.
         scroll = new PullToRefreshScrollView(this);
         scroll.setOnRefreshListener(() -> {
             if ("home".equals(currentId)) renderCurrent();
@@ -784,24 +783,29 @@ public class MainActivity extends Activity {
         content = newPage();
         root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1f));
 
-        // bottom bar
+        // Bottom dock: it is a sibling of the scroll viewport, never an overlay on page content.
+        // Decor fitting has already applied the system navigation/gesture inset to this app window.
         bottomBar = new LinearLayout(this);
         bottomBar.setOrientation(LinearLayout.HORIZONTAL);
         bottomBar.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        // Keep the nut-theme dock tactile, but reclaim about 14dp of dashboard height on phones.
-        int dockVPad = Theme.isNuts() ? 4 : 8;
-        bottomBar.setPadding(Theme.dp(6), Theme.dp(dockVPad), Theme.dp(6),
-                Theme.dp(Theme.isNuts() ? 4 : 10));
+        bottomBar.setMinimumHeight(Theme.dp(72));
+        bottomBar.setClipChildren(false);
+        bottomBar.setClipToPadding(false);
+        bottomBar.setPadding(Theme.dp(6), Theme.dp(4), Theme.dp(6), Theme.dp(4));
         bottomHost = new android.widget.FrameLayout(this);
         bottomHost.setBackground(Theme.isNuts() ? Theme.navDock() : Theme.bottomBar());
+        bottomHost.setClipChildren(false);
+        bottomHost.setClipToPadding(false);
+        Theme.lift(bottomHost, Theme.dp(2));
         navCapsule = new View(this);
         navCapsule.setVisibility(View.GONE);
         navCapsule.setBackground(Theme.bottomNavSelected());
+        navCapsule.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         bottomHost.addView(navCapsule, new android.widget.FrameLayout.LayoutParams(Theme.dp(40), Theme.dp(40),
                 Gravity.TOP | Gravity.LEFT));
         bottomHost.addView(bottomBar, new android.widget.FrameLayout.LayoutParams(-1, -2));
         LinearLayout.LayoutParams hostLp = kit.lp(-1, -2);
-        if (Theme.isNuts()) hostLp.setMargins(Theme.dp(12), 0, Theme.dp(12), Theme.dp(6));
+        if (Theme.isNuts()) hostLp.setMargins(Theme.dp(10), 0, Theme.dp(10), Theme.dp(6));
         root.addView(bottomHost, hostLp);
 
         setContentView(root);
@@ -861,7 +865,7 @@ public class MainActivity extends Activity {
             ir.meelano.manager.core.LicenseStore.setTourPending(this, false);
         } catch (Exception ignored) { Diag.ignored("MainActivity:677", ignored); }
         Notify.boot(this);
-        syncBackFab();
+        syncBackControl();
         watchLink();
     }
 
@@ -943,16 +947,21 @@ public class MainActivity extends Activity {
         }
         if (ids.isEmpty()) ids.add("home");
         tabs = ids.toArray(new String[0]);
+        int availableWidthDp = getResources().getDisplayMetrics().widthPixels * 160
+                / getResources().getDisplayMetrics().densityDpi;
+        boolean compactDock = availableWidthDp < (12 + 52 + tabs.length * 48);
         for (final String id : tabs) {
             final Screen s = screens.get(id);
             if (s == null) continue;
             LinearLayout b = kit.v();
             b.setGravity(Gravity.CENTER);
-            b.setMinimumHeight(Theme.dp(64)); // Preserve a comfortable tap target in every skin.
-            b.setPadding(Theme.dp(2), Theme.dp(Theme.isNuts() ? 2 : 4),
-                    Theme.dp(2), Theme.dp(2));
+            b.setMinimumWidth(Theme.dp(48));
+            b.setMinimumHeight(Theme.dp(64)); // Every destination remains a 48dp+ touch target.
+            b.setPadding(Theme.dp(2), Theme.dp(3), Theme.dp(2), Theme.dp(3));
+            b.setClipChildren(false);
             LinearLayout badge = new LinearLayout(this);
             badge.setGravity(Gravity.CENTER);
+            badge.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
             int iconRes = MeelanoIcons.iconFor(s.glyph());
             // Navigation uses the same 24dp line icon family in every skin.
             if (iconRes != 0) {
@@ -967,7 +976,8 @@ public class MainActivity extends Activity {
             b.addView(badge, new LinearLayout.LayoutParams(Theme.dp(46), Theme.dp(Theme.isNuts() ? 44 : 36)));
             String tl = RoleStore.tabLabel(id);
             if ("more".equals(id) && RoleStore.VISITOR.equals(effRole())) tl = "بیشتر";
-            TextView l = kit.text(tl != null ? tl : s.title(), Theme.isNuts() ? 11f : 10.5f, Theme.MUTED, true);
+            TextView l = kit.text(tl != null ? tl : s.title(), Theme.isNuts() ? 11.5f : 11f,
+                    Theme.MUTED, true);
             l.setGravity(Gravity.CENTER);
             l.setSingleLine(true);
             l.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -985,26 +995,28 @@ public class MainActivity extends Activity {
             b.setOnClickListener(v -> nav(id));
             bottomBar.addView(b, kit.wlp(1f));
         }
-        // The back control lives in the tab bar, so it never covers the rows it points at.
-        // It sits at the start of the row, where the back arrow belongs in a Persian layout.
+        // Separate utility action (not a sixth destination) keeps in-app back one tap away.
         LinearLayout back = kit.v();
         back.setGravity(Gravity.CENTER);
         back.setTag(BACK_CELL_TAG);
+        // On narrow screens, reserve 48dp for each destination and leave Back to Android's
+        // system gesture/key rather than shrinking the role-specific targets.
+        if (compactDock) back.setVisibility(View.GONE);
+        back.setMinimumWidth(Theme.dp(48));
+        back.setMinimumHeight(Theme.dp(64));
         back.setContentDescription("بازگشت به صفحه قبلی");
-        final int backInk = Theme.onAccent(Theme.GOLD);
-        android.graphics.drawable.GradientDrawable backDisc = new android.graphics.drawable.GradientDrawable(
-                android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
-                new int[]{Theme.GOLD_SOFT, Theme.GOLD});
-        backDisc.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-        backDisc.setStroke(Theme.dp(1), Theme.alpha(backInk, 60));
-        TextView backArrow = kit.text("\u2192", 19f, backInk, true);
-        backArrow.setGravity(Gravity.CENTER);
-        backArrow.setBackground(backDisc);
-        backArrow.setContentDescription("بازگشت به صفحه قبلی");
-        Theme.pressable(backArrow);
-        backArrow.setOnClickListener(v -> goBack());
-        back.addView(backArrow, kit.lp(Theme.dp(38), Theme.dp(38)));
-        bottomBar.addView(back, 0, kit.lp(Theme.dp(50), -2));
+        android.widget.FrameLayout backSurface = new android.widget.FrameLayout(this);
+        backSurface.setBackground(Theme.bottomNavIconSelected());
+        backSurface.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        android.widget.ImageView backArrow = kit.icon(R.drawable.mi_arrow_forward,
+                Theme.selectedNavInk(), 24);
+        backArrow.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        backSurface.addView(backArrow, new android.widget.FrameLayout.LayoutParams(
+                Theme.dp(48), Theme.dp(48), Gravity.CENTER));
+        back.addView(backSurface, new LinearLayout.LayoutParams(Theme.dp(48), Theme.dp(48)));
+        Theme.pressable(back);
+        back.setOnClickListener(v -> goBack());
+        bottomBar.addView(back, 0, kit.lp(Theme.dp(52), -1));
         backCell = back;
         paintBottom();
         updateBackControl();
@@ -1034,10 +1046,12 @@ public class MainActivity extends Activity {
             navCapsule.setLayoutParams(lp);
             float x = tab.getLeft() + Theme.dp(4);
             navCapsule.setVisibility(View.VISIBLE);
-            if (animate) {
-                navCapsule.animate().translationX(x).setDuration(280)
+            if (animate && ir.meelano.manager.ui.Ui.motionOk(this)) {
+                navCapsule.animate().cancel();
+                navCapsule.animate().translationX(x).setDuration(220)
                         .setInterpolator(new android.view.animation.DecelerateInterpolator()).start();
             } else {
+                navCapsule.animate().cancel();
                 navCapsule.setTranslationX(x);
             }
         };
@@ -1055,18 +1069,6 @@ public class MainActivity extends Activity {
                     || ("more".equals(tabs[tabIndex]) && !isTab(currentId)));
             LinearLayout badge = (LinearLayout) b.getChildAt(0);
             badge.setBackground(on ? Theme.bottomNavIconSelected() : null);
-            // Gold underline under the selected tab (the marker was never shown before).
-            View under = b.getChildCount() > 2 ? b.getChildAt(2) : null;
-            if (under != null) {
-                under.setVisibility(on ? View.VISIBLE : View.INVISIBLE);
-                under.setBackground(Theme.pill(Theme.GOLD));
-            }
-            // Gold halo under the selected capsule (API 28+ coloured shadow; older devices keep the rim).
-            if (android.os.Build.VERSION.SDK_INT >= 28) {
-                badge.setElevation(on ? Theme.dp(6) : 0f);
-                badge.setOutlineSpotShadowColor(Theme.GOLD);
-                badge.setOutlineAmbientShadowColor(Theme.GOLD);
-            }
             View symbol = badge.getChildAt(0);
             if (symbol instanceof android.widget.ImageView) {
                 if (!Boolean.TRUE.equals(symbol.getTag()))
@@ -1075,16 +1077,14 @@ public class MainActivity extends Activity {
                 ((TextView) symbol).setTextColor(on ? Theme.selectedNavInk() : Theme.MUTED);
             }
             TextView label = (TextView) b.getChildAt(1);
-            label.setTextColor(on ? Theme.GOLD_SOFT : Theme.MUTED);
-            label.setTextSize(on ? 11f : 10.5f);
-            b.getChildAt(2).setVisibility(on ? View.VISIBLE : View.INVISIBLE);
-            b.getChildAt(2).setBackground(on ? Theme.bottomNavMarker() : null);
-            b.setBackground(null); // the sliding capsule marks the selected tab instead
+            label.setTextColor(on ? Theme.selectedNavInk() : Theme.MUTED);
+            label.setTextSize((on ? 11.5f : 11f) * Theme.fontScale());
+            View marker = b.getChildAt(2);
+            marker.setVisibility(on ? View.VISIBLE : View.INVISIBLE);
+            marker.setBackground(on ? Theme.bottomNavMarker() : null);
             if (on) selectedNavIndex = i;
             b.setSelected(on);
-            b.setElevation(on ? Theme.dp(2) : 0f);
             b.setContentDescription(label.getText() + (on ? "، بخش فعال" : "، رفتن به بخش"));
-            Theme.pressable(b); // Re-wrap the selected-state background with touch feedback.
             tabIndex++;
         }
         moveCapsule(true);
@@ -1432,21 +1432,12 @@ public class MainActivity extends Activity {
         setBrandHeaderCollapsed(false);
     }
 
-    /** Repaint bottom bar + back control (screens call this after internal state changes). */
+    /** Repaint bottom bar and back utility after a page or role-state change. */
     public void refreshChrome() {
         Screen s = screens.get(currentId);
         if (s == null) return;
         paintBottom();
         updateBackControl();
-        updateBackLabel();
-    }
-
-    /** The back capsule names the screen it will actually return to. */
-    private void updateBackLabel() {
-        if (backLabel == null) return;
-        String target = history.isEmpty() ? "home" : history.get(history.size() - 1);
-        Screen t = screens.get(target);
-        backLabel.setText(t == null ? "بازگشت" : "بازگشت به «" + t.title() + "»");
     }
 
     public void openFilter() {
@@ -1467,7 +1458,7 @@ public class MainActivity extends Activity {
         }
     }
 
-    /** Shared back logic for the system back key and the golden back FAB. */
+    /** Shared back logic for the system back gesture and the dock's separate back utility. */
     public void goBack() {
         Screen s = screens.get(currentId);
         if (s != null && s.onBack()) return;
@@ -1478,32 +1469,16 @@ public class MainActivity extends Activity {
         } else nav("home");
     }
 
-    /**
-     * The single back control for every screen: a gold disc with a round arrow, docked in the
-     * tab bar next to the sections. It used to float above the scrolling content, where it
-     * covered the very rows it points at - on the visitor grid that was the text of a section.
-     * In the bar it always sits in the same place and never hides anything.
-     */
-    private void syncBackFab() {
-        backLabel = null;
-        updateBackControl();
-        updateBackLabel();
-    }
+    /** Reconcile the dock's back utility with the current page after shell construction. */
+    private void syncBackControl() { updateBackControl(); }
 
-    /**
-     * The back control of the tab bar: bright when there is a page to return to, dimmed on the
-     * first page. The cell always keeps its place, so the sections never jump while navigating.
-     */
+    /** Keep the separate back utility visible, clear, and genuinely disabled at the root page. */
     private void updateBackControl() {
         if (backCell == null) return;
-        // On the home page there is nothing to go back to. The arrow is hidden there instead of
-        // dimmed: a half-faded disc reads as a broken button, and the cell keeps its place so
-        // the tabs never jump while the user walks through the sections.
-        boolean can = !"home".equals(currentId);
-        backCell.setAlpha(can ? 1f : 0f);
-        backCell.setContentDescription(can ? "بازگشت به صفحه قبلی" : "خانه");
-        android.view.View arrow = backCell.getChildCount() > 0 ? backCell.getChildAt(0) : null;
-        if (arrow != null) arrow.setContentDescription(backCell.getContentDescription());
+        boolean can = !history.isEmpty() || !"home".equals(currentId);
+        backCell.setEnabled(can);
+        backCell.setAlpha(can ? 1f : 0.48f);
+        backCell.setContentDescription(can ? "بازگشت به صفحه قبلی" : "صفحه اصلی؛ بازگشتی وجود ندارد");
     }
 
     // ================= Persian voice search =================

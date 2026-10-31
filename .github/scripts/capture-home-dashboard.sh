@@ -29,6 +29,40 @@ if [ "$result" -ne 0 ]; then
     safe_line="$(printf '%s' "$line" | sed 's/%/%25/g; s/:/%3A/g')"
     echo "::error title=Screenshot instrumentation diagnostics::$safe_line"
   done <<< "$diagnostics"
+
+  python3 - <<'PY' > "$RUNNER_TEMP/home-screenshot-test-failures.txt"
+from pathlib import Path
+from xml.etree import ElementTree
+
+reports = [p for p in Path("app/build").rglob("TEST-*.xml")
+           if "androidTest-results" in str(p) or "connected" in p.parts]
+failures = []
+for report in reports:
+    try:
+        root = ElementTree.parse(report).getroot()
+    except Exception as error:
+        failures.append(f"Could not parse {report}: {error}")
+        continue
+    for case in root.iter("testcase"):
+        for kind in ("failure", "error"):
+            result = case.find(kind)
+            if result is None:
+                continue
+            name = f"{case.get('classname', '')}.{case.get('name', '')}"
+            failures.append(f"{name}: {result.get('message', '')}")
+            detail = (result.text or "").strip()
+            if detail:
+                failures.append(detail[:2500])
+            break
+if not failures:
+    failures.append("No failing Android instrumentation XML report was found.")
+print("\n".join(failures)[:8000])
+PY
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    safe_line="$(printf '%s' "$line" | sed 's/%/%25/g; s/:/%3A/g')"
+    echo "::error title=Screenshot test report::$safe_line"
+  done < "$RUNNER_TEMP/home-screenshot-test-failures.txt"
   exit 1
 fi
 

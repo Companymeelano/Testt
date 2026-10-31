@@ -1,0 +1,5 @@
+MEELANO License Seller v1.9.1 (versionCode 11)
+Package: ir.meelano.admin.debug
+Build run: 41155921188
+Commit: be7d270
+SHA-256: 2d284c4b48971fc1c1374b3fcf33e6b5fa8cfa0b19ce1655d1f625d4b9629e39

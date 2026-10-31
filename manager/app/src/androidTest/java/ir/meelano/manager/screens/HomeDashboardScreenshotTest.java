@@ -1,8 +1,5 @@
 package ir.meelano.manager.screens;
 
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
@@ -12,8 +9,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
-import androidx.test.ext.junit.runners.AndroidJUnit4;
-import androidx.test.platform.app.InstrumentationRegistry;
+import android.test.InstrumentationTestCase;
 
 import ir.meelano.licensing.License;
 import ir.meelano.manager.MainActivity;
@@ -25,17 +21,13 @@ import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.RoleStore;
 import ir.meelano.manager.data.Settings;
 
-import org.junit.Test;
-import org.junit.runner.RunWith;
-
 import java.io.File;
 import java.io.FileOutputStream;
 
 /** Seed-only instrumentation preview used by CI to capture the real Views in Light and Dark. */
-@RunWith(AndroidJUnit4.class)
-public final class HomeDashboardScreenshotTest {
-    @Test public void captureHomeLightAndDark() throws Exception {
-        Context target = InstrumentationRegistry.getInstrumentation().getTargetContext();
+public final class HomeDashboardScreenshotTest extends InstrumentationTestCase {
+    public void testCaptureHomeLightAndDark() throws Exception {
+        Context target = getInstrumentation().getTargetContext();
         capture(target, "light", "home-dashboard-light.png");
         capture(target, "dark", "home-dashboard-dark.png");
     }
@@ -64,14 +56,14 @@ public final class HomeDashboardScreenshotTest {
 
         Intent launch = new Intent(target, MainActivity.class);
         launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        Activity activity = InstrumentationRegistry.getInstrumentation().startActivitySync(launch);
+        Activity activity = getInstrumentation().startActivitySync(launch);
         assertNotNull("Manager shell did not start", activity);
 
         String[] visibleText = {""};
         long deadline = SystemClock.uptimeMillis() + 20_000L;
         while (SystemClock.uptimeMillis() < deadline) {
-            InstrumentationRegistry.getInstrumentation().waitForIdleSync();
-            InstrumentationRegistry.getInstrumentation().runOnMainSync(() ->
+            getInstrumentation().waitForIdleSync();
+            getInstrumentation().runOnMainSync(() ->
                     collectText(activity.getWindow().getDecorView(), visibleText));
             if (visibleText[0].contains("شاخص‌های مالی")) break;
             SystemClock.sleep(250L);
@@ -80,8 +72,8 @@ public final class HomeDashboardScreenshotTest {
                 visibleText[0].contains("شاخص‌های مالی"));
         // Let the intro transition finish before recording the first viewport.
         SystemClock.sleep(500L);
-        InstrumentationRegistry.getInstrumentation().waitForIdleSync();
-        Bitmap screenshot = InstrumentationRegistry.getInstrumentation().getUiAutomation().takeScreenshot();
+        getInstrumentation().waitForIdleSync();
+        Bitmap screenshot = getInstrumentation().getUiAutomation().takeScreenshot();
         assertNotNull("Android UI screenshot was empty", screenshot);
         File directory = new File(target.getExternalFilesDir(null), "home-dashboard-screenshots");
         if (!directory.exists() && !directory.mkdirs()) throw new IllegalStateException("Cannot create screenshot directory");
@@ -92,7 +84,7 @@ public final class HomeDashboardScreenshotTest {
         } finally {
             screenshot.recycle();
         }
-        InstrumentationRegistry.getInstrumentation().runOnMainSync(activity::finish);
+        getInstrumentation().runOnMainSync(activity::finish);
         SystemClock.sleep(350L);
     }
 

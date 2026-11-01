@@ -286,15 +286,22 @@ public final class HomeDashboardScreenshotTest {
                 screenBounds[1] = location[1];
                 screenBounds[2] = target.getWidth();
                 screenBounds[3] = target.getHeight();
+                boolean windowFocused = target.getRootView().hasWindowFocus();
+                int[] inWindow = new int[2];
+                int[] rootOnScreen = new int[2];
+                target.getLocationInWindow(inWindow);
+                target.getRootView().getLocationOnScreen(rootOnScreen);
                 ready[0] = target.isShown() && target.isAttachedToWindow()
-                        && target.isEnabled() && target.isClickable()
+                        && target.isEnabled() && target.isClickable() && windowFocused
                         && hasVisibleBounds && visible.width() > 0 && visible.height() > 0
                         && target.getWidth() > 0 && target.getHeight() > 0;
                 details[0] = "tag=" + target.getTag() + ", screen=" + location[0] + "," + location[1]
                         + " " + target.getWidth() + "x" + target.getHeight()
+                        + ", window=" + inWindow[0] + "," + inWindow[1]
+                        + ", rootScreen=" + rootOnScreen[0] + "," + rootOnScreen[1]
                         + ", visible=" + visible.toShortString() + ", shown=" + target.isShown()
                         + ", attached=" + target.isAttachedToWindow() + ", enabled=" + target.isEnabled()
-                        + ", clickable=" + target.isClickable();
+                        + ", clickable=" + target.isClickable() + ", windowFocused=" + windowFocused;
             });
             if (ready[0]) break;
             SystemClock.sleep(50L);

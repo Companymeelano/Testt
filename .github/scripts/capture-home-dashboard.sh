@@ -136,6 +136,11 @@ for apk in "$app_apk" "$test_apk"; do
   cat "$install_log"
 done
 
+# The headless emulator may leave the Activity visible behind the lock screen. Wake and
+# dismiss the unprotected AVD keyguard so real touchscreen injection reaches the app window.
+adb shell input keyevent 224 >/dev/null 2>&1 || true
+adb shell wm dismiss-keyguard >/dev/null 2>&1 || true
+
 instrumentation_log="$(mktemp)"
 set +e
 adb shell am instrument -w -r ir.meelano.manager.debug.test/androidx.test.runner.AndroidJUnitRunner 2>&1 | tee "$instrumentation_log"

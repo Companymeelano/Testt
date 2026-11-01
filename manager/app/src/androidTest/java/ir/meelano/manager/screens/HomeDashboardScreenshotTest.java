@@ -7,6 +7,7 @@ import static org.junit.Assert.assertTrue;
 
 import android.app.Activity;
 import android.app.Instrumentation;
+import android.app.UiAutomation;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
@@ -204,7 +205,7 @@ public final class HomeDashboardScreenshotTest {
         List<AccessibilityNodeInfo> matches = null;
         long deadline = SystemClock.uptimeMillis() + 2_000L;
         do {
-            root = instrumentation.getUiAutomation().getRootInActiveWindow();
+            root = instrumentation.getUiAutomation(UiAutomation.FLAG_RETRIEVE_INTERACTIVE_WINDOWS).getRootInActiveWindow();
             if (root != null) {
                 matches = root.findAccessibilityNodeInfosByText(label);
                 if (!matches.isEmpty()) break;
@@ -316,7 +317,7 @@ public final class HomeDashboardScreenshotTest {
     private static String accessibilityWindows(Instrumentation instrumentation) {
         StringBuilder result = new StringBuilder();
         try {
-            for (AccessibilityWindowInfo window : instrumentation.getUiAutomation().getWindows()) {
+            for (AccessibilityWindowInfo window : instrumentation.getUiAutomation(UiAutomation.FLAG_RETRIEVE_INTERACTIVE_WINDOWS).getWindows()) {
                 Rect bounds = new Rect();
                 window.getBoundsInScreen(bounds);
                 AccessibilityNodeInfo root = window.getRoot();
@@ -373,7 +374,7 @@ public final class HomeDashboardScreenshotTest {
         event.setSource(InputDevice.SOURCE_TOUCHSCREEN);
         try {
             assertTrue("Could not inject touchscreen event",
-                    instrumentation.getUiAutomation().injectInputEvent(event, true));
+                    instrumentation.getUiAutomation(UiAutomation.FLAG_RETRIEVE_INTERACTIVE_WINDOWS).injectInputEvent(event, true));
         } finally {
             event.recycle();
         }

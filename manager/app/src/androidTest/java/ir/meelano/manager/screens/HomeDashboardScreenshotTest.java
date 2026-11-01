@@ -333,9 +333,6 @@ public final class HomeDashboardScreenshotTest {
         MotionEvent event = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(),
                 action, x, y, 0);
         event.setSource(InputDevice.SOURCE_TOUCHSCREEN);
-        if (android.os.Build.VERSION.SDK_INT >= 29)
-            event.setDisplayId(android.view.Display.DEFAULT_DISPLAY);
-        event.setToolType(0, MotionEvent.TOOL_TYPE_FINGER);
         try {
             assertTrue("Could not inject touchscreen event",
                     instrumentation.getUiAutomation().injectInputEvent(event, true));

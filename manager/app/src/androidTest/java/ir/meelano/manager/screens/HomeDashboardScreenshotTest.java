@@ -26,6 +26,8 @@ import android.widget.TextView;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry;
+import androidx.test.runner.lifecycle.Stage;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -44,6 +46,7 @@ import ir.meelano.manager.ui.Theme;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.util.Collection;
 import java.util.List;
 
 /** Seed-only instrumentation preview used by CI to capture the real Views in Light and Dark. */
@@ -80,24 +83,17 @@ public final class HomeDashboardScreenshotTest {
         AtiranAuth.saveSession(target, 1, "arena-preview", "مدیر نمونه", RoleStore.ADMIN, true, true);
 
         Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
-        Instrumentation.ActivityMonitor monitor = instrumentation.addMonitor(
-                MainActivity.class.getName(), null, false);
         ByteArrayOutputStream launchOutput = new ByteArrayOutputStream();
-        Activity activity;
-        try {
-            String command = "am start -W -n ir.meelano.manager.debug/ir.meelano.manager.MainActivity"
-                    + " -f 0x10008000 --ez ir.meelano.manager.HOME_SCREENSHOT_PREVIEW true";
-            ParcelFileDescriptor descriptor = uiAutomation(instrumentation).executeShellCommand(command);
-            try (ParcelFileDescriptor.AutoCloseInputStream stream =
-                         new ParcelFileDescriptor.AutoCloseInputStream(descriptor)) {
-                byte[] buffer = new byte[512];
-                int count;
-                while ((count = stream.read(buffer)) >= 0) launchOutput.write(buffer, 0, count);
-            }
-            activity = instrumentation.waitForMonitorWithTimeout(monitor, 20_000L);
-        } finally {
-            instrumentation.removeMonitor(monitor);
+        String command = "am start -W -n ir.meelano.manager.debug/ir.meelano.manager.MainActivity"
+                + " -f 0x10008000 --ez ir.meelano.manager.HOME_SCREENSHOT_PREVIEW true";
+        ParcelFileDescriptor descriptor = uiAutomation(instrumentation).executeShellCommand(command);
+        try (ParcelFileDescriptor.AutoCloseInputStream stream =
+                     new ParcelFileDescriptor.AutoCloseInputStream(descriptor)) {
+            byte[] buffer = new byte[512];
+            int count;
+            while ((count = stream.read(buffer)) >= 0) launchOutput.write(buffer, 0, count);
         }
+        Activity activity = waitForMainActivity(instrumentation, 20_000L);
         assertNotNull("Manager shell did not start: " + launchOutput.toString(), activity);
 
         String[] visibleText = {""};
@@ -137,6 +133,26 @@ public final class HomeDashboardScreenshotTest {
         }
         InstrumentationRegistry.getInstrumentation().runOnMainSync(activity::finish);
         SystemClock.sleep(350L);
+    }
+
+    private static Activity waitForMainActivity(Instrumentation instrumentation, long timeoutMs) {
+        Activity[] resumed = {null};
+        long deadline = SystemClock.uptimeMillis() + timeoutMs;
+        do {
+            instrumentation.runOnMainSync(() -> {
+                Collection<Activity> activities = ActivityLifecycleMonitorRegistry.getInstance()
+                        .getActivitiesInStage(Stage.RESUMED);
+                for (Activity candidate : activities) {
+                    if (candidate instanceof MainActivity) {
+                        resumed[0] = candidate;
+                        break;
+                    }
+                }
+            });
+            if (resumed[0] != null) return resumed[0];
+            SystemClock.sleep(50L);
+        } while (SystemClock.uptimeMillis() < deadline);
+        return null;
     }
 
     /** Exercise real pointer input, dock taps, and both transitions of the collapsible header. */

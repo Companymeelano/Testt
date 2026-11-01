@@ -13,6 +13,7 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Rect;
 import android.os.SystemClock;
+import android.view.InputDevice;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -256,7 +257,6 @@ public final class HomeDashboardScreenshotTest {
         return value[0];
     }
 
-    @SuppressWarnings("deprecation")
     private static void tap(Instrumentation instrumentation, View target) {
         float[] point = new float[2];
         instrumentation.runOnMainSync(() -> {
@@ -268,7 +268,6 @@ public final class HomeDashboardScreenshotTest {
         tapPoint(instrumentation, point[0], point[1]);
     }
 
-    @SuppressWarnings("deprecation")
     private static void tapPoint(Instrumentation instrumentation, float x, float y) {
         long downTime = SystemClock.uptimeMillis();
         injectPointer(instrumentation, downTime, MotionEvent.ACTION_DOWN, x, y);
@@ -277,7 +276,6 @@ public final class HomeDashboardScreenshotTest {
         SystemClock.sleep(120L);
     }
 
-    @SuppressWarnings("deprecation")
     private static void swipe(Instrumentation instrumentation, View target, boolean up) {
         float[] points = new float[4];
         instrumentation.runOnMainSync(() -> {
@@ -300,13 +298,14 @@ public final class HomeDashboardScreenshotTest {
         SystemClock.sleep(100L);
     }
 
-    @SuppressWarnings("deprecation")
     private static void injectPointer(Instrumentation instrumentation, long downTime,
                                       int action, float x, float y) {
         MotionEvent event = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(),
                 action, x, y, 0);
+        event.setSource(InputDevice.SOURCE_TOUCHSCREEN);
         try {
-            instrumentation.sendPointerSync(event);
+            assertTrue("Could not inject touchscreen event",
+                    instrumentation.getUiAutomation().injectInputEvent(event, true));
         } finally {
             event.recycle();
         }

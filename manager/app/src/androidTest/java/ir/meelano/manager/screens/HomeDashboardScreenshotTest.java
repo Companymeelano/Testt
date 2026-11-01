@@ -10,7 +10,7 @@ import android.app.Activity;
 import android.app.Instrumentation;
 import android.app.UiAutomation;
 import android.content.Context;
-import android.content.Intent;
+import android.os.ParcelFileDescriptor;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Rect;
@@ -41,6 +41,7 @@ import ir.meelano.manager.core.RoleStore;
 import ir.meelano.manager.data.Settings;
 import ir.meelano.manager.ui.Theme;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.util.List;
@@ -78,12 +79,26 @@ public final class HomeDashboardScreenshotTest {
         LicenseStore.setTourPending(target, false);
         AtiranAuth.saveSession(target, 1, "arena-preview", "مدیر نمونه", RoleStore.ADMIN, true, true);
 
-        Intent launch = new Intent(target, MainActivity.class);
-        launch.putExtra("ir.meelano.manager.HOME_SCREENSHOT_PREVIEW", true);
-        launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
-        Activity activity = instrumentation.startActivitySync(launch);
-        assertNotNull("Manager shell did not start", activity);
+        Instrumentation.ActivityMonitor monitor = instrumentation.addMonitor(
+                MainActivity.class.getName(), null, false);
+        ByteArrayOutputStream launchOutput = new ByteArrayOutputStream();
+        Activity activity;
+        try {
+            String command = "am start -W -n ir.meelano.manager.debug/ir.meelano.manager.MainActivity"
+                    + " -f 0x10008000 --ez ir.meelano.manager.HOME_SCREENSHOT_PREVIEW true";
+            ParcelFileDescriptor descriptor = uiAutomation(instrumentation).executeShellCommand(command);
+            try (ParcelFileDescriptor.AutoCloseInputStream stream =
+                         new ParcelFileDescriptor.AutoCloseInputStream(descriptor)) {
+                byte[] buffer = new byte[512];
+                int count;
+                while ((count = stream.read(buffer)) >= 0) launchOutput.write(buffer, 0, count);
+            }
+            activity = instrumentation.waitForMonitorWithTimeout(monitor, 20_000L);
+        } finally {
+            instrumentation.removeMonitor(monitor);
+        }
+        assertNotNull("Manager shell did not start: " + launchOutput.toString(), activity);
 
         String[] visibleText = {""};
         long deadline = SystemClock.uptimeMillis() + 20_000L;

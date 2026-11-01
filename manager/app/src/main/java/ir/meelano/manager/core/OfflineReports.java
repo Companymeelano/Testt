@@ -2,8 +2,8 @@ package ir.meelano.manager.core;
 
 import android.content.Context;
 
-import ir.meelano.manager.data.Atiran;
 import ir.meelano.manager.data.Meta;
+import ir.meelano.manager.data.NetRoute;
 import ir.meelano.manager.data.Repo;
 import ir.meelano.manager.data.Row;
 import ir.meelano.manager.data.Settings;
@@ -26,7 +26,8 @@ public final class OfflineReports {
     public static int refresh(Context app) throws Exception {
         Settings s = new Settings(app);
         int saved = 0;
-        try (Connection c = Atiran.open(s.effHost(), s.effPort(), s.effDb(), Backup.BACKUP_USER, Backup.BACKUP_PASS)) {
+        boolean bound = s.directConn() && NetRoute.bindDirect(app);
+        try (Connection c = SmartLink.open(app, s)) {
             Meta m = new Meta(c);
             String label = "بکاپ شبانه " + Jalali.faDate(Jalali.todayStr());
             for (ReportCatalog.Spec sp : ReportCatalog.ALL) {
@@ -43,7 +44,9 @@ public final class OfflineReports {
                     Diag.ignored("OfflineReports:" + sp.id, e);
                 }
             }
+            return saved;
+        } finally {
+            if (bound) NetRoute.unbind(app);
         }
-        return saved;
     }
 }

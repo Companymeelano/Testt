@@ -718,12 +718,12 @@ public final class ProductionScreen extends Screen {
     private <T> void runWriter(String wait,String failurePrefix,SqlRun<T> work,Done<T> done){
         a.kit.toast(wait);
         writer.execute(()->{
-            T result=null;String error=null;boolean direct=false;
+            T result=null;String error=null;boolean bound=false;
             try{
-                direct=a.settings.directConn();if(direct)ir.meelano.manager.data.NetRoute.bindDirect(a);
+                bound=a.settings.directConn()&&ir.meelano.manager.data.NetRoute.bindDirect(a);
                 try(Connection c=SmartLink.open(a,a.settings)){result=work.run(c);}
             }catch(Exception e){error=ir.meelano.manager.data.Atiran.diagnose(e);}
-            finally{if(direct)try{ir.meelano.manager.data.NetRoute.unbind(a);}catch(Exception ignored){Diag.ignored("ProductionScreen:writer",ignored);}}
+            finally{if(bound)try{ir.meelano.manager.data.NetRoute.unbind(a);}catch(Exception ignored){Diag.ignored("ProductionScreen:writer",ignored);}}
             T val=result;String err=error;
             a.runOnUiThread(()->{
                 if(err!=null){busy=false;render(content);a.kit.toast(failurePrefix+": "+err);}

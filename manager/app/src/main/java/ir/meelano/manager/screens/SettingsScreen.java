@@ -219,8 +219,10 @@ public class SettingsScreen extends Screen {
         String lm = a.settings.linkMode();
         c.addView(a.kit.chips(new String[]{"خودکار ✦", "فقط داخل شبکه", "فقط خارج شبکه"},
                 "lan".equals(lm) ? 1 : ("wan".equals(lm) ? 2 : 0), idx -> {
-                    a.settings.setLinkMode(idx == 1 ? "lan" : (idx == 2 ? "wan" : "auto"));
-                    a.kit.toast(idx == 0 ? "حالت خودکار فعال شد" : "حالت دستی فعال شد");
+                    boolean applied = a.settings.setLinkMode(idx == 1 ? "lan" : (idx == 2 ? "wan" : "auto"));
+                    a.kit.toast(!applied
+                            ? "آدرس این مسیر ثبت نشده؛ حالت خودکار فعال ماند"
+                            : (idx == 0 ? "حالت خودکار فعال شد" : "حالت دستی فعال شد"));
                     try {
                         a.checkConn();
                     } catch (Exception ignored) { Diag.ignored("SettingsScreen:188", ignored); }

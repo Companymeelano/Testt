@@ -1240,6 +1240,8 @@ public class LicenseActivity extends Activity {
             fPort.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
         } catch (Exception e) { Diag.ignored("LicenseActivity:portField", e); }
         c.addView(iconField(fPort, R.drawable.mi_my_location), kit.lp(-1, -2));
+        c.addView(kit.hint("اگر آی‌پی اختصاصی از پورت ۵۰۵۰ به ۱۴۳۳ فوروارد شده، پورت بیرونی ۵۰۵۰ را وارد کنید. اگر آدرس را به‌شکل IP:PORT می‌نویسید، پورت داخل آدرس اولویت دارد."),
+                kit.lp(-1, -2));
         if (editingConnection) {
             c.addView(kit.hint("برای اتصال به سرور دیگر، آدرس بالا را کامل جایگزین کنید؛ دیتابیس قبلی به‌صورت خودکار انتخاب نمی‌شود. پورت خالی = ۱۴۳۳؛ اگر روی آی‌پی اختصاصی پورت دیگری (مثل ۵۰۵۰) به ۱۴۳۳ فوروارد شده، همان را وارد کنید."), 
                     kit.lp(-1, -2));
@@ -1312,20 +1314,9 @@ public class LicenseActivity extends Activity {
         }
     }
 
-    /**
-     * Port for one manual connection: the port field wins; then a ":port"
-     * typed into the address itself (IP:5050); then the default 1433.
-     */
+    /** Port typed into the address wins, then the separate field, then the default 1433. */
     private static int resolvePort(String portText, String typedHost) {
-        String t = portText == null ? "" : portText.trim();
-        if (!t.isEmpty()) {
-            try {
-                int v = Integer.parseInt(ir.meelano.manager.core.Money.en(t).trim());
-                if (v >= 1 && v <= 65535) return v;
-            } catch (Exception ignored) { Diag.ignored("LicenseActivity:resolvePort", ignored); }
-        }
-        int fromHost = LanDiscover.typedPort(typedHost);
-        return fromHost > 0 ? fromHost : LanDiscover.PORT;
+        return LanDiscover.resolvePort(portText, typedHost);
     }
 
     /**
@@ -1350,9 +1341,9 @@ public class LicenseActivity extends Activity {
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:991", ignored); }
         showRadar("در حال اتصال مستقیم به سرور…");
         new Thread(() -> {
+          boolean directBound = settings.directConn() && NetRoute.bindDirect(getApplicationContext());
           try {
-            List<String> databases = LanDiscover.listDatabases(fIp, fPort,
-                    License.SQL_USER, License.SQL_PASS);
+            List<String> databases = listAtiranDatabases(fIp, fPort);
             if (databases == null || databases.isEmpty()) {
                 runOnUiThread(() -> {
                     hideRadar();
@@ -1365,14 +1356,15 @@ public class LicenseActivity extends Activity {
                     boolean vpn = NetRoute.isVpnActive(LicenseActivity.this);
                     SmartLink.diagnoseExplicit(LicenseActivity.this, lan, wan,
                             fPort, "master", License.SQL_USER,
-                            License.SQL_PASS, vpn, r -> {
+                            License.SQL_PASS, vpn, settings.directConn(), r -> {
                                 if (isFinishing()) return;
                                 LinkPanel.showFixSheet(LicenseActivity.this, r,
                                         () -> connectManual(ip, portText, btn),
                                         () -> LinkPanel.showDiagnoseExplicit(
                                                 LicenseActivity.this, lan, wan,
                                                 fPort, "master",
-                                                License.SQL_USER, License.SQL_PASS));
+                                                License.SQL_USER, License.SQL_PASS,
+                                                settings.directConn()));
                             });
                 });
                 return;
@@ -1401,8 +1393,7 @@ public class LicenseActivity extends Activity {
                 for (final String[] pair : pairs) {
                     fs.add(pool.submit(() -> {
                         try {
-                            return SmartLink.probeTables(pair[0], Integer.parseInt(pair[2]), pair[1],
-                                    License.SQL_USER, License.SQL_PASS);
+                            return probeAtiranTables(pair[0], Integer.parseInt(pair[2]), pair[1]);
                         } catch (Exception e) {
                             return -1;
                         }
@@ -1441,8 +1432,30 @@ public class LicenseActivity extends Activity {
           } catch (Throwable t) {
             Diag.ignored("LicenseActivity:connectThread", t);
             runOnUiThread(() -> { hideRadar(); restoreManualBtn(btn); });
+          } finally {
+            if (directBound) NetRoute.unbind(getApplicationContext());
           }
         }).start();
+    }
+
+    private List<String> listAtiranDatabases(String host, int port) {
+        android.content.Context app = getApplicationContext();
+        boolean bound = settings.directConn() && NetRoute.bindDirect(app);
+        try {
+            return LanDiscover.listDatabases(host, port, License.SQL_USER, License.SQL_PASS);
+        } finally {
+            if (bound) NetRoute.unbind(app);
+        }
+    }
+
+    private int probeAtiranTables(String host, int port, String db) throws Exception {
+        android.content.Context app = getApplicationContext();
+        boolean bound = settings.directConn() && NetRoute.bindDirect(app);
+        try {
+            return SmartLink.probeTables(host, port, db, License.SQL_USER, License.SQL_PASS);
+        } finally {
+            if (bound) NetRoute.unbind(app);
+        }
     }
 
     private void restoreManualBtn(android.widget.Button btn) {
@@ -1464,6 +1477,7 @@ public class LicenseActivity extends Activity {
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:1099", ignored); }
         showRadar("در حال یافتن سرور در وای‌فای…");
         new Thread(() -> {
+          boolean directBound = settings.directConn() && NetRoute.bindDirect(getApplicationContext());
           try {
             // Probe both the default SQL port and the common forwarded port
             // (5050 → 1433): a shop server may listen on either.
@@ -1474,7 +1488,15 @@ public class LicenseActivity extends Activity {
                 hostPorts.add(LanDiscover.PORT);
             }
             for (String h : LanDiscover.find("", LanDiscover.PORT_FWD)) {
-                if (!hosts.contains(h)) {
+                boolean duplicate = false;
+                for (int i = 0; i < hosts.size(); i++) {
+                    if (LanDiscover.sameEndpoint(hosts.get(i), hostPorts.get(i),
+                            h, LanDiscover.PORT_FWD)) {
+                        duplicate = true;
+                        break;
+                    }
+                }
+                if (!duplicate) {
                     hosts.add(h);
                     hostPorts.add(LanDiscover.PORT_FWD);
                 }
@@ -1498,8 +1520,7 @@ public class LicenseActivity extends Activity {
                 for (int hi = 0; hi < hosts.size(); hi++) {
                     final String h = hosts.get(hi);
                     final int hp = hostPorts.get(hi);
-                    fs.add(pool.submit(() -> LanDiscover.listDatabases(h, hp,
-                            License.SQL_USER, License.SQL_PASS)));
+                    fs.add(pool.submit(() -> listAtiranDatabases(h, hp)));
                 }
                 long deadline = System.currentTimeMillis() + 12000;
                 for (int i = 0; i < fs.size(); i++) {
@@ -1530,9 +1551,8 @@ public class LicenseActivity extends Activity {
                 for (final String[] pr : pairs) {
                     vs.add(pool.submit(() -> {
                         try {
-                            return new int[]{SmartLink.probeTables(pr[0],
-                                    Integer.parseInt(pr[2]), pr[1],
-                                    License.SQL_USER, License.SQL_PASS)};
+                            return new int[]{probeAtiranTables(pr[0],
+                                    Integer.parseInt(pr[2]), pr[1])};
                         } catch (Exception e) {
                             return new int[]{-1};
                         }
@@ -1574,6 +1594,8 @@ public class LicenseActivity extends Activity {
           } catch (Throwable t) {
             Diag.ignored("LicenseActivity:wifiThread", t);
             runOnUiThread(() -> { hideRadar(); restoreWifiBtn(btn); });
+          } finally {
+            if (directBound) NetRoute.unbind(getApplicationContext());
           }
         }).start();
     }

@@ -90,8 +90,23 @@ public final class Settings {
     /** Effective port for one smart-link profile (see {@link #effPort}). */
     public int effPortFor(String kind) {
         String per = ir.meelano.manager.core.SmartLink.WAN.equals(kind) ? portWan() : portLan();
-        if (!per.isEmpty()) return parsePort(per);
-        return effPort();
+        return resolveProfilePort(per, port());
+    }
+
+    /** Per-profile port wins; a legacy shared value is used only when that profile is unset. */
+    public static int resolveProfilePort(String profilePort, String sharedPort) {
+        if (profilePort != null && !profilePort.trim().isEmpty()) return parsePort(profilePort);
+        return parsePort(sharedPort);
+    }
+
+    /**
+     * A forced route cannot work when its profile is absent. Fall back to auto in that
+     * case rather than leaving the app with an empty candidate list after an endpoint change.
+     */
+    public static String normalizeLinkMode(String mode, boolean hasLan, boolean hasWan) {
+        if ("lan".equals(mode)) return hasLan ? "lan" : "auto";
+        if ("wan".equals(mode)) return hasWan ? "wan" : "auto";
+        return "auto";
     }
     public String db() { return p.getString("db_name", "").trim(); }
     public String user() { return p.getString("db_user", "").trim(); }
@@ -132,7 +147,7 @@ public final class Settings {
     public void clearSavedServer() {
         p.edit().remove("db_host").remove("db_lan").remove("db_wan")
                 .remove("db_name").remove("link_last")
-                .remove("db_port_lan").remove("db_port_wan")
+                .remove("db_port").remove("db_port_lan").remove("db_port_wan")
                 .putString("link_mode", "auto").apply();
     }
 
@@ -141,6 +156,8 @@ public final class Settings {
                 .putString("db_port", port == null ? "" : port.trim())
                 .putString("db_name", db == null ? "" : db.trim())
                 .putString("db_user", user == null ? "" : user.trim())
+                .putString("link_mode", "auto")
+                .putString("link_last", "")
                 .apply();
         savePass(pass);
     }
@@ -152,7 +169,7 @@ public final class Settings {
 
     /**
      * Save both smart-link profiles with their own ports (either may be empty;
-     * empty = the default 1433, or the shared port when one was saved before).
+     * empty uses the default 1433).
      * The dedicated/public address often answers on a forwarded port
      * (e.g. 5050 → 1433) while the shop LAN keeps 1433.
      */
@@ -165,6 +182,9 @@ public final class Settings {
                 .putString("db_port", "")
                 .putString("db_name", db == null ? "" : db.trim())
                 .putString("db_user", user == null ? "" : user.trim())
+                // Changing the endpoint invalidates a manually pinned old route.
+                .putString("link_mode", "auto")
+                .putString("link_last", "")
                 .apply();
         savePass(pass);
     }
@@ -178,19 +198,35 @@ public final class Settings {
     public void placeHost(String host, String port, String db, String user, String pass) {
         String h = host == null ? "" : host.trim();
         SharedPreferences.Editor e = p.edit();
+        String kind = "";
         if (!h.isEmpty()) {
+            String sharedPort = port();
             Boolean priv = ir.meelano.manager.core.SmartLink.isPrivate(h);
-            if (priv != null && !priv) {
+            kind = priv != null && !priv
+                    ? ir.meelano.manager.core.SmartLink.WAN
+                    : ir.meelano.manager.core.SmartLink.LAN;
+            if (ir.meelano.manager.core.SmartLink.WAN.equals(kind)) {
+                // Preserve the other saved endpoint's legacy shared-port behavior before
+                // replacing it with this newly verified endpoint's (possibly forwarded) port.
+                if (!lan().isEmpty() && portLan().isEmpty())
+                    e.putString("db_port_lan", String.valueOf(resolveProfilePort("", sharedPort)));
                 e.putString("db_wan", h);
                 e.putString("db_port_wan", port == null ? "" : port.trim());
             } else {
+                if (!wan().isEmpty() && portWan().isEmpty())
+                    e.putString("db_port_wan", String.valueOf(resolveProfilePort("", sharedPort)));
                 e.putString("db_lan", h);
                 e.putString("db_port_lan", port == null ? "" : port.trim());
             }
+            // Keep the new endpoint's port for older single-route builds; the other saved
+            // endpoint has been materialized above so it will not inherit this forwarded port.
+            e.putString("db_port", port == null ? "" : port.trim());
         }
-        e.putString("db_port", port == null ? "" : port.trim())
-                .putString("db_name", db == null ? "" : db.trim())
+        e.putString("db_name", db == null ? "" : db.trim())
                 .putString("db_user", user == null ? "" : user.trim())
+                // A freshly verified endpoint becomes the active route; never keep a stale pin.
+                .putString("link_mode", "auto")
+                .putString("link_last", kind)
                 .apply();
         savePass(pass);
     }
@@ -207,13 +243,22 @@ public final class Settings {
 
     /** Smart-link mode: "auto" (default), "lan" or "wan". */
     public String linkMode() {
-        String m = p.getString("link_mode", "auto");
-        if ("lan".equals(m) || "wan".equals(m)) return m;
-        return "auto";
+        String stored = p.getString("link_mode", "auto");
+        String normalized = normalizeLinkMode(stored, !lan().isEmpty(), !wan().isEmpty());
+        if (!normalized.equals(stored)) p.edit().putString("link_mode", normalized).apply();
+        return normalized;
     }
 
-    public void setLinkMode(String mode) {
-        p.edit().putString("link_mode", "lan".equals(mode) || "wan".equals(mode) ? mode : "auto").apply();
+    /**
+     * Select a route only when its endpoint exists. A missing profile is not a useful
+     * manual choice; keep the app in auto mode and tell the caller to explain that.
+     */
+    public boolean setLinkMode(String mode) {
+        if (lan().isEmpty() && wan().isEmpty() && !host().isEmpty()) migrateLegacyHost();
+        String requested = "lan".equals(mode) || "wan".equals(mode) ? mode : "auto";
+        String normalized = normalizeLinkMode(requested, !lan().isEmpty(), !wan().isEmpty());
+        p.edit().putString("link_mode", normalized).apply();
+        return requested.equals(normalized);
     }
 
     /** Profile that worked last ("lan" / "wan" / ""). */

@@ -40,8 +40,7 @@ public final class Atiran {
     }
 
     /**
-     * Same, with tunable speed: the smart link uses a fast profile
-     * (no retry — failover to the other profile IS the retry).
+     * Same, with tunable network timeouts and retry policy selected by the smart-link caller.
      */
     public static Connection open(String host, int port, String db, String user, String pass,
                                   int tcpMs, int loginSec, boolean retry) throws Exception {

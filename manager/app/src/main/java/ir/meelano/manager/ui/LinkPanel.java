@@ -73,8 +73,11 @@ public final class LinkPanel {
             final AlertDialog[] box = new AlertDialog[1];
             body.addView(kit.chips(new String[]{"خودکار ✦", "داخل شبکه", "خارج شبکه"}, sel, idx -> {
                 try {
-                    s.setLinkMode(idx == 1 ? "lan" : (idx == 2 ? "wan" : "auto"));
-                    kit.toast(idx == 0 ? "حالت خودکار فعال شد" : ("فقط " + SmartLink.kindShort(idx == 1 ? "lan" : "wan")));
+                    boolean applied = s.setLinkMode(idx == 1 ? "lan" : (idx == 2 ? "wan" : "auto"));
+                    kit.toast(!applied
+                            ? "آدرس این مسیر ثبت نشده؛ حالت خودکار فعال ماند"
+                            : (idx == 0 ? "حالت خودکار فعال شد"
+                            : ("فقط " + SmartLink.kindShort(idx == 1 ? "lan" : "wan"))));
                     if (box[0] != null) box[0].dismiss();
                     showStatus(a, s, onModeChanged);
                     if (onModeChanged != null) onModeChanged.run();
@@ -124,7 +127,7 @@ public final class LinkPanel {
 
     /** Troubleshoot explicit (unsaved) values from the activation screen. */
     public static void showDiagnoseExplicit(Activity a, String lan, String wan, int port, String db,
-                                            String user, String pass) {
+                                            String user, String pass, boolean directRoute) {
         try {
             Kit kit = new Kit(a);
             LinearLayout body = kit.v();
@@ -135,12 +138,14 @@ public final class LinkPanel {
             AlertDialog d = kit.dialog("عیب‌یابی هوشمند", body, true);
             d.show();
             boolean vpn = NetRoute.isVpnActive(a);
-            SmartLink.diagnoseExplicit(a, lan, wan, port, db, user, pass, vpn, r -> {
+            SmartLink.diagnoseExplicit(a, lan, wan, port, db, user, pass, vpn,
+                    directRoute, r -> {
                 try {
                     d.dismiss();
                 } catch (Exception ignored) { Diag.ignored("LinkPanel:140", ignored); }
                 if (finished(a)) return;
-                renderReport(a, r, () -> showDiagnoseExplicit(a, lan, wan, port, db, user, pass));
+                renderReport(a, r, () -> showDiagnoseExplicit(
+                        a, lan, wan, port, db, user, pass, directRoute));
             });
         } catch (Exception ignored) { Diag.ignored("LinkPanel:144", ignored); }
     }

@@ -17,6 +17,7 @@ import java.sql.Connection;
 import ir.meelano.manager.core.AtiranAuth;
 import ir.meelano.manager.core.LicenseStore;
 import ir.meelano.manager.core.RoleStore;
+import ir.meelano.manager.data.NetRoute;
 import ir.meelano.manager.data.Settings;
 import ir.meelano.manager.core.SmartLink;
 import ir.meelano.manager.ui.Kit;
@@ -352,13 +353,17 @@ public class LoginActivity extends Activity {
         final boolean rem = remember;
         setBusy(true);
         new Thread(() -> {
+            boolean directBound = settings.directConn()
+                    && NetRoute.bindDirect(getApplicationContext());
             // Use cached Atiran credentials only when opening the SQL connection itself fails.
             // Query/schema/permission errors must not be disguised as an offline login failure.
             final Connection connection;
             try {
                 connection = SmartLink.open(getApplicationContext(), settings);
             } catch (Exception connectionError) {
-                offlineTry(user, pass, rem);
+                if (directBound) NetRoute.unbind(getApplicationContext());
+                // Keep the route/port diagnosis visible when no offline session can be used.
+                offlineTry(user, pass, rem, connectionError);
                 return;
             }
             try (Connection c = connection) {
@@ -421,11 +426,13 @@ public class LoginActivity extends Activity {
                 String detail = authError.getMessage();
                 uiFail("خواندن حساب/نقش از آتیران انجام نشد"
                         + (detail == null || detail.trim().isEmpty() ? "." : ": " + detail));
+            } finally {
+                if (directBound) NetRoute.unbind(getApplicationContext());
             }
         }).start();
     }
 
-    private void offlineTry(String user, String pass, boolean rem) {
+    private void offlineTry(String user, String pass, boolean rem, Exception connectionError) {
         try {
             int uid = AtiranAuth.cachedUid(LoginActivity.this, user);
             if (uid != -999) {
@@ -453,7 +460,12 @@ public class LoginActivity extends Activity {
                 }
             }
         } catch (Exception ignored) { Diag.ignored("LoginActivity:274", ignored); }
-        uiFail("ارتباط با سرور ممکن نشد؛ برای اولین ورود، اینترنت لازم است");
+        String detail = connectionError == null ? "" : connectionError.getMessage();
+        if (detail == null) detail = "";
+        detail = detail.replace('\n', ' ').replace('\r', ' ').trim();
+        if (detail.length() > 320) detail = detail.substring(0, 320) + "…";
+        uiFail("ارتباط با سرور برقرار نشد؛ برای اولین ورود اتصال لازم است"
+                + (detail.isEmpty() ? "" : " • " + detail));
     }
 
     /**

@@ -47,6 +47,8 @@ public class MoreScreen extends Screen {
     public void render(final LinearLayout content) {
         contentRef = content;
         boolean visitor = isVisitorRole();
+        boolean reportsAllowed = RoleStore.allowed(a, "reports");
+        if (!reportsAllowed) seg = SEG_ALL;
         if (expandedGroup == null) {
             String role = AtiranAuth.sessionRole(a);
             if (role == null || role.isEmpty()) role = RoleStore.current(a);
@@ -68,8 +70,9 @@ public class MoreScreen extends Screen {
         }
         content.addView(a.kit.gap(10));
 
-        // The report hub belongs to the manager; for the visitor this switch would be dead.
-        if (!visitor) {
+        // Only roles with report permission see the report-hub segment; everyone else lands
+        // directly in the role-filtered section index instead of a dead/denied reports view.
+        if (!visitor && reportsAllowed) {
             LinearLayout segRow = a.kit.h();
             for (int i = 0; i < SEG_LABELS.length; i++) {
                 final int idx = i;
@@ -85,7 +88,7 @@ public class MoreScreen extends Screen {
 
         LinearLayout inner = a.kit.v();
         content.addView(inner, a.kit.lp(-1, -2));
-        if (seg == SEG_REPORTS && !visitor) {
+        if (seg == SEG_REPORTS && !visitor && reportsAllowed) {
             renderReportsHub(inner);
         } else {
             renderAll(inner);

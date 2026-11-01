@@ -122,26 +122,27 @@ public final class RoleStore {
 
     /**
      * Bottom tabs per role (v30): ONE app, each role lands in its own
-     * edition. Closed phases still define tabs so opening a phase is only
-     * a one-line change in AtiranAuth.phaseOpen.
+     * edition. Keep the dock to five useful, authorized destinations at most;
+     * other allowed screens remain available in the role-filtered «اتاق فرمان».
+     * Closed phases still define tabs so opening a phase is only a one-line
+     * change in AtiranAuth.phaseOpen.
      */
     public static String[] tabsFor(String role) {
-        // The warehouse keeper gets the four highest-frequency destinations;
-        // counts, supplier score and the rest remain one tap away in «همه بخش‌ها».
+        // Stock counts, supplier score and the rest remain in the role-filtered command room.
         if (WAREHOUSE.equals(role))
-            return new String[]{"anbar", "tahvil", "resid", "more"};
+            return new String[]{"anbar", "tahvil", "resid", "products", "more"};
         if (SALES_MANAGER.equals(role))
-            return new String[]{"home", "sales", "customers", "visitors", "reports", "more"};
+            return new String[]{"home", "sales", "customers", "visitors", "more"};
         if (SELLER.equals(role))
-            return new String[]{"home", "sales", "customers", "products", "dues", "more"};
+            return new String[]{"home", "sales", "customers", "products", "more"};
         if (ACCOUNTANT.equals(role))
-            return new String[]{"home", "customers", "cheques", "dues", "reports", "more"};
+            return new String[]{"home", "customers", "cheques", "dues", "more"};
         if (VISITOR.equals(role))
             return new String[]{"visitor_work", "more"};
         if (DISTRIBUTOR.equals(role))
             return new String[]{"sales", "customers", "cheques", "dues", "more"};
         if (MOADIAN.equals(role))
-            return new String[]{"sales", "customers", "reports", "more"};
+            return new String[]{"sales", "customers", "reports", "search", "more"};
         // Manager's bar: home, product file, customers, a dedicated assistant tab, and the
         // command room («اتاق فرمان») which holds reports and every section.
         return new String[]{"home", "products", "customers", "assistant", "more"};

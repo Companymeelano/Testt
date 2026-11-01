@@ -36,6 +36,7 @@ import ir.meelano.manager.core.LicenseStore;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.RoleStore;
 import ir.meelano.manager.data.Settings;
+import ir.meelano.manager.ui.Theme;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -151,7 +152,7 @@ public final class HomeDashboardScreenshotTest {
         assertNotNull("Role-filtered More tab is missing", moreTab);
         assertNotNull("Home tab is missing", homeTab);
 
-        String moreTarget = tap(instrumentation, moreTab);
+        String moreTarget = tapWithTouchTrace(instrumentation, moreTab);
         assertCurrentScreen(instrumentation, (MainActivity) activity, "more",
                 "Bottom-tab tap did not open More; " + moreTarget);
         String homeTarget = tap(instrumentation, homeTab);
@@ -255,6 +256,19 @@ public final class HomeDashboardScreenshotTest {
         int[] value = {0};
         instrumentation.runOnMainSync(() -> value[0] = scroll.getScrollY());
         return value[0];
+    }
+
+    private static String tapWithTouchTrace(Instrumentation instrumentation, View target) {
+        StringBuilder events = new StringBuilder();
+        instrumentation.runOnMainSync(() -> target.setOnTouchListener((view, event) -> {
+            if (events.length() > 0) events.append(';');
+            events.append(event.getActionMasked()).append('@')
+                    .append(event.getRawX()).append(',').append(event.getRawY());
+            return false;
+        }));
+        String details = tap(instrumentation, target);
+        instrumentation.runOnMainSync(() -> Theme.pressable(target));
+        return details + ", pointer=" + events;
     }
 
     private static String tap(Instrumentation instrumentation, View target) {

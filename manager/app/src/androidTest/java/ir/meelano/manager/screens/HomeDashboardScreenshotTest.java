@@ -18,6 +18,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.accessibility.AccessibilityNodeInfo;
+import android.view.accessibility.AccessibilityWindowInfo;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
@@ -79,15 +80,7 @@ public final class HomeDashboardScreenshotTest {
         launch.putExtra("ir.meelano.manager.HOME_SCREENSHOT_PREVIEW", true);
         launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
-        Instrumentation.ActivityMonitor monitor = instrumentation.addMonitor(
-                MainActivity.class.getName(), null, false);
-        Activity activity;
-        try {
-            target.startActivity(launch);
-            activity = instrumentation.waitForMonitorWithTimeout(monitor, 20_000L);
-        } finally {
-            instrumentation.removeMonitor(monitor);
-        }
+        Activity activity = instrumentation.startActivitySync(launch);
         assertNotNull("Manager shell did not start", activity);
 
         String[] visibleText = {""};
@@ -306,6 +299,7 @@ public final class HomeDashboardScreenshotTest {
             if (ready[0]) break;
             SystemClock.sleep(50L);
         }
+        if (!ready[0]) details[0] += ", windows=" + accessibilityWindows(instrumentation);
         assertTrue("Touch target did not become visible and laid out: " + details[0], ready[0]);
         float minimumTouchSize = 48f * activityDensity(target);
         assertTrue("Touch target is narrower than 48dp: " + details[0], screenBounds[2] >= minimumTouchSize);
@@ -317,6 +311,29 @@ public final class HomeDashboardScreenshotTest {
 
     private static float activityDensity(View target) {
         return target.getResources().getDisplayMetrics().density;
+    }
+
+    private static String accessibilityWindows(Instrumentation instrumentation) {
+        StringBuilder result = new StringBuilder();
+        try {
+            for (AccessibilityWindowInfo window : instrumentation.getUiAutomation().getWindows()) {
+                Rect bounds = new Rect();
+                window.getBoundsInScreen(bounds);
+                AccessibilityNodeInfo root = window.getRoot();
+                CharSequence packageName = root == null ? null : root.getPackageName();
+                if (result.length() > 0) result.append(';');
+                result.append("type=").append(window.getType())
+                        .append(",active=").append(window.isActive())
+                        .append(",focused=").append(window.isFocused())
+                        .append(",title=").append(window.getTitle())
+                        .append(",package=").append(packageName)
+                        .append(",bounds=").append(bounds.toShortString());
+                if (root != null) root.recycle();
+            }
+        } catch (RuntimeException error) {
+            return "unavailable:" + error.getClass().getSimpleName();
+        }
+        return result.length() == 0 ? "none" : result.toString();
     }
 
     private static void tapPoint(Instrumentation instrumentation, float x, float y) {

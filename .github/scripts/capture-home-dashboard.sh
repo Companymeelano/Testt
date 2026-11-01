@@ -136,10 +136,11 @@ for apk in "$app_apk" "$test_apk"; do
   cat "$install_log"
 done
 
-# The headless emulator may leave the Activity visible behind the lock screen. Wake and
-# dismiss the unprotected AVD keyguard so real touchscreen injection reaches the app window.
-adb shell input keyevent 224 >/dev/null 2>&1 || true
-adb shell wm dismiss-keyguard >/dev/null 2>&1 || true
+# The headless emulator can leave launched Activities behind its lock screen. Disable the
+# unprotected AVD keyguard, wake the display, and dismiss any existing keyguard before UI input.
+adb shell settings put secure lockscreen.disabled 1 || true
+adb shell input keyevent 224 || true
+adb shell wm dismiss-keyguard || true
 
 instrumentation_log="$(mktemp)"
 set +e

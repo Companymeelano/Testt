@@ -26,7 +26,8 @@ public final class AutoBackup {
 
     static final String ACT_AUTO = "ir.meelano.manager.AUTO_BACKUP";
     private static final int REQ = 7007;
-    private static final int NOTIF_ID = 7008;
+    /** Distinct from Notify's end-of-day summary notification (7008). */
+    static final int NOTIF_ID = 7014;
     private static final String CH = "meelano_due";
 
     /** Arm (or re-arm) the daily alarm at the user's hour. */

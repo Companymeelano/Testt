@@ -23,6 +23,24 @@ public class HomeNotificationPolicyTest {
         assertFalse(HomeNotificationPolicy.isQuietTime(true, 9 * 60, 9 * 60, 9 * 60));
     }
 
+    @Test public void quietHoursSuppressOnlyTheDocumentedSummaryDropAndDueAlerts() {
+        assertFalse(HomeNotificationPolicy.shouldShowAlert("sales_drop", true, true));
+        assertFalse(HomeNotificationPolicy.shouldShowAlert("cheque_in_due", true, true));
+        assertFalse(HomeNotificationPolicy.shouldShowAlert("cheque_out_due", true, true));
+        assertTrue(HomeNotificationPolicy.shouldShowAlert("stock_out", true, true));
+        assertTrue(HomeNotificationPolicy.shouldShowAlert("stock_low", true, true));
+        assertTrue(HomeNotificationPolicy.shouldShowAlert("purchase_price_drift", true, true));
+        assertTrue(HomeNotificationPolicy.shouldShowAlert("sales_drop", true, false));
+    }
+
+    @Test public void dueAlertSwitchDoesNotHideSalesOrOtherAlertCategories() {
+        assertFalse(HomeNotificationPolicy.shouldShowAlert("cheque_in_due", false, false));
+        assertFalse(HomeNotificationPolicy.shouldShowAlert("cheque_out_due", false, true));
+        assertTrue(HomeNotificationPolicy.shouldShowAlert("sales_drop", false, false));
+        assertTrue(HomeNotificationPolicy.shouldShowAlert("stock_out", false, true));
+        assertTrue(HomeNotificationPolicy.shouldShowAlert(null, false, true));
+    }
+
     @Test public void alertActionsMapOnlyToKnownInternalScreens() {
         assertEquals("products", HomeNotificationPolicy.screenFor(AlertEngine.Action.PRODUCT_FILE));
         assertEquals("sales", HomeNotificationPolicy.screenFor(AlertEngine.Action.SALES));

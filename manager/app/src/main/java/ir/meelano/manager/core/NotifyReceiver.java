@@ -18,6 +18,9 @@ public final class NotifyReceiver extends BroadcastReceiver {
         }
         try {
             Settings s = new Settings(c);
+            // AlarmManager entries are cleared at reboot. Re-arm this independent feature before
+            // the general-notification gate, so disabling Home alerts cannot strand auto-backup.
+            AutoBackup.reschedule(c);
             String act = intent == null || intent.getAction() == null ? "" : intent.getAction();
             if (Notify.ACT_BACKUP.equals(act)) {
                 if (s.backupOn()) {
@@ -65,7 +68,6 @@ public final class NotifyReceiver extends BroadcastReceiver {
             if (s.eodOn()) Notify.scheduleEod(c);
             if (s.guardOn()) Notify.scheduleGuard(c);
             if (s.whNewOn()) Notify.scheduleNewInv(c);
-            AutoBackup.reschedule(c);
             Notify.checkNow(c, () -> finishPr(pr));
         } catch (Exception ignored) {
             finishPr(pr);

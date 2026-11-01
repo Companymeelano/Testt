@@ -43,7 +43,7 @@ public final class Notify {
     private static final int WEEKLY_NOTIF_ID = 7006;
     static final String ACT_EOD = "ir.meelano.manager.EOD";
     private static final int EOD_REQ = 7007;
-    private static final int EOD_NOTIF_ID = 7008;
+    static final int EOD_NOTIF_ID = 7008;
     static final String ACT_GUARD = "ir.meelano.manager.GUARD";
     private static final int GUARD_REQ = 7009;
     static final int GUARD_NOTIF_ID = 7010;
@@ -67,6 +67,9 @@ public final class Notify {
     public static void boot(Activity a) {
         try {
             Settings s = new Settings(a);
+            // Auto-backup is an independent preference: its AlarmManager entry must survive
+            // reboot and app startup even when Home's smart-notification master switch is off.
+            AutoBackup.reschedule(a.getApplicationContext());
             if (!s.notifOn()) return;
             channel(a);
             scheduleDaily(a);
@@ -544,27 +547,33 @@ public final class Notify {
                     long[] v = result.values;
                     Settings s2 = new Settings(c);
                     boolean dueAlertsOn = s2.homeDueAlertsOn();
+                    Calendar now = Calendar.getInstance();
+                    int minute = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE);
+                    boolean quietNow = HomeNotificationPolicy.isQuietTime(s2.homeQuietHoursOn(),
+                            s2.homeQuietStartMinute(), s2.homeQuietEndMinute(), minute);
                     List<AlertEngine.Alert> homeAlerts = result.alerts;
-                    if (!dueAlertsOn) {
+                    if (!dueAlertsOn || quietNow) {
                         v = v.clone();
                         v[0] = v[1] = v[2] = v[3] = v[4] = v[5] = 0;
-                        List<AlertEngine.Alert> withoutDue = new java.util.ArrayList<>();
-                        if (homeAlerts != null) for (AlertEngine.Alert alert : homeAlerts) {
-                            if (!"cheque_in_due".equals(alert.code)
-                                    && !"cheque_out_due".equals(alert.code)) withoutDue.add(alert);
+                    }
+                    if (homeAlerts != null) {
+                        List<AlertEngine.Alert> visibleAlerts = new java.util.ArrayList<>();
+                        for (AlertEngine.Alert alert : homeAlerts) {
+                            if (alert != null && HomeNotificationPolicy.shouldShowAlert(
+                                    alert.code, dueAlertsOn, quietNow)) visibleAlerts.add(alert);
                         }
-                        homeAlerts = withoutDue;
+                        homeAlerts = visibleAlerts;
                     }
                     long lastB = s2.lastBouncedN();
                     long bNew = lastB < 0 ? 0 : Math.max(0, v[8] - lastB);
                     s2.setLastBouncedN(v[8]);
-                    boolean morning = s2.morningOn() && result.morningSummaryAvailable
+                    boolean morning = !quietNow && s2.morningOn() && result.morningSummaryAvailable
                             && RoleStore.allowed(c, "sales");
                     boolean showStock = s2.stockOn() && RoleStore.allowed(c, "products")
                             && v[10] + v[11] > 0;
                     boolean canCheques = RoleStore.allowed(c, "cheques");
-                    boolean showDue = dueAlertsOn && canCheques && (v[3] > 0 || v[4] > 0);
-                    boolean showOverdue = dueAlertsOn && RoleStore.allowed(c, "sales") && v[5] > 0;
+                    boolean showDue = !quietNow && dueAlertsOn && canCheques && (v[3] > 0 || v[4] > 0);
+                    boolean showOverdue = !quietNow && dueAlertsOn && RoleStore.allowed(c, "sales") && v[5] > 0;
                     boolean showBounced = canCheques && bNew > 0;
                     boolean hasHomeAlert = homeAlerts != null && !homeAlerts.isEmpty();
                     if (!showDue && !showOverdue && !showBounced && !morning
@@ -572,10 +581,6 @@ public final class Notify {
                         cancelSmartNotification(c);
                         return;
                     }
-                    Calendar now = Calendar.getInstance();
-                    int minute = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE);
-                    if (HomeNotificationPolicy.isQuietTime(s2.homeQuietHoursOn(),
-                            s2.homeQuietStartMinute(), s2.homeQuietEndMinute(), minute)) return;
                     show(c, v, bNew, morning, homeAlerts);
                 }
 

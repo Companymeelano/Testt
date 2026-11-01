@@ -15,6 +15,17 @@ public final class HomeNotificationPolicy {
         return start < end ? now >= start && now < end : now >= start || now < end;
     }
 
+    /**
+     * Daily Home alert categories that the settings copy promises to quiet. Unknown alert types
+     * remain visible so a future critical alert cannot be silently hidden by this allow-list.
+     */
+    public static boolean shouldShowAlert(String code, boolean dueAlertsEnabled, boolean quietHours) {
+        boolean due = "cheque_in_due".equals(code) || "cheque_out_due".equals(code);
+        if (due && !dueAlertsEnabled) return false;
+        if (!quietHours) return true;
+        return !"sales_drop".equals(code) && !due;
+    }
+
     /** MainActivity routes these known internal destinations after a notification tap. */
     public static String screenFor(AlertEngine.Action action) {
         if (action == null) return "";

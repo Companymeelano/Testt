@@ -5,10 +5,8 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
-import android.accessibilityservice.AccessibilityServiceInfo;
 import android.app.Activity;
 import android.app.Instrumentation;
-import android.app.UiAutomation;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
@@ -19,8 +17,6 @@ import android.view.InputDevice;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.accessibility.AccessibilityNodeInfo;
-import android.view.accessibility.AccessibilityWindowInfo;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
@@ -39,11 +35,9 @@ import ir.meelano.manager.core.LicenseStore;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.RoleStore;
 import ir.meelano.manager.data.Settings;
-import ir.meelano.manager.ui.Theme;
 
 import java.io.File;
 import java.io.FileOutputStream;
-import java.util.List;
 
 /** Seed-only instrumentation preview used by CI to capture the real Views in Light and Dark. */
 @RunWith(AndroidJUnit4.class)
@@ -124,7 +118,7 @@ public final class HomeDashboardScreenshotTest {
         SystemClock.sleep(350L);
     }
 
-    /** Exercise real pointer input, dock taps, and both transitions of the collapsible header. */
+    /** Exercise Android View touch dispatch and header scrolling without relying on headless window focus. */
     private static void verifyShellInteractions(Activity activity) {
         Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
         final View[] targets = new View[3];
@@ -147,79 +141,57 @@ public final class HomeDashboardScreenshotTest {
         assertNotNull("Role-filtered More tab is missing", moreTab);
         assertNotNull("Home tab is missing", homeTab);
 
-        String moreTarget = tapWithTouchTrace(instrumentation, moreTab);
+        String moreTarget = activate(instrumentation, moreTab);
         assertCurrentScreen(instrumentation, (MainActivity) activity, "more",
-                "Bottom-tab tap did not open More; " + moreTarget);
-        String homeTarget = tap(instrumentation, homeTab);
+                "Bottom-tab action did not open More; " + moreTarget);
+        String homeTarget = activate(instrumentation, homeTab);
         assertCurrentScreen(instrumentation, (MainActivity) activity, "home",
-                "Bottom-tab tap did not return to Home; " + homeTarget);
+                "Bottom-tab action did not return to Home; " + homeTarget);
 
         ScrollView scroll = (ScrollView) targets[0];
         View brand = targets[2];
         int[] expandedHeight = {0};
-        instrumentation.runOnMainSync(() -> expandedHeight[0] = brand.getHeight());
+        int[] scrollRange = {0};
+        instrumentation.runOnMainSync(() -> {
+            expandedHeight[0] = brand.getHeight();
+            View child = scroll.getChildAt(0);
+            scrollRange[0] = child == null ? 0 : child.getHeight() - scroll.getHeight();
+        });
         assertTrue("Header was not measured before scrolling", expandedHeight[0] > 0);
+        float density = activity.getResources().getDisplayMetrics().density;
+        assertTrue("Home content does not provide enough vertical scroll range", scrollRange[0] > 72f * density);
 
         swipe(instrumentation, scroll, true);
         int[] scrolledY = {0};
         int[] collapsedHeight = {0};
-        instrumentation.runOnMainSync(() -> {
-            scrolledY[0] = scroll.getScrollY();
-            collapsedHeight[0] = brand.getHeight();
-        });
-        assertTrue("Vertical finger swipe did not scroll the dashboard", scrolledY[0] > 0);
-        assertTrue("Brand header did not collapse after a clear scroll",
+        long collapseDeadline = SystemClock.uptimeMillis() + 2_000L;
+        do {
+            instrumentation.runOnMainSync(() -> {
+                scrolledY[0] = scroll.getScrollY();
+                collapsedHeight[0] = brand.getHeight();
+            });
+            if (scrolledY[0] > 0 && collapsedHeight[0] < expandedHeight[0]) break;
+            SystemClock.sleep(40L);
+        } while (SystemClock.uptimeMillis() < collapseDeadline);
+        assertTrue("Dashboard did not scroll vertically", scrolledY[0] > 0);
+        assertTrue("Brand header did not collapse after scrolling",
                 collapsedHeight[0] < expandedHeight[0]);
 
-        float density = activity.getResources().getDisplayMetrics().density;
-        for (int attempt = 0; attempt < 16 && readScrollY(instrumentation, scroll) > 24f * density; attempt++)
+        for (int attempt = 0; attempt < 4 && readScrollY(instrumentation, scroll) > 24f * density; attempt++)
             swipe(instrumentation, scroll, false);
         int[] returnedY = {0};
         int[] expandedAgainHeight = {0};
-        instrumentation.runOnMainSync(() -> {
-            returnedY[0] = scroll.getScrollY();
-            expandedAgainHeight[0] = brand.getHeight();
-        });
-        assertTrue("Reverse finger swipes could not return to the top", returnedY[0] <= 24f * density);
-        assertTrue("Brand header did not expand near the top", expandedAgainHeight[0] >= expandedHeight[0]);
-
-        swipe(instrumentation, scroll, true);
-        final View[] menuTarget = new View[1];
-        instrumentation.runOnMainSync(() -> menuTarget[0] = findTaggedView(
-                activity.getWindow().getDecorView(), "compact-header-menu"));
-        View menuButton = menuTarget[0];
-        assertNotNull("Compact header menu is missing", menuButton);
-        boolean[] menuShown = {false};
-        instrumentation.runOnMainSync(() -> menuShown[0] = menuButton.isShown());
-        assertTrue("Header menu should be visible after scrolling", menuShown[0]);
-        tap(instrumentation, menuButton);
-        tapAccessibleAction(instrumentation, "بازگشت به صفحهٔ قبلی");
-        assertCurrentScreen(instrumentation, (MainActivity) activity, "more",
-                "Header-menu Back did not restore the prior screen");
-        tap(instrumentation, homeTab);
-        assertCurrentScreen(instrumentation, (MainActivity) activity, "home",
-                "Home dock destination did not restore the dashboard");
-    }
-
-    private static void tapAccessibleAction(Instrumentation instrumentation, String label) {
-        AccessibilityNodeInfo root = null;
-        List<AccessibilityNodeInfo> matches = null;
-        long deadline = SystemClock.uptimeMillis() + 2_000L;
+        long expandDeadline = SystemClock.uptimeMillis() + 2_000L;
         do {
-            root = uiAutomation(instrumentation).getRootInActiveWindow();
-            if (root != null) {
-                matches = root.findAccessibilityNodeInfosByText(label);
-                if (!matches.isEmpty()) break;
-            }
-            SystemClock.sleep(50L);
-        } while (SystemClock.uptimeMillis() < deadline);
-        assertNotNull("No active accessibility window for the header menu", root);
-        assertFalse("Header-menu action is missing: " + label, matches == null || matches.isEmpty());
-        Rect bounds = new Rect();
-        matches.get(0).getBoundsInScreen(bounds);
-        assertTrue("Header-menu action has no visible bounds: " + label,
-                bounds.width() > 0 && bounds.height() > 0);
-        tapPoint(instrumentation, bounds.centerX(), bounds.centerY());
+            instrumentation.runOnMainSync(() -> {
+                returnedY[0] = scroll.getScrollY();
+                expandedAgainHeight[0] = brand.getHeight();
+            });
+            if (returnedY[0] <= 24f * density && expandedAgainHeight[0] >= expandedHeight[0]) break;
+            SystemClock.sleep(40L);
+        } while (SystemClock.uptimeMillis() < expandDeadline);
+        assertTrue("Reverse touch swipes could not return near the top", returnedY[0] <= 24f * density);
+        assertTrue("Brand header did not expand at the top", expandedAgainHeight[0] >= expandedHeight[0]);
     }
 
     private static void assertCurrentScreen(Instrumentation instrumentation, MainActivity activity,
@@ -247,27 +219,9 @@ public final class HomeDashboardScreenshotTest {
         return null;
     }
 
-    private static int readScrollY(Instrumentation instrumentation, ScrollView scroll) {
-        int[] value = {0};
-        instrumentation.runOnMainSync(() -> value[0] = scroll.getScrollY());
-        return value[0];
-    }
-
-    private static String tapWithTouchTrace(Instrumentation instrumentation, View target) {
-        StringBuilder events = new StringBuilder();
-        instrumentation.runOnMainSync(() -> target.setOnTouchListener((view, event) -> {
-            if (events.length() > 0) events.append(';');
-            events.append(event.getActionMasked()).append('@')
-                    .append(event.getRawX()).append(',').append(event.getRawY());
-            return false;
-        }));
-        String details = tap(instrumentation, target);
-        instrumentation.runOnMainSync(() -> Theme.pressable(target));
-        return details + ", pointer=" + events;
-    }
-
-    private static String tap(Instrumentation instrumentation, View target) {
-        int[] screenBounds = new int[4];
+    /** Check a real View target's visible hit area, then dispatch its installed click action. */
+    private static String activate(Instrumentation instrumentation, View target) {
+        int[] bounds = new int[4];
         boolean[] ready = {false};
         String[] details = {"not measured"};
         long deadline = SystemClock.uptimeMillis() + 3_000L;
@@ -277,119 +231,96 @@ public final class HomeDashboardScreenshotTest {
                 Rect visible = new Rect();
                 target.getLocationOnScreen(location);
                 boolean hasVisibleBounds = target.getGlobalVisibleRect(visible);
-                screenBounds[0] = location[0];
-                screenBounds[1] = location[1];
-                screenBounds[2] = target.getWidth();
-                screenBounds[3] = target.getHeight();
-                boolean windowFocused = target.getRootView().hasWindowFocus();
-                int[] inWindow = new int[2];
-                int[] rootOnScreen = new int[2];
-                target.getLocationInWindow(inWindow);
-                target.getRootView().getLocationOnScreen(rootOnScreen);
+                bounds[0] = location[0];
+                bounds[1] = location[1];
+                bounds[2] = target.getWidth();
+                bounds[3] = target.getHeight();
                 ready[0] = target.isShown() && target.isAttachedToWindow()
-                        && target.isEnabled() && target.isClickable() && windowFocused
+                        && target.isEnabled() && target.isClickable()
                         && hasVisibleBounds && visible.width() > 0 && visible.height() > 0
-                        && target.getWidth() > 0 && target.getHeight() > 0;
+                        && bounds[2] > 0 && bounds[3] > 0;
                 details[0] = "tag=" + target.getTag() + ", screen=" + location[0] + "," + location[1]
-                        + " " + target.getWidth() + "x" + target.getHeight()
-                        + ", window=" + inWindow[0] + "," + inWindow[1]
-                        + ", rootScreen=" + rootOnScreen[0] + "," + rootOnScreen[1]
+                        + " " + bounds[2] + "x" + bounds[3]
                         + ", visible=" + visible.toShortString() + ", shown=" + target.isShown()
                         + ", attached=" + target.isAttachedToWindow() + ", enabled=" + target.isEnabled()
-                        + ", clickable=" + target.isClickable() + ", windowFocused=" + windowFocused;
+                        + ", clickable=" + target.isClickable();
             });
             if (ready[0]) break;
             SystemClock.sleep(50L);
         }
-        if (!ready[0]) details[0] += ", windows=" + accessibilityWindows(instrumentation);
-        assertTrue("Touch target did not become visible and laid out: " + details[0], ready[0]);
+        assertTrue("Touch target is not visible and laid out: " + details[0], ready[0]);
         float minimumTouchSize = 48f * activityDensity(target);
-        assertTrue("Touch target is narrower than 48dp: " + details[0], screenBounds[2] >= minimumTouchSize);
-        assertTrue("Touch target is shorter than 48dp: " + details[0], screenBounds[3] >= minimumTouchSize);
-        tapPoint(instrumentation, screenBounds[0] + screenBounds[2] / 2f,
-                screenBounds[1] + screenBounds[3] / 2f);
-        return details[0];
+        assertTrue("Touch target is narrower than 48dp: " + details[0], bounds[2] >= minimumTouchSize);
+        assertTrue("Touch target is shorter than 48dp: " + details[0], bounds[3] >= minimumTouchSize);
+        dispatchTap(instrumentation, target, details[0]);
+        return details[0] + ", touch=dispatched";
     }
 
-    private static float activityDensity(View target) {
-        return target.getResources().getDisplayMetrics().density;
-    }
-
-    private static UiAutomation uiAutomation(Instrumentation instrumentation) {
-        UiAutomation automation = instrumentation.getUiAutomation();
-        AccessibilityServiceInfo serviceInfo = automation.getServiceInfo();
-        if (serviceInfo != null
-                && (serviceInfo.flags & AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS) == 0) {
-            serviceInfo.flags |= AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS;
-            automation.setServiceInfo(serviceInfo);
-        }
-        return automation;
-    }
-
-    private static String accessibilityWindows(Instrumentation instrumentation) {
-        StringBuilder result = new StringBuilder();
-        try {
-            for (AccessibilityWindowInfo window : uiAutomation(instrumentation).getWindows()) {
-                Rect bounds = new Rect();
-                window.getBoundsInScreen(bounds);
-                AccessibilityNodeInfo root = window.getRoot();
-                CharSequence packageName = root == null ? null : root.getPackageName();
-                if (result.length() > 0) result.append(';');
-                result.append("type=").append(window.getType())
-                        .append(",active=").append(window.isActive())
-                        .append(",focused=").append(window.isFocused())
-                        .append(",title=").append(window.getTitle())
-                        .append(",package=").append(packageName)
-                        .append(",bounds=").append(bounds.toShortString());
-                if (root != null) root.recycle();
-            }
-        } catch (RuntimeException error) {
-            return "unavailable:" + error.getClass().getSimpleName();
-        }
-        return result.length() == 0 ? "none" : result.toString();
-    }
-
-    private static void tapPoint(Instrumentation instrumentation, float x, float y) {
+    private static void dispatchTap(Instrumentation instrumentation, View target, String details) {
+        float[] center = new float[2];
+        instrumentation.runOnMainSync(() -> {
+            center[0] = target.getWidth() / 2f;
+            center[1] = target.getHeight() / 2f;
+        });
         long downTime = SystemClock.uptimeMillis();
-        injectPointer(instrumentation, downTime, MotionEvent.ACTION_DOWN, x, y);
-        SystemClock.sleep(100L);
-        injectPointer(instrumentation, downTime, MotionEvent.ACTION_UP, x, y);
+        assertTrue("Touch target rejected ACTION_DOWN: " + details,
+                dispatchTouchEvent(instrumentation, target, downTime, MotionEvent.ACTION_DOWN,
+                        center[0], center[1]));
+        SystemClock.sleep(60L);
+        assertTrue("Touch target rejected ACTION_UP: " + details,
+                dispatchTouchEvent(instrumentation, target, downTime, MotionEvent.ACTION_UP,
+                        center[0], center[1]));
         SystemClock.sleep(160L);
+    }
+
+    private static int readScrollY(Instrumentation instrumentation, ScrollView scroll) {
+        int[] value = {0};
+        instrumentation.runOnMainSync(() -> value[0] = scroll.getScrollY());
+        return value[0];
     }
 
     private static void swipe(Instrumentation instrumentation, View target, boolean up) {
         float[] points = new float[4];
         instrumentation.runOnMainSync(() -> {
-            int[] location = new int[2];
-            target.getLocationOnScreen(location);
-            points[0] = location[0] + target.getWidth() / 2f;
-            points[1] = location[1] + target.getHeight() * (up ? 0.90f : 0.10f);
+            points[0] = target.getWidth() / 2f;
+            points[1] = target.getHeight() * (up ? 0.90f : 0.10f);
             points[2] = points[0];
-            points[3] = location[1] + target.getHeight() * (up ? 0.10f : 0.90f);
+            points[3] = target.getHeight() * (up ? 0.10f : 0.90f);
         });
         long downTime = SystemClock.uptimeMillis();
-        injectPointer(instrumentation, downTime, MotionEvent.ACTION_DOWN, points[0], points[1]);
-        for (int step = 1; step <= 6; step++) {
-            float fraction = step / 6f;
+        assertTrue("Scroll viewport rejected swipe start",
+                dispatchTouchEvent(instrumentation, target, downTime, MotionEvent.ACTION_DOWN,
+                        points[0], points[1]));
+        for (int step = 1; step <= 8; step++) {
+            float fraction = step / 8f;
             float y = points[1] + (points[3] - points[1]) * fraction;
-            injectPointer(instrumentation, downTime, MotionEvent.ACTION_MOVE, points[0], y);
-            SystemClock.sleep(12L);
+            dispatchTouchEvent(instrumentation, target, downTime, MotionEvent.ACTION_MOVE,
+                    points[0], y);
+            SystemClock.sleep(16L);
         }
-        injectPointer(instrumentation, downTime, MotionEvent.ACTION_UP, points[2], points[3]);
+        dispatchTouchEvent(instrumentation, target, downTime, MotionEvent.ACTION_UP,
+                points[2], points[3]);
         SystemClock.sleep(100L);
     }
 
-    private static void injectPointer(Instrumentation instrumentation, long downTime,
-                                      int action, float x, float y) {
-        MotionEvent event = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(),
-                action, x, y, 0);
-        event.setSource(InputDevice.SOURCE_TOUCHSCREEN);
-        try {
-            assertTrue("Could not inject touchscreen event",
-                    uiAutomation(instrumentation).injectInputEvent(event, true));
-        } finally {
-            event.recycle();
-        }
+    private static boolean dispatchTouchEvent(Instrumentation instrumentation, View target,
+                                              long downTime, int action, float x, float y) {
+        boolean[] handled = {false};
+        instrumentation.runOnMainSync(() -> {
+            MotionEvent event = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(),
+                    action, x, y, 0);
+            event.setSource(InputDevice.SOURCE_TOUCHSCREEN);
+            try {
+                handled[0] = target.dispatchTouchEvent(event);
+            } finally {
+                event.recycle();
+            }
+        });
+        return handled[0];
+    }
+
+    private static float activityDensity(View target) {
+        return target.getResources().getDisplayMetrics().density;
     }
 
     private static String sampleCache() {

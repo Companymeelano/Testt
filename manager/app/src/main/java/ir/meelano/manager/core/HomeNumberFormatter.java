@@ -47,6 +47,7 @@ public final class HomeNumberFormatter {
             int codePoint = value.codePointAt(offset);
             offset += Character.charCount(codePoint);
             if (codePoint == 0xFFFD || codePoint == 0xFFFC || Character.isISOControl(codePoint)
+                    || isBidiControl(codePoint)
                     || (codePoint >= Character.MIN_SURROGATE && codePoint <= Character.MAX_SURROGATE)) {
                 spacePending = cleaned.length() > 0;
                 continue;
@@ -66,6 +67,13 @@ public final class HomeNumberFormatter {
         int length = cleaned.length();
         while (length > 0 && cleaned.charAt(length - 1) == ' ') length--;
         return cleaned.substring(0, length);
+    }
+
+    /** Strip Unicode bidirectional formatting controls from account names, but keep ZWNJ/ZWJ. */
+    private static boolean isBidiControl(int codePoint) {
+        return codePoint == 0x061C || codePoint == 0x200E || codePoint == 0x200F
+                || (codePoint >= 0x202A && codePoint <= 0x202E)
+                || (codePoint >= 0x2066 && codePoint <= 0x2069);
     }
 
     /** Grouped integer, isolated from surrounding RTL prose. */

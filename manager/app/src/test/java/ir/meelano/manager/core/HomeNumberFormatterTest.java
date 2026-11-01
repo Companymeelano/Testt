@@ -48,6 +48,8 @@ public class HomeNumberFormatterTest {
     @Test public void displayNameDropsReplacementGlyphsAndCollapsesWhitespace() {
         assertEquals("علی محمد", HomeNumberFormatter.cleanDisplayName("علی\uFFFD\u00A0محمد"));
         assertEquals("Admin 12", HomeNumberFormatter.cleanDisplayName(" Admin  12 "));
+        assertEquals("علی اکبر", HomeNumberFormatter.cleanDisplayName("علی" + (char) 0x202E + "اکبر"));
+        assertEquals("علی‌اکبر", HomeNumberFormatter.cleanDisplayName("علی" + (char) 0x200C + "اکبر"));
         assertEquals("", HomeNumberFormatter.cleanDisplayName("\uFFFD\uFFFC\u0000"));
         assertEquals("", HomeNumberFormatter.cleanDisplayName("   "));
     }

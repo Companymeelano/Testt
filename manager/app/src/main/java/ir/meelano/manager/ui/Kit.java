@@ -419,6 +419,8 @@ public final class Kit {
         public boolean emeraldIcon = false;
         /** Optional semantic tone for a directional delta note; zero selects by direction. */
         public int subColor = 0;
+        /** Compact, neutral-surface variant used for the financial dashboard's responsive KPI grid. */
+        public boolean dashboardStyle = false;
 
         public Kpi(String label, String value, String sub, int accent) {
             this(label, value, sub, accent, null);
@@ -449,16 +451,23 @@ public final class Kit {
 
     public View kpiTile(Kpi k) {
         final int accent = sectionAccentForKpi(k);
+        final boolean dashboardStyle = k.dashboardStyle;
         LinearLayout t = v();
-        t.setBackground(Theme.kpi(accent));
-        t.setPadding(Theme.dp(12), Theme.dp(11), Theme.dp(12), Theme.dp(11));
+        t.setBackground(dashboardStyle ? Theme.dashboardMetric(accent) : Theme.kpi(accent));
+        int horizontalPad = dashboardStyle ? 10 : 12;
+        int verticalPad = dashboardStyle ? 8 : 11;
+        t.setPadding(Theme.dp(horizontalPad), Theme.dp(verticalPad),
+                Theme.dp(horizontalPad), Theme.dp(verticalPad));
+        if (dashboardStyle) t.setTag("home-financial-kpi");
         // Centred composition like the reference: icon, label, value and note share one axis.
         t.setGravity(Gravity.CENTER_HORIZONTAL);
         if (k.icon != 0) {
-            View badge = iconBadge(k.icon, accent, 32);
-            LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(Theme.dp(32), Theme.dp(32));
+            int iconSize = dashboardStyle ? 30 : 32;
+            View badge = iconBadge(k.icon, accent, iconSize);
+            LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(
+                    Theme.dp(iconSize), Theme.dp(iconSize));
             ip.gravity = Gravity.CENTER_HORIZONTAL;
-            ip.bottomMargin = Theme.dp(4);
+            ip.bottomMargin = Theme.dp(dashboardStyle ? 3 : 4);
             t.addView(badge, ip);
         }
         TextView l = text(k.label, 10.5f, Theme.MUTED, false);
@@ -481,7 +490,7 @@ public final class Kit {
         LinearLayout amount = h();
         amount.setGravity(Gravity.CENTER);
         amount.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        TextView v = text(numberDisplayValue, 16.5f, Theme.TEXT, true);
+        TextView v = text(numberDisplayValue, dashboardStyle ? 15.5f : 16.5f, Theme.TEXT, true);
         v.setGravity(Gravity.CENTER);
         v.setSingleLine(true);
         // Large amounts shrink to fit the tile instead of ending in "…".
@@ -489,7 +498,7 @@ public final class Kit {
             float valueScale = Theme.fontScale() * Theme.typeScale();
             v.setAutoSizeTextTypeUniformWithConfiguration(
                     Math.max(9, Math.round(10f * valueScale)),
-                    Math.max(10, Math.round(17f * valueScale)), 1,
+                    Math.max(10, Math.round((dashboardStyle ? 16f : 17f) * valueScale)), 1,
                     android.util.TypedValue.COMPLEX_UNIT_SP);
         } else {
             v.setEllipsize(TextUtils.TruncateAt.END);
@@ -506,16 +515,16 @@ public final class Kit {
         }
         t.addView(amount, lp(-1, -2));
         if (k.detail != null && !k.detail.trim().isEmpty()) {
-            TextView detail = text(k.detail, 9f, Theme.MUTED, false);
+            TextView detail = text(k.detail, dashboardStyle ? 9.5f : 9f, Theme.MUTED, false);
             detail.setGravity(Gravity.CENTER_HORIZONTAL);
             detail.setSingleLine(true);
             detail.setEllipsize(TextUtils.TruncateAt.END);
-            detail.setMinHeight(Theme.dp(20));
+            detail.setMinHeight(Theme.dp(dashboardStyle ? 18 : 20));
             t.addView(detail, lp(-1, -2));
         }
         if (k.spark != null && k.spark.length > 1) {
-            LinearLayout.LayoutParams sp = lp(-1, Theme.dp(26));
-            sp.setMargins(0, Theme.dp(4), 0, Theme.dp(2));
+            LinearLayout.LayoutParams sp = lp(-1, Theme.dp(dashboardStyle ? 22 : 26));
+            sp.setMargins(0, Theme.dp(dashboardStyle ? 3 : 4), 0, Theme.dp(dashboardStyle ? 1 : 2));
             Sparkline sparkline = new Sparkline(a, k.spark, accent);
             sparkline.setContentDescription(k.sparkDescription == null
                     ? "روند هفت‌روزهٔ " + k.label : k.sparkDescription);
@@ -575,10 +584,12 @@ public final class Kit {
             note.setMinHeight(Theme.dp(32));
             t.addView(note, lp(-1, -2));
         }
-        TextView more = text(k.action != null ? "مشاهده جزئیات ›" : " ", 9.5f, Theme.MUTED, true);
-        more.setGravity(Gravity.CENTER_HORIZONTAL);
-        more.setSingleLine(true);
-        t.addView(more, lp(-1, -2));
+        if (!dashboardStyle) {
+            TextView more = text(k.action != null ? "مشاهده جزئیات ›" : " ", 9.5f, Theme.MUTED, true);
+            more.setGravity(Gravity.CENTER_HORIZONTAL);
+            more.setSingleLine(true);
+            t.addView(more, lp(-1, -2));
+        }
         String complete = k.fullValue == null || k.fullValue.trim().isEmpty() ? k.value : k.fullValue;
         String spoken = k.label + ": " + (complete == null ? "" : complete)
                 + (k.detail == null || k.detail.trim().isEmpty() ? "" : "؛ " + k.detail)
@@ -1853,7 +1864,7 @@ public final class Kit {
         return e;
     }
 
-    /** One 24dp Material vector icon family; 3D artwork is reserved for hero/empty states. */
+    /** Flat, tinted Material vector for compact controls; themed 3D marks use artworkIcon. */
     public ImageView icon(int res, int color, int dp) {
         ImageView v = new ImageView(a);
         try {
@@ -1877,11 +1888,39 @@ public final class Kit {
         return v;
     }
 
-    /** Duotone section mark: accent wash + a 24dp vector inside a small outlined circle. */
+    /**
+     * Theme-aware image for a section mark. Mapped 3D assets keep their original jewel colors;
+     * unmapped glyphs fall back to the normal tinted vector family.
+     */
+    public ImageView artworkIcon(int iconRes, int color, int sizeDp) {
+        int artwork = Theme.icon3d(iconRes);
+        if (!Theme.isIcon3d(artwork)) return icon(iconRes, color, sizeDp);
+        ImageView image = new ImageView(a);
+        try {
+            image.setImageResource(artwork);
+        } catch (Exception error) {
+            Diag.ignored("Kit:artworkIcon", error);
+            return icon(iconRes, color, sizeDp);
+        }
+        int size = Theme.dp(sizeDp);
+        image.setLayoutParams(new LinearLayout.LayoutParams(size, size));
+        image.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        image.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        return image;
+    }
+
+    /** 3D artwork when the selected theme provides it; otherwise an accent-washed vector badge. */
     public FrameLayout iconBadge(int iconRes, int accent, int sizeDp) {
+        int artwork = Theme.icon3d(iconRes);
         FrameLayout badge = new FrameLayout(a);
-        badge.setBackground(Theme.avatar(Theme.alpha(accent, Theme.isLight() ? 28 : 42)));
         badge.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        if (Theme.isIcon3d(artwork)) {
+            ImageView symbol = artworkIcon(iconRes, Theme.sectionText(accent), sizeDp);
+            symbol.setContentDescription(null);
+            badge.addView(symbol, new FrameLayout.LayoutParams(-1, -1, Gravity.CENTER));
+            return badge;
+        }
+        badge.setBackground(Theme.avatar(Theme.alpha(accent, Theme.isLight() ? 28 : 42)));
         int inner = Math.min(24, Math.max(16, sizeDp - 8));
         ImageView symbol = icon(iconRes, Theme.sectionText(accent), inner);
         symbol.setContentDescription(null);

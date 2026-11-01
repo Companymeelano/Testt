@@ -17,6 +17,7 @@ import android.view.InputDevice;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.HorizontalScrollView;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
@@ -144,6 +145,72 @@ public final class HomeDashboardScreenshotTest {
                 visibleText[0].contains("جزئیات اتصال"));
     }
 
+    private static void verifyDashboardPolish(Activity activity) {
+        assertTrue("Selected theme did not resolve 3D financial artwork",
+                Theme.isIcon3d(Theme.icon3d(R.drawable.mi_account_balance_wallet)));
+        assertTrue("Selected theme did not resolve 3D return artwork",
+                Theme.isIcon3d(Theme.icon3d(R.drawable.mi_assignment_return)));
+        Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
+        final View[] targets = new View[6];
+        final int[] facts = new int[4];
+        long layoutDeadline = SystemClock.uptimeMillis() + 3_000L;
+        do {
+            instrumentation.runOnMainSync(() -> {
+                View decor = activity.getWindow().getDecorView();
+                targets[0] = findTaggedView(decor, "home-financial-kpis");
+                targets[1] = targets[0] == null ? null
+                        : findTaggedView(targets[0], "home-financial-kpi");
+                targets[2] = findTaggedView(decor, "home-cash-position");
+                targets[3] = findTaggedView(decor, "home-closeout-card");
+                targets[4] = findTaggedView(decor, "home-smart-report-share");
+                targets[5] = findTaggedView(decor, "home-bottom-safe-space");
+                facts[0] = targets[0] == null ? 0 : countTaggedViews(targets[0], "home-financial-kpi");
+                facts[1] = targets[0] != null
+                        && containsViewType(targets[0], HorizontalScrollView.class) ? 1 : 0;
+                facts[2] = targets[1] == null ? 0 : targets[1].getWidth();
+                facts[3] = targets[5] == null ? 0 : targets[5].getHeight();
+            });
+            if (facts[2] > 0 && facts[3] > 0) break;
+            SystemClock.sleep(40L);
+        } while (SystemClock.uptimeMillis() < layoutDeadline);
+        assertNotNull("Financial KPI section is missing", targets[0]);
+        assertEquals("Financial KPIs still use a clipping horizontal carousel", 0, facts[1]);
+        assertEquals("Admin preview should show four complete financial metrics", 4, facts[0]);
+        assertNotNull("Financial metric tiles were not rendered", targets[1]);
+        assertTrue("Financial metric tile is too narrow for its value",
+                facts[2] >= 120f * activityDensity(targets[1]));
+        assertNotNull("Cash-position module is missing", targets[2]);
+        assertNotNull("Closeout module is missing", targets[3]);
+        assertNotNull("Smart-report share action is missing", targets[4]);
+        assertTrue("Smart-report share action is not clickable", targets[4].isClickable());
+        assertTrue("Smart-report share action is not accessible", targets[4].isFocusable());
+        assertNotNull("Home has no clearance below the last card", targets[5]);
+        assertTrue("Home's bottom clearance is smaller than 16dp",
+                facts[3] >= 16f * activityDensity(targets[5]));
+    }
+
+    private static boolean containsViewType(View view, Class<?> type) {
+        if (view == null) return false;
+        if (type.isInstance(view)) return true;
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++)
+                if (containsViewType(group.getChildAt(i), type)) return true;
+        }
+        return false;
+    }
+
+    private static int countTaggedViews(View view, String tag) {
+        if (view == null) return 0;
+        int count = tag.equals(view.getTag()) ? 1 : 0;
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++)
+                count += countTaggedViews(group.getChildAt(i), tag);
+        }
+        return count;
+    }
+
     private static void finishPreview(Activity activity) {
         InstrumentationRegistry.getInstrumentation().runOnMainSync(activity::finish);
         SystemClock.sleep(350L);
@@ -164,6 +231,7 @@ public final class HomeDashboardScreenshotTest {
         assertNotNull("Bottom navigation is missing", targets[1]);
         assertTrue("Bottom navigation is not a ViewGroup", targets[1] instanceof ViewGroup);
         assertNotNull("Collapsible brand header is missing", targets[2]);
+        verifyDashboardPolish(activity);
 
         ViewGroup dock = (ViewGroup) targets[1];
         assertEquals("Admin dock should have five destinations", 5, dock.getChildCount());

@@ -80,6 +80,16 @@ public final class DesignTokens {
         return mix(base, accent, 0.07f);
     }
 
+    /**
+     * Near-neutral dashboard metric surface. A 2.5% wash keeps the selected section hue present
+     * without the pastel blocks that make a dense financial dashboard feel noisy; the accent is
+     * carried by a distinct outline and its 3D icon instead.
+     */
+    public static int dashboardMetricSurface(int accent, boolean dark) {
+        int base = dark ? NIGHT_SURFACE : IVORY;
+        return mix(base, accent, 0.025f);
+    }
+
     /** Find a text-safe variant of an accent without changing the accent used by its icon. */
     public static int accessibleAccent(int accent, boolean dark) {
         return textSafeColor(accent, dark ? NIGHT_SURFACE : IVORY, dark);

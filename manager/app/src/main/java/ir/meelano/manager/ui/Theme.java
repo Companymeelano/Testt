@@ -178,6 +178,8 @@ public final class Theme {
         if (vector == R.drawable.mi_widgets) return R.drawable.icon3d_more;
         if (vector == R.drawable.mi_calendar_month) return R.drawable.icon3d_dues;
         if (vector == R.drawable.mi_zoom) return R.drawable.icon3d_zoom;
+        if (vector == R.drawable.mi_assignment_return)
+            return nuts ? R.drawable.icon3d_medal_refresh : R.drawable.icon3d_refresh;
         if (vector == R.drawable.mi_sell) return light ? R.drawable.icon3d_light_tag : R.drawable.icon3d_dark_tag;
         if (vector == R.drawable.mi_point_of_sale) return nuts ? R.drawable.icon3d_medal_sales : R.drawable.icon3d_sales;
         if (vector == R.drawable.mi_shopping_cart) return nuts ? R.drawable.icon3d_medal_purchase : R.drawable.icon3d_purchase;
@@ -559,6 +561,15 @@ public final class Theme {
     public static GradientDrawable kpi(int accent) {
         return base(DesignTokens.surfaceTint(accent, !light), 20, dp(1),
                 alpha(accent, light ? 68 : 86));
+    }
+
+    /**
+     * Dashboard-only metric tile: near-neutral fill, stronger section outline, and no pastel slab.
+     * The caller's 3D artwork supplies the rich color while the text stays on a quiet surface.
+     */
+    public static GradientDrawable dashboardMetric(int accent) {
+        return base(DesignTokens.dashboardMetricSurface(accent, !light), 17, dp(1),
+                alpha(accent, light ? 126 : 146));
     }
 
     /** Primary button gradient, toned toward a high-contrast ink/paper foreground. */

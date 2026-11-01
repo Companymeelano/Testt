@@ -1598,6 +1598,9 @@ public class HomeScreen extends Screen {
             content.addView(block, a.kit.lp(-1, -2));
         }
         renderNotes(content, d.notes);
+        View safeTail = a.kit.gap(20);
+        safeTail.setTag("home-bottom-safe-space");
+        content.addView(safeTail, a.kit.lp(-1, Theme.dp(20)));
         localizeHomeNumbers(content);
         staggerIn(content);
     }
@@ -1778,36 +1781,19 @@ public class HomeScreen extends Screen {
 
         if (tiles.isEmpty()) return;
         LinearLayout card = a.kit.card(Theme.GOLD);
+        card.setTag("home-financial-kpis");
         card.addView(a.kit.sectionHeader("شاخص‌های مالی", R.drawable.mi_account_balance_wallet,
                 Theme.GOLD, null, null), a.kit.lp(-1, -2));
-        TextView subtitle = a.kit.text("خرید، دریافت و پرداخت " + snapshotLabel(d) + " · برگشتی در ۳۰ روز اخیر",
-                9.5f, Theme.MUTED, false);
-        subtitle.setSingleLine(true);
+        TextView subtitle = a.kit.text("جریان مالی " + snapshotLabel(d)
+                        + " · اسناد برگشتی در ۳۰ روز گذشته",
+                10f, Theme.MUTED, false);
+        subtitle.setMaxLines(2);
         subtitle.setEllipsize(TextUtils.TruncateAt.END);
         card.addView(subtitle, a.kit.lp(-1, -2));
         card.addView(a.kit.gap(6));
-
-        HorizontalScrollView scroll = new HorizontalScrollView(a);
-        scroll.setHorizontalScrollBarEnabled(false);
-        scroll.setHorizontalFadingEdgeEnabled(true);
-        scroll.setFadingEdgeLength(Theme.dp(18));
-        scroll.setClipToPadding(false);
-        scroll.setFillViewport(false);
-        scroll.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        LinearLayout strip = a.kit.h();
-        strip.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        strip.setGravity(Gravity.CENTER_VERTICAL);
-        strip.setPadding(Theme.dp(2), Theme.dp(2), Theme.dp(2), Theme.dp(2));
-        int tileWidth = ir.meelano.manager.ui.Ui.widthDp(a) >= 600 ? 168 : 148;
-        for (int i = 0; i < tiles.size(); i++) {
-            View tile = a.kit.kpiTile(tiles.get(i));
-            LinearLayout.LayoutParams p = a.kit.lp(Theme.dp(tileWidth), -2);
-            if (i < tiles.size() - 1) p.setMarginEnd(Theme.dp(8));
-            strip.addView(tile, p);
-        }
-        scroll.addView(strip, new HorizontalScrollView.LayoutParams(-2, -2));
-        scroll.setContentDescription("شاخص‌های مالی؛ برای دیدن همهٔ شاخص‌ها افقی بکشید");
-        card.addView(scroll, a.kit.lp(-1, -2));
+        // A complete RTL grid replaces the clipped horizontal carousel: every metric is visible
+        // at a glance, while wide screens naturally open to four columns through Kit.kpiGrid.
+        card.addView(a.kit.kpiGrid(tiles, 2), a.kit.lp(-1, -2));
         a.kit.addCard(content, card);
     }
 
@@ -1850,6 +1836,7 @@ public class HomeScreen extends Screen {
         Kit.Kpi tile = new Kit.Kpi(label,
                 available ? ir.meelano.manager.core.Money.toUnit(amountRials) : Double.NaN,
                 amount + (unit.isEmpty() ? "" : " " + unit), sub, accent, action);
+        tile.dashboardStyle = true;
         tile.fullValue = available ? HomeNumberFormatter.money(amountRials) : "داده در دسترس نیست";
         tile.detail = detail;
         tile.neutralStatus = neutralReturn;
@@ -1923,19 +1910,34 @@ public class HomeScreen extends Screen {
         return Theme.SECTION_SALES;
     }
 
-    /** Vector icon in a quiet accent circle; data cards never use the 3D artwork set. */
+    /** Theme-aware 3D dashboard mark; unmapped glyphs retain the quiet accent-circle fallback. */
     private ImageView dashboardArt(int iconVector) {
         return dashboardArt(iconVector, dashboardAccent(iconVector));
     }
 
     private ImageView dashboardArt(int iconVector, int accent) {
-        ImageView image = a.kit.icon(iconVector, Theme.sectionText(accent), 24);
-        image.setBackground(Theme.avatar(Theme.alpha(accent, Theme.isLight() ? 26 : 40)));
-        int inset = Theme.dp(6);
-        image.setPadding(inset, inset, inset, inset);
+        int artwork = Theme.icon3d(iconVector);
+        ImageView image = a.kit.artworkIcon(iconVector, Theme.sectionText(accent), 36);
+        if (!Theme.isIcon3d(artwork)) {
+            image.setBackground(Theme.avatar(Theme.alpha(accent, Theme.isLight() ? 26 : 40)));
+            int inset = Theme.dp(6);
+            image.setPadding(inset, inset, inset, inset);
+        }
         image.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         image.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         return image;
+    }
+
+    /** Small but fully accessible action used at the end of a dashboard section heading. */
+    private Button dashboardHeaderAction(String label, int accent, String spoken,
+                                         View.OnClickListener action) {
+        Button button = a.kit.btnGhost(label, accent, action);
+        button.setTextSize(10.5f * Theme.fontScale());
+        button.setPadding(Theme.dp(8), Theme.dp(4), Theme.dp(8), Theme.dp(4));
+        button.setMinWidth(Theme.dp(48));
+        button.setMinHeight(Theme.dp(48));
+        button.setContentDescription(spoken);
+        return button;
     }
 
     /** Dashboard sections use the same accessible SectionHeader as every other screen. */
@@ -2077,6 +2079,71 @@ public class HomeScreen extends Screen {
             LinearLayout.LayoutParams tp = a.kit.wlp(1f);
             if (i % cols != 0) tp.setMargins(0, 0, Theme.dp(8), 0);
             row.addView(tile, tp);
+        }
+        return root;
+    }
+
+    /** Neutral, theme-aware 2-column dashboard summary grid for cash and closeout modules. */
+    private View dashboardMetricGrid(List<Mini> metrics, int columns, int accent) {
+        LinearLayout root = a.kit.v();
+        root.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        if (metrics == null || metrics.isEmpty()) return root;
+        int span = Math.max(1, columns);
+        for (int start = 0; start < metrics.size();) {
+            int count = Math.min(span, metrics.size() - start);
+            LinearLayout row = a.kit.h();
+            row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+            row.setGravity(Gravity.TOP);
+            LinearLayout.LayoutParams rowParams = a.kit.lp(-1, -2);
+            if (start > 0) rowParams.topMargin = Theme.dp(8);
+            root.addView(row, rowParams);
+
+            for (int offset = 0; offset < count; offset++) {
+                Mini metric = metrics.get(start + offset);
+                LinearLayout tile = a.kit.v();
+                tile.setBackground(Theme.dashboardMetric(accent));
+                tile.setPadding(Theme.dp(10), Theme.dp(9), Theme.dp(10), Theme.dp(9));
+                tile.setMinimumHeight(Theme.dp(78));
+
+                LinearLayout heading = a.kit.h();
+                heading.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+                heading.setGravity(Gravity.CENTER_VERTICAL);
+                ImageView mark = dashboardArt(metric.icon, dashboardAccent(metric.icon));
+                heading.addView(mark, new LinearLayout.LayoutParams(Theme.dp(28), Theme.dp(28)));
+                heading.addView(a.kit.space(6));
+                TextView label = a.kit.text(metric.label, 10.5f, Theme.MUTED, false);
+                label.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+                label.setMaxLines(2);
+                label.setEllipsize(TextUtils.TruncateAt.END);
+                heading.addView(label, a.kit.wlp(1f));
+                tile.addView(heading, a.kit.lp(-1, -2));
+
+                int valueColor = metric.valueColor == 0 ? Theme.TEXT : metric.valueColor;
+                View amount = a.kit.amountLine(metric.value, 14f, Gravity.START, valueColor);
+                if (amount instanceof TextView && android.os.Build.VERSION.SDK_INT >= 26) {
+                    float scale = Theme.fontScale() * Theme.typeScale();
+                    ((TextView) amount).setAutoSizeTextTypeUniformWithConfiguration(
+                            Math.max(9, Math.round(9f * scale)),
+                            Math.max(10, Math.round(14f * scale)), 1,
+                            android.util.TypedValue.COMPLEX_UNIT_SP);
+                }
+                tile.addView(amount, a.kit.lp(-1, -2));
+                if (metric.note != null && !metric.note.trim().isEmpty()) {
+                    TextView note = a.kit.text(metric.note, 9.5f, Theme.MUTED, false);
+                    note.setGravity(Gravity.START);
+                    note.setMaxLines(2);
+                    note.setEllipsize(TextUtils.TruncateAt.END);
+                    tile.addView(note, a.kit.lp(-1, -2));
+                }
+                String spoken = metric.label + "، " + metric.value
+                        + (metric.note == null || metric.note.trim().isEmpty() ? "" : "؛ " + metric.note);
+                tile.setContentDescription(spoken);
+                if (android.os.Build.VERSION.SDK_INT >= 26) tile.setTooltipText(spoken);
+
+                row.addView(tile, a.kit.wlp(span / (float) count));
+                if (offset < count - 1) row.addView(a.kit.space(8));
+            }
+            start += count;
         }
         return root;
     }
@@ -2746,49 +2813,48 @@ public class HomeScreen extends Screen {
                 : java.util.Collections.emptyList();
 
         LinearLayout card = a.kit.card(Theme.SECTION_CASH_POSITION);
-        card.addView(boardHead("موقعیت نقدی", "گردش نقد صندوق به‌صورت آبشاری • " + day,
-                R.drawable.mi_account_balance_wallet, null), a.kit.lp(-1, -2));
-        card.addView(statRow(R.drawable.mi_receipt_long, "دریافت نقد امروز",
-                receiptsAvailable ? HomeNumberFormatter.money(receipts) : "تفکیک نقد موجود نیست",
-                Theme.SECTION_RECEIVE), a.kit.lp(-1, -2));
-        card.addView(a.kit.gap(6));
-        card.addView(statRow(R.drawable.mi_payments, "پرداخت نقد امروز",
-                paymentsAvailable ? HomeNumberFormatter.money(payments) : "تفکیک نقد موجود نیست",
-                Theme.SECTION_PAY), a.kit.lp(-1, -2));
-        card.addView(a.kit.gap(5));
+        card.setTag("home-cash-position");
+        Button entry = dashboardHeaderAction("ثبت صندوق", Theme.SECTION_CASH_POSITION,
+                "ثبت ماندهٔ آغاز و شمارش پایان صندوق؛ فقط روی این دستگاه",
+                v -> showCloseoutCashDialog(content, d, day));
+        card.addView(boardHead("موقعیت نقدی", "گردش صندوق به‌صورت آبشاری • " + day,
+                R.drawable.mi_account_balance_wallet, entry, Theme.SECTION_CASH_POSITION),
+                a.kit.lp(-1, -2));
 
-        if (steps.isEmpty()) {
-            String reason = !flowAvailable
-                    ? "دادهٔ تفکیک نقد دریافت یا پرداخت در دسترس نیست."
-                    : (opening == null ? "موجودی آغاز روز ثبت نشده است."
-                            : "گردش نقد این روز قابل محاسبه نیست.");
-            card.addView(a.kit.emptyRow(reason), a.kit.lp(-1, -2));
-            String nextStep = !flowAvailable
-                    ? "پس از در دسترس بودن تفکیک دریافت و پرداخت، گردش نقد نمایش داده می‌شود."
-                    : (opening == null ? "با ثبت ماندهٔ آغاز روز، نمودار گردش نقد نمایش داده می‌شود."
-                            : "برای محاسبهٔ گردش، داده‌های همین روز را تازه‌سازی کنید.");
-            card.addView(a.kit.hint(nextStep + " این برآورد، موجودی حساب بانکی نیست."),
-                    a.kit.lp(-1, -2));
-        } else {
+        List<Mini> metrics = new ArrayList<>();
+        metrics.add(new Mini(R.drawable.mi_receipt_long, "دریافت نقد امروز",
+                receiptsAvailable ? HomeNumberFormatter.money(receipts) : "—",
+                receiptsAvailable ? "ورودی ثبت‌شده" : "تفکیک نقد موجود نیست", Theme.TEXT));
+        metrics.add(new Mini(R.drawable.mi_payments, "پرداخت نقد امروز",
+                paymentsAvailable ? HomeNumberFormatter.money(payments) : "—",
+                paymentsAvailable ? "خروجی ثبت‌شده" : "تفکیک نقد موجود نیست", Theme.TEXT));
+        if (!steps.isEmpty()) {
             double expectedClosing = steps.get(steps.size() - 1).endRials;
-            card.addView(statRow(R.drawable.mi_account_balance_wallet, "ماندهٔ نقد مورد انتظار",
-                    HomeNumberFormatter.money(expectedClosing), Theme.SECTION_CASH_POSITION),
-                    a.kit.lp(-1, -2));
-            HomeCashWaterfall waterfall = new HomeCashWaterfall(a);
-            waterfall.setSteps(steps);
-            card.addView(waterfall, a.kit.lp(-1, Theme.dp(220)));
-            card.addView(a.kit.hint("ماندهٔ پایان، برآوردِ ماندهٔ آغاز + دریافت نقد − پرداخت نقد است؛ موجودی حساب بانکی از گردش به‌تنهایی استنباط نمی‌شود."),
-                    a.kit.lp(-1, -2));
+            metrics.add(new Mini(R.drawable.mi_account_balance_wallet, "ماندهٔ نقد مورد انتظار",
+                    HomeNumberFormatter.money(expectedClosing), "برآورد پایان روز", Theme.TEXT));
         }
         String counted = a.settings.closeoutCashCounted(day);
         if (counted != null && !counted.trim().isEmpty()) {
-            card.addView(a.kit.gap(5));
-            card.addView(statRow(R.drawable.mi_point_of_sale, "اختلاف با شمارش پایان صندوق",
-                    closeoutVarianceLabel(d, day), Theme.SECTION_CLOSEOUT), a.kit.lp(-1, -2));
+            metrics.add(new Mini(R.drawable.mi_point_of_sale, "اختلاف با شمارش",
+                    closeoutVarianceLabel(d, day), "تطبیق پایان صندوق", Theme.TEXT));
         }
-        card.addView(a.kit.btnGhost("ثبت ماندهٔ آغاز و شمارش پایان (فقط دستگاه)",
-                Theme.SECTION_CASH_POSITION, v -> showCloseoutCashDialog(content, d, day)),
+        card.addView(dashboardMetricGrid(metrics, 2, Theme.SECTION_CASH_POSITION),
                 a.kit.lp(-1, -2));
+
+        if (steps.isEmpty()) {
+            String nextStep = !flowAvailable
+                    ? "برای نمودار، تفکیک نقد دریافت و پرداخت باید در دسترس باشد."
+                    : (opening == null ? "با ثبت ماندهٔ نقد آغاز روز، نمودار گردش نمایش داده می‌شود."
+                            : "گردش نقد این روز قابل محاسبه نیست؛ داده‌های همان روز را تازه‌سازی کنید.");
+            card.addView(a.kit.hint(nextStep + " ماندهٔ محاسباتی، موجودی حساب بانکی نیست."),
+                    a.kit.lp(-1, -2));
+        } else {
+            HomeCashWaterfall waterfall = new HomeCashWaterfall(a);
+            waterfall.setSteps(steps);
+            card.addView(waterfall, a.kit.lp(-1, Theme.dp(196)));
+            card.addView(a.kit.hint("ماندهٔ پایان = ماندهٔ آغاز + دریافت نقد − پرداخت نقد؛ این رقم موجودی حساب بانکی نیست."),
+                    a.kit.lp(-1, -2));
+        }
         a.kit.addCard(content, card);
     }
 
@@ -3327,48 +3393,66 @@ public class HomeScreen extends Screen {
         if (!RoleStore.allowed(a, "closeout")) return;
         final String day = snapshotDay(d);
         LinearLayout card = a.kit.card(Theme.SECTION_CLOSEOUT);
-        card.addView(boardHead("بستن روز", "خلاصهٔ ثبت‌شده و تطبیق نقد صندوق • " + day,
-                R.drawable.mi_point_of_sale, null), a.kit.lp(-1, -2));
+        card.setTag("home-closeout-card");
+        Button entry = dashboardHeaderAction("ثبت صندوق", Theme.SECTION_CLOSEOUT,
+                "ثبت ماندهٔ آغاز و شمارش پایان صندوق؛ فقط روی این دستگاه",
+                v -> showCloseoutCashDialog(content, d, day));
+        card.addView(boardHead("بستن روز", "خلاصهٔ عملکرد و تطبیق صندوق • " + day,
+                R.drawable.mi_point_of_sale, entry, Theme.SECTION_CLOSEOUT), a.kit.lp(-1, -2));
 
         boolean salesAvailable = d.salesSnapshot != null && d.salesSnapshot.isAvailable()
                 && RoleStore.allowed(a, "sales");
-        card.addView(statRow(R.drawable.mi_sell, "فروش روز",
-                salesAvailable ? HomeNumberFormatter.money(d.salesSnapshot.salesRialsOn(day))
-                        : "داده در دسترس نیست", Theme.SECTION_SALES), a.kit.lp(-1, -2));
-        card.addView(a.kit.gap(6));
-        card.addView(statRow(R.drawable.mi_receipt_long, "دریافت ثبت‌شده",
-                d.inDay == null ? "داده در دسترس نیست" : HomeNumberFormatter.money(d.inDay.d("total")),
-                Theme.SECTION_RECEIVE), a.kit.lp(-1, -2));
-        card.addView(a.kit.gap(6));
-        card.addView(statRow(R.drawable.mi_payments, "پرداخت ثبت‌شده",
-                d.outDay == null ? "داده در دسترس نیست" : HomeNumberFormatter.money(d.outDay.d("total")),
-                Theme.SECTION_PAY), a.kit.lp(-1, -2));
-        card.addView(a.kit.gap(6));
-
+        String salesNote = salesAvailable
+                ? HomeNumberFormatter.integer(d.salesSnapshot.documentsOn(day)) + " فاکتور"
+                : "داده در دسترس نیست";
+        String receiveNote = d.inDay == null ? "داده در دسترس نیست"
+                : HomeNumberFormatter.integer(d.inDay.l("count")) + " قبض";
+        String paymentNote = d.outDay == null ? "داده در دسترس نیست"
+                : HomeNumberFormatter.integer(d.outDay.l("count")) + " قبض";
         long returnDocs = sumLongField(d.returnsToday, "docs");
-        String returnValue = !d.returnsTodayAvailable ? "داده در دسترس نیست"
-                : HomeNumberFormatter.money(sumField(d.returnsToday, "total")) + " • "
-                + HomeNumberFormatter.integer(returnDocs) + " سند";
-        card.addView(statRow(R.drawable.mi_assignment_return, "برگشتی امروز", returnValue,
-                Theme.SECTION_RETURNS), a.kit.lp(-1, -2));
-        card.addView(a.kit.gap(6));
-
-        String grossProfit = !d.grossProfitAvailable ? "مبنای بهای تمام‌شده در دسترس نیست"
-                : HomeNumberFormatter.money(grossProfitOnDay(d, day)) + " • برآورد";
-        card.addView(statRow(R.drawable.mi_bar_chart, "سود ناخالص برآوردی", grossProfit,
-                Theme.SECTION_CLOSEOUT), a.kit.lp(-1, -2));
-        card.addView(a.kit.gap(8));
+        String returnNote = d.returnsTodayAvailable
+                ? HomeNumberFormatter.integer(returnDocs) + " سند" : "داده در دسترس نیست";
+        String profitNote = d.grossProfitAvailable ? "برآورد بر پایهٔ بهای ثبت‌شده"
+                : "مبنای بهای تمام‌شده موجود نیست";
         String variance = closeoutVarianceLabel(d, day);
-        card.addView(statRow(R.drawable.mi_point_of_sale, "اختلاف شمارش صندوق",
-                variance, Theme.SECTION_CLOSEOUT), a.kit.lp(-1, -2));
-        card.addView(a.kit.btnGhost("ثبت موجودی آغاز و شمارش پایان صندوق", Theme.SECTION_CLOSEOUT,
-                v -> showCloseoutCashDialog(content, d, day)), a.kit.lp(-1, -2));
+
+        List<Mini> metrics = new ArrayList<>();
+        metrics.add(new Mini(R.drawable.mi_sell, "فروش روز",
+                salesAvailable ? HomeNumberFormatter.money(d.salesSnapshot.salesRialsOn(day)) : "—",
+                salesNote, Theme.TEXT));
+        metrics.add(new Mini(R.drawable.mi_receipt_long, "دریافت ثبت‌شده",
+                d.inDay == null ? "—" : HomeNumberFormatter.money(d.inDay.d("total")),
+                receiveNote, Theme.TEXT));
+        metrics.add(new Mini(R.drawable.mi_payments, "پرداخت ثبت‌شده",
+                d.outDay == null ? "—" : HomeNumberFormatter.money(d.outDay.d("total")),
+                paymentNote, Theme.TEXT));
+        metrics.add(new Mini(R.drawable.mi_assignment_return, "برگشتی امروز",
+                d.returnsTodayAvailable ? HomeNumberFormatter.money(sumField(d.returnsToday, "total")) : "—",
+                returnNote, Theme.TEXT));
+        metrics.add(new Mini(R.drawable.mi_bar_chart, "سود ناخالص برآوردی",
+                d.grossProfitAvailable ? HomeNumberFormatter.money(grossProfitOnDay(d, day)) : "—",
+                profitNote, Theme.TEXT));
+        metrics.add(new Mini(R.drawable.mi_point_of_sale, "اختلاف شمارش صندوق",
+                variance, "در برابر ماندهٔ مورد انتظار", Theme.TEXT));
+        int metricColumns = ir.meelano.manager.ui.Ui.widthDp(a) >= 600 ? 3 : 2;
+        card.addView(dashboardMetricGrid(metrics, metricColumns, Theme.SECTION_CLOSEOUT),
+                a.kit.lp(-1, -2));
         card.addView(a.kit.gap(8));
-        card.addView(a.kit.btnGhost("اشتراک گزارش پایان روز (PDF)", Theme.SECTION_CLOSEOUT,
-                v -> shareCloseoutReport(d, day, false)), a.kit.lp(-1, -2));
-        card.addView(a.kit.gap(5));
-        card.addView(a.kit.btnGhost("چاپ گزارش پایان روز", Theme.SECTION_CLOSEOUT,
-                v -> shareCloseoutReport(d, day, true)), a.kit.lp(-1, -2));
+
+        LinearLayout exports = a.kit.h();
+        exports.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        Button share = a.kit.btnGhost("اشتراک PDF", Theme.SECTION_CLOSEOUT,
+                v -> shareCloseoutReport(d, day, false));
+        share.setTextSize(11f * Theme.fontScale());
+        share.setContentDescription("اشتراک گزارش پایان روز به‌صورت PDF");
+        Button print = a.kit.btnGhost("چاپ گزارش", Theme.SECTION_CLOSEOUT,
+                v -> shareCloseoutReport(d, day, true));
+        print.setTextSize(11f * Theme.fontScale());
+        print.setContentDescription("چاپ گزارش پایان روز");
+        exports.addView(share, a.kit.wlp(1f));
+        exports.addView(a.kit.space(8));
+        exports.addView(print, a.kit.wlp(1f));
+        card.addView(exports, a.kit.lp(-1, -2));
         a.kit.addCard(content, card);
     }
 
@@ -3474,31 +3558,43 @@ public class HomeScreen extends Screen {
         if (!RoleStore.allowed(a, "sales")) return;
         final List<String> sentences = smartReportSentences(d);
         LinearLayout card = a.kit.card(Theme.SECTION_SALES);
+        card.setTag("home-smart-report");
+        Button share = dashboardHeaderAction("اشتراک", Theme.SECTION_SALES,
+                "اشتراک تصویر برندشدهٔ گزارش هوشمند امروز", v -> {
+                    try {
+                        a.shareImage(SmartReportImage.create(a,
+                                d == null ? Jalali.todayStr() : d.snapshotDay, sentences),
+                                "گزارش هوشمند امروز میلانو");
+                    } catch (Exception e) {
+                        a.kit.toast("ساخت تصویر ممکن نشد");
+                    }
+                });
+        share.setTag("home-smart-report-share");
         card.addView(boardHead("گزارش هوشمند امروز", "سه نکته بر پایهٔ داده‌های ثبت‌شده",
-                R.drawable.mi_star_shine, null), a.kit.lp(-1, -2));
-        for (String sentence : sentences) {
+                R.drawable.mi_star_shine, share, Theme.SECTION_SALES), a.kit.lp(-1, -2));
+        for (int i = 0; i < sentences.size(); i++) {
+            String sentence = sentences.get(i);
             LinearLayout line = a.kit.h();
+            line.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
             line.setGravity(Gravity.TOP);
-            TextView star = a.kit.text("✦", 14f, Theme.GOLD, true);
-            star.setContentDescription(null);
-            line.addView(star, a.kit.lp(Theme.dp(24), -2));
-            TextView copy = a.kit.text(sentence, 11.5f, Theme.TEXT, false);
+            TextView rank = a.kit.text(HomeNumberFormatter.integer(i + 1), 9.5f,
+                    Theme.sectionText(Theme.SECTION_SALES), true);
+            rank.setGravity(Gravity.CENTER);
+            rank.setMinWidth(Theme.dp(24));
+            rank.setMinHeight(Theme.dp(24));
+            rank.setBackground(Theme.pill(Theme.SECTION_SALES));
+            rank.setContentDescription(null);
+            line.addView(rank, a.kit.lp(Theme.dp(28), Theme.dp(26)));
+            line.addView(a.kit.space(5));
+            TextView copy = a.kit.text(sentence, 12f, Theme.TEXT, false);
             copy.setMaxLines(3);
             copy.setEllipsize(TextUtils.TruncateAt.END);
             line.addView(copy, a.kit.wlp(1f));
             line.setContentDescription(sentence);
             LinearLayout.LayoutParams lineParams = a.kit.lp(-1, -2);
-            lineParams.topMargin = Theme.dp(5);
+            lineParams.topMargin = Theme.dp(7);
             card.addView(line, lineParams);
         }
-        card.addView(a.kit.btnGhost("اشتراک تصویر برندشده", Theme.GOLD, v -> {
-            try {
-                a.shareImage(SmartReportImage.create(a, d == null ? Jalali.todayStr() : d.snapshotDay,
-                        sentences), "گزارش هوشمند امروز میلانو");
-            } catch (Exception e) {
-                a.kit.toast("ساخت تصویر ممکن نشد");
-            }
-        }), a.kit.lp(-1, -2));
         a.kit.addCard(content, card);
     }
 

@@ -55,6 +55,26 @@ public class DesignTokensTest {
         }
     }
 
+    @Test public void dashboardMetricSurfacesStayQuietAndReadableInBothSkins() {
+        int[] accents = {DesignTokens.SALES, DesignTokens.PURCHASE, DesignTokens.RECEIVE,
+                DesignTokens.PAY, DesignTokens.RETURNS, DesignTokens.CLOSEOUT,
+                DesignTokens.CASH_POSITION};
+        for (int accent : accents) {
+            int lightSurface = DesignTokens.dashboardMetricSurface(accent, false);
+            int darkSurface = DesignTokens.dashboardMetricSurface(accent, true);
+            assertTrue("light dashboard metric text contrast",
+                    DesignTokens.contrastRatio(DesignTokens.INK, lightSurface) >= 4.8);
+            assertTrue("light dashboard muted-label contrast",
+                    DesignTokens.contrastRatio(DesignTokens.LIGHT_MUTED, lightSurface) >= 4.8);
+            assertTrue("dark dashboard metric text contrast",
+                    DesignTokens.contrastRatio(DesignTokens.NIGHT_TEXT, darkSurface) >= 4.8);
+            assertTrue("dark dashboard muted-label contrast",
+                    DesignTokens.contrastRatio(DesignTokens.NIGHT_MUTED, darkSurface) >= 4.8);
+            assertTrue("dashboard metric uses less tint than a standard card",
+                    lightSurface != DesignTokens.surfaceTint(accent, false));
+        }
+    }
+
     @Test public void tintedComponentPreviewTextPassesAaInLightAndDarkModes() {
         int[] tones = {DesignTokens.EMERALD, DesignTokens.POSITIVE, DesignTokens.NEGATIVE,
                 DesignTokens.WARNING, DesignTokens.INFO};

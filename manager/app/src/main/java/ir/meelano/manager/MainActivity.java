@@ -880,12 +880,18 @@ public class MainActivity extends Activity {
         watchLink();
     }
 
-    /** Consistent duotone vector icon for the header toolbar. */
+    /** Theme-aware toolbar artwork: mapped 3D marks stay untinted; other actions use duotone vectors. */
     private android.widget.ImageView toolIcon(int res) {
         android.widget.ImageView iv = new android.widget.ImageView(this);
         try {
-            iv.setImageResource(res);
-            iv.setColorFilter(Theme.sectionText(Theme.PRIMARY));
+            int artwork = Theme.icon3d(res);
+            if (Theme.isIcon3d(artwork)) {
+                iv.setImageResource(artwork);
+                iv.clearColorFilter();
+            } else {
+                iv.setImageResource(res);
+                iv.setColorFilter(Theme.sectionText(Theme.PRIMARY));
+            }
             iv.setScaleType(android.widget.ImageView.ScaleType.CENTER_INSIDE);
             iv.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         } catch (Exception ignored) { Diag.ignored("MainActivity:toolIcon", ignored); }

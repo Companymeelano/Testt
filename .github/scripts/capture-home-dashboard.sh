@@ -154,7 +154,7 @@ if [ "$instrumentation_result" -ne 0 ] \
   done || true
   exit 1
 fi
-echo "::notice title=Home screenshot instrumentation::Instrumented Light and Dark rendering test passed."
+echo "::notice title=Home UI instrumentation::Light/Dark rendering, Nuts large-font layout, 48dp touch targets, and accessibility labels passed."
 
 mkdir -p ../design/screenshots
 screenshot_dir="files/home-dashboard-screenshots"

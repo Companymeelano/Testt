@@ -28,6 +28,7 @@ import org.junit.runner.RunWith;
 
 import ir.meelano.licensing.License;
 import ir.meelano.manager.MainActivity;
+import ir.meelano.manager.R;
 import ir.meelano.manager.core.AtiranAuth;
 import ir.meelano.manager.core.DeviceId;
 import ir.meelano.manager.core.Jalali;
@@ -35,20 +36,63 @@ import ir.meelano.manager.core.LicenseStore;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.RoleStore;
 import ir.meelano.manager.data.Settings;
+import ir.meelano.manager.ui.Theme;
 
 import java.io.File;
 import java.io.FileOutputStream;
 
-/** Seed-only instrumentation preview used by CI to capture the real Views in Light and Dark. */
+/** Seed-only instrumentation preview for real Light/Dark screenshots and large-font Nuts accessibility checks. */
 @RunWith(AndroidJUnit4.class)
 public final class HomeDashboardScreenshotTest {
-    @Test public void captureHomeLightAndDark() throws Exception {
+    @Test public void captureThemesAndVerifyLargeFontNutsAccessibility() throws Exception {
         Context target = InstrumentationRegistry.getInstrumentation().getTargetContext();
         capture(target, "light", "home-dashboard-light.png");
         capture(target, "dark", "home-dashboard-dark.png");
+        verifyLargeFontNuts(target);
     }
 
     private void capture(Context target, String theme, String filename) throws Exception {
+        Activity activity = startPreview(target, theme, 1);
+        verifyShellInteractions(activity);
+        // Do not wait for global UI idleness: the live chart may animate continuously.
+        SystemClock.sleep(500L);
+        Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
+        final Bitmap[] captured = {null};
+        instrumentation.runOnMainSync(() -> {
+            View decor = activity.getWindow().getDecorView();
+            if (decor.getWidth() <= 0 || decor.getHeight() <= 0) return;
+            Bitmap bitmap = Bitmap.createBitmap(decor.getWidth(), decor.getHeight(), Bitmap.Config.ARGB_8888);
+            decor.draw(new Canvas(bitmap));
+            captured[0] = bitmap;
+        });
+        Bitmap screenshot = captured[0];
+        assertNotNull("Home activity could not render a screenshot", screenshot);
+        File directory = new File(target.getFilesDir(), "home-dashboard-screenshots");
+        if (!directory.exists() && !directory.mkdirs()) throw new IllegalStateException("Cannot create screenshot directory");
+        File output = new File(directory, filename);
+        try (FileOutputStream stream = new FileOutputStream(output)) {
+            if (!screenshot.compress(Bitmap.CompressFormat.PNG, 100, stream))
+                throw new IllegalStateException("PNG encoding failed: " + filename);
+        } finally {
+            screenshot.recycle();
+        }
+        finishPreview(activity);
+    }
+
+    /** Exercise the preserved Nuts identity with the app's largest text setting. */
+    private void verifyLargeFontNuts(Context target) throws Exception {
+        Activity activity = startPreview(target, "nuts", 3);
+        try {
+            assertTrue("Nuts theme did not remain active", Theme.isNuts());
+            assertEquals("Nuts theme crest was not selected", R.drawable.meelano_nuts, Theme.logoRes());
+            assertEquals("Largest text setting was not applied", 1.3f, Theme.fontScale(), 0.001f);
+            verifyShellInteractions(activity);
+        } finally {
+            finishPreview(activity);
+        }
+    }
+
+    private Activity startPreview(Context target, String theme, int zoomIndex) throws Exception {
         target.getSharedPreferences("meelano_manager7", Context.MODE_PRIVATE).edit().clear().commit();
         target.getSharedPreferences("meelano_login", Context.MODE_PRIVATE).edit().clear().commit();
         target.getSharedPreferences("meelano_roles", Context.MODE_PRIVATE).edit().clear().commit();
@@ -56,6 +100,8 @@ public final class HomeDashboardScreenshotTest {
 
         Settings settings = new Settings(target);
         settings.setThemeMode(theme);
+        settings.setZoomIdx(zoomIndex);
+        settings.setBigFont(zoomIndex >= 3);
         settings.setMoneyUnit(Money.UNIT_TOMAN);
         settings.setHomeSimpleMode(true);
         settings.setHomeOrder(Settings.HOME_ORDER_DEFAULT);
@@ -78,7 +124,11 @@ public final class HomeDashboardScreenshotTest {
         Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
         Activity activity = instrumentation.startActivitySync(launch);
         assertNotNull("Manager shell did not start", activity);
+        awaitDashboard(instrumentation, activity);
+        return activity;
+    }
 
+    private static void awaitDashboard(Instrumentation instrumentation, Activity activity) {
         String[] visibleText = {""};
         long deadline = SystemClock.uptimeMillis() + 20_000L;
         while (SystemClock.uptimeMillis() < deadline) {
@@ -92,28 +142,9 @@ public final class HomeDashboardScreenshotTest {
                 visibleText[0].contains("شاخص‌های مالی"));
         assertFalse("Preview screenshot contains a live connection error",
                 visibleText[0].contains("جزئیات اتصال"));
-        verifyShellInteractions(activity);
-        // Do not wait for global UI idleness: the live chart may animate continuously.
-        SystemClock.sleep(500L);
-        final Bitmap[] captured = {null};
-        instrumentation.runOnMainSync(() -> {
-            View decor = activity.getWindow().getDecorView();
-            if (decor.getWidth() <= 0 || decor.getHeight() <= 0) return;
-            Bitmap bitmap = Bitmap.createBitmap(decor.getWidth(), decor.getHeight(), Bitmap.Config.ARGB_8888);
-            decor.draw(new Canvas(bitmap));
-            captured[0] = bitmap;
-        });
-        Bitmap screenshot = captured[0];
-        assertNotNull("Home activity could not render a screenshot", screenshot);
-        File directory = new File(target.getFilesDir(), "home-dashboard-screenshots");
-        if (!directory.exists() && !directory.mkdirs()) throw new IllegalStateException("Cannot create screenshot directory");
-        File output = new File(directory, filename);
-        try (FileOutputStream stream = new FileOutputStream(output)) {
-            if (!screenshot.compress(Bitmap.CompressFormat.PNG, 100, stream))
-                throw new IllegalStateException("PNG encoding failed: " + filename);
-        } finally {
-            screenshot.recycle();
-        }
+    }
+
+    private static void finishPreview(Activity activity) {
         InstrumentationRegistry.getInstrumentation().runOnMainSync(activity::finish);
         SystemClock.sleep(350L);
     }
@@ -136,6 +167,31 @@ public final class HomeDashboardScreenshotTest {
 
         ViewGroup dock = (ViewGroup) targets[1];
         assertEquals("Admin dock should have five destinations", 5, dock.getChildCount());
+        boolean[] laidOut = {false};
+        long dockDeadline = SystemClock.uptimeMillis() + 3_000L;
+        while (SystemClock.uptimeMillis() < dockDeadline && !laidOut[0]) {
+            instrumentation.runOnMainSync(() -> {
+                laidOut[0] = dock.getChildCount() == 5;
+                for (int i = 0; i < dock.getChildCount() && laidOut[0]; i++) {
+                    View tab = dock.getChildAt(i);
+                    laidOut[0] = tab.getWidth() > 0 && tab.getHeight() > 0;
+                }
+            });
+            if (!laidOut[0]) SystemClock.sleep(40L);
+        }
+        assertTrue("Five bottom destinations were not measured", laidOut[0]);
+        float minTouchSize = 48f * activityDensity(dock);
+        for (int i = 0; i < dock.getChildCount(); i++) {
+            View tab = dock.getChildAt(i);
+            CharSequence spokenLabel = tab.getContentDescription();
+            assertTrue("Bottom destination is not keyboard/TalkBack focusable: " + i, tab.isFocusable());
+            assertTrue("Bottom destination is not clickable: " + i, tab.isClickable());
+            assertNotNull("Bottom destination has no accessible label: " + i, spokenLabel);
+            assertFalse("Bottom destination has a blank accessible label: " + i,
+                    spokenLabel.toString().trim().isEmpty());
+            assertTrue("Bottom destination is narrower than 48dp: " + i, tab.getWidth() >= minTouchSize);
+            assertTrue("Bottom destination is shorter than 48dp: " + i, tab.getHeight() >= minTouchSize);
+        }
         View moreTab = findTaggedView(dock, "more");
         View homeTab = findTaggedView(dock, "home");
         assertNotNull("Role-filtered More tab is missing", moreTab);

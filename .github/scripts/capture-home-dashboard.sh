@@ -117,13 +117,13 @@ adb uninstall ir.meelano.manager.debug >/dev/null 2>&1 || true
 for apk in "$app_apk" "$test_apk"; do
   install_log="$(mktemp)"
   installed=0
-  for install_attempt in 1 2 3; do
+  for install_attempt in 1 2 3 4 5; do
     if wait_for_package_service 60 && adb install -r "$apk" > "$install_log" 2>&1; then
       installed=1
       break
     fi
-    if [ "$install_attempt" -lt 3 ]; then
-      echo "::warning::Android package service was temporarily unavailable while installing $apk; retry $((install_attempt + 1))/3."
+    if [ "$install_attempt" -lt 5 ]; then
+      echo "::warning::Android package service was temporarily unavailable while installing $apk; retry $((install_attempt + 1))/5."
       adb wait-for-device
       sleep 5
     fi

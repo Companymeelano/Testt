@@ -46,17 +46,22 @@ public class AtiranSampleSchemaTest {
         assertFalse(sql, sql.contains("linesum"));
     }
 
-    @Test public void homePriceDriftUsesTheTwoLatestPurchasesWithoutAnArbitraryDateWindow() throws Exception {
+    @Test public void homePriceDriftUsesCurrentPurchaseLinesAndDeterministicSameDayOrdering() throws Exception {
         Meta meta = new Meta(connection(loadManifest()));
         Filter allHistory = new Filter();
         allHistory.from = "";
         allHistory.to = "";
         Queries.Q q = Queries.buyPriceTrend(meta, allHistory, 20);
         String sql = q.sql.toLowerCase(Locale.ROOT);
-        assertTrue(sql, sql.contains("row_number() over (partition by k order by dk desc)"));
+        assertTrue(sql, sql.contains("row_number() over (partition by k order by dk desc, purchasetime desc"));
+        assertTrue(sql, sql.contains("try_convert(time(0),h.[hour])"));
+        assertTrue(sql, sql.contains("max(try_convert(bigint,v.[rdf__]))"));
+        assertTrue(sql, sql.contains("max(try_convert(bigint,x.[rdf__]))"));
+        assertTrue(sql, sql.contains("active"));
         assertTrue(sql, sql.contains("r1.rn=1"));
         assertTrue(sql, sql.contains("r1.rn=2"));
         assertTrue(q.binds.isEmpty());
+        assertFalse(sql, sql.contains("insert into "));
         assertFalse(sql, sql.contains("update dbo."));
         assertFalse(sql, sql.contains("delete from "));
     }

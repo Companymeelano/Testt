@@ -835,10 +835,10 @@ public final class Queries {
     }
 
     /**
-     * Purchase price drift per product. For each item bought in the range, the unit price
-     * (LINESUM / TEDVAH) of its latest purchase is compared with the purchase before it.
+     * Purchase price drift per product. Compare the two latest current, active purchase lines.
+     * Ordering uses the invoice date, a valid stored invoice time when available, then stable
+     * invoice/line keys so same-day rows cannot be selected nondeterministically.
      * Only products bought at least twice are listed; the largest moves come first.
-     * Columns are the same ones factorTopProducts already reads from buyfact/subbuyfact.
      */
     public static Q buyPriceTrend(Meta m, Filter f, int top) throws Missing {
         String head = "buyfact";
@@ -861,23 +861,54 @@ public final class Queries {
         List<String> conds = new ArrayList<>();
         String dc = Sql.dateCond(Sql.date10("x", dateCol), f.from, f.to, binds);
         if (!dc.isEmpty()) conds.add(dc);
+        String headerVersionCol = Sql.pick(cols, "rdf__", "RDF__");
+        String timeCol = Sql.pick(cols, "Hour", "hour");
+        String lineVersionCol = Sql.pick(sub, "rdf__", "RDF__");
+        String lineSequenceCol = Sql.pick(sub, "rdf", "RDF");
+        String latestHeader = "";
+        if (headerVersionCol != null) {
+            latestHeader = " AND TRY_CONVERT(bigint,x.[" + headerVersionCol + "])=(SELECT MAX(TRY_CONVERT(bigint,v.["
+                    + headerVersionCol + "])) FROM dbo.[" + head + "] v"
+                    + " WHERE TRY_CONVERT(nvarchar(100),v.[" + numberCol + "])=TRY_CONVERT(nvarchar(100),x.["
+                    + numberCol + "]))";
+        }
         String inner = "WHERE " + (conds.isEmpty() ? "1=1" : Sql.join(conds, " AND "))
-                + Sql.activeAnd(cols, "x") + Sql.softAnd(cols, "x");
+                + Sql.activeAnd(cols, "x") + Sql.softAnd(cols, "x") + latestHeader;
         String src = Sql.dedupe(head, numberCol, "h", inner);
         boolean useInv = invName != null && invShka != null;
         String label = "COALESCE(" + (useInv ? Sql.txt("i", invName, 250) + "," : "") + Sql.txt("d", shka, 120) + ",N'—')";
         // Unit price per piece: the line amount covers vah and joz, so the denominator must too.
         String unit = "CAST(" + Sql.num("d", unitCol) + " AS decimal(19,4))";
+        String purchaseTime = timeCol == null ? "CAST(NULL AS time(0))"
+                : "TRY_CONVERT(time(0),h.[" + timeCol + "])";
+        String invoiceNo = "TRY_CONVERT(nvarchar(100),h.[" + numberCol + "])";
+        String invoiceSort = "TRY_CONVERT(decimal(19,0),h.[" + numberCol + "])";
+        String headerRevision = headerVersionCol == null ? "CAST(0 AS bigint)"
+                : "TRY_CONVERT(bigint,h.[" + headerVersionCol + "])";
+        String lineSequence = lineSequenceCol == null ? "CAST(0 AS bigint)"
+                : "TRY_CONVERT(bigint,d.[" + lineSequenceCol + "])";
+        String lineRevision = lineVersionCol == null ? "CAST(0 AS bigint)"
+                : "TRY_CONVERT(bigint,d.[" + lineVersionCol + "])";
+        String latestLine = "";
+        if (lineVersionCol != null) {
+            latestLine = " AND TRY_CONVERT(bigint,d.[" + lineVersionCol + "])=(SELECT MAX(TRY_CONVERT(bigint,x.["
+                    + lineVersionCol + "])) FROM dbo.[" + line + "] x"
+                    + " WHERE TRY_CONVERT(nvarchar(100),x.[" + linkCol + "])=TRY_CONVERT(nvarchar(100),d.["
+                    + linkCol + "]))";
+        }
         String sql = "WITH ln AS ("
                 + " SELECT TRY_CONVERT(nvarchar(100),d.[" + shka + "]) AS k, " + label + " AS label"
                 + ", " + Sql.dateKey(Sql.date10("h", dateCol)) + " AS dk"
-                + ", (" + unit + ") AS unit"
+                + ", " + purchaseTime + " AS purchaseTime, " + invoiceSort + " AS invoiceSort, " + invoiceNo + " AS invoiceNo"
+                + ", " + headerRevision + " AS headRevision, " + lineSequence + " AS lineSequence"
+                + ", " + lineRevision + " AS lineRevision, (" + unit + ") AS unit"
                 + " FROM " + src
                 + " JOIN dbo.[" + line + "] d ON TRY_CONVERT(nvarchar(100),d.[" + linkCol + "])=TRY_CONVERT(nvarchar(100),h.[" + numberCol + "])"
                 + (useInv ? " LEFT JOIN dbo.inventory i ON TRY_CONVERT(nvarchar(100),i.[" + invShka + "])=TRY_CONVERT(nvarchar(100),d.[" + shka + "])" : "")
-                + " WHERE d.[" + qty + "] IS NOT NULL"
+                + " WHERE d.[" + qty + "] IS NOT NULL" + latestLine
+                + Sql.activeAnd(sub, "d") + Sql.softAnd(sub, "d")
                 + "), r AS ("
-                + " SELECT k, label, unit, dk, ROW_NUMBER() OVER (PARTITION BY k ORDER BY dk DESC) AS rn"
+                + " SELECT k, label, unit, dk, ROW_NUMBER() OVER (PARTITION BY k ORDER BY dk DESC, purchaseTime DESC, invoiceSort DESC, invoiceNo DESC, headRevision DESC, lineSequence DESC, lineRevision DESC) AS rn"
                 + ", COUNT(*) OVER (PARTITION BY k) AS n"
                 + " FROM ln WHERE unit IS NOT NULL AND unit > 0"
                 + ") SELECT TOP (" + clampTop(top) + ") MAX(r1.label) AS label"

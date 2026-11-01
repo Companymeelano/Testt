@@ -301,9 +301,9 @@ public final class HomeDashboardScreenshotTest {
     private static void tapPoint(Instrumentation instrumentation, float x, float y) {
         long downTime = SystemClock.uptimeMillis();
         injectPointer(instrumentation, downTime, MotionEvent.ACTION_DOWN, x, y);
-        SystemClock.sleep(40L);
+        SystemClock.sleep(100L);
         injectPointer(instrumentation, downTime, MotionEvent.ACTION_UP, x, y);
-        SystemClock.sleep(120L);
+        SystemClock.sleep(160L);
     }
 
     private static void swipe(Instrumentation instrumentation, View target, boolean up) {
@@ -333,6 +333,9 @@ public final class HomeDashboardScreenshotTest {
         MotionEvent event = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(),
                 action, x, y, 0);
         event.setSource(InputDevice.SOURCE_TOUCHSCREEN);
+        if (android.os.Build.VERSION.SDK_INT >= 29)
+            event.setDisplayId(android.view.Display.DEFAULT_DISPLAY);
+        event.setToolType(0, MotionEvent.TOOL_TYPE_FINGER);
         try {
             assertTrue("Could not inject touchscreen event",
                     instrumentation.getUiAutomation().injectInputEvent(event, true));

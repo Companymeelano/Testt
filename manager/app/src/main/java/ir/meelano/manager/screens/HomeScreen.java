@@ -155,24 +155,6 @@ public class HomeScreen extends Screen {
             this.m = new Meta(c);
         }
 
-        /** Probes the link with SELECT 1 (jTDS does not implement Connection.isValid). */
-        void ensure(Repo repo) {
-            boolean alive;
-            try (java.sql.Statement st = c.createStatement()) {
-                st.setQueryTimeout(5);
-                st.execute("SELECT 1");
-                alive = true;
-            } catch (Throwable e) {
-                alive = false;
-            }
-            if (alive) return;
-            try {
-                reopen(repo);
-            } catch (Throwable e) {
-                Diag.ignored("HomeScreen:ensure", e);
-            }
-        }
-
         void reopen(Repo repo) throws Exception {
             java.sql.Connection old = c;
             c = repo.reopen();
@@ -197,10 +179,9 @@ public class HomeScreen extends Screen {
         }
     }
 
-    /** Like live(), but on a dropped link it reopens the connection and runs the section once more. */
+    /** Run the query directly; on a dropped link reopen once and retry instead of probing every query. */
     private <T> T liveL(final int token, final Link L, Map<String, String> notes, String key, Soft<T> t) {
         if (a.renderGen() != token) return null;
-        L.ensure(a.repo);
         try {
             return t.run();
         } catch (Exception first) {

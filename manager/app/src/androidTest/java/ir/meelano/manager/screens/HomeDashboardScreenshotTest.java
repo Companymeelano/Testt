@@ -151,12 +151,12 @@ public final class HomeDashboardScreenshotTest {
         assertNotNull("Role-filtered More tab is missing", moreTab);
         assertNotNull("Home tab is missing", homeTab);
 
-        tap(instrumentation, moreTab);
+        String moreTarget = tap(instrumentation, moreTab);
         assertCurrentScreen(instrumentation, (MainActivity) activity, "more",
-                "Bottom-tab tap did not open More");
-        tap(instrumentation, homeTab);
+                "Bottom-tab tap did not open More; " + moreTarget);
+        String homeTarget = tap(instrumentation, homeTab);
         assertCurrentScreen(instrumentation, (MainActivity) activity, "home",
-                "Bottom-tab tap did not return to Home");
+                "Bottom-tab tap did not return to Home; " + homeTarget);
 
         ScrollView scroll = (ScrollView) targets[0];
         View brand = targets[2];
@@ -257,15 +257,45 @@ public final class HomeDashboardScreenshotTest {
         return value[0];
     }
 
-    private static void tap(Instrumentation instrumentation, View target) {
-        float[] point = new float[2];
-        instrumentation.runOnMainSync(() -> {
-            int[] location = new int[2];
-            target.getLocationOnScreen(location);
-            point[0] = location[0] + target.getWidth() / 2f;
-            point[1] = location[1] + target.getHeight() / 2f;
-        });
-        tapPoint(instrumentation, point[0], point[1]);
+    private static String tap(Instrumentation instrumentation, View target) {
+        int[] screenBounds = new int[4];
+        boolean[] ready = {false};
+        String[] details = {"not measured"};
+        long deadline = SystemClock.uptimeMillis() + 3_000L;
+        while (SystemClock.uptimeMillis() < deadline) {
+            instrumentation.runOnMainSync(() -> {
+                int[] location = new int[2];
+                Rect visible = new Rect();
+                target.getLocationOnScreen(location);
+                boolean hasVisibleBounds = target.getGlobalVisibleRect(visible);
+                screenBounds[0] = location[0];
+                screenBounds[1] = location[1];
+                screenBounds[2] = target.getWidth();
+                screenBounds[3] = target.getHeight();
+                ready[0] = target.isShown() && target.isAttachedToWindow()
+                        && target.isEnabled() && target.isClickable()
+                        && hasVisibleBounds && visible.width() > 0 && visible.height() > 0
+                        && target.getWidth() > 0 && target.getHeight() > 0;
+                details[0] = "tag=" + target.getTag() + ", screen=" + location[0] + "," + location[1]
+                        + " " + target.getWidth() + "x" + target.getHeight()
+                        + ", visible=" + visible.toShortString() + ", shown=" + target.isShown()
+                        + ", attached=" + target.isAttachedToWindow() + ", enabled=" + target.isEnabled()
+                        + ", clickable=" + target.isClickable();
+            });
+            if (ready[0]) break;
+            SystemClock.sleep(50L);
+        }
+        assertTrue("Touch target did not become visible and laid out: " + details[0], ready[0]);
+        float minimumTouchSize = 48f * activityDensity(target);
+        assertTrue("Touch target is narrower than 48dp: " + details[0], screenBounds[2] >= minimumTouchSize);
+        assertTrue("Touch target is shorter than 48dp: " + details[0], screenBounds[3] >= minimumTouchSize);
+        tapPoint(instrumentation, screenBounds[0] + screenBounds[2] / 2f,
+                screenBounds[1] + screenBounds[3] / 2f);
+        return details[0];
+    }
+
+    private static float activityDensity(View target) {
+        return target.getResources().getDisplayMetrics().density;
     }
 
     private static void tapPoint(Instrumentation instrumentation, float x, float y) {

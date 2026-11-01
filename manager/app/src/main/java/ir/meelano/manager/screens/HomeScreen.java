@@ -1996,7 +1996,9 @@ public class HomeScreen extends Screen {
     private View chevronChip(String label, View.OnClickListener onClick) {
         TextView chip = a.kit.text("‹", 20f, Theme.GOLD, true);
         chip.setGravity(Gravity.CENTER);
-        chip.setPadding(Theme.dp(12), Theme.dp(2), Theme.dp(12), Theme.dp(2));
+        chip.setPadding(Theme.dp(12), Theme.dp(4), Theme.dp(12), Theme.dp(4));
+        chip.setMinWidth(Theme.dp(48));
+        chip.setMinHeight(Theme.dp(48));
         chip.setBackground(Theme.ghostButton(Theme.GOLD));
         chip.setContentDescription(label == null ? "باز کردن" : label + "؛ باز کردن");
         Theme.pressable(chip);
@@ -3101,16 +3103,16 @@ public class HomeScreen extends Screen {
     private View quickActionNode(String label, String screenId, int icon, int accent) {
         LinearLayout node = a.kit.v();
         node.setGravity(Gravity.CENTER);
-        node.setMinimumHeight(Theme.dp(62));
+        node.setMinimumHeight(Theme.dp(72));
         FrameLayout badge = new FrameLayout(a);
         badge.setBackground(Theme.chip(true, accent));
         badge.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         ImageView glyph = a.kit.icon(icon, Theme.onAccent(accent), 20);
         badge.addView(glyph, new FrameLayout.LayoutParams(Theme.dp(40), Theme.dp(40), Gravity.CENTER));
         node.addView(badge, a.kit.lp(Theme.dp(40), Theme.dp(40)));
-        TextView title = a.kit.text(label, 9.5f, Theme.TEXT, true);
+        TextView title = a.kit.text(label, 11f, Theme.TEXT, true);
         title.setGravity(Gravity.CENTER);
-        title.setSingleLine(true);
+        title.setMaxLines(2);
         title.setEllipsize(TextUtils.TruncateAt.END);
         title.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         node.addView(title, a.kit.lp(-1, -2));

@@ -104,7 +104,6 @@ public class MainActivity extends Activity {
     private View brandHeaderBlock;
     private int brandHeaderExpandedHeight;
     private boolean brandHeaderCollapsed;
-    private android.animation.ValueAnimator brandHeaderAnimator;
     private LinearLayout headerRoot;
     private LinearLayout headerTools;
     private LinearLayout brandRow;
@@ -132,8 +131,6 @@ public class MainActivity extends Activity {
             new android.os.Handler(android.os.Looper.getMainLooper());
     private Runnable linkPending = null;
     private TextView licChip;
-    /** Separate back utility beside the role-specific destinations, never over the content. */
-    private LinearLayout backCell;
     private TextView companyName;
     private android.widget.FrameLayout logoBox;
     private android.widget.ImageView logoImg;
@@ -572,10 +569,6 @@ public class MainActivity extends Activity {
 
     // ================= shell =================
     private void shell() {
-        if (brandHeaderAnimator != null) {
-            brandHeaderAnimator.cancel();
-            brandHeaderAnimator = null;
-        }
         if (!shellStarted) {
             shellStarted = true;
             AtiranAuth.applySessionRole(this);
@@ -694,6 +687,7 @@ public class MainActivity extends Activity {
         compactMenuGap.setVisibility(compact ? View.VISIBLE : View.GONE);
         brandRow.addView(compactMenuGap);
         android.widget.FrameLayout menuButton = new android.widget.FrameLayout(this);
+        menuButton.setTag("compact-header-menu");
         menuButton.setBackground(Theme.ghostButton(Theme.bottomNavAccent()));
         menuButton.setContentDescription("ابزارها، تنظیمات و حساب کاربری");
         android.widget.ImageView menuIcon = kit.icon(R.drawable.mi_more_horiz,
@@ -707,6 +701,7 @@ public class MainActivity extends Activity {
         brandRow.addView(menuButton, new LinearLayout.LayoutParams(Theme.dp(48), Theme.dp(48)));
 
         LinearLayout brandBlock = kit.v();
+        brandBlock.setTag("main-brand-header");
         brandBlock.setClipChildren(false);
         brandBlock.addView(brandRow, kit.lp(-1, -2));
         brandHeaderBlock = brandBlock;
@@ -726,7 +721,7 @@ public class MainActivity extends Activity {
         LinearLayout tools = kit.h();
         tools.setGravity(Gravity.CENTER_VERTICAL);
         tools.setBackground(Theme.toolbarPanel());
-        tools.setPadding(Theme.dp(3), Theme.dp(3), Theme.dp(3), Theme.dp(3));
+        tools.setPadding(Theme.dp(4), Theme.dp(4), Theme.dp(4), Theme.dp(4));
 
         // Role-aware toolbar: each person only sees the tools their own role may open.
         if (!tiny && RoleStore.allowed(this, "search"))
@@ -755,7 +750,7 @@ public class MainActivity extends Activity {
         tools.addView(accountCell, toolLp());
 
         for (int i = tools.getChildCount() - 1; i > 0; i--) {
-            tools.addView(vdiv(), i, new LinearLayout.LayoutParams(Theme.dp(1), Theme.dp(40)));
+            tools.addView(vdiv(), i, new LinearLayout.LayoutParams(Theme.dp(1), Theme.dp(44)));
         }
         headerTools = tools;
         headerRoot.addView(tools, kit.lp(-1, -2));
@@ -777,11 +772,19 @@ public class MainActivity extends Activity {
         // Center the content on wide screens. The sibling dock stays inside the system-safe
         // app window; decor fitting supplies navigation-bar insets, so adding them here would double them.
         scroll = new PullToRefreshScrollView(this);
+        scroll.setTag("main-scroll-viewport");
+        scroll.setFillViewport(true);
         scroll.setOnRefreshListener(() -> {
             if ("home".equals(currentId)) renderCurrent();
         });
+        // Hysteresis avoids collapsing/expanding the fixed header repeatedly when a finger
+        // pauses near the threshold; one layout change happens only after a clear scroll.
         scroll.setOnScrollChangeListener((v, x, y, oldX, oldY) -> {
-            setBrandHeaderCollapsed(y > Theme.dp(48));
+            if (brandHeaderCollapsed) {
+                if (y < Theme.dp(24)) setBrandHeaderCollapsed(false);
+            } else if (y > Theme.dp(72)) {
+                setBrandHeaderCollapsed(true);
+            }
         });
         contentWrap = kit.h();
         contentWrap.setGravity(Gravity.CENTER_HORIZONTAL);
@@ -794,10 +797,11 @@ public class MainActivity extends Activity {
         bottomBar = new LinearLayout(this);
         bottomBar.setOrientation(LinearLayout.HORIZONTAL);
         bottomBar.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        bottomBar.setMinimumHeight(Theme.dp(72));
+        bottomBar.setGravity(Gravity.CENTER_VERTICAL);
+        bottomBar.setMinimumHeight(Theme.dp(76));
         bottomBar.setClipChildren(false);
         bottomBar.setClipToPadding(false);
-        bottomBar.setPadding(Theme.dp(6), Theme.dp(4), Theme.dp(6), Theme.dp(4));
+        bottomBar.setPadding(Theme.dp(8), Theme.dp(4), Theme.dp(8), Theme.dp(4));
         bottomHost = new android.widget.FrameLayout(this);
         bottomHost.setBackground(Theme.isNuts() ? Theme.navDock() : Theme.bottomBar());
         bottomHost.setClipChildren(false);
@@ -805,6 +809,8 @@ public class MainActivity extends Activity {
         Theme.lift(bottomHost, Theme.dp(2));
         navCapsule = new View(this);
         navCapsule.setVisibility(View.GONE);
+        navCapsule.setClickable(false);
+        navCapsule.setFocusable(false);
         navCapsule.setBackground(Theme.bottomNavSelected());
         navCapsule.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         bottomHost.addView(navCapsule, new android.widget.FrameLayout.LayoutParams(Theme.dp(40), Theme.dp(40),
@@ -871,7 +877,6 @@ public class MainActivity extends Activity {
             ir.meelano.manager.core.LicenseStore.setTourPending(this, false);
         } catch (Exception ignored) { Diag.ignored("MainActivity:677", ignored); }
         Notify.boot(this);
-        syncBackControl();
         watchLink();
     }
 
@@ -892,19 +897,18 @@ public class MainActivity extends Activity {
         cell.setOrientation(LinearLayout.VERTICAL);
         cell.setGravity(Gravity.CENTER);
         cell.setContentDescription(desc);
-        cell.setMinimumHeight(Theme.dp(Theme.isNuts() ? 64 : 54));
+        cell.setMinimumHeight(Theme.dp(Theme.isNuts() ? 68 : 60));
+        cell.setPadding(Theme.dp(2), Theme.dp(3), Theme.dp(2), Theme.dp(3));
         Theme.pressable(cell);
         cell.setOnClickListener(v -> onTap.run());
         icon.setClickable(false);
-        int ic = Theme.isNuts() ? 38 : 24;
+        int ic = Theme.isNuts() ? 38 : 28;
         cell.addView(icon, new LinearLayout.LayoutParams(Theme.dp(ic), Theme.dp(ic)));
-        TextView t = new TextView(this);
-        t.setText(label);
-        t.setTextSize((Theme.isNuts() ? 10.5f : 10f) * Theme.fontScale());
-        t.setTextColor(Theme.DARK ? Theme.GOLD_SOFT : Theme.TEXT);
+        TextView t = kit.text(label, 12.5f, Theme.DARK ? Theme.GOLD_SOFT : Theme.TEXT, true);
         t.setGravity(Gravity.CENTER);
         t.setSingleLine(true);
-        cell.addView(t, new LinearLayout.LayoutParams(-2, -2));
+        t.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        cell.addView(t, new LinearLayout.LayoutParams(-1, -2));
         return cell;
     }
 
@@ -923,6 +927,9 @@ public class MainActivity extends Activity {
         LinearLayout body = kit.v();
         body.setPadding(Theme.dp(14), Theme.dp(10), Theme.dp(14), Theme.dp(14));
         final AlertDialog[] dialog = new AlertDialog[1];
+        if (!history.isEmpty() || !"home".equals(currentId))
+            addHeaderMenuAction(body, "بازگشت به صفحهٔ قبلی", R.drawable.mi_arrow_forward,
+                    dialog, this::goBack);
         if (RoleStore.allowed(this, "search"))
             addHeaderMenuAction(body, "جستجو", R.drawable.mi_search, dialog, () -> nav("search"));
         addHeaderMenuAction(body, "تغییر تم روشن، تیره یا آجیل و خشکبار",
@@ -946,13 +953,13 @@ public class MainActivity extends Activity {
                                      AlertDialog[] dialog, Runnable action) {
         LinearLayout item = kit.h();
         item.setGravity(Gravity.CENTER_VERTICAL);
-        item.setPadding(Theme.dp(12), Theme.dp(4), Theme.dp(12), Theme.dp(4));
-        item.setMinimumHeight(Theme.dp(48));
+        item.setPadding(Theme.dp(14), Theme.dp(6), Theme.dp(14), Theme.dp(6));
+        item.setMinimumHeight(Theme.dp(56));
         item.setBackground(Theme.ghostButton(Theme.bottomNavAccent()));
-        item.addView(kit.icon(icon, Theme.sectionText(Theme.bottomNavAccent()), 24),
-                new LinearLayout.LayoutParams(Theme.dp(24), Theme.dp(24)));
+        item.addView(kit.icon(icon, Theme.sectionText(Theme.bottomNavAccent()), 28),
+                new LinearLayout.LayoutParams(Theme.dp(28), Theme.dp(28)));
         item.addView(kit.space(10));
-        TextView text = kit.text(label, 12.5f, Theme.TEXT, true);
+        TextView text = kit.text(label, 13f, Theme.TEXT, true);
         text.setMaxLines(2);
         text.setEllipsize(android.text.TextUtils.TruncateAt.END);
         item.addView(text, kit.wlp(1f));
@@ -974,7 +981,7 @@ public class MainActivity extends Activity {
     }
 
     private LinearLayout.LayoutParams toolLp() {
-        return new LinearLayout.LayoutParams(0, Theme.dp(Theme.isNuts() ? 64 : 54), 1f);
+        return new LinearLayout.LayoutParams(0, Theme.dp(Theme.isNuts() ? 68 : 60), 1f);
     }
 
     /** Hairline divider between header tool buttons. */
@@ -1011,89 +1018,69 @@ public class MainActivity extends Activity {
 
     private void buildBottom() {
         bottomBar.removeAllViews();
+        bottomBar.setTag("main-bottom-nav");
         java.util.List<String> ids = new java.util.ArrayList<>();
         for (String t : RoleStore.tabsFor(effRole())) {
             if (screens.containsKey(t)) ids.add(t);
         }
         if (ids.isEmpty()) ids.add("home");
         tabs = ids.toArray(new String[0]);
-        int availableWidthDp = getResources().getDisplayMetrics().widthPixels * 160
-                / getResources().getDisplayMetrics().densityDpi;
-        boolean compactDock = availableWidthDp < (12 + 52 + tabs.length * 48);
         for (final String id : tabs) {
             final Screen s = screens.get(id);
             if (s == null) continue;
             LinearLayout b = kit.v();
             b.setGravity(Gravity.CENTER);
             b.setMinimumWidth(Theme.dp(48));
-            b.setMinimumHeight(Theme.dp(64)); // Every destination remains a 48dp+ touch target.
-            b.setPadding(Theme.dp(2), Theme.dp(3), Theme.dp(2), Theme.dp(3));
+            b.setMinimumHeight(Theme.dp(72));
+            b.setPadding(Theme.dp(3), Theme.dp(4), Theme.dp(3), Theme.dp(3));
             b.setClipChildren(false);
+
             LinearLayout badge = new LinearLayout(this);
             badge.setGravity(Gravity.CENTER);
             badge.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
             int iconRes = MeelanoIcons.iconFor(s.glyph());
-            // Navigation uses the same 24dp line icon family in every skin.
+            int iconSize = Theme.isNuts() ? 30 : 28;
             if (iconRes != 0) {
-                android.widget.ImageView symbol = kit.icon(iconRes, Theme.MUTED, 24);
+                android.widget.ImageView symbol = kit.icon(iconRes, Theme.MUTED, iconSize);
                 symbol.setTag(Boolean.FALSE);
-                badge.addView(symbol, new LinearLayout.LayoutParams(Theme.dp(24), Theme.dp(24)));
+                badge.addView(symbol, new LinearLayout.LayoutParams(
+                        Theme.dp(iconSize), Theme.dp(iconSize)));
             } else {
-                TextView symbol = kit.text(s.glyph(), 20, Theme.MUTED, true);
+                TextView symbol = kit.text(s.glyph(), 22, Theme.MUTED, true);
                 symbol.setGravity(Gravity.CENTER);
                 badge.addView(symbol, kit.lp(-2, -2));
             }
-            b.addView(badge, new LinearLayout.LayoutParams(Theme.dp(46), Theme.dp(Theme.isNuts() ? 44 : 36)));
-            String tl = RoleStore.tabLabel(id);
-            if ("more".equals(id) && RoleStore.VISITOR.equals(effRole())) tl = "بیشتر";
-            TextView l = kit.text(tl != null ? tl : s.title(), Theme.isNuts() ? 11.5f : 11f,
-                    Theme.MUTED, true);
-            l.setGravity(Gravity.CENTER);
-            l.setSingleLine(true);
-            l.setEllipsize(android.text.TextUtils.TruncateAt.END);
-            b.addView(l, kit.lp(-1, -2));
+            b.addView(badge, new LinearLayout.LayoutParams(Theme.dp(44), Theme.dp(36)));
+
+            String label = RoleStore.tabLabel(id);
+            if ("more".equals(id) && RoleStore.VISITOR.equals(effRole())) label = "بیشتر";
+            if (label == null) label = s.title();
+            TextView title = kit.text(label, 12.5f, Theme.MUTED, true);
+            title.setGravity(Gravity.CENTER);
+            title.setMaxLines(2);
+            title.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            title.setIncludeFontPadding(false);
+            LinearLayout.LayoutParams titleParams = kit.lp(-1, -2);
+            titleParams.topMargin = Theme.dp(1);
+            b.addView(title, titleParams);
+
             View marker = new View(this);
             marker.setVisibility(View.INVISIBLE);
             marker.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-            LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(Theme.dp(18), Theme.dp(2));
-            mp.setMargins(0, Theme.dp(Theme.isNuts() ? 2 : 3), 0, 0);
-            b.addView(marker, mp);
+            LinearLayout.LayoutParams markerParams = new LinearLayout.LayoutParams(
+                    Theme.dp(20), Theme.dp(2));
+            markerParams.topMargin = Theme.dp(2);
+            b.addView(marker, markerParams);
+
             b.setTag(id);
-            b.setContentDescription((tl != null ? tl : s.title()) + "، رفتن به بخش");
+            b.setContentDescription(label + "، رفتن به بخش");
             if (!RoleStore.allowed(this, id)) b.setAlpha(0.35f);
             Theme.pressable(b);
             b.setOnClickListener(v -> nav(id));
             bottomBar.addView(b, kit.wlp(1f));
         }
-        // Separate utility action (not a sixth destination) keeps in-app back one tap away.
-        LinearLayout back = kit.v();
-        back.setGravity(Gravity.CENTER);
-        back.setTag(BACK_CELL_TAG);
-        // On narrow screens, reserve 48dp for each destination and leave Back to Android's
-        // system gesture/key rather than shrinking the role-specific targets.
-        if (compactDock) back.setVisibility(View.GONE);
-        back.setMinimumWidth(Theme.dp(48));
-        back.setMinimumHeight(Theme.dp(64));
-        back.setContentDescription("بازگشت به صفحه قبلی");
-        android.widget.FrameLayout backSurface = new android.widget.FrameLayout(this);
-        backSurface.setBackground(Theme.bottomNavIconSelected());
-        backSurface.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-        android.widget.ImageView backArrow = kit.icon(R.drawable.mi_arrow_forward,
-                Theme.selectedNavInk(), 24);
-        backArrow.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-        backSurface.addView(backArrow, new android.widget.FrameLayout.LayoutParams(
-                Theme.dp(48), Theme.dp(48), Gravity.CENTER));
-        back.addView(backSurface, new LinearLayout.LayoutParams(Theme.dp(48), Theme.dp(48)));
-        Theme.pressable(back);
-        back.setOnClickListener(v -> goBack());
-        bottomBar.addView(back, 0, kit.lp(Theme.dp(52), -1));
-        backCell = back;
         paintBottom();
-        updateBackControl();
     }
-
-    /** Tag of the back control inside the tab bar, so the tab painter skips it. */
-    private static final String BACK_CELL_TAG = "back-cell";
 
     private int selectedNavIndex = -1;
 
@@ -1136,7 +1123,6 @@ public class MainActivity extends Activity {
         for (int i = 0; i < bottomBar.getChildCount(); i++) {
             LinearLayout b = (LinearLayout) bottomBar.getChildAt(i);
             if (b == null) continue;
-            if (BACK_CELL_TAG.equals(b.getTag())) continue;   // the back control is not a tab
             boolean on = tabIndex < tabs.length && (tabs[tabIndex].equals(currentId)
                     || ("more".equals(tabs[tabIndex]) && !isTab(currentId)));
             LinearLayout badge = (LinearLayout) b.getChildAt(0);
@@ -1150,7 +1136,8 @@ public class MainActivity extends Activity {
             }
             TextView label = (TextView) b.getChildAt(1);
             label.setTextColor(on ? Theme.selectedNavInk() : Theme.MUTED);
-            label.setTextSize((on ? 11.5f : 11f) * Theme.fontScale());
+            float size = on ? 13f : 12.5f;
+            label.setTextSize(size * Theme.fontScale() * Theme.typeScale());
             View marker = b.getChildAt(2);
             marker.setVisibility(on ? View.VISIBLE : View.INVISIBLE);
             marker.setBackground(on ? Theme.bottomNavMarker() : null);
@@ -1210,29 +1197,15 @@ public class MainActivity extends Activity {
             brandHeaderExpandedHeight = block.getHeight();
         if (brandHeaderExpandedHeight <= 0) return;
 
-        if (brandHeaderAnimator != null) {
-            brandHeaderAnimator.cancel();
-            brandHeaderAnimator = null;
-        }
+        // Keep scroll-driven collapse to one layout pass. Animating this sibling's height per
+        // frame repeatedly remeasures the ScrollView while it is dispatching finger movement.
         applyHeaderDensity(collapsed);
         android.view.ViewGroup.LayoutParams params = block.getLayoutParams();
         if (params == null) return;
-        int start = Math.max(0, block.getHeight());
-        int target = collapsed ? Theme.dp(48) : brandHeaderExpandedHeight;
+        params.height = collapsed ? Theme.dp(48) : brandHeaderExpandedHeight;
         brandHeaderCollapsed = collapsed;
         block.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_AUTO);
-        if (start == target || !ir.meelano.manager.ui.Ui.motionOk(this)) {
-            params.height = target;
-            block.setLayoutParams(params);
-            return;
-        }
-        brandHeaderAnimator = android.animation.ValueAnimator.ofInt(start, target);
-        brandHeaderAnimator.setDuration(180);
-        brandHeaderAnimator.addUpdateListener(anim -> {
-            params.height = (Integer) anim.getAnimatedValue();
-            block.setLayoutParams(params);
-        });
-        brandHeaderAnimator.start();
+        block.setLayoutParams(params);
     }
 
     /** Set the compact header's controls and line count without duplicating the brand mark. */
@@ -1542,7 +1515,6 @@ public class MainActivity extends Activity {
         Screen s = screens.get(currentId);
         if (s == null) return;
         paintBottom();
-        updateBackControl();
     }
 
     public void openFilter() {
@@ -1563,7 +1535,7 @@ public class MainActivity extends Activity {
         }
     }
 
-    /** Shared back logic for the system back gesture and the dock's separate back utility. */
+    /** Shared back action for the Android system gesture/key and the header overflow menu. */
     public void goBack() {
         Screen s = screens.get(currentId);
         if (s != null && s.onBack()) return;
@@ -1572,18 +1544,6 @@ public class MainActivity extends Activity {
             renderCurrent();
             animateContent(false);
         } else nav("home");
-    }
-
-    /** Reconcile the dock's back utility with the current page after shell construction. */
-    private void syncBackControl() { updateBackControl(); }
-
-    /** Keep the separate back utility visible, clear, and genuinely disabled at the root page. */
-    private void updateBackControl() {
-        if (backCell == null) return;
-        boolean can = !history.isEmpty() || !"home".equals(currentId);
-        backCell.setEnabled(can);
-        backCell.setAlpha(can ? 1f : 0.48f);
-        backCell.setContentDescription(can ? "بازگشت به صفحه قبلی" : "صفحه اصلی؛ بازگشتی وجود ندارد");
     }
 
     // ================= Persian voice search =================

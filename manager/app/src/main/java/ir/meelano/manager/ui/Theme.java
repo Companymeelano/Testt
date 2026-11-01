@@ -755,21 +755,26 @@ public final class Theme {
         v.setClickable(true);
         v.setFocusable(true);
         // Micro-interaction: a soft press-in, a spring back, and a light haptic tick on release.
+        // Read the system animation scale once per gesture (ACTION_DOWN), not on every MOVE.
         // Returns false so clicks and scrolling behave exactly as before.
         try {
+            final boolean[] gestureMotion = {true};
             v.setOnTouchListener((view, ev) -> {
-                boolean motion = Ui.motionOk(view.getContext());
                 switch (ev.getActionMasked()) {
                     case android.view.MotionEvent.ACTION_DOWN:
-                        if (motion) view.animate().scaleX(0.975f).scaleY(0.975f).setDuration(110).start();
+                        gestureMotion[0] = Ui.motionOk(view.getContext());
+                        if (gestureMotion[0])
+                            view.animate().scaleX(0.975f).scaleY(0.975f).setDuration(110).start();
                         break;
                     case android.view.MotionEvent.ACTION_UP:
-                        if (motion) view.animate().scaleX(1f).scaleY(1f).setDuration(260)
-                                .setInterpolator(new android.view.animation.OvershootInterpolator(1.3f)).start();
+                        if (gestureMotion[0])
+                            view.animate().scaleX(1f).scaleY(1f).setDuration(180)
+                                    .setInterpolator(new android.view.animation.DecelerateInterpolator()).start();
                         view.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP);
                         break;
                     case android.view.MotionEvent.ACTION_CANCEL:
-                        if (motion) view.animate().scaleX(1f).scaleY(1f).setDuration(160).start();
+                        if (gestureMotion[0])
+                            view.animate().scaleX(1f).scaleY(1f).setDuration(120).start();
                         break;
                     default:
                         break;

@@ -1,5 +1,6 @@
 package ir.meelano.manager.screens;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
@@ -10,9 +11,13 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.Rect;
 import android.os.SystemClock;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.accessibility.AccessibilityNodeInfo;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -33,6 +38,7 @@ import ir.meelano.manager.data.Settings;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.util.List;
 
 /** Seed-only instrumentation preview used by CI to capture the real Views in Light and Dark. */
 @RunWith(AndroidJUnit4.class)
@@ -95,6 +101,7 @@ public final class HomeDashboardScreenshotTest {
                 visibleText[0].contains("شاخص‌های مالی"));
         assertFalse("Preview screenshot contains a live connection error",
                 visibleText[0].contains("جزئیات اتصال"));
+        verifyShellInteractions(activity);
         // Do not wait for global UI idleness: the live chart may animate continuously.
         SystemClock.sleep(500L);
         final Bitmap[] captured = {null};
@@ -118,6 +125,191 @@ public final class HomeDashboardScreenshotTest {
         }
         InstrumentationRegistry.getInstrumentation().runOnMainSync(activity::finish);
         SystemClock.sleep(350L);
+    }
+
+    /** Exercise real pointer input, dock taps, and both transitions of the collapsible header. */
+    private static void verifyShellInteractions(Activity activity) {
+        Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
+        final View[] targets = new View[3];
+        instrumentation.runOnMainSync(() -> {
+            View decor = activity.getWindow().getDecorView();
+            targets[0] = findTaggedView(decor, "main-scroll-viewport");
+            targets[1] = findTaggedView(decor, "main-bottom-nav");
+            targets[2] = findTaggedView(decor, "main-brand-header");
+        });
+        assertNotNull("Scroll viewport is missing", targets[0]);
+        assertTrue("Scroll viewport is not a ScrollView", targets[0] instanceof ScrollView);
+        assertNotNull("Bottom navigation is missing", targets[1]);
+        assertTrue("Bottom navigation is not a ViewGroup", targets[1] instanceof ViewGroup);
+        assertNotNull("Collapsible brand header is missing", targets[2]);
+
+        ViewGroup dock = (ViewGroup) targets[1];
+        assertEquals("Admin dock should have five destinations", 5, dock.getChildCount());
+        View moreTab = findTaggedView(dock, "more");
+        View homeTab = findTaggedView(dock, "home");
+        assertNotNull("Role-filtered More tab is missing", moreTab);
+        assertNotNull("Home tab is missing", homeTab);
+
+        tap(instrumentation, moreTab);
+        assertCurrentScreen(instrumentation, (MainActivity) activity, "more",
+                "Bottom-tab tap did not open More");
+        tap(instrumentation, homeTab);
+        assertCurrentScreen(instrumentation, (MainActivity) activity, "home",
+                "Bottom-tab tap did not return to Home");
+
+        ScrollView scroll = (ScrollView) targets[0];
+        View brand = targets[2];
+        int[] expandedHeight = {0};
+        instrumentation.runOnMainSync(() -> expandedHeight[0] = brand.getHeight());
+        assertTrue("Header was not measured before scrolling", expandedHeight[0] > 0);
+
+        swipe(instrumentation, scroll, true);
+        int[] scrolledY = {0};
+        int[] collapsedHeight = {0};
+        instrumentation.runOnMainSync(() -> {
+            scrolledY[0] = scroll.getScrollY();
+            collapsedHeight[0] = brand.getHeight();
+        });
+        assertTrue("Vertical finger swipe did not scroll the dashboard", scrolledY[0] > 0);
+        assertTrue("Brand header did not collapse after a clear scroll",
+                collapsedHeight[0] < expandedHeight[0]);
+
+        float density = activity.getResources().getDisplayMetrics().density;
+        for (int attempt = 0; attempt < 16 && readScrollY(instrumentation, scroll) > 24f * density; attempt++)
+            swipe(instrumentation, scroll, false);
+        int[] returnedY = {0};
+        int[] expandedAgainHeight = {0};
+        instrumentation.runOnMainSync(() -> {
+            returnedY[0] = scroll.getScrollY();
+            expandedAgainHeight[0] = brand.getHeight();
+        });
+        assertTrue("Reverse finger swipes could not return to the top", returnedY[0] <= 24f * density);
+        assertTrue("Brand header did not expand near the top", expandedAgainHeight[0] >= expandedHeight[0]);
+
+        swipe(instrumentation, scroll, true);
+        final View[] menuTarget = new View[1];
+        instrumentation.runOnMainSync(() -> menuTarget[0] = findTaggedView(
+                activity.getWindow().getDecorView(), "compact-header-menu"));
+        View menuButton = menuTarget[0];
+        assertNotNull("Compact header menu is missing", menuButton);
+        boolean[] menuShown = {false};
+        instrumentation.runOnMainSync(() -> menuShown[0] = menuButton.isShown());
+        assertTrue("Header menu should be visible after scrolling", menuShown[0]);
+        tap(instrumentation, menuButton);
+        tapAccessibleAction(instrumentation, "بازگشت به صفحهٔ قبلی");
+        assertCurrentScreen(instrumentation, (MainActivity) activity, "more",
+                "Header-menu Back did not restore the prior screen");
+        tap(instrumentation, homeTab);
+        assertCurrentScreen(instrumentation, (MainActivity) activity, "home",
+                "Home dock destination did not restore the dashboard");
+    }
+
+    private static void tapAccessibleAction(Instrumentation instrumentation, String label) {
+        AccessibilityNodeInfo root = null;
+        List<AccessibilityNodeInfo> matches = null;
+        long deadline = SystemClock.uptimeMillis() + 2_000L;
+        do {
+            root = instrumentation.getUiAutomation().getRootInActiveWindow();
+            if (root != null) {
+                matches = root.findAccessibilityNodeInfosByText(label);
+                if (!matches.isEmpty()) break;
+            }
+            SystemClock.sleep(50L);
+        } while (SystemClock.uptimeMillis() < deadline);
+        assertNotNull("No active accessibility window for the header menu", root);
+        assertFalse("Header-menu action is missing: " + label, matches == null || matches.isEmpty());
+        Rect bounds = new Rect();
+        matches.get(0).getBoundsInScreen(bounds);
+        assertTrue("Header-menu action has no visible bounds: " + label,
+                bounds.width() > 0 && bounds.height() > 0);
+        tapPoint(instrumentation, bounds.centerX(), bounds.centerY());
+    }
+
+    private static void assertCurrentScreen(Instrumentation instrumentation, MainActivity activity,
+                                            String expected, String message) {
+        String[] current = {""};
+        long deadline = SystemClock.uptimeMillis() + 2_000L;
+        do {
+            instrumentation.runOnMainSync(() -> current[0] = activity.currentScreenId());
+            if (expected.equals(current[0])) return;
+            SystemClock.sleep(40L);
+        } while (SystemClock.uptimeMillis() < deadline);
+        assertEquals(message, expected, current[0]);
+    }
+
+    private static View findTaggedView(View view, String tag) {
+        if (view == null) return null;
+        if (tag.equals(view.getTag())) return view;
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                View found = findTaggedView(group.getChildAt(i), tag);
+                if (found != null) return found;
+            }
+        }
+        return null;
+    }
+
+    private static int readScrollY(Instrumentation instrumentation, ScrollView scroll) {
+        int[] value = {0};
+        instrumentation.runOnMainSync(() -> value[0] = scroll.getScrollY());
+        return value[0];
+    }
+
+    @SuppressWarnings("deprecation")
+    private static void tap(Instrumentation instrumentation, View target) {
+        float[] point = new float[2];
+        instrumentation.runOnMainSync(() -> {
+            int[] location = new int[2];
+            target.getLocationOnScreen(location);
+            point[0] = location[0] + target.getWidth() / 2f;
+            point[1] = location[1] + target.getHeight() / 2f;
+        });
+        tapPoint(instrumentation, point[0], point[1]);
+    }
+
+    @SuppressWarnings("deprecation")
+    private static void tapPoint(Instrumentation instrumentation, float x, float y) {
+        long downTime = SystemClock.uptimeMillis();
+        injectPointer(instrumentation, downTime, MotionEvent.ACTION_DOWN, x, y);
+        SystemClock.sleep(40L);
+        injectPointer(instrumentation, downTime, MotionEvent.ACTION_UP, x, y);
+        SystemClock.sleep(120L);
+    }
+
+    @SuppressWarnings("deprecation")
+    private static void swipe(Instrumentation instrumentation, View target, boolean up) {
+        float[] points = new float[4];
+        instrumentation.runOnMainSync(() -> {
+            int[] location = new int[2];
+            target.getLocationOnScreen(location);
+            points[0] = location[0] + target.getWidth() / 2f;
+            points[1] = location[1] + target.getHeight() * (up ? 0.90f : 0.10f);
+            points[2] = points[0];
+            points[3] = location[1] + target.getHeight() * (up ? 0.10f : 0.90f);
+        });
+        long downTime = SystemClock.uptimeMillis();
+        injectPointer(instrumentation, downTime, MotionEvent.ACTION_DOWN, points[0], points[1]);
+        for (int step = 1; step <= 6; step++) {
+            float fraction = step / 6f;
+            float y = points[1] + (points[3] - points[1]) * fraction;
+            injectPointer(instrumentation, downTime, MotionEvent.ACTION_MOVE, points[0], y);
+            SystemClock.sleep(12L);
+        }
+        injectPointer(instrumentation, downTime, MotionEvent.ACTION_UP, points[2], points[3]);
+        SystemClock.sleep(100L);
+    }
+
+    @SuppressWarnings("deprecation")
+    private static void injectPointer(Instrumentation instrumentation, long downTime,
+                                      int action, float x, float y) {
+        MotionEvent event = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(),
+                action, x, y, 0);
+        try {
+            instrumentation.sendPointerSync(event);
+        } finally {
+            event.recycle();
+        }
     }
 
     private static String sampleCache() {

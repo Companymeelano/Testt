@@ -897,7 +897,9 @@ public final class Kit {
     public TextView chip(String t, boolean selected, int accent, View.OnClickListener onClick) {
         TextView c = text(t, 11.5f, selected ? Theme.onAccent(accent) : accent, true);
         c.setBackground(Theme.chip(selected, selected ? accent : Theme.alpha(accent, 255)));
-        c.setPadding(Theme.dp(14), Theme.dp(8), Theme.dp(14), Theme.dp(8));
+        c.setPadding(Theme.dp(14), Theme.dp(10), Theme.dp(14), Theme.dp(10));
+        c.setMinHeight(Theme.dp(48));
+        c.setMinWidth(Theme.dp(48));
         c.setSingleLine(true);
         Theme.pressable(c);
         c.setOnClickListener(onClick);

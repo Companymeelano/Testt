@@ -44,4 +44,11 @@ public class HomeNumberFormatterTest {
         assertEquals("\u2066۰۸:۰۵\u2069", HomeNumberFormatter.time(8, 5));
         assertEquals("پرداخت ۱۲۳۴ / ۵۶۷۸", HomeNumberFormatter.localizeText("پرداخت 1234 / ٥٦٧٨"));
     }
+
+    @Test public void displayNameDropsReplacementGlyphsAndCollapsesWhitespace() {
+        assertEquals("علی محمد", HomeNumberFormatter.cleanDisplayName("علی\uFFFD\u00A0محمد"));
+        assertEquals("Admin 12", HomeNumberFormatter.cleanDisplayName(" Admin  12 "));
+        assertEquals("", HomeNumberFormatter.cleanDisplayName("\uFFFD\uFFFC\u0000"));
+        assertEquals("", HomeNumberFormatter.cleanDisplayName("   "));
+    }
 }

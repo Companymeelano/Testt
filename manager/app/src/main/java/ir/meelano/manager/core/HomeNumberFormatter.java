@@ -33,6 +33,41 @@ public final class HomeNumberFormatter {
         return persianDigits(value);
     }
 
+    /**
+     * Clean a name copied from account metadata before placing it in the Home greeting.
+     * Invalid UTF-8 replacement glyphs and control characters should never become a row of
+     * visible tofu boxes; callers can fall back to the active role label when this is empty.
+     */
+    public static String cleanDisplayName(String value) {
+        if (value == null || value.isEmpty()) return "";
+        StringBuilder cleaned = new StringBuilder(value.length());
+        boolean spacePending = false;
+        boolean hasNameCharacter = false;
+        for (int offset = 0; offset < value.length();) {
+            int codePoint = value.codePointAt(offset);
+            offset += Character.charCount(codePoint);
+            if (codePoint == 0xFFFD || codePoint == 0xFFFC || Character.isISOControl(codePoint)
+                    || (codePoint >= Character.MIN_SURROGATE && codePoint <= Character.MAX_SURROGATE)) {
+                spacePending = cleaned.length() > 0;
+                continue;
+            }
+            if (Character.isWhitespace(codePoint) || codePoint == 0x00A0) {
+                spacePending = cleaned.length() > 0;
+                continue;
+            }
+            if (spacePending) {
+                cleaned.append(' ');
+                spacePending = false;
+            }
+            cleaned.appendCodePoint(codePoint);
+            if (Character.isLetterOrDigit(codePoint)) hasNameCharacter = true;
+        }
+        if (!hasNameCharacter) return "";
+        int length = cleaned.length();
+        while (length > 0 && cleaned.charAt(length - 1) == ' ') length--;
+        return cleaned.substring(0, length);
+    }
+
     /** Grouped integer, isolated from surrounding RTL prose. */
     public static String integer(long value) {
         DecimalFormat format = new DecimalFormat("#,##0", DecimalFormatSymbols.getInstance(Locale.US));

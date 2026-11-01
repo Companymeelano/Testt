@@ -890,10 +890,11 @@ public class HomeScreen extends Screen {
         int hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
         String greeting = hour < 5 ? "شب بخیر" : (hour < 12 ? "صبح بخیر"
                 : (hour < 15 ? "روز بخیر" : (hour < 19 ? "عصر بخیر" : "شب بخیر")));
-        String name = AtiranAuth.sessionName(a);
-        if (name == null || name.trim().isEmpty()) name = AtiranAuth.sessionUser(a);
-        if (name == null || name.trim().isEmpty()) name = RoleStore.faName(currentRole());
-        name = HomeNumberFormatter.localizeText(name == null ? "مدیر" : name.trim());
+        String name = HomeNumberFormatter.cleanDisplayName(AtiranAuth.sessionName(a));
+        if (name.isEmpty()) name = HomeNumberFormatter.cleanDisplayName(AtiranAuth.sessionUser(a));
+        if (name.isEmpty()) name = HomeNumberFormatter.cleanDisplayName(RoleStore.faName(currentRole()));
+        if (name.isEmpty()) name = "مدیر";
+        name = HomeNumberFormatter.localizeText(name);
 
         LinearLayout card = a.kit.card(Theme.SECTION_SALES);
         card.setPadding(Theme.dp(14), Theme.dp(10), Theme.dp(14), Theme.dp(10));
@@ -1056,6 +1057,13 @@ public class HomeScreen extends Screen {
         amountParams.topMargin = Theme.dp(8);
         card.addView(amountPanel, amountParams);
         renderSalesSummary(amountPanel, data, selectedSalesRange, false, amountAnimator);
+        if (syncState == SyncState.REFRESHING && data != null && data.salesSnapshot != null
+                && data.salesSnapshot.isAvailable()) {
+            TextView age = a.kit.text("نمایش آخرین دادهٔ ذخیره‌شده تا پایان همگام‌سازی",
+                    9.5f, Theme.MUTED, false);
+            age.setGravity(Gravity.END);
+            card.addView(age, a.kit.lp(-1, -2));
+        }
 
         if (data != null && data.salesSnapshot != null && data.salesSnapshot.isAvailable()) {
             String end = snapshotDay(data);
@@ -2769,20 +2777,26 @@ public class HomeScreen extends Screen {
         if (steps.isEmpty()) {
             String reason = !flowAvailable
                     ? "دادهٔ تفکیک نقد دریافت یا پرداخت در دسترس نیست."
-                    : "موجودی آغاز روز ثبت نشده است.";
+                    : (opening == null ? "موجودی آغاز روز ثبت نشده است."
+                            : "گردش نقد این روز قابل محاسبه نیست.");
             card.addView(a.kit.emptyRow(reason), a.kit.lp(-1, -2));
+            String nextStep = !flowAvailable
+                    ? "پس از در دسترس بودن تفکیک دریافت و پرداخت، گردش نقد نمایش داده می‌شود."
+                    : (opening == null ? "با ثبت ماندهٔ آغاز روز، نمودار گردش نقد نمایش داده می‌شود."
+                            : "برای محاسبهٔ گردش، داده‌های همین روز را تازه‌سازی کنید.");
+            card.addView(a.kit.hint(nextStep + " این برآورد، موجودی حساب بانکی نیست."),
+                    a.kit.lp(-1, -2));
         } else {
             double expectedClosing = steps.get(steps.size() - 1).endRials;
             card.addView(statRow(R.drawable.mi_account_balance_wallet, "ماندهٔ نقد مورد انتظار",
                     HomeNumberFormatter.money(expectedClosing), Theme.SECTION_CASH_POSITION),
                     a.kit.lp(-1, -2));
+            HomeCashWaterfall waterfall = new HomeCashWaterfall(a);
+            waterfall.setSteps(steps);
+            card.addView(waterfall, a.kit.lp(-1, Theme.dp(220)));
+            card.addView(a.kit.hint("ماندهٔ پایان، برآوردِ ماندهٔ آغاز + دریافت نقد − پرداخت نقد است؛ موجودی حساب بانکی از گردش به‌تنهایی استنباط نمی‌شود."),
+                    a.kit.lp(-1, -2));
         }
-
-        HomeCashWaterfall waterfall = new HomeCashWaterfall(a);
-        waterfall.setSteps(steps);
-        card.addView(waterfall, a.kit.lp(-1, Theme.dp(220)));
-        card.addView(a.kit.hint("ماندهٔ پایان، برآوردِ ماندهٔ آغاز + دریافت نقد − پرداخت نقد است؛ موجودی حساب بانکی از گردش به‌تنهایی استنباط نمی‌شود."),
-                a.kit.lp(-1, -2));
         String counted = a.settings.closeoutCashCounted(day);
         if (counted != null && !counted.trim().isEmpty()) {
             card.addView(a.kit.gap(5));

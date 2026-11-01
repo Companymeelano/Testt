@@ -5,6 +5,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+import android.accessibilityservice.AccessibilityServiceInfo;
 import android.app.Activity;
 import android.app.Instrumentation;
 import android.app.UiAutomation;
@@ -205,7 +206,7 @@ public final class HomeDashboardScreenshotTest {
         List<AccessibilityNodeInfo> matches = null;
         long deadline = SystemClock.uptimeMillis() + 2_000L;
         do {
-            root = instrumentation.getUiAutomation(UiAutomation.FLAG_RETRIEVE_INTERACTIVE_WINDOWS).getRootInActiveWindow();
+            root = uiAutomation(instrumentation).getRootInActiveWindow();
             if (root != null) {
                 matches = root.findAccessibilityNodeInfosByText(label);
                 if (!matches.isEmpty()) break;
@@ -314,10 +315,21 @@ public final class HomeDashboardScreenshotTest {
         return target.getResources().getDisplayMetrics().density;
     }
 
+    private static UiAutomation uiAutomation(Instrumentation instrumentation) {
+        UiAutomation automation = instrumentation.getUiAutomation();
+        AccessibilityServiceInfo serviceInfo = automation.getServiceInfo();
+        if (serviceInfo != null
+                && (serviceInfo.flags & AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS) == 0) {
+            serviceInfo.flags |= AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS;
+            automation.setServiceInfo(serviceInfo);
+        }
+        return automation;
+    }
+
     private static String accessibilityWindows(Instrumentation instrumentation) {
         StringBuilder result = new StringBuilder();
         try {
-            for (AccessibilityWindowInfo window : instrumentation.getUiAutomation(UiAutomation.FLAG_RETRIEVE_INTERACTIVE_WINDOWS).getWindows()) {
+            for (AccessibilityWindowInfo window : uiAutomation(instrumentation).getWindows()) {
                 Rect bounds = new Rect();
                 window.getBoundsInScreen(bounds);
                 AccessibilityNodeInfo root = window.getRoot();
@@ -374,7 +386,7 @@ public final class HomeDashboardScreenshotTest {
         event.setSource(InputDevice.SOURCE_TOUCHSCREEN);
         try {
             assertTrue("Could not inject touchscreen event",
-                    instrumentation.getUiAutomation(UiAutomation.FLAG_RETRIEVE_INTERACTIVE_WINDOWS).injectInputEvent(event, true));
+                    uiAutomation(instrumentation).injectInputEvent(event, true));
         } finally {
             event.recycle();
         }

@@ -218,13 +218,13 @@ public final class HomeDashboardScreenshotTest {
             View decor = activity.getWindow().getDecorView();
             chartAndSelector[0] = findTaggedView(decor, "home-sales-chart");
             chartAndSelector[1] = findTaggedView(decor, "sales-chart-range-selector");
-            if (chartAndSelector[0] != null
-                    && chartAndSelector[0].getContentDescription() != null)
-                initialDescription[0] = chartAndSelector[0].getContentDescription().toString();
+            if (chartAndSelector[0] != null)
+                initialDescription[0] = normalizedAccessibleText(chartAndSelector[0].getContentDescription());
         });
         assertNotNull("Live sales chart is missing", chartAndSelector[0]);
         assertNotNull("Sales chart range selector is missing", chartAndSelector[1]);
-        assertTrue("Initial chart window was not identified", initialDescription[0].contains("۱۴ روز"));
+        assertTrue("Initial chart window was not identified: " + initialDescription[0],
+                initialDescription[0].contains("۱۴ روز"));
         assertTrue("Sales chart selector must offer real 7- and 14-day ranges",
                 chartAndSelector[1] instanceof ViewGroup
                         && ((ViewGroup) chartAndSelector[1]).getChildCount() >= 2);
@@ -235,10 +235,8 @@ public final class HomeDashboardScreenshotTest {
         instrumentation.runOnMainSync(() -> weekClicked[0] = weekSegment.performClick());
         assertTrue("Seven-day sales chart option is not clickable", weekClicked[0]);
         String[] weeklyDescription = {""};
-        instrumentation.runOnMainSync(() -> {
-            CharSequence description = chartAndSelector[0].getContentDescription();
-            weeklyDescription[0] = description == null ? "" : description.toString();
-        });
+        instrumentation.runOnMainSync(() ->
+                weeklyDescription[0] = normalizedAccessibleText(chartAndSelector[0].getContentDescription()));
         assertTrue("Selecting seven days did not update the chart window to real daily data",
                 weeklyDescription[0].contains("۷ روز تا"));
 
@@ -264,12 +262,24 @@ public final class HomeDashboardScreenshotTest {
         instrumentation.runOnMainSync(() -> fortnightClicked[0] = fortnightSegment[0].performClick());
         assertTrue("Fourteen-day sales chart option is not clickable", fortnightClicked[0]);
         String[] restoredDescription = {""};
-        instrumentation.runOnMainSync(() -> {
-            CharSequence description = chartAndSelector[0].getContentDescription();
-            restoredDescription[0] = description == null ? "" : description.toString();
-        });
+        instrumentation.runOnMainSync(() ->
+                restoredDescription[0] = normalizedAccessibleText(chartAndSelector[0].getContentDescription()));
         assertTrue("Sales chart did not return to its initial 14-day range",
                 restoredDescription[0].contains("۱۴ روز"));
+    }
+
+    /** Remove bidi isolation controls before matching human-readable accessibility text. */
+    private static String normalizedAccessibleText(CharSequence text) {
+        if (text == null) return "";
+        StringBuilder normalized = new StringBuilder(text.length());
+        for (int i = 0; i < text.length(); i++) {
+            char ch = text.charAt(i);
+            if (ch == '\u061C' || ch == '\u200E' || ch == '\u200F'
+                    || (ch >= '\u202A' && ch <= '\u202E')
+                    || (ch >= '\u2066' && ch <= '\u2069')) continue;
+            normalized.append(ch);
+        }
+        return normalized.toString();
     }
 
     private static boolean containsViewType(View view, Class<?> type) {

@@ -1261,10 +1261,19 @@ public final class MasterQueries {
             String dc = Sql.dateCond(Sql.date10("h", date), f.from, f.to, binds);
             if (!dc.isEmpty()) conds.add(dc);
         }
+        String bankIsActive = m.col("ban_act", "isActive", "IsActive");
+        if (bankIsActive != null) conds.add(boolTrue("h.[" + bankIsActive + "]"));
+        String active = Sql.activeAnd(m.columns("ban_act"), "h");
+        String soft = Sql.softAnd(m.columns("ban_act"), "h");
+        if (!active.isEmpty()) conds.add(active.substring(5));
+        if (!soft.isEmpty()) conds.add(soft.substring(5));
         String where = conds.isEmpty() ? "" : " WHERE " + Sql.join(conds, " AND ");
+        // Keep the account key alongside its display label: two accounts at the same bank
+        // must not be collapsed when the manager reconciles each statement independently.
+        String bankId = Sql.txt("h", bank, 60);
         return new Queries.Q("SELECT " + label + " AS bank, " + inExpr + " AS [in], " + outExpr + " AS [out]"
-                + ", COUNT_BIG(1) AS count FROM dbo.ban_act h" + join + where
-                + " GROUP BY " + label + " ORDER BY 2 DESC", binds);
+                + ", COUNT_BIG(1) AS count, " + bankId + " AS bankId FROM dbo.ban_act h" + join + where
+                + " GROUP BY " + label + ", " + bankId + " ORDER BY 2 DESC", binds);
     }
 
     /** Bank operations per account and month (banking only): bank,month,in,out,net,count. */

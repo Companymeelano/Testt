@@ -84,7 +84,8 @@ public final class FinanceReports {
         String dc = Sql.dateCond(Sql.date10("h", dateCol), f.from, f.to, binds);
         if (!dc.isEmpty()) conds.add(dc);
         String where = "WHERE " + (conds.isEmpty() ? "1=1" : Sql.join(conds, " AND "))
-                + " AND TRY_CONVERT(int,h.[" + p + "])=0" + Sql.activeAnd(m.columns("dar"), "h");
+                + " AND TRY_CONVERT(int,h.[" + p + "])=0"
+                + Sql.activeAnd(m.columns("dar"), "h") + Sql.softAnd(m.columns("dar"), "h");
         String month = Sql.month7("h", dateCol);
         String cash = "ISNULL(SUM(" + Sql.num("h", naghd) + "),0)";
         String cheq = "ISNULL(SUM(" + Sql.num("h", chk) + "),0)";

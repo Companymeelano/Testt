@@ -113,6 +113,7 @@ public final class HomeDashboardScreenshotTest {
         settings.setCloseoutCashCounted(Jalali.todayStr(), "1100000000");
         settings.saveConnection("127.0.0.1", "1", "HOME_PREVIEW", "preview", "preview");
         settings.saveHomeCache(sampleCache());
+        verifyLocalBankStatementStore(settings, Jalali.todayStr());
 
         LicenseStore.Status license = LicenseStore.activate(target,
                 License.generate(DeviceId.code(target), License.P_MONTHLY, 0));
@@ -160,8 +161,9 @@ public final class HomeDashboardScreenshotTest {
                 144, MainActivity.headerTitleWidthDp(320, 2, true, true));
         verifyDashboardColorContrast();
         Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
-        final View[] targets = new View[8];
+        final View[] targets = new View[10];
         final int[] facts = new int[5];
+        final String[] reconciliationCopy = {""};
         long layoutDeadline = SystemClock.uptimeMillis() + 3_000L;
         do {
             instrumentation.runOnMainSync(() -> {
@@ -176,6 +178,10 @@ public final class HomeDashboardScreenshotTest {
                 targets[6] = findTaggedView(decor, "header-license-chip");
                 targets[7] = targets[0] == null ? null
                         : findTaggedView(targets[0], "home-kpi-delta");
+                targets[8] = findTaggedView(decor, "home-financial-reconciliation");
+                targets[9] = findTaggedView(decor, "home-bank-statement-entry");
+                reconciliationCopy[0] = "";
+                if (targets[8] != null) collectText(targets[8], reconciliationCopy);
                 facts[0] = targets[0] == null ? 0 : countTaggedViews(targets[0], "home-financial-kpi");
                 facts[1] = targets[0] != null
                         && containsViewType(targets[0], HorizontalScrollView.class) ? 1 : 0;
@@ -224,6 +230,17 @@ public final class HomeDashboardScreenshotTest {
         assertTrue("Full comparison period was lost to accessibility",
                 delta.getContentDescription() != null
                         && delta.getContentDescription().toString().contains("نسبت به"));
+        assertNotNull("Daily financial reconciliation module is missing", targets[8]);
+        assertTrue("Financial reconciliation title was lost", reconciliationCopy[0].contains("مغایرت‌گیری مالی"));
+        assertTrue("Bank statement limitation was not disclosed", reconciliationCopy[0].contains("صورت‌حساب مستقل بانکی"));
+        assertNotNull("Per-bank actual-statement entry is missing", targets[9]);
+        assertTrue("Per-bank statement entry is not clickable", targets[9].isClickable());
+        assertTrue("Per-bank statement entry is not keyboard/accessibility focusable", targets[9].isFocusable());
+        assertTrue("Per-bank statement entry is below the 48dp touch target",
+                targets[9].getMinimumHeight() >= 48f * activityDensity(targets[9]));
+        assertTrue("Per-bank statement entry has no accessible explanation",
+                targets[9].getContentDescription() != null
+                        && targets[9].getContentDescription().toString().contains("ویرایش صورت‌حساب"));
     }
 
     private static void verifyDashboardColorContrast() {
@@ -618,6 +635,22 @@ public final class HomeDashboardScreenshotTest {
         return target.getResources().getDisplayMetrics().density;
     }
 
+    private static void verifyLocalBankStatementStore(Settings settings, String day) {
+        assertTrue("Valid statement totals were not stored locally",
+                settings.setHomeBankStatementRials(day, "preview/bank-10", "۰", "۱۲٫۵"));
+        assertEquals("Explicit zero was not preserved", "0",
+                settings.homeBankStatementInRials(day, "preview/bank-10"));
+        assertEquals("Persian decimal digits were not normalized", "12.5",
+                settings.homeBankStatementOutRials(day, "preview/bank-10"));
+        assertFalse("A missing statement direction must not be saved as zero",
+                settings.setHomeBankStatementRials(day, "preview/bank-10", "", "0"));
+        assertFalse("Negative statement totals must not be saved",
+                settings.setHomeBankStatementRials(day, "preview/bank-10", "-1", "0"));
+        settings.clearHomeBankStatement(day, "preview/bank-10");
+        assertEquals("Cleared statement input remains in local settings", "",
+                settings.homeBankStatementInRials(day, "preview/bank-10"));
+    }
+
     private static String sampleCache() {
         String today = Jalali.todayStr();
         StringBuilder cache = new StringBuilder("ts=").append(today).append(" ساعت ۱۰:۳۰")
@@ -631,6 +664,11 @@ public final class HomeDashboardScreenshotTest {
                 .append("|trendfrom=").append(Jalali.addDays(today, -13))
                 .append("|stockok=1|reorderok=1|priceok=1|dueinok=1|dueoutok=1|topok=1|overdueok=1")
                 .append("|retodayok=1|cashinok=1|cashoutok=1|gpok=1")
+                .append("|bankaccountsok=1|bankturnok=1|overpaidvok=1|unbalancedjok=1")
+                .append("|bankacct0=id=10;name=بانک نمونه")
+                .append("|bankacct1=id=11;name=بانک دوم")
+                .append("|bankturn0=bank=بانک نمونه;in=3500000000;out=500000000;count=6;bankId=10")
+                .append("|bankturn1=bank=بانک دوم;in=900000000;out=120000000;count=2;bankId=11")
                 .append("|top0=label=پستهٔ نمونه;total=2400000000;qty=18;docs=7")
                 .append("|overdue0=party=مشتری نمونه;amount=730000000;dueDate=").append(today)
                 .append(";days=2;invoice=۴۸۲۱");
@@ -655,8 +693,8 @@ public final class HomeDashboardScreenshotTest {
                 .append("|inmix1=label=کارت‌خوان;amount=2800000000")
                 .append("|inmix2=label=حواله;amount=1800000000")
                 .append("|inmix3=label=چک‌های دریافتی;amount=700000000")
-                .append("|cashin=cash=3100000000;pos=2800000000;havaleh=1800000000;cheque=700000000;breakdownAvailable=1")
-                .append("|cashout=cash=1600000000;pos=900000000;havaleh=400000000;cheque=0;breakdownAvailable=1")
+                .append("|cashin=total=8400000000;cash=3100000000;pos=2800000000;havaleh=1800000000;cheque=700000000;breakdownAvailable=1")
+                .append("|cashout=total=2900000000;cash=1600000000;pos=900000000;havaleh=400000000;cheque=0;breakdownAvailable=1")
                 .append("|retoday0=label=فاکتور برگشتی;docs=1;total=250000000")
                 .append("|gp0=day=").append(today).append(";sales=9200000000;cogs=6100000000;profit=3100000000")
                 .append("|ret0=total=0;docs=0")

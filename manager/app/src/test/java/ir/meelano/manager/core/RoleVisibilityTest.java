@@ -60,6 +60,16 @@ public class RoleVisibilityTest {
     }
 
     @Test
+    public void closeoutFinancialReconciliationRemainsManagerOnly() {
+        assertTrue(RoleStore.allowedForRole(RoleStore.ADMIN, "closeout"));
+        for (String role : RoleStore.ALL) {
+            if (!RoleStore.ADMIN.equals(role))
+                assertFalse(role + " must not open manager closeout reconciliation",
+                        RoleStore.allowedForRole(role, "closeout"));
+        }
+    }
+
+    @Test
     public void toolbarToolsAreRoleFiltered() {
         // «جستجو» and «تنظیمات» are the two nav tools of the shared toolbar.
         assertTrue(RoleStore.allowedForRole(RoleStore.ADMIN, "search"));

@@ -20,7 +20,10 @@ import android.widget.TextView;
 import ir.meelano.manager.core.AtiranAuth;
 import ir.meelano.manager.core.AtiranSchema;
 import ir.meelano.manager.core.AlertEngine;
+import ir.meelano.manager.core.BankStatementReconciliation;
 import ir.meelano.manager.core.CashCloseMath;
+import ir.meelano.manager.core.FinanceReports;
+import ir.meelano.manager.core.MoneyBreakdown;
 import ir.meelano.manager.core.CashWaterfallEngine;
 import ir.meelano.manager.core.Filter;
 import ir.meelano.manager.core.FollowUps;
@@ -127,6 +130,14 @@ public class HomeScreen extends Screen {
         Row cashPayments;
         boolean cashReceiptsAvailable;
         boolean cashPaymentsAvailable;
+        List<Row> bankAccounts = new ArrayList<>();
+        boolean bankAccountsAvailable;
+        List<Row> bankTurnover = new ArrayList<>();
+        boolean bankTurnoverAvailable;
+        List<Row> overpaidVouchers = new ArrayList<>();
+        boolean overpaidVouchersAvailable;
+        List<Row> unbalancedJournals = new ArrayList<>();
+        boolean unbalancedJournalsAvailable;
         List<Row> grossProfitDaily = new ArrayList<>();
         boolean grossProfitAvailable;
         Map<String, String> notes = new LinkedHashMap<>();
@@ -406,6 +417,30 @@ public class HomeScreen extends Screen {
             d.returnsToday = liveL(token, L, d.notes, "برگشتی امروز",
                     () -> Repo.exec(L.c, MasterQueries.returnsByKindOn(L.m, todayMix)));
             d.returnsTodayAvailable = d.returnsToday != null;
+
+            // Statement reconciliation is deliberately manager-only, date-scoped and read-only.
+            // A missing date/direction column must never turn an unbounded total into a daily zero.
+            d.bankAccounts = liveL(token, L, d.notes, "حساب‌های بانکی",
+                    () -> Repo.exec(L.c, MasterQueries.lookupBanks(L.m)));
+            d.bankAccountsAvailable = d.bankAccounts != null;
+            boolean hasBankDate = L.m.colFlex("ban_act", "act_date", "done_act") != null;
+            boolean hasBankIn = L.m.colFlex("ban_act", "act_bes", "bes", "bestankar") != null;
+            boolean hasBankOut = L.m.colFlex("ban_act", "act_bed", "bed", "bedehkar") != null;
+            if (!hasBankDate) {
+                d.notes.put("گردش بانک روزانه", "ستون تاریخ معتبر در دفتر بانک پیدا نشد؛ گردش روزانه نمایش داده نمی‌شود.");
+            } else if (!hasBankIn || !hasBankOut) {
+                d.notes.put("گردش بانک روزانه", "ستون واریز یا برداشت در دفتر بانک پیدا نشد؛ تطبیق بانکی در دسترس نیست.");
+            } else {
+                d.bankTurnover = liveL(token, L, d.notes, "گردش بانک روزانه",
+                        () -> Repo.exec(L.c, MasterQueries.bankTurnover(L.m, todayMix)));
+                d.bankTurnoverAvailable = d.bankTurnover != null;
+            }
+            d.overpaidVouchers = liveL(token, L, d.notes, "قبض‌های دارای اضافه‌پرداخت",
+                    () -> Repo.exec(L.c, FinanceReports.overpaidVouchers(L.m, todayMix, 5)));
+            d.overpaidVouchersAvailable = d.overpaidVouchers != null;
+            d.unbalancedJournals = liveL(token, L, d.notes, "اسناد حسابداری نامتوازن",
+                    () -> Repo.exec(L.c, FinanceReports.unbalancedJournals(L.m, todayMix, 5)));
+            d.unbalancedJournalsAvailable = d.unbalancedJournals != null;
         }
         if (d.salesDay == null && d.inDay == null && d.buyDay == null && d.outDay == null)
             throw new Exception(firstNote(d.notes));
@@ -531,6 +566,14 @@ public class HomeScreen extends Screen {
         s.cashPayments = g.cashPayments;
         s.cashReceiptsAvailable = g.cashReceiptsAvailable;
         s.cashPaymentsAvailable = g.cashPaymentsAvailable;
+        s.bankAccounts = g.bankAccounts;
+        s.bankAccountsAvailable = g.bankAccountsAvailable;
+        s.bankTurnover = g.bankTurnover;
+        s.bankTurnoverAvailable = g.bankTurnoverAvailable;
+        s.overpaidVouchers = g.overpaidVouchers;
+        s.overpaidVouchersAvailable = g.overpaidVouchersAvailable;
+        s.unbalancedJournals = g.unbalancedJournals;
+        s.unbalancedJournalsAvailable = g.unbalancedJournalsAvailable;
         s.grossProfitDaily = g.grossProfitDaily;
         s.grossProfitAvailable = g.grossProfitAvailable;
         s.notes.putAll(g.notes);
@@ -626,6 +669,10 @@ public class HomeScreen extends Screen {
                     .append("|retodayok=").append(d.returnsTodayAvailable ? "1" : "0")
                     .append("|cashinok=").append(d.cashReceiptsAvailable ? "1" : "0")
                     .append("|cashoutok=").append(d.cashPaymentsAvailable ? "1" : "0")
+                    .append("|bankaccountsok=").append(d.bankAccountsAvailable ? "1" : "0")
+                    .append("|bankturnok=").append(d.bankTurnoverAvailable ? "1" : "0")
+                    .append("|overpaidvok=").append(d.overpaidVouchersAvailable ? "1" : "0")
+                    .append("|unbalancedjok=").append(d.unbalancedJournalsAvailable ? "1" : "0")
                     .append("|gpok=").append(d.grossProfitAvailable ? "1" : "0");
             if (d.buyDaily != null) for (int i = 0; i < Math.min(7, d.buyDaily.size()); i++)
                 s.append("|buytrend").append(i).append('=').append(rowStr(d.buyDaily.get(i)));
@@ -656,6 +703,14 @@ public class HomeScreen extends Screen {
             }
             if (d.cashReceipts != null) s.append("|cashin=").append(rowStr(d.cashReceipts));
             if (d.cashPayments != null) s.append("|cashout=").append(rowStr(d.cashPayments));
+            if (d.bankAccounts != null) for (int i = 0; i < Math.min(50, d.bankAccounts.size()); i++)
+                s.append("|bankacct").append(i).append('=').append(rowStr(cacheFields(d.bankAccounts.get(i), "id", "name")));
+            if (d.bankTurnover != null) for (int i = 0; i < Math.min(50, d.bankTurnover.size()); i++)
+                s.append("|bankturn").append(i).append('=').append(rowStr(cacheFields(d.bankTurnover.get(i), "bank", "in", "out", "count", "bankId")));
+            if (d.overpaidVouchers != null) for (int i = 0; i < Math.min(5, d.overpaidVouchers.size()); i++)
+                s.append("|overpaidv").append(i).append('=').append(rowStr(cacheFields(d.overpaidVouchers.get(i), "no", "kind", "party", "date", "total", "paid", "excess")));
+            if (d.unbalancedJournals != null) for (int i = 0; i < Math.min(5, d.unbalancedJournals.size()); i++)
+                s.append("|unbalancedj").append(i).append('=').append(rowStr(cacheFields(d.unbalancedJournals.get(i), "sanad", "date", "rows", "debit", "credit", "diff")));
             if (d.returnsToday != null) {
                 for (int i = 0; i < Math.min(20, d.returnsToday.size()); i++)
                     s.append("|retoday").append(i).append('=').append(rowStr(d.returnsToday.get(i)));
@@ -758,9 +813,17 @@ public class HomeScreen extends Screen {
                 else if ("retodayok".equals(k)) d.returnsTodayAvailable = "1".equals(v);
                 else if ("cashinok".equals(k)) d.cashReceiptsAvailable = "1".equals(v);
                 else if ("cashoutok".equals(k)) d.cashPaymentsAvailable = "1".equals(v);
+                else if ("bankaccountsok".equals(k)) d.bankAccountsAvailable = "1".equals(v);
+                else if ("bankturnok".equals(k)) d.bankTurnoverAvailable = "1".equals(v);
+                else if ("overpaidvok".equals(k)) d.overpaidVouchersAvailable = "1".equals(v);
+                else if ("unbalancedjok".equals(k)) d.unbalancedJournalsAvailable = "1".equals(v);
                 else if ("gpok".equals(k)) d.grossProfitAvailable = "1".equals(v);
                 else if ("cashin".equals(k)) { d.cashReceipts = rowFrom(v); any = true; }
                 else if ("cashout".equals(k)) { d.cashPayments = rowFrom(v); any = true; }
+                else if (k.matches("bankacct(?:[0-9]|[1-4][0-9])")) { d.bankAccounts.add(rowFrom(v)); any = true; }
+                else if (k.matches("bankturn(?:[0-9]|[1-4][0-9])")) { d.bankTurnover.add(rowFrom(v)); any = true; }
+                else if (k.matches("overpaidv[0-4]")) { d.overpaidVouchers.add(rowFrom(v)); any = true; }
+                else if (k.matches("unbalancedj[0-4]")) { d.unbalancedJournals.add(rowFrom(v)); any = true; }
                 else if (k.matches("topmonth[0-4]")) { d.topItemsMonth.add(rowFrom(v)); any = true; }
                 else if (k.matches("topcusttoday[0-4]")) { d.topCustomersToday.add(rowFrom(v)); any = true; }
                 else if (k.matches("topcustmonth[0-4]")) { d.topCustomersMonth.add(rowFrom(v)); any = true; }
@@ -3788,6 +3851,415 @@ public class HomeScreen extends Screen {
         exports.addView(print, a.kit.wlp(1f));
         card.addView(exports, a.kit.lp(-1, -2));
         a.kit.addCard(content, card);
+        secFinancialReconciliation(content, d);
+    }
+
+    /**
+     * Manager-only daily controls. Internal ledgers and a manager-entered bank statement stay
+     * distinct; no inferred zero or direct sales-minus-receipts verdict is presented as fact.
+     */
+    private void secFinancialReconciliation(LinearLayout content, Data d) {
+        if (!RoleStore.allowed(a, "closeout")) return;
+        final String day = snapshotDay(d);
+        LinearLayout card = homeCard(Theme.SECTION_CLOSEOUT);
+        card.setTag("home-financial-reconciliation");
+        card.addView(boardHead("مغایرت‌گیری مالی", "کنترل‌های دفتر روزانهٔ آتیران • " + day
+                        + " • نمایش به " + ir.meelano.manager.core.Money.unitName(),
+                R.drawable.mi_fact_check, navChip("گزارش‌ها", "reports"), Theme.SECTION_CLOSEOUT),
+                a.kit.lp(-1, -2));
+
+        int[] summary = financialControlCounts(d, day);
+        String headline;
+        String status;
+        int tone;
+        if (summary[0] > 0) {
+            headline = "برای رسیدگی: " + HomeNumberFormatter.integer(summary[0]) + " اختلاف ثبت‌شده";
+            status = "نیازمند رسیدگی";
+            tone = Theme.DANGER;
+        } else if (summary[1] == 0 && summary[2] > 0) {
+            headline = "در کنترل‌های تکمیل‌شده اختلافی پیدا نشد";
+            status = "کنترل‌شده";
+            tone = Theme.SUCCESS;
+        } else if (summary[2] == 0) {
+            headline = "برای نتیجه‌گیری دادهٔ کافی در دسترس نیست";
+            status = "نامشخص";
+            tone = Theme.WARNING;
+        } else {
+            headline = "تطبیق ناقص است؛ ورودی‌های واقعی را تکمیل کنید";
+            status = "ناقص";
+            tone = Theme.WARNING;
+        }
+        card.addView(financialAuditLine("home-financial-audit-summary", headline,
+                HomeNumberFormatter.integer(summary[2]) + " کنترل اجراشده • "
+                        + HomeNumberFormatter.integer(summary[1]) + " مورد/منبع نیازمند تکمیل؛ "
+                        + "کنترل ناقص به‌معنی نبود مغایرت نیست.", status, tone), a.kit.lp(-1, -2));
+
+        String salesValue = d.salesSnapshot != null && d.salesSnapshot.isAvailable()
+                ? HomeNumberFormatter.money(d.salesSnapshot.salesRialsOn(day)) : "دادهٔ فروش در دسترس نیست";
+        String receiptValue = d.inDay != null ? HomeNumberFormatter.money(d.inDay.d("total"))
+                : "دادهٔ دریافت در دسترس نیست";
+        card.addView(financialAuditLine("home-sales-receipts-control", "فروش و دریافت • مقایسهٔ نیازمند پیوند فاکتور",
+                "فروش روز: " + salesValue + " • دریافت ثبت‌شدهٔ روز: " + receiptValue
+                        + ". دریافت امروز می‌تواند تسویهٔ فاکتورهای روزهای قبل باشد؛ تفاضل این دو به‌تنهایی مغایرت قطعی نیست.",
+                "نیازمند تطبیق فاکتور", Theme.WARNING), a.kit.lp(-1, -2));
+
+        card.addView(a.kit.text("کنترل جمع و تفکیک قبوض", 12f,
+                Theme.dashboardAccentInk(Theme.SECTION_CLOSEOUT), true), a.kit.lp(-1, -2));
+        card.addView(moneyBreakdownLine("home-receipt-breakdown", "ترکیب دریافت",
+                d.cashReceipts, d.cashReceiptsAvailable), a.kit.lp(-1, -2));
+        card.addView(moneyBreakdownLine("home-payment-breakdown", "ترکیب پرداخت",
+                d.cashPayments, d.cashPaymentsAvailable), a.kit.lp(-1, -2));
+        card.addView(a.kit.hint("فرمول کنترل جمع: مبلغ ثبت‌شده − (نقد + کارت‌خوان + حواله + چک). این کنترل در سطح جمع روز است و جای بررسی ریز قبض‌ها را نمی‌گیرد؛ دادهٔ تفکیک‌نشده صفر فرض نمی‌شود."),
+                a.kit.lp(-1, -2));
+
+        card.addView(a.kit.text("تطبیق هر حساب بانکی با صورت‌حساب واقعی", 12f,
+                Theme.dashboardAccentInk(Theme.SECTION_CLOSEOUT), true), a.kit.lp(-1, -2));
+        card.addView(a.kit.hint("دفتر آتیران از گردش ثبت‌شدهٔ بانکی خوانده می‌شود؛ صورت‌حساب مستقل بانکی به سرویس متصل نیست. ارقام واریز و برداشت صورت‌حساب را برای همین روز وارد کنید؛ ثبت فقط روی همین دستگاه می‌ماند."),
+                a.kit.lp(-1, -2));
+        List<Row> accounts = bankAccountsForHome(d);
+        if (!d.bankTurnoverAvailable) {
+            card.addView(financialAuditLine("home-bank-ledger-unavailable", "گردش بانکی روزانه",
+                    "دادهٔ تاریخ‌دار و کامل برای دفتر بانک در دسترس نیست؛ مقایسه انجام نشد.",
+                    "نامشخص", Theme.WARNING), a.kit.lp(-1, -2));
+        } else if (accounts.isEmpty()) {
+            card.addView(financialAuditLine("home-bank-accounts-empty", "حساب بانکی",
+                    d.bankAccountsAvailable ? "حسابی برای این روز در فهرست بانک آتیران پیدا نشد."
+                            : "فهرست حساب‌های بانک در دسترس نیست.", "نامشخص", Theme.WARNING),
+                    a.kit.lp(-1, -2));
+        } else {
+            for (Row account : accounts)
+                card.addView(bankReconciliationRow(content, d, day, account), a.kit.lp(-1, -2));
+        }
+
+        card.addView(a.kit.text("استثناهای قابل رسیدگی", 12f,
+                Theme.dashboardAccentInk(Theme.SECTION_CLOSEOUT), true), a.kit.lp(-1, -2));
+        addExceptionRows(card, d);
+
+        String cashLabel = closeoutVarianceLabel(d, day);
+        boolean cashEntered = d.cashReceiptsAvailable && d.cashPaymentsAvailable
+                && parseLocalRials(a.settings.closeoutCashOpening(day)) != null
+                && parseLocalRials(a.settings.closeoutCashCounted(day)) != null;
+        card.addView(financialAuditLine("home-cash-count-control", "تطبیق شمارش صندوق",
+                cashLabel + " • فرمول: ماندهٔ آغاز + دریافت نقد − پرداخت نقد، در برابر شمارش پایان.",
+                cashEntered ? (cashLabel.startsWith("بدون اختلاف") ? "مطابق" : "رسیدگی") : "ثبت/داده ناقص",
+                cashEntered && cashLabel.startsWith("بدون اختلاف") ? Theme.SUCCESS
+                        : cashEntered ? Theme.DANGER : Theme.WARNING), a.kit.lp(-1, -2));
+        Button cashEntry = dashboardHeaderAction("ثبت شمارش صندوق", Theme.SECTION_CLOSEOUT,
+                "ثبت ماندهٔ آغاز و شمارش پایان صندوق برای " + day + "؛ فقط روی همین دستگاه",
+                v -> showCloseoutCashDialog(content, d, day));
+        LinearLayout actions = a.kit.h();
+        actions.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        actions.addView(cashEntry, a.kit.wlp(1f));
+        card.addView(actions, a.kit.lp(-1, -2));
+
+        card.addView(a.kit.text("اسناد برگشتی امروز", 12f,
+                Theme.dashboardAccentInk(Theme.SECTION_CLOSEOUT), true), a.kit.lp(-1, -2));
+        if (!d.returnsTodayAvailable) {
+            card.addView(a.kit.hint("گزارش اسناد برگشتی در دسترس نیست؛ صفر تلقی نشده است."), a.kit.lp(-1, -2));
+        } else if (d.returnsToday == null || d.returnsToday.isEmpty()) {
+            card.addView(a.kit.hint("در منبع اسناد برگشتی فعال، ردیفی برای این روز برنگشت."), a.kit.lp(-1, -2));
+        } else {
+            for (int i = 0; i < Math.min(8, d.returnsToday.size()); i++) {
+                Row returned = d.returnsToday.get(i);
+                card.addView(financialAuditLine("home-return-kind-" + i,
+                        returned.s("label").isEmpty() ? "نوع سند برگشتی" : returned.s("label"),
+                        HomeNumberFormatter.money(returned.d("total")) + " • "
+                                + HomeNumberFormatter.integer(returned.l("docs")) + " سند",
+                        "گزارش‌شده", Theme.SECTION_RETURNS), a.kit.lp(-1, -2));
+            }
+        }
+        card.addView(a.kit.hint("برگشتی‌ها بر اساس نوع جدا نمایش داده شده‌اند و بدون تشخیص ماهیت مالی از فروش کم نشده‌اند؛ ابطال فاکتور و تسویهٔ مطالبات نیز باید در گزارش همان سند کنترل شود."),
+                a.kit.lp(-1, -2));
+        a.kit.addCard(content, card);
+    }
+
+    private int[] financialControlCounts(Data d, String day) {
+        int issues = 0;
+        int incomplete = 0;
+        int checked = 0;
+        MoneyBreakdown receipts = breakdown(d.cashReceipts, d.cashReceiptsAvailable);
+        MoneyBreakdown payments = breakdown(d.cashPayments, d.cashPaymentsAvailable);
+        if (receipts.available) { checked++; if (!receipts.matches()) issues++; } else incomplete++;
+        if (payments.available) { checked++; if (!payments.matches()) issues++; } else incomplete++;
+        // Daily sales/receipts are not linked by settled invoice, and voided invoice effects
+        // are not exposed as a reliable daily aggregate by the current read-only schema.
+        incomplete += 2;
+        if (d.returnsTodayAvailable) checked++; else incomplete++;
+
+        if (d.overpaidVouchersAvailable) {
+            checked++;
+            issues += d.overpaidVouchers == null ? 0 : d.overpaidVouchers.size();
+            if (d.overpaidVouchers != null && d.overpaidVouchers.size() >= 5) incomplete++;
+        } else incomplete++;
+        if (d.unbalancedJournalsAvailable) {
+            checked++;
+            issues += d.unbalancedJournals == null ? 0 : d.unbalancedJournals.size();
+            if (d.unbalancedJournals != null && d.unbalancedJournals.size() >= 5) incomplete++;
+        } else incomplete++;
+
+        if (d.bankTurnoverAvailable && (d.bankAccountsAvailable || !d.bankTurnover.isEmpty())) {
+            List<Row> accounts = bankAccountsForHome(d);
+            if (accounts.isEmpty()) incomplete++;
+            for (Row account : accounts) {
+                Double in = parseLocalRials(a.settings.homeBankStatementInRials(day, account.s("id")));
+                Double out = parseLocalRials(a.settings.homeBankStatementOutRials(day, account.s("id")));
+                if (in == null || out == null) { incomplete++; continue; }
+                Row ledger = bankMovement(d, account.s("id"));
+                BankStatementReconciliation.Result result = BankStatementReconciliation.compare(true,
+                        ledger == null ? 0 : ledger.d("in"), ledger == null ? 0 : ledger.d("out"),
+                        true, in, out);
+                checked++;
+                if (!result.matches()) issues++;
+            }
+        } else incomplete++;
+
+        Double opening = parseLocalRials(a.settings.closeoutCashOpening(day));
+        Double counted = parseLocalRials(a.settings.closeoutCashCounted(day));
+        if (d.cashReceiptsAvailable && d.cashPaymentsAvailable && opening != null && counted != null) {
+            double variance = CashCloseMath.variance(opening, d.cashReceipts.d("cash"),
+                    d.cashPayments.d("cash"), counted);
+            if (Double.isFinite(variance)) { checked++; if (Math.abs(variance) > 0.5d) issues++; }
+            else incomplete++;
+        } else incomplete++;
+        return new int[]{issues, incomplete, checked};
+    }
+
+    private MoneyBreakdown breakdown(Row row, boolean available) {
+        if (row == null) return MoneyBreakdown.calculate(false, 0, 0, 0, 0, 0);
+        return MoneyBreakdown.calculate(available, row.d("total"), row.d("cash"), row.d("pos"),
+                row.d("havaleh"), row.d("cheque"));
+    }
+
+    private View moneyBreakdownLine(String tag, String title, Row row, boolean available) {
+        MoneyBreakdown result = breakdown(row, available);
+        if (!result.available) return financialAuditLine(tag, title,
+                "تفکیک مبلغ در دادهٔ فروشگاه موجود نیست؛ صفر یا تطبیق فرض نشده است.",
+                "نامشخص", Theme.WARNING);
+        String details = "ثبت " + HomeNumberFormatter.money(result.bookedTotal)
+                + " • اجزا " + HomeNumberFormatter.money(result.componentTotal);
+        String state;
+        int tone;
+        if (result.matches()) {
+            details += " • اختلاف جمعی صفر";
+            state = "برابر";
+            tone = Theme.SUCCESS;
+        } else {
+            details += " • " + (result.unexplained > 0 ? "کسری اجزا " : "اضافهٔ اجزا ")
+                    + HomeNumberFormatter.money(Math.abs(result.unexplained));
+            state = "رسیدگی";
+            tone = Theme.DANGER;
+        }
+        return financialAuditLine(tag, title, details, state, tone);
+    }
+
+    private View financialAuditLine(String tag, String title, String detail, String status, int tone) {
+        LinearLayout row = a.kit.v();
+        row.setTag(tag);
+        row.setBackground(Theme.dashboardMetric(Theme.SECTION_CLOSEOUT));
+        row.setElevation(Theme.dp(1f));
+        row.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
+        row.setPadding(Theme.dp(12), Theme.dp(9), Theme.dp(12), Theme.dp(9));
+        LinearLayout head = a.kit.h();
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        TextView label = a.kit.text(title, 11.5f, Theme.dashboardAccentInk(Theme.SECTION_CLOSEOUT), true);
+        label.setMaxLines(2);
+        label.setEllipsize(TextUtils.TruncateAt.END);
+        head.addView(label, a.kit.wlp(1f));
+        head.addView(statusChip(status, tone), a.kit.lp(-2, -2));
+        row.addView(head, a.kit.lp(-1, -2));
+        TextView copy = a.kit.text(detail, 10.5f, Theme.dashboardCardMutedInk(Theme.SECTION_CLOSEOUT), false);
+        copy.setGravity(Gravity.START);
+        copy.setMaxLines(4);
+        copy.setEllipsize(TextUtils.TruncateAt.END);
+        LinearLayout.LayoutParams cp = a.kit.lp(-1, -2);
+        cp.topMargin = Theme.dp(4);
+        row.addView(copy, cp);
+        row.setContentDescription(title + "؛ " + status + "؛ " + detail);
+        return row;
+    }
+
+    private List<Row> bankAccountsForHome(Data d) {
+        List<Row> accounts = new ArrayList<>();
+        java.util.HashSet<String> seen = new java.util.HashSet<>();
+        if (d.bankAccounts != null) for (Row source : d.bankAccounts) {
+            if (source == null) continue;
+            String id = source.s("id").trim();
+            if (id.isEmpty() || !seen.add(id)) continue;
+            Row account = new Row();
+            account.put("id", id);
+            account.put("name", source.s("name"));
+            accounts.add(account);
+        }
+        if (d.bankTurnover != null) for (Row movement : d.bankTurnover) {
+            if (movement == null) continue;
+            String id = movement.s("bankId").trim();
+            if (id.isEmpty() || !seen.add(id)) continue;
+            Row account = new Row();
+            account.put("id", id);
+            account.put("name", movement.s("bank"));
+            accounts.add(account);
+        }
+        return accounts;
+    }
+
+    private Row bankMovement(Data d, String bankId) {
+        if (d == null || d.bankTurnover == null || bankId == null) return null;
+        for (Row row : d.bankTurnover)
+            if (row != null && bankId.equals(row.s("bankId").trim())) return row;
+        return null;
+    }
+
+    private View bankReconciliationRow(LinearLayout content, Data d, String day, Row account) {
+        String id = account.s("id").trim();
+        String name = account.s("name").trim();
+        if (name.isEmpty()) name = "حساب بانکی";
+        String title = name + (id.isEmpty() ? "" : " • کد آتیران " + id);
+        Row ledger = bankMovement(d, id);
+        double ledgerIn = ledger == null ? 0 : ledger.d("in");
+        double ledgerOut = ledger == null ? 0 : ledger.d("out");
+        Double statementIn = parseLocalRials(a.settings.homeBankStatementInRials(day, id));
+        Double statementOut = parseLocalRials(a.settings.homeBankStatementOutRials(day, id));
+        boolean statementReady = statementIn != null && statementOut != null;
+        BankStatementReconciliation.Result result = BankStatementReconciliation.compare(
+                d.bankTurnoverAvailable, ledgerIn, ledgerOut, statementReady,
+                statementIn == null ? 0 : statementIn, statementOut == null ? 0 : statementOut);
+        String badge;
+        int tone;
+        switch (result.state) {
+            case MATCH: badge = "مطابق"; tone = Theme.SUCCESS; break;
+            case VARIANCE: badge = "مغایرت"; tone = Theme.DANGER; break;
+            case NEEDS_STATEMENT: badge = "صورت‌حساب ثبت نشده"; tone = Theme.WARNING; break;
+            case LEDGER_UNAVAILABLE: badge = "دفتر ناموجود"; tone = Theme.WARNING; break;
+            default: badge = "مبلغ نامعتبر"; tone = Theme.DANGER; break;
+        }
+        String detail = d.bankTurnoverAvailable
+                ? "دفتر آتیران: واریز " + HomeNumberFormatter.money(ledgerIn)
+                    + " • برداشت " + HomeNumberFormatter.money(ledgerOut)
+                : "دفتر آتیران: گردش تاریخ‌دار در دسترس نیست";
+        if (statementReady) {
+            detail += "\nصورت‌حساب: واریز " + HomeNumberFormatter.money(statementIn)
+                    + " • برداشت " + HomeNumberFormatter.money(statementOut);
+            if (result.comparable()) detail += "\n" + bankVariancePiece("واریز", result.inflowVarianceRials)
+                    + " • " + bankVariancePiece("برداشت", result.outflowVarianceRials);
+        } else {
+            detail += "\nصورت‌حساب واقعی: ثبت نشده؛ برای ورود ارقام واقعی لمس کنید.";
+        }
+        LinearLayout row = (LinearLayout) financialAuditLine("home-bank-statement-entry", title,
+                detail, badge, tone);
+        row.setMinimumHeight(Theme.dp(64));
+        row.setClickable(true);
+        row.setFocusable(true);
+        row.setContentDescription(title + "؛ " + badge + "؛ " + detail + "؛ ویرایش صورت‌حساب روزانه");
+        Theme.pressable(row);
+        row.setOnClickListener(v -> showHomeBankStatementEditor(content, day, account));
+        return row;
+    }
+
+    private String bankVariancePiece(String direction, double variance) {
+        if (Math.abs(variance) <= BankStatementReconciliation.TOLERANCE_RIALS)
+            return direction + " برابر";
+        String relation = variance > 0 ? "صورت‌حساب بیش از دفتر" : "دفتر بیش از صورت‌حساب";
+        return direction + "، " + relation + " " + HomeNumberFormatter.money(Math.abs(variance));
+    }
+
+    private void showHomeBankStatementEditor(LinearLayout content, String day, Row account) {
+        String bankId = account.s("id").trim();
+        if (bankId.isEmpty()) {
+            a.kit.toast("شناسهٔ حساب بانکی برای ذخیرهٔ محلی در دسترس نیست");
+            return;
+        }
+        String bankName = account.s("name").trim();
+        if (bankName.isEmpty()) bankName = "حساب بانکی";
+        LinearLayout form = a.kit.v();
+        form.setPadding(Theme.dp(20), Theme.dp(10), Theme.dp(20), Theme.dp(8));
+        form.addView(a.kit.hint("جمع واقعی واریز و برداشت صورت‌حساب را برای همین روز به ریال وارد کنید. هر دو مبلغ لازم‌اند؛ صفر را فقط وقتی واقعاً صفر است وارد کنید. داده فقط روی این دستگاه ذخیره می‌شود و به آتیران فرستاده نمی‌شود."), a.kit.lp(-1, -2));
+        android.widget.EditText inflow = a.kit.edit("واریز صورت‌حساب به ریال",
+                a.settings.homeBankStatementInRials(day, bankId));
+        android.widget.EditText outflow = a.kit.edit("برداشت صورت‌حساب به ریال",
+                a.settings.homeBankStatementOutRials(day, bankId));
+        int numberInput = android.text.InputType.TYPE_CLASS_NUMBER
+                | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL;
+        inflow.setInputType(numberInput);
+        outflow.setInputType(numberInput);
+        inflow.setContentDescription("جمع واریز واقعی صورت‌حساب به ریال برای " + bankName + " در " + day);
+        outflow.setContentDescription("جمع برداشت واقعی صورت‌حساب به ریال برای " + bankName + " در " + day);
+        form.addView(inflow, a.kit.lp(-1, -2));
+        form.addView(outflow, a.kit.lp(-1, -2));
+        android.app.AlertDialog dialog = new android.app.AlertDialog.Builder(a)
+                .setTitle("صورت‌حساب واقعی • " + bankName + " • " + day)
+                .setView(form)
+                .setNegativeButton("انصراف", null)
+                .setNeutralButton("پاک‌کردن ثبت", null)
+                .setPositiveButton("ذخیره روی دستگاه", null)
+                .create();
+        dialog.setOnShowListener(ignored -> {
+            dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+                if (parseLocalRials(inflow.getText().toString()) == null
+                        || parseLocalRials(outflow.getText().toString()) == null) {
+                    a.kit.toast("واریز و برداشت را جداگانه، با عدد صفر یا بیشتر، وارد کنید");
+                    return;
+                }
+                if (!a.settings.setHomeBankStatementRials(day, bankId,
+                        inflow.getText().toString(), outflow.getText().toString())) {
+                    a.kit.toast("مبلغ صورت‌حساب معتبر نیست؛ مبلغ را به ریال بررسی کنید");
+                    return;
+                }
+                dialog.dismiss();
+                render(content);
+            });
+            dialog.getButton(android.app.AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v -> {
+                a.settings.clearHomeBankStatement(day, bankId);
+                dialog.dismiss();
+                render(content);
+            });
+        });
+        dialog.show();
+    }
+
+    private void addExceptionRows(LinearLayout card, Data d) {
+        if (!d.overpaidVouchersAvailable) {
+            card.addView(financialAuditLine("home-overpaid-vouchers", "قبض‌های دارای اضافه‌پرداخت",
+                    "گزارش در دسترس نیست؛ نبود نتیجه به‌معنی نبود مورد نیست.", "نامشخص", Theme.WARNING),
+                    a.kit.lp(-1, -2));
+        } else if (d.overpaidVouchers == null || d.overpaidVouchers.isEmpty()) {
+            card.addView(financialAuditLine("home-overpaid-vouchers", "قبض‌های دارای اضافه‌پرداخت",
+                    "در کنترل قبض‌های فعال امروز موردی با نقد و چک بیش از مبلغ قبض برنگشت.",
+                    "بدون مورد در این کنترل", Theme.SUCCESS), a.kit.lp(-1, -2));
+        } else {
+            for (int i = 0; i < d.overpaidVouchers.size(); i++) {
+                Row item = d.overpaidVouchers.get(i);
+                card.addView(financialAuditLine("home-overpaid-voucher-" + i,
+                        "قبض " + item.s("no") + " • " + item.s("kind"),
+                        item.s("party") + " • مبلغ قبض " + HomeNumberFormatter.money(item.d("total"))
+                                + " • نقد و چک " + HomeNumberFormatter.money(item.d("paid"))
+                                + " • اضافه " + HomeNumberFormatter.money(item.d("excess")),
+                        "بازبینی سند", Theme.DANGER), a.kit.lp(-1, -2));
+            }
+            if (d.overpaidVouchers.size() >= 5)
+                card.addView(a.kit.hint("فهرست فقط ۵ مورد نخست را نشان می‌دهد؛ ممکن است موارد بیشتری وجود داشته باشد."), a.kit.lp(-1, -2));
+        }
+
+        if (!d.unbalancedJournalsAvailable) {
+            card.addView(financialAuditLine("home-unbalanced-journals", "اسناد حسابداری نامتوازن",
+                    "گزارش در دسترس نیست؛ نبود نتیجه به‌معنی توازن قطعی نیست.", "نامشخص", Theme.WARNING),
+                    a.kit.lp(-1, -2));
+        } else if (d.unbalancedJournals == null || d.unbalancedJournals.isEmpty()) {
+            card.addView(financialAuditLine("home-unbalanced-journals", "اسناد حسابداری نامتوازن",
+                    "در کنترل اسناد ثبت‌شدهٔ این روز، سند نامتوازن برنگشت.",
+                    "بدون مورد در این کنترل", Theme.SUCCESS), a.kit.lp(-1, -2));
+        } else {
+            for (int i = 0; i < d.unbalancedJournals.size(); i++) {
+                Row item = d.unbalancedJournals.get(i);
+                card.addView(financialAuditLine("home-unbalanced-journal-" + i,
+                        "سند حسابداری " + item.s("sanad"),
+                        "بدهکار " + HomeNumberFormatter.money(item.d("debit"))
+                                + " • بستانکار " + HomeNumberFormatter.money(item.d("credit"))
+                                + " • اختلاف " + HomeNumberFormatter.money(item.d("diff")),
+                        "بازبینی سند", Theme.DANGER), a.kit.lp(-1, -2));
+            }
+            if (d.unbalancedJournals.size() >= 5)
+                card.addView(a.kit.hint("فهرست فقط ۵ سند نخست را نشان می‌دهد؛ ممکن است موارد بیشتری وجود داشته باشد."), a.kit.lp(-1, -2));
+        }
     }
 
     private double grossProfitOnDay(Data d, String day) {

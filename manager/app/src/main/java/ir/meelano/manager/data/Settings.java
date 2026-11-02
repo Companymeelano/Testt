@@ -612,6 +612,64 @@ public final class Settings {
         p.edit().putString(closeoutCashKey(kind, normalized), value).apply();
     }
 
+    /** Actual bank-statement movement totals entered by a manager; local to this device. */
+    public String homeBankStatementInRials(String day, String bankId) {
+        String key = homeBankStatementKey("in", day, bankId);
+        return key == null ? "" : p.getString(key, "");
+    }
+
+    public String homeBankStatementOutRials(String day, String bankId) {
+        String key = homeBankStatementKey("out", day, bankId);
+        return key == null ? "" : p.getString(key, "");
+    }
+
+    /** Both directions are required: a blank is never interpreted as a zero bank movement. */
+    public boolean setHomeBankStatementRials(String day, String bankId, String inflow, String outflow) {
+        String inKey = homeBankStatementKey("in", day, bankId);
+        String outKey = homeBankStatementKey("out", day, bankId);
+        String in = normalizeLocalRials(inflow);
+        String out = normalizeLocalRials(outflow);
+        if (inKey == null || outKey == null || in == null || out == null) return false;
+        p.edit().putString(inKey, in).putString(outKey, out).apply();
+        return true;
+    }
+
+    public void clearHomeBankStatement(String day, String bankId) {
+        String inKey = homeBankStatementKey("in", day, bankId);
+        String outKey = homeBankStatementKey("out", day, bankId);
+        if (inKey == null || outKey == null) return;
+        p.edit().remove(inKey).remove(outKey).apply();
+    }
+
+    private String homeBankStatementKey(String direction, String day, String bankId) {
+        String normalizedDay = ir.meelano.manager.core.Jalali.disp(day);
+        String id = bankId == null ? "" : bankId.trim();
+        if (normalizedDay.isEmpty() || id.isEmpty() || id.length() > 200) return null;
+        try {
+            String token = android.util.Base64.encodeToString(id.getBytes("UTF-8"),
+                    android.util.Base64.URL_SAFE | android.util.Base64.NO_WRAP
+                            | android.util.Base64.NO_PADDING);
+            return "home_bank_statement_" + direction + "_"
+                    + normalizedDay.replace('/', '_') + "_" + token;
+        } catch (Exception invalid) {
+            return null;
+        }
+    }
+
+    private String normalizeLocalRials(String raw) {
+        String value = Money.en(raw == null ? "" : raw.trim()).replace(",", "")
+                .replace("٬", "").replace('٫', '.').trim();
+        if (value.isEmpty()) return null;
+        try {
+            java.math.BigDecimal amount = new java.math.BigDecimal(value);
+            if (amount.signum() < 0 || amount.precision() > 24 || amount.scale() > 4
+                    || amount.compareTo(new java.math.BigDecimal("999999999999999999")) > 0) return null;
+            return amount.stripTrailingZeros().toPlainString();
+        } catch (Exception invalid) {
+            return null;
+        }
+    }
+
     // ---------------- stock alerts + auto backup (v18) ----------------
     public boolean stockOn() { return p.getBoolean("stock_on", true); }
 

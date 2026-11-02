@@ -387,23 +387,20 @@ public final class Theme {
     /** Contrast-safe foreground for a compact, filled dashboard action. */
     public static int dashboardActionInk(int accent) {
         int hue = accent == 0 ? PRIMARY : accent;
-        int top = DesignTokens.mix(hue, Color.WHITE, 0.02f);
-        int bottom = DesignTokens.mix(hue, Color.BLACK, 0.02f);
-        double blackContrast = Math.min(DesignTokens.contrastRatio(Color.BLACK, top),
-                DesignTokens.contrastRatio(Color.BLACK, bottom));
-        double whiteContrast = Math.min(DesignTokens.contrastRatio(Color.WHITE, top),
-                DesignTokens.contrastRatio(Color.WHITE, bottom));
+        double blackContrast = DesignTokens.contrastRatio(Color.BLACK, hue);
+        double whiteContrast = DesignTokens.contrastRatio(Color.WHITE, hue);
         return blackContrast >= whiteContrast ? Color.BLACK : Color.WHITE;
     }
 
     /** Filled, lightly shaded action used by dashboard section headings only. */
     public static GradientDrawable dashboardAction(int accent) {
         int hue = accent == 0 ? PRIMARY : accent;
+        int ink = dashboardActionInk(hue);
+        int safeShade = ink == Color.BLACK ? Color.WHITE : Color.BLACK;
         GradientDrawable action = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{DesignTokens.mix(hue, Color.WHITE, 0.02f),
-                        DesignTokens.mix(hue, Color.BLACK, 0.02f)});
+                new int[]{hue, DesignTokens.mix(hue, safeShade, 0.035f)});
         action.setCornerRadius(dp(12));
-        action.setStroke(dp(1), alpha(dashboardActionInk(hue), 30));
+        action.setStroke(dp(1), alpha(ink, 30));
         return action;
     }
 

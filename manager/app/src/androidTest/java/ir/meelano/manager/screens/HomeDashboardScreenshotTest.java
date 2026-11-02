@@ -272,13 +272,13 @@ public final class HomeDashboardScreenshotTest {
             assertTrue("Dashboard card subtitle contrast across gradient for " + Integer.toHexString(accent),
                     DesignTokens.contrastRatio(cardMuted, cardBottom) >= 4.8);
 
-            int actionTop = DesignTokens.mix(accent, 0xFFFFFFFF, 0.02f);
-            int actionBottom = DesignTokens.mix(accent, 0xFF000000, 0.02f);
             int actionInk = Theme.dashboardActionInk(accent);
+            int safeShade = actionInk == 0xFF000000 ? 0xFFFFFFFF : 0xFF000000;
+            int actionEnd = DesignTokens.mix(accent, safeShade, 0.035f);
             assertTrue("Dashboard action text contrast for " + Integer.toHexString(accent),
-                    DesignTokens.contrastRatio(actionInk, actionTop) >= 4.8);
+                    DesignTokens.contrastRatio(actionInk, accent) >= 4.8);
             assertTrue("Dashboard action text contrast across gradient for " + Integer.toHexString(accent),
-                    DesignTokens.contrastRatio(actionInk, actionBottom) >= 4.8);
+                    DesignTokens.contrastRatio(actionInk, actionEnd) >= 4.8);
         }
     }
 

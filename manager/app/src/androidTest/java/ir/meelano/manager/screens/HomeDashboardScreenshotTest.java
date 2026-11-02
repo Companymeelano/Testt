@@ -115,7 +115,7 @@ public final class HomeDashboardScreenshotTest {
         settings.saveHomeCache(sampleCache());
 
         LicenseStore.Status license = LicenseStore.activate(target,
-                License.generate(DeviceId.code(target), License.P_PERM, 0));
+                License.generate(DeviceId.code(target), License.P_MONTHLY, 0));
         assertTrue("Could not seed debug preview license: " + license.fa, license.ok);
         LicenseStore.setEnteredOnce(target);
         LicenseStore.setTourPending(target, false);
@@ -205,9 +205,12 @@ public final class HomeDashboardScreenshotTest {
         assertNotNull("Expanded header licence chip is missing", targets[6]);
         assertTrue("Licence chip is not a text control", targets[6] instanceof TextView);
         TextView licence = (TextView) targets[6];
+        assertTrue("The 30-day license label was not preserved in the home header",
+                licence.getText().toString().contains("۳۰ روز"));
         assertTrue("Licence chip is clipped by the viewport/header bounds", facts[4] == 1);
         assertTrue("Licence chip is below the 48dp touch target",
                 licence.getWidth() >= 48f * activityDensity(licence));
+        assertTrue("Licence chip lost its management action", licence.isClickable());
         assertFalse("Licence chip text is clipped", licence.getText().toString().contains("…"));
         assertTrue("Licence chip has no accessible meaning",
                 licence.getContentDescription() != null

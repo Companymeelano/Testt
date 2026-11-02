@@ -8,6 +8,8 @@ import java.util.List;
 public final class SmartReportEngine {
     private SmartReportEngine() { }
 
+    public enum FollowUpPriority { INCOMPLETE, URGENT, FOLLOW_UP, CLEAR }
+
     public static final class Input {
         public boolean salesAvailable;
         public double salesRials;
@@ -25,6 +27,17 @@ public final class SmartReportEngine {
         public long dueCheques;
         public boolean returnsAvailable;
         public long returnDocuments;
+    }
+
+    /** Priority is derived only from available, already-read counts; missing data never becomes clear. */
+    public static FollowUpPriority followUpPriority(Input input) {
+        if (input == null) return FollowUpPriority.INCOMPLETE;
+        if (input.overdueAvailable && input.overdueInvoices > 0) return FollowUpPriority.URGENT;
+        if (input.dueChequesAvailable && input.dueCheques > 0) return FollowUpPriority.FOLLOW_UP;
+        if (input.returnsAvailable && input.returnDocuments > 0) return FollowUpPriority.FOLLOW_UP;
+        if (!input.overdueAvailable || !input.dueChequesAvailable || !input.returnsAvailable)
+            return FollowUpPriority.INCOMPLETE;
+        return FollowUpPriority.CLEAR;
     }
 
     /** Always returns exactly three short sentences; unavailable sources never become zeroes. */

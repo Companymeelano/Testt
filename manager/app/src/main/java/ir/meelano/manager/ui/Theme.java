@@ -13,8 +13,8 @@ import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.data.Settings;
 
 /**
- * Luxury theme engine: two skins («Midnight Gold» dark, «Ivory Royal» light)
- * × six accent colors, applied to the WHOLE app at runtime.
+ * Executive Royal theme engine: «Midnight Emerald» and «Royal Ivory», applied to the WHOLE app
+ * at runtime, while retaining the existing Nuts skin and its brand mark.
  *
  * Colors are plain static fields (not constants) on purpose: every screen,
  * chart and drawable reads them fresh on each render, so switching theme +
@@ -305,7 +305,8 @@ public final class Theme {
             GOLD_SOFT = DesignTokens.GOLD_DARK;
             PRIMARY = DesignTokens.EMERALD;
             TEXT = DesignTokens.INK;
-            MUTED = DesignTokens.LIGHT_MUTED;
+            // Darken the approved secondary-text token only as much as needed on Soft Surface.
+            MUTED = DesignTokens.textSafeColor(DesignTokens.LIGHT_MUTED, DesignTokens.PAPER, false);
             SUCCESS = DesignTokens.accessibleAccent(DesignTokens.POSITIVE, false);
             DANGER = DesignTokens.accessibleAccent(DesignTokens.NEGATIVE, false);
             WARNING = DesignTokens.accessibleAccent(DesignTokens.WARNING, false);
@@ -450,8 +451,8 @@ public final class Theme {
         v.setElevation(elevationPx);
         if (android.os.Build.VERSION.SDK_INT >= 28) {
             try {
-                v.setOutlineAmbientShadowColor(light ? 0x220E4B3A : 0x66000000);
-                v.setOutlineSpotShadowColor(light ? 0x260E4B3A : 0x44000000);
+                v.setOutlineAmbientShadowColor(light ? 0x220D3028 : 0x66000000);
+                v.setOutlineSpotShadowColor(light ? 0x260D3028 : 0x44000000);
             } catch (Exception ignored) { Diag.ignored("Theme:lift", ignored); }
         }
     }
@@ -475,13 +476,17 @@ public final class Theme {
     }
 
     public static android.graphics.drawable.Drawable card() {
-        return base(SURFACE, 20, dp(1), alpha(GOLD_METAL, light ? 42 : 54));
+        int edge = light
+                ? (nuts ? alpha(GOLD_METAL, 84) : DesignTokens.BORDER)
+                : alpha(DesignTokens.GOLD_LIGHT, 58);
+        return base(SURFACE, 20, dp(1), edge);
     }
 
-    /** Accent card: solid surface tinted by 7%, with a one-dp section hairline. */
+    /** Quiet 4.5% surface wash; the icon and heading carry section identity. */
     public static GradientDrawable cardAccent(int accent) {
         int tint = DesignTokens.surfaceTint(accent, !light);
-        return base(tint, 20, dp(1), alpha(accent, light ? 72 : 92));
+        int edge = alpha(accent, light ? 54 : 72);
+        return base(tint, 20, dp(1), edge);
     }
 
     /** Stable section hue derived from its title; semantic outcomes use separate tokens. */
@@ -508,9 +513,9 @@ public final class Theme {
     /** Hero header background. */
     public static GradientDrawable hero(int accent) {
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TR_BL,
-                new int[]{alpha(accent, light ? 44 : 70), alpha(accent, light ? 16 : 22), alpha(SURFACE, 255)});
+                new int[]{alpha(accent, light ? 30 : 50), alpha(accent, light ? 10 : 16), alpha(SURFACE, 255)});
         d.setCornerRadius(dp(24));
-        d.setStroke(dp(1), alpha(accent, light ? 90 : 110));
+        d.setStroke(dp(1), alpha(accent, light ? 70 : 88));
         return d;
     }
 
@@ -520,7 +525,7 @@ public final class Theme {
         GradientDrawable hero = new GradientDrawable(GradientDrawable.Orientation.TR_BL,
                 new int[]{light ? IVORY : alpha(GOLD_METAL, 22), lower});
         hero.setCornerRadius(dp(20));
-        hero.setStroke(dp(1), alpha(GOLD_METAL, light ? 170 : 112));
+        hero.setStroke(dp(1), alpha(GOLD_METAL, light ? 118 : 82));
         return hero;
     }
 
@@ -560,7 +565,7 @@ public final class Theme {
     /** Flat KPI surface with a restrained section tint and hairline. */
     public static GradientDrawable kpi(int accent) {
         return base(DesignTokens.surfaceTint(accent, !light), 20, dp(1),
-                alpha(accent, light ? 68 : 86));
+                alpha(accent, light ? 58 : 76));
     }
 
     /**
@@ -569,7 +574,7 @@ public final class Theme {
      */
     public static GradientDrawable dashboardMetric(int accent) {
         return base(DesignTokens.dashboardMetricSurface(accent, !light), 17, dp(1),
-                alpha(accent, light ? 126 : 146));
+                alpha(accent, light ? 96 : 116));
     }
 
     /** Primary button gradient, toned toward a high-contrast ink/paper foreground. */
@@ -585,27 +590,19 @@ public final class Theme {
         return d;
     }
 
-    /** Controlled rose-gold for the primary start CTA (v34). */
+    /** Existing expense-category accent; primary CTAs use the approved emerald/champagne palette. */
     public static final int ROSE = 0xFFC2527E;
 
-    /** Primary start button: gold-to-rose sheen, both stops matched to the active ink. */
+    /** Primary CTA: champagne with a contrast-safe dark-emerald label; Nuts keeps its crest colors. */
     public static GradientDrawable startButton() {
         if (nuts) {
-            // Nut theme: emerald to antique gold, the same as the main action buttons (no rose).
             GradientDrawable n = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                    new int[]{0xFF1F6F55, 0xFF0B5C44, 0xFF9C7A1A});
+                    new int[]{DesignTokens.EMERALD, DesignTokens.EMERALD_DEEP, DesignTokens.GOLD});
             n.setCornerRadius(dp(18));
             n.setStroke(dp(1), alpha(ACCENT_PAPER, 110));
             return n;
         }
-        boolean darkInk = darkAccentInk(GOLD);
-        int gold = shade(GOLD, darkInk ? 0.04f : -0.08f);
-        int rose = shade(ROSE, darkInk ? 0.22f : -0.18f);
-        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{shade(gold, 0.10f), gold, rose});
-        d.setCornerRadius(dp(18));
-        d.setStroke(dp(1), alpha(ACCENT_PAPER, 110));
-        return d;
+        return goldButton();
     }
 
     /** Luxury field background with a real focus ring (v34). */
@@ -693,14 +690,12 @@ public final class Theme {
         return d;
     }
 
-    /** Header tool row: solid ivory panel in light mode so labels read over the artwork. */
+    /** Header tools and brand row share the same flat, theme-aware executive surface. */
     public static android.graphics.drawable.Drawable toolbarPanel() {
-        if (!light) return ghostButton(GOLD);
-        GradientDrawable d = new GradientDrawable();
-        d.setCornerRadius(dp(18));
-        d.setColor(0xF2FFFFFF);
-        d.setStroke(dp(1), alpha(GOLD, 110));
-        return d;
+        int edge = light
+                ? (nuts ? alpha(GOLD_METAL, 112) : DesignTokens.BORDER)
+                : alpha(DesignTokens.GOLD_LIGHT, 60);
+        return base(SURFACE, 18, dp(1), edge);
     }
 
     /** Nuts keeps its ivory dock and gold outline while sharing the same low-noise surfaces. */
@@ -714,7 +709,8 @@ public final class Theme {
         d.setColor(SURFACE);
         float r = dp(22);
         d.setCornerRadii(new float[]{r, r, r, r, 0, 0, 0, 0});
-        d.setStroke(dp(1), alpha(bottomNavAccent(), light ? 72 : 64));
+        d.setStroke(dp(1), light && !nuts ? DesignTokens.BORDER
+                : alpha(bottomNavAccent(), light ? 84 : 64));
         return d;
     }
 
@@ -729,18 +725,18 @@ public final class Theme {
     /** Nut theme: ivory panel framed in gold, the frame of every data table. */
     public static GradientDrawable nutPanel() {
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{0xFFFFFFFF, 0xFFF7F0DC});
+                new int[]{DesignTokens.IVORY, DesignTokens.PAPER});
         d.setCornerRadius(dp(20));
-        d.setStroke(dp(1), 0xFFC9A24A);
+        d.setStroke(dp(1), DesignTokens.GOLD);
         return d;
     }
 
-    /** Nut theme: deep emerald header band with a gold hairline, like the dashboard banner. */
+    /** Nut theme: emerald header band with a champagne hairline, like the dashboard banner. */
     public static GradientDrawable nutTableHeader() {
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
-                new int[]{0xFF0A3B2E, 0xFF17684F, 0xFF0A3B2E});
+                new int[]{DesignTokens.EMERALD_DEEP, DesignTokens.EMERALD, DesignTokens.EMERALD_DEEP});
         d.setCornerRadius(dp(14));
-        d.setStroke(dp(1), alpha(0xFFC9A24A, 170));
+        d.setStroke(dp(1), alpha(DesignTokens.GOLD, 170));
         return d;
     }
 

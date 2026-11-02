@@ -60,6 +60,22 @@ public class SalesSnapshotTest {
         assertEquals(30_000_000d, series.get(2).salesRials, 0.001);
     }
 
+    @Test public void chartSeriesNeverFillsCalendarDaysBeforeTheSuccessfulQueryWindow() {
+        List<Row> rows = new ArrayList<>();
+        rows.add(row("1405/07/05", 55_000_000d, 1));
+        SalesSnapshot snapshot = SalesSnapshot.fromRows(rows, "1405/07/07", "1405/07/04");
+
+        List<SalesSnapshot.Day> series = snapshot.dailySeries("1405/07/07", 14);
+
+        assertEquals("1405/07/04", series.get(0).date);
+        assertEquals(4, series.size());
+        assertEquals(0d, series.get(0).salesRials, 0.001);
+        assertEquals(55_000_000d, series.get(1).salesRials, 0.001);
+        assertEquals(0d, series.get(2).salesRials, 0.001);
+        assertEquals(0d, series.get(3).salesRials, 0.001);
+        assertTrue(snapshot.dailySeries("1405/07/03", 14).isEmpty());
+    }
+
     @Test public void nullRowsMeansUnavailableRatherThanKnownZeroSales() {
         SalesSnapshot snapshot = SalesSnapshot.fromRows(null, "1405/07/02");
 

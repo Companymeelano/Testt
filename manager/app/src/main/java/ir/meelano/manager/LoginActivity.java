@@ -71,9 +71,8 @@ public class LoginActivity extends Activity {
         android.widget.FrameLayout halo = new android.widget.FrameLayout(this);
         android.graphics.drawable.GradientDrawable glow = new android.graphics.drawable.GradientDrawable();
         glow.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-        // Nut theme: a warm gold halo (GOLD is emerald there, which read as grey mud on ivory).
-        int haloRgb = Theme.isNuts() ? 0xFFE2BE5E : Theme.GOLD;
-        glow.setColors(new int[]{Theme.alpha(haloRgb, Theme.isNuts() ? 110 : 90), Theme.alpha(haloRgb, 0)});
+        int haloRgb = Theme.GOLD_METAL;
+        glow.setColors(new int[]{Theme.alpha(haloRgb, 90), Theme.alpha(haloRgb, 0)});
         glow.setGradientType(android.graphics.drawable.GradientDrawable.RADIAL_GRADIENT);
         glow.setGradientRadius(Theme.dp(96));
         halo.setBackground(glow);
@@ -90,11 +89,14 @@ public class LoginActivity extends Activity {
             t.post(() -> {
                 int h = t.getHeight();
                 if (h <= 0) return;
-                int[] cols = Theme.isLight()
-                        ? new int[]{Theme.shade(Theme.GOLD, -0.4f), Theme.GOLD, Theme.shade(Theme.GOLD, -0.5f)}
-                        : new int[]{0xFFFFFFFF, Theme.GOLD, 0xFFA9B0BC};
-                t.getPaint().setShader(new android.graphics.LinearGradient(0, 0, 0, h, cols,
-                        null, android.graphics.Shader.TileMode.CLAMP));
+                if (Theme.isLight()) {
+                    t.getPaint().setShader(null);
+                    t.setTextColor(Theme.GOLD_DARK);
+                } else {
+                    t.getPaint().setShader(new android.graphics.LinearGradient(0, 0, 0, h,
+                            new int[]{Theme.GOLD_LIGHT, Theme.GOLD_METAL, Theme.GOLD_LIGHT},
+                            null, android.graphics.Shader.TileMode.CLAMP));
+                }
                 t.invalidate();
             });
         } catch (Exception ignored) { Diag.ignored("LoginActivity:metal", ignored); }

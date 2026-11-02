@@ -210,6 +210,68 @@ public final class HomeDashboardScreenshotTest {
                         && delta.getContentDescription().toString().contains("نسبت به"));
     }
 
+    private static void verifySalesChartRangeSwitch(Activity activity) {
+        Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
+        final View[] chartAndSelector = new View[2];
+        final String[] initialDescription = {""};
+        instrumentation.runOnMainSync(() -> {
+            View decor = activity.getWindow().getDecorView();
+            chartAndSelector[0] = findTaggedView(decor, "home-sales-chart");
+            chartAndSelector[1] = findTaggedView(decor, "sales-chart-range-selector");
+            if (chartAndSelector[0] != null
+                    && chartAndSelector[0].getContentDescription() != null)
+                initialDescription[0] = chartAndSelector[0].getContentDescription().toString();
+        });
+        assertNotNull("Live sales chart is missing", chartAndSelector[0]);
+        assertNotNull("Sales chart range selector is missing", chartAndSelector[1]);
+        assertTrue("Initial chart window was not identified", initialDescription[0].contains("۱۴ روز"));
+        assertTrue("Sales chart selector must offer real 7- and 14-day ranges",
+                chartAndSelector[1] instanceof ViewGroup
+                        && ((ViewGroup) chartAndSelector[1]).getChildCount() >= 2);
+
+        ViewGroup initialSelector = (ViewGroup) chartAndSelector[1];
+        View weekSegment = initialSelector.getChildAt(0);
+        final boolean[] weekClicked = {false};
+        instrumentation.runOnMainSync(() -> weekClicked[0] = weekSegment.performClick());
+        assertTrue("Seven-day sales chart option is not clickable", weekClicked[0]);
+        String[] weeklyDescription = {""};
+        instrumentation.runOnMainSync(() -> {
+            CharSequence description = chartAndSelector[0].getContentDescription();
+            weeklyDescription[0] = description == null ? "" : description.toString();
+        });
+        assertTrue("Selecting seven days did not update the chart window to real daily data",
+                weeklyDescription[0].contains("۷ روز تا"));
+
+        final View[] refreshedSelector = {null};
+        final View[] fortnightSegment = {null};
+        instrumentation.runOnMainSync(() -> {
+            refreshedSelector[0] = findTaggedView(activity.getWindow().getDecorView(),
+                    "sales-chart-range-selector");
+            if (refreshedSelector[0] instanceof ViewGroup) {
+                ViewGroup group = (ViewGroup) refreshedSelector[0];
+                for (int i = 0; i < group.getChildCount(); i++) {
+                    CharSequence label = group.getChildAt(i).getContentDescription();
+                    if (label != null && "۱۴ روز".contentEquals(label)) {
+                        fortnightSegment[0] = group.getChildAt(i);
+                        break;
+                    }
+                }
+            }
+        });
+        assertNotNull("Updated sales range selector was not rendered", refreshedSelector[0]);
+        assertNotNull("Actual 14-day chart option disappeared after range change", fortnightSegment[0]);
+        final boolean[] fortnightClicked = {false};
+        instrumentation.runOnMainSync(() -> fortnightClicked[0] = fortnightSegment[0].performClick());
+        assertTrue("Fourteen-day sales chart option is not clickable", fortnightClicked[0]);
+        String[] restoredDescription = {""};
+        instrumentation.runOnMainSync(() -> {
+            CharSequence description = chartAndSelector[0].getContentDescription();
+            restoredDescription[0] = description == null ? "" : description.toString();
+        });
+        assertTrue("Sales chart did not return to its initial 14-day range",
+                restoredDescription[0].contains("۱۴ روز"));
+    }
+
     private static boolean containsViewType(View view, Class<?> type) {
         if (view == null) return false;
         if (type.isInstance(view)) return true;
@@ -255,6 +317,7 @@ public final class HomeDashboardScreenshotTest {
         assertNotNull("Brand row is not visually grouped into a themed header panel",
                 targets[2].getBackground());
         verifyDashboardPolish(activity);
+        verifySalesChartRangeSwitch(activity);
 
         ViewGroup dock = (ViewGroup) targets[1];
         assertEquals("Admin dock should have five destinations", 5, dock.getChildCount());

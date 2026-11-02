@@ -460,7 +460,8 @@ public final class ProductionScreen extends Screen {
         try{
             if(dialog.getWindow()!=null)dialog.getWindow().setBackgroundDrawable(Theme.dialogBg());
             if(dialog.getButton(AlertDialog.BUTTON_POSITIVE)!=null)
-                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(Theme.GOLD);
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(
+                        Theme.isLight() ? Theme.GOLD_DARK : Theme.GOLD);
             if(dialog.getButton(AlertDialog.BUTTON_NEGATIVE)!=null)
                 dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(Theme.MUTED);
         }catch(Exception ignored){Diag.ignored("ProductionScreen:dialogTheme",ignored);}

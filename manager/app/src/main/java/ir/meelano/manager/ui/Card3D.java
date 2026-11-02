@@ -13,8 +13,8 @@ import android.widget.TextView;
 /**
  * Beveled 3D card kit for the license experience: every panel is a little
  * slab — a soft drop shadow, an accent «side wall» peeking at the bottom,
- * and a face with a top-down sheen. Built purely from the {@link Theme}
- * grammar so Yalda / light modes keep working untouched.
+ * and a face with a restrained sheen. Built purely from the {@link Theme}
+ * grammar so Royal Ivory, Midnight Emerald and the preserved Nuts skin stay aligned.
  */
 public final class Card3D {
     private Card3D() { }
@@ -25,7 +25,7 @@ public final class Card3D {
         c.setOrientation(LinearLayout.VERTICAL);
         c.setBackground(slab(accent));
         try {
-            c.setElevation(Theme.dp(4));
+            c.setElevation(Theme.dp(2));
         } catch (Exception ignored) { Diag.ignored("Card3D:28", ignored); }
         c.setPadding(Theme.dp(14), Theme.dp(13), Theme.dp(14), Theme.dp(13));
         return c;
@@ -54,7 +54,7 @@ public final class Card3D {
         bg.setStroke(Theme.dp(1), Theme.alpha(badgeInk, 100));
         badge.setBackground(bg);
         try {
-            badge.setElevation(Theme.dp(3));
+            badge.setElevation(Theme.dp(2));
         } catch (Exception ignored) { Diag.ignored("Card3D:57", ignored); }
         int s = Theme.dp(30);
         row.addView(badge, new LinearLayout.LayoutParams(s, s));
@@ -116,25 +116,25 @@ public final class Card3D {
         boolean light = Theme.isLight();
         // 0 — soft drop shadow peeking below.
         GradientDrawable shadow = new GradientDrawable();
-        shadow.setColor(Theme.alpha(0xFF000000, light ? 50 : 110));
+        shadow.setColor(Theme.alpha(0xFF000000, light ? 34 : 72));
         shadow.setCornerRadius(Theme.dp(20));
         // 1 — accent «side wall», peeking at the bottom like a slab edge.
         GradientDrawable edge = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{Theme.alpha(accent, light ? 120 : 170),
-                        Theme.alpha(accent, light ? 200 : 235)});
+                new int[]{Theme.alpha(accent, light ? 72 : 104),
+                        Theme.alpha(accent, light ? 126 : 160)});
         edge.setCornerRadius(Theme.dp(20));
         // 2 — face with a top-down sheen.
         GradientDrawable face = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{Theme.shade(Theme.SURFACE, light ? 0.10f : 0.14f),
+                new int[]{Theme.shade(Theme.SURFACE, light ? 0.025f : 0.06f),
                         Theme.SURFACE,
-                        Theme.shade(Theme.SURFACE, light ? -0.08f : -0.25f)});
+                        Theme.shade(Theme.SURFACE, light ? -0.025f : -0.10f)});
         face.setCornerRadius(Theme.dp(18));
-        face.setStroke(Theme.dp(1), Theme.alpha(accent, light ? 100 : 130));
+        face.setStroke(Theme.dp(1), Theme.alpha(accent, light ? 72 : 96));
         LayerDrawable layers = new LayerDrawable(new Drawable[]{shadow, edge, face});
-        int s = Theme.dp(3);
-        layers.setLayerInset(0, s, Theme.dp(6), s, 0);
-        layers.setLayerInset(1, 0, 0, 0, Theme.dp(2));
-        layers.setLayerInset(2, Theme.dp(2), Theme.dp(2), Theme.dp(2), Theme.dp(4));
+        int s = Theme.dp(2);
+        layers.setLayerInset(0, s, Theme.dp(4), s, 0);
+        layers.setLayerInset(1, 0, 0, 0, Theme.dp(1));
+        layers.setLayerInset(2, Theme.dp(1), Theme.dp(1), Theme.dp(1), Theme.dp(3));
         return layers;
     }
 
@@ -143,7 +143,7 @@ public final class Card3D {
         g.setShape(GradientDrawable.OVAL);
         g.setGradientType(GradientDrawable.RADIAL_GRADIENT);
         g.setGradientRadius(Theme.dp(sizeDp * 0.75f));
-        g.setColors(new int[]{Theme.alpha(color, Theme.isLight() ? 70 : 110),
+        g.setColors(new int[]{Theme.alpha(color, Theme.isLight() ? 46 : 74),
                 Theme.alpha(color, 0)});
         return g;
     }

@@ -56,18 +56,18 @@ public final class TableShot {
         int H = margin + 90 + 52 + 24 + headH + n * rowH + rowH + 70 + margin;
         Bitmap bmp = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888);
         Canvas g = new Canvas(bmp);
-        g.drawColor(0xFFFFFFFF);
+        g.drawColor(DesignTokens.IVORY);
         Paint fill = new Paint();
-        fill.setColor(Theme.GOLD);
+        fill.setColor(DesignTokens.GOLD);
         g.drawRect(0, 0, W, 14, fill);
         Paint t1 = new Paint(Paint.ANTI_ALIAS_FLAG);
-        t1.setColor(0xFF101828);
+        t1.setColor(DesignTokens.INK);
         t1.setTextSize(46);
         t1.setTypeface(Theme.face(true));
         t1.setTextAlign(Paint.Align.RIGHT);
         g.drawText(safe(title), W - margin, margin + 62, t1);
         Paint t2 = new Paint(Paint.ANTI_ALIAS_FLAG);
-        t2.setColor(0xFF5A6478);
+        t2.setColor(DesignTokens.LIGHT_MUTED);
         t2.setTextSize(30);
         t2.setTypeface(Theme.face(false));
         t2.setTextAlign(Paint.Align.RIGHT);
@@ -76,10 +76,10 @@ public final class TableShot {
         g.drawText(sub + brand + " • " + Money.fa(Jalali.todayStr()), W - margin, margin + 118, t2);
         // Header.
         float y = margin + 90 + 52 + 24;
-        fill.setColor(0xFF101828);
+        fill.setColor(DesignTokens.EMERALD);
         g.drawRect(margin, y, W - margin, y + headH, fill);
         Paint hh = new Paint(Paint.ANTI_ALIAS_FLAG);
-        hh.setColor(0xFFF1D493);
+        hh.setColor(DesignTokens.GOLD_LIGHT);
         hh.setTextSize(31);
         hh.setTypeface(Theme.face(true));
         hh.setTextAlign(Paint.Align.CENTER);
@@ -93,16 +93,16 @@ public final class TableShot {
         y += headH;
         // Rows.
         Paint zebra = new Paint();
-        zebra.setColor(0xFFF4F1E8);
+        zebra.setColor(DesignTokens.PAPER);
         Paint line = new Paint();
-        line.setColor(0xFFE3DCC8);
+        line.setColor(DesignTokens.BORDER);
         line.setStrokeWidth(2);
         cell.setTextAlign(Paint.Align.CENTER);
         moneyP.setTextAlign(Paint.Align.CENTER);
         Paint num = new Paint(Paint.ANTI_ALIAS_FLAG);
         num.setTextSize(29);
         num.setTypeface(Theme.face(false));
-        num.setColor(0xFF5A6478);
+        num.setColor(DesignTokens.LIGHT_MUTED);
         num.setTextAlign(Paint.Align.CENTER);
         double[] sums = new double[cols.length];
         for (int i = 0; i < n; i++) {
@@ -116,27 +116,27 @@ public final class TableShot {
                 boolean isMoney = cols[j].type == ReportCatalog.T_MONEY;
                 if (isMoney) sums[j] += r.d(cols[j].key);
                 Paint p = isMoney ? moneyP : cell;
-                p.setColor(isMoney ? 0xFF101828 : 0xFF333C4E);
+                p.setColor(DesignTokens.INK);
                 g.drawText(fit(fmt(cols[j], r), w[j + 1] - 20, p), x + w[j + 1] / 2f, y + 39, p);
             }
             g.drawLine(margin, y + rowH, W - margin, y + rowH, line);
             y += rowH;
         }
         // Totals.
-        fill.setColor(0xFFF6E7C6);
+        fill.setColor(DesignTokens.PAPER);
         g.drawRect(margin, y, W - margin, y + rowH, fill);
         x = W - margin;
         x -= w[0];
         g.drawText("جمع", x + w[0] / 2f, y + 39, moneyP);
         for (int j = 0; j < cols.length; j++) {
             x -= w[j + 1];
-            moneyP.setColor(0xFF101828);
+            moneyP.setColor(DesignTokens.INK);
             String t = cols[j].type == ReportCatalog.T_MONEY ? Money.rial(sums[j]) : "";
             g.drawText(fit(t, w[j + 1] - 20, moneyP), x + w[j + 1] / 2f, y + 39, moneyP);
         }
         y += rowH;
         Paint ft = new Paint(Paint.ANTI_ALIAS_FLAG);
-        ft.setColor(0xFF9AA3B5);
+        ft.setColor(DesignTokens.LIGHT_MUTED);
         ft.setTextSize(26);
         ft.setTypeface(Theme.face(false));
         ft.setTextAlign(Paint.Align.CENTER);

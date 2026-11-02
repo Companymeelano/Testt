@@ -286,7 +286,7 @@ public class SettingsScreen extends Screen {
         final boolean isNuts = "nuts".equals(a.settings.themeMode());
         final int themeIdx = isNuts ? 2 : isLight ? 1 : 0;
         th.addView(a.kit.segmentedControl(
-                new String[]{"تیره • ابسیدین طلایی", "روشن • عاج سلطنتی", "آجیل و خشکبار"},
+                new String[]{"تیره • زمرد نیمه‌شب", "روشن • عاج سلطنتی", "آجیل و خشکبار"},
                 themeIdx,
                 new int[]{R.drawable.mi_dark_mode, R.drawable.mi_light_mode, R.drawable.mi_storefront},
                 Theme.GOLD, idx -> {
@@ -314,7 +314,7 @@ public class SettingsScreen extends Screen {
     }
 
     private void buildPreview(final LinearLayout content) {
-        content.addView(a.kit.sectionHeader("پیش‌نمایش Light و Dark",
+        content.addView(a.kit.sectionHeader("پیش‌نمایش عاج سلطنتی و زمرد نیمه‌شب",
                 R.drawable.mi_contrast, Theme.GOLD, null, null), a.kit.lp(-1, -2));
         content.addView(a.kit.hint("هدر جمع‌شونده، داک پنج‌مقصدی و اجزای مشترک را در هر دو پالت ببینید. "
                 + "این نمونه‌ها تنظیم فعلی دستگاه را تغییر نمی‌دهند."), a.kit.lp(-1, -2));

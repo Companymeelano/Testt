@@ -80,7 +80,9 @@ public final class Kit {
         float base = micro ? (sp < 9f ? 9f : sp) : (sp < 12.5f ? 12.5f : sp);
         float grow = micro ? Theme.fontScale() : Theme.fontScale() * Theme.typeScale();
         t.setTextSize(base * grow);
-        t.setTextColor(isOutcomeColor(color) && !isDeltaCopy(s) ? Theme.TEXT : color);
+        int resolvedColor = isOutcomeColor(color) && !isDeltaCopy(s) ? Theme.TEXT
+                : (!Theme.DARK && color == Theme.GOLD ? Theme.GOLD_DARK : color);
+        t.setTextColor(resolvedColor);
         t.setTypeface(Theme.face(bold));
         t.setFontFeatureSettings("tnum");
         t.setLineSpacing(Theme.dp(1.5f), 1.0f);

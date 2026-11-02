@@ -50,7 +50,7 @@ public final class Pdf {
         Paint bold = new Paint(Paint.ANTI_ALIAS_FLAG);
         bold.setTypeface(Theme.face(true));
         Paint muted = new Paint(Paint.ANTI_ALIAS_FLAG);
-        muted.setColor(0xFF5A6478);
+        muted.setColor(DesignTokens.LIGHT_MUTED);
         // Column widths by type.
         int[] widths = new int[cols.length];
         int totalW = 0;
@@ -70,12 +70,12 @@ public final class Pdf {
             PdfDocument.PageInfo info = new PdfDocument.PageInfo.Builder(W, H, pg + 1).create();
             PdfDocument.Page page = doc.startPage(info);
             android.graphics.Canvas g = page.getCanvas();
-            g.drawColor(0xFFFFFFFF);
+            g.drawColor(DesignTokens.IVORY);
             // accent top bar (follows the user's theme color)
-            paint.setColor(Theme.GOLD);
+            paint.setColor(DesignTokens.GOLD);
             g.drawRect(0, 0, W, 10, paint);
             // title (right aligned)
-            head.setColor(0xFF101828);
+            head.setColor(DesignTokens.INK);
             head.setTextSize(21);
             head.setTextAlign(Paint.Align.RIGHT);
             g.drawText(safe(title), W - margin, 62, head);
@@ -85,9 +85,9 @@ public final class Pdf {
             g.drawText(LicenseStore.brandName(c) + " • " + Money.fa(Jalali.todayStr()), W - margin, 106, muted);
             // header row
             int y = 130;
-            paint.setColor(0xFF101828);
+            paint.setColor(DesignTokens.EMERALD);
             g.drawRect(margin, y, W - margin, y + headH, paint);
-            bold.setColor(0xFFF1D493);
+            bold.setColor(DesignTokens.GOLD_LIGHT);
             bold.setTextSize(12.5f);
             bold.setTextAlign(Paint.Align.CENTER);
             int x = W - margin;
@@ -101,7 +101,7 @@ public final class Pdf {
             cell.setTextSize(11.5f);
             cell.setTextAlign(Paint.Align.CENTER);
             Paint zebra = new Paint();
-            zebra.setColor(0xFFF4F1E8);
+            zebra.setColor(DesignTokens.PAPER);
             int from = pg * rowsPerPage;
             int to = Math.min(n, from + rowsPerPage);
             for (int i = from; i < to; i++) {
@@ -110,7 +110,7 @@ public final class Pdf {
                 x = W - margin;
                 for (int j = 0; j < cols.length; j++) {
                     x -= widths[j];
-                    cell.setColor(cols[j].type == ReportCatalog.T_MONEY ? 0xFF101828 : 0xFF333C4E);
+                    cell.setColor(DesignTokens.INK);
                     cell.setTypeface(cols[j].type == ReportCatalog.T_MONEY ? Theme.face(true) : Theme.face(false));
                     g.drawText(fit(fmt(cols[j], r), widths[j] - 10, cell), x + widths[j] / 2f, y + 20, cell);
                 }
@@ -131,10 +131,10 @@ public final class Pdf {
                 PdfDocument.PageInfo info = new PdfDocument.PageInfo.Builder(W, H, 999).create();
                 PdfDocument.Page page = doc.startPage(info);
                 android.graphics.Canvas g = page.getCanvas();
-                g.drawColor(0xFFFFFFFF);
-                paint.setColor(Theme.GOLD);
+                g.drawColor(DesignTokens.IVORY);
+                paint.setColor(DesignTokens.GOLD);
                 g.drawRect(0, 0, W, 10, paint);
-                head.setColor(0xFF101828);
+                head.setColor(DesignTokens.INK);
                 head.setTextSize(19);
                 head.setTextAlign(Paint.Align.RIGHT);
                 g.drawText(safe(im.cap), W - margin, 62, head);

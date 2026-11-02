@@ -1056,10 +1056,11 @@ public class MainActivity extends Activity {
             badge.setGravity(Gravity.CENTER);
             badge.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
             int iconRes = MeelanoIcons.iconFor(s.glyph());
-            int iconSize = Theme.isNuts() ? 30 : 28;
+            int iconSize = Theme.isNuts() ? 26 : 24;
             if (iconRes != 0) {
-                android.widget.ImageView symbol = kit.icon(iconRes, Theme.MUTED, iconSize);
-                symbol.setTag(Boolean.FALSE);
+                int artwork = Theme.icon3d(iconRes);
+                android.widget.ImageView symbol = kit.artworkIcon(iconRes, Theme.MUTED, iconSize);
+                symbol.setTag(Theme.isIcon3d(artwork) ? Boolean.TRUE : Boolean.FALSE);
                 badge.addView(symbol, new LinearLayout.LayoutParams(
                         Theme.dp(iconSize), Theme.dp(iconSize)));
             } else {
@@ -1153,8 +1154,7 @@ public class MainActivity extends Activity {
             }
             TextView label = (TextView) b.getChildAt(1);
             label.setTextColor(on ? Theme.selectedNavInk() : Theme.MUTED);
-            float size = on ? 13f : 12.5f;
-            label.setTextSize(size * Theme.fontScale() * Theme.typeScale());
+            label.setTextSize(12.5f * Theme.fontScale() * Theme.typeScale());
             View marker = b.getChildAt(2);
             marker.setVisibility(on ? View.VISIBLE : View.INVISIBLE);
             marker.setBackground(on ? Theme.bottomNavMarker() : null);

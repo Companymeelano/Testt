@@ -23,6 +23,17 @@ public class HomeScreenKpiTest {
     }
 
     @Test
+    public void zeroCurrentVersusZeroPreviousIsReportedAsUnchangedNotMinusOneHundredPercent() {
+        HomeScreen screen = new HomeScreen(null);
+
+        Kit.Kpi kpi = screen.homeKpi("فروش", 0, 0, "فاکتور", true, 0d, null,
+                ir.meelano.manager.ui.Theme.SECTION_SALES,
+                ir.meelano.manager.R.drawable.mi_point_of_sale, true, false, null);
+
+        assertEquals("بدون تغییر · نسبت به روز قبل", kpi.sub);
+    }
+
+    @Test
     public void missingDaySummaryShowsUnavailableInertKpi() {
         HomeScreen screen = new HomeScreen(null);
 

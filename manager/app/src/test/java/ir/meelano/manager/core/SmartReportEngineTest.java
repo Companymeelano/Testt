@@ -50,6 +50,34 @@ public class SmartReportEngineTest {
         assertFalse(result.get(0).contains("۰ تومان"));
     }
 
+    @Test public void followUpPriorityUsesOnlyKnownCountsAndNeverCallsMissingDataClear() {
+        SmartReportEngine.Input input = new SmartReportEngine.Input();
+
+        assertEquals(SmartReportEngine.FollowUpPriority.INCOMPLETE,
+                SmartReportEngine.followUpPriority(input));
+
+        input.overdueAvailable = true;
+        input.overdueInvoices = 1;
+        assertEquals(SmartReportEngine.FollowUpPriority.URGENT,
+                SmartReportEngine.followUpPriority(input));
+
+        input.overdueInvoices = 0;
+        input.dueChequesAvailable = true;
+        input.dueCheques = 2;
+        assertEquals(SmartReportEngine.FollowUpPriority.FOLLOW_UP,
+                SmartReportEngine.followUpPriority(input));
+
+        input.dueCheques = 0;
+        input.returnsAvailable = true;
+        input.returnDocuments = 1;
+        assertEquals(SmartReportEngine.FollowUpPriority.FOLLOW_UP,
+                SmartReportEngine.followUpPriority(input));
+
+        input.returnDocuments = 0;
+        assertEquals(SmartReportEngine.FollowUpPriority.CLEAR,
+                SmartReportEngine.followUpPriority(input));
+    }
+
     @Test public void emptyButAvailableSourcesCanSafelyReportNoActivity() {
         SmartReportEngine.Input input = new SmartReportEngine.Input();
         input.salesAvailable = true;

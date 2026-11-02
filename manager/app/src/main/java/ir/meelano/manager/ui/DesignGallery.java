@@ -459,8 +459,9 @@ public final class DesignGallery {
             background = dark ? DesignTokens.NIGHT_BG : DesignTokens.IVORY;
             surface = dark ? DesignTokens.NIGHT_SURFACE : DesignTokens.IVORY;
             text = dark ? DesignTokens.NIGHT_TEXT : DesignTokens.INK;
-            muted = dark ? DesignTokens.NIGHT_MUTED : DesignTokens.LIGHT_MUTED;
-            border = dark ? 0xFF315244 : 0xFFE5DFD2;
+            muted = dark ? DesignTokens.NIGHT_MUTED
+                    : DesignTokens.textSafeColor(DesignTokens.LIGHT_MUTED, DesignTokens.PAPER, false);
+            border = dark ? 0xFF35574A : DesignTokens.BORDER;
             accent = dark ? DesignTokens.NIGHT_EMERALD : DesignTokens.EMERALD;
         }
 

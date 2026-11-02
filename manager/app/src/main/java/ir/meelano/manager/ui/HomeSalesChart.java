@@ -61,6 +61,7 @@ public final class HomeSalesChart {
         private double axisMaximum = 1d;
         private double axisStep = 1d;
         private double average;
+        private boolean hasSalesActivity;
         private float drawProgress = 1f;
         private float pulse = 0.5f;
         private int selectedIndex = -1;
@@ -96,15 +97,36 @@ public final class HomeSalesChart {
             return size * density * Theme.fontScale() * Theme.typeScale();
         }
 
+        private int chartGold() { return Theme.isLight() ? Theme.GOLD_DARK : Theme.GOLD; }
+
         public void setData(List<SalesSnapshot.Day> values, double averageRials) {
+            setData(values, averageRials, "۱۴ روزه");
+        }
+
+        /** Updates the visible time window from the same successful daily sales snapshot. */
+        public void setData(List<SalesSnapshot.Day> values, double averageRials, String windowLabel) {
             days.clear();
-            if (values != null) days.addAll(values);
+            if (values != null) for (SalesSnapshot.Day day : values) if (day != null) days.add(day);
             average = finite(averageRials) ? Math.max(0, averageRials) : 0;
+            hasSalesActivity = false;
+            for (SalesSnapshot.Day day : days) {
+                if (day != null && (Math.abs(day.salesRials) >= 0.005d || day.documents > 0)) {
+                    hasSalesActivity = true;
+                    break;
+                }
+            }
             selectedIndex = days.isEmpty() ? -1 : days.size() - 1;
             touched = false;
             geometryDirty = true;
             String latest = days.isEmpty() ? "" : Jalali.dispFa(days.get(days.size() - 1).date);
-            setContentDescription("نمودار فروش ۱۴ روزه. زمان از راست، روزهای قدیمی‌تر، به چپ، روزهای جدیدتر است. آخرین روز " + latest);
+            String label = windowLabel == null || windowLabel.trim().isEmpty()
+                    ? "بازهٔ انتخاب‌شده" : windowLabel.trim();
+            String state = days.isEmpty() ? "؛ تاریخچهٔ این بازه در دسترس نیست"
+                    : hasSalesActivity ? "" : "؛ در این بازه فروشی ثبت نشده است";
+            setContentDescription("نمودار فروش " + label
+                    + ". روزهای قدیمی‌تر در راست و روزهای جدیدتر در چپ هستند"
+                    + (latest.isEmpty() ? "" : "؛ آخرین روز " + latest) + state);
+            setClickable(hasSalesActivity && !days.isEmpty());
             invalidate();
             if (isAttachedToWindow()) startMotion();
         }
@@ -144,7 +166,7 @@ public final class HomeSalesChart {
         private void startMotion() {
             cancel(drawAnimator);
             cancel(pulseAnimator);
-            if (days.size() < 2 || !Ui.motionOk(getContext())) {
+            if (!hasSalesActivity || days.size() < 2 || !Ui.motionOk(getContext())) {
                 drawProgress = 1f;
                 pulse = 0.5f;
                 invalidate();
@@ -228,7 +250,7 @@ public final class HomeSalesChart {
             }
             linePaint.setStrokeWidth(Theme.dp(2));
             linePaint.setShader(new LinearGradient(plotLeft, 0, plotRight, 0,
-                    Theme.GOLD, Theme.SECTION_SALES, Shader.TileMode.CLAMP));
+                    chartGold(), Theme.SECTION_SALES, Shader.TileMode.CLAMP));
             fillPaint.setShader(new LinearGradient(0, plotTop, 0, plotBottom,
                     Theme.alpha(Theme.SECTION_SALES, Theme.isLight() ? 55 : 70),
                     Theme.alpha(Theme.SECTION_SALES, 0), Shader.TileMode.CLAMP));
@@ -245,17 +267,19 @@ public final class HomeSalesChart {
             super.onDraw(canvas);
             ensureGeometry();
             if (getWidth() <= 0 || getHeight() <= 0) return;
-            drawAxes(canvas);
             if (days.isEmpty()) {
-                textPaint.setColor(Theme.MUTED);
-                textPaint.setTextAlign(Paint.Align.CENTER);
-                canvas.drawText("روند فروش در دسترس نیست", getWidth() / 2f, getHeight() / 2f, textPaint);
+                drawEmptyState(canvas, "تاریخچهٔ فروش این بازه در دسترس نیست");
                 return;
             }
+            if (!hasSalesActivity) {
+                drawEmptyState(canvas, "در این بازه فاکتوری ثبت نشده است");
+                return;
+            }
+            drawAxes(canvas);
             drawFridayBands(canvas);
             if (average > 0) {
                 float avgY = valueY(average);
-                gridPaint.setColor(Theme.alpha(Theme.GOLD, Theme.isLight() ? 170 : 195));
+                gridPaint.setColor(Theme.alpha(chartGold(), Theme.isLight() ? 170 : 195));
                 gridPaint.setPathEffect(dotted);
                 canvas.drawLine(plotLeft, avgY, plotRight, avgY, gridPaint);
                 gridPaint.setPathEffect(null);
@@ -274,6 +298,15 @@ public final class HomeSalesChart {
             drawMarkers(canvas);
             drawXLabels(canvas);
             if (touched && selectedIndex >= 0) drawTooltip(canvas);
+        }
+
+        private void drawEmptyState(Canvas canvas, String message) {
+            textPaint.setColor(Theme.MUTED);
+            textPaint.setTextSize(sp(10.5f));
+            textPaint.setTypeface(Theme.face(false));
+            textPaint.setTextAlign(Paint.Align.CENTER);
+            canvas.drawText(message, getWidth() / 2f,
+                    getHeight() / 2f + textPaint.getTextSize() * 0.36f, textPaint);
         }
 
         private void drawAxes(Canvas canvas) {
@@ -335,7 +368,7 @@ public final class HomeSalesChart {
                 markerPaint.setColor(Theme.SECTION_SALES);
                 canvas.drawCircle(todayX, todayY, Theme.dp(5), markerPaint);
                 markerPaint.setStyle(Paint.Style.FILL);
-                markerPaint.setColor(Theme.GOLD);
+                markerPaint.setColor(chartGold());
                 canvas.drawCircle(todayX, todayY, Theme.dp(2.2f), markerPaint);
             }
             if (touched && selectedIndex >= 0) {
@@ -408,7 +441,7 @@ public final class HomeSalesChart {
         }
 
         @Override public boolean onTouchEvent(MotionEvent event) {
-            if (days.isEmpty()) return false;
+            if (days.isEmpty() || !hasSalesActivity) return false;
             switch (event.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
                     downX = event.getX();
@@ -528,7 +561,8 @@ public final class HomeSalesChart {
                 lastY = y;
             }
             line.setShader(new LinearGradient(inset, 0, getWidth() - inset, 0,
-                    Theme.GOLD, accent, Shader.TileMode.CLAMP));
+                    Theme.isLight() ? Theme.GOLD_DARK : Theme.GOLD,
+                    accent, Shader.TileMode.CLAMP));
             canvas.drawPath(path, line);
             line.setShader(null);
             marker.setColor(Theme.alpha(accent, Theme.isLight() ? 42 : 60));

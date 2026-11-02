@@ -136,16 +136,18 @@ public final class SalesSnapshot {
     }
 
     /**
-     * Daily rows from oldest to newest, including missing days as zero. Useful for the
-     * fixed 14-day chart; all values remain raw Rials until Charts.MONEY formats them.
+     * Daily rows from oldest to newest, filling zeroes only inside the query's known history.
+     * Values remain raw Rials until a display formatter converts them.
      */
     public List<Day> dailySeries(String endDate, int count) {
         if (!available || count <= 0) return Collections.emptyList();
         String end = Jalali.disp(endDate);
         int endDay = Jalali.parse(end);
-        if (endDay < 0) return Collections.emptyList();
+        int firstKnownDay = Jalali.parse(historyStart);
+        if (endDay < 0 || firstKnownDay < 0 || endDay < firstKnownDay) return Collections.emptyList();
+        int actualCount = Math.min(count, endDay - firstKnownDay + 1);
         List<Day> result = new ArrayList<>();
-        int first = endDay - count + 1;
+        int first = endDay - actualCount + 1;
         for (int day = first; day <= endDay; day++) {
             String key = Jalali.format(day);
             result.add(day(key));

@@ -6,17 +6,29 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 public class DesignTokensTest {
-    @Test public void paletteMatchesTheApprovedBrandValues() {
-        assertEquals(0xFF0E4B3A, DesignTokens.EMERALD_DEEP);
-        assertEquals(0xFF137A5A, DesignTokens.EMERALD);
-        assertEquals(0xFFC8A24A, DesignTokens.GOLD);
-        assertEquals(0xFFE7CF8E, DesignTokens.GOLD_LIGHT);
-        assertEquals(0xFF8F6F22, DesignTokens.GOLD_DARK);
-        assertEquals(0xFFFBF7EE, DesignTokens.IVORY);
-        assertEquals(0xFFF4EEDC, DesignTokens.PAPER);
-        assertEquals(0xFF1B2B26, DesignTokens.INK);
-        assertEquals(0xFF52655D, DesignTokens.LIGHT_MUTED);
+    @Test public void paletteMatchesTheExecutiveRoyalBrief() {
+        assertEquals(0xFF0D3028, DesignTokens.EMERALD_DEEP);
+        assertEquals(0xFF123D32, DesignTokens.EMERALD);
+        assertEquals(0xFFB69A60, DesignTokens.GOLD);
+        assertEquals(0xFFE9DFC7, DesignTokens.GOLD_LIGHT);
+        assertEquals(0xFFFAF7EF, DesignTokens.IVORY);
+        assertEquals(0xFFF2EEE4, DesignTokens.PAPER);
+        assertEquals(0xFF1D2924, DesignTokens.INK);
+        assertEquals(0xFF69746D, DesignTokens.LIGHT_MUTED);
+        assertEquals(0xFFE4D9C0, DesignTokens.BORDER);
+        assertEquals(DesignTokens.EMERALD_DEEP, DesignTokens.NIGHT_BG);
+        assertEquals(DesignTokens.EMERALD, DesignTokens.NIGHT_SURFACE);
         assertEquals(0xFF2D9A73, DesignTokens.NIGHT_EMERALD);
+    }
+
+    @Test public void approvedSecondaryInkMeetsAaOnRoyalIvoryAndSafeVariantCoversSoftSurface() {
+        assertTrue("approved secondary ink must meet WCAG AA on Ivory",
+                DesignTokens.contrastRatio(DesignTokens.LIGHT_MUTED, DesignTokens.IVORY) >= 4.5);
+        int safe = DesignTokens.textSafeColor(DesignTokens.LIGHT_MUTED, DesignTokens.PAPER, false);
+        assertTrue("raised Soft Surface uses a contrast-safe secondary ink",
+                DesignTokens.contrastRatio(safe, DesignTokens.PAPER) >= 4.8);
+        assertTrue("metallic gold keeps a darker, accessible text companion",
+                DesignTokens.contrastRatio(DesignTokens.GOLD_DARK, DesignTokens.PAPER) >= 4.5);
     }
 
     @Test public void sectionHuesAreIndependentAndLocalized() {
@@ -48,10 +60,10 @@ public class DesignTokensTest {
         for (int accent : accents) {
             assertTrue("light contrast for " + Integer.toHexString(accent),
                     DesignTokens.contrastRatio(DesignTokens.accessibleAccent(accent, false),
-                            DesignTokens.IVORY) >= 4.8);
+                            DesignTokens.PAPER) >= 4.8);
             assertTrue("dark contrast for " + Integer.toHexString(accent),
                     DesignTokens.contrastRatio(DesignTokens.accessibleAccent(accent, true),
-                            DesignTokens.NIGHT_SURFACE) >= 4.8);
+                            DesignTokens.NIGHT_PAPER) >= 4.8);
         }
     }
 
@@ -65,7 +77,8 @@ public class DesignTokensTest {
             assertTrue("light dashboard metric text contrast",
                     DesignTokens.contrastRatio(DesignTokens.INK, lightSurface) >= 4.8);
             assertTrue("light dashboard muted-label contrast",
-                    DesignTokens.contrastRatio(DesignTokens.LIGHT_MUTED, lightSurface) >= 4.8);
+                    DesignTokens.contrastRatio(DesignTokens.textSafeColor(
+                            DesignTokens.LIGHT_MUTED, lightSurface, false), lightSurface) >= 4.8);
             assertTrue("dark dashboard metric text contrast",
                     DesignTokens.contrastRatio(DesignTokens.NIGHT_TEXT, darkSurface) >= 4.8);
             assertTrue("dark dashboard muted-label contrast",
@@ -108,7 +121,8 @@ public class DesignTokensTest {
         int lightCard = DesignTokens.surfaceTint(DesignTokens.EMERALD, false);
         int darkCard = DesignTokens.surfaceTint(DesignTokens.NIGHT_EMERALD, true);
         assertTrue("light muted copy contrast",
-                DesignTokens.contrastRatio(DesignTokens.LIGHT_MUTED, lightCard) >= 4.8);
+                DesignTokens.contrastRatio(DesignTokens.textSafeColor(
+                        DesignTokens.LIGHT_MUTED, lightCard, false), lightCard) >= 4.8);
         assertTrue("dark muted copy contrast",
                 DesignTokens.contrastRatio(DesignTokens.NIGHT_MUTED, darkCard) >= 4.8);
     }

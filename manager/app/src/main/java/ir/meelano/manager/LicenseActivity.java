@@ -338,36 +338,18 @@ public class LicenseActivity extends Activity {
         connStage = null;
     }
 
-    /** Quiet champagne used for card edges and hairlines on the licence screens. */
-    private static final int CHAMPAGNE = 0xFFC9B27C;
-    /** Dark taupe edge for cards: keeps the card frame subtle next to the gold accents. */
-    private static final int CARD_EDGE = 0xFF5A4E36;
+    /** Exact Champagne Gold token used for licence-card hairlines and progress marks. */
+    private static final int CHAMPAGNE = Theme.GOLD_METAL;
+    private static final int CARD_EDGE = Theme.GOLD_METAL;
 
-    private static int mix(int a, int b, float t) {
-        float it = 1f - t;
-        return android.graphics.Color.argb(
-                Math.round(android.graphics.Color.alpha(a) * it + android.graphics.Color.alpha(b) * t),
-                Math.round(android.graphics.Color.red(a) * it + android.graphics.Color.red(b) * t),
-                Math.round(android.graphics.Color.green(a) * it + android.graphics.Color.green(b) * t),
-                Math.round(android.graphics.Color.blue(a) * it + android.graphics.Color.blue(b) * t));
-    }
-
-    /** Dark theme: a soft sapphire fading to near-black. Light theme keeps the ivory backdrop. */
+    /** Both licensing skins use the same flat, theme-aware app backdrop. */
     private android.graphics.drawable.Drawable licenseBackdrop() {
-        if (Theme.isLight()) return Theme.backdrop();
-        return new android.graphics.drawable.GradientDrawable(
-                android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{0xFF17213B, 0xFF0A0F1C});
+        return Theme.backdrop();
     }
 
-    /** Primary CTA: champagne gold, with only a faint rose tint at the lower edge. */
+    /** Primary CTA: the shared contrast-safe executive button style. */
     private android.graphics.drawable.GradientDrawable quietStart() {
-        android.graphics.drawable.GradientDrawable d = new android.graphics.drawable.GradientDrawable(
-                android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{Theme.shade(Theme.GOLD, 0.06f), Theme.GOLD, Theme.isNuts() ? 0xFFB8862E : mix(Theme.GOLD, Theme.ROSE, 0.28f)});
-        d.setCornerRadius(Theme.dp(16));
-        d.setStroke(Theme.dp(1), Theme.alpha(0xFFFFFFFF, 90));
-        return d;
+        return Theme.startButton();
     }
 
     /** Device code plaque: a soft surface with a thin champagne rim. */
@@ -2097,7 +2079,7 @@ public class LicenseActivity extends Activity {
         try {
             if (recvGranted()) {
                 ir.meelano.manager.ui.MeelanoIcons.set(recvHint, "✦ دریافت خودکار فعال است — فقط منتظر بمانید.");
-                recvHint.setTextColor(Theme.GOLD);
+                recvHint.setTextColor(Theme.isLight() ? Theme.GOLD_DARK : Theme.GOLD);
             } else {
                 recvHint.setText("برای دریافت خودکار کلید، اجازه را تأیید کنید.");
                 recvHint.setTextColor(Theme.MUTED);

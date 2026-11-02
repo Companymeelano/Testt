@@ -8,22 +8,25 @@ package ir.meelano.manager.ui;
 public final class DesignTokens {
     private DesignTokens() { }
 
-    // Brand palette
-    public static final int EMERALD_DEEP = 0xFF0E4B3A;
-    public static final int EMERALD = 0xFF137A5A;
-    public static final int GOLD = 0xFFC8A24A;
-    public static final int GOLD_LIGHT = 0xFFE7CF8E;
-    public static final int GOLD_DARK = 0xFF8F6F22;
-    public static final int IVORY = 0xFFFBF7EE;
-    public static final int PAPER = 0xFFF4EEDC;
-    public static final int INK = 0xFF1B2B26;
-    public static final int LIGHT_MUTED = 0xFF52655D;
+    // Executive Royal brand palette. Keep these values aligned with the product brief.
+    public static final int EMERALD_DEEP = 0xFF0D3028; // Deep Emerald
+    public static final int EMERALD = 0xFF123D32;      // Royal Emerald
+    public static final int GOLD = 0xFFB69A60;         // Champagne Gold
+    public static final int GOLD_LIGHT = 0xFFE9DFC7;   // Soft Champagne
+    /** Accessible companion ink for champagne labels on the light surface. */
+    public static final int GOLD_DARK = 0xFF73582A;
+    public static final int IVORY = 0xFFFAF7EF;
+    public static final int PAPER = 0xFFF2EEE4;        // Soft Surface
+    public static final int INK = 0xFF1D2924;          // Primary Text
+    public static final int LIGHT_MUTED = 0xFF69746D;  // Secondary Text
+    public static final int BORDER = 0xFFE4D9C0;
 
-    // Emerald-night surfaces
-    public static final int NIGHT_BG = 0xFF071A14;
-    public static final int NIGHT_SURFACE = 0xFF0E241D;
+    // Midnight Emerald surfaces. The first two are the same exact brand greens above;
+    // NIGHT_PAPER is a restrained raised surface for nested controls and charts.
+    public static final int NIGHT_BG = EMERALD_DEEP;
+    public static final int NIGHT_SURFACE = EMERALD;
     public static final int NIGHT_EMERALD = 0xFF2D9A73;
-    public static final int NIGHT_PAPER = 0xFF15372B;
+    public static final int NIGHT_PAPER = 0xFF19483D;
     public static final int NIGHT_TEXT = 0xFFF6F4EC;
     public static final int NIGHT_MUTED = 0xFFB8C5BE;
 
@@ -74,10 +77,10 @@ public final class DesignTokens {
         return EMERALD_DEEP;
     }
 
-    /** 7% accent wash over a solid palette surface; no texture or transparent glass. */
+    /** Quiet 4.5% accent wash over a solid palette surface; no texture or transparent glass. */
     public static int surfaceTint(int accent, boolean dark) {
         int base = dark ? NIGHT_SURFACE : IVORY;
-        return mix(base, accent, 0.07f);
+        return mix(base, accent, 0.045f);
     }
 
     /**
@@ -92,7 +95,9 @@ public final class DesignTokens {
 
     /** Find a text-safe variant of an accent without changing the accent used by its icon. */
     public static int accessibleAccent(int accent, boolean dark) {
-        return textSafeColor(accent, dark ? NIGHT_SURFACE : IVORY, dark);
+        // Section copy can appear on either the main surface or a lightly tinted card.
+        // Resolve against the slightly more demanding raised surface to keep it legible.
+        return textSafeColor(accent, dark ? NIGHT_PAPER : PAPER, dark);
     }
 
     /** Highest-contrast palette ink for text rendered directly on a solid accent fill. */

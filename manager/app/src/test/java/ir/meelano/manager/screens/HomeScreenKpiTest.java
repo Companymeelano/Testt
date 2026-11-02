@@ -8,6 +8,21 @@ import org.junit.Test;
 
 public class HomeScreenKpiTest {
     @Test
+    public void closeoutTilesUseShortStatesAndHelpfulHintsInsteadOfTruncatedCopy() {
+        assertEquals("ثبت نشده", HomeScreen.compactCloseoutVariance("شمارش محلی ثبت نشده"));
+        assertEquals("ماندهٔ آغاز و شمارش پایان را وارد کنید",
+                HomeScreen.closeoutVarianceHint("شمارش محلی ثبت نشده"));
+        assertEquals("ناموجود", HomeScreen.compactCloseoutVariance(
+                "تفکیک نقد در دادهٔ فروشگاه موجود نیست"));
+        assertEquals("تفکیک دریافت و پرداخت نقد در دسترس نیست",
+                HomeScreen.closeoutVarianceHint("تفکیک نقد در دادهٔ فروشگاه موجود نیست"));
+        assertEquals("کسری ۱۲٬۰۰۰ تومان",
+                HomeScreen.compactCloseoutVariance("کسری ۱۲٬۰۰۰ تومان"));
+        assertEquals("در برابر ماندهٔ مورد انتظار",
+                HomeScreen.closeoutVarianceHint("کسری ۱۲٬۰۰۰ تومان"));
+    }
+
+    @Test
     public void missingDaySummaryShowsUnavailableInertKpi() {
         HomeScreen screen = new HomeScreen(null);
 

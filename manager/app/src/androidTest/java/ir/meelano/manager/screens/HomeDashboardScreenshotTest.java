@@ -151,7 +151,7 @@ public final class HomeDashboardScreenshotTest {
         assertTrue("Selected theme did not resolve 3D return artwork",
                 Theme.isIcon3d(Theme.icon3d(R.drawable.mi_assignment_return)));
         Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
-        final View[] targets = new View[6];
+        final View[] targets = new View[8];
         final int[] facts = new int[4];
         long layoutDeadline = SystemClock.uptimeMillis() + 3_000L;
         do {
@@ -164,6 +164,9 @@ public final class HomeDashboardScreenshotTest {
                 targets[3] = findTaggedView(decor, "home-closeout-card");
                 targets[4] = findTaggedView(decor, "home-smart-report-share");
                 targets[5] = findTaggedView(decor, "home-bottom-safe-space");
+                targets[6] = findTaggedView(decor, "header-license-chip");
+                targets[7] = targets[0] == null ? null
+                        : findTaggedView(targets[0], "home-kpi-delta");
                 facts[0] = targets[0] == null ? 0 : countTaggedViews(targets[0], "home-financial-kpi");
                 facts[1] = targets[0] != null
                         && containsViewType(targets[0], HorizontalScrollView.class) ? 1 : 0;
@@ -187,6 +190,24 @@ public final class HomeDashboardScreenshotTest {
         assertNotNull("Home has no clearance below the last card", targets[5]);
         assertTrue("Home's bottom clearance is smaller than 16dp",
                 facts[3] >= 16f * activityDensity(targets[5]));
+        assertNotNull("Expanded header licence chip is missing", targets[6]);
+        assertTrue("Licence chip is not a text control", targets[6] instanceof TextView);
+        TextView licence = (TextView) targets[6];
+        assertTrue("Licence chip is below the 48dp touch target",
+                licence.getWidth() >= 48f * activityDensity(licence));
+        assertFalse("Licence chip text is clipped", licence.getText().toString().contains("…"));
+        assertTrue("Licence chip has no accessible meaning",
+                licence.getContentDescription() != null
+                        && licence.getContentDescription().toString().contains("مجوز"));
+        assertNotNull("Financial comparison badge is missing", targets[7]);
+        TextView delta = (TextView) targets[7];
+        assertFalse("Dashboard comparison badge still truncates its basis",
+                delta.getText().toString().contains("…"));
+        assertFalse("Visual delta badge is still overloaded with comparison copy",
+                delta.getText().toString().contains("نسبت به"));
+        assertTrue("Full comparison period was lost to accessibility",
+                delta.getContentDescription() != null
+                        && delta.getContentDescription().toString().contains("نسبت به"));
     }
 
     private static boolean containsViewType(View view, Class<?> type) {
@@ -231,6 +252,8 @@ public final class HomeDashboardScreenshotTest {
         assertNotNull("Bottom navigation is missing", targets[1]);
         assertTrue("Bottom navigation is not a ViewGroup", targets[1] instanceof ViewGroup);
         assertNotNull("Collapsible brand header is missing", targets[2]);
+        assertNotNull("Brand row is not visually grouped into a themed header panel",
+                targets[2].getBackground());
         verifyDashboardPolish(activity);
 
         ViewGroup dock = (ViewGroup) targets[1];

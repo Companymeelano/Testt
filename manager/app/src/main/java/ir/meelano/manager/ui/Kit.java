@@ -449,6 +449,15 @@ public final class Kit {
         return visualAccent(k.label, k.accent);
     }
 
+    /** Keep comparison badges concise; the full period remains in the accessible description. */
+    static String compactDashboardDelta(String detail) {
+        if (detail == null) return "";
+        String compact = detail.trim();
+        int basis = compact.indexOf('·');
+        if (basis >= 0) compact = compact.substring(0, basis).trim();
+        return compact;
+    }
+
     public View kpiTile(Kpi k) {
         final int accent = sectionAccentForKpi(k);
         final boolean dashboardStyle = k.dashboardStyle;
@@ -571,11 +580,16 @@ public final class Kit {
                 detail = detail.substring(1).trim();
             int tone = k.subColor != 0 ? k.subColor
                     : direction > 0 ? Theme.SUCCESS : Theme.DANGER;
-            TextView delta = deltaBadge(detail, direction, tone,
-                    k.label + (direction > 0 ? " افزایش " : " کاهش ") + detail);
+            String visibleDetail = dashboardStyle ? compactDashboardDelta(detail) : detail;
+            TextView delta = deltaBadge(visibleDetail, direction, tone,
+                    dashboardStyle ? k.label + "؛ " + sub0
+                            : k.label + (direction > 0 ? " افزایش " : " کاهش ") + detail);
             delta.setSingleLine(true);
             delta.setEllipsize(TextUtils.TruncateAt.END);
-            t.addView(delta, lp(-1, Theme.dp(32)));
+            if (dashboardStyle) delta.setTag("home-kpi-delta");
+            LinearLayout.LayoutParams deltaParams = lp(dashboardStyle ? -2 : -1, Theme.dp(32));
+            deltaParams.gravity = Gravity.CENTER_HORIZONTAL;
+            t.addView(delta, deltaParams);
         } else {
             TextView note = text(sub0.isEmpty() ? " " : sub0, 10f, Theme.MUTED, false);
             note.setGravity(Gravity.CENTER_HORIZONTAL);

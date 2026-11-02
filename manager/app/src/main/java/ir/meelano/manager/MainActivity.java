@@ -117,6 +117,8 @@ public class MainActivity extends Activity {
     private android.view.View compactMenuButton;
     private int headerWidthDp;
     private int brandMarkExpandedDp;
+    private int brandHeaderSideInsetDp;
+    private int brandTitleExpandedSp;
     private int titleExpandedWidthDp;
     private boolean compactHeaderLayout;
     private String linkKind = "probe";
@@ -595,8 +597,10 @@ public class MainActivity extends Activity {
         headerWidthDp = widthDp;
         compactHeaderLayout = compact;
         brandMarkExpandedDp = compact ? 56 : 64;
-        titleExpandedWidthDp = Math.max(104, widthDp - 24 - brandMarkExpandedDp - 10
-                - (compact ? 52 : 0));
+        brandHeaderSideInsetDp = compact ? 6 : 8;
+        brandTitleExpandedSp = compact ? 20 : 22;
+        titleExpandedWidthDp = Math.max(104, widthDp - 24 - (2 * brandHeaderSideInsetDp)
+                - brandMarkExpandedDp - 10 - (compact ? 52 : 0));
         headerRoot = kit.v();
         headerRoot.setPadding(Theme.dp(12), Theme.dp(compact ? 6 : 9), Theme.dp(12), Theme.dp(5));
 
@@ -635,7 +639,8 @@ public class MainActivity extends Activity {
         // Compute text room instead of letting long names slide underneath the logo.
         LinearLayout titleCol = kit.v();
         brandTitleColumn = titleCol;
-        companyName = kit.text(companyTitle(), 22, Theme.TEXT, true);
+        companyName = kit.text(companyTitle(), brandTitleExpandedSp, Theme.TEXT, true);
+        companyName.setTag("header-company-title");
         companyName.setMaxLines(2);
         companyName.setEllipsize(android.text.TextUtils.TruncateAt.END);
         companyName.setMaxWidth(Theme.dp(titleExpandedWidthDp));
@@ -656,16 +661,18 @@ public class MainActivity extends Activity {
         headerStatusRow.setGravity(Gravity.CENTER_VERTICAL);
         headerStatusRow.setMinimumHeight(Theme.dp(48));
         headerSyncHost = new android.widget.FrameLayout(this);
-        headerSyncHost.setMinimumWidth(Theme.dp(compact ? 80 : 104));
+        headerSyncHost.setMinimumWidth(Theme.dp(tiny ? 72 : compact ? 80 : 104));
         headerStatusRow.addView(headerSyncHost, new LinearLayout.LayoutParams(0, -1, 1f));
         headerStatusRow.addView(kit.space(6));
         licChip = kit.text("", 10.5f, Theme.GOLD_SOFT, true);
+        licChip.setTag("header-license-chip");
         licChip.setBackground(Theme.pill(Theme.GOLD));
         licChip.setPadding(Theme.dp(8), Theme.dp(4), Theme.dp(8), Theme.dp(4));
         licChip.setSingleLine(true);
-        licChip.setMinWidth(Theme.dp(48));
+        licChip.setMinWidth(Theme.dp(tiny ? 52 : 56));
         licChip.setMinHeight(Theme.dp(48));
-        licChip.setMaxWidth(Theme.dp(64));
+        // A shield + remaining-time label is recognizable as a licence, not a clipped date.
+        licChip.setMaxWidth(Theme.dp(tiny ? 72 : 92));
         licChip.setEllipsize(android.text.TextUtils.TruncateAt.END);
         Theme.pressable(licChip);
         licChip.setOnClickListener(v -> openLicense());
@@ -702,7 +709,11 @@ public class MainActivity extends Activity {
 
         LinearLayout brandBlock = kit.v();
         brandBlock.setTag("main-brand-header");
+        brandBlock.setBackground(Theme.toolbarPanel());
+        brandBlock.setPadding(Theme.dp(brandHeaderSideInsetDp), Theme.dp(4),
+                Theme.dp(brandHeaderSideInsetDp), Theme.dp(4));
         brandBlock.setClipChildren(false);
+        brandBlock.setClipToPadding(false);
         brandBlock.addView(brandRow, kit.lp(-1, -2));
         brandHeaderBlock = brandBlock;
         brandHeaderExpandedHeight = 0;
@@ -1220,6 +1231,12 @@ public class MainActivity extends Activity {
         int verticalPad = collapsed ? 4 : (compactHeaderLayout ? 6 : 9);
         headerRoot.setPadding(Theme.dp(12), Theme.dp(verticalPad), Theme.dp(12),
                 Theme.dp(collapsed ? 4 : 5));
+        if (brandHeaderBlock != null) {
+            int blockVerticalInset = collapsed ? 0 : 4;
+            brandHeaderBlock.setPadding(Theme.dp(brandHeaderSideInsetDp),
+                    Theme.dp(blockVerticalInset), Theme.dp(brandHeaderSideInsetDp),
+                    Theme.dp(blockVerticalInset));
+        }
         if (headerTools != null) headerTools.setVisibility(collapsed ? View.GONE : View.VISIBLE);
         if (headerToolbarGap != null) headerToolbarGap.setVisibility(collapsed ? View.GONE : View.VISIBLE);
         if (headerStatusRow != null) headerStatusRow.setVisibility(collapsed ? View.GONE : View.VISIBLE);
@@ -1239,11 +1256,12 @@ public class MainActivity extends Activity {
         if (companyName != null) {
             companyName.setSingleLine(collapsed);
             companyName.setMaxLines(collapsed ? 1 : 2);
-            companyName.setTextSize((collapsed ? 16f : 22f) * Theme.fontScale() * Theme.typeScale());
+            companyName.setTextSize((collapsed ? 16f : brandTitleExpandedSp)
+                    * Theme.fontScale() * Theme.typeScale());
         }
         if (brandTitleColumn != null) {
             int width = collapsed
-                    ? headerWidthDp - 24 - 40 - 10 - 48 - 4 - 48
+                    ? headerWidthDp - 24 - (2 * brandHeaderSideInsetDp) - 40 - 10 - 48 - 4 - 48
                     : titleExpandedWidthDp;
             android.view.ViewGroup.LayoutParams title = brandTitleColumn.getLayoutParams();
             if (title != null) {
@@ -1781,7 +1799,7 @@ public class MainActivity extends Activity {
     }
 
     // ================= helpers for screens =================
-    /** Paint the header license chip (remaining time; red when ≤ 7 days). */
+    /** Paint the themed header licence chip with a warning tone as expiry approaches. */
     public void refreshLicChip() {
         if (licChip == null) return;
         try {
@@ -1791,19 +1809,26 @@ public class MainActivity extends Activity {
                 return;
             }
             licChip.setVisibility(View.VISIBLE);
+            int tone;
+            String spoken;
             if (s.plan == License.P_PERM) {
-                ir.meelano.manager.ui.MeelanoIcons.set(licChip, "📅 دائمی");
-                licChip.setTextColor(Theme.GOLD_SOFT);
-            } else if (s.daysLeft <= 2) {
-                ir.meelano.manager.ui.MeelanoIcons.set(licChip, "📅 " + Money.fa(String.valueOf(s.daysLeft)) + " روز!");
-                licChip.setTextColor(Theme.TEXT);
-            } else if (s.daysLeft <= 7) {
-                ir.meelano.manager.ui.MeelanoIcons.set(licChip, "📅 " + Money.fa(String.valueOf(s.daysLeft)) + " روز");
-                licChip.setTextColor(Theme.TEXT);
+                ir.meelano.manager.ui.MeelanoIcons.set(licChip, "🛡 دائمی");
+                tone = Theme.GOLD;
+                spoken = "مجوز دائمی";
             } else {
-                ir.meelano.manager.ui.MeelanoIcons.set(licChip, "📅 " + Money.fa(String.valueOf(s.daysLeft)) + " روز");
-                licChip.setTextColor(Theme.GOLD_SOFT);
+                int daysLeft = Math.max(0, s.daysLeft);
+                String days = Money.fa(String.valueOf(daysLeft));
+                ir.meelano.manager.ui.MeelanoIcons.set(licChip, "🛡 " + days + " روز");
+                tone = daysLeft <= 2 ? Theme.DANGER
+                        : daysLeft <= 7 ? Theme.WARNING : Theme.GOLD;
+                spoken = "مجوز؛ " + days + " روز باقی‌مانده";
             }
+            licChip.setBackground(Theme.pill(tone));
+            Theme.pressable(licChip);
+            licChip.setTextColor(Theme.sectionText(tone));
+            licChip.setContentDescription(spoken + "؛ لمس برای مدیریت مجوز");
+            if (android.os.Build.VERSION.SDK_INT >= 26)
+                licChip.setTooltipText(spoken + "؛ لمس برای مدیریت مجوز");
         } catch (Exception e) {
             try {
                 licChip.setVisibility(View.GONE);

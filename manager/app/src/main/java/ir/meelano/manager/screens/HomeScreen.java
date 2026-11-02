@@ -2835,8 +2835,9 @@ public class HomeScreen extends Screen {
         }
         String counted = a.settings.closeoutCashCounted(day);
         if (counted != null && !counted.trim().isEmpty()) {
+            String variance = closeoutVarianceLabel(d, day);
             metrics.add(new Mini(R.drawable.mi_point_of_sale, "اختلاف با شمارش",
-                    closeoutVarianceLabel(d, day), "تطبیق پایان صندوق", Theme.TEXT));
+                    compactCloseoutVariance(variance), closeoutVarianceHint(variance), Theme.TEXT));
         }
         card.addView(dashboardMetricGrid(metrics, 2, Theme.SECTION_CASH_POSITION),
                 a.kit.lp(-1, -2));
@@ -3415,6 +3416,8 @@ public class HomeScreen extends Screen {
         String profitNote = d.grossProfitAvailable ? "برآورد بر پایهٔ بهای ثبت‌شده"
                 : "مبنای بهای تمام‌شده موجود نیست";
         String variance = closeoutVarianceLabel(d, day);
+        String varianceDisplay = compactCloseoutVariance(variance);
+        String varianceHint = closeoutVarianceHint(variance);
 
         List<Mini> metrics = new ArrayList<>();
         metrics.add(new Mini(R.drawable.mi_sell, "فروش روز",
@@ -3433,7 +3436,7 @@ public class HomeScreen extends Screen {
                 d.grossProfitAvailable ? HomeNumberFormatter.money(grossProfitOnDay(d, day)) : "—",
                 profitNote, Theme.TEXT));
         metrics.add(new Mini(R.drawable.mi_point_of_sale, "اختلاف شمارش صندوق",
-                variance, "در برابر ماندهٔ مورد انتظار", Theme.TEXT));
+                varianceDisplay, varianceHint, Theme.TEXT));
         int metricColumns = ir.meelano.manager.ui.Ui.widthDp(a) >= 600 ? 3 : 2;
         card.addView(dashboardMetricGrid(metrics, metricColumns, Theme.SECTION_CLOSEOUT),
                 a.kit.lp(-1, -2));
@@ -3479,6 +3482,27 @@ public class HomeScreen extends Screen {
         if (Double.isNaN(variance) || Double.isInfinite(variance)) return "قابل محاسبه نیست";
         String direction = variance > 0 ? "مازاد " : variance < 0 ? "کسری " : "بدون اختلاف ";
         return direction + HomeNumberFormatter.money(Math.abs(variance));
+    }
+
+    /** Short face value for narrow closeout tiles; full wording remains in the export report. */
+    static String compactCloseoutVariance(String fullValue) {
+        String value = fullValue == null ? "" : fullValue.trim();
+        if ("شمارش محلی ثبت نشده".equals(value)) return "ثبت نشده";
+        if ("قابل محاسبه نیست".equals(value)) return "نامشخص";
+        if (value.startsWith("تفکیک نقد")) return "ناموجود";
+        return value;
+    }
+
+    /** One concise instruction line explains abbreviated closeout states without ellipses. */
+    static String closeoutVarianceHint(String fullValue) {
+        String value = fullValue == null ? "" : fullValue.trim();
+        if ("شمارش محلی ثبت نشده".equals(value))
+            return "ماندهٔ آغاز و شمارش پایان را وارد کنید";
+        if ("قابل محاسبه نیست".equals(value))
+            return "دادهٔ نقد برای تطبیق کافی نیست";
+        if (value.startsWith("تفکیک نقد"))
+            return "تفکیک دریافت و پرداخت نقد در دسترس نیست";
+        return "در برابر ماندهٔ مورد انتظار";
     }
 
     private Double parseLocalRials(String raw) {

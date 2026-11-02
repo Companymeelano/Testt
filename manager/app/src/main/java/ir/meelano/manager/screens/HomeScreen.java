@@ -1960,7 +1960,7 @@ public class HomeScreen extends Screen {
         a.kit.addCard(content, card);
     }
 
-    private Kit.Kpi homeKpi(String label, double amountRials, long documents, String countLabel,
+    Kit.Kpi homeKpi(String label, double amountRials, long documents, String countLabel,
                             boolean available, Double previousRials, double[] spark, int accent,
                             int icon, boolean increaseIsGood, boolean returnsMetric, Runnable action) {
         String amount = available

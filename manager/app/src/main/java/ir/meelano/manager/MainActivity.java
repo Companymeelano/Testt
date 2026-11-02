@@ -1816,7 +1816,7 @@ public class MainActivity extends Activity {
                 tone = Theme.GOLD;
                 spoken = "مجوز دائمی";
             } else {
-                int daysLeft = Math.max(0, s.daysLeft);
+                long daysLeft = Math.max(0L, s.daysLeft);
                 String days = Money.fa(String.valueOf(daysLeft));
                 ir.meelano.manager.ui.MeelanoIcons.set(licChip, "🛡 " + days + " روز");
                 tone = daysLeft <= 2 ? Theme.DANGER

@@ -1960,6 +1960,9 @@ public class LicenseActivity extends Activity {
     private String simPhone() {
         try {
             if (!phoneGranted()) return "";
+            if (Build.VERSION.SDK_INT >= 26
+                    && checkSelfPermission(android.Manifest.permission.READ_PHONE_NUMBERS)
+                    != PackageManager.PERMISSION_GRANTED) return "";
             android.telephony.TelephonyManager tm = (android.telephony.TelephonyManager)
                     getSystemService(TELEPHONY_SERVICE);
             if (tm == null) return "";

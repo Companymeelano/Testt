@@ -589,8 +589,7 @@ public class MainActivity extends Activity {
         brandMarkExpandedDp = 36;
         brandHeaderSideInsetDp = compact ? 2 : 4;
         brandTitleExpandedSp = compact ? 17 : 18;
-        titleExpandedWidthDp = Math.max(96, widthDp - 24 - (2 * brandHeaderSideInsetDp)
-                - brandMarkExpandedDp - 8 - (compact ? 48 : 0));
+        titleExpandedWidthDp = headerTitleWidthDp(widthDp, brandHeaderSideInsetDp, compact, false);
         headerRoot = kit.v();
         headerRoot.setPadding(Theme.dp(12), Theme.dp(compact ? 4 : 6), Theme.dp(12), Theme.dp(2));
 
@@ -1152,6 +1151,19 @@ public class MainActivity extends Activity {
         block.setLayoutParams(params);
     }
 
+    /**
+     * Available brand-title width after accounting for every visible header control. The 4dp
+     * spacer before the menu is included in both compact states; omitting it let the licence chip
+     * and long company names get clipped on narrow displays.
+     */
+    public static int headerTitleWidthDp(int widthDp, int sideInsetDp,
+                                         boolean compact, boolean collapsed) {
+        int fixed = 24 + (2 * sideInsetDp) + (collapsed ? 40 : 36) + 8;
+        if (collapsed) fixed += 48 + 4 + 48; // sync, menu gap, menu
+        else if (compact) fixed += 4 + 48;   // expanded compact menu gap and menu
+        return Math.max(collapsed ? 72 : 96, widthDp - fixed);
+    }
+
     /** Set the compact header's controls and line count without duplicating the brand mark. */
     private void applyHeaderDensity(boolean collapsed) {
         if (headerRoot == null || brandRow == null) return;
@@ -1187,9 +1199,8 @@ public class MainActivity extends Activity {
                     * Theme.fontScale() * Theme.typeScale());
         }
         if (brandTitleColumn != null) {
-            int width = collapsed
-                    ? headerWidthDp - 24 - (2 * brandHeaderSideInsetDp) - 40 - 10 - 48 - 4 - 48
-                    : titleExpandedWidthDp;
+            int width = headerTitleWidthDp(headerWidthDp, brandHeaderSideInsetDp,
+                    compactHeaderLayout, collapsed);
             android.view.ViewGroup.LayoutParams title = brandTitleColumn.getLayoutParams();
             if (title != null) {
                 title.width = Theme.dp(Math.max(72, width));

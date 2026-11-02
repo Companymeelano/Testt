@@ -364,7 +364,7 @@ public final class Kit {
         public boolean emeraldIcon = false;
         /** Optional semantic tone for a directional delta note; zero selects by direction. */
         public int subColor = 0;
-        /** Compact, neutral-surface variant used for the financial dashboard's responsive KPI grid. */
+        /** Compact, accent-tinted variant used only for the Home financial KPI grid. */
         public boolean dashboardStyle = false;
 
         public Kpi(String label, String value, String sub, int accent) {
@@ -408,6 +408,10 @@ public final class Kit {
         final boolean dashboardStyle = k.dashboardStyle;
         LinearLayout tile = v();
         tile.setBackground(dashboardStyle ? Theme.dashboardMetric(accent) : Theme.kpi(accent));
+        if (dashboardStyle) {
+            tile.setElevation(Theme.dp(1f));
+            tile.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
+        }
         int horizontalPad = dashboardStyle ? 8 : 12;
         int verticalPad = dashboardStyle ? 9 : 11;
         tile.setPadding(Theme.dp(horizontalPad), Theme.dp(verticalPad),
@@ -419,13 +423,23 @@ public final class Kit {
         heading.setGravity(Gravity.CENTER_VERTICAL);
         heading.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         if (k.icon != 0) {
-            ImageView symbol = icon(k.icon, accent, dashboardStyle ? 17 : 18);
+            ImageView symbol = icon(k.icon,
+                    dashboardStyle ? Theme.dashboardAccentInk(accent) : accent,
+                    dashboardStyle ? 17 : 18);
+            if (dashboardStyle) {
+                symbol.setBackground(Theme.dashboardBadge(accent));
+                int inset = Theme.dp(3);
+                symbol.setPadding(inset, inset, inset, inset);
+                symbol.setElevation(Theme.dp(1f));
+                symbol.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
+            }
             symbol.setContentDescription(null);
             symbol.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
             heading.addView(symbol, lp(Theme.dp(20), Theme.dp(20)));
             heading.addView(space(6));
         }
-        TextView label = text(k.label, 10.5f, Theme.MUTED, false);
+        TextView label = text(k.label, 10.5f,
+                dashboardStyle ? Theme.dashboardMutedInk(accent) : Theme.MUTED, false);
         label.setSingleLine(true);
         label.setEllipsize(TextUtils.TruncateAt.END);
         heading.addView(label, wlp(1f));
@@ -469,7 +483,8 @@ public final class Kit {
         tile.addView(amount, amountParams);
 
         if (k.detail != null && !k.detail.trim().isEmpty()) {
-            TextView detail = text(k.detail, dashboardStyle ? 9.5f : 9f, Theme.MUTED, false);
+            TextView detail = text(k.detail, dashboardStyle ? 9.5f : 9f,
+                    dashboardStyle ? Theme.dashboardMutedInk(accent) : Theme.MUTED, false);
             detail.setSingleLine(true);
             detail.setEllipsize(TextUtils.TruncateAt.END);
             detail.setMinHeight(Theme.dp(18));
@@ -513,7 +528,8 @@ public final class Kit {
                 : probe.startsWith("▼") || probe.startsWith("↘") || probe.startsWith("-")
                 || probe.startsWith("−") ? -1 : 0;
         if (k.neutralStatus) {
-            TextView note = text(sub0.isEmpty() ? "✓" : sub0, 9.5f, Theme.MUTED, true);
+            TextView note = text(sub0.isEmpty() ? "✓" : sub0, 9.5f,
+                    dashboardStyle ? Theme.dashboardMutedInk(accent) : Theme.MUTED, true);
             note.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
             note.setSingleLine(true);
             note.setEllipsize(TextUtils.TruncateAt.END);
@@ -535,7 +551,8 @@ public final class Kit {
             LinearLayout.LayoutParams deltaParams = lp(-1, Theme.dp(28));
             tile.addView(delta, deltaParams);
         } else {
-            TextView note = text(sub0.isEmpty() ? " " : sub0, 10f, Theme.MUTED, false);
+            TextView note = text(sub0.isEmpty() ? " " : sub0, 10f,
+                    dashboardStyle ? Theme.dashboardMutedInk(accent) : Theme.MUTED, false);
             note.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
             note.setSingleLine(true);
             note.setEllipsize(TextUtils.TruncateAt.END);

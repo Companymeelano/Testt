@@ -314,6 +314,119 @@ public final class Theme {
         return base(SURFACE, 14, dp(1), BORDER);
     }
 
+    /**
+     * Raised, softly tinted card used only by the home dashboard. Other screens keep the shared
+     * neutral card so the home refresh does not leak into the rest of the application.
+     */
+    public static GradientDrawable dashboardCard(int accent) {
+        int hue = accent == 0 ? PRIMARY : accent;
+        float topTint = light ? 0.04f : 0.20f;
+        float bottomTint = light ? 0.015f : 0.10f;
+        GradientDrawable card = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{DesignTokens.mix(SURFACE, hue, topTint),
+                        DesignTokens.mix(SURFACE, hue, bottomTint)});
+        card.setCornerRadius(dp(18));
+        card.setStroke(dp(1), DesignTokens.mix(BORDER, hue, light ? 0.36f : 0.48f));
+        return card;
+    }
+
+    /** Slightly richer inset tile, still restrained enough for dense financial information. */
+    public static GradientDrawable dashboardMetric(int accent) {
+        int hue = accent == 0 ? PRIMARY : accent;
+        float topTint = light ? 0.16f : 0.34f;
+        float bottomTint = light ? 0.065f : 0.18f;
+        GradientDrawable tile = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{DesignTokens.mix(SURFACE, hue, topTint),
+                        DesignTokens.mix(SURFACE, hue, bottomTint)});
+        tile.setCornerRadius(dp(14));
+        tile.setStroke(dp(1), DesignTokens.mix(BORDER, hue, light ? 0.48f : 0.56f));
+        return tile;
+    }
+
+    /** Small raised jewel plate for dashboard icons; foreground color is resolved separately. */
+    public static GradientDrawable dashboardBadge(int accent) {
+        int hue = accent == 0 ? PRIMARY : accent;
+        float topTint = light ? 0.23f : 0.42f;
+        float bottomTint = light ? 0.12f : 0.27f;
+        GradientDrawable badge = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{DesignTokens.mix(SURFACE, hue, topTint),
+                        DesignTokens.mix(SURFACE, hue, bottomTint)});
+        badge.setCornerRadius(dp(12));
+        badge.setStroke(dp(1), DesignTokens.mix(BORDER, hue, light ? 0.42f : 0.52f));
+        return badge;
+    }
+
+    /** Accent ink that remains legible on the dashboard's tinted icon plates and card surfaces. */
+    public static int dashboardAccentInk(int accent) {
+        int hue = accent == 0 ? PRIMARY : accent;
+        int referenceSurface = DesignTokens.mix(SURFACE, hue, light ? 0.23f : 0.42f);
+        return DesignTokens.textSafeColor(hue, referenceSurface, !light);
+    }
+
+    /** Secondary copy ink adjusted for the strongest part of an inset dashboard tile. */
+    public static int dashboardMutedInk(int accent) {
+        int hue = accent == 0 ? PRIMARY : accent;
+        int referenceSurface = DesignTokens.mix(SURFACE, hue, light ? 0.16f : 0.34f);
+        return DesignTokens.textSafeColor(MUTED, referenceSurface, !light);
+    }
+
+    /** Semantic success/warning ink adjusted for the inset surface without changing its meaning. */
+    public static int dashboardSemanticInk(int accent, int preferred) {
+        int hue = accent == 0 ? PRIMARY : accent;
+        int referenceSurface = DesignTokens.mix(SURFACE, hue, light ? 0.16f : 0.34f);
+        return DesignTokens.textSafeColor(preferred, referenceSurface, !light);
+    }
+
+    /** Secondary copy ink for labels placed directly on a home-card surface. */
+    public static int dashboardCardMutedInk(int accent) {
+        int hue = accent == 0 ? PRIMARY : accent;
+        int referenceSurface = DesignTokens.mix(SURFACE, hue, light ? 0.04f : 0.20f);
+        return DesignTokens.textSafeColor(MUTED, referenceSurface, !light);
+    }
+
+    /** Contrast-safe foreground for a compact, filled dashboard action. */
+    public static int dashboardActionInk(int accent) {
+        int hue = accent == 0 ? PRIMARY : accent;
+        int top = DesignTokens.mix(hue, Color.WHITE, 0.02f);
+        int bottom = DesignTokens.mix(hue, Color.BLACK, 0.02f);
+        double blackContrast = Math.min(DesignTokens.contrastRatio(Color.BLACK, top),
+                DesignTokens.contrastRatio(Color.BLACK, bottom));
+        double whiteContrast = Math.min(DesignTokens.contrastRatio(Color.WHITE, top),
+                DesignTokens.contrastRatio(Color.WHITE, bottom));
+        return blackContrast >= whiteContrast ? Color.BLACK : Color.WHITE;
+    }
+
+    /** Filled, lightly shaded action used by dashboard section headings only. */
+    public static GradientDrawable dashboardAction(int accent) {
+        int hue = accent == 0 ? PRIMARY : accent;
+        GradientDrawable action = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{DesignTokens.mix(hue, Color.WHITE, 0.02f),
+                        DesignTokens.mix(hue, Color.BLACK, 0.02f)});
+        action.setCornerRadius(dp(12));
+        action.setStroke(dp(1), alpha(dashboardActionInk(hue), 30));
+        return action;
+    }
+
+    /** Deep emerald welcome panel with a restrained champagne edge; home-only by design. */
+    public static GradientDrawable dashboardWelcome() {
+        int deep = DesignTokens.EMERALD_DEEP;
+        int royal = DesignTokens.mix(DesignTokens.EMERALD, PRIMARY, nuts ? 0.12f : 0.08f);
+        GradientDrawable welcome = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{royal, DesignTokens.EMERALD, deep});
+        welcome.setCornerRadius(dp(20));
+        welcome.setStroke(dp(1), alpha(DesignTokens.GOLD, nuts ? 188 : 112));
+        return welcome;
+    }
+
+    /** Readable text and secondary ink for the deep emerald dashboard welcome panel. */
+    public static int dashboardWelcomeText() {
+        return DesignTokens.accentTextColor(DesignTokens.EMERALD_DEEP);
+    }
+
+    public static int dashboardWelcomeMuted() {
+        return DesignTokens.mix(dashboardWelcomeText(), DesignTokens.GOLD_LIGHT, 0.17f);
+    }
+
     /** Stable section hue derived from its title; semantic outcomes use separate tokens. */
     public static int sectionAccent(String title) {
         return DesignTokens.sectionAccent(title);
@@ -377,10 +490,6 @@ public final class Theme {
         return base(SURFACE, 14, dp(1), BORDER);
     }
 
-    /** Dashboard metric tile with a quiet transparent fill and no decorative outline. */
-    public static GradientDrawable dashboardMetric(int accent) {
-        return base(Color.TRANSPARENT, 10, 0, 0);
-    }
 
     /** Legacy primary-button factory; resolves to a solid accent fill. */
     public static GradientDrawable goldButton() {

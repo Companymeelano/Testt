@@ -566,7 +566,7 @@ public class HomeScreen extends Screen {
                 ir.meelano.manager.core.Net.online(a));
         if (cached != null) {
             build(content, cached, failureState, cachedTs);
-            LinearLayout bc = a.kit.card(Theme.SECTION_ALERT);
+            LinearLayout bc = homeCard(Theme.SECTION_ALERT);
             bc.addView(a.kit.text("جزئیات اتصال", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
             bc.addView(a.kit.kv("خطا", faError == null ? "" : faError, Theme.MUTED), a.kit.lp(-1, -2));
             bc.addView(a.kit.btn("تلاش مجدد", v -> render(content)), a.kit.lp(-1, -2));
@@ -872,18 +872,36 @@ public class HomeScreen extends Screen {
 
         LinearLayout intro = a.kit.v();
         intro.setTag("home-greeting");
-        intro.setPadding(Theme.dp(2), Theme.dp(3), Theme.dp(2), Theme.dp(2));
-        TextView title = a.kit.text(greeting + "، " + name, 17f, Theme.TEXT, true);
+        intro.setBackground(Theme.dashboardWelcome());
+        intro.setElevation(Theme.dp(4f));
+        intro.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
+        intro.setClipToPadding(false);
+        intro.setPadding(Theme.dp(14), Theme.dp(12), Theme.dp(14), Theme.dp(12));
+
+        LinearLayout row = a.kit.h();
+        row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.addView(dashboardArt(R.drawable.mi_diamond, Theme.GOLD_METAL),
+                a.kit.lp(Theme.dp(42), Theme.dp(42)));
+        row.addView(a.kit.space(10));
+        LinearLayout copy = a.kit.v();
+        TextView title = a.kit.text(greeting + "، " + name, 17f,
+                Theme.dashboardWelcomeText(), true);
+        title.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
         title.setSingleLine(true);
         title.setEllipsize(TextUtils.TruncateAt.END);
         title.setAutoSizeTextTypeUniformWithConfiguration(12, 17, 1,
                 android.util.TypedValue.COMPLEX_UNIT_SP);
-        intro.addView(title, a.kit.lp(-1, -2));
+        copy.addView(title, a.kit.lp(-1, -2));
         String summary = greetingSummary(data);
-        TextView detail = a.kit.text(dateLine() + "  ·  " + summary, 10.5f, Theme.MUTED, false);
-        detail.setSingleLine(true);
+        TextView detail = a.kit.text(dateLine() + "  ·  " + summary, 10.5f,
+                Theme.dashboardWelcomeMuted(), false);
+        detail.setGravity(Gravity.END);
+        detail.setMaxLines(2);
         detail.setEllipsize(TextUtils.TruncateAt.END);
-        intro.addView(detail, a.kit.lp(-1, -2));
+        copy.addView(detail, a.kit.lp(-1, -2));
+        row.addView(copy, a.kit.wlp(1f));
+        intro.addView(row, a.kit.lp(-1, -2));
         intro.setContentDescription(greeting + "، " + name + "؛ " + dateLine() + "؛ " + summary);
         return intro;
     }
@@ -1014,12 +1032,19 @@ public class HomeScreen extends Screen {
     }
 
     private View salesHero(final Data data, final SyncState syncState) {
-        final LinearLayout card = a.kit.card(Theme.SECTION_SALES);
+        final LinearLayout card = homeCard(Theme.SECTION_SALES);
         card.setPadding(Theme.dp(14), Theme.dp(10), Theme.dp(14), Theme.dp(12));
-        card.addView(a.kit.sectionHeader("فروش", R.drawable.mi_point_of_sale,
-                Theme.SECTION_SALES, "جزئیات ›", navAction("sales")), a.kit.lp(-1, -2));
+        View.OnClickListener salesAction = navAction("sales");
+        View salesDetails = salesAction == null ? null : dashboardHeaderAction("جزئیات",
+                Theme.SECTION_SALES, "جزئیات فروش؛ باز کردن", salesAction);
+        card.addView(boardHead("فروش", null, R.drawable.mi_point_of_sale, salesDetails,
+                Theme.SECTION_SALES), a.kit.lp(-1, -2));
 
         final LinearLayout amountPanel = a.kit.v();
+        amountPanel.setBackground(Theme.dashboardMetric(Theme.SECTION_SALES));
+        amountPanel.setElevation(Theme.dp(1f));
+        amountPanel.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
+        amountPanel.setPadding(Theme.dp(12), Theme.dp(9), Theme.dp(12), Theme.dp(9));
         final android.animation.ValueAnimator[] amountAnimator = {null};
         final HomeSalesChart.Area chart = new HomeSalesChart.Area(a);
         final TextView[] chartHint = {null};
@@ -1035,7 +1060,7 @@ public class HomeScreen extends Screen {
         if (syncState == SyncState.REFRESHING && data != null && data.salesSnapshot != null
                 && data.salesSnapshot.isAvailable()) {
             TextView age = a.kit.text("نمایش آخرین دادهٔ ذخیره‌شده تا پایان همگام‌سازی",
-                    9.5f, Theme.MUTED, false);
+                    9.5f, Theme.dashboardCardMutedInk(Theme.SECTION_SALES), false);
             age.setGravity(Gravity.END);
             card.addView(age, a.kit.lp(-1, -2));
         }
@@ -1046,10 +1071,11 @@ public class HomeScreen extends Screen {
                 if (chartHint[0] != null) chartHint[0].setText(salesPointLabel(day));
             });
             chartHint[0] = a.kit.text("روند فروش روزانه · لمس نمودار برای جزئیات",
-                    9.5f, Theme.MUTED, false);
+                    9.5f, Theme.dashboardCardMutedInk(Theme.SECTION_SALES), false);
             chartHint[0].setGravity(Gravity.END);
             refreshSalesChart(chart, chartHint, data, selectedChartRange);
-            TextView rangeTitle = a.kit.text("بازهٔ نمودار فروش", 9.5f, Theme.MUTED, true);
+            TextView rangeTitle = a.kit.text("بازهٔ نمودار فروش", 9.5f,
+                    Theme.dashboardCardMutedInk(Theme.SECTION_SALES), true);
             rangeTitle.setGravity(Gravity.END);
             LinearLayout.LayoutParams rangeTitleParams = a.kit.lp(-1, -2);
             rangeTitleParams.topMargin = Theme.dp(8);
@@ -1073,7 +1099,7 @@ public class HomeScreen extends Screen {
         if (syncState == SyncState.STALE || syncState == SyncState.OFFLINE) {
             TextView age = a.kit.text(syncState == SyncState.OFFLINE
                     ? "نمایش آخرین دادهٔ ذخیره‌شده" : "فروش بر اساس آخرین دریافت موفق",
-                    9.5f, Theme.MUTED, false);
+                    9.5f, Theme.dashboardCardMutedInk(Theme.SECTION_SALES), false);
             age.setGravity(Gravity.END);
             card.addView(age, a.kit.lp(-1, -2));
         }
@@ -1277,7 +1303,8 @@ public class HomeScreen extends Screen {
         amount.setFontFeatureSettings("tnum");
         amount.setContentDescription(HomeNumberFormatter.money(display.amountRials));
         valueRow.addView(amount, a.kit.wlp(1f));
-        TextView unit = a.kit.text(ir.meelano.manager.core.Money.unitName(), 10.5f, Theme.MUTED, false);
+        TextView unit = a.kit.text(ir.meelano.manager.core.Money.unitName(), 10.5f,
+                Theme.dashboardMutedInk(Theme.SECTION_SALES), false);
         unit.setSingleLine(true);
         unit.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         valueRow.addView(a.kit.space(5));
@@ -1300,7 +1327,7 @@ public class HomeScreen extends Screen {
         LinearLayout detail = a.kit.h();
         detail.setGravity(Gravity.CENTER_VERTICAL);
         TextView documents = a.kit.text(HomeNumberFormatter.integer(display.documents) + " فاکتور",
-                10.5f, Theme.MUTED, false);
+                10.5f, Theme.dashboardMutedInk(Theme.SECTION_SALES), false);
         documents.setContentDescription(HomeNumberFormatter.integer(display.documents) + " فاکتور در "
                 + display.rangeLabel);
         detail.addView(documents, a.kit.wlp(1f));
@@ -1312,12 +1339,14 @@ public class HomeScreen extends Screen {
                             + "؛ " + display.comparisonLabel);
             detail.addView(delta, a.kit.lp(-2, -2));
         } else {
-            TextView noBaseline = a.kit.text("مبنای مقایسه کافی نیست", 9.5f, Theme.MUTED, false);
+            TextView noBaseline = a.kit.text("مبنای مقایسه کافی نیست", 9.5f,
+                    Theme.dashboardMutedInk(Theme.SECTION_SALES), false);
             noBaseline.setGravity(Gravity.END);
             detail.addView(noBaseline, a.kit.lp(-2, -2));
         }
         panel.addView(detail, a.kit.lp(-1, -2));
-        TextView comparison = a.kit.text(display.comparisonLabel, 9.5f, Theme.MUTED, false);
+        TextView comparison = a.kit.text(display.comparisonLabel, 9.5f,
+                Theme.dashboardMutedInk(Theme.SECTION_SALES), false);
         comparison.setGravity(Gravity.END);
         panel.addView(comparison, a.kit.lp(-1, -2));
 
@@ -1361,7 +1390,7 @@ public class HomeScreen extends Screen {
         final int gen = a.renderGen();
         // A cache paint and its later database paint belong to one render; keep one ticker request/view.
         if (marketView != null && marketViewGeneration == gen) return marketView;
-        final LinearLayout card = a.kit.card(Theme.SECTION_MARKET);
+        final LinearLayout card = homeCard(Theme.SECTION_MARKET);
         marketView = card;
         marketViewGeneration = gen;
         // Device weather requires both an explicit in-app opt-in and Android permission.
@@ -1650,13 +1679,15 @@ public class HomeScreen extends Screen {
         tile.setGravity(Gravity.CENTER);
         tile.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         tile.setPadding(Theme.dp(7), Theme.dp(6), Theme.dp(7), Theme.dp(7));
-        tile.setBackground(Theme.kpi(Theme.SECTION_MARKET));
+        tile.setBackground(Theme.dashboardMetric(Theme.SECTION_MARKET));
+        tile.setElevation(Theme.dp(1f));
+        tile.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
 
         LinearLayout heading = a.kit.h();
         heading.setGravity(Gravity.CENTER);
         heading.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        heading.addView(a.kit.iconBadge(tileIcon, Theme.SECTION_MARKET, 22),
-                a.kit.lp(Theme.dp(22), Theme.dp(22)));
+        heading.addView(dashboardArt(tileIcon, Theme.SECTION_MARKET),
+                a.kit.lp(Theme.dp(28), Theme.dp(28)));
         heading.addView(a.kit.space(4));
         TextView name = a.kit.text(shortLabel, 9.5f, Theme.TEXT, true);
         name.setSingleLine(true);
@@ -1684,7 +1715,8 @@ public class HomeScreen extends Screen {
             badgeParams.topMargin = Theme.dp(4);
             tile.addView(badge, badgeParams);
         } else {
-            TextView unavailable = a.kit.text("قیمت ناموجود", 9f, Theme.MUTED, false);
+            TextView unavailable = a.kit.text("قیمت ناموجود", 9f,
+                    Theme.dashboardMutedInk(Theme.SECTION_MARKET), false);
             unavailable.setGravity(Gravity.CENTER);
             tile.addView(unavailable, a.kit.lp(-1, -2));
         }
@@ -1925,13 +1957,13 @@ public class HomeScreen extends Screen {
         }
 
         if (tiles.isEmpty()) return;
-        LinearLayout card = a.kit.card(Theme.GOLD);
+        LinearLayout card = homeCard(Theme.SECTION_SALES);
         card.setTag("home-financial-kpis");
-        card.addView(a.kit.sectionHeader("شاخص‌های مالی", R.drawable.mi_account_balance_wallet,
-                Theme.GOLD, null, null), a.kit.lp(-1, -2));
+        card.addView(boardHead("شاخص‌های مالی", null, R.drawable.mi_account_balance_wallet,
+                null, Theme.SECTION_SALES), a.kit.lp(-1, -2));
         TextView subtitle = a.kit.text("جریان مالی " + snapshotLabel(d)
                         + " · اسناد برگشتی در ۳۰ روز گذشته",
-                10f, Theme.MUTED, false);
+                10f, Theme.dashboardCardMutedInk(Theme.SECTION_SALES), false);
         subtitle.setMaxLines(2);
         subtitle.setEllipsize(TextUtils.TruncateAt.END);
         card.addView(subtitle, a.kit.lp(-1, -2));
@@ -2028,6 +2060,20 @@ public class HomeScreen extends Screen {
         return total;
     }
 
+    /**
+     * Home-only elevated card factory. The shared Kit card stays neutral on every other screen;
+     * only the dashboard gets a coloured gradient, champagne edge, and shallow lift.
+     */
+    private LinearLayout homeCard(int accent) {
+        LinearLayout card = a.kit.card(accent);
+        card.setBackground(Theme.dashboardCard(accent));
+        card.setElevation(Theme.dp(3.5f));
+        card.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
+        card.setClipToPadding(false);
+        card.setClipChildren(false);
+        return card;
+    }
+
     /** Select a stable jewel hue by section; outcome colors stay reserved for deltas only. */
     private int dashboardAccent(int vector) {
         if (vector == R.drawable.mi_point_of_sale) return Theme.SECTION_CLOSEOUT;
@@ -2045,6 +2091,8 @@ public class HomeScreen extends Screen {
         if (vector == R.drawable.mi_payments || vector == R.drawable.mi_trending_down)
             return Theme.SECTION_PAY;
         if (vector == R.drawable.mi_assignment_return) return Theme.SECTION_RETURNS;
+        if (vector == R.drawable.mi_group || vector == R.drawable.mi_person)
+            return Theme.SECTION_TOP_PERFORMERS;
         if (vector == R.drawable.mi_warning || vector == R.drawable.mi_error)
             return Theme.SECTION_ALERT;
         if (vector == R.drawable.mi_diamond || vector == R.drawable.mi_trending_up)
@@ -2055,14 +2103,19 @@ public class HomeScreen extends Screen {
         return Theme.SECTION_SALES;
     }
 
-    /** Theme-aware 3D dashboard mark; unmapped glyphs retain the quiet accent-circle fallback. */
+    /** Raised, theme-aware plate around an existing flat vector; hue follows dashboard section. */
     private ImageView dashboardArt(int iconVector) {
         return dashboardArt(iconVector, dashboardAccent(iconVector));
     }
 
     private ImageView dashboardArt(int iconVector, int accent) {
-        ImageView image = a.kit.icon(iconVector, Theme.sectionText(accent), 21);
+        ImageView image = a.kit.icon(iconVector, Theme.dashboardAccentInk(accent), 21);
         image.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        image.setBackground(Theme.dashboardBadge(accent));
+        int inset = Theme.dp(4);
+        image.setPadding(inset, inset, inset, inset);
+        image.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
+        image.setElevation(Theme.dp(1.25f));
         image.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         return image;
     }
@@ -2072,6 +2125,10 @@ public class HomeScreen extends Screen {
                                          View.OnClickListener action) {
         Button button = a.kit.btnGhost(label, accent, action);
         button.setTextSize(10.5f * Theme.fontScale());
+        button.setTextColor(Theme.dashboardActionInk(accent));
+        button.setBackground(Theme.dashboardAction(accent));
+        Theme.pressable(button);
+        button.setElevation(Theme.dp(1.5f));
         button.setPadding(Theme.dp(8), Theme.dp(4), Theme.dp(8), Theme.dp(4));
         button.setMinWidth(Theme.dp(48));
         button.setMinHeight(Theme.dp(48));
@@ -2079,10 +2136,15 @@ public class HomeScreen extends Screen {
         return button;
     }
 
-    /** Dashboard sections use the same accessible SectionHeader as every other screen. */
+    /** Dashboard-only section heading with a contrast-safe filled action. */
     private View dashboardSectionHead(String title, int iconVector, int accent,
                                       String actionLabel, View.OnClickListener action) {
-        return a.kit.sectionHeader(title, iconVector, accent, actionLabel, action);
+        View end = null;
+        if (actionLabel != null && action != null) {
+            String label = actionLabel.replace("›", "").replace("‹", "").trim();
+            end = dashboardHeaderAction(label, accent, label + "؛ باز کردن", action);
+        }
+        return boardHead(title, null, iconVector, end, accent);
     }
 
     /** Section heading: a duotone icon, title, optional subtitle and action. */
@@ -2098,14 +2160,15 @@ public class HomeScreen extends Screen {
         row.addView(dashboardArt(iconVector, accent),
                 new LinearLayout.LayoutParams(Theme.dp(36), Theme.dp(36)));
         row.addView(a.kit.space(8));
-        TextView label = a.kit.text(title, 15f, Theme.sectionText(accent), true);
+        TextView label = a.kit.text(title, 15f, Theme.dashboardAccentInk(accent), true);
         label.setMaxLines(1);
         label.setEllipsize(TextUtils.TruncateAt.END);
         row.addView(label, a.kit.wlp(1f));
         if (end != null) row.addView(end, a.kit.lp(-2, -2));
         box.addView(row, a.kit.lp(-1, -2));
         if (subtitle != null && !subtitle.isEmpty()) {
-            TextView sub = a.kit.text(subtitle, 11f, Theme.MUTED, false);
+            TextView sub = a.kit.text(subtitle, 11f,
+                    Theme.dashboardCardMutedInk(accent), false);
             sub.setGravity(Gravity.START);
             sub.setSingleLine(true);
             sub.setEllipsize(TextUtils.TruncateAt.END);
@@ -2159,12 +2222,14 @@ public class HomeScreen extends Screen {
     private LinearLayout statRow(int iconVector, String label, String value, int accent) {
         LinearLayout row = a.kit.h();
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setBackground(Theme.kpi(accent));
+        row.setBackground(Theme.dashboardMetric(accent));
+        row.setElevation(Theme.dp(1f));
+        row.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
         row.setPadding(Theme.dp(12), Theme.dp(10), Theme.dp(12), Theme.dp(10));
         row.addView(dashboardArt(iconVector), a.kit.lp(Theme.dp(42), Theme.dp(42)));
         row.addView(a.kit.space(10));
         LinearLayout copy = a.kit.v();
-        TextView l = a.kit.text(label, 11f, Theme.MUTED, false);
+        TextView l = a.kit.text(label, 11f, Theme.dashboardMutedInk(accent), false);
         l.setGravity(Gravity.START);
         copy.addView(l, a.kit.lp(-1, -2));
         copy.addView(a.kit.amountLine(value, 14f, Gravity.START), a.kit.lp(-1, -2));
@@ -2192,8 +2257,11 @@ public class HomeScreen extends Screen {
                 root.addView(row, rp);
             }
             Mini m = tiles.get(i);
+            int tileAccent = dashboardAccent(m.icon);
             LinearLayout tile = a.kit.v();
-            tile.setBackground(Theme.kpi(accent));
+            tile.setBackground(Theme.dashboardMetric(tileAccent));
+            tile.setElevation(Theme.dp(1f));
+            tile.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
             tile.setPadding(Theme.dp(10), Theme.dp(12), Theme.dp(10), Theme.dp(12));
             tile.setGravity(Gravity.CENTER_HORIZONTAL);
             ImageView ic = dashboardArt(m.icon);
@@ -2201,14 +2269,15 @@ public class HomeScreen extends Screen {
             ip.gravity = Gravity.CENTER_HORIZONTAL;
             ip.bottomMargin = Theme.dp(6);
             tile.addView(ic, ip);
-            TextView l = a.kit.text(m.label, 11f, Theme.MUTED, false);
+            TextView l = a.kit.text(m.label, 11f, Theme.dashboardMutedInk(tileAccent), false);
             l.setGravity(Gravity.CENTER_HORIZONTAL);
             l.setSingleLine(true);
             l.setEllipsize(TextUtils.TruncateAt.END);
             tile.addView(l, a.kit.lp(-1, -2));
             tile.addView(a.kit.amountLine(m.value, 15f, Gravity.CENTER), a.kit.lp(-1, -2));
             if (m.note != null && !m.note.isEmpty()) {
-                int noteColor = m.note.contains("ناقص") ? Theme.MUTED : Theme.SUCCESS;
+                int noteColor = m.note.contains("ناقص") ? Theme.dashboardMutedInk(tileAccent)
+                        : Theme.dashboardSemanticInk(tileAccent, Theme.SUCCESS);
                 TextView n = a.kit.text(m.note, 10.5f, noteColor, true);
                 n.setGravity(Gravity.CENTER_HORIZONTAL);
                 n.setSingleLine(true);
@@ -2222,7 +2291,7 @@ public class HomeScreen extends Screen {
         return root;
     }
 
-    /** Neutral, theme-aware 2-column dashboard summary grid for cash and closeout modules. */
+    /** Theme-aware, section-coloured summary grid for cash and closeout modules. */
     private View dashboardMetricGrid(List<Mini> metrics, int columns, int accent) {
         LinearLayout root = a.kit.v();
         root.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
@@ -2240,7 +2309,10 @@ public class HomeScreen extends Screen {
             for (int offset = 0; offset < count; offset++) {
                 Mini metric = metrics.get(start + offset);
                 LinearLayout tile = a.kit.v();
-                tile.setBackground(Theme.dashboardMetric(accent));
+                int metricAccent = dashboardAccent(metric.icon);
+                tile.setBackground(Theme.dashboardMetric(metricAccent));
+                tile.setElevation(Theme.dp(1f));
+                tile.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
                 tile.setPadding(Theme.dp(10), Theme.dp(9), Theme.dp(10), Theme.dp(9));
                 tile.setMinimumHeight(Theme.dp(78));
 
@@ -2250,7 +2322,8 @@ public class HomeScreen extends Screen {
                 ImageView mark = dashboardArt(metric.icon, dashboardAccent(metric.icon));
                 heading.addView(mark, new LinearLayout.LayoutParams(Theme.dp(28), Theme.dp(28)));
                 heading.addView(a.kit.space(6));
-                TextView label = a.kit.text(metric.label, 10.5f, Theme.MUTED, false);
+                TextView label = a.kit.text(metric.label, 10.5f,
+                        Theme.dashboardMutedInk(metricAccent), false);
                 label.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
                 label.setMaxLines(2);
                 label.setEllipsize(TextUtils.TruncateAt.END);
@@ -2268,7 +2341,8 @@ public class HomeScreen extends Screen {
                 }
                 tile.addView(amount, a.kit.lp(-1, -2));
                 if (metric.note != null && !metric.note.trim().isEmpty()) {
-                    TextView note = a.kit.text(metric.note, 9.5f, Theme.MUTED, false);
+                    TextView note = a.kit.text(metric.note, 9.5f,
+                            Theme.dashboardMutedInk(metricAccent), false);
                     note.setGravity(Gravity.START);
                     note.setMaxLines(2);
                     note.setEllipsize(TextUtils.TruncateAt.END);
@@ -2334,10 +2408,10 @@ public class HomeScreen extends Screen {
     private void secAlerts(LinearLayout content, Data d) {
         List<HomeAttention> items = homeAttentionItems(d);
         List<String> unavailable = unavailableAlertSources(d);
-        LinearLayout card = a.kit.card(Theme.SECTION_ALERT);
+        LinearLayout card = homeCard(Theme.SECTION_ALERT);
         card.setPadding(Theme.dp(13), Theme.dp(10), Theme.dp(13), Theme.dp(12));
-        card.addView(a.kit.sectionHeader("مرکز توجه", R.drawable.mi_priority_high,
-                Theme.SECTION_ALERT, null, null), a.kit.lp(-1, -2));
+        card.addView(boardHead("مرکز توجه", null, R.drawable.mi_priority_high,
+                null, Theme.SECTION_ALERT), a.kit.lp(-1, -2));
 
         if (items.isEmpty()) {
             String status = unavailable.isEmpty() ? "بدون هشدار مهم"
@@ -2354,7 +2428,9 @@ public class HomeScreen extends Screen {
             HomeAttention primary = items.get(0);
             LinearLayout focus = a.kit.v();
             focus.setPadding(Theme.dp(11), Theme.dp(10), Theme.dp(11), Theme.dp(10));
-            focus.setBackground(Theme.kpi(Theme.SECTION_ALERT));
+            focus.setBackground(Theme.dashboardMetric(Theme.SECTION_ALERT));
+            focus.setElevation(Theme.dp(1f));
+            focus.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
             LinearLayout heading = a.kit.h();
             heading.setGravity(Gravity.CENTER_VERTICAL);
             TextView title = a.kit.text(primary.title, 12.5f, Theme.TEXT, true);
@@ -2364,7 +2440,8 @@ public class HomeScreen extends Screen {
             heading.addView(statusChip(attentionLabel(primary.priority), primary.accent),
                     a.kit.lp(-2, -2));
             focus.addView(heading, a.kit.lp(-1, -2));
-            TextView detail = a.kit.text(primary.detail, 10.5f, Theme.MUTED, false);
+            TextView detail = a.kit.text(primary.detail, 10.5f,
+                    Theme.dashboardMutedInk(Theme.SECTION_ALERT), false);
             detail.setMaxLines(3);
             detail.setEllipsize(TextUtils.TruncateAt.END);
             LinearLayout.LayoutParams detailParams = a.kit.lp(-1, -2);
@@ -2602,7 +2679,7 @@ public class HomeScreen extends Screen {
      * in the profit figures.
      */
     private void secReturns(LinearLayout content, Data d) {
-        LinearLayout card = a.kit.card(Theme.SECTION_RETURNS);
+        LinearLayout card = homeCard(Theme.SECTION_RETURNS);
         card.addView(boardHead("برگشتی‌های ۳۰ روز اخیر", "ابطال و برگشت، ۳۰ روز گذشته",
                 R.drawable.mi_assignment_return, navChip("گزارش برگشتی‌ها", "reports")),
                 a.kit.lp(-1, -2));
@@ -2658,7 +2735,7 @@ public class HomeScreen extends Screen {
                     endDay.equals(Jalali.todayStr()) ? currentMinuteOfDay() : SalesComparison.MINUTES_PER_DAY,
                     SalesComparison.DEFAULT_COMPARABLE_WEEKS);
             double today = dayComparison.actualRials;
-            LinearLayout trend = a.kit.card(Theme.SECTION_SALES);
+            LinearLayout trend = homeCard(Theme.SECTION_SALES);
             String period = points.isEmpty() ? "تاریخچهٔ موجود"
                     : points.size() == 14 ? "۱۴ روزه"
                     : HomeNumberFormatter.integer(points.size()) + " روز از تاریخچهٔ موجود";
@@ -2714,7 +2791,7 @@ public class HomeScreen extends Screen {
         }
 
         if (hasProducts || hasMonths) {
-            LinearLayout card = a.kit.card(Theme.SECTION_SALES);
+            LinearLayout card = homeCard(Theme.SECTION_SALES);
             card.addView(dashboardSectionHead("نبض فروش", R.drawable.mi_bar_chart,
                     Theme.SECTION_SALES, "فروش ›", navAction("sales")), a.kit.lp(-1, -2));
             if (hasProducts) {
@@ -2786,9 +2863,9 @@ public class HomeScreen extends Screen {
     /** Compact, accessible receipt mix: one stacked strip with concise amount/percentage chips. */
     private void secCashMix(LinearLayout content, Data d) {
         if (!RoleStore.allowed(a, "dar_in")) return;
-        LinearLayout card = a.kit.card(Theme.SECTION_RECEIVE);
+        LinearLayout card = homeCard(Theme.SECTION_RECEIVE);
         card.setPadding(Theme.dp(13), Theme.dp(10), Theme.dp(13), Theme.dp(11));
-        card.addView(a.kit.sectionHeader("ترکیب دریافت", R.drawable.mi_receipt_long,
+        card.addView(dashboardSectionHead("ترکیب دریافت", R.drawable.mi_receipt_long,
                 Theme.SECTION_RECEIVE, "دریافت‌ها ›", navAction("dar_in")), a.kit.lp(-1, -2));
 
         if (d.inDay == null || !d.inMixAvailable || d.inMix == null) {
@@ -2892,7 +2969,9 @@ public class HomeScreen extends Screen {
         LinearLayout item = a.kit.v();
         item.setGravity(Gravity.CENTER);
         item.setPadding(Theme.dp(6), Theme.dp(5), Theme.dp(6), Theme.dp(5));
-        item.setBackground(Theme.kpi(Theme.SECTION_RECEIVE));
+        item.setBackground(Theme.dashboardMetric(Theme.SECTION_RECEIVE));
+        item.setElevation(Theme.dp(1f));
+        item.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
         LinearLayout heading = a.kit.h();
         heading.setGravity(Gravity.CENTER);
         TextView dot = a.kit.text("●", 8f, color, true);
@@ -2903,7 +2982,8 @@ public class HomeScreen extends Screen {
         item.addView(a.kit.text(HomeNumberFormatter.percent(
                 denominator > 0 ? amount * 100d / denominator : 0), 10f, Theme.TEXT, true),
                 a.kit.lp(-1, -2));
-        item.addView(a.kit.text(HomeNumberFormatter.compactMoney(amount), 8.5f, Theme.MUTED, false),
+        item.addView(a.kit.text(HomeNumberFormatter.compactMoney(amount), 8.5f,
+                        Theme.dashboardMutedInk(Theme.SECTION_RECEIVE), false),
                 a.kit.lp(-1, -2));
         item.setContentDescription(label + "، "
                 + HomeNumberFormatter.percent(denominator > 0 ? amount * 100d / denominator : 0)
@@ -2914,18 +2994,20 @@ public class HomeScreen extends Screen {
     private View insightSubhead(String title, int icon, int accent) {
         LinearLayout row = a.kit.h();
         row.setGravity(Gravity.CENTER_VERTICAL);
-        ImageView art = dashboardArt(icon);
+        ImageView art = dashboardArt(icon, accent);
         row.addView(art, a.kit.lp(Theme.dp(32), Theme.dp(32)));
         row.addView(a.kit.space(6));
-        row.addView(a.kit.text(title, 11f, Theme.sectionText(accent), true), a.kit.wlp(1f));
+        row.addView(a.kit.text(title, 11f, Theme.dashboardAccentInk(accent), true), a.kit.wlp(1f));
         return row;
     }
 
     private View insightMetric(String label, String value, int accent) {
         LinearLayout tile = a.kit.v();
         tile.setPadding(Theme.dp(9), Theme.dp(7), Theme.dp(9), Theme.dp(7));
-        tile.setBackground(Theme.kpi(accent));
-        TextView title = a.kit.text(label, 9.5f, Theme.MUTED, false);
+        tile.setBackground(Theme.dashboardMetric(accent));
+        tile.setElevation(Theme.dp(1f));
+        tile.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
+        TextView title = a.kit.text(label, 9.5f, Theme.dashboardMutedInk(accent), false);
         title.setSingleLine(true);
         title.setEllipsize(TextUtils.TruncateAt.END);
         tile.addView(title, a.kit.lp(-1, -2));
@@ -2938,7 +3020,7 @@ public class HomeScreen extends Screen {
         double dueInSum = sum(d.dueIn);
         double dueOutSum = sum(d.dueOut);
         if ((d.dueIn != null && !d.dueIn.isEmpty()) || (d.dueOut != null && !d.dueOut.isEmpty())) {
-            LinearLayout c = a.kit.card(Theme.SECTION_ALERT);
+            LinearLayout c = homeCard(Theme.SECTION_ALERT);
             c.addView(boardHead("سررسید ۳ روز آینده", "چک‌های دریافتی و پرداختی",
                     R.drawable.mi_cheque, navChip("گزارش چک‌ها", "cheques")), a.kit.lp(-1, -2));
             if (d.dueIn != null && !d.dueIn.isEmpty()) {
@@ -2966,7 +3048,7 @@ public class HomeScreen extends Screen {
                 ? CashWaterfallEngine.build(opening, receipts, payments)
                 : java.util.Collections.emptyList();
 
-        LinearLayout card = a.kit.card(Theme.SECTION_CASH_POSITION);
+        LinearLayout card = homeCard(Theme.SECTION_CASH_POSITION);
         card.setTag("home-cash-position");
         Button entry = dashboardHeaderAction("ثبت صندوق", Theme.SECTION_CASH_POSITION,
                 "ثبت ماندهٔ آغاز و شمارش پایان صندوق؛ فقط روی این دستگاه",
@@ -3018,7 +3100,7 @@ public class HomeScreen extends Screen {
         final int selected = selectedPerformerRange == 1 ? 1 : 0;
         final boolean month = selected == 1;
         final String period = month ? "این ماه" : "امروز";
-        LinearLayout card = a.kit.card(Theme.SECTION_TOP_PERFORMERS);
+        LinearLayout card = homeCard(Theme.SECTION_TOP_PERFORMERS);
         card.addView(boardHead("برترین‌ها", "پنج مشتری و پنج کالای برتر • " + period,
                 R.drawable.mi_military_tech, null), a.kit.lp(-1, -2));
         card.addView(a.kit.segmentedControl(PERFORMER_RANGES, selected, null,
@@ -3099,7 +3181,9 @@ public class HomeScreen extends Screen {
         LinearLayout row = a.kit.h();
         row.setMinimumHeight(Theme.dp(56));
         row.setPadding(Theme.dp(5), Theme.dp(5), Theme.dp(5), Theme.dp(5));
-        row.setBackground(Theme.kpi(Theme.SECTION_TOP_PERFORMERS));
+        row.setBackground(Theme.dashboardMetric(Theme.SECTION_TOP_PERFORMERS));
+        row.setElevation(Theme.dp(1f));
+        row.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
         TextView rankView = a.kit.text(HomeNumberFormatter.integer(rank), 11f,
                 Theme.onAccent(Theme.SECTION_TOP_PERFORMERS), true);
         rankView.setGravity(Gravity.CENTER);
@@ -3112,7 +3196,8 @@ public class HomeScreen extends Screen {
         TextView title = a.kit.text(name, 11f, Theme.TEXT, true);
         title.setSingleLine(true);
         title.setEllipsize(TextUtils.TruncateAt.END);
-        TextView detail = a.kit.text(sub, 9.5f, Theme.MUTED, false);
+        TextView detail = a.kit.text(sub, 9.5f,
+                Theme.dashboardMutedInk(Theme.SECTION_TOP_PERFORMERS), false);
         detail.setSingleLine(true);
         detail.setEllipsize(TextUtils.TruncateAt.END);
         info.addView(title, a.kit.lp(-1, -2));
@@ -3146,7 +3231,7 @@ public class HomeScreen extends Screen {
         final int season = SeasonalCalendarEngine.seasonIndex(selectedMonth);
         if (season < 0) return;
         final int accent = Theme.SECTION_SEASONAL_CALENDAR;
-        LinearLayout card = a.kit.card(accent);
+        LinearLayout card = homeCard(accent);
         String yearLabel = HomeNumberFormatter.localizeText(String.valueOf(year));
         card.addView(boardHead("تقویم فصلی خشکبار", "گاه‌شمار جلالی " + yearLabel
                         + " • برنامه‌ریزی محلی خرید و موجودی",
@@ -3194,14 +3279,16 @@ public class HomeScreen extends Screen {
         String monthName = Jalali.monthName(monthKey + "/01");
         String note = a.settings.homeSeasonalPlan(monthKey);
         card.addView(a.kit.text("برنامهٔ " + monthName + " " + yearLabel,
-                12f, Theme.sectionText(accent), true), a.kit.lp(-1, -2));
+                12f, Theme.dashboardAccentInk(accent), true), a.kit.lp(-1, -2));
         if (note == null || note.trim().isEmpty()) {
             card.addView(a.kit.emptyRow("برای این ماه هنوز برنامهٔ محلی ثبت نشده است."),
                     a.kit.lp(-1, -2));
         } else {
             TextView plan = a.kit.text(note, 11.5f, Theme.TEXT, false);
             plan.setPadding(Theme.dp(10), Theme.dp(8), Theme.dp(10), Theme.dp(8));
-            plan.setBackground(Theme.kpi(accent));
+            plan.setBackground(Theme.dashboardMetric(accent));
+            plan.setElevation(Theme.dp(1f));
+            plan.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
             plan.setContentDescription("برنامهٔ محلی " + monthName + " " + yearLabel + ": " + note);
             card.addView(plan, a.kit.lp(-1, -2));
         }
@@ -3268,14 +3355,14 @@ public class HomeScreen extends Screen {
             if (RoleStore.allowed(a, targets[i])) allowed.add(i);
         if (allowed.isEmpty()) return null;
 
-        LinearLayout card = a.kit.card(Theme.PRIMARY);
+        LinearLayout card = homeCard(Theme.SECTION_QUICK_ACTIONS);
         card.setTag("home-quick-actions");
         card.setPadding(Theme.dp(12), Theme.dp(8), Theme.dp(12), Theme.dp(8));
-        card.addView(a.kit.sectionHeader("دسترسی سریع", R.drawable.mi_bolt,
-                Theme.PRIMARY, null, null), a.kit.lp(-1, -2));
+        card.addView(boardHead("دسترسی سریع", null, R.drawable.mi_bolt,
+                null, Theme.SECTION_QUICK_ACTIONS), a.kit.lp(-1, -2));
         TextView summary = a.kit.text(
                 HomeNumberFormatter.integer(allowed.size()) + " مقصد مجاز برای نقش شما",
-                10f, Theme.MUTED, false);
+                10f, Theme.dashboardCardMutedInk(Theme.SECTION_QUICK_ACTIONS), false);
         LinearLayout.LayoutParams summaryParams = a.kit.lp(-1, -2);
         summaryParams.topMargin = Theme.dp(3);
         card.addView(summary, summaryParams);
@@ -3300,9 +3387,8 @@ public class HomeScreen extends Screen {
         item.setTag("home-quick-action-" + screenId);
         item.setContentDescription(label + "؛ باز کردن بخش " + label);
 
-        ImageView symbol = a.kit.icon(iconVector, Theme.PRIMARY, 20);
-        symbol.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-        item.addView(symbol, a.kit.lp(Theme.dp(22), Theme.dp(22)));
+        ImageView symbol = dashboardArt(iconVector, dashboardAccent(iconVector));
+        item.addView(symbol, a.kit.lp(Theme.dp(28), Theme.dp(28)));
         TextView title = a.kit.text(label, 10.5f, Theme.TEXT, true);
         title.setGravity(Gravity.CENTER);
         title.setMaxLines(2);
@@ -3327,24 +3413,27 @@ public class HomeScreen extends Screen {
         for (int i = 0; i < targets.length; i++)
             if (RoleStore.allowed(a, targets[i])) allowed.add(i);
 
-        LinearLayout card = a.kit.card(accent);
+        LinearLayout card = homeCard(accent);
         card.setTag("home-quick-actions-section");
         final List<View> actionRows = new ArrayList<>();
         final TextView[] toggleLabel = new TextView[1];
-        View header = a.kit.sectionHeader("میان‌برهای سریع", R.drawable.mi_bolt, accent,
-                allowed.size() > 2 ? (quickActionsExpanded ? "کمتر" : "همه") : null,
-                allowed.size() > 2 ? v -> {
-                    quickActionsExpanded = !quickActionsExpanded;
-                    for (int i = 0; i < actionRows.size(); i++)
-                        actionRows.get(i).setVisibility(quickActionsExpanded || i == 0
-                                ? View.VISIBLE : View.GONE);
-                    if (toggleLabel[0] != null) {
-                        toggleLabel[0].setText(quickActionsExpanded ? "کمتر" : "همه");
-                        toggleLabel[0].setContentDescription(quickActionsExpanded
-                                ? "نمایش کمتر از میان‌برهای سریع"
-                                : "نمایش همهٔ میان‌برهای سریع");
-                    }
-                } : null);
+        View.OnClickListener toggleAction = allowed.size() > 2 ? v -> {
+            quickActionsExpanded = !quickActionsExpanded;
+            for (int i = 0; i < actionRows.size(); i++)
+                actionRows.get(i).setVisibility(quickActionsExpanded || i == 0
+                        ? View.VISIBLE : View.GONE);
+            if (toggleLabel[0] != null) {
+                toggleLabel[0].setText(quickActionsExpanded ? "کمتر" : "همه");
+                toggleLabel[0].setContentDescription(quickActionsExpanded
+                        ? "نمایش کمتر از میان‌برهای سریع"
+                        : "نمایش همهٔ میان‌برهای سریع");
+            }
+        } : null;
+        View toggle = toggleAction == null ? null : dashboardHeaderAction(
+                quickActionsExpanded ? "کمتر" : "همه", accent,
+                quickActionsExpanded ? "نمایش کمتر از میان‌برهای سریع"
+                        : "نمایش همهٔ میان‌برهای سریع", toggleAction);
+        View header = boardHead("میان‌برهای سریع", null, R.drawable.mi_bolt, toggle, accent);
         if (allowed.size() > 2 && header instanceof ViewGroup) {
             ViewGroup headerRow = (ViewGroup) ((ViewGroup) header).getChildAt(0);
             View possibleToggle = headerRow.getChildAt(headerRow.getChildCount() - 1);
@@ -3358,7 +3447,7 @@ public class HomeScreen extends Screen {
         card.addView(header, a.kit.lp(-1, -2));
         TextView summary = a.kit.text(
                 HomeNumberFormatter.integer(allowed.size()) + " مقصد در دسترس نقش شما",
-                10f, Theme.MUTED, false);
+                10f, Theme.dashboardCardMutedInk(accent), false);
         LinearLayout.LayoutParams summaryParams = a.kit.lp(-1, -2);
         summaryParams.topMargin = Theme.dp(3);
         card.addView(summary, summaryParams);
@@ -3374,13 +3463,13 @@ public class HomeScreen extends Screen {
                 LinearLayout.LayoutParams rowParams = a.kit.lp(-1, -2);
                 rowParams.topMargin = Theme.dp(4);
                 int first = allowed.get(rowIndex * 2);
-                row.addView(quickActionNode(labels[first], targets[first], icons[first], accent),
+                row.addView(quickActionNode(labels[first], targets[first], icons[first]),
                         a.kit.wlp(1f));
                 int secondPosition = rowIndex * 2 + 1;
                 if (secondPosition < allowed.size()) {
                     row.addView(a.kit.space(8));
                     int second = allowed.get(secondPosition);
-                    row.addView(quickActionNode(labels[second], targets[second], icons[second], accent),
+                    row.addView(quickActionNode(labels[second], targets[second], icons[second]),
                             a.kit.wlp(1f));
                 } else {
                     row.addView(new View(a), a.kit.wlp(1f));
@@ -3392,14 +3481,14 @@ public class HomeScreen extends Screen {
         a.kit.addCard(content, card);
     }
 
-    private View quickActionNode(String label, String screenId, int icon, int accent) {
+    private View quickActionNode(String label, String screenId, int icon) {
         LinearLayout item = a.kit.h();
         item.setGravity(Gravity.CENTER_VERTICAL);
         item.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         item.setMinimumHeight(Theme.dp(48));
         item.setPadding(Theme.dp(6), Theme.dp(5), Theme.dp(6), Theme.dp(5));
-        ImageView symbol = a.kit.icon(icon, Theme.sectionText(accent), 19);
-        item.addView(symbol, a.kit.lp(Theme.dp(22), Theme.dp(22)));
+        ImageView symbol = dashboardArt(icon, dashboardAccent(icon));
+        item.addView(symbol, a.kit.lp(Theme.dp(28), Theme.dp(28)));
         item.addView(a.kit.space(7));
         TextView title = a.kit.text(label, 11f, Theme.TEXT, true);
         title.setMaxLines(2);
@@ -3417,7 +3506,7 @@ public class HomeScreen extends Screen {
         final int accent = Theme.SECTION_SALES_FORECAST;
         SalesForecastEngine.Result forecast = d == null || d.salesSnapshot == null
                 ? SalesForecastEngine.forecast(null) : SalesForecastEngine.forecast(d.salesSnapshot);
-        LinearLayout card = a.kit.card(accent);
+        LinearLayout card = homeCard(accent);
         card.addView(boardHead("پیش‌بینی فروش هفت‌روزه",
                 "روزهای تقویمی آینده • روزهای نزدیک‌تر سمت راست",
                 R.drawable.mi_bar_chart, null, accent), a.kit.lp(-1, -2));
@@ -3445,7 +3534,7 @@ public class HomeScreen extends Screen {
 
     private void secGrossProfit(LinearLayout content, Data d) {
         if (!RoleStore.allowed(a, "closeout")) return;
-        LinearLayout card = a.kit.card(Theme.SECTION_GROSS_PROFIT);
+        LinearLayout card = homeCard(Theme.SECTION_GROSS_PROFIT);
         card.addView(boardHead("سود ناخالص", "ماه جاری تا " + snapshotDay(d) + " • برآوردی",
                 R.drawable.mi_profit, null), a.kit.lp(-1, -2));
         if (d == null || !d.grossProfitAvailable || d.grossProfitDaily == null) {
@@ -3489,7 +3578,7 @@ public class HomeScreen extends Screen {
         SalesSnapshot snapshot = d == null ? null : d.salesSnapshot;
         boolean salesAvailable = snapshot != null && snapshot.isAvailable();
 
-        LinearLayout card = a.kit.card(Theme.SECTION_SALES_GOAL);
+        LinearLayout card = homeCard(Theme.SECTION_SALES_GOAL);
         card.addView(boardHead("هدف فروش ماهانه", periodLabel + " • تنظیم محلی روی این دستگاه",
                 R.drawable.mi_track_changes, null), a.kit.lp(-1, -2));
 
@@ -3635,7 +3724,7 @@ public class HomeScreen extends Screen {
     private void secHomeCloseout(LinearLayout content, Data d) {
         if (!RoleStore.allowed(a, "closeout")) return;
         final String day = snapshotDay(d);
-        LinearLayout card = a.kit.card(Theme.SECTION_CLOSEOUT);
+        LinearLayout card = homeCard(Theme.SECTION_CLOSEOUT);
         card.setTag("home-closeout-card");
         Button entry = dashboardHeaderAction("ثبت صندوق", Theme.SECTION_CLOSEOUT,
                 "ثبت ماندهٔ آغاز و شمارش پایان صندوق؛ فقط روی این دستگاه",
@@ -3825,7 +3914,7 @@ public class HomeScreen extends Screen {
         final SmartReportEngine.Input report = smartReportInput(d);
         final List<String> sentences = SmartReportEngine.compose(report);
         final SmartReportEngine.FollowUpPriority priority = SmartReportEngine.followUpPriority(report);
-        LinearLayout card = a.kit.card(Theme.SECTION_SALES);
+        LinearLayout card = homeCard(Theme.SECTION_SALES);
         card.setTag("home-smart-report");
         card.setPadding(Theme.dp(12), Theme.dp(9), Theme.dp(12), Theme.dp(12));
         Button share = dashboardHeaderAction("اشتراک", Theme.SECTION_SALES,
@@ -3850,7 +3939,8 @@ public class HomeScreen extends Screen {
         String received = syncTime == null ? "" : syncTime.trim();
         String timestamp = received.isEmpty() ? "زمان آخرین دریافت ثبت نشده"
                 : "آخرین دریافت موفق · " + received;
-        TextView updated = a.kit.text(timestamp, 9.5f, Theme.MUTED, false);
+        TextView updated = a.kit.text(timestamp, 9.5f,
+                Theme.dashboardCardMutedInk(Theme.SECTION_SALES), false);
         updated.setMaxLines(2);
         updated.setEllipsize(TextUtils.TruncateAt.END);
         updated.setContentDescription(timestamp);
@@ -3885,13 +3975,16 @@ public class HomeScreen extends Screen {
             line.setGravity(Gravity.TOP | Gravity.CENTER_VERTICAL);
             line.setMinimumHeight(Theme.dp(56));
             line.setPadding(Theme.dp(8), Theme.dp(7), Theme.dp(8), Theme.dp(7));
-            line.setBackground(Theme.cardAccent(Theme.SECTION_SALES));
+            line.setBackground(Theme.dashboardMetric(tones[i]));
+            line.setElevation(Theme.dp(1f));
+            line.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
             line.addView(dashboardArt(icons[i], tones[i]),
                     new LinearLayout.LayoutParams(Theme.dp(34), Theme.dp(34)));
             line.addView(a.kit.space(8));
 
             LinearLayout copy = a.kit.v();
-            TextView label = a.kit.text(headings[i], 10.5f, Theme.MUTED, true);
+            TextView label = a.kit.text(headings[i], 10.5f,
+                    Theme.dashboardMutedInk(tones[i]), true);
             label.setMaxLines(1);
             label.setEllipsize(TextUtils.TruncateAt.END);
             copy.addView(label, a.kit.lp(-1, -2));
@@ -3972,7 +4065,7 @@ public class HomeScreen extends Screen {
             return;
         }
         if (txt == null || txt.isEmpty()) return;
-        LinearLayout c = a.kit.card(Theme.SECTION_SALES);
+        LinearLayout c = homeCard(Theme.SECTION_SALES);
         String when = "";
         try {
             when = dt == null || dt.isEmpty() ? "" : Jalali.dispFa(dt);

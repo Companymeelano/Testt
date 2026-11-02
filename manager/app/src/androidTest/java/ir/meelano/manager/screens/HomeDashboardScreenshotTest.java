@@ -154,9 +154,14 @@ public final class HomeDashboardScreenshotTest {
                 R.drawable.mi_assignment_return, Theme.icon3d(R.drawable.mi_assignment_return));
         assertFalse("The new visual system should not substitute 3D artwork",
                 Theme.isIcon3d(Theme.icon3d(R.drawable.mi_account_balance_wallet)));
+        assertEquals("Expanded 30-day chip leaves too little title room on a narrow phone",
+                196, MainActivity.headerTitleWidthDp(320, 2, true, false));
+        assertEquals("Collapsed header controls are not included in the narrow-width budget",
+                144, MainActivity.headerTitleWidthDp(320, 2, true, true));
+        verifyDashboardColorContrast();
         Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
         final View[] targets = new View[8];
-        final int[] facts = new int[4];
+        final int[] facts = new int[5];
         long layoutDeadline = SystemClock.uptimeMillis() + 3_000L;
         do {
             instrumentation.runOnMainSync(() -> {
@@ -176,8 +181,11 @@ public final class HomeDashboardScreenshotTest {
                         && containsViewType(targets[0], HorizontalScrollView.class) ? 1 : 0;
                 facts[2] = targets[1] == null ? 0 : targets[1].getWidth();
                 facts[3] = targets[5] == null ? 0 : targets[5].getHeight();
+                Rect visibleLicense = new Rect();
+                facts[4] = targets[6] != null && targets[6].getGlobalVisibleRect(visibleLicense)
+                        && visibleLicense.width() == targets[6].getWidth() ? 1 : 0;
             });
-            if (facts[2] > 0 && facts[3] > 0) break;
+            if (facts[2] > 0 && facts[3] > 0 && facts[4] > 0) break;
             SystemClock.sleep(40L);
         } while (SystemClock.uptimeMillis() < layoutDeadline);
         assertNotNull("Financial KPI section is missing", targets[0]);
@@ -197,6 +205,7 @@ public final class HomeDashboardScreenshotTest {
         assertNotNull("Expanded header licence chip is missing", targets[6]);
         assertTrue("Licence chip is not a text control", targets[6] instanceof TextView);
         TextView licence = (TextView) targets[6];
+        assertTrue("Licence chip is clipped by the viewport/header bounds", facts[4] == 1);
         assertTrue("Licence chip is below the 48dp touch target",
                 licence.getWidth() >= 48f * activityDensity(licence));
         assertFalse("Licence chip text is clipped", licence.getText().toString().contains("…"));
@@ -212,6 +221,65 @@ public final class HomeDashboardScreenshotTest {
         assertTrue("Full comparison period was lost to accessibility",
                 delta.getContentDescription() != null
                         && delta.getContentDescription().toString().contains("نسبت به"));
+    }
+
+    private static void verifyDashboardColorContrast() {
+        int[] accents = {DesignTokens.SALES, DesignTokens.PURCHASE, DesignTokens.RECEIVE,
+                DesignTokens.PAY, DesignTokens.RETURNS, DesignTokens.ALERT,
+                DesignTokens.MARKET, DesignTokens.WAREHOUSE, DesignTokens.CLOSEOUT,
+                DesignTokens.CASH_POSITION, DesignTokens.TOP_PERFORMERS,
+                DesignTokens.SALES_GOAL, DesignTokens.GROSS_PROFIT,
+                DesignTokens.SEASONAL_CALENDAR, DesignTokens.QUICK_ACTIONS,
+                DesignTokens.SALES_FORECAST};
+        boolean light = Theme.isLight();
+        float badgeTopTint = light ? 0.23f : 0.42f;
+        float badgeBottomTint = light ? 0.12f : 0.27f;
+        float metricTopTint = light ? 0.16f : 0.34f;
+        float metricBottomTint = light ? 0.065f : 0.18f;
+        float cardTopTint = light ? 0.04f : 0.20f;
+        float cardBottomTint = light ? 0.015f : 0.10f;
+        int welcomeRoyal = DesignTokens.mix(DesignTokens.EMERALD, Theme.PRIMARY,
+                Theme.isNuts() ? 0.12f : 0.08f);
+        int[] welcomeSurfaces = {welcomeRoyal, DesignTokens.EMERALD, DesignTokens.EMERALD_DEEP};
+        for (int surface : welcomeSurfaces) {
+            assertTrue("Welcome title contrast on emerald hero",
+                    DesignTokens.contrastRatio(Theme.dashboardWelcomeText(), surface) >= 4.8);
+            assertTrue("Welcome secondary-text contrast on emerald hero",
+                    DesignTokens.contrastRatio(Theme.dashboardWelcomeMuted(), surface) >= 4.8);
+        }
+        for (int accent : accents) {
+            int badgeTop = DesignTokens.mix(Theme.SURFACE, accent, badgeTopTint);
+            int badgeBottom = DesignTokens.mix(Theme.SURFACE, accent, badgeBottomTint);
+            int iconInk = Theme.dashboardAccentInk(accent);
+            assertTrue("Dashboard icon contrast on top badge for " + Integer.toHexString(accent),
+                    DesignTokens.contrastRatio(iconInk, badgeTop) >= 4.8);
+            assertTrue("Dashboard icon contrast on lower badge for " + Integer.toHexString(accent),
+                    DesignTokens.contrastRatio(iconInk, badgeBottom) >= 4.8);
+
+            int metricTop = DesignTokens.mix(Theme.SURFACE, accent, metricTopTint);
+            int metricBottom = DesignTokens.mix(Theme.SURFACE, accent, metricBottomTint);
+            int mutedInk = Theme.dashboardMutedInk(accent);
+            assertTrue("Dashboard metric label contrast for " + Integer.toHexString(accent),
+                    DesignTokens.contrastRatio(mutedInk, metricTop) >= 4.8);
+            assertTrue("Dashboard metric label contrast across gradient for " + Integer.toHexString(accent),
+                    DesignTokens.contrastRatio(mutedInk, metricBottom) >= 4.8);
+
+            int cardTop = DesignTokens.mix(Theme.SURFACE, accent, cardTopTint);
+            int cardBottom = DesignTokens.mix(Theme.SURFACE, accent, cardBottomTint);
+            int cardMuted = Theme.dashboardCardMutedInk(accent);
+            assertTrue("Dashboard card subtitle contrast for " + Integer.toHexString(accent),
+                    DesignTokens.contrastRatio(cardMuted, cardTop) >= 4.8);
+            assertTrue("Dashboard card subtitle contrast across gradient for " + Integer.toHexString(accent),
+                    DesignTokens.contrastRatio(cardMuted, cardBottom) >= 4.8);
+
+            int actionTop = DesignTokens.mix(accent, 0xFFFFFFFF, 0.02f);
+            int actionBottom = DesignTokens.mix(accent, 0xFF000000, 0.02f);
+            int actionInk = Theme.dashboardActionInk(accent);
+            assertTrue("Dashboard action text contrast for " + Integer.toHexString(accent),
+                    DesignTokens.contrastRatio(actionInk, actionTop) >= 4.8);
+            assertTrue("Dashboard action text contrast across gradient for " + Integer.toHexString(accent),
+                    DesignTokens.contrastRatio(actionInk, actionBottom) >= 4.8);
+        }
     }
 
     private static void verifySalesChartRangeSwitch(Activity activity) {

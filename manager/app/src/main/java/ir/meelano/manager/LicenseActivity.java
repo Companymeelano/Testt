@@ -49,7 +49,6 @@ import ir.meelano.manager.data.NetRoute;
 import ir.meelano.manager.data.Repo;
 import ir.meelano.manager.data.Settings;
 import ir.meelano.manager.ui.Card3D;
-import ir.meelano.manager.ui.ConfettiView;
 import ir.meelano.manager.ui.Kit;
 import ir.meelano.manager.ui.RadarView;
 import ir.meelano.manager.ui.Ui;
@@ -62,7 +61,7 @@ import ir.meelano.licensing.License;
  * holds until the license arrives; page 2 asks for the server address and lists compatible databases,
  * and lets the user choose one before entering the app. Everything activates silently:
  * no mechanism talk, no notification. Remote revoke/block enforcement
- * stays, plus the luxury gold designer signature on every page.
+ * stays, with a compact flat interface across all pages.
  * Blocks MainActivity until {@link LicenseStore#unlocked}.
  */
 public class LicenseActivity extends Activity {
@@ -338,10 +337,6 @@ public class LicenseActivity extends Activity {
         connStage = null;
     }
 
-    /** Exact Champagne Gold token used for licence-card hairlines and progress marks. */
-    private static final int CHAMPAGNE = Theme.GOLD_METAL;
-    private static final int CARD_EDGE = Theme.GOLD_METAL;
-
     /** Both licensing skins use the same flat, theme-aware app backdrop. */
     private android.graphics.drawable.Drawable licenseBackdrop() {
         return Theme.backdrop();
@@ -352,31 +347,30 @@ public class LicenseActivity extends Activity {
         return Theme.startButton();
     }
 
-    /** Device code plaque: a soft surface with a thin champagne rim. */
+    /** Device-code plaque: a flat surface with a neutral border. */
     private android.graphics.drawable.GradientDrawable plaque() {
-        android.graphics.drawable.GradientDrawable d = new android.graphics.drawable.GradientDrawable(
-                android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{Theme.alpha(Theme.GOLD, Theme.isLight() ? 30 : 22), Theme.SURFACE});
-        d.setCornerRadius(Theme.dp(18));
-        d.setStroke(Theme.dp(1), Theme.alpha(CHAMPAGNE, 110));
-        return d;
+        android.graphics.drawable.GradientDrawable background = new android.graphics.drawable.GradientDrawable();
+        background.setColor(Theme.SURFACE);
+        background.setCornerRadius(Theme.dp(12));
+        background.setStroke(Theme.dp(1), Theme.BORDER);
+        return background;
     }
 
-    /** Input frame: slightly lighter than the page, thin champagne rim, gold only when focused. */
+    /** Input frame: a flat surface with a visible emerald focus border. */
     private void luxField(EditText e) {
         android.graphics.drawable.GradientDrawable normal = new android.graphics.drawable.GradientDrawable();
-        normal.setColor(Theme.SURFACE2);
-        normal.setCornerRadius(Theme.dp(14));
-        normal.setStroke(Theme.dp(1), Theme.alpha(CHAMPAGNE, Theme.isLight() ? 90 : 56));
+        normal.setColor(Theme.SURFACE);
+        normal.setCornerRadius(Theme.dp(10));
+        normal.setStroke(Theme.dp(1), Theme.BORDER);
         android.graphics.drawable.GradientDrawable focused = new android.graphics.drawable.GradientDrawable();
-        focused.setColor(Theme.SURFACE2);
-        focused.setCornerRadius(Theme.dp(14));
-        focused.setStroke(Theme.dp(2), Theme.GOLD);
-        android.graphics.drawable.StateListDrawable s = new android.graphics.drawable.StateListDrawable();
-        s.addState(new int[]{android.R.attr.state_focused}, focused);
-        s.addState(new int[]{}, normal);
-        e.setBackground(s);
-        e.setMinHeight(Theme.dp(54));
+        focused.setColor(Theme.SURFACE);
+        focused.setCornerRadius(Theme.dp(10));
+        focused.setStroke(Theme.dp(2), Theme.PRIMARY);
+        android.graphics.drawable.StateListDrawable states = new android.graphics.drawable.StateListDrawable();
+        states.addState(new int[]{android.R.attr.state_focused}, focused);
+        states.addState(new int[]{}, normal);
+        e.setBackground(states);
+        e.setMinHeight(Theme.dp(52));
     }
 
     /** Animated 3-step progress (v33): 1=request+wait, 2=connect, 3=enter. */
@@ -385,47 +379,37 @@ public class LicenseActivity extends Activity {
         row.setGravity(Gravity.CENTER_VERTICAL);
         String[] labels = {"فعال‌سازی", "اتصال", "ورود"};
         for (int i = 1; i <= 3; i++) {
-            final int idx = i;
+            final int index = i;
             LinearLayout cell = kit.v();
             cell.setGravity(Gravity.CENTER);
-            boolean done = idx < active;
-            boolean on = idx == active;
-            int stepColor = done ? Theme.GOLD_SOFT : (on ? Theme.GOLD : Theme.SURFACE2);
+            boolean done = index < active;
+            boolean current = index == active;
             int stepIcon = done ? R.drawable.mi_check
-                    : (idx == 1 ? R.drawable.mi_key : (idx == 2 ? R.drawable.mi_database : R.drawable.mi_login));
-            android.widget.FrameLayout dot = new android.widget.FrameLayout(this);
-            dot.setBackground(done || on ? Theme.accentAvatar(stepColor) : Theme.avatar(stepColor));
-            dot.addView(kit.icon(stepIcon, done || on ? Theme.onAccent(stepColor) : Theme.MUTED, 18),
-                    new android.widget.FrameLayout.LayoutParams(Theme.dp(18), Theme.dp(18), Gravity.CENTER));
-            int d = Theme.dp(38);
-            LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(d, d);
-            dlp.gravity = Gravity.CENTER;
-            cell.addView(dot, dlp);
-            TextView lb = kit.text(labels[idx - 1], 10f,
-                    done || on ? Theme.GOLD_SOFT : Theme.MUTED, true);
-            lb.setGravity(Gravity.CENTER);
-            try {
-                lb.setSingleLine(true);
-                cell.setContentDescription("مرحله " + idx + " از ۳: " + labels[idx - 1]
-                        + (done ? "، انجام شد" : (on ? "، مرحله کنونی" : "، مانده")));
-            } catch (Exception ignored) { Diag.ignored("LicenseActivity:343", ignored); }
-            cell.addView(lb, kit.lp(-2, -2));
+                    : (index == 1 ? R.drawable.mi_key : (index == 2 ? R.drawable.mi_database : R.drawable.mi_login));
+            int ink = done || current ? Theme.PRIMARY : Theme.MUTED;
+            android.widget.FrameLayout mark = new android.widget.FrameLayout(this);
+            mark.setBackground(Theme.avatar(done || current ? Theme.ACCENT_SOFT : Theme.SURFACE2));
+            mark.addView(kit.icon(stepIcon, ink, 17), new android.widget.FrameLayout.LayoutParams(
+                    Theme.dp(20), Theme.dp(20), Gravity.CENTER));
+            LinearLayout.LayoutParams markParams = new LinearLayout.LayoutParams(Theme.dp(28), Theme.dp(28));
+            markParams.gravity = Gravity.CENTER;
+            cell.addView(mark, markParams);
+            TextView label = kit.text(labels[index - 1], 10f,
+                    done || current ? Theme.TEXT : Theme.MUTED, true);
+            label.setGravity(Gravity.CENTER);
+            label.setSingleLine(true);
+            cell.setContentDescription("مرحله " + index + " از ۳: " + labels[index - 1]
+                    + (done ? "، انجام شد" : (current ? "، مرحله کنونی" : "، مانده")));
+            cell.addView(label, kit.lp(-2, -2));
             row.addView(cell, kit.lp(-2, -2));
-            if (Ui.motionOk(this)) {
-                dot.setScaleX(0.4f);
-                dot.setScaleY(0.4f);
-                dot.setAlpha(0f);
-                dot.animate().scaleX(1f).scaleY(1f).alpha(1f)
-                        .setStartDelay(idx * 120L).setDuration(320).start();
-            }
-            if (idx < 3) {
+            if (index < 3) {
                 View line = new View(this);
-                line.setBackgroundColor(idx < active ? Theme.alpha(CHAMPAGNE, 190) : Theme.alpha(CHAMPAGNE, 44));
-                LinearLayout.LayoutParams llp = new LinearLayout.LayoutParams(0, Theme.dp(3));
-                llp.weight = 1;
-                llp.gravity = Gravity.CENTER_VERTICAL;
-                llp.setMargins(Theme.dp(4), 0, Theme.dp(4), Theme.dp(14));
-                row.addView(line, llp);
+                line.setBackgroundColor(index < active ? Theme.PRIMARY : Theme.BORDER);
+                LinearLayout.LayoutParams lineParams = new LinearLayout.LayoutParams(0, Theme.dp(1));
+                lineParams.weight = 1;
+                lineParams.gravity = Gravity.CENTER_VERTICAL;
+                lineParams.setMargins(Theme.dp(6), 0, Theme.dp(6), Theme.dp(12));
+                row.addView(line, lineParams);
             }
         }
         row.setPadding(Theme.dp(8), Theme.dp(4), Theme.dp(8), 0);
@@ -434,39 +418,32 @@ public class LicenseActivity extends Activity {
 
     // ================= page 1: automatic device code + contact =================
 
-    /** Brand header for the licence pages: framed gold logo, title and a muted subtitle. */
+    /** Brand header for licence pages: a flat vector mark, title and muted subtitle. */
     private LinearLayout heroHeader(String title, String sub) {
-        LinearLayout h = kit.v();
-        h.setGravity(Gravity.CENTER_HORIZONTAL);
-        h.setPadding(0, Theme.dp(4), 0, Theme.dp(14));
-        android.widget.FrameLayout ring = new android.widget.FrameLayout(this);
-        try {
-            android.graphics.drawable.GradientDrawable rg = new android.graphics.drawable.GradientDrawable();
-            rg.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-            rg.setStroke(Theme.dp(1), Theme.alpha(CHAMPAGNE, 170));
-            rg.setColor(Theme.alpha(CHAMPAGNE, Theme.isLight() ? 18 : 10));
-            ring.setBackground(rg);
-        } catch (Exception ignored) { Diag.ignored("LicenseActivity:ring", ignored); }
-        ring.addView(kit.logo(88), new android.widget.FrameLayout.LayoutParams(Theme.dp(88), Theme.dp(88),
-                Gravity.CENTER));
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(Theme.dp(104), Theme.dp(104));
-        lp.gravity = Gravity.CENTER_HORIZONTAL;
-        h.addView(ring, lp);
-        TextView t = kit.text(title, 20f, Theme.GOLD_SOFT, true);
-        t.setGravity(Gravity.CENTER);
-        h.addView(t, kit.lp(-1, -2));
-        TextView s = kit.text(sub, 12.5f, Theme.MUTED, false);
-        s.setLineSpacing(Theme.dp(3), 1f);
-        s.setGravity(Gravity.CENTER);
-        h.addView(s, kit.lp(-1, -2));
-        return h;
+        LinearLayout header = kit.v();
+        header.setGravity(Gravity.CENTER_HORIZONTAL);
+        header.setPadding(0, Theme.dp(2), 0, Theme.dp(10));
+        android.widget.ImageView mark = kit.logo(42);
+        LinearLayout.LayoutParams markParams = new LinearLayout.LayoutParams(Theme.dp(42), Theme.dp(42));
+        markParams.gravity = Gravity.CENTER_HORIZONTAL;
+        header.addView(mark, markParams);
+        TextView heading = kit.text(title, 19f, Theme.TEXT, true);
+        heading.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams headingParams = kit.lp(-1, -2);
+        headingParams.topMargin = Theme.dp(5);
+        header.addView(heading, headingParams);
+        TextView subtitle = kit.text(sub, 12f, Theme.MUTED, false);
+        subtitle.setLineSpacing(Theme.dp(2), 1f);
+        subtitle.setGravity(Gravity.CENTER);
+        header.addView(subtitle, kit.lp(-1, -2));
+        return header;
     }
 
     private void buildRequestPage(LinearLayout box) {
         box.addView(heroHeader("فعال‌سازی مجوز", "کد دستگاه خودکار است؛ نام را اینجا وارد نمی‌کنید"), kit.lp(-1, -2));
         box.addView(stepBar(1), kit.lp(-1, -2));
         box.addView(kit.gap(10));
-        LinearLayout c = Card3D.card(this, CARD_EDGE);
+        LinearLayout c = Card3D.card(this, Theme.BORDER);
         c.addView(sectionHead(R.drawable.mi_star_shine, Theme.GOLD, "خوش آمدید"), kit.lp(-1, -2));
         c.addView(kit.text("شناسهٔ گوشی برای درخواست به‌صورت خودکار ساخته می‌شود. شمارهٔ تماس برای هماهنگی است؛ نام شخص را فروشنده هنگام صدور لایسنس ثبت می‌کند.",
                 12.5f, Theme.TEXT, false), kit.lp(-1, -2));
@@ -576,24 +553,18 @@ public class LicenseActivity extends Activity {
         c.addView(body, kit.lp(-1, -2));
     }
 
-    /** A round medallion: graded tint, hairline rim, and a centred icon in the given colour. */
+    /** A compact flat icon tile with a centered, contrast-safe vector glyph. */
     private android.widget.FrameLayout iconChip(int iconRes, int color, int sizeDp) {
-        android.widget.FrameLayout f = new android.widget.FrameLayout(this);
-        try {
-            android.graphics.drawable.GradientDrawable g = new android.graphics.drawable.GradientDrawable(
-                    android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
-                    new int[]{Theme.alpha(color, Theme.isLight() ? 80 : 84), Theme.alpha(color, Theme.isLight() ? 24 : 26)});
-            g.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-            g.setStroke(Theme.dp(1), Theme.alpha(color, 170));
-            f.setBackground(g);
-        } catch (Exception ignored) { Diag.ignored("LicenseActivity:chip", ignored); }
-        int inner = Math.round(sizeDp * 0.5f);
-        f.addView(kit.icon(iconRes, color, inner), new android.widget.FrameLayout.LayoutParams(
-                Theme.dp(inner), Theme.dp(inner), Gravity.CENTER));
-        return f;
+        android.widget.FrameLayout frame = new android.widget.FrameLayout(this);
+        frame.setBackground(Theme.avatar(Theme.sectionTint(color)));
+        int inner = Math.min(22, Math.max(16, sizeDp - 8));
+        frame.addView(kit.icon(iconRes, Theme.sectionText(color), inner),
+                new android.widget.FrameLayout.LayoutParams(Theme.dp(inner), Theme.dp(inner), Gravity.CENTER));
+        frame.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        return frame;
     }
 
-    /** Section title with a medallion icon on the leading edge. */
+    /** Section title with a simple line icon. */
     /** Manual code entry hidden until {@code delayMs} passes: the SMS path stays automatic. */
     private void addManualEntryLater(LinearLayout c, long delayMs) {
         final LinearLayout holder = kit.v();
@@ -633,7 +604,7 @@ public class LicenseActivity extends Activity {
         return h;
     }
 
-    /** One label/value row with a medallion, used in the summary card. */
+    /** One label/value row with a simple icon, used in the summary card. */
     private LinearLayout statRow(int iconRes, int color, String label, String value, int valueColor) {
         LinearLayout r = kit.h();
         r.setGravity(Gravity.CENTER_VERTICAL);
@@ -647,30 +618,27 @@ public class LicenseActivity extends Activity {
         return r;
     }
 
-    /** Gold hairline that fades at both ends. */
+    /** Neutral one-pixel divider. */
     private View hairline() {
-        View v = new View(this);
-        try {
-            v.setBackground(new android.graphics.drawable.GradientDrawable(
-                    android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
-                    new int[]{0x00000000, Theme.alpha(Theme.GOLD, 120), 0x00000000}));
-        } catch (Exception ignored) { Diag.ignored("LicenseActivity:hairline", ignored); }
-        return v;
+        View line = new View(this);
+        line.setBackgroundColor(Theme.BORDER);
+        line.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        return line;
     }
 
-    /** Primary action: metallic gold-to-rose capsule with a leading icon. */
+    /** Primary action: solid emerald button with a leading icon. */
     private android.widget.Button goldAction(String text, int iconRes, View.OnClickListener l) {
         android.widget.Button b = kit.btnGold(text, l);
         try {
             b.setBackground(quietStart());
-            b.setTextSize(15.5f * Theme.fontScale());
-            b.setMinHeight(Theme.dp(56));
-            b.setLetterSpacing(0.04f);
+            b.setTextColor(Theme.onAccent(Theme.PRIMARY));
+            b.setTextSize(15f * Theme.fontScale());
+            b.setMinHeight(Theme.dp(52));
             if (iconRes != 0) {
                 android.graphics.drawable.Drawable d = getDrawable(iconRes);
                 if (d != null) {
                     d = d.mutate();
-                    d.setTint(Theme.onAccent(Theme.GOLD));
+                    d.setTint(Theme.onAccent(Theme.PRIMARY));
                     b.setCompoundDrawablesRelativeWithIntrinsicBounds(d, null, null, null);
                     b.setCompoundDrawablePadding(Theme.dp(8));
                 }
@@ -746,7 +714,7 @@ public class LicenseActivity extends Activity {
         copyNote.setVisibility(View.GONE);
         copyBtn.setOnClickListener(v -> {
             boolean ok = copyText("کد دستگاه میلانو", device);
-            copyNote.setTextColor(Theme.TEXT);
+            copyNote.setTextColor(ok ? Theme.SUCCESS : Theme.DANGER);
             copyNote.setText(ok ? "کد دستگاه کپی شد" : "کپی نشد؛ دوباره تلاش کنید");
             copyNote.setVisibility(View.VISIBLE);
             copyNote.postDelayed(() -> copyNote.setVisibility(View.GONE), 2500);
@@ -914,7 +882,7 @@ public class LicenseActivity extends Activity {
         c.addView(deviceCodeView(), kit.lp(-1, -2));
         c.addView(kit.gap(6));
         LinearLayout row = kit.h();
-        row.addView(kit.btnGhost("📲 ارسال مجدد", Theme.MUTED,
+        row.addView(kit.btnGhost("↻ ارسال مجدد", Theme.MUTED,
                 v -> directSend(buildRequestMsg(LicenseStore.contactPhone(this)))), kit.wlp(1f));
         row.addView(kit.space(8));
         final android.widget.Button[] recall = new android.widget.Button[1];
@@ -937,11 +905,11 @@ public class LicenseActivity extends Activity {
     // ================= page 2: server IP, then explicit database choice =================
 
     /**
-     * Luxury manual recall (v32): no mechanism talk — the button says the
+     * Manual license recall: concise copy, with no internal mechanism details — the
      * key is on its way, and either the license lands or one smart line
      * explains the wait. Also sweeps the clipboard invisibly.
      */
-    /** Golden-burst celebration overlay, then the next step (v33). */
+    /** Brief confirmation feedback, then the next step. */
     private void celebrateThen(Runnable after) {
         if (!Ui.motionOk(this)) {
             try {
@@ -951,20 +919,19 @@ public class LicenseActivity extends Activity {
         }
         try {
             android.widget.FrameLayout root = new android.widget.FrameLayout(this);
-            root.setBackgroundColor(0xCC0B0E12);
-            ConfettiView cf = new ConfettiView(this);
-            root.addView(cf, new android.widget.FrameLayout.LayoutParams(-1, -1));
-            TextView big = kit.text("✓", 90, Theme.GOLD_SOFT, true);
-            big.setGravity(Gravity.CENTER);
-            android.widget.FrameLayout.LayoutParams bp =
-                    new android.widget.FrameLayout.LayoutParams(-2, -2);
-            bp.gravity = Gravity.CENTER;
-            root.addView(big, bp);
+            root.setBackgroundColor(Theme.alpha(Theme.BG, 232));
+            android.widget.FrameLayout mark = new android.widget.FrameLayout(this);
+            mark.setBackground(Theme.avatar(Theme.ACCENT_SOFT));
+            mark.addView(kit.icon(R.drawable.mi_check, Theme.PRIMARY, 28),
+                    new android.widget.FrameLayout.LayoutParams(Theme.dp(36), Theme.dp(36), Gravity.CENTER));
+            android.widget.FrameLayout.LayoutParams markParams =
+                    new android.widget.FrameLayout.LayoutParams(Theme.dp(64), Theme.dp(64), Gravity.CENTER);
+            root.addView(mark, markParams);
             addContentView(root, new android.widget.FrameLayout.LayoutParams(-1, -1));
-            big.setScaleX(0.3f);
-            big.setScaleY(0.3f);
-            big.setAlpha(0f);
-            big.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(450).start();
+            mark.setScaleX(0.92f);
+            mark.setScaleY(0.92f);
+            mark.setAlpha(0f);
+            mark.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(220).start();
             uiHandler.postDelayed(() -> {
                 try {
                     android.view.ViewGroup pa = (android.view.ViewGroup) root.getParent();
@@ -1054,7 +1021,7 @@ public class LicenseActivity extends Activity {
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:827", ignored); }
     }
 
-    /** Circular gold refresh icon for the card headers. */
+    /** Compact refresh control for card headers. */
     private TextView refreshIconView() {
         TextView v = kit.text("↻", 22, Theme.GOLD_SOFT, true);
         v.setGravity(Gravity.CENTER);
@@ -1111,7 +1078,7 @@ public class LicenseActivity extends Activity {
         details.addView(kit.btnGhost("کپی گزارش برای پشتیبانی", Theme.INFO, v -> {
             String report = CrashReporter.readReport(this);
             boolean ok = !report.isEmpty() && copyText("گزارش فنی میلانو", report);
-            reportNote.setTextColor(Theme.TEXT);
+            reportNote.setTextColor(ok ? Theme.SUCCESS : Theme.DANGER);
             reportNote.setText(report.isEmpty() ? "گزارش فنی در دسترس نیست"
                     : (ok ? "گزارش کپی شد؛ برای پشتیبانی بفرستید" : "کپی گزارش ممکن نشد"));
             reportNote.setVisibility(View.VISIBLE);
@@ -1160,9 +1127,10 @@ public class LicenseActivity extends Activity {
     }
 
     private void buildConnPage(LinearLayout box, LicenseStore.Status s) {
-        // Top brand mark: the same crown-M medallion used across the app.
+        // Top brand mark: the shared flat vector used across the app.
         android.widget.ImageView topLogo = new android.widget.ImageView(this);
         topLogo.setImageResource(ir.meelano.manager.ui.Theme.logoRes());
+        topLogo.setColorFilter(Theme.isNuts() ? Theme.GOLD_DARK : Theme.PRIMARY);
         topLogo.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
         LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(Theme.dp(84), Theme.dp(84));
         tlp.gravity = Gravity.CENTER_HORIZONTAL;
@@ -1222,8 +1190,6 @@ public class LicenseActivity extends Activity {
             fPort.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
         } catch (Exception e) { Diag.ignored("LicenseActivity:portField", e); }
         c.addView(iconField(fPort, R.drawable.mi_my_location), kit.lp(-1, -2));
-        c.addView(kit.hint("اگر آی‌پی اختصاصی از پورت ۵۰۵۰ به ۱۴۳۳ فوروارد شده، پورت بیرونی ۵۰۵۰ را وارد کنید. اگر آدرس را به‌شکل IP:PORT می‌نویسید، پورت داخل آدرس اولویت دارد."),
-                kit.lp(-1, -2));
         if (editingConnection) {
             c.addView(kit.hint("برای اتصال به سرور دیگر، آدرس بالا را کامل جایگزین کنید؛ دیتابیس قبلی به‌صورت خودکار انتخاب نمی‌شود. پورت خالی = ۱۴۳۳؛ اگر روی آی‌پی اختصاصی پورت دیگری (مثل ۵۰۵۰) به ۱۴۳۳ فوروارد شده، همان را وارد کنید."), 
                     kit.lp(-1, -2));
@@ -1298,7 +1264,15 @@ public class LicenseActivity extends Activity {
 
     /** Port typed into the address wins, then the separate field, then the default 1433. */
     private static int resolvePort(String portText, String typedHost) {
-        return LanDiscover.resolvePort(portText, typedHost);
+        String t = portText == null ? "" : portText.trim();
+        if (!t.isEmpty()) {
+            try {
+                int v = Integer.parseInt(ir.meelano.manager.core.Money.en(t).trim());
+                if (v >= 1 && v <= 65535) return v;
+            } catch (Exception ignored) { Diag.ignored("LicenseActivity:resolvePort", ignored); }
+        }
+        int fromHost = LanDiscover.typedPort(typedHost);
+        return fromHost > 0 ? fromHost : LanDiscover.PORT;
     }
 
     /**
@@ -1323,9 +1297,9 @@ public class LicenseActivity extends Activity {
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:991", ignored); }
         showRadar("در حال اتصال مستقیم به سرور…");
         new Thread(() -> {
-          boolean directBound = settings.directConn() && NetRoute.bindDirect(getApplicationContext());
           try {
-            List<String> databases = listAtiranDatabases(fIp, fPort);
+            List<String> databases = LanDiscover.listDatabases(fIp, fPort,
+                    License.SQL_USER, License.SQL_PASS);
             if (databases == null || databases.isEmpty()) {
                 runOnUiThread(() -> {
                     hideRadar();
@@ -1338,15 +1312,14 @@ public class LicenseActivity extends Activity {
                     boolean vpn = NetRoute.isVpnActive(LicenseActivity.this);
                     SmartLink.diagnoseExplicit(LicenseActivity.this, lan, wan,
                             fPort, "master", License.SQL_USER,
-                            License.SQL_PASS, vpn, settings.directConn(), r -> {
+                            License.SQL_PASS, vpn, r -> {
                                 if (isFinishing()) return;
                                 LinkPanel.showFixSheet(LicenseActivity.this, r,
                                         () -> connectManual(ip, portText, btn),
                                         () -> LinkPanel.showDiagnoseExplicit(
                                                 LicenseActivity.this, lan, wan,
                                                 fPort, "master",
-                                                License.SQL_USER, License.SQL_PASS,
-                                                settings.directConn()));
+                                                License.SQL_USER, License.SQL_PASS));
                             });
                 });
                 return;
@@ -1375,7 +1348,8 @@ public class LicenseActivity extends Activity {
                 for (final String[] pair : pairs) {
                     fs.add(pool.submit(() -> {
                         try {
-                            return probeAtiranTables(pair[0], Integer.parseInt(pair[2]), pair[1]);
+                            return SmartLink.probeTables(pair[0], Integer.parseInt(pair[2]), pair[1],
+                                    License.SQL_USER, License.SQL_PASS);
                         } catch (Exception e) {
                             return -1;
                         }
@@ -1414,30 +1388,8 @@ public class LicenseActivity extends Activity {
           } catch (Throwable t) {
             Diag.ignored("LicenseActivity:connectThread", t);
             runOnUiThread(() -> { hideRadar(); restoreManualBtn(btn); });
-          } finally {
-            if (directBound) NetRoute.unbind(getApplicationContext());
           }
         }).start();
-    }
-
-    private List<String> listAtiranDatabases(String host, int port) {
-        android.content.Context app = getApplicationContext();
-        boolean bound = settings.directConn() && NetRoute.bindDirect(app);
-        try {
-            return LanDiscover.listDatabases(host, port, License.SQL_USER, License.SQL_PASS);
-        } finally {
-            if (bound) NetRoute.unbind(app);
-        }
-    }
-
-    private int probeAtiranTables(String host, int port, String db) throws Exception {
-        android.content.Context app = getApplicationContext();
-        boolean bound = settings.directConn() && NetRoute.bindDirect(app);
-        try {
-            return SmartLink.probeTables(host, port, db, License.SQL_USER, License.SQL_PASS);
-        } finally {
-            if (bound) NetRoute.unbind(app);
-        }
     }
 
     private void restoreManualBtn(android.widget.Button btn) {
@@ -1459,7 +1411,6 @@ public class LicenseActivity extends Activity {
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:1099", ignored); }
         showRadar("در حال یافتن سرور در وای‌فای…");
         new Thread(() -> {
-          boolean directBound = settings.directConn() && NetRoute.bindDirect(getApplicationContext());
           try {
             // Probe both the default SQL port and the common forwarded port
             // (5050 → 1433): a shop server may listen on either.
@@ -1470,15 +1421,7 @@ public class LicenseActivity extends Activity {
                 hostPorts.add(LanDiscover.PORT);
             }
             for (String h : LanDiscover.find("", LanDiscover.PORT_FWD)) {
-                boolean duplicate = false;
-                for (int i = 0; i < hosts.size(); i++) {
-                    if (LanDiscover.sameEndpoint(hosts.get(i), hostPorts.get(i),
-                            h, LanDiscover.PORT_FWD)) {
-                        duplicate = true;
-                        break;
-                    }
-                }
-                if (!duplicate) {
+                if (!hosts.contains(h)) {
                     hosts.add(h);
                     hostPorts.add(LanDiscover.PORT_FWD);
                 }
@@ -1502,7 +1445,8 @@ public class LicenseActivity extends Activity {
                 for (int hi = 0; hi < hosts.size(); hi++) {
                     final String h = hosts.get(hi);
                     final int hp = hostPorts.get(hi);
-                    fs.add(pool.submit(() -> listAtiranDatabases(h, hp)));
+                    fs.add(pool.submit(() -> LanDiscover.listDatabases(h, hp,
+                            License.SQL_USER, License.SQL_PASS)));
                 }
                 long deadline = System.currentTimeMillis() + 12000;
                 for (int i = 0; i < fs.size(); i++) {
@@ -1533,8 +1477,9 @@ public class LicenseActivity extends Activity {
                 for (final String[] pr : pairs) {
                     vs.add(pool.submit(() -> {
                         try {
-                            return new int[]{probeAtiranTables(pr[0],
-                                    Integer.parseInt(pr[2]), pr[1])};
+                            return new int[]{SmartLink.probeTables(pr[0],
+                                    Integer.parseInt(pr[2]), pr[1],
+                                    License.SQL_USER, License.SQL_PASS)};
                         } catch (Exception e) {
                             return new int[]{-1};
                         }
@@ -1576,8 +1521,6 @@ public class LicenseActivity extends Activity {
           } catch (Throwable t) {
             Diag.ignored("LicenseActivity:wifiThread", t);
             runOnUiThread(() -> { hideRadar(); restoreWifiBtn(btn); });
-          } finally {
-            if (directBound) NetRoute.unbind(getApplicationContext());
           }
         }).start();
     }
@@ -1600,7 +1543,7 @@ public class LicenseActivity extends Activity {
         return LanDiscover.PORT;
     }
 
-    /** Luxury single-choice database picker (v33). */
+    /** Single-choice database picker. */
     private void dbPickerDialog(List<String[]> pairs, List<Integer> counts) {
         LinearLayout b = kit.v();
         b.setPadding(Theme.dp(16), Theme.dp(8), Theme.dp(16), Theme.dp(8));
@@ -1725,7 +1668,8 @@ public class LicenseActivity extends Activity {
         ring.setBackground(Theme.accentAvatar(Theme.GOLD));
         android.widget.ImageView mark = new android.widget.ImageView(this);
         mark.setImageResource(ir.meelano.manager.ui.Theme.logoRes());
-        mark.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
+        mark.setColorFilter(Theme.isNuts() ? Theme.GOLD_DARK : Theme.PRIMARY);
+        mark.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
         mark.setClipToOutline(true);
         mark.setOutlineProvider(new android.view.ViewOutlineProvider() {
             @Override
@@ -1854,7 +1798,7 @@ public class LicenseActivity extends Activity {
     // ---- network row (lives inside the master frame) ----
 
 
-    // ---- the one luxury frame: request + receive + network, all in one ----
+    // ---- request, receive and network activation flow ----
 
 
     private String buildRequestMsg(String phone) {
@@ -2016,9 +1960,6 @@ public class LicenseActivity extends Activity {
     private String simPhone() {
         try {
             if (!phoneGranted()) return "";
-            if (Build.VERSION.SDK_INT >= 26
-                    && checkSelfPermission(android.Manifest.permission.READ_PHONE_NUMBERS)
-                    != PackageManager.PERMISSION_GRANTED) return "";
             android.telephony.TelephonyManager tm = (android.telephony.TelephonyManager)
                     getSystemService(TELEPHONY_SERVICE);
             if (tm == null) return "";
@@ -2199,11 +2140,10 @@ public class LicenseActivity extends Activity {
 
             @Override
             public void fail(String faError) {
-                // Server unreachable (often a LAN-only server while on mobile data):
-                // keep the card staged — every resume + the retry button try again.
+                // Keep the staged card and its retry path without inferring why the probe failed.
                 LicenseStore.addPendingSms(LicenseActivity.this, null, pasted);
                 kit.toast(faError == null || faError.isEmpty()
-                        ? "سرور در دسترس نیست؛ اگر سرور فقط روی وای‌فای داخلی است به وای‌فای فروشگاه وصل شوید — کارت ذخیره شد و خودکار تلاش می‌شود"
+                        ? "ارتباط با سرویس برقرار نشد؛ کارت ذخیره شد و طبق روال دوباره تلاش می‌شود"
                         : faError);
             }
         });
@@ -2211,63 +2151,36 @@ public class LicenseActivity extends Activity {
 
     // ---- developer signature + support (always on page one) ----
 
-    /** Frameless floating footer: a gold light-line, then floating signature. */
+    /** Compact footer with support actions and an unobtrusive attribution. */
     private void buildDevFooter(LinearLayout box) {
-        box.addView(kit.gap(16));
-        View div = new View(this);
-        try {
-            android.graphics.drawable.GradientDrawable gd =
-                    new android.graphics.drawable.GradientDrawable(
-                            android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
-                            new int[]{0x00000000, Theme.shade(Theme.GOLD, -0.45f), 0x00000000});
-            div.setBackground(gd);
-        } catch (Exception ignored) {
-            div.setBackgroundColor(Theme.GOLD);
-        }
-        box.addView(div, new LinearLayout.LayoutParams(-1, Theme.dp(2)));
+        box.addView(kit.gap(12));
+        View divider = new View(this);
+        divider.setBackgroundColor(Theme.BORDER);
+        box.addView(divider, new LinearLayout.LayoutParams(-1, Theme.dp(1)));
         box.addView(kit.gap(8));
-        TextView tag = kit.text(Brand.TAGLINE, 10.5f, Theme.MUTED, false);
-        tag.setGravity(Gravity.CENTER);
-        tag.setMaxLines(2);
-        box.addView(tag, kit.lp(-1, -2));
+        TextView tagline = kit.text(Brand.TAGLINE, 10.5f, Theme.MUTED, false);
+        tagline.setGravity(Gravity.CENTER);
+        tagline.setMaxLines(2);
+        box.addView(tagline, kit.lp(-1, -2));
         box.addView(kit.gap(4));
-        box.addView(kit.btnGhost("پشتیبانی", Theme.GOLD, v -> supportDialog()), kit.lp(-1, -2));
+        box.addView(kit.btnGhost("پشتیبانی", Theme.PRIMARY, v -> supportDialog()), kit.lp(-1, -2));
         addCrashReportCard(box);
-        TextView ver = kit.text(appVer(), 10.5f, Theme.MUTED, false);
-        ver.setGravity(Gravity.CENTER);
-        box.addView(ver, kit.lp(-1, -2));
+        TextView version = kit.text(appVer(), 10.5f, Theme.MUTED, false);
+        version.setGravity(Gravity.CENTER);
+        box.addView(version, kit.lp(-1, -2));
         luxurySig(box);
     }
 
-    /** Metallic-gold English designer signature with a soft 3D shadow. */
+    /** Small, flat designer attribution. */
     private void luxurySig(LinearLayout c) {
         try {
-            c.addView(kit.gap(4));
-            TextView over = kit.text("D E S I G N E D   B Y", 8.5f, Theme.MUTED, true);
-            over.setGravity(Gravity.CENTER);
-            c.addView(over, kit.lp(-1, -2));
-            final TextView name = kit.text("Milad Yaghoubi", 14.5f, Theme.GOLD_SOFT, true);
+            c.addView(kit.gap(6));
+            TextView caption = kit.text("طراحی و توسعه", 9.5f, Theme.MUTED, false);
+            caption.setGravity(Gravity.CENTER);
+            c.addView(caption, kit.lp(-1, -2));
+            TextView name = kit.text("Milad Yaghoubi", 12.5f, Theme.TEXT, true);
             name.setGravity(Gravity.CENTER);
-            try {
-                name.setTypeface(Theme.face(true));
-                name.setLetterSpacing(0.06f);
-                name.setShadowLayer(3, 0, 2, 0x40000000);
-            } catch (Exception ignored) { Diag.ignored("LicenseActivity:1739", ignored); }
             c.addView(name, kit.lp(-1, -2));
-            name.post(() -> {
-                try {
-                    int h = name.getHeight();
-                    if (h <= 0) h = Theme.dp(28);
-                    int[] sigCols = Theme.isLight()
-                            ? new int[]{Theme.shade(Theme.GOLD, -0.5f), Theme.shade(Theme.GOLD, -0.3f), Theme.shade(Theme.GOLD, -0.6f), Theme.shade(Theme.GOLD, -0.3f), Theme.shade(Theme.GOLD, -0.5f)}
-                            : new int[]{Theme.shade(Theme.GOLD, 0.6f), Theme.GOLD, Theme.shade(Theme.GOLD, 0.2f), Theme.GOLD, Theme.shade(Theme.GOLD, 0.6f)};
-                    name.getPaint().setShader(new android.graphics.LinearGradient(0, 0, 0, h,
-                            sigCols,
-                            new float[]{0f, 0.35f, 0.55f, 0.75f, 1f},
-                            android.graphics.Shader.TileMode.CLAMP));
-                    name.invalidate();
-                } catch (Exception ignored) { Diag.ignored("LicenseActivity:1753", ignored); }
-            });
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:1755", ignored); }
     }
 
@@ -2339,7 +2252,7 @@ public class LicenseActivity extends Activity {
         setContentView(sv);
     }
 
-    // ---------- 3D wait: the seller is issuing your code ----------
+    // ---------- waiting state: the seller is issuing your code ----------
 
 
 

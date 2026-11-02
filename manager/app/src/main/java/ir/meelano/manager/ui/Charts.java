@@ -4,11 +4,9 @@ import ir.meelano.manager.core.Diag;
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
-import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RectF;
-import android.graphics.Shader;
 import android.text.TextUtils;
 import android.view.MotionEvent;
 import android.view.View;
@@ -116,30 +114,12 @@ public final class Charts {
     }
 
 
-    /** Pseudo-3D block: front face with gradient, lighter top face, darker side face (light from upper-left). */
+    /** Flat chart bar retained under its legacy name for source compatibility. */
     static void drawBar3D(Canvas g, RectF r, int col, float radius) {
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        float d = Theme.dp(5);
-        Path side = new Path();
-        side.moveTo(r.right, r.top + radius);
-        side.lineTo(r.right + d, r.top + radius - d);
-        side.lineTo(r.right + d, r.bottom - d);
-        side.lineTo(r.right, r.bottom);
-        side.close();
         paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Theme.shade(col, -0.38f));
-        g.drawPath(side, paint);
-        Path top = new Path();
-        top.moveTo(r.left + radius, r.top);
-        top.lineTo(r.left + radius + d, r.top - d);
-        top.lineTo(r.right + d - radius, r.top - d);
-        top.lineTo(r.right - radius, r.top);
-        top.close();
-        paint.setColor(Theme.shade(col, 0.28f));
-        g.drawPath(top, paint);
-        paint.setShader(new LinearGradient(0, r.top, 0, r.bottom, Theme.shade(col, 0.08f), Theme.shade(col, -0.22f), Shader.TileMode.CLAMP));
+        paint.setColor(col);
         g.drawRoundRect(r, radius, radius, paint);
-        paint.setShader(null);
     }
 
     // ================= base =================
@@ -366,10 +346,8 @@ public final class Charts {
             area.lineTo(xs[n - 1], zeroY);
             area.close();
             paint.setStyle(Paint.Style.FILL);
-            paint.setShader(new LinearGradient(0, plot.top, 0, plot.bottom,
-                    Theme.alpha(accent, 120), Theme.alpha(accent, 8), Shader.TileMode.CLAMP));
+            paint.setColor(Theme.alpha(accent, Theme.isLight() ? 24 : 32));
             g.drawPath(area, paint);
-            paint.setShader(null);
             // line
             Path line = new Path();
             line.moveTo(xs[0], ys[0]);
@@ -836,9 +814,8 @@ public final class Charts {
                     fr = Math.min(track.right, mid + Theme.dp(4));
                 }
                 RectF fill = new RectF(fl, bTop, fr, bTop + barH);
-                paint.setShader(new LinearGradient(track.right, 0, track.left, 0, col, Theme.alpha(col, 140), Shader.TileMode.CLAMP));
+                paint.setColor(col);
                 g.drawRoundRect(fill, Theme.dp(7), Theme.dp(7), paint);
-                paint.setShader(null);
             }
         }
 

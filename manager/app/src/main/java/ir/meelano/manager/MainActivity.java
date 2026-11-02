@@ -18,7 +18,6 @@ import ir.meelano.manager.core.Finger;
 import ir.meelano.manager.core.LicenseStore;
 import ir.meelano.manager.core.MarketWeather;
 import ir.meelano.manager.core.UpdateCenter;
-import ir.meelano.manager.ui.WhatsNew;
 import ir.meelano.manager.core.RoleStore;
 import ir.meelano.manager.core.SmartLink;
 import ir.meelano.manager.ui.LinkPanel;
@@ -316,77 +315,68 @@ public class MainActivity extends Activity {
         toLogin();
     }
 
-    /** Luxury launch splash with the developer signature, then PIN gate / shell. */
+    /** Compact launch splash, then PIN gate or the main shell. */
     private void splash() {
         styleBars();
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setGravity(Gravity.CENTER);
         root.setBackgroundColor(Theme.BG);
-        root.setPadding(Theme.dp(28), Theme.dp(28), Theme.dp(28), Theme.dp(28));
-        android.widget.ImageView logoV = kit.logo(110);
-        root.addView(logoV, new LinearLayout.LayoutParams(Theme.dp(110), Theme.dp(110)));
-        TextView t = kit.text("میلانو", 26, Theme.TEXT, true);
-        t.setGravity(Gravity.CENTER);
-        root.addView(t, kit.lp(-1, -2));
-        String splashSub = "داشبورد مدیریتی آتیران";
+        root.setPadding(Theme.dp(24), Theme.dp(24), Theme.dp(24), Theme.dp(24));
+
+        android.widget.ImageView logo = kit.logo(56);
+        root.addView(logo, new LinearLayout.LayoutParams(Theme.dp(56), Theme.dp(56)));
+        TextView title = kit.text("میلانو", 22f, Theme.TEXT, true);
+        title.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams titleParams = kit.lp(-1, -2);
+        titleParams.topMargin = Theme.dp(8);
+        root.addView(title, titleParams);
+
+        String subtitle = "داشبورد مدیریتی آتیران";
         try {
-            String sr = AtiranAuth.sessionRole(this);
-            if (RoleStore.WAREHOUSE.equals(sr)) splashSub = "نسخه انباردار • آتیران";
+            String role = AtiranAuth.sessionRole(this);
+            if (RoleStore.WAREHOUSE.equals(role)) subtitle = "نسخه انباردار • آتیران";
         } catch (Exception ignored) { Diag.ignored("MainActivity:227", ignored); }
-        TextView s = kit.text(splashSub, 12.5f, Theme.MUTED, false);
-        s.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams sp = kit.lp(-1, -2);
-        sp.setMargins(0, Theme.dp(4), 0, Theme.dp(14));
-        root.addView(s, sp);
-        View line = new View(this);
-        line.setBackgroundColor(Theme.alpha(Theme.GOLD, 160));
-        LinearLayout.LayoutParams llp = new LinearLayout.LayoutParams(Theme.dp(120), Theme.dp(2));
-        llp.gravity = Gravity.CENTER;
-        root.addView(line, llp);
-        TextView dev = kit.text("Milad Yaghoobi", 21, Theme.GOLD, true);
-        dev.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams dp = kit.lp(-1, -2);
-        dp.setMargins(0, Theme.dp(12), 0, 0);
-        root.addView(dev, dp);
-        TextView role = kit.text("طراح و توسعه‌دهنده", 12f, Theme.MUTED, false);
-        role.setGravity(Gravity.CENTER);
-        root.addView(role, kit.lp(-1, -2));
-        TextView ver = kit.text(splashVersion(), 10.5f, Theme.MUTED, false);
-        ver.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams vp = kit.lp(-1, -2);
-        vp.setMargins(0, Theme.dp(10), 0, 0);
-        root.addView(ver, vp);
+        TextView description = kit.text(subtitle, 12f, Theme.MUTED, false);
+        description.setGravity(Gravity.CENTER);
+        root.addView(description, kit.lp(-1, -2));
+
+        View rule = new View(this);
+        rule.setBackgroundColor(Theme.BORDER);
+        LinearLayout.LayoutParams ruleParams = new LinearLayout.LayoutParams(Theme.dp(72), Theme.dp(1));
+        ruleParams.gravity = Gravity.CENTER;
+        ruleParams.topMargin = Theme.dp(14);
+        root.addView(rule, ruleParams);
+        TextView developer = kit.text("Milad Yaghoobi", 13f, Theme.PRIMARY, true);
+        developer.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams developerParams = kit.lp(-1, -2);
+        developerParams.topMargin = Theme.dp(12);
+        root.addView(developer, developerParams);
+        TextView roleLabel = kit.text("طراح و توسعه‌دهنده", 11f, Theme.MUTED, false);
+        roleLabel.setGravity(Gravity.CENTER);
+        root.addView(roleLabel, kit.lp(-1, -2));
+        TextView version = kit.text(splashVersion(), 10f, Theme.MUTED, false);
+        version.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams versionParams = kit.lp(-1, -2);
+        versionParams.topMargin = Theme.dp(8);
+        root.addView(version, versionParams);
         setContentView(root);
-        // Staged luxury intro: the logo pops, lines rise one by one, the gold rule sweeps.
-        logoV.setScaleX(0.55f);
-        logoV.setScaleY(0.55f);
-        logoV.setAlpha(0f);
-        logoV.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(650)
-                .setInterpolator(new android.view.animation.OvershootInterpolator(1.4f)).start();
-        t.setAlpha(0f);
-        t.setTranslationY(Theme.dp(14));
-        t.animate().alpha(1f).translationY(0f).setDuration(500).setStartDelay(250).start();
-        s.setAlpha(0f);
-        s.animate().alpha(1f).setDuration(500).setStartDelay(450).start();
-        line.setPivotX(0f);
-        line.setScaleX(0f);
-        line.animate().scaleX(1f).setDuration(600).setStartDelay(600).start();
-        dev.setAlpha(0f);
-        dev.setScaleX(0.92f);
-        dev.setScaleY(0.92f);
-        dev.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(700).setStartDelay(750).start();
-        role.setAlpha(0f);
-        ver.setAlpha(0f);
-        role.animate().alpha(1f).setDuration(500).setStartDelay(950).start();
-        ver.animate().alpha(1f).setDuration(500).setStartDelay(1100).start();
+
+        if (ir.meelano.manager.ui.Ui.motionOk(this)) {
+            logo.setAlpha(0f);
+            title.setAlpha(0f);
+            description.setAlpha(0f);
+            logo.animate().alpha(1f).setDuration(220).start();
+            title.animate().alpha(1f).setDuration(220).setStartDelay(60).start();
+            description.animate().alpha(1f).setDuration(220).setStartDelay(100).start();
+        }
         root.postDelayed(() -> {
             if (settings.pinEnabled()) pinGate();
             else {
                 unlocked = true;
                 shell();
             }
-        }, 1750);
+        }, 1100);
     }
 
     private String splashVersion() {
@@ -414,7 +404,7 @@ public class MainActivity extends Activity {
         } catch (Exception ignored) { Diag.ignored("MainActivity:303", ignored); }
     }
 
-    /** Re-apply the luxury theme and rebuild the shell on the current screen. */
+    /** Re-apply the selected palette and rebuild the current screen. */
     public void refreshTheme() {
         Theme.apply(this);
         history.clear();
@@ -596,45 +586,33 @@ public class MainActivity extends Activity {
         final boolean compact = widthDp < 520;
         headerWidthDp = widthDp;
         compactHeaderLayout = compact;
-        brandMarkExpandedDp = compact ? 56 : 64;
-        brandHeaderSideInsetDp = compact ? 6 : 8;
-        brandTitleExpandedSp = compact ? 20 : 22;
-        titleExpandedWidthDp = Math.max(104, widthDp - 24 - (2 * brandHeaderSideInsetDp)
-                - brandMarkExpandedDp - 10 - (compact ? 52 : 0));
+        brandMarkExpandedDp = 36;
+        brandHeaderSideInsetDp = compact ? 2 : 4;
+        brandTitleExpandedSp = compact ? 17 : 18;
+        titleExpandedWidthDp = Math.max(96, widthDp - 24 - (2 * brandHeaderSideInsetDp)
+                - brandMarkExpandedDp - 8 - (compact ? 48 : 0));
         headerRoot = kit.v();
-        headerRoot.setPadding(Theme.dp(12), Theme.dp(compact ? 6 : 9), Theme.dp(12), Theme.dp(5));
+        headerRoot.setPadding(Theme.dp(12), Theme.dp(compact ? 4 : 6), Theme.dp(12), Theme.dp(2));
 
-        // ---- one persistent brand row; the same logo view scales instead of being duplicated ----
+        // ---- compact, flat brand mark; the company name remains the data-backed identity ----
         brandRow = kit.h();
         brandRow.setGravity(Gravity.CENTER_VERTICAL);
         brandRow.setMinimumHeight(Theme.dp(48));
         brandRow.setClipChildren(false);
         logoBox = new android.widget.FrameLayout(this);
-        logoBox.setBackground(Theme.accentAvatar(Theme.GOLD));
-        logoGlyph = kit.text("M", 20, Theme.onAccent(Theme.GOLD), true);
+        logoBox.setBackground(Theme.accentAvatar(Theme.PRIMARY));
+        logoGlyph = kit.text("م", 17, Theme.onAccent(Theme.PRIMARY), true);
         logoGlyph.setGravity(Gravity.CENTER);
         logoGlyph.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         logoBox.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         logoBox.addView(logoGlyph, new android.widget.FrameLayout.LayoutParams(-1, -1));
         logoImg = new android.widget.ImageView(this);
-        logoImg.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
-        try {
-            logoImg.setClipToOutline(true);
-            logoImg.setOutlineProvider(new android.view.ViewOutlineProvider() {
-                @Override
-                public void getOutline(android.view.View v, android.graphics.Outline o) {
-                    o.setOval(0, 0, v.getWidth(), v.getHeight());
-                }
-            });
-        } catch (Exception ignored) { Diag.ignored("MainActivity:508", ignored); }
-        int lpad = Theme.dp(2);
-        logoImg.setPadding(lpad, lpad, lpad, lpad);
         logoImg.setVisibility(View.GONE);
         logoBox.addView(logoImg, new android.widget.FrameLayout.LayoutParams(-1, -1));
         LinearLayout.LayoutParams logoLp = new LinearLayout.LayoutParams(
                 Theme.dp(brandMarkExpandedDp), Theme.dp(brandMarkExpandedDp));
         brandRow.addView(logoBox, logoLp);
-        brandRow.addView(kit.space(10));
+        brandRow.addView(kit.space(8));
 
         // Compute text room instead of letting long names slide underneath the logo.
         LinearLayout titleCol = kit.v();
@@ -645,16 +623,6 @@ public class MainActivity extends Activity {
         companyName.setEllipsize(android.text.TextUtils.TruncateAt.END);
         companyName.setMaxWidth(Theme.dp(titleExpandedWidthDp));
         titleCol.addView(companyName, kit.lp(-1, -2));
-        if (Theme.DARK) {
-            // Gold-to-champagne gradient across the company name, as in the reference header.
-            companyName.addOnLayoutChangeListener((title_v, x1, x2, x3, x4, x5, x6, x7, x8) -> {
-                android.graphics.Shader sh = new android.graphics.LinearGradient(0, 0, 0, title_v.getHeight(),
-                        Theme.GOLD_SOFT, Theme.GOLD, android.graphics.Shader.TileMode.CLAMP);
-                companyName.getPaint().setShader(sh);
-                title_v.invalidate();
-            });
-        }
-
         // Expanded status line: the reusable SyncPill and a 48dp licence shortcut.
         // Account actions live in the toolbar/menu, avoiding a crowded brand row.
         headerStatusRow = kit.h();
@@ -683,9 +651,9 @@ public class MainActivity extends Activity {
         compactSyncButton = new android.widget.FrameLayout(this);
         compactSyncButton.setBackground(Theme.kpi(Theme.PRIMARY));
         compactSyncButton.setContentDescription("وضعیت اتصال؛ لمس برای جزئیات");
-        compactSyncIcon = kit.icon(R.drawable.mi_sync, Theme.MUTED, 24);
+        compactSyncIcon = kit.icon(R.drawable.mi_sync, Theme.MUTED, 18);
         compactSyncButton.addView(compactSyncIcon, new android.widget.FrameLayout.LayoutParams(
-                Theme.dp(24), Theme.dp(24), Gravity.CENTER));
+                Theme.dp(20), Theme.dp(20), Gravity.CENTER));
         compactSyncButton.setVisibility(View.GONE);
         Theme.pressable(compactSyncButton);
         compactSyncButton.setOnClickListener(v -> showLinkPanel());
@@ -698,9 +666,9 @@ public class MainActivity extends Activity {
         menuButton.setBackground(Theme.ghostButton(Theme.bottomNavAccent()));
         menuButton.setContentDescription("ابزارها، تنظیمات و حساب کاربری");
         android.widget.ImageView menuIcon = kit.icon(R.drawable.mi_more_horiz,
-                Theme.sectionText(Theme.bottomNavAccent()), 24);
+                Theme.sectionText(Theme.bottomNavAccent()), 20);
         menuButton.addView(menuIcon, new android.widget.FrameLayout.LayoutParams(
-                Theme.dp(24), Theme.dp(24), Gravity.CENTER));
+                Theme.dp(20), Theme.dp(20), Gravity.CENTER));
         menuButton.setVisibility(compact ? View.VISIBLE : View.GONE);
         Theme.pressable(menuButton);
         menuButton.setOnClickListener(v -> showHeaderMenu());
@@ -725,7 +693,7 @@ public class MainActivity extends Activity {
         headerRoot.addView(brandBlock, kit.lp(-1, -2));
         refreshUserChip();
         updateHeaderSyncPill(linkKind);
-        headerToolbarGap = kit.space(compact ? 5 : 8);
+        headerToolbarGap = kit.space(compact ? 2 : 4);
         headerRoot.addView(headerToolbarGap);
 
         // ---- row 2: compact, role-aware tools (the refresh action is intentionally absent) ----
@@ -809,15 +777,15 @@ public class MainActivity extends Activity {
         bottomBar.setOrientation(LinearLayout.HORIZONTAL);
         bottomBar.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         bottomBar.setGravity(Gravity.CENTER_VERTICAL);
-        bottomBar.setMinimumHeight(Theme.dp(76));
+        bottomBar.setMinimumHeight(Theme.dp(64));
         bottomBar.setClipChildren(false);
         bottomBar.setClipToPadding(false);
-        bottomBar.setPadding(Theme.dp(8), Theme.dp(4), Theme.dp(8), Theme.dp(4));
+        bottomBar.setPadding(Theme.dp(4), Theme.dp(2), Theme.dp(4), Theme.dp(2));
         bottomHost = new android.widget.FrameLayout(this);
-        bottomHost.setBackground(Theme.isNuts() ? Theme.navDock() : Theme.bottomBar());
+        bottomHost.setBackground(Theme.bottomBar());
         bottomHost.setClipChildren(false);
         bottomHost.setClipToPadding(false);
-        Theme.lift(bottomHost, Theme.dp(2));
+        Theme.lift(bottomHost, Theme.dp(1));
         navCapsule = new View(this);
         navCapsule.setVisibility(View.GONE);
         navCapsule.setClickable(false);
@@ -828,7 +796,6 @@ public class MainActivity extends Activity {
                 Gravity.TOP | Gravity.START));
         bottomHost.addView(bottomBar, new android.widget.FrameLayout.LayoutParams(-1, -2));
         LinearLayout.LayoutParams hostLp = kit.lp(-1, -2);
-        if (Theme.isNuts()) hostLp.setMargins(Theme.dp(10), 0, Theme.dp(10), Theme.dp(6));
         root.addView(bottomHost, hostLp);
 
         setContentView(root);
@@ -891,22 +858,9 @@ public class MainActivity extends Activity {
         watchLink();
     }
 
-    /** Theme-aware toolbar artwork: mapped 3D marks stay untinted; other actions use duotone vectors. */
+    /** Theme-aware flat toolbar icons. */
     private android.widget.ImageView toolIcon(int res) {
-        android.widget.ImageView iv = new android.widget.ImageView(this);
-        try {
-            int artwork = Theme.icon3d(res);
-            if (Theme.isIcon3d(artwork)) {
-                iv.setImageResource(artwork);
-                iv.clearColorFilter();
-            } else {
-                iv.setImageResource(res);
-                iv.setColorFilter(Theme.sectionText(Theme.PRIMARY));
-            }
-            iv.setScaleType(android.widget.ImageView.ScaleType.CENTER_INSIDE);
-            iv.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-        } catch (Exception ignored) { Diag.ignored("MainActivity:toolIcon", ignored); }
-        return iv;
+        return kit.icon(res, Theme.MUTED, 20);
     }
 
     private LinearLayout toolCell(View icon, String label, String desc, Runnable onTap) {
@@ -914,18 +868,18 @@ public class MainActivity extends Activity {
         cell.setOrientation(LinearLayout.VERTICAL);
         cell.setGravity(Gravity.CENTER);
         cell.setContentDescription(desc);
-        cell.setMinimumHeight(Theme.dp(Theme.isNuts() ? 68 : 60));
+        cell.setMinimumHeight(Theme.dp(52));
+        cell.setMinimumWidth(Theme.dp(48));
         cell.setPadding(Theme.dp(2), Theme.dp(3), Theme.dp(2), Theme.dp(3));
         Theme.pressable(cell);
         cell.setOnClickListener(v -> onTap.run());
         icon.setClickable(false);
-        int ic = Theme.isNuts() ? 38 : 28;
-        cell.addView(icon, new LinearLayout.LayoutParams(Theme.dp(ic), Theme.dp(ic)));
-        TextView t = kit.text(label, 12.5f, Theme.DARK ? Theme.GOLD_SOFT : Theme.TEXT, true);
-        t.setGravity(Gravity.CENTER);
-        t.setSingleLine(true);
-        t.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        cell.addView(t, new LinearLayout.LayoutParams(-1, -2));
+        cell.addView(icon, new LinearLayout.LayoutParams(Theme.dp(20), Theme.dp(20)));
+        TextView title = kit.text(label, 10.5f, Theme.MUTED, true);
+        title.setGravity(Gravity.CENTER);
+        title.setSingleLine(true);
+        title.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        cell.addView(title, new LinearLayout.LayoutParams(-1, -2));
         return cell;
     }
 
@@ -998,14 +952,15 @@ public class MainActivity extends Activity {
     }
 
     private LinearLayout.LayoutParams toolLp() {
-        return new LinearLayout.LayoutParams(0, Theme.dp(Theme.isNuts() ? 68 : 60), 1f);
+        return new LinearLayout.LayoutParams(0, Theme.dp(52), 1f);
     }
 
     /** Hairline divider between header tool buttons. */
     private View vdiv() {
-        View d = new View(this);
-        d.setBackgroundColor(Theme.alpha(Theme.GOLD, 70));
-        return d;
+        View divider = new View(this);
+        divider.setBackgroundColor(Theme.BORDER);
+        divider.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        return divider;
     }
 
     private void reg(Screen s) {
@@ -1048,15 +1003,15 @@ public class MainActivity extends Activity {
             LinearLayout b = kit.v();
             b.setGravity(Gravity.CENTER);
             b.setMinimumWidth(Theme.dp(48));
-            b.setMinimumHeight(Theme.dp(72));
-            b.setPadding(Theme.dp(3), Theme.dp(4), Theme.dp(3), Theme.dp(3));
+            b.setMinimumHeight(Theme.dp(56));
+            b.setPadding(Theme.dp(2), Theme.dp(2), Theme.dp(2), Theme.dp(2));
             b.setClipChildren(false);
 
             LinearLayout badge = new LinearLayout(this);
             badge.setGravity(Gravity.CENTER);
             badge.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
             int iconRes = MeelanoIcons.iconFor(s.glyph());
-            int iconSize = Theme.isNuts() ? 26 : 24;
+            int iconSize = 20;
             if (iconRes != 0) {
                 int artwork = Theme.icon3d(iconRes);
                 android.widget.ImageView symbol = kit.artworkIcon(iconRes, Theme.MUTED, iconSize);
@@ -1068,12 +1023,12 @@ public class MainActivity extends Activity {
                 symbol.setGravity(Gravity.CENTER);
                 badge.addView(symbol, kit.lp(-2, -2));
             }
-            b.addView(badge, new LinearLayout.LayoutParams(Theme.dp(44), Theme.dp(36)));
+            b.addView(badge, new LinearLayout.LayoutParams(Theme.dp(24), Theme.dp(24)));
 
             String label = RoleStore.tabLabel(id);
             if ("more".equals(id) && RoleStore.VISITOR.equals(effRole())) label = "بیشتر";
             if (label == null) label = s.title();
-            TextView title = kit.text(label, 12.5f, Theme.MUTED, true);
+            TextView title = kit.text(label, 10.5f, Theme.MUTED, true);
             title.setGravity(Gravity.CENTER);
             title.setMaxLines(2);
             title.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -1102,37 +1057,9 @@ public class MainActivity extends Activity {
 
     private int selectedNavIndex = -1;
 
-    /** Slides the selection capsule to the selected tab (animated after the first layout). */
+    /** Compatibility hook; selection is shown by a small flat marker under the active tab. */
     private void moveCapsule(final boolean animate) {
-        if (navCapsule == null || bottomBar == null) return;
-        if (selectedNavIndex < 0 || selectedNavIndex >= bottomBar.getChildCount()) {
-            navCapsule.setVisibility(View.GONE);
-            return;
-        }
-        final View tab = bottomBar.getChildAt(selectedNavIndex);
-        Runnable go = () -> {
-            if (tab.getWidth() <= 0 || tab.getHeight() <= 0) return;
-            android.widget.FrameLayout.LayoutParams lp =
-                    (android.widget.FrameLayout.LayoutParams) navCapsule.getLayoutParams();
-            lp.width = tab.getWidth() - Theme.dp(8);
-            lp.height = tab.getHeight() - Theme.dp(4);
-            lp.topMargin = tab.getTop() + Theme.dp(2);
-            lp.leftMargin = 0;
-            navCapsule.setLayoutParams(lp);
-            float x = tab.getLeft() + Theme.dp(4);
-            if (bottomHost.getLayoutDirection() == View.LAYOUT_DIRECTION_RTL)
-                x -= bottomHost.getWidth() - lp.width;
-            navCapsule.setVisibility(View.VISIBLE);
-            if (animate && ir.meelano.manager.ui.Ui.motionOk(this)) {
-                navCapsule.animate().cancel();
-                navCapsule.animate().translationX(x).setDuration(220)
-                        .setInterpolator(new android.view.animation.DecelerateInterpolator()).start();
-            } else {
-                navCapsule.animate().cancel();
-                navCapsule.setTranslationX(x);
-            }
-        };
-        if (tab.getWidth() > 0) go.run(); else tab.post(go);
+        if (navCapsule != null) navCapsule.setVisibility(View.GONE);
     }
 
     private void paintBottom() {
@@ -1144,7 +1071,7 @@ public class MainActivity extends Activity {
             boolean on = tabIndex < tabs.length && (tabs[tabIndex].equals(currentId)
                     || ("more".equals(tabs[tabIndex]) && !isTab(currentId)));
             LinearLayout badge = (LinearLayout) b.getChildAt(0);
-            badge.setBackground(on ? Theme.bottomNavIconSelected() : null);
+            badge.setBackground(null);
             View symbol = badge.getChildAt(0);
             if (symbol instanceof android.widget.ImageView) {
                 if (!Boolean.TRUE.equals(symbol.getTag()))
@@ -1154,7 +1081,7 @@ public class MainActivity extends Activity {
             }
             TextView label = (TextView) b.getChildAt(1);
             label.setTextColor(on ? Theme.selectedNavInk() : Theme.MUTED);
-            label.setTextSize(12.5f * Theme.fontScale() * Theme.typeScale());
+            label.setTextSize(10.5f * Theme.fontScale() * Theme.typeScale());
             View marker = b.getChildAt(2);
             marker.setVisibility(on ? View.VISIBLE : View.INVISIBLE);
             marker.setBackground(on ? Theme.bottomNavMarker() : null);
@@ -1429,13 +1356,13 @@ public class MainActivity extends Activity {
     private void paintCompany() {
         try {
             if (companyName != null) ir.meelano.manager.ui.MeelanoIcons.set(companyName, companyTitle());
-            android.graphics.Bitmap b = Company.logo(this);
-            if (logoImg != null && logoGlyph != null) {
-                // Same crown-M medallion as the dashboard crest (b is intentionally not shown here).
-                logoImg.setImageResource(Theme.logoRes());
-                logoImg.setVisibility(View.VISIBLE);
-                logoGlyph.setVisibility(View.GONE);
+            if (logoImg != null) logoImg.setVisibility(View.GONE);
+            if (logoGlyph != null) {
+                logoGlyph.setVisibility(View.VISIBLE);
+                logoGlyph.setTextColor(Theme.onAccent(Theme.PRIMARY));
+                logoGlyph.setBackgroundColor(android.graphics.Color.TRANSPARENT);
             }
+            if (logoBox != null) logoBox.setBackground(Theme.accentAvatar(Theme.PRIMARY));
         } catch (Exception ignored) { Diag.ignored("MainActivity:997", ignored); }
     }
 
@@ -2195,10 +2122,9 @@ public class MainActivity extends Activity {
         b.setTypeface(Theme.face(true));
         b.setBackground(Theme.ghostButton(accent));
         b.setGravity(android.view.Gravity.CENTER);
-        b.setElevation(Theme.dp(1));
         b.setPadding(Theme.dp(2), Theme.dp(8), Theme.dp(2), Theme.dp(8));
-        b.setMinHeight(Theme.dp(44));
-        b.setMinimumHeight(Theme.dp(44));
+        b.setMinHeight(Theme.dp(48));
+        b.setMinimumHeight(Theme.dp(48));
         b.setMinWidth(0);
         b.setMinimumWidth(0);
         b.setOnClickListener(click);

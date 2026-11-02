@@ -37,6 +37,7 @@ import ir.meelano.manager.core.LicenseStore;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.RoleStore;
 import ir.meelano.manager.data.Settings;
+import ir.meelano.manager.ui.DesignTokens;
 import ir.meelano.manager.ui.Theme;
 
 import java.io.File;
@@ -85,7 +86,8 @@ public final class HomeDashboardScreenshotTest {
         Activity activity = startPreview(target, "nuts", 3);
         try {
             assertTrue("Nuts theme did not remain active", Theme.isNuts());
-            assertEquals("Nuts theme crest was not selected", R.drawable.meelano_nuts, Theme.logoRes());
+            assertEquals("Nuts theme must use the shared flat brand mark", R.drawable.mi_diamond, Theme.logoRes());
+            assertEquals("Nuts theme gold accent was not preserved", DesignTokens.GOLD, Theme.GOLD);
             assertEquals("Largest text setting was not applied", 1.3f, Theme.fontScale(), 0.001f);
             verifyShellInteractions(activity);
         } finally {
@@ -146,10 +148,12 @@ public final class HomeDashboardScreenshotTest {
     }
 
     private static void verifyDashboardPolish(Activity activity) {
-        assertTrue("Selected theme did not resolve 3D financial artwork",
+        assertEquals("Financial artwork should remain a flat, tinted vector",
+                R.drawable.mi_account_balance_wallet, Theme.icon3d(R.drawable.mi_account_balance_wallet));
+        assertEquals("Return artwork should remain a flat, tinted vector",
+                R.drawable.mi_assignment_return, Theme.icon3d(R.drawable.mi_assignment_return));
+        assertFalse("The new visual system should not substitute 3D artwork",
                 Theme.isIcon3d(Theme.icon3d(R.drawable.mi_account_balance_wallet)));
-        assertTrue("Selected theme did not resolve 3D return artwork",
-                Theme.isIcon3d(Theme.icon3d(R.drawable.mi_assignment_return)));
         Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
         final View[] targets = new View[8];
         final int[] facts = new int[4];

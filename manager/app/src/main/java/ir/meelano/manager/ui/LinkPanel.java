@@ -6,8 +6,6 @@ import android.app.AlertDialog;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
-import android.graphics.LinearGradient;
-import android.graphics.Shader;
 import android.view.Gravity;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -35,17 +33,10 @@ public final class LinkPanel {
             LinearLayout body = kit.v();
             body.setPadding(Theme.dp(18), Theme.dp(4), Theme.dp(18), Theme.dp(12));
             String last = s.linkLast();
-            int icon = SmartLink.WAN.equals(last) ? R.drawable.link_wan
-                    : (SmartLink.LAN.equals(last) ? R.drawable.link_lan : R.drawable.link_probe);
-            ImageView iv = new ImageView(a);
-            try {
-                iv.setImageResource(icon);
-            } catch (Exception ignored) { Diag.ignored("LinkPanel:42", ignored); }
-            try {
-                iv.setElevation(Theme.dp(6));
-            } catch (Exception ignored) { Diag.ignored("LinkPanel:45", ignored); }
-            LinearLayout.LayoutParams ip =
-                    new LinearLayout.LayoutParams(Theme.dp(76), Theme.dp(76));
+            int icon = SmartLink.WAN.equals(last) || SmartLink.LAN.equals(last)
+                    ? R.drawable.mi_wifi : R.drawable.mi_sync;
+            ImageView iv = kit.icon(icon, Theme.PRIMARY, 28);
+            LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(Theme.dp(32), Theme.dp(32));
             ip.gravity = Gravity.CENTER;
             body.addView(iv, ip);
             body.addView(kit.gap(6));
@@ -73,11 +64,8 @@ public final class LinkPanel {
             final AlertDialog[] box = new AlertDialog[1];
             body.addView(kit.chips(new String[]{"خودکار ✦", "داخل شبکه", "خارج شبکه"}, sel, idx -> {
                 try {
-                    boolean applied = s.setLinkMode(idx == 1 ? "lan" : (idx == 2 ? "wan" : "auto"));
-                    kit.toast(!applied
-                            ? "آدرس این مسیر ثبت نشده؛ حالت خودکار فعال ماند"
-                            : (idx == 0 ? "حالت خودکار فعال شد"
-                            : ("فقط " + SmartLink.kindShort(idx == 1 ? "lan" : "wan"))));
+                    s.setLinkMode(idx == 1 ? "lan" : (idx == 2 ? "wan" : "auto"));
+                    kit.toast(idx == 0 ? "حالت خودکار فعال شد" : ("فقط " + SmartLink.kindShort(idx == 1 ? "lan" : "wan")));
                     if (box[0] != null) box[0].dismiss();
                     showStatus(a, s, onModeChanged);
                     if (onModeChanged != null) onModeChanged.run();
@@ -127,7 +115,7 @@ public final class LinkPanel {
 
     /** Troubleshoot explicit (unsaved) values from the activation screen. */
     public static void showDiagnoseExplicit(Activity a, String lan, String wan, int port, String db,
-                                            String user, String pass, boolean directRoute) {
+                                            String user, String pass) {
         try {
             Kit kit = new Kit(a);
             LinearLayout body = kit.v();
@@ -138,14 +126,12 @@ public final class LinkPanel {
             AlertDialog d = kit.dialog("عیب‌یابی هوشمند", body, true);
             d.show();
             boolean vpn = NetRoute.isVpnActive(a);
-            SmartLink.diagnoseExplicit(a, lan, wan, port, db, user, pass, vpn,
-                    directRoute, r -> {
+            SmartLink.diagnoseExplicit(a, lan, wan, port, db, user, pass, vpn, r -> {
                 try {
                     d.dismiss();
                 } catch (Exception ignored) { Diag.ignored("LinkPanel:140", ignored); }
                 if (finished(a)) return;
-                renderReport(a, r, () -> showDiagnoseExplicit(
-                        a, lan, wan, port, db, user, pass, directRoute));
+                renderReport(a, r, () -> showDiagnoseExplicit(a, lan, wan, port, db, user, pass));
             });
         } catch (Exception ignored) { Diag.ignored("LinkPanel:144", ignored); }
     }
@@ -325,36 +311,11 @@ public final class LinkPanel {
 
     /** Metallic-gold English signature with a soft 3D shadow. */
     private static void signature(Kit kit, LinearLayout body) {
-        try {
-            body.addView(kit.gap(10));
-            TextView over = kit.text("S M A R T   L I N K", 10.5f, Theme.MUTED, true);
-            over.setGravity(Gravity.CENTER);
-            try {
-                over.setTypeface(Theme.face(true));
-            } catch (Exception ignored) { Diag.ignored("LinkPanel:328", ignored); }
-            body.addView(over, kit.lp(-1, -2));
-            final TextView name = kit.text("Milad Yaghoobi", 21, Theme.GOLD_SOFT, true);
-            name.setGravity(Gravity.CENTER);
-            try {
-                name.setTypeface(Theme.face(true));
-                name.setLetterSpacing(0.06f);
-                name.setShadowLayer(5, 0, 3, 0x80000000);
-            } catch (Exception ignored) { Diag.ignored("LinkPanel:336", ignored); }
-            body.addView(name, kit.lp(-1, -2));
-            name.post(() -> {
-                try {
-                    int h = name.getHeight();
-                    if (h <= 0) h = Theme.dp(28);
-                    name.getPaint().setShader(new LinearGradient(0, 0, 0, h,
-                            new int[]{0xFFFFF6DE, 0xFFE9C37C, 0xFF8A6420, 0xFFF1D493, 0xFFFFF6DE},
-                            new float[]{0f, 0.35f, 0.55f, 0.75f, 1f}, Shader.TileMode.CLAMP));
-                    name.invalidate();
-                } catch (Exception ignored) { Diag.ignored("LinkPanel:346", ignored); }
-            });
-            TextView under = kit.text("معماری اتصال هوشمند", 11f, Theme.MUTED, false);
-            under.setGravity(Gravity.CENTER);
-            body.addView(under, kit.lp(-1, -2));
-        } catch (Exception ignored) { Diag.ignored("LinkPanel:351", ignored); }
+        TextView label = kit.text("اتصال هوشمند", 10f, Theme.MUTED, false);
+        label.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams params = kit.lp(-1, -2);
+        params.topMargin = Theme.dp(10);
+        body.addView(label, params);
     }
 
     private static boolean finished(Activity a) {

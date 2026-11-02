@@ -84,6 +84,8 @@ public final class SmartReportImage {
         try {
             Drawable logo = context.getDrawable(Theme.logoRes());
             if (logo != null) {
+                logo = logo.mutate();
+                logo.setTint(Theme.isNuts() ? Theme.GOLD_DARK : Theme.PRIMARY);
                 logo.setBounds(margin + 20, 74, margin + 150, 204);
                 logo.draw(canvas);
             }

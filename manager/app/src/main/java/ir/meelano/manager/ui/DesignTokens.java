@@ -30,6 +30,25 @@ public final class DesignTokens {
     public static final int NIGHT_TEXT = 0xFFF6F4EC;
     public static final int NIGHT_MUTED = 0xFFB8C5BE;
 
+    // Quiet Fintech surfaces: neutral canvas, one emerald action color, no decorative gold slabs.
+    // The legacy brand palette above stays available for Nuts identity and exported documents.
+    public static final int APP_LIGHT_BG = 0xFFF4F5F1;
+    public static final int APP_LIGHT_SURFACE = 0xFFFFFFFF;
+    public static final int APP_LIGHT_SURFACE_2 = 0xFFF8F9F6;
+    public static final int APP_LIGHT_TEXT = 0xFF18231E;
+    public static final int APP_LIGHT_MUTED = 0xFF68736C;
+    public static final int APP_LIGHT_BORDER = 0xFFE1E6E1;
+    public static final int APP_LIGHT_ACCENT = 0xFF176149;
+    public static final int APP_LIGHT_ACCENT_SOFT = 0xFFEAF2ED;
+    public static final int APP_DARK_BG = 0xFF101814;
+    public static final int APP_DARK_SURFACE = 0xFF18231E;
+    public static final int APP_DARK_SURFACE_2 = 0xFF1D2A24;
+    public static final int APP_DARK_TEXT = 0xFFF1F3EE;
+    public static final int APP_DARK_MUTED = 0xFFA6B0A9;
+    public static final int APP_DARK_BORDER = 0xFF2D3A33;
+    public static final int APP_DARK_ACCENT = 0xFF70B99A;
+    public static final int APP_DARK_ACCENT_SOFT = 0xFF20372C;
+
     // Section accents: hue identifies the section, never the outcome of a metric.
     public static final int SALES = EMERALD;
     public static final int PURCHASE = 0xFF2B6A8F;

@@ -6,6 +6,33 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 public class DesignTokensTest {
+    @Test public void neutralApplicationSurfacesAndEmeraldAccentsMeetContrastTargets() {
+        assertEquals(0xFFF4F5F1, DesignTokens.APP_LIGHT_BG);
+        assertEquals(0xFFFFFFFF, DesignTokens.APP_LIGHT_SURFACE);
+        assertEquals(0xFF101814, DesignTokens.APP_DARK_BG);
+        assertEquals(0xFF18231E, DesignTokens.APP_DARK_SURFACE);
+        assertTrue("light primary text contrast on canvas",
+                DesignTokens.contrastRatio(DesignTokens.APP_LIGHT_TEXT, DesignTokens.APP_LIGHT_BG) >= 4.8);
+        assertTrue("light muted text contrast on canvas",
+                DesignTokens.contrastRatio(DesignTokens.APP_LIGHT_MUTED, DesignTokens.APP_LIGHT_BG) >= 4.5);
+        assertTrue("light muted text contrast on surface",
+                DesignTokens.contrastRatio(DesignTokens.APP_LIGHT_MUTED, DesignTokens.APP_LIGHT_SURFACE) >= 4.5);
+        assertTrue("light accent contrast on surface",
+                DesignTokens.contrastRatio(DesignTokens.APP_LIGHT_ACCENT, DesignTokens.APP_LIGHT_SURFACE) >= 4.8);
+        assertTrue("dark primary text contrast on canvas",
+                DesignTokens.contrastRatio(DesignTokens.APP_DARK_TEXT, DesignTokens.APP_DARK_BG) >= 4.8);
+        assertTrue("dark muted text contrast on surface",
+                DesignTokens.contrastRatio(DesignTokens.APP_DARK_MUTED, DesignTokens.APP_DARK_SURFACE) >= 4.5);
+        assertTrue("dark accent contrast on canvas",
+                DesignTokens.contrastRatio(DesignTokens.APP_DARK_ACCENT, DesignTokens.APP_DARK_BG) >= 4.5);
+        assertTrue("light semantic positive text is readable",
+                DesignTokens.contrastRatio(DesignTokens.textSafeColor(DesignTokens.POSITIVE,
+                        DesignTokens.APP_LIGHT_SURFACE, false), DesignTokens.APP_LIGHT_SURFACE) >= 4.8);
+        assertTrue("dark semantic warning text is readable",
+                DesignTokens.contrastRatio(DesignTokens.textSafeColor(DesignTokens.WARNING,
+                        DesignTokens.APP_DARK_SURFACE, true), DesignTokens.APP_DARK_SURFACE) >= 4.8);
+    }
+
     @Test public void paletteMatchesTheExecutiveRoyalBrief() {
         assertEquals(0xFF0D3028, DesignTokens.EMERALD_DEEP);
         assertEquals(0xFF123D32, DesignTokens.EMERALD);

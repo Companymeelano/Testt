@@ -8,12 +8,6 @@ import java.util.Locale;
 import ir.meelano.manager.core.MarketWeather;
 import ir.meelano.manager.core.Diag;
 import android.content.Context;
-import android.graphics.Canvas;
-import android.graphics.LinearGradient;
-import android.graphics.Paint;
-import android.graphics.RadialGradient;
-import android.graphics.RectF;
-import android.graphics.Shader;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
@@ -52,7 +46,6 @@ import ir.meelano.manager.data.Row;
 import ir.meelano.manager.ui.Charts;
 import ir.meelano.manager.ui.HomeCashWaterfall;
 import ir.meelano.manager.ui.HomeGoalGauge;
-import ir.meelano.manager.ui.HomeQuickActionArc;
 import ir.meelano.manager.ui.HomeForecastChart;
 import ir.meelano.manager.ui.HomePaymentMixBar;
 import ir.meelano.manager.ui.HomeSalesChart;
@@ -272,11 +265,10 @@ public class HomeScreen extends Screen {
         } else {
             content.removeAllViews();
             syncWasRefreshing = true;
-            content.addView(syncStatus("", SyncState.REFRESHING, null, null), a.kit.lp(-1, -2));
-            content.addView(a.kit.gap(8));
-            addTopQuickActions(content);
             content.addView(greetingHero(cached), a.kit.lp(-1, -2));
-            content.addView(a.kit.gap(8));
+            content.addView(syncStatus("", SyncState.REFRESHING, null, null), a.kit.lp(-1, -2));
+            content.addView(a.kit.gap(4));
+            addTopQuickActions(content);
             if (RoleStore.allowed(a, "sales")) {
                 content.addView(salesHero(null, SyncState.REFRESHING), a.kit.lp(-1, -2));
                 content.addView(a.kit.gap(8));
@@ -584,11 +576,10 @@ public class HomeScreen extends Screen {
             return;
         }
         content.removeAllViews();
-        content.addView(syncStatus("", failureState, faError, v -> render(content)), a.kit.lp(-1, -2));
-        content.addView(a.kit.gap(8));
-        addTopQuickActions(content);
         content.addView(greetingHero(null), a.kit.lp(-1, -2));
-        content.addView(a.kit.gap(8));
+        content.addView(syncStatus("", failureState, faError, v -> render(content)), a.kit.lp(-1, -2));
+        content.addView(a.kit.gap(4));
+        addTopQuickActions(content);
         if (RoleStore.allowed(a, "sales")) {
             content.addView(salesHero(null, failureState), a.kit.lp(-1, -2));
             content.addView(a.kit.gap(8));
@@ -879,30 +870,22 @@ public class HomeScreen extends Screen {
         if (name.isEmpty()) name = "مدیر";
         name = HomeNumberFormatter.localizeText(name);
 
-        LinearLayout card = a.kit.card(Theme.SECTION_SALES);
-        card.setPadding(Theme.dp(14), Theme.dp(10), Theme.dp(14), Theme.dp(10));
-        LinearLayout row = a.kit.h();
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        row.addView(a.kit.iconBadge(R.drawable.mi_wb_twilight, Theme.SECTION_SALES, 36),
-                a.kit.lp(Theme.dp(36), Theme.dp(36)));
-        row.addView(a.kit.space(10));
-
-        LinearLayout copy = a.kit.v();
-        TextView title = a.kit.text(greeting + "، " + name, 16f, Theme.TEXT, true);
+        LinearLayout intro = a.kit.v();
+        intro.setTag("home-greeting");
+        intro.setPadding(Theme.dp(2), Theme.dp(3), Theme.dp(2), Theme.dp(2));
+        TextView title = a.kit.text(greeting + "، " + name, 17f, Theme.TEXT, true);
         title.setSingleLine(true);
         title.setEllipsize(TextUtils.TruncateAt.END);
-        title.setAutoSizeTextTypeUniformWithConfiguration(12, 16, 1,
+        title.setAutoSizeTextTypeUniformWithConfiguration(12, 17, 1,
                 android.util.TypedValue.COMPLEX_UNIT_SP);
-        copy.addView(title, a.kit.lp(-1, -2));
+        intro.addView(title, a.kit.lp(-1, -2));
         String summary = greetingSummary(data);
         TextView detail = a.kit.text(dateLine() + "  ·  " + summary, 10.5f, Theme.MUTED, false);
         detail.setSingleLine(true);
         detail.setEllipsize(TextUtils.TruncateAt.END);
-        copy.addView(detail, a.kit.lp(-1, -2));
-        row.addView(copy, a.kit.wlp(1f));
-        card.addView(row, a.kit.lp(-1, -2));
-        card.setContentDescription(greeting + "، " + name + "؛ " + dateLine() + "؛ " + summary);
-        return card;
+        intro.addView(detail, a.kit.lp(-1, -2));
+        intro.setContentDescription(greeting + "، " + name + "؛ " + dateLine() + "؛ " + summary);
+        return intro;
     }
 
     /** One sentence of context, not another presentation of the sales total. */
@@ -1739,11 +1722,10 @@ public class HomeScreen extends Screen {
             status.animate().alpha(1f).setDuration(220).start();
         }
         syncWasRefreshing = false;
-        content.addView(status, a.kit.lp(-1, -2));
-        content.addView(a.kit.gap(8));
-        addTopQuickActions(content);
         content.addView(greetingHero(d), a.kit.lp(-1, -2));
-        content.addView(a.kit.gap(8));
+        content.addView(status, a.kit.lp(-1, -2));
+        content.addView(a.kit.gap(4));
+        addTopQuickActions(content);
         if (RoleStore.allowed(a, "sales")) {
             content.addView(salesHero(d, syncState), a.kit.lp(-1, -2));
             content.addView(a.kit.gap(10));
@@ -2079,13 +2061,7 @@ public class HomeScreen extends Screen {
     }
 
     private ImageView dashboardArt(int iconVector, int accent) {
-        int artwork = Theme.icon3d(iconVector);
-        ImageView image = a.kit.artworkIcon(iconVector, Theme.sectionText(accent), 36);
-        if (!Theme.isIcon3d(artwork)) {
-            image.setBackground(Theme.avatar(Theme.alpha(accent, Theme.isLight() ? 26 : 40)));
-            int inset = Theme.dp(6);
-            image.setPadding(inset, inset, inset, inset);
-        }
+        ImageView image = a.kit.icon(iconVector, Theme.sectionText(accent), 21);
         image.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         image.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         return image;
@@ -3292,21 +3268,25 @@ public class HomeScreen extends Screen {
             if (RoleStore.allowed(a, targets[i])) allowed.add(i);
         if (allowed.isEmpty()) return null;
 
-        LinearLayout card = a.kit.card(Theme.SECTION_SALES);
+        LinearLayout card = a.kit.card(Theme.PRIMARY);
         card.setTag("home-quick-actions");
-        card.setPadding(Theme.dp(12), Theme.dp(7), Theme.dp(12), Theme.dp(9));
-        card.addView(boardHead("دسترسی سریع",
+        card.setPadding(Theme.dp(12), Theme.dp(8), Theme.dp(12), Theme.dp(8));
+        card.addView(a.kit.sectionHeader("دسترسی سریع", R.drawable.mi_bolt,
+                Theme.PRIMARY, null, null), a.kit.lp(-1, -2));
+        TextView summary = a.kit.text(
                 HomeNumberFormatter.integer(allowed.size()) + " مقصد مجاز برای نقش شما",
-                R.drawable.mi_bolt, null, Theme.SECTION_SALES), a.kit.lp(-1, -2));
+                10f, Theme.MUTED, false);
+        LinearLayout.LayoutParams summaryParams = a.kit.lp(-1, -2);
+        summaryParams.topMargin = Theme.dp(3);
+        card.addView(summary, summaryParams);
 
         LinearLayout row = a.kit.h();
         row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         row.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout.LayoutParams rowParams = a.kit.lp(-1, -2);
-        rowParams.topMargin = Theme.dp(4);
-        for (int index : allowed) {
+        rowParams.topMargin = Theme.dp(5);
+        for (int index : allowed)
             row.addView(topQuickAction(labels[index], targets[index], icons[index]), a.kit.wlp(1f));
-        }
         card.addView(row, rowParams);
         return card;
     }
@@ -3315,21 +3295,14 @@ public class HomeScreen extends Screen {
         LinearLayout item = a.kit.v();
         item.setGravity(Gravity.CENTER);
         item.setMinimumWidth(Theme.dp(48));
-        item.setMinimumHeight(Theme.dp(64));
-        item.setPadding(Theme.dp(2), Theme.dp(2), Theme.dp(2), Theme.dp(2));
+        item.setMinimumHeight(Theme.dp(56));
+        item.setPadding(Theme.dp(2), Theme.dp(3), Theme.dp(2), Theme.dp(3));
         item.setTag("home-quick-action-" + screenId);
         item.setContentDescription(label + "؛ باز کردن بخش " + label);
 
-        FrameLayout badge = new FrameLayout(a);
-        badge.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-        badge.setBackground(Theme.avatar(Theme.alpha(Theme.GOLD_METAL, 72)));
-        ImageView artwork = a.kit.artworkIcon(iconVector,
-                Theme.sectionText(Theme.SECTION_SALES), 28);
-        artwork.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-        badge.addView(artwork, new FrameLayout.LayoutParams(
-                Theme.dp(28), Theme.dp(28), Gravity.CENTER));
-        item.addView(badge, a.kit.lp(Theme.dp(38), Theme.dp(38)));
-
+        ImageView symbol = a.kit.icon(iconVector, Theme.PRIMARY, 20);
+        symbol.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        item.addView(symbol, a.kit.lp(Theme.dp(22), Theme.dp(22)));
         TextView title = a.kit.text(label, 10.5f, Theme.TEXT, true);
         title.setGravity(Gravity.CENTER);
         title.setMaxLines(2);
@@ -3355,68 +3328,89 @@ public class HomeScreen extends Screen {
             if (RoleStore.allowed(a, targets[i])) allowed.add(i);
 
         LinearLayout card = a.kit.card(accent);
-        card.addView(boardHead("میان‌برهای سریع",
+        card.setTag("home-quick-actions-section");
+        final List<View> actionRows = new ArrayList<>();
+        final TextView[] toggleLabel = new TextView[1];
+        View header = a.kit.sectionHeader("میان‌برهای سریع", R.drawable.mi_bolt, accent,
+                allowed.size() > 2 ? (quickActionsExpanded ? "کمتر" : "همه") : null,
+                allowed.size() > 2 ? v -> {
+                    quickActionsExpanded = !quickActionsExpanded;
+                    for (int i = 0; i < actionRows.size(); i++)
+                        actionRows.get(i).setVisibility(quickActionsExpanded || i == 0
+                                ? View.VISIBLE : View.GONE);
+                    if (toggleLabel[0] != null) {
+                        toggleLabel[0].setText(quickActionsExpanded ? "کمتر" : "همه");
+                        toggleLabel[0].setContentDescription(quickActionsExpanded
+                                ? "نمایش کمتر از میان‌برهای سریع"
+                                : "نمایش همهٔ میان‌برهای سریع");
+                    }
+                } : null);
+        if (allowed.size() > 2 && header instanceof ViewGroup) {
+            ViewGroup headerRow = (ViewGroup) ((ViewGroup) header).getChildAt(0);
+            View possibleToggle = headerRow.getChildAt(headerRow.getChildCount() - 1);
+            if (possibleToggle instanceof TextView) {
+                toggleLabel[0] = (TextView) possibleToggle;
+                toggleLabel[0].setContentDescription(quickActionsExpanded
+                        ? "نمایش کمتر از میان‌برهای سریع"
+                        : "نمایش همهٔ میان‌برهای سریع");
+            }
+        }
+        card.addView(header, a.kit.lp(-1, -2));
+        TextView summary = a.kit.text(
                 HomeNumberFormatter.integer(allowed.size()) + " مقصد در دسترس نقش شما",
-                R.drawable.mi_add, null), a.kit.lp(-1, -2));
+                10f, Theme.MUTED, false);
+        LinearLayout.LayoutParams summaryParams = a.kit.lp(-1, -2);
+        summaryParams.topMargin = Theme.dp(3);
+        card.addView(summary, summaryParams);
         if (allowed.isEmpty()) {
             card.addView(a.kit.emptyRow("برای نقش فعلی مقصد میان‌بر مجازی وجود ندارد."),
                     a.kit.lp(-1, -2));
         } else {
-            final HomeQuickActionArc arc = new HomeQuickActionArc(a, accent);
-            for (int index : allowed)
-                arc.addArcAction(quickActionNode(labels[index], targets[index], icons[index], accent));
-
-            FrameLayout fab = new FrameLayout(a);
-            fab.setBackground(Theme.accentAvatar(accent));
-            Theme.lift(fab, Theme.dp(2));
-            ImageView glyph = a.kit.icon(R.drawable.mi_add, Theme.onAccent(accent), 24);
-            glyph.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-            fab.addView(glyph, new FrameLayout.LayoutParams(Theme.dp(24), Theme.dp(24), Gravity.CENTER));
-            fab.setContentDescription(quickActionsExpanded
-                    ? "بستن میان‌برهای سریع" : "نمایش میان‌برهای سریع");
-            fab.setFocusable(true);
-            fab.setSelected(quickActionsExpanded);
-            Theme.pressable(fab);
-            fab.setOnClickListener(v -> {
-                quickActionsExpanded = !quickActionsExpanded;
-                arc.setExpanded(quickActionsExpanded);
-                int icon = quickActionsExpanded ? R.drawable.mi_close : R.drawable.mi_add;
-                glyph.setImageResource(icon);
-                glyph.setColorFilter(Theme.onAccent(accent));
-                fab.setContentDescription(quickActionsExpanded
-                        ? "بستن میان‌برهای سریع" : "نمایش میان‌برهای سریع");
-                fab.setSelected(quickActionsExpanded);
-            });
-            arc.setMainAction(fab);
-            arc.setExpanded(quickActionsExpanded);
-            card.addView(arc, a.kit.lp(-1, -2));
-            card.addView(a.kit.hint("هر دکمه فقط صفحهٔ مربوط را باز می‌کند؛ هیچ ثبت فروش یا تغییری در دیتابیس با میان‌بر انجام نمی‌شود."),
-                    a.kit.lp(-1, -2));
+            int rowCount = (allowed.size() + 1) / 2;
+            for (int rowIndex = 0; rowIndex < rowCount; rowIndex++) {
+                LinearLayout row = a.kit.h();
+                row.setGravity(Gravity.CENTER_VERTICAL);
+                row.setVisibility(quickActionsExpanded || rowIndex == 0 ? View.VISIBLE : View.GONE);
+                LinearLayout.LayoutParams rowParams = a.kit.lp(-1, -2);
+                rowParams.topMargin = Theme.dp(4);
+                int first = allowed.get(rowIndex * 2);
+                row.addView(quickActionNode(labels[first], targets[first], icons[first], accent),
+                        a.kit.wlp(1f));
+                int secondPosition = rowIndex * 2 + 1;
+                if (secondPosition < allowed.size()) {
+                    row.addView(a.kit.space(8));
+                    int second = allowed.get(secondPosition);
+                    row.addView(quickActionNode(labels[second], targets[second], icons[second], accent),
+                            a.kit.wlp(1f));
+                } else {
+                    row.addView(new View(a), a.kit.wlp(1f));
+                }
+                actionRows.add(row);
+                card.addView(row, rowParams);
+            }
         }
         a.kit.addCard(content, card);
     }
 
     private View quickActionNode(String label, String screenId, int icon, int accent) {
-        LinearLayout node = a.kit.v();
-        node.setGravity(Gravity.CENTER);
-        node.setMinimumHeight(Theme.dp(72));
-        FrameLayout badge = new FrameLayout(a);
-        badge.setBackground(Theme.chip(true, accent));
-        badge.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-        ImageView glyph = a.kit.icon(icon, Theme.onAccent(accent), 20);
-        badge.addView(glyph, new FrameLayout.LayoutParams(Theme.dp(40), Theme.dp(40), Gravity.CENTER));
-        node.addView(badge, a.kit.lp(Theme.dp(40), Theme.dp(40)));
+        LinearLayout item = a.kit.h();
+        item.setGravity(Gravity.CENTER_VERTICAL);
+        item.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        item.setMinimumHeight(Theme.dp(48));
+        item.setPadding(Theme.dp(6), Theme.dp(5), Theme.dp(6), Theme.dp(5));
+        ImageView symbol = a.kit.icon(icon, Theme.sectionText(accent), 19);
+        item.addView(symbol, a.kit.lp(Theme.dp(22), Theme.dp(22)));
+        item.addView(a.kit.space(7));
         TextView title = a.kit.text(label, 11f, Theme.TEXT, true);
-        title.setGravity(Gravity.CENTER);
         title.setMaxLines(2);
         title.setEllipsize(TextUtils.TruncateAt.END);
         title.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-        node.addView(title, a.kit.lp(-1, -2));
-        node.setContentDescription(label + "؛ بازکردن صفحهٔ " + label);
-        node.setFocusable(true);
-        Theme.pressable(node);
-        node.setOnClickListener(v -> a.nav(screenId));
-        return node;
+        item.addView(title, a.kit.wlp(1f));
+        item.setContentDescription(label + "؛ بازکردن صفحهٔ " + label);
+        item.setFocusable(true);
+        Theme.pressable(item);
+        item.setOnClickListener(v -> a.nav(screenId));
+        return item;
     }
 
     private void secSalesForecast(LinearLayout content, Data d) {

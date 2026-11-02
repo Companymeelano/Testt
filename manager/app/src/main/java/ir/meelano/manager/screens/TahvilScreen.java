@@ -295,9 +295,8 @@ public class TahvilScreen extends Screen {
         android.graphics.drawable.GradientDrawable g = new android.graphics.drawable.GradientDrawable();
         g.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
         g.setCornerRadius(Theme.dp(12));
-        g.setStroke(Math.max(1, Theme.dp(on ? 1.6f : 1f)), on ? Theme.SUCCESS : Theme.MUTED);
-        // رنگِ پرکننده از خودِ Theme مشتق می‌شود تا با تغییرِ پوست هماهنگ بماند
-        g.setColor(on ? ((Theme.SUCCESS & 0x00FFFFFF) | 0x1A000000) : 0x00000000);
+        g.setStroke(Math.max(1, Theme.dp(on ? 1.5f : 1f)), on ? Theme.PRIMARY : Theme.BORDER);
+        g.setColor(on ? Theme.ACCENT_SOFT : Theme.SURFACE);
         return g;
     }
 
@@ -343,7 +342,8 @@ if (!items.isEmpty()) {
                 tally.setText(Money.fa(String.valueOf(n)) + " از "
                         + Money.fa(String.valueOf(items.size())));
                 // رنگِ شمارنده وضعیت را می‌گوید: کامل، ناقص، یا خالی
-                tally.setTextColor(Theme.TEXT);
+                tally.setTextColor(n == 0 ? Theme.WARNING
+                        : (n == items.size() ? Theme.SUCCESS : Theme.INFO));
             };
             paintRef[0] = repaint;
             repaint.run();

@@ -17,7 +17,6 @@ import java.sql.Connection;
 import ir.meelano.manager.core.AtiranAuth;
 import ir.meelano.manager.core.LicenseStore;
 import ir.meelano.manager.core.RoleStore;
-import ir.meelano.manager.data.NetRoute;
 import ir.meelano.manager.data.Settings;
 import ir.meelano.manager.core.SmartLink;
 import ir.meelano.manager.ui.Kit;
@@ -60,52 +59,25 @@ public class LoginActivity extends Activity {
         }
 
         ScrollView sv = new ScrollView(this);
-        // Backdrop: a warm gold light falling from the top onto the graphite/ivory base.
         sv.setBackground(Theme.backdrop());
+        sv.setFillViewport(true);
         LinearLayout root = kit.v();
         root.setGravity(Gravity.CENTER);
-        root.setPadding(Theme.dp(26), Theme.dp(44), Theme.dp(26), Theme.dp(30));
+        root.setPadding(Theme.dp(22), Theme.dp(24), Theme.dp(22), Theme.dp(24));
         sv.addView(root);
 
-        // Logo inside a soft gold halo.
-        android.widget.FrameLayout halo = new android.widget.FrameLayout(this);
-        android.graphics.drawable.GradientDrawable glow = new android.graphics.drawable.GradientDrawable();
-        glow.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-        int haloRgb = Theme.GOLD_METAL;
-        glow.setColors(new int[]{Theme.alpha(haloRgb, 90), Theme.alpha(haloRgb, 0)});
-        glow.setGradientType(android.graphics.drawable.GradientDrawable.RADIAL_GRADIENT);
-        glow.setGradientRadius(Theme.dp(96));
-        halo.setBackground(glow);
-        android.widget.FrameLayout.LayoutParams hp = new android.widget.FrameLayout.LayoutParams(
-                Theme.dp(92), Theme.dp(92), Gravity.CENTER);
-        halo.addView(kit.logo(92), hp);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(Theme.dp(190), Theme.dp(170));
-        lp.gravity = Gravity.CENTER;
-        root.addView(halo, lp);
-        TextView t = kit.text("ورود به میلانو", 26, Theme.TEXT, true);
+        android.widget.ImageView brand = kit.logo(52);
+        LinearLayout.LayoutParams brandParams = new LinearLayout.LayoutParams(Theme.dp(52), Theme.dp(52));
+        brandParams.gravity = Gravity.CENTER_HORIZONTAL;
+        root.addView(brand, brandParams);
+        TextView t = kit.text("ورود به میلانو", 23f, Theme.TEXT, true);
         t.setGravity(Gravity.CENTER);
-        try {
-            t.setLetterSpacing(0.04f);
-            t.post(() -> {
-                int h = t.getHeight();
-                if (h <= 0) return;
-                if (Theme.isLight()) {
-                    t.getPaint().setShader(null);
-                    t.setTextColor(Theme.GOLD_DARK);
-                } else {
-                    t.getPaint().setShader(new android.graphics.LinearGradient(0, 0, 0, h,
-                            new int[]{Theme.GOLD_LIGHT, Theme.GOLD_METAL, Theme.GOLD_LIGHT},
-                            null, android.graphics.Shader.TileMode.CLAMP));
-                }
-                t.invalidate();
-            });
-        } catch (Exception ignored) { Diag.ignored("LoginActivity:metal", ignored); }
-        root.addView(t, kit.lp(-1, -2));
+        LinearLayout.LayoutParams titleParams = kit.lp(-1, -2);
+        titleParams.topMargin = Theme.dp(8);
+        root.addView(t, titleParams);
         View hair = new View(this);
-        hair.setBackground(new android.graphics.drawable.GradientDrawable(
-                android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
-                new int[]{0x00000000, Theme.alpha(Theme.GOLD, 150), 0x00000000}));
-        LinearLayout.LayoutParams hlp = new LinearLayout.LayoutParams(Theme.dp(120), Theme.dp(1));
+        hair.setBackgroundColor(Theme.BORDER);
+        LinearLayout.LayoutParams hlp = new LinearLayout.LayoutParams(Theme.dp(72), Theme.dp(1));
         hlp.gravity = Gravity.CENTER_HORIZONTAL;
         hlp.setMargins(0, Theme.dp(8), 0, 0);
         root.addView(hair, hlp);
@@ -130,7 +102,8 @@ public class LoginActivity extends Activity {
             android.widget.Button fp = kit.btnGold("◉  ورود با اثر انگشت", v -> quickFinger());
             try {
                 fp.setBackground(Theme.startButton());
-                fp.setMinHeight(Theme.dp(56));
+                fp.setTextColor(Theme.onAccent(Theme.PRIMARY));
+                fp.setMinHeight(Theme.dp(52));
                 fp.setLetterSpacing(0.04f);
             } catch (Exception ignored) { Diag.ignored("LoginActivity:fp", ignored); }
             LinearLayout.LayoutParams fpl = kit.lp(-1, -2);
@@ -205,9 +178,9 @@ public class LoginActivity extends Activity {
         loginBtn = kit.btnGold("ورود  ✦", v -> doLogin());
         try {
             loginBtn.setBackground(Theme.startButton());
-            loginBtn.setTextSize(16f * Theme.fontScale());
-            loginBtn.setMinHeight(Theme.dp(56));
-            loginBtn.setLetterSpacing(0.05f);
+            loginBtn.setTextColor(Theme.onAccent(Theme.PRIMARY));
+            loginBtn.setTextSize(15f * Theme.fontScale());
+            loginBtn.setMinHeight(Theme.dp(52));
         } catch (Exception ignored) { Diag.ignored("LoginActivity:btn", ignored); }
         root.addView(loginBtn, kit.lp(-1, -2));
         root.addView(kit.gap(10));
@@ -273,13 +246,9 @@ public class LoginActivity extends Activity {
         box.setPadding(Theme.dp(14), Theme.dp(12), Theme.dp(16), Theme.dp(12));
         box.setBackground(Theme.ghostButton(Theme.GOLD));
         String ini = name == null || name.trim().isEmpty() ? "م" : name.trim().substring(0, 1);
-        TextView mark = kit.text(ini, 20f, Theme.GOLD, true);
+        TextView mark = kit.text(ini, 18f, Theme.PRIMARY, true);
         mark.setGravity(Gravity.CENTER);
-        android.graphics.drawable.GradientDrawable ring = new android.graphics.drawable.GradientDrawable();
-        ring.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-        ring.setColor(Theme.alpha(Theme.GOLD, 40));
-        ring.setStroke(Theme.dp(1), Theme.alpha(Theme.GOLD, 160));
-        mark.setBackground(ring);
+        mark.setBackground(Theme.avatar(Theme.ACCENT_SOFT));
         box.addView(mark, new LinearLayout.LayoutParams(Theme.dp(52), Theme.dp(52)));
         LinearLayout copy = kit.v();
         copy.setPadding(Theme.dp(12), 0, 0, 0);
@@ -355,17 +324,13 @@ public class LoginActivity extends Activity {
         final boolean rem = remember;
         setBusy(true);
         new Thread(() -> {
-            boolean directBound = settings.directConn()
-                    && NetRoute.bindDirect(getApplicationContext());
             // Use cached Atiran credentials only when opening the SQL connection itself fails.
             // Query/schema/permission errors must not be disguised as an offline login failure.
             final Connection connection;
             try {
                 connection = SmartLink.open(getApplicationContext(), settings);
             } catch (Exception connectionError) {
-                if (directBound) NetRoute.unbind(getApplicationContext());
-                // Keep the route/port diagnosis visible when no offline session can be used.
-                offlineTry(user, pass, rem, connectionError);
+                offlineTry(user, pass, rem);
                 return;
             }
             try (Connection c = connection) {
@@ -428,13 +393,11 @@ public class LoginActivity extends Activity {
                 String detail = authError.getMessage();
                 uiFail("خواندن حساب/نقش از آتیران انجام نشد"
                         + (detail == null || detail.trim().isEmpty() ? "." : ": " + detail));
-            } finally {
-                if (directBound) NetRoute.unbind(getApplicationContext());
             }
         }).start();
     }
 
-    private void offlineTry(String user, String pass, boolean rem, Exception connectionError) {
+    private void offlineTry(String user, String pass, boolean rem) {
         try {
             int uid = AtiranAuth.cachedUid(LoginActivity.this, user);
             if (uid != -999) {
@@ -462,12 +425,7 @@ public class LoginActivity extends Activity {
                 }
             }
         } catch (Exception ignored) { Diag.ignored("LoginActivity:274", ignored); }
-        String detail = connectionError == null ? "" : connectionError.getMessage();
-        if (detail == null) detail = "";
-        detail = detail.replace('\n', ' ').replace('\r', ' ').trim();
-        if (detail.length() > 320) detail = detail.substring(0, 320) + "…";
-        uiFail("ارتباط با سرور برقرار نشد؛ برای اولین ورود اتصال لازم است"
-                + (detail.isEmpty() ? "" : " • " + detail));
+        uiFail("ارتباط با سرور ممکن نشد؛ برای اولین ورود، اینترنت لازم است");
     }
 
     /**

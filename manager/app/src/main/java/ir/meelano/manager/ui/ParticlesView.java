@@ -1,35 +1,24 @@
 package ir.meelano.manager.ui;
 
 import android.content.Context;
-import android.graphics.Canvas;
-import android.graphics.LinearGradient;
-import android.graphics.Paint;
-import android.graphics.Shader;
 import android.util.AttributeSet;
 import android.view.View;
 
-import java.util.Random;
-
-/**
- * Living activation background (v33): a deep vertical gradient with slow
- * golden dust drifting upward. Runs only while attached to a window.
- */
+/** Optional, low-motion accent dots for legacy activation surfaces; no texture or gradient. */
 public class ParticlesView extends View {
-    private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Random rnd = new Random();
-    private float[] x, y, r, v, tw;
-    private int n;
+    private final android.graphics.Paint paint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+    private final java.util.Random rnd = new java.util.Random();
+    private float[] x, y, radius, velocity, phase;
+    private int count;
     private boolean live;
-    private Shader shader;
-    private int lastH;
 
-    public ParticlesView(Context c) {
-        super(c);
+    public ParticlesView(Context context) {
+        super(context);
         init();
     }
 
-    public ParticlesView(Context c, AttributeSet a) {
-        super(c, a);
+    public ParticlesView(Context context, AttributeSet attrs) {
+        super(context, attrs);
         init();
     }
 
@@ -38,20 +27,20 @@ public class ParticlesView extends View {
         setCount(10);
     }
 
-    /** How many drifting specks to draw. Screens that need a quieter look ask for fewer. */
-    public void setCount(int count) {
-        n = Math.max(0, count);
-        x = new float[n];
-        y = new float[n];
-        r = new float[n];
-        v = new float[n];
-        tw = new float[n];
-        for (int i = 0; i < n; i++) {
+    /** How many subtle accent dots to draw. Screens may request fewer. */
+    public void setCount(int value) {
+        count = Math.max(0, value);
+        x = new float[count];
+        y = new float[count];
+        radius = new float[count];
+        velocity = new float[count];
+        phase = new float[count];
+        for (int i = 0; i < count; i++) {
             x[i] = rnd.nextFloat();
             y[i] = rnd.nextFloat();
-            r[i] = 1.0f + rnd.nextFloat() * 2.0f;
-            v[i] = 0.0004f + rnd.nextFloat() * 0.0008f;
-            tw[i] = rnd.nextFloat() * 6.28f;
+            radius[i] = 1f + rnd.nextFloat();
+            velocity[i] = 0.00025f + rnd.nextFloat() * 0.0004f;
+            phase[i] = rnd.nextFloat() * 6.28f;
         }
     }
 
@@ -73,38 +62,32 @@ public class ParticlesView extends View {
         @Override
         public void run() {
             if (!live) return;
-            for (int i = 0; i < n; i++) {
-                y[i] -= v[i];
-                tw[i] += 0.06f;
+            for (int i = 0; i < count; i++) {
+                y[i] -= velocity[i];
+                phase[i] += 0.06f;
                 if (y[i] < -0.02f) {
                     y[i] = 1.02f;
                     x[i] = rnd.nextFloat();
                 }
             }
             invalidate();
-            postDelayed(step, 33);
+            postDelayed(this, 48L);
         }
     };
 
     @Override
-    protected void onDraw(Canvas c) {
-        int w = getWidth(), h = getHeight();
-        if (w <= 0 || h <= 0) return;
-        if (shader == null || h != lastH) {
-            lastH = h;
-            shader = new LinearGradient(0, 0, 0, h,
-                    new int[]{Theme.BG, Theme.SURFACE, Theme.SURFACE2},
-                    new float[]{0f, 0.6f, 1f}, Shader.TileMode.CLAMP);
-        }
-        paint.setShader(shader);
-        paint.setAlpha(255);
-        c.drawRect(0, 0, w, h, paint);
-        paint.setShader(null);
-        for (int i = 0; i < n; i++) {
-            float a = 0.08f + 0.18f * (0.5f + 0.5f * (float) Math.sin(tw[i]));
-            paint.setAlpha((int) (a * 255));
-            paint.setColor(Theme.GOLD);
-            c.drawCircle(x[i] * w, y[i] * h, r[i] * (w / 700f + 0.5f), paint);
+    protected void onDraw(android.graphics.Canvas canvas) {
+        super.onDraw(canvas);
+        int width = getWidth(), height = getHeight();
+        if (width <= 0 || height <= 0) return;
+        canvas.drawColor(Theme.BG);
+        int accent = Theme.isNuts() ? Theme.GOLD : Theme.PRIMARY;
+        paint.setColor(accent);
+        for (int i = 0; i < count; i++) {
+            float opacity = 0.035f + 0.055f * (0.5f + 0.5f * (float) Math.sin(phase[i]));
+            paint.setAlpha(Math.round(opacity * 255));
+            canvas.drawCircle(x[i] * width, y[i] * height,
+                    radius[i] * (width / 700f + 0.5f), paint);
         }
     }
 }

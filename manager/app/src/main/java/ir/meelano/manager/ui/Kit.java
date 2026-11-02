@@ -43,61 +43,25 @@ public final class Kit {
     }
 
     // ---------------- text ----------------
-    private boolean isOutcomeColor(int color) {
-        return color == Theme.SUCCESS || color == Theme.DANGER
-                || color == Theme.WARNING || color == Theme.INFO;
-    }
-
-    private boolean isDeltaCopy(String value) {
-        String probe = value == null ? "" : value.trim();
-        probe = probe.replace(String.valueOf((char) 0x2066), "")
-                .replace(String.valueOf((char) 0x2067), "")
-                .replace(String.valueOf((char) 0x2068), "")
-                .replace(String.valueOf((char) 0x2069), "").trim();
-        return probe.startsWith("▲") || probe.startsWith("▼") || probe.startsWith("↗")
-                || probe.startsWith("↘") || probe.contains("تغییر")
-                || probe.startsWith("افزایش") || probe.startsWith("کاهش")
-                || probe.startsWith("افت ") || probe.startsWith("رشد ");
-    }
-
     public TextView text(String s, float sp, int color, boolean bold) {
         TextView t = new TextView(a);
         t.setText(s == null ? "" : s);
-        // Legibility floor, then two multipliers. fontScale is the user's own zoom
-        // choice; typeScale grows type with the screen so labels stay readable on the
-        // large displays of high-end phones. Only type is scaled - layout metrics
-        // stay in dp.
-        //
-        // v37.1: micro type (tile labels, captions, badges) is small ON PURPOSE — it
-        // sits under a value inside a tile that has a fixed share of the row. The old
-        // rule floored everything below 12.5 and then grew it again by typeScale, so a
-        // 10sp caption rendered at ~14.8sp: the tiles overflowed, captions collided
-        // with their values, and the value/label ratio collapsed from ~1.8x to ~1.3x,
-        // which is what made the top of the dashboard read as a jumble. Micro type now
-        // keeps its designed size and takes the user's zoom only — never the extra
-        // screen-driven growth.
         boolean micro = sp < 12f;
         float base = micro ? (sp < 9f ? 9f : sp) : (sp < 12.5f ? 12.5f : sp);
         float grow = micro ? Theme.fontScale() : Theme.fontScale() * Theme.typeScale();
         t.setTextSize(base * grow);
-        int resolvedColor = isOutcomeColor(color) && !isDeltaCopy(s) ? Theme.TEXT
-                : (!Theme.DARK && color == Theme.GOLD ? Theme.GOLD_DARK : color);
+        int resolvedColor = Theme.isNuts() && color == Theme.GOLD ? Theme.GOLD_DARK : color;
         t.setTextColor(resolvedColor);
         t.setTypeface(Theme.face(bold));
         t.setFontFeatureSettings("tnum");
         t.setLineSpacing(Theme.dp(1.5f), 1.0f);
-        // Lock the paragraph direction to RTL: a pure-digit value («۱۴۰۵/۰۸/۰۳», «۹٫۸»)
-        // has no strong directional character, so first-strong heuristics fall back to
-        // LTR and the value would slide to the left edge - visible inside dialogs where
-        // the stock resolution differs from the activity window.
         t.setTextDirection(View.TEXT_DIRECTION_RTL);
         MeelanoIcons.iconize(t);
         return t;
     }
 
     public TextView title(String s) {
-        // Section titles take the gold accent in the dark theme, matching the reference.
-        return text(s, 15f, Theme.DARK ? Theme.GOLD_SOFT : Theme.TEXT, true);
+        return text(s, 15f, Theme.TEXT, true);
     }
 
     public TextView sub(String s) {
@@ -148,14 +112,14 @@ public final class Kit {
         return best;
     }
 
-    /** Shared luxury card surface: flat paper, 20dp corners, a single hairline, and low lift. */
+    /** Shared flat card surface with a neutral fill, compact corner radius and border. */
     public LinearLayout luxCard() { return luxCard(0); }
 
     /** Accent-tinted LuxCard; accents identify a section, never a positive/negative outcome. */
     public LinearLayout luxCard(int accent) {
         LinearLayout c = v();
         c.setBackground(accent == 0 ? Theme.card() : Theme.cardAccent(accent));
-        c.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(16));
+        c.setPadding(Theme.dp(14), Theme.dp(14), Theme.dp(14), Theme.dp(14));
         Theme.lift(c, Theme.cardElevation());
         return c;
     }
@@ -166,37 +130,32 @@ public final class Kit {
 
     public void addCard(LinearLayout parent, View card) {
         LinearLayout.LayoutParams p = lp(-1, -2);
-        p.setMargins(0, 0, 0, Theme.dp(12));
+        p.setMargins(0, 0, 0, Theme.dp(10));
         parent.addView(card, p);
     }
 
     // ---------------- hero & sections ----------------
     public View hero(String glyph, String title, String subtitle, int accent) {
-        LinearLayout c = v();
-        c.setBackground(Theme.hero(accent));
-        c.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(15));
-        LinearLayout head = h();
+        LinearLayout card = v();
+        card.setBackground(Theme.hero(accent));
+        card.setPadding(Theme.dp(14), Theme.dp(12), Theme.dp(14), Theme.dp(12));
+        LinearLayout row = h();
+        row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         int heroVector = MeelanoIcons.iconFor(glyph);
         if (heroVector != 0) {
-            head.addView(iconBadge(heroVector, accent, 44),
-                    new LinearLayout.LayoutParams(Theme.dp(44), Theme.dp(44)));
-        } else {
-            TextView g = text(glyph, 24, Theme.sectionText(accent), true);
-            g.setGravity(Gravity.CENTER);
-            g.setBackground(Theme.avatar(Theme.alpha(accent, 44)));
-            head.addView(g, new LinearLayout.LayoutParams(Theme.dp(44), Theme.dp(44)));
+            row.addView(icon(heroVector, Theme.PRIMARY, 22), lp(Theme.dp(24), Theme.dp(24)));
         }
-        head.addView(space(10));
+        if (heroVector != 0) row.addView(space(8));
         LinearLayout copy = v();
-        copy.setPadding(Theme.dp(2), 0, 0, 0);
         copy.addView(title(title), lp(-1, -2));
-        if (subtitle != null && !subtitle.isEmpty()) copy.addView(sub(subtitle), lp(-1, -2));
-        head.addView(copy, wlp(1f));
-        c.addView(head, lp(-1, -2));
-        return c;
+        if (subtitle != null && !subtitle.trim().isEmpty())
+            copy.addView(sub(subtitle), lp(-1, -2));
+        row.addView(copy, wlp(1f));
+        card.addView(row, lp(-1, -2));
+        return card;
     }
 
-    /** Shared SectionHeader: duotone mark, title, optional action, and one accent hairline. */
+    /** Shared section header: flat line icon, readable title, optional action and neutral divider. */
     public View sectionHeader(String title, int iconRes, int accent,
                               String actionLabel, View.OnClickListener action) {
         final int sectionHue = visualAccent(title, accent);
@@ -205,23 +164,20 @@ public final class Kit {
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         row.setMinimumHeight(Theme.dp(48));
-
         if (iconRes != 0) {
-            row.addView(iconBadge(iconRes, sectionHue, 36),
-                    new LinearLayout.LayoutParams(Theme.dp(36), Theme.dp(36)));
+            row.addView(icon(iconRes, sectionHue, 19), lp(Theme.dp(22), Theme.dp(22)));
             row.addView(space(8));
         }
-        TextView heading = text(title, 14f, Theme.sectionText(sectionHue), true);
+        TextView heading = text(title, 14f, Theme.TEXT, true);
         heading.setMaxLines(2);
         heading.setEllipsize(TextUtils.TruncateAt.END);
         row.addView(heading, wlp(1f));
         if (actionLabel != null && action != null) {
-            TextView button = text(actionLabel, 10.5f, Theme.sectionText(sectionHue), true);
+            TextView button = text(actionLabel, 10.5f, Theme.PRIMARY, true);
             button.setGravity(Gravity.CENTER);
-            button.setPadding(Theme.dp(9), Theme.dp(4), Theme.dp(9), Theme.dp(4));
+            button.setPadding(Theme.dp(8), Theme.dp(4), Theme.dp(8), Theme.dp(4));
             button.setMinHeight(Theme.dp(48));
             button.setMinWidth(Theme.dp(48));
-            button.setBackground(Theme.ghostButton(sectionHue));
             button.setContentDescription(actionLabel.replace("›", "").replace("‹", "").trim()
                     + "؛ باز کردن");
             Theme.pressable(button);
@@ -231,7 +187,7 @@ public final class Kit {
         }
         root.addView(row, lp(-1, -2));
         LinearLayout.LayoutParams rule = lp(-1, Theme.dp(1));
-        rule.topMargin = Theme.dp(6);
+        rule.topMargin = Theme.dp(4);
         root.addView(accentHairline(sectionHue), rule);
         return root;
     }
@@ -272,9 +228,7 @@ public final class Kit {
 
     /** Keep legacy status hues out of section styling; outcome colors are reserved for deltas. */
     public int visualAccent(String title, int requestedAccent) {
-        boolean outcome = requestedAccent == Theme.SUCCESS || requestedAccent == Theme.DANGER
-                || requestedAccent == Theme.WARNING || requestedAccent == Theme.INFO;
-        return outcome ? Theme.sectionAccent(title) : requestedAccent;
+        return Theme.isNuts() ? Theme.GOLD_DARK : Theme.PRIMARY;
     }
 
     /** Compact shared KPI chip; money units stay smaller and quieter beside the value. */
@@ -285,44 +239,35 @@ public final class Kit {
     public View kpiChip(String label, String value, String unit, int accent, int iconRes) {
         int sectionHue = visualAccent(label, accent);
         LinearLayout chip = v();
-        chip.setGravity(Gravity.CENTER_HORIZONTAL);
+        chip.setGravity(Gravity.CENTER_VERTICAL);
+        chip.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         chip.setBackground(Theme.kpi(sectionHue));
-        chip.setPadding(Theme.dp(8), Theme.dp(8), Theme.dp(8), Theme.dp(8));
+        chip.setPadding(Theme.dp(12), Theme.dp(9), Theme.dp(12), Theme.dp(9));
         if (iconRes != 0) {
-            LinearLayout.LayoutParams ip = lp(Theme.dp(32), Theme.dp(32));
-            ip.gravity = Gravity.CENTER_HORIZONTAL;
-            ip.bottomMargin = Theme.dp(4);
-            chip.addView(iconBadge(iconRes, sectionHue, 32), ip);
+            chip.addView(icon(iconRes, sectionHue, 18), lp(Theme.dp(20), Theme.dp(20)));
+            chip.addView(space(7));
         }
+        LinearLayout copy = v();
         TextView name = text(label, 10.5f, Theme.MUTED, false);
-        name.setGravity(Gravity.CENTER);
-        name.setMinLines(1);
         name.setMaxLines(2);
         name.setEllipsize(TextUtils.TruncateAt.END);
-        chip.addView(name, lp(-1, -2));
-
+        copy.addView(name, lp(-1, -2));
         LinearLayout amount = h();
-        amount.setGravity(Gravity.CENTER);
-        amount.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        amount.setGravity(Gravity.CENTER_VERTICAL);
         TextView figure = text(value, 16f, Theme.TEXT, true);
         figure.setSingleLine(true);
-        figure.setGravity(Gravity.CENTER);
-        float sizeScale = Theme.fontScale() * Theme.typeScale();
-        figure.setAutoSizeTextTypeUniformWithConfiguration(
-                Math.max(9, Math.round(10f * sizeScale)),
-                Math.max(10, Math.round(16f * sizeScale)), 1,
+        figure.setAutoSizeTextTypeUniformWithConfiguration(10, 16, 1,
                 android.util.TypedValue.COMPLEX_UNIT_SP);
         if (unit != null && !unit.trim().isEmpty()) {
             amount.addView(figure, wlp(1f));
+            amount.addView(space(4));
             TextView unitView = text(unit, 9.5f, Theme.MUTED, false);
             unitView.setSingleLine(true);
             unitView.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-            amount.addView(space(4));
             amount.addView(unitView, lp(-2, -2));
-        } else {
-            amount.addView(figure, lp(-1, -2));
-        }
-        chip.addView(amount, lp(-1, -2));
+        } else amount.addView(figure, lp(-1, -2));
+        copy.addView(amount, lp(-1, -2));
+        chip.addView(copy, wlp(1f));
         String spoken = (label == null ? "" : label) + ": " + (value == null ? "" : value)
                 + (unit == null || unit.trim().isEmpty() ? "" : " " + unit);
         chip.setContentDescription(spoken);
@@ -386,10 +331,8 @@ public final class Kit {
         String marker = direction > 0 ? "▲ " : direction < 0 ? "▼ " : "";
         TextView badge = text(marker + (label == null ? "" : label), 10.5f,
                 Theme.sectionText(tone), true);
-        badge.setGravity(Gravity.CENTER);
-        badge.setPadding(Theme.dp(8), Theme.dp(4), Theme.dp(8), Theme.dp(4));
-        badge.setMinHeight(Theme.dp(32));
-        badge.setBackground(Theme.pill(tone));
+        badge.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        badge.setMinHeight(Theme.dp(28));
         badge.setContentDescription(spokenDescription == null || spokenDescription.trim().isEmpty()
                 ? (direction > 0 ? "افزایش " : direction < 0 ? "کاهش " : "تغییر ") + label
                 : spokenDescription);
@@ -463,29 +406,31 @@ public final class Kit {
     public View kpiTile(Kpi k) {
         final int accent = sectionAccentForKpi(k);
         final boolean dashboardStyle = k.dashboardStyle;
-        LinearLayout t = v();
-        t.setBackground(dashboardStyle ? Theme.dashboardMetric(accent) : Theme.kpi(accent));
-        int horizontalPad = dashboardStyle ? 10 : 12;
-        int verticalPad = dashboardStyle ? 8 : 11;
-        t.setPadding(Theme.dp(horizontalPad), Theme.dp(verticalPad),
+        LinearLayout tile = v();
+        tile.setBackground(dashboardStyle ? Theme.dashboardMetric(accent) : Theme.kpi(accent));
+        int horizontalPad = dashboardStyle ? 8 : 12;
+        int verticalPad = dashboardStyle ? 9 : 11;
+        tile.setPadding(Theme.dp(horizontalPad), Theme.dp(verticalPad),
                 Theme.dp(horizontalPad), Theme.dp(verticalPad));
-        if (dashboardStyle) t.setTag("home-financial-kpi");
-        // Centred composition like the reference: icon, label, value and note share one axis.
-        t.setGravity(Gravity.CENTER_HORIZONTAL);
+        tile.setGravity(Gravity.START);
+        if (dashboardStyle) tile.setTag("home-financial-kpi");
+
+        LinearLayout heading = h();
+        heading.setGravity(Gravity.CENTER_VERTICAL);
+        heading.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         if (k.icon != 0) {
-            int iconSize = dashboardStyle ? 30 : 32;
-            View badge = iconBadge(k.icon, accent, iconSize);
-            LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(
-                    Theme.dp(iconSize), Theme.dp(iconSize));
-            ip.gravity = Gravity.CENTER_HORIZONTAL;
-            ip.bottomMargin = Theme.dp(dashboardStyle ? 3 : 4);
-            t.addView(badge, ip);
+            ImageView symbol = icon(k.icon, accent, dashboardStyle ? 17 : 18);
+            symbol.setContentDescription(null);
+            symbol.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+            heading.addView(symbol, lp(Theme.dp(20), Theme.dp(20)));
+            heading.addView(space(6));
         }
-        TextView l = text(k.label, 10.5f, Theme.MUTED, false);
-        l.setGravity(Gravity.CENTER_HORIZONTAL);
-        l.setSingleLine(true);
-        l.setEllipsize(TextUtils.TruncateAt.END);
-        t.addView(l, lp(-1, -2));
+        TextView label = text(k.label, 10.5f, Theme.MUTED, false);
+        label.setSingleLine(true);
+        label.setEllipsize(TextUtils.TruncateAt.END);
+        heading.addView(label, wlp(1f));
+        tile.addView(heading, lp(-1, -2));
+
         String fullDisplayValue = k.value == null ? "" : k.value;
         String moneyUnit = "";
         String numberDisplayValue = fullDisplayValue;
@@ -499,66 +444,66 @@ public final class Kit {
         }
         final String stableNumberValue = numberDisplayValue;
         LinearLayout amount = h();
-        amount.setGravity(Gravity.CENTER);
+        amount.setGravity(Gravity.CENTER_VERTICAL);
         amount.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        TextView v = text(numberDisplayValue, dashboardStyle ? 15.5f : 16.5f, Theme.TEXT, true);
-        v.setGravity(Gravity.CENTER);
-        v.setSingleLine(true);
-        // Large amounts shrink to fit the tile instead of ending in "…".
+        TextView value = text(numberDisplayValue, dashboardStyle ? 16f : 17f, Theme.TEXT, true);
+        value.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        value.setSingleLine(true);
         if (android.os.Build.VERSION.SDK_INT >= 26) {
             float valueScale = Theme.fontScale() * Theme.typeScale();
-            v.setAutoSizeTextTypeUniformWithConfiguration(
+            value.setAutoSizeTextTypeUniformWithConfiguration(
                     Math.max(9, Math.round(10f * valueScale)),
-                    Math.max(10, Math.round((dashboardStyle ? 16f : 17f) * valueScale)), 1,
+                    Math.max(10, Math.round((dashboardStyle ? 17f : 18f) * valueScale)), 1,
                     android.util.TypedValue.COMPLEX_UNIT_SP);
-        } else {
-            v.setEllipsize(TextUtils.TruncateAt.END);
-        }
+        } else value.setEllipsize(TextUtils.TruncateAt.END);
         if (!moneyUnit.isEmpty()) {
-            amount.addView(v, wlp(1f));
+            amount.addView(value, wlp(1f));
             amount.addView(space(4));
             TextView unit = text(moneyUnit, 9.5f, Theme.MUTED, false);
             unit.setSingleLine(true);
             unit.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
             amount.addView(unit, lp(-2, -2));
-        } else {
-            amount.addView(v, lp(-1, -2));
-        }
-        t.addView(amount, lp(-1, -2));
+        } else amount.addView(value, lp(-1, -2));
+        LinearLayout.LayoutParams amountParams = lp(-1, -2);
+        amountParams.topMargin = Theme.dp(3);
+        tile.addView(amount, amountParams);
+
         if (k.detail != null && !k.detail.trim().isEmpty()) {
             TextView detail = text(k.detail, dashboardStyle ? 9.5f : 9f, Theme.MUTED, false);
-            detail.setGravity(Gravity.CENTER_HORIZONTAL);
             detail.setSingleLine(true);
             detail.setEllipsize(TextUtils.TruncateAt.END);
-            detail.setMinHeight(Theme.dp(dashboardStyle ? 18 : 20));
-            t.addView(detail, lp(-1, -2));
+            detail.setMinHeight(Theme.dp(18));
+            tile.addView(detail, lp(-1, -2));
         }
         if (k.spark != null && k.spark.length > 1) {
             LinearLayout.LayoutParams sp = lp(-1, Theme.dp(dashboardStyle ? 22 : 26));
-            sp.setMargins(0, Theme.dp(dashboardStyle ? 3 : 4), 0, Theme.dp(dashboardStyle ? 1 : 2));
+            sp.setMargins(0, Theme.dp(3), 0, Theme.dp(2));
             Sparkline sparkline = new Sparkline(a, k.spark, accent);
             sparkline.setContentDescription(k.sparkDescription == null
                     ? "روند هفت‌روزهٔ " + k.label : k.sparkDescription);
             sparkline.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-            t.addView(sparkline, sp);
+            tile.addView(sparkline, sp);
         }
         if (!Double.isNaN(k.countTo) && Ui.motionOk(a)) {
-            ValueAnimator va = ValueAnimator.ofFloat(0f, 1f);
-            va.setDuration(600);
-            va.setInterpolator(new android.view.animation.DecelerateInterpolator());
-            va.addUpdateListener(an -> v.setText(Money.fa(Money.compact(k.countTo * (float) an.getAnimatedValue()))));
-            va.addListener(new android.animation.AnimatorListenerAdapter() {
-                @Override public void onAnimationEnd(android.animation.Animator animation) { v.setText(stableNumberValue); }
+            ValueAnimator animator = ValueAnimator.ofFloat(0f, 1f);
+            animator.setDuration(600);
+            animator.setInterpolator(new android.view.animation.DecelerateInterpolator());
+            animator.addUpdateListener(an -> value.setText(Money.fa(
+                    Money.compact(k.countTo * (float) an.getAnimatedValue()))));
+            animator.addListener(new android.animation.AnimatorListenerAdapter() {
+                @Override public void onAnimationEnd(android.animation.Animator animation) {
+                    value.setText(stableNumberValue);
+                }
             });
-            va.start();
+            animator.start();
         } else {
-            v.setText(stableNumberValue);
+            value.setText(stableNumberValue);
             if (Ui.motionOk(a)) {
-                v.setAlpha(0f);
-                v.animate().alpha(1f).setDuration(350).start();
-            } else v.setAlpha(1f);
+                value.setAlpha(0f);
+                value.animate().alpha(1f).setDuration(350).start();
+            } else value.setAlpha(1f);
         }
-        // Every tile reserves equal space; outcome colors are restricted to actual deltas.
+
         String sub0 = k.sub == null ? "" : k.sub.trim();
         String probe = sub0.replace(String.valueOf((char) 0x2066), "")
                 .replace(String.valueOf((char) 0x2067), "")
@@ -569,13 +514,11 @@ public final class Kit {
                 || probe.startsWith("−") ? -1 : 0;
         if (k.neutralStatus) {
             TextView note = text(sub0.isEmpty() ? "✓" : sub0, 9.5f, Theme.MUTED, true);
-            note.setGravity(Gravity.CENTER);
+            note.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
             note.setSingleLine(true);
             note.setEllipsize(TextUtils.TruncateAt.END);
-            note.setPadding(Theme.dp(7), Theme.dp(3), Theme.dp(7), Theme.dp(3));
-            note.setMinHeight(Theme.dp(32));
-            note.setBackground(Theme.pill(Theme.MUTED));
-            t.addView(note, lp(-1, Theme.dp(32)));
+            note.setMinHeight(Theme.dp(28));
+            tile.addView(note, lp(-1, -2));
         } else if (direction != 0) {
             String detail = sub0.replaceFirst("^(▲|▼|↗|↘)\\s*", "").trim();
             if (detail.startsWith("+") || detail.startsWith("−") || detail.startsWith("-"))
@@ -589,41 +532,39 @@ public final class Kit {
             delta.setSingleLine(true);
             delta.setEllipsize(TextUtils.TruncateAt.END);
             if (dashboardStyle) delta.setTag("home-kpi-delta");
-            LinearLayout.LayoutParams deltaParams = lp(dashboardStyle ? -2 : -1, Theme.dp(32));
-            deltaParams.gravity = Gravity.CENTER_HORIZONTAL;
-            t.addView(delta, deltaParams);
+            LinearLayout.LayoutParams deltaParams = lp(-1, Theme.dp(28));
+            tile.addView(delta, deltaParams);
         } else {
             TextView note = text(sub0.isEmpty() ? " " : sub0, 10f, Theme.MUTED, false);
-            note.setGravity(Gravity.CENTER_HORIZONTAL);
+            note.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
             note.setSingleLine(true);
             note.setEllipsize(TextUtils.TruncateAt.END);
-            note.setMinHeight(Theme.dp(32));
-            t.addView(note, lp(-1, -2));
+            note.setMinHeight(Theme.dp(28));
+            tile.addView(note, lp(-1, -2));
         }
         if (!dashboardStyle) {
-            TextView more = text(k.action != null ? "مشاهده جزئیات ›" : " ", 9.5f, Theme.MUTED, true);
-            more.setGravity(Gravity.CENTER_HORIZONTAL);
+            TextView more = text(k.action != null ? "مشاهده جزئیات ›" : " ", 9.5f, Theme.PRIMARY, true);
             more.setSingleLine(true);
-            t.addView(more, lp(-1, -2));
+            tile.addView(more, lp(-1, -2));
         }
         String complete = k.fullValue == null || k.fullValue.trim().isEmpty() ? k.value : k.fullValue;
         String spoken = k.label + ": " + (complete == null ? "" : complete)
                 + (k.detail == null || k.detail.trim().isEmpty() ? "" : "؛ " + k.detail)
                 + (sub0.isEmpty() ? "" : "؛ " + sub0);
-        t.setContentDescription(spoken);
-        if (android.os.Build.VERSION.SDK_INT >= 26) t.setTooltipText(spoken);
+        tile.setContentDescription(spoken);
+        if (android.os.Build.VERSION.SDK_INT >= 26) tile.setTooltipText(spoken);
         View.OnLongClickListener reveal = vw -> {
             Toast.makeText(a, spoken, Toast.LENGTH_LONG).show();
             return true;
         };
-        t.setOnLongClickListener(reveal);
-        v.setContentDescription(complete == null ? "" : complete);
-        v.setOnLongClickListener(reveal);
+        tile.setOnLongClickListener(reveal);
+        value.setContentDescription(complete == null ? "" : complete);
+        value.setOnLongClickListener(reveal);
         if (k.action != null) {
-            Theme.pressable(t);
-            t.setOnClickListener(vw -> k.action.run());
+            Theme.pressable(tile);
+            tile.setOnClickListener(vw -> k.action.run());
         }
-        return t;
+        return tile;
     }
 
     /** True on tablets / wide screens (smallest width 600dp+): grids open up. */
@@ -636,31 +577,26 @@ public final class Kit {
     }
 
     public View kpiGrid(List<Kpi> kpis, int cols) {
-        int span = isWide() ? Math.max(cols, 4) : cols;
+        int span = Math.max(1, isWide() ? Math.max(cols, 4) : cols);
         LinearLayout root = v();
+        root.setTag("home-kpi-grid");
         LinearLayout row = null;
         for (int i = 0; i < kpis.size(); i++) {
             if (i % span == 0) {
                 row = h();
-                LinearLayout.LayoutParams rp = lp(-1, -2);
-                if (i > 0) rp.setMargins(0, Theme.dp(10), 0, 0);
-                root.addView(row, rp);
+                LinearLayout.LayoutParams rowParams = lp(-1, -2);
+                if (i > 0) rowParams.setMargins(0, Theme.dp(6), 0, 0);
+                root.addView(row, rowParams);
             }
             View tile = kpiTile(kpis.get(i));
-            // Equal width (weight 1). Height stays wrap: all tiles share the same
-            // single-line structure, so they come out equal without MATCH_PARENT pitfalls.
-            LinearLayout.LayoutParams p = wlp(1f);
-            if (i % span != span - 1) p.setMarginEnd(Theme.dp(10));
-            row.addView(tile, p);
-            // Value reveal: each KPI tile settles from 94% with a short stagger (skipped when
-            // the system animations are off).
+            LinearLayout.LayoutParams params = wlp(1f);
+            if (i % span != span - 1) params.setMarginEnd(Theme.dp(8));
+            row.addView(tile, params);
             if (Ui.motionOk(a)) {
                 tile.setAlpha(0f);
-                tile.setScaleX(0.94f);
-                tile.setScaleY(0.94f);
-                tile.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(320)
-                        .setStartDelay(i * 60L).setInterpolator(new android.view.animation.DecelerateInterpolator())
-                        .start();
+                tile.setTranslationY(Theme.dp(7));
+                tile.animate().alpha(1f).translationY(0f)
+                        .setStartDelay(Math.min(180, (i % span) * 45L)).setDuration(260).start();
             }
         }
         return root;
@@ -777,15 +713,19 @@ public final class Kit {
 
     public View alertRow(String title, String body, int accent, View.OnClickListener onClick) {
         LinearLayout line = h();
-        line.setPadding(Theme.dp(11), Theme.dp(10), Theme.dp(11), Theme.dp(10));
-        line.setBackground(Theme.ghostButton(accent));
-        TextView dot = text("●", 15, accent, true);
-        line.addView(dot, new LinearLayout.LayoutParams(Theme.dp(24), -2));
+        line.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        line.setMinimumHeight(Theme.dp(48));
+        line.setPadding(Theme.dp(8), Theme.dp(8), Theme.dp(8), Theme.dp(8));
+        int iconRes = accent == Theme.DANGER ? R.drawable.mi_error
+                : accent == Theme.SUCCESS ? R.drawable.mi_check_circle : R.drawable.mi_warning;
+        line.addView(icon(iconRes, Theme.sectionText(accent), 19),
+                lp(Theme.dp(22), Theme.dp(22)));
+        line.addView(space(8));
         LinearLayout copy = v();
         copy.addView(text(title, 12f, Theme.TEXT, true), lp(-1, -2));
         if (body != null && !body.isEmpty()) {
-            TextView b = text(body, 10.8f, Theme.MUTED, false);
-            copy.addView(b, lp(-1, -2));
+            TextView caption = text(body, 10.8f, Theme.MUTED, false);
+            copy.addView(caption, lp(-1, -2));
         }
         line.addView(copy, wlp(1f));
         if (onClick != null) {
@@ -796,24 +736,24 @@ public final class Kit {
     }
 
     public View navRow(String glyph, String title, String subLine, int accent, View.OnClickListener onClick) {
-        LinearLayout c = h();
-        c.setBackground(Theme.card());
-        c.setPadding(Theme.dp(13), Theme.dp(12), Theme.dp(13), Theme.dp(12));
-        Theme.lift(c, Theme.cardElevation());
-        TextView g = text(glyph, 22, accent, true);
-        g.setGravity(Gravity.CENTER);
-        g.setBackground(Theme.avatar(Theme.alpha(accent, 52)));
-        c.addView(g, new LinearLayout.LayoutParams(Theme.dp(48), Theme.dp(48)));
-        c.addView(space(10));
+        LinearLayout row = h();
+        row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        row.setBackground(Theme.card());
+        row.setMinimumHeight(Theme.dp(56));
+        row.setPadding(Theme.dp(12), Theme.dp(10), Theme.dp(12), Theme.dp(10));
+        int vector = MeelanoIcons.iconFor(glyph);
+        if (vector != 0) row.addView(icon(vector, Theme.sectionText(accent), 20),
+                lp(Theme.dp(22), Theme.dp(22)));
+        else row.addView(text(glyph, 20, Theme.sectionText(accent), true), lp(Theme.dp(22), Theme.dp(22)));
+        row.addView(space(9));
         LinearLayout copy = v();
         copy.addView(text(title, 14f, Theme.TEXT, true), lp(-1, -2));
         if (subLine != null && !subLine.isEmpty()) copy.addView(sub(subLine), lp(-1, -2));
-        c.addView(copy, wlp(1f));
-        TextView arrow = text("‹", 24, Theme.MUTED, true);
-        c.addView(arrow, lp(-2, -2));
-        Theme.pressable(c);
-        c.setOnClickListener(onClick);
-        return c;
+        row.addView(copy, wlp(1f));
+        row.addView(icon(R.drawable.mi_chevron_left, Theme.MUTED, 18), lp(Theme.dp(20), Theme.dp(20)));
+        Theme.pressable(row);
+        row.setOnClickListener(onClick);
+        return row;
     }
 
     /** Fraction bar: track + fill drawn in onDraw — exact at any size, no layout races. */
@@ -888,12 +828,10 @@ public final class Kit {
         b.setTypeface(Theme.face(true));
         b.setBackground(Theme.stated(Theme.goldButton()));
         b.setGravity(Gravity.CENTER);
-        b.setLetterSpacing(0.015f);
-        b.setElevation(Theme.dp(2));
-        b.setPadding(Theme.dp(16), Theme.dp(10), Theme.dp(16), Theme.dp(10));
-        b.setMinHeight(Theme.dp(52));
-        b.setMinimumHeight(Theme.dp(52));
-        if (t != null && t.trim().length() <= 2) b.setMinWidth(Theme.dp(52));
+        b.setPadding(Theme.dp(16), Theme.dp(8), Theme.dp(16), Theme.dp(8));
+        b.setMinHeight(Theme.dp(48));
+        b.setMinimumHeight(Theme.dp(48));
+        if (t != null && t.trim().length() <= 2) b.setMinWidth(Theme.dp(48));
         b.setOnClickListener(onClick);
         b.setAllCaps(false);
         MeelanoIcons.iconize(b);
@@ -905,12 +843,11 @@ public final class Kit {
         Button b = new Button(a);
         b.setText(t);
         b.setTextSize(12.5f * Theme.fontScale());
-        b.setTextColor(isOutcomeColor(accent) ? Theme.TEXT : Theme.sectionText(accent));
+        b.setTextColor(Theme.sectionText(accent));
         b.setTypeface(Theme.face(true));
         b.setBackground(Theme.stated(Theme.ghostButton(accent)));
         b.setGravity(Gravity.CENTER);
-        b.setElevation(Theme.dp(1));
-        b.setPadding(Theme.dp(14), Theme.dp(9), Theme.dp(14), Theme.dp(9));
+        b.setPadding(Theme.dp(14), Theme.dp(8), Theme.dp(14), Theme.dp(8));
         b.setMinHeight(Theme.dp(48));
         b.setMinimumHeight(Theme.dp(48));
         if (t != null && t.trim().length() <= 2) b.setMinWidth(Theme.dp(48));
@@ -922,12 +859,14 @@ public final class Kit {
     }
 
     public TextView chip(String t, boolean selected, int accent, View.OnClickListener onClick) {
-        TextView c = text(t, 11.5f, selected ? Theme.onAccent(accent) : accent, true);
-        c.setBackground(Theme.chip(selected, selected ? accent : Theme.alpha(accent, 255)));
-        c.setPadding(Theme.dp(14), Theme.dp(10), Theme.dp(14), Theme.dp(10));
+        int sectionHue = visualAccent(t, accent);
+        TextView c = text(t, 11.5f, selected ? Theme.onAccent(sectionHue) : Theme.TEXT, true);
+        c.setBackground(Theme.chip(selected, sectionHue));
+        c.setPadding(Theme.dp(14), Theme.dp(8), Theme.dp(14), Theme.dp(8));
         c.setMinHeight(Theme.dp(48));
         c.setMinWidth(Theme.dp(48));
         c.setSingleLine(true);
+        c.setSelected(selected);
         Theme.pressable(c);
         c.setOnClickListener(onClick);
         return c;
@@ -946,38 +885,36 @@ public final class Kit {
     /** Equal-width, accessible segmented selector for a small fixed set of choices. */
     public View segmentedControl(String[] items, int selected, int[] iconRes,
                                  int accent, final ChipsListener listener) {
+        int sectionHue = visualAccent("", accent);
         LinearLayout group = h();
         group.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         group.setGravity(Gravity.CENTER_VERTICAL);
-        group.setPadding(Theme.dp(4), Theme.dp(4), Theme.dp(4), Theme.dp(4));
+        group.setPadding(Theme.dp(3), Theme.dp(3), Theme.dp(3), Theme.dp(3));
         group.setBackground(Theme.card());
         if (items == null) return group;
         for (int i = 0; i < items.length; i++) {
             final int index = i;
             final String label = items[i] == null ? "" : items[i];
             boolean chosen = i == selected;
-            LinearLayout segment = v();
+            LinearLayout segment = h();
             segment.setGravity(Gravity.CENTER);
             segment.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-            segment.setPadding(Theme.dp(4), Theme.dp(4), Theme.dp(4), Theme.dp(4));
+            segment.setPadding(Theme.dp(8), Theme.dp(5), Theme.dp(8), Theme.dp(5));
             segment.setMinimumHeight(Theme.dp(48));
-            segment.setBackground(chosen ? Theme.chip(true, accent)
+            segment.setBackground(chosen ? Theme.chip(true, sectionHue)
                     : new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
             int vector = iconRes != null && i < iconRes.length ? iconRes[i] : 0;
             if (vector != 0) {
-                View mark = iconBadge(vector, accent, 28);
-                LinearLayout.LayoutParams ip = lp(Theme.dp(28), Theme.dp(28));
-                ip.gravity = Gravity.CENTER_HORIZONTAL;
-                segment.addView(mark, ip);
+                segment.addView(icon(vector, chosen ? Theme.onAccent(sectionHue) : Theme.MUTED, 18),
+                        lp(Theme.dp(20), Theme.dp(20)));
+                segment.addView(space(5));
             }
-            TextView text = text(label, 10.5f, chosen ? Theme.onAccent(accent) : Theme.TEXT, true);
+            TextView text = text(label, 10.5f, chosen ? Theme.onAccent(sectionHue) : Theme.TEXT, true);
             text.setGravity(Gravity.CENTER);
             text.setMaxLines(2);
             text.setEllipsize(TextUtils.TruncateAt.END);
             text.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-            LinearLayout.LayoutParams tp = lp(-1, -2);
-            if (vector != 0) tp.topMargin = Theme.dp(3);
-            segment.addView(text, tp);
+            segment.addView(text, lp(-2, -2));
             segment.setContentDescription(label);
             segment.setSelected(chosen);
             segment.setFocusable(true);
@@ -1020,14 +957,15 @@ public final class Kit {
 
     private View chipWithIcon(String label, boolean selected, int accent, int iconRes,
                               View.OnClickListener onClick) {
-        int ink = selected ? Theme.onAccent(accent) : accent;
+        int sectionHue = visualAccent(label, accent);
+        int ink = selected ? Theme.onAccent(sectionHue) : Theme.TEXT;
         LinearLayout c = h();
         c.setGravity(Gravity.CENTER_VERTICAL);
         c.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        c.setBackground(Theme.chip(selected, selected ? accent : Theme.alpha(accent, 255)));
-        c.setPadding(Theme.dp(10), Theme.dp(5), Theme.dp(12), Theme.dp(5));
-        ImageView artwork = icon(iconRes, ink, 26);
-        c.addView(artwork, lp(Theme.dp(26), Theme.dp(26)));
+        c.setBackground(Theme.chip(selected, sectionHue));
+        c.setPadding(Theme.dp(10), Theme.dp(6), Theme.dp(12), Theme.dp(6));
+        ImageView symbol = icon(iconRes, selected ? ink : sectionHue, 20);
+        c.addView(symbol, lp(Theme.dp(20), Theme.dp(20)));
         c.addView(space(5), lp(Theme.dp(5), 1));
         TextView title = text(label, 11.5f, ink, true);
         title.setSingleLine(true);
@@ -1101,25 +1039,30 @@ public final class Kit {
 
     /** In-content filter bar: live summary of the section's filters, opens the sheet. */
     public View filterBar(String summary, boolean active, View.OnClickListener onTap) {
-        LinearLayout r = h();
-        r.setGravity(Gravity.CENTER_VERTICAL);
-        r.setBackground(active ? Theme.cardAccent(Theme.GOLD) : Theme.card());
-        r.setPadding(Theme.dp(12), Theme.dp(9), Theme.dp(12), Theme.dp(9));
-        TextView ic = text("◈", 17, active ? Theme.GOLD : Theme.MUTED, true);
-        r.addView(ic, lp(-2, -2));
-        r.addView(space(8));
+        LinearLayout row = h();
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        row.setBackground(active ? Theme.cardAccent(Theme.PRIMARY) : Theme.card());
+        row.setMinimumHeight(Theme.dp(48));
+        row.setPadding(Theme.dp(12), Theme.dp(9), Theme.dp(12), Theme.dp(9));
+        row.addView(icon(R.drawable.mi_search, active ? Theme.PRIMARY : Theme.MUTED, 18),
+                lp(Theme.dp(20), Theme.dp(20)));
+        row.addView(space(8));
         LinearLayout copy = v();
-        copy.addView(text("فیلترها" + (active ? " • فعال" : ""), 10f, active ? Theme.GOLD_SOFT : Theme.MUTED, true), lp(-1, -2));
-        TextView sm = text(summary == null || summary.isEmpty() ? "همه" : summary, 12f, Theme.TEXT, false);
-        sm.setSingleLine(true);
-        sm.setEllipsize(TextUtils.TruncateAt.END);
-        copy.addView(sm, lp(-1, -2));
-        r.addView(copy, wlp(1f));
-        r.addView(space(8));
-        r.addView(text("‹", 20, Theme.GOLD_SOFT, true), lp(-2, -2));
-        Theme.pressable(r);
-        r.setOnClickListener(onTap);
-        return r;
+        copy.addView(text("فیلترها" + (active ? " • فعال" : ""), 10f,
+                active ? Theme.PRIMARY : Theme.MUTED, true), lp(-1, -2));
+        TextView caption = text(summary == null || summary.isEmpty() ? "همه" : summary,
+                12f, Theme.TEXT, false);
+        caption.setSingleLine(true);
+        caption.setEllipsize(TextUtils.TruncateAt.END);
+        copy.addView(caption, lp(-1, -2));
+        row.addView(copy, wlp(1f));
+        row.addView(space(8));
+        row.addView(icon(R.drawable.mi_chevron_left, Theme.MUTED, 18),
+                lp(Theme.dp(20), Theme.dp(20)));
+        Theme.pressable(row);
+        row.setOnClickListener(onTap);
+        return row;
     }
 
     // ---------------- shared states ----------------
@@ -1128,18 +1071,13 @@ public final class Kit {
                          boolean busy, View.OnClickListener retry) {
         LinearLayout pill = h();
         pill.setGravity(Gravity.CENTER_VERTICAL);
+        pill.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         pill.setMinimumHeight(Theme.dp(48));
-        pill.setPadding(Theme.dp(10), Theme.dp(6), Theme.dp(10), Theme.dp(6));
-        pill.setBackground(Theme.kpi(accent));
-
-        FrameLayout badge = new FrameLayout(a);
-        badge.setBackground(Theme.avatar(Theme.alpha(accent, Theme.isLight() ? 25 : 36)));
-        ImageView symbol = icon(iconRes, Theme.sectionText(accent), 24);
+        pill.setPadding(0, Theme.dp(4), 0, Theme.dp(4));
+        ImageView symbol = icon(iconRes, Theme.sectionText(accent), 18);
         symbol.setContentDescription(null);
-        badge.addView(symbol, new FrameLayout.LayoutParams(Theme.dp(24), Theme.dp(24), Gravity.CENTER));
-        pill.addView(badge, new LinearLayout.LayoutParams(Theme.dp(34), Theme.dp(34)));
-        pill.addView(space(8));
-
+        pill.addView(symbol, lp(Theme.dp(20), Theme.dp(20)));
+        pill.addView(space(7));
         LinearLayout copy = v();
         TextView heading = text(title, 11.5f, Theme.TEXT, true);
         heading.setMaxLines(1);
@@ -1168,6 +1106,7 @@ public final class Kit {
             });
         }
         if (retry != null) {
+            pill.setMinimumWidth(Theme.dp(48));
             Theme.pressable(pill);
             pill.setOnClickListener(retry);
         }
@@ -1178,15 +1117,16 @@ public final class Kit {
     public View emptyRow(String message) {
         LinearLayout row = h();
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setMinimumHeight(Theme.dp(48));
-        row.setPadding(Theme.dp(8), Theme.dp(6), Theme.dp(8), Theme.dp(6));
-        row.addView(iconBadge(R.drawable.mi_check_circle, Theme.SUCCESS, 32),
-                new LinearLayout.LayoutParams(Theme.dp(32), Theme.dp(32)));
+        row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        row.setMinimumHeight(Theme.dp(44));
+        row.setPadding(Theme.dp(4), Theme.dp(5), Theme.dp(4), Theme.dp(5));
+        row.addView(icon(R.drawable.mi_check_circle, Theme.SUCCESS, 18),
+                lp(Theme.dp(20), Theme.dp(20)));
         row.addView(space(8));
-        TextView text = text(message == null || message.trim().isEmpty()
+        TextView caption = text(message == null || message.trim().isEmpty()
                 ? "همه‌چیز مرتب است" : message, 11.5f, Theme.MUTED, false);
-        text.setMaxLines(2);
-        row.addView(text, wlp(1f));
+        caption.setMaxLines(2);
+        row.addView(caption, wlp(1f));
         row.setContentDescription(message == null || message.trim().isEmpty()
                 ? "همه‌چیز مرتب است" : message);
         return row;
@@ -1195,18 +1135,15 @@ public final class Kit {
     /** Skeleton shimmer block. Its width is a fraction of a horizontal row. */
     public View skeletonBlock(int heightDp, float widthFraction) {
         View block = new View(a);
-        int base = Theme.SURFACE2;
-        int highlight = Theme.alpha(Theme.GOLD_METAL, Theme.isLight() ? 28 : 34);
-        android.graphics.drawable.GradientDrawable shimmer = new android.graphics.drawable.GradientDrawable(
-                android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
-                new int[]{Theme.alpha(base, 255), highlight, Theme.alpha(base, 255)});
-        shimmer.setCornerRadius(Theme.dp(Math.max(6, Math.min(12, heightDp / 2))));
-        shimmer.setStroke(Theme.dp(1), Theme.alpha(Theme.GOLD_METAL, Theme.isLight() ? 28 : 32));
-        block.setBackground(shimmer);
+        android.graphics.drawable.GradientDrawable skeleton = new android.graphics.drawable.GradientDrawable();
+        skeleton.setColor(Theme.SURFACE2);
+        skeleton.setCornerRadius(Theme.dp(Math.max(6, Math.min(10, heightDp / 2))));
+        skeleton.setStroke(Theme.dp(1), Theme.BORDER);
+        block.setBackground(skeleton);
         block.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         if (Ui.motionOk(a)) {
             android.animation.ObjectAnimator pulse = android.animation.ObjectAnimator.ofFloat(
-                    block, View.ALPHA, 0.58f, 1f);
+                    block, View.ALPHA, 0.72f, 1f);
             pulse.setDuration(1250);
             pulse.setRepeatMode(ValueAnimator.REVERSE);
             pulse.setRepeatCount(ValueAnimator.INFINITE);
@@ -1223,17 +1160,20 @@ public final class Kit {
     // ---------------- states ----------------
     /** Fake search field (gold loupe + hint) that opens the filter sheet. */
     public View searchBar(String hint, View.OnClickListener onClick) {
-        LinearLayout r = h();
-        r.setGravity(Gravity.CENTER_VERTICAL);
-        r.setBackground(Theme.searchBar());
-        r.setPadding(Theme.dp(14), Theme.dp(11), Theme.dp(14), Theme.dp(11));
-        r.addView(text("⌕", 17, Theme.GOLD, true), lp(-2, -2));
-        r.addView(space(8));
-        TextView t = text(hint == null || hint.isEmpty() ? "جستجو…" : hint, 12f, Theme.MUTED, false);
-        r.addView(t, wlp(1f));
-        Theme.pressable(r);
-        r.setOnClickListener(onClick);
-        return r;
+        LinearLayout row = h();
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        row.setBackground(Theme.searchBar());
+        row.setMinimumHeight(Theme.dp(48));
+        row.setPadding(Theme.dp(12), Theme.dp(10), Theme.dp(12), Theme.dp(10));
+        row.addView(icon(R.drawable.mi_search, Theme.PRIMARY, 18), lp(Theme.dp(20), Theme.dp(20)));
+        row.addView(space(8));
+        TextView caption = text(hint == null || hint.isEmpty() ? "جستجو…" : hint,
+                12f, Theme.MUTED, false);
+        row.addView(caption, wlp(1f));
+        Theme.pressable(row);
+        row.setOnClickListener(onClick);
+        return row;
     }
 
     /**
@@ -1242,91 +1182,102 @@ public final class Kit {
      * so the layout does not jump when content arrives.
      */
     public View loading(String msg) {
-        LinearLayout c = luxCard();
+        LinearLayout card = luxCard();
         TextView title = text(msg, 12f, Theme.MUTED, false);
-        c.addView(title, lp(-1, -2));
-        int[] heights = {16, 12, 12, 44};
+        card.addView(title, lp(-1, -2));
+        int[] heights = {16, 12, 12, 36};
         float[] widths = {0.55f, 0.85f, 0.4f, 1f};
         for (int i = 0; i < heights.length; i++) {
             LinearLayout line = h();
             line.addView(skeletonBlock(heights[i], widths[i]));
             if (widths[i] < 1f)
                 line.addView(new Space(a), new LinearLayout.LayoutParams(0, 1, 1f - widths[i]));
-            LinearLayout.LayoutParams p = lp(-1, -2);
-            p.topMargin = Theme.dp(i == 0 ? 12 : 8);
-            c.addView(line, p);
+            LinearLayout.LayoutParams params = lp(-1, -2);
+            params.topMargin = Theme.dp(i == 0 ? 12 : 8);
+            card.addView(line, params);
         }
-        c.setContentDescription(msg == null ? "در حال بارگذاری" : msg);
-        return c;
+        card.setContentDescription(msg == null ? "در حال بارگذاری" : msg);
+        return card;
     }
 
     /** Empty state: a small gold illustration, a title and a one-line guidance text. */
     public View empty(String title, String body) {
-        LinearLayout c = card();
-        c.setGravity(Gravity.CENTER_HORIZONTAL);
-        c.setPadding(Theme.dp(16), Theme.dp(18), Theme.dp(16), Theme.dp(18));
-        c.addView(new ir.meelano.manager.ui.EmptyArt(a, ir.meelano.manager.ui.EmptyArt.EMPTY),
-                new LinearLayout.LayoutParams(Theme.dp(96), Theme.dp(96)));
-        TextView t = text(title, 14f, Theme.TEXT, true);
-        t.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams tp = lp(-1, -2);
-        tp.setMargins(0, Theme.dp(8), 0, 0);
-        c.addView(t, tp);
+        LinearLayout card = card();
+        card.setGravity(Gravity.CENTER_HORIZONTAL);
+        card.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(16));
+        ImageView symbol = icon(R.drawable.mi_inbox, Theme.MUTED, 24);
+        LinearLayout.LayoutParams ip = lp(Theme.dp(28), Theme.dp(28));
+        ip.gravity = Gravity.CENTER_HORIZONTAL;
+        card.addView(symbol, ip);
+        TextView heading = text(title, 14f, Theme.TEXT, true);
+        heading.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams hp = lp(-1, -2);
+        hp.topMargin = Theme.dp(7);
+        card.addView(heading, hp);
         if (body != null && !body.isEmpty()) {
-            TextView b = text(body, 11.5f, Theme.MUTED, false);
-            b.setGravity(Gravity.CENTER);
-            c.addView(b, lp(-1, -2));
+            TextView caption = text(body, 11.5f, Theme.MUTED, false);
+            caption.setGravity(Gravity.CENTER);
+            card.addView(caption, lp(-1, -2));
         }
-        return c;
+        return card;
     }
 
     /** Calm card for reports whose data source is not confirmed in this database (not a crash). */
     public View unavailable(String msg) {
-        LinearLayout c = card(Theme.GOLD);
-        TextView g = text("◈", 30, Theme.GOLD, true);
-        g.setGravity(Gravity.CENTER);
-        c.addView(g, lp(-1, -2));
-        TextView t = text("این گزارش فعلاً در دسترس نیست", 14f, Theme.TEXT, true);
-        t.setGravity(Gravity.CENTER);
-        c.addView(t, lp(-1, -2));
-        TextView b = text(msg == null || msg.isEmpty() ? "ساختار دیتابیس برای این گزارش تأیید نشده است." : msg, 11.5f, Theme.MUTED, false);
-        b.setGravity(Gravity.CENTER);
-        c.addView(b, lp(-1, -2));
-        TextView n = text("پس از تأیید ساختار دیتابیس فعال می‌شود؛ اعداد نادرست نمایش داده نمی‌شوند.", 11f, Theme.MUTED, false);
-        n.setGravity(Gravity.CENTER);
+        LinearLayout card = card();
+        card.setGravity(Gravity.CENTER_HORIZONTAL);
+        ImageView symbol = icon(R.drawable.mi_help, Theme.MUTED, 22);
+        LinearLayout.LayoutParams ip = lp(Theme.dp(26), Theme.dp(26));
+        ip.gravity = Gravity.CENTER_HORIZONTAL;
+        card.addView(symbol, ip);
+        TextView title = text("این گزارش فعلاً در دسترس نیست", 14f, Theme.TEXT, true);
+        title.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams tp = lp(-1, -2);
+        tp.topMargin = Theme.dp(6);
+        card.addView(title, tp);
+        TextView body = text(msg == null || msg.isEmpty()
+                ? "ساختار دیتابیس برای این گزارش تأیید نشده است." : msg, 11.5f, Theme.MUTED, false);
+        body.setGravity(Gravity.CENTER);
+        card.addView(body, lp(-1, -2));
+        TextView note = text("پس از تأیید ساختار دیتابیس فعال می‌شود؛ اعداد نادرست نمایش داده نمی‌شوند.",
+                11f, Theme.MUTED, false);
+        note.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams np = lp(-1, -2);
-        np.setMargins(0, Theme.dp(8), 0, 0);
-        c.addView(n, np);
-        return c;
+        np.topMargin = Theme.dp(6);
+        card.addView(note, np);
+        return card;
     }
 
     /** Error state: alert illustration, the reason, a hint on what to check, and a retry button. */
     public View error(String msg, final Runnable retry) {
-        LinearLayout c = card(Theme.DANGER);
-        c.setGravity(Gravity.CENTER_HORIZONTAL);
-        c.setPadding(Theme.dp(16), Theme.dp(18), Theme.dp(16), Theme.dp(18));
-        c.addView(new ir.meelano.manager.ui.EmptyArt(a, ir.meelano.manager.ui.EmptyArt.ERROR),
-                new LinearLayout.LayoutParams(Theme.dp(96), Theme.dp(96)));
-        TextView t = text("خطا در دریافت اطلاعات", 14f, Theme.TEXT, true);
-        t.setGravity(Gravity.CENTER);
+        LinearLayout card = card(Theme.DANGER);
+        card.setGravity(Gravity.CENTER_HORIZONTAL);
+        ImageView symbol = icon(R.drawable.mi_error, Theme.DANGER, 24);
+        LinearLayout.LayoutParams ip = lp(Theme.dp(28), Theme.dp(28));
+        ip.gravity = Gravity.CENTER_HORIZONTAL;
+        card.addView(symbol, ip);
+        TextView title = text("خطا در دریافت اطلاعات", 14f, Theme.TEXT, true);
+        title.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams tp = lp(-1, -2);
-        tp.setMargins(0, Theme.dp(8), 0, 0);
-        c.addView(t, tp);
-        TextView b = text(msg == null || msg.isEmpty() ? "خطای نامشخص" : msg, 11.5f, Theme.MUTED, false);
-        b.setGravity(Gravity.CENTER);
-        c.addView(b, lp(-1, -2));
-        TextView hint = text("اتصال شبکه و تنظیمات سرور را بررسی کنید، سپس دوباره تلاش کنید.", 11f, Theme.GOLD_SOFT, false);
+        tp.topMargin = Theme.dp(7);
+        card.addView(title, tp);
+        TextView body = text(msg == null || msg.isEmpty() ? "خطای نامشخص" : msg,
+                11.5f, Theme.MUTED, false);
+        body.setGravity(Gravity.CENTER);
+        card.addView(body, lp(-1, -2));
+        TextView hint = text("اگر مشکل ادامه داشت، وضعیت سرویس و گزارش خطا را بررسی کنید.",
+                11f, Theme.MUTED, false);
         hint.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams hp = lp(-1, -2);
-        hp.setMargins(0, Theme.dp(6), 0, 0);
-        c.addView(hint, hp);
+        hp.topMargin = Theme.dp(6);
+        card.addView(hint, hp);
         if (retry != null) {
-            Button r = btnGold("⇅ تلاش مجدد", v -> retry.run());
+            Button button = btnGold("تلاش دوباره", v -> retry.run());
             LinearLayout.LayoutParams p = lp(-1, -2);
-            p.setMargins(0, Theme.dp(12), 0, 0);
-            c.addView(r, p);
+            p.topMargin = Theme.dp(12);
+            card.addView(button, p);
         }
-        return c;
+        return card;
     }
 
     public View pager(int page, boolean hasMore, final Runnable prev, final Runnable next) {
@@ -1610,34 +1561,13 @@ public final class Kit {
     }
 
     public ImageView logo(int sizeDp) {
-        ImageView v = new ImageView(a);
-        try {
-            v.setImageResource(Theme.logoRes());
-        } catch (Exception ignored) { Diag.ignored("Kit:957", ignored); }
-        v.setAdjustViewBounds(true);
-        v.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        // Gold ring framing: the artwork sits on a themed halo and is clipped to a circle,
-        // so the crest reads as a premium badge on both light and dark palettes.
-        try {
-            android.graphics.drawable.GradientDrawable ring = new android.graphics.drawable.GradientDrawable();
-            ring.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-            ring.setColor(Theme.alpha(Theme.GOLD, 30));
-            ring.setStroke(Theme.dp(2), Theme.alpha(Theme.GOLD, 220));
-            v.setBackground(ring);
-            v.setPadding(Theme.dp(3), Theme.dp(3), Theme.dp(3), Theme.dp(3));
-            v.setClipToOutline(true);
-            v.setOutlineProvider(new android.view.ViewOutlineProvider() {
-                @Override
-                public void getOutline(android.view.View view, android.graphics.Outline o) {
-                    o.setOval(0, 0, view.getWidth(), view.getHeight());
-                }
-            });
-        } catch (Exception ignored) { Diag.ignored("Kit:976", ignored); }
-        // Honour the requested size: the argument used to be accepted and then ignored, so a
-        // caller that relied on it got an unsized ImageView and the artwork rendered at its
-        // raw pixel size instead.
-        if (sizeDp > 0) v.setLayoutParams(new LinearLayout.LayoutParams(Theme.dp(sizeDp), Theme.dp(sizeDp)));
-        return v;
+        int size = sizeDp > 0 ? sizeDp : 24;
+        ImageView image = icon(R.drawable.mi_diamond,
+                Theme.isNuts() ? Theme.GOLD_DARK : Theme.PRIMARY, size);
+        image.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        image.setContentDescription("نشان میلانو");
+        if (sizeDp <= 0) image.setLayoutParams(new LinearLayout.LayoutParams(-2, -2));
+        return image;
     }
 
     /** «امروز ۱۴ مهر» style date line. */
@@ -1782,14 +1712,11 @@ public final class Kit {
 
     /** Neon status chip (موجود / کم‌موجود / ناموجود) in the given tone. */
     public TextView stockChip(String label, int tone) {
-        TextView t = text(label, 10f, tone, true);
-        t.setSingleLine(true);
-        t.setPadding(Theme.dp(8), Theme.dp(2), Theme.dp(8), Theme.dp(2));
-        t.setBackground(Theme.pill(tone));
-        try {
-            t.setShadowLayer(Theme.dp(4), 0, 0, Theme.alpha(tone, 150));
-        } catch (Exception ignored) { Diag.ignored("Kit:chipGlow", ignored); }
-        return t;
+        TextView text = text(label, 10f, Theme.sectionText(tone), true);
+        text.setSingleLine(true);
+        text.setPadding(Theme.dp(8), Theme.dp(3), Theme.dp(8), Theme.dp(3));
+        text.setBackground(Theme.pill(tone));
+        return text;
     }
 
     public View invRowTone(String name, String code, String extra, String qty, String price,
@@ -1880,7 +1807,7 @@ public final class Kit {
         return e;
     }
 
-    /** Flat, tinted Material vector for compact controls; themed 3D marks use artworkIcon. */
+    /** Flat, theme-tinted Material vector for compact controls. */
     public ImageView icon(int res, int color, int dp) {
         ImageView v = new ImageView(a);
         try {
@@ -1904,45 +1831,22 @@ public final class Kit {
         return v;
     }
 
-    /**
-     * Theme-aware image for a section mark. Mapped 3D assets keep their original jewel colors;
-     * unmapped glyphs fall back to the normal tinted vector family.
-     */
+    /** Compatibility alias for a flat, theme-tinted vector image. */
     public ImageView artworkIcon(int iconRes, int color, int sizeDp) {
-        int artwork = Theme.icon3d(iconRes);
-        if (!Theme.isIcon3d(artwork)) return icon(iconRes, color, sizeDp);
-        ImageView image = new ImageView(a);
-        try {
-            image.setImageResource(artwork);
-        } catch (Exception error) {
-            Diag.ignored("Kit:artworkIcon", error);
-            return icon(iconRes, color, sizeDp);
-        }
-        int size = Theme.dp(sizeDp);
-        image.setLayoutParams(new LinearLayout.LayoutParams(size, size));
-        image.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        image.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-        return image;
+        return icon(iconRes, color, sizeDp);
     }
 
-    /** 3D artwork when the selected theme provides it; otherwise an accent-washed vector badge. */
+    /** Flat vector glyph on a quiet theme-aware icon tile. */
     public FrameLayout iconBadge(int iconRes, int accent, int sizeDp) {
-        int artwork = Theme.icon3d(iconRes);
         FrameLayout badge = new FrameLayout(a);
         badge.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-        if (Theme.isIcon3d(artwork)) {
-            ImageView symbol = artworkIcon(iconRes, Theme.sectionText(accent), sizeDp);
-            symbol.setContentDescription(null);
-            badge.addView(symbol, new FrameLayout.LayoutParams(-1, -1, Gravity.CENTER));
-            return badge;
-        }
-        badge.setBackground(Theme.avatar(Theme.alpha(accent, Theme.isLight() ? 28 : 42)));
-        int inner = Math.min(24, Math.max(16, sizeDp - 8));
+        badge.setBackground(Theme.avatar(Theme.sectionTint(accent)));
+        int inner = Math.min(22, Math.max(16, sizeDp - 8));
         ImageView symbol = icon(iconRes, Theme.sectionText(accent), inner);
         symbol.setContentDescription(null);
-        FrameLayout.LayoutParams p = new FrameLayout.LayoutParams(
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
                 Theme.dp(inner), Theme.dp(inner), Gravity.CENTER);
-        badge.addView(symbol, p);
+        badge.addView(symbol, params);
         return badge;
     }
 

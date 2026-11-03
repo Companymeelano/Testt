@@ -52,6 +52,7 @@ public class AssistantPromptTest {
         StringBuilder facts = new StringBuilder();
         for (int i = 0; i < 8_500; i++) facts.append('د');
         List<String[]> history = new ArrayList<>();
+        history.add(new String[]{"user", "پرسش آغازین"});
         for (int i = 0; i < 12; i++) history.add(new String[]{"ai", "پاسخ " + i + " " + facts.substring(0, 900)});
         history.add(new String[]{"user", "پرسش پایانی"});
         String prompt = AssistantPrompt.build(facts.toString(), history, "پرسش پایانی");

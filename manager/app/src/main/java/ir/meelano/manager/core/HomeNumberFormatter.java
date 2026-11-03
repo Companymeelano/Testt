@@ -2,6 +2,7 @@ package ir.meelano.manager.core;
 
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
+import java.math.BigDecimal;
 import java.util.Locale;
 
 /** One RTL-safe number formatter for text rendered on the Home dashboard. */
@@ -124,6 +125,28 @@ public final class HomeNumberFormatter {
     /** Full Rial amount in the selected display unit (Toman or Rial). */
     public static String money(double rials) {
         return isolate(formatNumber(Money.toUnit(rials), 0)) + " " + Money.unitName();
+    }
+
+    /** Exact Rial amount formatted without converting through binary floating point. */
+    public static String money(BigDecimal rials) {
+        if (rials == null) return isolate("—") + " " + Money.unitName();
+        BigDecimal display = Money.isToman()
+                ? rials.divide(BigDecimal.TEN, 0, java.math.RoundingMode.HALF_UP)
+                : rials.setScale(0, java.math.RoundingMode.HALF_UP);
+        DecimalFormat format = new DecimalFormat("#,##0", DecimalFormatSymbols.getInstance(Locale.US));
+        format.setRoundingMode(java.math.RoundingMode.HALF_UP);
+        return isolate(localizeFormatted(format.format(display))) + " " + Money.unitName();
+    }
+
+    /** Exact-enough variance display: unlike normal totals, do not hide fractional Rials by rounding. */
+    public static String preciseMoney(BigDecimal rials) {
+        if (rials == null) return isolate("—") + " " + Money.unitName();
+        BigDecimal display = Money.isToman() ? rials.movePointLeft(1) : rials;
+        DecimalFormat format = new DecimalFormat("#,##0.#####", DecimalFormatSymbols.getInstance(Locale.US));
+        format.setMaximumFractionDigits(Money.isToman() ? 5 : 4);
+        format.setMinimumFractionDigits(0);
+        format.setRoundingMode(java.math.RoundingMode.HALF_UP);
+        return isolate(localizeFormatted(format.format(display))) + " " + Money.unitName();
     }
 
     /** Compact Rial value for chart axes, without repeating the currency unit. */

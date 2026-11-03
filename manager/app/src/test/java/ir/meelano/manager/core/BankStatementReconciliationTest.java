@@ -2,6 +2,8 @@ package ir.meelano.manager.core;
 
 import org.junit.Test;
 
+import java.math.BigDecimal;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -23,6 +25,19 @@ public class BankStatementReconciliationTest {
         assertEquals(-10, result.outflowVarianceRials, 0.0001);
         assertEquals(0, result.netVarianceRials, 0.0001);
         assertFalse(result.matches());
+    }
+
+    @Test public void exactDecimalComparisonKeepsSubRialAndLargeValuesDistinct() {
+        BigDecimal large = new BigDecimal("9007199254740993");
+        BankStatementReconciliation.Result halfRial = BankStatementReconciliation.compare(
+                true, large, BigDecimal.ZERO, true, large.add(new BigDecimal("0.50")), BigDecimal.ZERO);
+        assertEquals(BankStatementReconciliation.State.MATCH, halfRial.state);
+        assertEquals(new BigDecimal("0.50"), halfRial.inflowVarianceRialsExact);
+
+        BankStatementReconciliation.Result overHalf = BankStatementReconciliation.compare(
+                true, large, BigDecimal.ZERO, true, large.add(new BigDecimal("0.51")), BigDecimal.ZERO);
+        assertEquals(BankStatementReconciliation.State.VARIANCE, overHalf.state);
+        assertEquals(new BigDecimal("0.51"), overHalf.inflowVarianceRialsExact);
     }
 
     @Test public void missingStatementIsNotAssumedToBeZero() {

@@ -2,6 +2,8 @@ package ir.meelano.manager.core;
 
 import org.junit.Test;
 
+import java.math.BigDecimal;
+
 import static org.junit.Assert.assertEquals;
 
 public class HomeNumberFormatterTest {
@@ -25,6 +27,18 @@ public class HomeNumberFormatterTest {
             assertEquals("\u2066۱٫۳\u2069 هزار", HomeNumberFormatter.chartMoney(12_500));
             Money.setUnit(Money.UNIT_RIAL);
             assertEquals("\u2066۱۲٬۵۰۰\u2069 ریال", HomeNumberFormatter.money(12_500));
+        } finally {
+            Money.setUnit(old);
+        }
+    }
+
+    @Test public void preciseBankVarianceDisplayDoesNotRoundAwayFractionalRials() {
+        int old = Money.unit();
+        try {
+            Money.setUnit(Money.UNIT_RIAL);
+            assertEquals("\u2066۰٫۵۱\u2069 ریال", HomeNumberFormatter.preciseMoney(new BigDecimal("0.51")));
+            Money.setUnit(Money.UNIT_TOMAN);
+            assertEquals("\u2066۰٫۰۵۱\u2069 تومان", HomeNumberFormatter.preciseMoney(new BigDecimal("0.51")));
         } finally {
             Money.setUnit(old);
         }

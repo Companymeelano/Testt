@@ -4,6 +4,7 @@ import android.text.SpannableString;
 import android.text.Spanned;
 import android.text.TextUtils;
 import android.view.ViewGroup;
+import java.math.BigDecimal;
 import java.util.Locale;
 import ir.meelano.manager.core.MarketWeather;
 import ir.meelano.manager.core.Diag;
@@ -170,6 +171,8 @@ public class HomeScreen extends Screen {
         String toDay = "";
         String bankId = "";
         String bankName = "";
+        boolean sourceUnitToman;
+        boolean sourceUnitConfirmed;
         int renderToken;
         long comparedAt;
     }
@@ -4039,13 +4042,14 @@ public class HomeScreen extends Screen {
             List<Row> accounts = bankAccountsForHome(d);
             if (accounts.isEmpty()) incomplete++;
             for (Row account : accounts) {
-                Double in = parseLocalRials(a.settings.homeBankStatementInRials(day, account.s("id")));
-                Double out = parseLocalRials(a.settings.homeBankStatementOutRials(day, account.s("id")));
+                BigDecimal in = parseLocalRialsExact(a.settings.homeBankStatementInRials(day, account.s("id")));
+                BigDecimal out = parseLocalRialsExact(a.settings.homeBankStatementOutRials(day, account.s("id")));
                 if (in == null || out == null) { incomplete++; continue; }
                 Row ledger = bankMovement(d, account.s("id"));
+                BigDecimal ledgerIn = ledger == null ? BigDecimal.ZERO : ledger.bd("in");
+                BigDecimal ledgerOut = ledger == null ? BigDecimal.ZERO : ledger.bd("out");
                 BankStatementReconciliation.Result result = BankStatementReconciliation.compare(true,
-                        ledger == null ? 0 : ledger.d("in"), ledger == null ? 0 : ledger.d("out"),
-                        true, in, out);
+                        ledgerIn, ledgerOut, true, in, out);
                 checked++;
                 if (!result.matches()) issues++;
             }
@@ -4153,14 +4157,16 @@ public class HomeScreen extends Screen {
         if (name.isEmpty()) name = "حساب بانکی";
         String title = name + (id.isEmpty() ? "" : " • کد آتیران " + id);
         Row ledger = bankMovement(d, id);
-        double ledgerIn = ledger == null ? 0 : ledger.d("in");
-        double ledgerOut = ledger == null ? 0 : ledger.d("out");
-        Double statementIn = parseLocalRials(a.settings.homeBankStatementInRials(day, id));
-        Double statementOut = parseLocalRials(a.settings.homeBankStatementOutRials(day, id));
+        BigDecimal ledgerIn = ledger == null ? BigDecimal.ZERO : ledger.bd("in");
+        BigDecimal ledgerOut = ledger == null ? BigDecimal.ZERO : ledger.bd("out");
+        String rawStatementIn = a.settings.homeBankStatementInRials(day, id);
+        String rawStatementOut = a.settings.homeBankStatementOutRials(day, id);
+        BigDecimal statementIn = parseLocalRialsExact(rawStatementIn);
+        BigDecimal statementOut = parseLocalRialsExact(rawStatementOut);
+        boolean statementProvided = !rawStatementIn.trim().isEmpty() || !rawStatementOut.trim().isEmpty();
         boolean statementReady = statementIn != null && statementOut != null;
         BankStatementReconciliation.Result result = BankStatementReconciliation.compare(
-                d.bankTurnoverAvailable, ledgerIn, ledgerOut, statementReady,
-                statementIn == null ? 0 : statementIn, statementOut == null ? 0 : statementOut);
+                d.bankTurnoverAvailable, ledgerIn, ledgerOut, statementProvided, statementIn, statementOut);
         String badge;
         int tone;
         switch (result.state) {
@@ -4171,14 +4177,14 @@ public class HomeScreen extends Screen {
             default: badge = "مبلغ نامعتبر"; tone = Theme.DANGER; break;
         }
         String detail = d.bankTurnoverAvailable
-                ? "دفتر آتیران: واریز " + HomeNumberFormatter.money(ledgerIn)
-                    + " • برداشت " + HomeNumberFormatter.money(ledgerOut)
+                ? "دفتر آتیران: واریز " + HomeNumberFormatter.preciseMoney(ledgerIn)
+                    + " • برداشت " + HomeNumberFormatter.preciseMoney(ledgerOut)
                 : "دفتر آتیران: گردش تاریخ‌دار در دسترس نیست";
         if (statementReady) {
-            detail += "\nصورت‌حساب: واریز " + HomeNumberFormatter.money(statementIn)
-                    + " • برداشت " + HomeNumberFormatter.money(statementOut);
-            if (result.comparable()) detail += "\n" + bankVariancePiece("واریز", result.inflowVarianceRials)
-                    + " • " + bankVariancePiece("برداشت", result.outflowVarianceRials);
+            detail += "\nصورت‌حساب: واریز " + HomeNumberFormatter.preciseMoney(statementIn)
+                    + " • برداشت " + HomeNumberFormatter.preciseMoney(statementOut);
+            if (result.comparable()) detail += "\n" + bankVariancePiece("واریز", result.inflowVarianceRialsExact)
+                    + " • " + bankVariancePiece("برداشت", result.outflowVarianceRialsExact);
             String source = a.settings.homeBankStatementSource(day, id);
             if (!source.isEmpty()) detail += "\nمنبع: " + source;
             long updated = a.settings.homeBankStatementUpdatedAt(day, id);
@@ -4187,6 +4193,8 @@ public class HomeScreen extends Screen {
                         .format(new java.util.Date(updated));
                 detail += " • به‌روزرسانی محلی " + ir.meelano.manager.core.Money.fa(time);
             }
+        } else if (statementProvided) {
+            detail += "\nمبلغ صورت‌حساب ناقص یا نامعتبر است؛ صفر فرض نشده، برای اصلاح لمس کنید.";
         } else {
             detail += "\nصورت‌حساب واقعی: ثبت نشده؛ برای ورود ارقام واقعی لمس کنید.";
         }
@@ -4206,11 +4214,12 @@ public class HomeScreen extends Screen {
         return row;
     }
 
-    private String bankVariancePiece(String direction, double variance) {
-        if (Math.abs(variance) <= BankStatementReconciliation.TOLERANCE_RIALS)
+    private String bankVariancePiece(String direction, BigDecimal variance) {
+        if (variance == null) return direction + " نامشخص";
+        if (variance.abs().compareTo(BankStatementReconciliation.TOLERANCE_RIALS_EXACT) <= 0)
             return direction + " برابر";
-        String relation = variance > 0 ? "صورت‌حساب بیش از دفتر" : "دفتر بیش از صورت‌حساب";
-        return direction + "، " + relation + " " + HomeNumberFormatter.money(Math.abs(variance));
+        String relation = variance.signum() > 0 ? "صورت‌حساب بیش از دفتر" : "دفتر بیش از صورت‌حساب";
+        return direction + "، " + relation + " " + HomeNumberFormatter.preciseMoney(variance.abs());
     }
 
     private void showHomeBankStatementEditor(LinearLayout content, String day, Row account) {
@@ -4223,7 +4232,7 @@ public class HomeScreen extends Screen {
         if (bankName.isEmpty()) bankName = "حساب بانکی";
         LinearLayout form = a.kit.v();
         form.setPadding(Theme.dp(20), Theme.dp(10), Theme.dp(20), Theme.dp(8));
-        form.addView(a.kit.hint("جمع واقعی واریز و برداشت صورت‌حساب را برای همین روز به ریال وارد کنید. هر دو مبلغ لازم‌اند؛ صفر را فقط وقتی واقعاً صفر است وارد کنید. داده فقط روی این دستگاه ذخیره می‌شود و به آتیران فرستاده نمی‌شود."), a.kit.lp(-1, -2));
+        form.addView(a.kit.hint("جمع واقعی واریز و برداشت صورت‌حساب را برای همین روز به ریال وارد کنید؛ ارقام را بدون جداکنندهٔ هزارگان بنویسید. هر دو مبلغ لازم‌اند؛ صفر را فقط وقتی واقعاً صفر است وارد کنید. داده فقط روی این دستگاه ذخیره می‌شود و به آتیران فرستاده نمی‌شود."), a.kit.lp(-1, -2));
         android.widget.EditText inflow = a.kit.edit("واریز صورت‌حساب به ریال",
                 a.settings.homeBankStatementInRials(day, bankId));
         android.widget.EditText outflow = a.kit.edit("برداشت صورت‌حساب به ریال",
@@ -4245,8 +4254,8 @@ public class HomeScreen extends Screen {
                 .create();
         dialog.setOnShowListener(ignored -> {
             dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
-                if (parseLocalRials(inflow.getText().toString()) == null
-                        || parseLocalRials(outflow.getText().toString()) == null) {
+                if (parseLocalRialsExact(inflow.getText().toString()) == null
+                        || parseLocalRialsExact(outflow.getText().toString()) == null) {
                     a.kit.toast("واریز و برداشت را جداگانه، با عدد صفر یا بیشتر، وارد کنید");
                     return;
                 }
@@ -4415,7 +4424,9 @@ public class HomeScreen extends Screen {
         form.addView(a.kit.hint("اگر فایل چندحسابی است، ستون حساب و مقدار دقیق حساب موردنظر را وارد کنید تا ردیف‌های سایر حساب‌ها کنار گذاشته شوند. در غیر این صورت، پیش از ادامه تأیید می‌کنید که فایل فقط مربوط به حساب انتخابی است."), a.kit.lp(-1, -2));
 
         form.addView(a.kit.text("قالب تاریخ", 11.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
-        String[] dateLabels = {"تشخیص خودکار", "شمسی: سال/ماه/روز", "میلادی: سال/ماه/روز", "میلادی: روز/ماه/سال", "شمارهٔ روز Excel"};
+        String[] dateLabels = {"تشخیص خودکار؛ تاریخ مبهم رد می‌شود", "شمسی: سال/ماه/روز", "شمسی: روز/ماه/سال",
+                "میلادی: سال/ماه/روز", "میلادی: روز/ماه/سال", "میلادی: ماه/روز/سال", "شمارهٔ روز Excel",
+                "شمسی: ماه/روز/سال"};
         Spinner dateFormat = new Spinner(a);
         ArrayAdapter<String> dateAdapter = new ArrayAdapter<>(a, android.R.layout.simple_spinner_item, dateLabels);
         dateAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
@@ -4424,7 +4435,7 @@ public class HomeScreen extends Screen {
         dateFormat.setContentDescription("قالب تاریخ صورت‌حساب بانکی");
         form.addView(dateFormat, a.kit.lp(-1, -2));
         form.addView(a.kit.text("قالب جداکنندهٔ مبلغ", 11.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
-        String[] amountLabels = {"تشخیص خودکار (مثل ۱٬۲۳۴ یا ۱,۲۳۴.۵۰)",
+        String[] amountLabels = {"تشخیص خودکار؛ ۱,۲۳۴ مبهم است، قالب را انتخاب کنید",
                 "ممیز نقطه (مثل ۱,۲۳۴.۵۰)", "ممیز ویرگول (مثل ۱.۲۳۴,۵۰)",
                 "عدد صحیح؛ نقطه/ویرگول فقط جداکنندهٔ هزارگان"};
         Spinner amountFormat = new Spinner(a);
@@ -4449,8 +4460,9 @@ public class HomeScreen extends Screen {
         tomans.setTextColor(Theme.TEXT);
         unit.addView(rials, a.kit.lp(-1, -2));
         unit.addView(tomans, a.kit.lp(-1, -2));
-        unit.check(initial.amountsInToman ? tomans.getId() : rials.getId());
-        unit.setContentDescription("انتخاب واحد مبلغ در فایل بانک");
+        if (initial.amountUnitConfirmed) unit.check(initial.amountsInToman ? tomans.getId() : rials.getId());
+        unit.setContentDescription("انتخاب صریح واحد مبالغ در فایل بانک؛ واحد نمایشی برنامه ملاک نیست");
+        form.addView(a.kit.hint("واحد را از خود فایل یا تنظیمات/رسید بانک بررسی کنید؛ واحد نمایشی برنامه ملاک نیست. اگر سربرگ یا منبع واحد را روشن نمی‌کند، ادامه ندهید."), a.kit.lp(-1, -2));
         form.addView(unit, a.kit.lp(-1, -2));
         CheckBox signedDirection = new CheckBox(a);
         signedDirection.setText("در فایل تک‌مبلغی، علامت مثبت/منفی جهت واریز/برداشت را تعیین می‌کند");
@@ -4459,7 +4471,7 @@ public class HomeScreen extends Screen {
         signedDirection.setContentDescription("تأیید استفاده از علامت مبلغ به‌عنوان جهت تراکنش");
         form.addView(signedDirection, a.kit.lp(-1, -2));
 
-        form.addView(a.kit.hint("بازه را دقیقاً برابر دورهٔ کامل فایل بانکی تنظیم کنید، حتی اگر روز آغاز یا پایان گردش نداشته باشد. روزهای خارج از این بازه کنار گذاشته می‌شوند."), a.kit.lp(-1, -2));
+        form.addView(a.kit.hint("تشخیص خودکار فقط تاریخ‌های بی‌ابهام را می‌پذیرد؛ برای تاریخ‌هایی مثل ۰۱/۰۲/۱۴۰۵ قالب دقیق را از خروجی بانک انتخاب کنید. بازه را دقیقاً برابر دورهٔ کامل فایل تنظیم کنید؛ روزهای خارج از آن کنار گذاشته می‌شوند."), a.kit.lp(-1, -2));
         android.widget.EditText fromInput = a.kit.edit("از تاریخ شمسی (مثال ۱۴۰۵/۰۱/۰۱)", draft.fromDay);
         android.widget.EditText toInput = a.kit.edit("تا تاریخ شمسی (مثال ۱۴۰۵/۰۱/۳۱)", draft.toDay);
         fromInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
@@ -4489,7 +4501,16 @@ public class HomeScreen extends Screen {
             initial.accountValue = accountFilter.getText().toString().trim();
             initial.dateFormat = dateFormat.getSelectedItemPosition();
             initial.amountFormat = amountFormat.getSelectedItemPosition();
-            initial.amountsInToman = unit.getCheckedRadioButtonId() == tomans.getId();
+            int selectedUnit = unit.getCheckedRadioButtonId();
+            if (selectedUnit == -1) {
+                initial.amountUnitConfirmed = false;
+                a.kit.toast("واحد واقعی فایل را صریحاً ریال یا تومان انتخاب کنید؛ واحد برنامه جایگزین آن نیست");
+                return;
+            }
+            initial.amountUnitConfirmed = true;
+            initial.amountsInToman = selectedUnit == tomans.getId();
+            draft.sourceUnitConfirmed = true;
+            draft.sourceUnitToman = initial.amountsInToman;
             initial.signedAmountDefinesDirection = signedDirection.isChecked();
             if (!initial.valid()) {
                 a.kit.toast("ستون تاریخ و دو ستون مبلغ یا مبلغ همراه جهت را انتخاب کنید");
@@ -4566,12 +4587,13 @@ public class HomeScreen extends Screen {
         text.append("دورهٔ انتخاب‌شده: ").append(Money.fa(draft.fromDay)).append(" تا ")
                 .append(Money.fa(draft.toDay)).append("\n")
                 .append("تراکنش‌های پذیرفته‌شده: ").append(HomeNumberFormatter.integer(parsed.transactionCount)).append("\n")
-                .append("جمع واریز فایل: ").append(HomeNumberFormatter.money(parsed.totalCreditRials)).append("\n")
-                .append("جمع برداشت فایل: ").append(HomeNumberFormatter.money(parsed.totalDebitRials)).append("\n")
-                .append("ردیف‌های خالی/بدون گردش کنارگذاشته‌شده: ").append(HomeNumberFormatter.integer(parsed.skippedRows)).append("\n")
+                .append("جمع واریز فایل: ").append(HomeNumberFormatter.preciseMoney(parsed.totalCreditRialsExact)).append("\n")
+                .append("جمع برداشت فایل: ").append(HomeNumberFormatter.preciseMoney(parsed.totalDebitRialsExact)).append("\n")
+                .append("ردیف‌های کاملاً خالی کنارگذاشته‌شده: ").append(HomeNumberFormatter.integer(parsed.skippedRows)).append("\n")
                 .append("ردیف‌های بیرون از بازه و مستثناشده: ").append(HomeNumberFormatter.integer(parsed.outsideRangeRows)).append("\n")
                 .append("ردیف‌های حساب‌های دیگر که فیلتر شدند: ").append(HomeNumberFormatter.integer(parsed.filteredAccountRows)).append("\n")
-                .append("واحد پایهٔ محاسبه: ریال؛ نمایش با واحد فعلی برنامه.\n\n")
+                .append("واحد فایل (تأیید مدیر): ").append(draft.sourceUnitToman ? "تومان؛ ×۱۰ به ریال" : "ریال؛ بدون ضریب")
+                .append(" • واحد نمایش: ").append(Money.unitName()).append("\n\n")
                 .append("فایل خام و شرح/شمارهٔ تراکنش ذخیره نمی‌شود. پس از تأیید، فقط جمع روزانهٔ واریز و برداشت روی همین دستگاه می‌ماند.\n");
         if (parsed.invalidRows > 0) {
             text.append("\nذخیره و مقایسه مسدود است: ").append(HomeNumberFormatter.integer(parsed.invalidRows))
@@ -4719,24 +4741,51 @@ public class HomeScreen extends Screen {
         int to = Jalali.parse(draft.toDay);
         if (rows == null) throw new IOException("گردش روزانهٔ آتیران برنگشت؛ صفر فرض نشده است.");
         for (Row row : rows) {
-            if (row == null) continue;
-            if (row.l("invalidIn") > 0 || row.l("invalidOut") > 0 || row.l("negativeRows") > 0)
-                throw new IOException("در گردش آتیران مبلغ تبدیل‌ناپذیر یا منفی وجود دارد؛ دادهٔ روزانه برای تطبیق معتبر نیست.");
-            String day = Jalali.disp(row.s("day"));
+            if (row == null || !row.containsKey("day") || !row.has("in") || !row.has("out") || !row.has("count")
+                    || !row.has("invalidIn") || !row.has("invalidOut") || !row.has("missingRows")
+                    || !row.has("negativeRows") || !row.has("invalidDateRows"))
+                throw new IOException("ستون روزانه یا مبلغ گردش آتیران ناقص است؛ صفر فرض نشده است.");
+            Long invalidIn = row.exactLong("invalidIn");
+            Long invalidOut = row.exactLong("invalidOut");
+            Long missingRows = row.exactLong("missingRows");
+            Long negativeRows = row.exactLong("negativeRows");
+            Long invalidDateRows = row.exactLong("invalidDateRows");
+            if (invalidIn == null || invalidOut == null || missingRows == null || negativeRows == null
+                    || invalidDateRows == null || invalidIn < 0 || invalidOut < 0 || missingRows < 0
+                    || negativeRows < 0 || invalidDateRows < 0)
+                throw new IOException("کنترل کیفیت تاریخ یا مبلغ‌های آتیران ناقص یا نامعتبر است.");
+            if (invalidDateRows > 0)
+                throw new IOException("در گردش همین حساب، تاریخ نامعتبر یا تبدیل‌ناپذیر وجود دارد؛ Query روزهای آن را صفر فرض نکرد.");
+            if (invalidIn > 0 || invalidOut > 0 || missingRows > 0 || negativeRows > 0)
+                throw new IOException("در گردش آتیران مبلغ تبدیل‌ناپذیر، ناموجود یا منفی وجود دارد؛ دادهٔ روزانه برای تطبیق معتبر نیست.");
+            BigDecimal inflow = row.bd("in");
+            BigDecimal outflow = row.bd("out");
+            Long txCount = row.exactLong("count");
+            if (!validBankLedgerAmount(inflow) || !validBankLedgerAmount(outflow)
+                    || txCount == null || txCount < 0)
+                throw new IOException("مبلغ یا تعداد تراکنش آتیران خارج از محدودهٔ معتبر است.");
+            if (txCount == 0 && (inflow.signum() > 0 || outflow.signum() > 0))
+                throw new IOException("جمع مبلغ آتیران با تعداد تراکنش صفر ناسازگار است.");
+            String rawDay = row.s("day").trim();
+            if (rawDay.isEmpty()) {
+                if (txCount != 0 || inflow.signum() != 0 || outflow.signum() != 0)
+                    throw new IOException("ردیف خلاصهٔ گردش بدون تاریخ شامل مبلغ یا شمارش است؛ نتیجه نامشخص است.");
+                continue; // The read-only query's explicit empty-period sentinel; not a movement row.
+            }
+            String day = Jalali.disp(rawDay);
             int dayNumber = Jalali.parse(day);
             if (dayNumber < from || dayNumber > to)
                 throw new IOException("یک تاریخ از گردش آتیران نامعتبر یا بیرون از بازه است؛ مقایسه لغو شد.");
-            double inflow = row.d("in");
-            double outflow = row.d("out");
-            long txCount = row.l("count");
-            if (!Double.isFinite(inflow) || !Double.isFinite(outflow) || inflow < 0 || outflow < 0
-                    || txCount < 0 || txCount > Integer.MAX_VALUE)
-                throw new IOException("مبلغ یا تعداد تراکنش آتیران خارج از محدودهٔ معتبر است.");
             if (result.containsKey(day))
                 throw new IOException("گردش آتیران یک روز را چندبار برگرداند؛ از جمع‌کردن مبهم داده خودداری شد.");
-            result.put(day, new BankStatementPeriodReconciliation.DailyFlow(inflow, outflow, (int) txCount));
+            result.put(day, new BankStatementPeriodReconciliation.DailyFlow(inflow, outflow, txCount));
         }
         return result;
+    }
+
+    private boolean validBankLedgerAmount(BigDecimal amount) {
+        return amount != null && amount.signum() >= 0 && amount.scale() <= 4
+                && amount.precision() <= 24 && amount.compareTo(BankStatementFile.MAX_AMOUNT_RIALS) <= 0;
     }
 
     private void showBankStatementReport(BankImportDraft draft) {
@@ -4749,14 +4798,17 @@ public class HomeScreen extends Screen {
                 .append(Money.fa(report.toDay)).append('\n')
                 .append("منبع بانکی: خروجی دستی انتخاب‌شده • منبع دفتر: Query فقط‌خواندنی آتیران\n")
                 .append("زمان تکمیل Query (ساعت دستگاه): ").append(bankImportTimestamp(draft.comparedAt)).append('\n')
+                .append("تازگی منبع: زمان ساخت فایل بانک و زمان آخرین تغییر سند در آتیران از این داده‌ها قابل‌اثبات نیست؛ Query فقط وضعیت بازگشتی در زمان بالا را خوانده است.\n")
                 .append("پوشش کامل فایل برای کل دوره: تأیید مدیر؛ روز بدون ردیف فقط با همین فرض صفر است.\n")
-                .append("واحد پایهٔ محاسبه: ریال؛ واحد نمایش فعلی برنامه: ").append(Money.unitName()).append(".\n\n")
-                .append("صورت‌حساب: واریز ").append(HomeNumberFormatter.money(report.statementInflowRials))
-                .append(" • برداشت ").append(HomeNumberFormatter.money(report.statementOutflowRials)).append('\n')
-                .append("دفتر آتیران: واریز ").append(HomeNumberFormatter.money(report.ledgerInflowRials))
-                .append(" • برداشت ").append(HomeNumberFormatter.money(report.ledgerOutflowRials)).append('\n')
-                .append("اختلاف کل واریز: ").append(bankVariancePiece("واریز", report.inflowVarianceRials)).append('\n')
-                .append("اختلاف کل برداشت: ").append(bankVariancePiece("برداشت", report.outflowVarianceRials)).append("\n\n")
+                .append("واحد فایل (تأیید مدیر): ").append(draft.sourceUnitConfirmed
+                        ? (draft.sourceUnitToman ? "تومان؛ ×۱۰ به ریال" : "ریال؛ بدون ضریب") : "تأییدنشده")
+                .append(" • واحد پایهٔ محاسبه: ریال؛ واحد نمایش فعلی برنامه: ").append(Money.unitName()).append(".\n\n")
+                .append("صورت‌حساب: واریز ").append(HomeNumberFormatter.preciseMoney(report.statementInflowRialsExact))
+                .append(" • برداشت ").append(HomeNumberFormatter.preciseMoney(report.statementOutflowRialsExact)).append('\n')
+                .append("دفتر آتیران: واریز ").append(HomeNumberFormatter.preciseMoney(report.ledgerInflowRialsExact))
+                .append(" • برداشت ").append(HomeNumberFormatter.preciseMoney(report.ledgerOutflowRialsExact)).append('\n')
+                .append("اختلاف کل واریز: ").append(bankVariancePiece("واریز", report.inflowVarianceRialsExact)).append('\n')
+                .append("اختلاف کل برداشت: ").append(bankVariancePiece("برداشت", report.outflowVarianceRialsExact)).append("\n\n")
                 .append("روزهای برابر: ").append(HomeNumberFormatter.integer(report.matchedDays))
                 .append(" • روزهای دارای اختلاف: ").append(HomeNumberFormatter.integer(report.varianceDays))
                 .append(" • روزهای نامشخص: ").append(HomeNumberFormatter.integer(report.unavailableDays)).append('\n')
@@ -4773,8 +4825,8 @@ public class HomeScreen extends Screen {
             for (BankStatementPeriodReconciliation.DayResult day : report.days) {
                 if (day.comparison.state != BankStatementReconciliation.State.VARIANCE) continue;
                 text.append(Money.fa(day.day)).append(" — ")
-                        .append(bankVariancePiece("واریز", day.comparison.inflowVarianceRials)).append("؛ ")
-                        .append(bankVariancePiece("برداشت", day.comparison.outflowVarianceRials)).append('\n');
+                        .append(bankVariancePiece("واریز", day.comparison.inflowVarianceRialsExact)).append("؛ ")
+                        .append(bankVariancePiece("برداشت", day.comparison.outflowVarianceRialsExact)).append('\n');
                 if (++shown >= 20) break;
             }
             if (report.varianceDays > 20) text.append("روزهای بیشتر در جمع روزهای دارای اختلاف آمده‌اند؛ جزئیات فقط ۲۰ روز نخست را نشان می‌دهد.\n");
@@ -4832,18 +4884,16 @@ public class HomeScreen extends Screen {
         for (int offset = 0; offset <= to - from; offset++) {
             String day = Jalali.format(from + offset);
             BankStatementFile.DailyTotal daily = draft.parsed.daily.get(day);
-            double in = daily == null ? 0d : daily.creditRials;
-            double out = daily == null ? 0d : daily.debitRials;
-            if (!Double.isFinite(in) || !Double.isFinite(out) || in < 0 || out < 0) return null;
+            BigDecimal in = daily == null ? BigDecimal.ZERO : daily.creditRialsExact;
+            BigDecimal out = daily == null ? BigDecimal.ZERO : daily.debitRialsExact;
+            if (!validBankLedgerAmount(in) || !validBankLedgerAmount(out)) return null;
             batch.put(day, new String[]{bankRialsStorageValue(in), bankRialsStorageValue(out)});
         }
         return batch;
     }
 
-    private String bankRialsStorageValue(double amount) {
-        return java.math.BigDecimal.valueOf(amount)
-                .setScale(4, java.math.RoundingMode.HALF_UP)
-                .stripTrailingZeros().toPlainString();
+    private String bankRialsStorageValue(BigDecimal amount) {
+        return amount.stripTrailingZeros().toPlainString();
     }
 
     private String bankImportTimestamp(long timestamp) {
@@ -4862,6 +4912,8 @@ public class HomeScreen extends Screen {
         draft.content = null;
         draft.bankName = "";
         draft.bankId = "";
+        draft.sourceUnitConfirmed = false;
+        draft.sourceUnitToman = false;
     }
 
     private void addExceptionRows(LinearLayout card, Data d) {
@@ -4966,6 +5018,16 @@ public class HomeScreen extends Screen {
         } catch (Exception invalid) {
             return null;
         }
+    }
+
+    private BigDecimal parseLocalRialsExact(String raw) {
+        if (raw == null || raw.trim().isEmpty()) return null;
+        String lower = Money.en(raw).toLowerCase(Locale.US);
+        if (lower.contains("تومان") || lower.contains("irt") || lower.contains("toman")) return null;
+        BigDecimal amount = BankStatementFile.parseAmountExact(raw, BankStatementFile.AMOUNT_AUTO);
+        if (amount == null || amount.signum() < 0 || amount.precision() > 24 || amount.scale() > 4
+                || amount.compareTo(BankStatementFile.MAX_AMOUNT_RIALS) > 0) return null;
+        return amount;
     }
 
     private void showCloseoutCashDialog(LinearLayout content, Data d, String day) {

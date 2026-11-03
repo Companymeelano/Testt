@@ -21,7 +21,7 @@ public class BankStatementFileTest {
                 + "۱۴۰۴/۰۸/۱۰;\"واریز بابت، فروش\";۱٬۲۳۴٬۰۰۰;—;۲٬۰۰۰٬۰۰۰\n"
                 + "۱۴۰۴/۰۸/۱۰;خرید;—;۲۵۰٬۰۰۰;۱٬۷۵۰٬۰۰۰\n";
         BankStatementFile.Table table = read(csv, "statement.csv");
-        BankStatementFile.Mapping mapping = BankStatementFile.Mapping.suggested(table.headers);
+        BankStatementFile.Mapping mapping = confirmedMapping(table);
         assertTrue(mapping.valid());
         mapping.amountsInToman = false;
         BankStatementFile.Parsed parsed = BankStatementFile.analyze(table, mapping,
@@ -44,9 +44,10 @@ public class BankStatementFileTest {
                 + "2025-03-21\t۱۲٬۵۰۰\tواریز\n"
                 + "2025-03-21\t۲٬۰۰۰\tبرداشت\n";
         BankStatementFile.Table table = read(tsv, "bank.tsv");
-        BankStatementFile.Mapping mapping = BankStatementFile.Mapping.suggested(table.headers);
+        BankStatementFile.Mapping mapping = confirmedMapping(table);
         assertTrue(mapping.valid());
         mapping.amountsInToman = true;
+        mapping.amountFormat = BankStatementFile.AMOUNT_GROUPING_ONLY;
         BankStatementFile.Parsed parsed = BankStatementFile.analyze(table, mapping,
                 "1404/01/01", "1404/01/01");
 
@@ -56,9 +57,9 @@ public class BankStatementFileTest {
     }
 
     @Test public void signedAmountRequiresExplicitManagerConfirmationAndReadsSigns() throws Exception {
-        String csv = "date,amount\n2026-03-21,100\n2026-03-21,-25\n";
+        String csv = "date,amount\n2026-03-21,100\n2026-03-21,-25\n2026-03-21,0\n";
         BankStatementFile.Table table = read(csv, "statement.csv");
-        BankStatementFile.Mapping mapping = BankStatementFile.Mapping.suggested(table.headers);
+        BankStatementFile.Mapping mapping = confirmedMapping(table);
         assertFalse(mapping.valid());
         mapping.signedAmountDefinesDirection = true;
         assertTrue(mapping.valid());
@@ -66,6 +67,8 @@ public class BankStatementFileTest {
                 "1405/01/01", "1405/01/01");
         assertEquals(100, parsed.totalCreditRials, 0.001);
         assertEquals(25, parsed.totalDebitRials, 0.001);
+        assertEquals(1, parsed.invalidRows);
+        assertTrue(parsed.errorSummary.contains("علامت مبلغ صفر"));
     }
 
     @Test public void filtersMultiAccountExportsByAnExplicitExactAccountValue() throws Exception {
@@ -73,7 +76,7 @@ public class BankStatementFileTest {
                 + "2026-03-21,11-11,100,credit\n"
                 + "2026-03-21,22-22,900,credit\n";
         BankStatementFile.Table table = read(csv, "statement.csv");
-        BankStatementFile.Mapping mapping = BankStatementFile.Mapping.suggested(table.headers);
+        BankStatementFile.Mapping mapping = confirmedMapping(table);
         assertEquals(1, mapping.account);
         mapping.accountValue = "1111";
         BankStatementFile.Parsed parsed = BankStatementFile.analyze(table, mapping,
@@ -87,7 +90,7 @@ public class BankStatementFileTest {
         String csv = "date,amount,direction\n2026-03-21,100,credit\nnot-a-date,50,debit\n";
         BankStatementFile.Table table = read(csv, "statement.csv");
         assertEquals(0, table.headerRow);
-        BankStatementFile.Mapping mapping = BankStatementFile.Mapping.suggested(table.headers);
+        BankStatementFile.Mapping mapping = confirmedMapping(table);
         assertTrue(mapping.valid());
         BankStatementFile.Parsed parsed = BankStatementFile.analyze(table, mapping,
                 "1405/01/01", "1405/01/01");
@@ -99,7 +102,7 @@ public class BankStatementFileTest {
     @Test public void rowsOutsideChosenDateRangeAreReportedSeparately() throws Exception {
         String csv = "date,amount,direction\n2026-03-21,100,credit\n2026-03-22,50,debit\n";
         BankStatementFile.Table table = read(csv, "statement.csv");
-        BankStatementFile.Mapping mapping = BankStatementFile.Mapping.suggested(table.headers);
+        BankStatementFile.Mapping mapping = confirmedMapping(table);
         BankStatementFile.Parsed parsed = BankStatementFile.analyze(table, mapping,
                 "1405/01/01", "1405/01/01");
         assertEquals(1, parsed.transactions.size());
@@ -109,7 +112,7 @@ public class BankStatementFileTest {
 
     @Test public void acceptsAnEmptyButValidStatementForAConfirmedZeroMovementPeriod() throws Exception {
         BankStatementFile.Table table = read("date,amount,direction\n", "statement.csv");
-        BankStatementFile.Mapping mapping = BankStatementFile.Mapping.suggested(table.headers);
+        BankStatementFile.Mapping mapping = confirmedMapping(table);
         mapping.signedAmountDefinesDirection = true;
         BankStatementFile.Parsed parsed = BankStatementFile.analyze(table, mapping,
                 "1405/01/01", "1405/01/02");
@@ -122,6 +125,13 @@ public class BankStatementFileTest {
         assertEquals("1404/08/10", BankStatementFile.normalizeDate("۱۴۰۴/۰۸/۱۰", BankStatementFile.DATE_AUTO));
         assertEquals("1404/01/01", BankStatementFile.normalizeDate("2025-03-21 13:40:00", BankStatementFile.DATE_AUTO));
         assertEquals("1404/01/01", BankStatementFile.normalizeDate("21/03/2025", BankStatementFile.DATE_GREGORIAN_DMY));
+        assertEquals("1404/01/01", BankStatementFile.normalizeDate("21/03/2025", BankStatementFile.DATE_AUTO));
+        assertEquals("1404/01/01", BankStatementFile.normalizeDate("03/21/2025", BankStatementFile.DATE_GREGORIAN_MDY));
+        assertEquals("1404/01/01", BankStatementFile.normalizeDate("01/01/1404", BankStatementFile.DATE_JALALI_DMY));
+        assertEquals("1404/01/01", BankStatementFile.normalizeDate("01/01/1404", BankStatementFile.DATE_JALALI_MDY));
+        assertEquals("", BankStatementFile.normalizeDate("01/02/2025", BankStatementFile.DATE_AUTO));
+        assertEquals("", BankStatementFile.normalizeDate("01/02/1404", BankStatementFile.DATE_AUTO));
+        assertEquals("", BankStatementFile.normalizeDate("2025-02-31", BankStatementFile.DATE_AUTO));
         long serial = LocalDate.of(2025, 3, 21).toEpochDay() - LocalDate.of(1899, 12, 30).toEpochDay();
         assertEquals("1404/01/01", BankStatementFile.normalizeDate(String.valueOf(serial), BankStatementFile.DATE_EXCEL_SERIAL));
         assertEquals("1404/01/01", BankStatementFile.normalizeDate(serial + ".5", BankStatementFile.DATE_EXCEL_SERIAL));
@@ -149,6 +159,62 @@ public class BankStatementFileTest {
         assertEquals(-1234, BankStatementFile.parseAmount("-1,234"), 0.001);
         assertNull(BankStatementFile.parseAmount("—"));
         assertNull(BankStatementFile.parseAmount("12x"));
+        assertNull(BankStatementFile.parseAmount("1,234"));
+        assertNull(BankStatementFile.parseAmount("1.234"));
+        assertNull(BankStatementFile.parseAmount("1,234.567"));
+        assertNull(BankStatementFile.parseAmount("1.234,567"));
+        assertEquals(1234, BankStatementFile.parseAmount("1,234", BankStatementFile.AMOUNT_DECIMAL_DOT), 0.001);
+        assertEquals(1234, BankStatementFile.parseAmount("1.234", BankStatementFile.AMOUNT_DECIMAL_COMMA), 0.001);
+        assertEquals(new java.math.BigDecimal("9007199254740993.12"),
+                BankStatementFile.parseAmountExact("9007199254740993.12", BankStatementFile.AMOUNT_AUTO));
+    }
+
+    @Test public void unitMustBeExplicitAndMissingOrAmbiguousRowsNeverBecomeZero() throws Exception {
+        BankStatementFile.Table unitTable = read("date,amount,direction\n2026-03-21,100,credit\n", "statement.csv");
+        BankStatementFile.Mapping unconfirmed = BankStatementFile.Mapping.suggested(unitTable.headers);
+        assertFalse(unconfirmed.valid());
+        try {
+            BankStatementFile.analyze(unitTable, unconfirmed, "1405/01/01", "1405/01/01");
+            throw new AssertionError("Expected an explicit currency unit");
+        } catch (IOException expected) {
+            assertTrue(expected.getMessage().contains("واحد"));
+        }
+
+        BankStatementFile.Table malformed = read("date,amount,direction\n"
+                + "2026-03-21,100,credit\n"
+                + "2026-03-21,,debit\n"
+                + "2026-03-21,100,credit/debit\n", "statement.csv");
+        BankStatementFile.Mapping mapping = confirmedMapping(malformed);
+        BankStatementFile.Parsed parsed = BankStatementFile.analyze(malformed, mapping,
+                "1405/01/01", "1405/01/01");
+        assertEquals(1, parsed.transactionCount);
+        assertEquals(2, parsed.invalidRows);
+        assertTrue(parsed.errorSummary.contains("مبلغ این ردیف خالی است"));
+        assertTrue(parsed.errorSummary.contains("جهت واریز/برداشت نامشخص"));
+    }
+
+    @Test public void bothSplitAmountsMissingIsAnInvalidRowRatherThanZeroMovement() throws Exception {
+        BankStatementFile.Table table = read("date,credit,debit\n"
+                + "2026-03-21,100,\n"
+                + "2026-03-21,,\n", "statement.csv");
+        BankStatementFile.Mapping mapping = confirmedMapping(table);
+        BankStatementFile.Parsed parsed = BankStatementFile.analyze(table, mapping,
+                "1405/01/01", "1405/01/01");
+        assertEquals(1, parsed.transactionCount);
+        assertEquals(1, parsed.invalidRows);
+        assertTrue(parsed.errorSummary.contains("هر دو مبلغ واریز و برداشت خالی‌اند"));
+    }
+
+    @Test public void explicitCurrencyMarkerMustMatchTheSelectedUnit() throws Exception {
+        BankStatementFile.Table table = read("date,amount,direction\n"
+                + "2026-03-21,100 ریال,credit\n"
+                + "2026-03-21,100 تومان,credit\n", "statement.csv");
+        BankStatementFile.Mapping mapping = confirmedMapping(table);
+        BankStatementFile.Parsed parsed = BankStatementFile.analyze(table, mapping,
+                "1405/01/01", "1405/01/01");
+        assertEquals(1, parsed.transactionCount);
+        assertEquals(1, parsed.invalidRows);
+        assertTrue(parsed.errorSummary.contains("واحد فایل ریال"));
     }
 
     @Test public void rejectsLegacyXlsAndUnterminatedCsvQuote() throws Exception {
@@ -171,13 +237,20 @@ public class BankStatementFileTest {
         BankStatementFile.Table table = BankStatementFile.read(new ByteArrayInputStream(bytes), "export.xlsx");
         assertTrue(table.xlsx);
         assertEquals(3, table.rows.size());
-        BankStatementFile.Mapping mapping = BankStatementFile.Mapping.suggested(table.headers);
+        BankStatementFile.Mapping mapping = confirmedMapping(table);
         assertTrue(mapping.valid());
         BankStatementFile.Parsed parsed = BankStatementFile.analyze(table, mapping,
                 "1404/01/01", "1404/01/01");
         assertEquals(12_500, parsed.totalCreditRials, 0.001);
         assertEquals(3_000, parsed.totalDebitRials, 0.001);
         assertNotNull(parsed.transactions.get(0).description);
+    }
+
+
+    private static BankStatementFile.Mapping confirmedMapping(BankStatementFile.Table table) {
+        BankStatementFile.Mapping mapping = BankStatementFile.Mapping.suggested(table.headers);
+        mapping.amountUnitConfirmed = true;
+        return mapping;
     }
 
     private static BankStatementFile.Table read(String text, String name) throws IOException {

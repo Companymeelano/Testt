@@ -3,6 +3,7 @@ package ir.meelano.manager.core;
 import org.junit.Test;
 
 import java.io.ByteArrayInputStream;
+import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -33,6 +34,20 @@ public class BankStatementPeriodReconciliationTest {
         assertEquals(-25, report.outflowVarianceRials, 0.001);
     }
 
+    @Test public void periodAggregationKeepsLargeDecimalAmountsExact() throws Exception {
+        BankStatementFile.Parsed statement = parsed(
+                "date,amount,direction\n2026-03-21,9007199254740993.50,credit\n",
+                "1405/01/01", "1405/01/01");
+        Map<String, BankStatementPeriodReconciliation.DailyFlow> ledger = new LinkedHashMap<>();
+        ledger.put("1405/01/01", new BankStatementPeriodReconciliation.DailyFlow(
+                new BigDecimal("9007199254740993.50"), BigDecimal.ZERO, 1));
+        BankStatementPeriodReconciliation.Report report = BankStatementPeriodReconciliation.compare(
+                "1405/01/01", "1405/01/01", statement, ledger, true);
+        assertTrue(report.fullyMatched());
+        assertEquals(new BigDecimal("9007199254740993.50"), report.statementInflowRialsExact);
+        assertEquals(BigDecimal.ZERO, report.inflowVarianceRialsExact);
+    }
+
     @Test public void incompleteStatementDoesNotAssumeMissingDaysAreZeroOrReturnVariance() throws Exception {
         BankStatementFile.Parsed statement = parsed(
                 "date,amount,direction\n2026-03-21,100,credit\n",
@@ -48,6 +63,20 @@ public class BankStatementPeriodReconciliationTest {
         assertTrue(Double.isNaN(report.inflowVarianceRials));
         assertEquals(BankStatementReconciliation.State.NEEDS_STATEMENT,
                 report.days.get(0).comparison.state);
+    }
+
+    @Test public void nullLedgerDayIsNotSilentlyTreatedAsZero() throws Exception {
+        BankStatementFile.Parsed statement = parsed(
+                "date,amount,direction\n2026-03-21,0,credit\n",
+                "1405/01/01", "1405/01/01");
+        Map<String, BankStatementPeriodReconciliation.DailyFlow> ledger = new LinkedHashMap<>();
+        ledger.put("1405/01/01", null);
+        try {
+            BankStatementPeriodReconciliation.compare("1405/01/01", "1405/01/01", statement, ledger, true);
+            throw new AssertionError("Expected an empty ledger day to be rejected");
+        } catch (java.io.IOException expected) {
+            assertTrue(expected.getMessage().contains("خالی"));
+        }
     }
 
     @Test public void oppositeDailyErrorsRemainVisibleEvenWhenPeriodTotalsCancel() throws Exception {
@@ -69,6 +98,7 @@ public class BankStatementPeriodReconciliationTest {
         BankStatementFile.Table table = BankStatementFile.read(
                 new ByteArrayInputStream(csv.getBytes("UTF-8")), "test.csv");
         BankStatementFile.Mapping mapping = BankStatementFile.Mapping.suggested(table.headers);
+        mapping.amountUnitConfirmed = true;
         return BankStatementFile.analyze(table, mapping, from, to);
     }
 }

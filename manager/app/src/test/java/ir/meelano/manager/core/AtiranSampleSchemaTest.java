@@ -42,13 +42,17 @@ public class AtiranSampleSchemaTest {
         Meta meta = new Meta(connection(loadManifest()));
         Queries.Q q = MasterQueries.bankTurnoverDaily(meta, "17", "1405/01/01", "1405/01/31");
         String sql = q.sql.toLowerCase(Locale.ROOT);
-        assertTrue(sql, sql.startsWith("select "));
+        assertTrue(sql, sql.startsWith("with bank_rows as ("));
         assertTrue(sql, sql.contains("h.[bank_rdf]"));
         assertTrue(sql, sql.contains("as day"));
         assertTrue(sql, sql.contains("as [in]"));
         assertTrue(sql, sql.contains("as [out]"));
         assertTrue(sql, sql.contains("as invalidin"));
         assertTrue(sql, sql.contains("as invalidout"));
+        assertTrue(sql, sql.contains("as missingrows"));
+        assertTrue(sql, sql.contains("as invaliddaterows"));
+        assertTrue(sql, sql.contains("decimal(38,18)"));
+        assertTrue(sql, sql.contains("decimal(38,4)"));
         assertTrue(sql, sql.contains("group by"));
         assertTrue(sql, sql.contains("h.[act_date]"));
         assertEquals("17", q.binds.get(0));

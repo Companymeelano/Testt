@@ -722,17 +722,14 @@ public final class Settings {
     }
 
     private String normalizeLocalRials(String raw) {
-        String value = Money.en(raw == null ? "" : raw.trim()).replace(",", "")
-                .replace("٬", "").replace('٫', '.').trim();
-        if (value.isEmpty()) return null;
-        try {
-            java.math.BigDecimal amount = new java.math.BigDecimal(value);
-            if (amount.signum() < 0 || amount.precision() > 24 || amount.scale() > 4
-                    || amount.compareTo(new java.math.BigDecimal("999999999999999999")) > 0) return null;
-            return amount.stripTrailingZeros().toPlainString();
-        } catch (Exception invalid) {
-            return null;
-        }
+        if (raw == null || raw.trim().isEmpty()) return null;
+        String lower = Money.en(raw).toLowerCase(java.util.Locale.US);
+        if (lower.contains("تومان") || lower.contains("irt") || lower.contains("toman")) return null;
+        java.math.BigDecimal amount = ir.meelano.manager.core.BankStatementFile.parseAmountExact(
+                raw, ir.meelano.manager.core.BankStatementFile.AMOUNT_AUTO);
+        if (amount == null || amount.signum() < 0 || amount.precision() > 24 || amount.scale() > 4
+                || amount.compareTo(ir.meelano.manager.core.BankStatementFile.MAX_AMOUNT_RIALS) > 0) return null;
+        return amount.stripTrailingZeros().toPlainString();
     }
 
     // ---------------- stock alerts + auto backup (v18) ----------------

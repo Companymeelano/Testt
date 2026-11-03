@@ -1291,31 +1291,62 @@ public final class MasterQueries {
             throw new Queries.Missing("ستون واریز یا برداشت در دفتر بانک پیدا نشد؛ مقایسهٔ دوطرفه ممکن نیست");
 
         String day = Sql.dateKey(Sql.date10("h", date));
-        String in = Sql.num("h", bes);
-        String out = Sql.num("h", bed);
-        String invalidIn = "SUM(CASE WHEN h.[" + bes + "] IS NOT NULL AND NULLIF(LTRIM(RTRIM(TRY_CONVERT(nvarchar(60),h.["
-                + bes + "]))),N'') IS NOT NULL AND TRY_CONVERT(decimal(19,2),h.[" + bes + "]) IS NULL THEN 1 ELSE 0 END)";
-        String invalidOut = "SUM(CASE WHEN h.[" + bed + "] IS NOT NULL AND NULLIF(LTRIM(RTRIM(TRY_CONVERT(nvarchar(60),h.["
-                + bed + "]))),N'') IS NOT NULL AND TRY_CONVERT(decimal(19,2),h.[" + bed + "]) IS NULL THEN 1 ELSE 0 END)";
-        String negative = "SUM(CASE WHEN TRY_CONVERT(decimal(19,2),h.[" + bes + "])<0 OR TRY_CONVERT(decimal(19,2),h.["
-                + bed + "])<0 THEN 1 ELSE 0 END)";
+        String rawIn = "TRY_CONVERT(decimal(38,18),h.[" + bes + "])";
+        String rawOut = "TRY_CONVERT(decimal(38,18),h.[" + bed + "])";
+        String roundedIn = "TRY_CONVERT(decimal(38,4),h.[" + bes + "])";
+        String roundedOut = "TRY_CONVERT(decimal(38,4),h.[" + bed + "])";
+        String in = "COALESCE(" + roundedIn + ",CAST(0 AS decimal(38,4)))";
+        String out = "COALESCE(" + roundedOut + ",CAST(0 AS decimal(38,4)))";
+        String presentIn = "h.[" + bes + "] IS NOT NULL AND NULLIF(LTRIM(RTRIM(TRY_CONVERT(nvarchar(60),h.["
+                + bes + "]))),N'') IS NOT NULL";
+        String presentOut = "h.[" + bed + "] IS NOT NULL AND NULLIF(LTRIM(RTRIM(TRY_CONVERT(nvarchar(60),h.["
+                + bed + "]))),N'') IS NOT NULL";
+        String invalidIn = "CASE WHEN " + presentIn + " AND (" + rawIn + " IS NULL OR " + roundedIn
+                + " IS NULL OR " + rawIn + "<>" + roundedIn + ") THEN CONVERT(bigint,1) ELSE CONVERT(bigint,0) END";
+        String invalidOut = "CASE WHEN " + presentOut + " AND (" + rawOut + " IS NULL OR " + roundedOut
+                + " IS NULL OR " + rawOut + "<>" + roundedOut + ") THEN CONVERT(bigint,1) ELSE CONVERT(bigint,0) END";
+        String missingAmounts = "CASE WHEN NOT(" + presentIn + ") AND NOT(" + presentOut
+                + ") THEN CONVERT(bigint,1) ELSE CONVERT(bigint,0) END";
+        String negative = "CASE WHEN " + rawIn + "<0 OR " + rawOut
+                + "<0 THEN CONVERT(bigint,1) ELSE CONVERT(bigint,0) END";
+        String bankKey = "TRY_CONVERT(nvarchar(60),h.[" + bank + "])";
         List<Object> binds = new ArrayList<>();
         List<String> conds = new ArrayList<>();
-        conds.add("LTRIM(RTRIM(TRY_CONVERT(nvarchar(60),h.[" + bank + "])) )=?");
+        conds.add("LTRIM(RTRIM(" + bankKey + "))=?");
         binds.add(bankId.trim());
-        String dateCondition = Sql.dateCond(Sql.date10("h", date), from, to, binds);
-        if (!dateCondition.isEmpty()) conds.add(dateCondition);
         String bankIsActive = m.col("ban_act", "isActive", "IsActive");
         if (bankIsActive != null) conds.add(boolTrue("h.[" + bankIsActive + "]"));
         String active = Sql.activeAnd(m.columns("ban_act"), "h");
         String soft = Sql.softAnd(m.columns("ban_act"), "h");
         if (!active.isEmpty()) conds.add(active.substring(5));
         if (!soft.isEmpty()) conds.add(soft.substring(5));
-        return new Queries.Q("SELECT " + day + " AS day, ISNULL(SUM(" + in + "),0) AS [in]"
-                + ", ISNULL(SUM(" + out + "),0) AS [out], COUNT_BIG(1) AS count"
+        String sourceWhere = Sql.join(conds, " AND ");
+        String dateCondition = Sql.dateCond("b.day", from, to, binds);
+        String dailyWhere = dateCondition.isEmpty() ? "" : " WHERE " + dateCondition;
+        int maxJalaliYear = Jalali.fromDay(Jalali.today())[0] + 8;
+        String validJalaliDay = "b.day LIKE N'[0-9][0-9][0-9][0-9]/[0-9][0-9]/[0-9][0-9]'"
+                + " AND TRY_CONVERT(int,LEFT(b.day,4)) BETWEEN 1300 AND " + maxJalaliYear
+                + " AND TRY_CONVERT(int,SUBSTRING(b.day,6,2)) BETWEEN 1 AND 12"
+                + " AND TRY_CONVERT(int,RIGHT(b.day,2)) BETWEEN 1 AND 31";
+        return new Queries.Q("WITH bank_rows AS ("
+                + " SELECT " + day + " AS day, " + in + " AS [in], " + out + " AS [out]"
                 + ", " + invalidIn + " AS invalidIn, " + invalidOut + " AS invalidOut"
-                + ", " + negative + " AS negativeRows FROM dbo.ban_act h WHERE "
-                + Sql.join(conds, " AND ") + " GROUP BY " + day + " ORDER BY 1", binds);
+                + ", " + missingAmounts + " AS missingRows, " + negative + " AS negativeRows"
+                + " FROM dbo.ban_act h WHERE " + sourceWhere + ")"
+                + ", daily AS (SELECT b.day, SUM(b.[in]) AS [in], SUM(b.[out]) AS [out]"
+                + ", COUNT_BIG(1) AS count, SUM(b.invalidIn) AS invalidIn, SUM(b.invalidOut) AS invalidOut"
+                + ", SUM(b.missingRows) AS missingRows, SUM(b.negativeRows) AS negativeRows"
+                + " FROM bank_rows b" + dailyWhere + " GROUP BY b.day)"
+                + ", quality AS (SELECT COALESCE(SUM(CASE WHEN " + validJalaliDay
+                + " THEN CONVERT(bigint,0) ELSE CONVERT(bigint,1) END),CONVERT(bigint,0)) AS invalidDateRows"
+                + " FROM bank_rows b)"
+                + " SELECT d.day,d.[in],d.[out],d.count,d.invalidIn,d.invalidOut,d.missingRows,d.negativeRows,q.invalidDateRows"
+                + " FROM daily d CROSS JOIN quality q"
+                + " UNION ALL SELECT CAST(NULL AS nvarchar(30)) AS day,CAST(0 AS decimal(38,4)) AS [in]"
+                + ",CAST(0 AS decimal(38,4)) AS [out],CONVERT(bigint,0) AS count"
+                + ",CONVERT(bigint,0) AS invalidIn,CONVERT(bigint,0) AS invalidOut"
+                + ",CONVERT(bigint,0) AS missingRows,CONVERT(bigint,0) AS negativeRows,q.invalidDateRows"
+                + " FROM quality q WHERE NOT EXISTS (SELECT 1 FROM daily) ORDER BY 1", binds);
     }
 
     /** Bank operations per account and month (banking only): bank,month,in,out,net,count. */

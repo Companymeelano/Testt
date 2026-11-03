@@ -36,13 +36,19 @@ public final class BankStatementFile {
     public static final int MAX_COLUMNS = 64;
     public static final int MAX_PERIOD_DAYS = 366;
     public static final double AMOUNT_TOLERANCE_RIALS = 0.5d;
-    private static final double MAX_AMOUNT_RIALS = 999_999_999_999_999_000d;
+    /** Conservative Rial bound shared by the parser, period comparison, and local persistence. */
+    public static final BigDecimal MAX_AMOUNT_RIALS = new BigDecimal("999999999999999999");
+    private static final BigDecimal TOMAN_TO_RIAL = BigDecimal.TEN;
+    private static final BigDecimal ZERO = BigDecimal.ZERO;
 
     public static final int DATE_AUTO = 0;
     public static final int DATE_JALALI_YMD = 1;
-    public static final int DATE_GREGORIAN_YMD = 2;
-    public static final int DATE_GREGORIAN_DMY = 3;
-    public static final int DATE_EXCEL_SERIAL = 4;
+    public static final int DATE_JALALI_DMY = 2;
+    public static final int DATE_GREGORIAN_YMD = 3;
+    public static final int DATE_GREGORIAN_DMY = 4;
+    public static final int DATE_GREGORIAN_MDY = 5;
+    public static final int DATE_EXCEL_SERIAL = 6;
+    public static final int DATE_JALALI_MDY = 7;
 
     public static final int AMOUNT_AUTO = 0;
     public static final int AMOUNT_DECIMAL_DOT = 1;
@@ -103,9 +109,12 @@ public final class BankStatementFile {
         public int amountFormat = AMOUNT_AUTO;
         public boolean signedAmountDefinesDirection;
         public boolean amountsInToman;
+        public boolean amountUnitConfirmed;
 
         public boolean valid() {
-            if (date < 0) return false;
+            if (date < 0 || !amountUnitConfirmed
+                    || dateFormat < DATE_AUTO || dateFormat > DATE_JALALI_MDY
+                    || amountFormat < AMOUNT_AUTO || amountFormat > AMOUNT_GROUPING_ONLY) return false;
             if (accountValue != null && !accountValue.trim().isEmpty() && account < 0) return false;
             boolean split = credit >= 0 && debit >= 0 && credit != debit
                     && credit != date && debit != date;
@@ -132,34 +141,46 @@ public final class BankStatementFile {
     public static final class Transaction {
         public final int rowNumber;
         public final String day;
+        public final BigDecimal creditRialsExact;
+        public final BigDecimal debitRialsExact;
+        /** Double views remain for existing read-only UI consumers; all arithmetic uses exact values. */
         public final double creditRials;
         public final double debitRials;
         public final String description;
         public final String reference;
+        public final BigDecimal balanceRialsExact;
         public final Double balanceRials;
 
-        private Transaction(int rowNumber, String day, double creditRials, double debitRials,
-                            String description, String reference, Double balanceRials) {
+        private Transaction(int rowNumber, String day, BigDecimal creditRials, BigDecimal debitRials,
+                            String description, String reference, BigDecimal balanceRials) {
             this.rowNumber = rowNumber;
             this.day = day;
-            this.creditRials = creditRials;
-            this.debitRials = debitRials;
+            this.creditRialsExact = creditRials;
+            this.debitRialsExact = debitRials;
+            this.creditRials = creditRials.doubleValue();
+            this.debitRials = debitRials.doubleValue();
             this.description = description;
             this.reference = reference;
-            this.balanceRials = balanceRials;
+            this.balanceRialsExact = balanceRials;
+            this.balanceRials = balanceRials == null ? null : balanceRials.doubleValue();
         }
     }
 
     public static final class DailyTotal {
         public final String day;
+        public final BigDecimal creditRialsExact;
+        public final BigDecimal debitRialsExact;
+        /** Convenience/display doubles; never use these for persistence or reconciliation. */
         public final double creditRials;
         public final double debitRials;
         public final int transactions;
 
-        private DailyTotal(String day, double creditRials, double debitRials, int transactions) {
+        private DailyTotal(String day, BigDecimal creditRials, BigDecimal debitRials, int transactions) {
             this.day = day;
-            this.creditRials = creditRials;
-            this.debitRials = debitRials;
+            this.creditRialsExact = creditRials;
+            this.debitRialsExact = debitRials;
+            this.creditRials = creditRials.doubleValue();
+            this.debitRials = debitRials.doubleValue();
             this.transactions = transactions;
         }
     }
@@ -172,6 +193,8 @@ public final class BankStatementFile {
         public final int invalidRows;
         public final int outsideRangeRows;
         public final int filteredAccountRows;
+        public final BigDecimal totalCreditRialsExact;
+        public final BigDecimal totalDebitRialsExact;
         public final double totalCreditRials;
         public final double totalDebitRials;
         public final String minDay;
@@ -182,7 +205,7 @@ public final class BankStatementFile {
         private Parsed(List<Transaction> transactions, Map<String, DailyTotal> daily,
                        List<String> warnings, int skippedRows, int invalidRows,
                        int outsideRangeRows, int filteredAccountRows,
-                       double totalCreditRials, double totalDebitRials,
+                       BigDecimal totalCreditRials, BigDecimal totalDebitRials,
                        String minDay, String maxDay, String errorSummary, int transactionCount) {
             this.transactions = Collections.unmodifiableList(transactions);
             this.daily = Collections.unmodifiableMap(daily);
@@ -191,8 +214,10 @@ public final class BankStatementFile {
             this.invalidRows = invalidRows;
             this.outsideRangeRows = outsideRangeRows;
             this.filteredAccountRows = filteredAccountRows;
-            this.totalCreditRials = totalCreditRials;
-            this.totalDebitRials = totalDebitRials;
+            this.totalCreditRialsExact = totalCreditRials;
+            this.totalDebitRialsExact = totalDebitRials;
+            this.totalCreditRials = totalCreditRials.doubleValue();
+            this.totalDebitRials = totalDebitRials.doubleValue();
             this.minDay = minDay;
             this.maxDay = maxDay;
             this.errorSummary = errorSummary;
@@ -201,8 +226,8 @@ public final class BankStatementFile {
     }
 
     private static final class MutableDaily {
-        double credit;
-        double debit;
+        BigDecimal credit = ZERO;
+        BigDecimal debit = ZERO;
         int count;
     }
 
@@ -213,7 +238,7 @@ public final class BankStatementFile {
         if (parsed == null) return null;
         return new Parsed(Collections.emptyList(), parsed.daily, parsed.warnings,
                 parsed.skippedRows, parsed.invalidRows, parsed.outsideRangeRows, parsed.filteredAccountRows,
-                parsed.totalCreditRials, parsed.totalDebitRials, parsed.minDay, parsed.maxDay,
+                parsed.totalCreditRialsExact, parsed.totalDebitRialsExact, parsed.minDay, parsed.maxDay,
                 parsed.errorSummary, parsed.transactionCount);
     }
 
@@ -250,8 +275,11 @@ public final class BankStatementFile {
     }
 
     public static Parsed analyze(Table table, Mapping mapping, String fromDay, String toDay) throws IOException {
-        if (table == null || mapping == null || !mapping.valid())
-            throw new IOException("ستون تاریخ و ستون‌های مبلغ/جهت را انتخاب کنید");
+        if (table == null || mapping == null)
+            throw new IOException("فایل یا نگاشت ستون‌ها در دسترس نیست");
+        if (!mapping.amountUnitConfirmed)
+            throw new IOException("واحد مبالغ را صریحاً به ریال یا تومان تأیید کنید");
+        if (!mapping.valid()) throw new IOException("ستون تاریخ و ستون‌های مبلغ/جهت را انتخاب کنید");
         String from = Jalali.disp(fromDay);
         String to = Jalali.disp(toDay);
         int fromNumber = Jalali.parse(from);
@@ -265,69 +293,102 @@ public final class BankStatementFile {
         List<Transaction> transactions = new ArrayList<>();
         Map<String, MutableDaily> totals = new TreeMap<>();
         List<String> warnings = new ArrayList<>();
+        java.util.Set<String> accountValues = new java.util.LinkedHashSet<>();
+        String requestedAccount = mapping.accountValue == null ? "" : accountToken(mapping.accountValue);
         String minDay = "";
         String maxDay = "";
         int skipped = 0;
         int invalid = 0;
         int outside = 0;
         int filteredAccount = 0;
+        int matchedAccountRows = 0;
         StringBuilder errors = new StringBuilder();
-        double totalCredit = 0;
-        double totalDebit = 0;
+        BigDecimal totalCredit = ZERO;
+        BigDecimal totalDebit = ZERO;
 
         for (int ri = table.headerRow + 1; ri < table.rows.size(); ri++) {
             List<String> row = table.rows.get(ri);
             if (blankRow(row)) { skipped++; continue; }
             String rawDate = cell(row, mapping.date);
             if (rawDate.trim().isEmpty() && blankAmounts(row, mapping)) { skipped++; continue; }
-            String requestedAccount = mapping.accountValue == null ? "" : accountToken(mapping.accountValue);
-            if (mapping.account >= 0 && !requestedAccount.isEmpty()) {
+
+            if (mapping.account >= 0) {
                 String rowAccount = accountToken(cell(row, mapping.account));
                 if (rowAccount.isEmpty()) {
                     invalid++;
-                    appendError(errors, ri + 1, "شناسهٔ حساب در ردیف خالی است؛ فیلتر حساب را بررسی کنید");
+                    appendError(errors, ri + 1, "شناسهٔ حساب در ردیف خالی است؛ ستون حساب یا فایل را بررسی کنید");
                     continue;
                 }
-                if (!requestedAccount.equals(rowAccount)) { filteredAccount++; continue; }
+                if (!requestedAccount.isEmpty()) {
+                    if (!requestedAccount.equals(rowAccount)) { filteredAccount++; continue; }
+                    matchedAccountRows++;
+                } else {
+                    accountValues.add(rowAccount);
+                }
             }
+
             String day = normalizeDate(rawDate, mapping.dateFormat);
             if (day.isEmpty()) {
                 invalid++;
-                appendError(errors, ri + 1, "تاریخ نامعتبر است");
+                appendError(errors, ri + 1, mapping.dateFormat == DATE_AUTO
+                        ? "تاریخ نامعتبر یا مبهم است؛ قالب تاریخ را صریح انتخاب کنید"
+                        : "تاریخ با قالب انتخاب‌شده سازگار نیست");
                 continue;
             }
             int dateNumber = Jalali.parse(day);
+            if (dateNumber < 0) {
+                invalid++;
+                appendError(errors, ri + 1, "تاریخ پس از نرمال‌سازی معتبر نیست");
+                continue;
+            }
             if (dateNumber < fromNumber || dateNumber > toNumber) { outside++; continue; }
 
-            double credit;
-            double debit;
+            BigDecimal credit;
+            BigDecimal debit;
             try {
                 if (mapping.credit >= 0 && mapping.debit >= 0) {
-                    credit = absoluteOptional(cell(row, mapping.credit), mapping.amountFormat);
-                    debit = absoluteOptional(cell(row, mapping.debit), mapping.amountFormat);
-                    if (credit > 0 && debit > 0) {
-                        invalid++;
-                        appendError(errors, ri + 1, "در یک ردیف هم واریز و هم برداشت ثبت شده؛ ستون‌ها را بررسی کنید");
-                        continue;
-                    }
+                    String rawCredit = cell(row, mapping.credit).trim();
+                    String rawDebit = cell(row, mapping.debit).trim();
+                    requireSelectedCurrency(rawCredit, mapping);
+                    requireSelectedCurrency(rawDebit, mapping);
+                    if (missingAmount(rawCredit) && missingAmount(rawDebit))
+                        throw new IllegalArgumentException("هر دو مبلغ واریز و برداشت خالی‌اند؛ مبلغ ناموجود به صفر تبدیل نشد");
+                    credit = absoluteOptionalExact(rawCredit, mapping.amountFormat);
+                    debit = absoluteOptionalExact(rawDebit, mapping.amountFormat);
+                    if (credit.signum() < 0 || debit.signum() < 0)
+                        throw new IllegalArgumentException("مبلغ منفی در ستون جداگانهٔ واریز/برداشت مجاز نیست؛ جهت ردیف را بررسی کنید");
+                    if (credit.signum() > 0 && debit.signum() > 0)
+                        throw new IllegalArgumentException("در یک ردیف هم واریز و هم برداشت ثبت شده؛ ستون‌ها را بررسی کنید");
                 } else {
-                    Double amount = parseAmount(cell(row, mapping.amount), mapping.amountFormat);
-                    if (amount == null) throw new IllegalArgumentException("مبلغ نامعتبر است");
-                    boolean positive = amount >= 0;
+                    String rawAmount = cell(row, mapping.amount).trim();
+                    requireSelectedCurrency(rawAmount, mapping);
+                    if (missingAmount(rawAmount))
+                        throw new IllegalArgumentException("مبلغ این ردیف خالی است؛ مبلغ ناموجود به صفر تبدیل نشد");
+                    BigDecimal amount = parseAmountExact(rawAmount, mapping.amountFormat);
+                    if (amount == null) throw new IllegalArgumentException("مبلغ نامعتبر یا قالب جداکننده مبهم است؛ قالب را صریح انتخاب کنید");
+                    int amountSign = amount.signum();
+                    boolean positive = amountSign >= 0;
                     if (mapping.direction >= 0) {
-                        int direction = direction(cell(row, mapping.direction));
-                        if (direction == 0) throw new IllegalArgumentException("جهت واریز/برداشت نامشخص است");
-                        positive = direction > 0;
+                        int movement = direction(cell(row, mapping.direction));
+                        if (movement == 0) throw new IllegalArgumentException("جهت واریز/برداشت نامشخص یا متناقض است");
+                        if (amountSign < 0 && movement > 0)
+                            throw new IllegalArgumentException("علامت منفی مبلغ با جهت واریز ناسازگار است");
+                        if (mapping.signedAmountDefinesDirection && (amountSign < 0) != (movement < 0))
+                            throw new IllegalArgumentException("علامت مبلغ با ستون جهت ناسازگار است؛ یکی از آن‌ها را مبنا قرار دهید");
+                        positive = movement > 0;
                     } else if (!mapping.signedAmountDefinesDirection) {
                         throw new IllegalArgumentException("جهت مبلغ تأیید نشده است");
+                    } else if (amountSign == 0) {
+                        throw new IllegalArgumentException("علامت مبلغ صفر جهت واریز/برداشت را مشخص نمی‌کند");
                     }
-                    double value = Math.abs(amount);
-                    credit = positive ? value : 0;
-                    debit = positive ? 0 : value;
+                    BigDecimal value = amount.abs();
+                    credit = positive ? value : ZERO;
+                    debit = positive ? ZERO : value;
                 }
-                double multiplier = mapping.amountsInToman ? 10d : 1d;
-                credit *= multiplier;
-                debit *= multiplier;
+                if (mapping.amountsInToman) {
+                    credit = credit.multiply(TOMAN_TO_RIAL);
+                    debit = debit.multiply(TOMAN_TO_RIAL);
+                }
                 if (!finiteAmount(credit) || !finiteAmount(debit))
                     throw new IllegalArgumentException("مبلغ خارج از محدودهٔ مجاز است");
             } catch (IllegalArgumentException bad) {
@@ -335,26 +396,32 @@ public final class BankStatementFile {
                 appendError(errors, ri + 1, bad.getMessage());
                 continue;
             }
-            if (credit == 0d && debit == 0d) { skipped++; continue; }
-
-            Double balance = null;
+            BigDecimal balance = null;
             if (mapping.balance >= 0 && !cell(row, mapping.balance).trim().isEmpty()) {
-                Double parsedBalance = parseAmount(cell(row, mapping.balance), mapping.amountFormat);
-                if (parsedBalance == null || !finiteAmount(Math.abs(parsedBalance) * (mapping.amountsInToman ? 10d : 1d))) {
+                String rawBalance = cell(row, mapping.balance).trim();
+                try { requireSelectedCurrency(rawBalance, mapping); }
+                catch (IllegalArgumentException mismatch) {
+                    if (warnings.size() < 5) warnings.add("ردیف " + (ri + 1) + ": " + mismatch.getMessage());
+                    rawBalance = "";
+                }
+                BigDecimal parsedBalance = rawBalance.isEmpty() ? null
+                        : parseAmountExact(rawBalance, mapping.amountFormat);
+                if (parsedBalance == null || !finiteAmount(parsedBalance.abs().multiply(
+                        mapping.amountsInToman ? TOMAN_TO_RIAL : BigDecimal.ONE))) {
                     if (warnings.size() < 5) warnings.add("ردیف " + (ri + 1) + ": مانده قابل‌خواندن نیست؛ در جمع واریز/برداشت دخالت داده نشد.");
                 } else {
-                    balance = parsedBalance * (mapping.amountsInToman ? 10d : 1d);
+                    balance = parsedBalance.multiply(mapping.amountsInToman ? TOMAN_TO_RIAL : BigDecimal.ONE);
                 }
             }
             MutableDaily daily = totals.get(day);
-            double nextDailyCredit = (daily == null ? 0d : daily.credit) + credit;
-            double nextDailyDebit = (daily == null ? 0d : daily.debit) + debit;
-            double nextTotalCredit = totalCredit + credit;
-            double nextTotalDebit = totalDebit + debit;
+            BigDecimal nextDailyCredit = (daily == null ? ZERO : daily.credit).add(credit);
+            BigDecimal nextDailyDebit = (daily == null ? ZERO : daily.debit).add(debit);
+            BigDecimal nextTotalCredit = totalCredit.add(credit);
+            BigDecimal nextTotalDebit = totalDebit.add(debit);
             if (!finiteAmount(nextDailyCredit) || !finiteAmount(nextDailyDebit)
                     || !finiteAmount(nextTotalCredit) || !finiteAmount(nextTotalDebit)) {
                 invalid++;
-                appendError(errors, ri + 1, "جمع مبلغ‌ها از محدودهٔ مجاز عبور می‌کند");
+                appendError(errors, ri + 1, "جمع دقیق مبلغ‌ها از محدودهٔ مجاز عبور می‌کند");
                 continue;
             }
             if (daily == null) { daily = new MutableDaily(); totals.put(day, daily); }
@@ -366,9 +433,13 @@ public final class BankStatementFile {
             daily.count++;
             totalCredit = nextTotalCredit;
             totalDebit = nextTotalDebit;
-            if (minDay.isEmpty() || Jalali.parse(day) < Jalali.parse(minDay)) minDay = day;
-            if (maxDay.isEmpty() || Jalali.parse(day) > Jalali.parse(maxDay)) maxDay = day;
+            if (minDay.isEmpty() || dateNumber < Jalali.parse(minDay)) minDay = day;
+            if (maxDay.isEmpty() || dateNumber > Jalali.parse(maxDay)) maxDay = day;
         }
+        if (!requestedAccount.isEmpty() && matchedAccountRows == 0)
+            throw new IOException("فیلتر حساب در هیچ ردیفی از فایل پیدا نشد؛ هیچ جمعی قابل‌مقایسه نیست");
+        if (requestedAccount.isEmpty() && accountValues.size() > 1)
+            throw new IOException("فایل شامل چند حساب است؛ برای جلوگیری از جمع‌کردن ناخواسته، ستون حساب و فیلتر دقیق را انتخاب کنید");
         if (transactions.isEmpty() && invalid > 0)
             throw new IOException("در بازهٔ انتخاب‌شده تراکنش معتبر پیدا نشد؛ " + invalid + " ردیف خطادار است. " + errors);
         if (invalid > 0 && warnings.size() < 5)
@@ -388,9 +459,11 @@ public final class BankStatementFile {
         int[] indexes = {m.date, m.credit, m.debit, m.amount, m.direction, m.balance, m.description, m.reference, m.account};
         for (int index : indexes) if (index >= columns) throw new IOException("انتخاب ستون از فایل خارج است");
         if (m.date < 0) throw new IOException("ستون تاریخ انتخاب نشده است");
-        if (m.dateFormat < DATE_AUTO || m.dateFormat > DATE_EXCEL_SERIAL
+        if (m.dateFormat < DATE_AUTO || m.dateFormat > DATE_JALALI_MDY
                 || m.amountFormat < AMOUNT_AUTO || m.amountFormat > AMOUNT_GROUPING_ONLY)
             throw new IOException("قالب تاریخ یا عدد انتخاب‌شده پشتیبانی نمی‌شود");
+        if (!m.amountUnitConfirmed)
+            throw new IOException("واحد مبالغ را صریحاً به ریال یا تومان تأیید کنید");
         boolean split = m.credit >= 0 && m.debit >= 0 && m.credit != m.debit
                 && m.credit != m.date && m.debit != m.date;
         boolean single = m.amount >= 0 && m.amount != m.date && m.amount != m.direction
@@ -405,8 +478,15 @@ public final class BankStatementFile {
     }
 
     private static boolean blankAmounts(List<String> row, Mapping m) {
-        return cell(row, m.credit).trim().isEmpty() && cell(row, m.debit).trim().isEmpty()
-                && cell(row, m.amount).trim().isEmpty();
+        return missingAmount(cell(row, m.credit)) && missingAmount(cell(row, m.debit))
+                && missingAmount(cell(row, m.amount));
+    }
+
+    private static boolean missingAmount(String raw) {
+        if (raw == null) return true;
+        String value = raw.trim();
+        return value.isEmpty() || "-".equals(value) || "−".equals(value)
+                || "—".equals(value) || "–".equals(value);
     }
 
     private static String cell(List<String> row, int index) {
@@ -430,138 +510,299 @@ public final class BankStatementFile {
         return token.toString();
     }
 
-    private static double absoluteOptional(String raw, int amountFormat) {
-        if (raw == null || raw.trim().isEmpty() || "-".equals(raw.trim()) || "—".equals(raw.trim())) return 0d;
-        Double amount = parseAmount(raw, amountFormat);
-        if (amount == null) throw new IllegalArgumentException("مبلغ واریز/برداشت نامعتبر است");
-        return Math.abs(amount);
+    private static BigDecimal absoluteOptionalExact(String raw, int amountFormat) {
+        if (raw == null || raw.trim().isEmpty() || "-".equals(raw.trim()) || "—".equals(raw.trim())) return ZERO;
+        BigDecimal amount = parseAmountExact(raw, amountFormat);
+        if (amount == null) throw new IllegalArgumentException("مبلغ نامعتبر یا قالب جداکننده مبهم است؛ قالب را بررسی کنید");
+        if (amount.signum() < 0)
+            throw new IllegalArgumentException("مبلغ منفی در ستون جداگانهٔ واریز/برداشت مجاز نیست؛ علامت را بررسی کنید");
+        return amount;
     }
 
-    /** Parse Persian/Arabic digits and common bank number formats; result retains an explicit sign. */
+    /** Parse Persian/Arabic digits without using floating point for any monetary arithmetic. */
     public static Double parseAmount(String raw) { return parseAmount(raw, AMOUNT_AUTO); }
 
+    /** Compatibility/display wrapper. New calculations should use parseAmountExact. */
     public static Double parseAmount(String raw, int amountFormat) {
-        if (raw == null) return null;
-        String s = Money.en(raw).trim().replace('−', '-').replace('٬', ',').replace('٫', '.');
-        if (s.isEmpty() || "-".equals(s) || "—".equals(s)) return null;
-        boolean negative = s.startsWith("(") && s.endsWith(")");
-        s = s.replace("(", "").replace(")", "").replace("ریال", "")
-                .replace("تومان", "").replace("IRR", "").replace("IRT", "")
-                .replace("irr", "").replace("irt", "").replace(" ", "")
-                .replace("\u00a0", "").replace("\u202f", "").replace("'", "");
-        if (s.isEmpty()) return null;
-        int sign = negative ? -1 : 1;
-        if (s.startsWith("-") || s.startsWith("+") || s.startsWith("−")) {
-            if (s.charAt(0) == '-' || s.charAt(0) == '−') sign = -1;
-            s = s.substring(1);
+        BigDecimal value = parseAmountExact(raw, amountFormat);
+        return value == null ? null : value.doubleValue();
+    }
+
+    /**
+     * Exact parser. Auto mode deliberately rejects a single separator followed by three digits
+     * when that token is also a valid thousands-grouped integer (for example «1,234»).
+     */
+    public static BigDecimal parseAmountExact(String raw, int amountFormat) {
+        if (raw == null || amountFormat < AMOUNT_AUTO || amountFormat > AMOUNT_GROUPING_ONLY) return null;
+        String value = Money.en(raw).trim().replace('−', '-').replace('٬', ',').replace('٫', '.')
+                .replace('ي', 'ی').replace('ك', 'ک');
+        if (value.isEmpty() || "-".equals(value) || "—".equals(value)) return null;
+        boolean parenthesized = value.startsWith("(") && value.endsWith(")");
+        if (value.contains("(") || value.contains(")")) {
+            if (!parenthesized) return null;
+            value = value.substring(1, value.length() - 1).trim();
         }
-        if (s.isEmpty()) return null;
-        int dot = s.lastIndexOf('.');
-        int comma = s.lastIndexOf(',');
+        value = stripCurrency(value);
+        if (value == null || value.isEmpty()) return null;
+        int sign = parenthesized ? -1 : 1;
+        if (value.startsWith("-") || value.startsWith("+")) {
+            if (parenthesized) return null;
+            if (value.charAt(0) == '-') sign = -1;
+            value = value.substring(1).trim();
+        }
+        if (value.isEmpty()) return null;
+
+        final char groupingSpace = '\u0001';
+        StringBuilder bodyBuilder = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (Character.isWhitespace(c) || c == '\u00a0' || c == '\u202f' || c == '\'')
+                bodyBuilder.append(groupingSpace);
+            else if ((c >= '0' && c <= '9') || c == '.' || c == ',') bodyBuilder.append(c);
+            else return null;
+        }
+        String body = bodyBuilder.toString();
+        if (body.isEmpty()) return null;
+
+        int dotCount = count(body, '.');
+        int commaCount = count(body, ',');
         int decimalPosition = -1;
-        if (amountFormat == AMOUNT_DECIMAL_DOT && dot >= 0) {
-            if (comma > dot) return null;
-            decimalPosition = dot;
-        } else if (amountFormat == AMOUNT_DECIMAL_COMMA && comma >= 0) {
-            if (dot > comma) return null;
-            decimalPosition = comma;
-        } else if (amountFormat == AMOUNT_AUTO) {
-            if (dot >= 0 && comma >= 0) {
-                decimalPosition = Math.max(dot, comma);
-            } else if (dot >= 0 || comma >= 0) {
-                char separator = dot >= 0 ? '.' : ',';
-                int last = Math.max(dot, comma);
-                int after = s.length() - last - 1;
-                int occurrences = 0;
-                for (int i = 0; i < s.length(); i++) if (s.charAt(i) == separator) occurrences++;
-                if (occurrences == 1 && after > 0 && after != 3) decimalPosition = last;
+        char decimalSeparator = 0;
+        if (amountFormat == AMOUNT_DECIMAL_DOT) decimalSeparator = '.';
+        else if (amountFormat == AMOUNT_DECIMAL_COMMA) decimalSeparator = ',';
+        else if (amountFormat == AMOUNT_AUTO) {
+            if (dotCount > 0 && commaCount > 0) {
+                decimalPosition = Math.max(body.lastIndexOf('.'), body.lastIndexOf(','));
+                decimalSeparator = body.charAt(decimalPosition);
+                int fractionalDigits = body.length() - decimalPosition - 1;
+                if (fractionalDigits < 1 || fractionalDigits > 4) return null;
+                if (fractionalDigits == 3 && groupedInteger(body, groupingSpace) != null) return null;
+            } else {
+                char separator = dotCount > 0 ? '.' : commaCount > 0 ? ',' : 0;
+                int occurrences = separator == 0 ? 0 : count(body, separator);
+                if (occurrences == 1) {
+                    int position = body.lastIndexOf(separator);
+                    int fractionalDigits = body.length() - position - 1;
+                    if (fractionalDigits < 1 || fractionalDigits > 4) return null;
+                    if (fractionalDigits == 3 && groupedInteger(body, groupingSpace) != null) return null;
+                    decimalPosition = position;
+                    decimalSeparator = separator;
+                } else if (occurrences > 1) {
+                    String grouped = groupedInteger(body, groupingSpace);
+                    if (grouped == null) return null;
+                    body = grouped;
+                }
             }
         }
-        StringBuilder normalized = new StringBuilder();
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            if (c >= '0' && c <= '9') normalized.append(c);
-            else if ((c == '.' || c == ',') && i == decimalPosition) normalized.append('.');
-            else if (c != '.' && c != ',') return null;
+
+        if (amountFormat == AMOUNT_GROUPING_ONLY || (amountFormat == AMOUNT_AUTO && decimalSeparator == 0)) {
+            String integer = groupedInteger(body, groupingSpace);
+            if (integer == null) return null;
+            body = integer;
+        } else if (decimalSeparator != 0) {
+            char other = amountFormat == AMOUNT_DECIMAL_DOT ? ','
+                    : amountFormat == AMOUNT_DECIMAL_COMMA ? '.'
+                    : decimalSeparator == '.' ? ',' : decimalSeparator == ',' ? '.' : 0;
+            int decimalCount = count(body, decimalSeparator);
+            if (decimalCount > 1) return null;
+            int position = body.lastIndexOf(decimalSeparator);
+            if (position >= 0) {
+                String fraction = body.substring(position + 1);
+                if (fraction.isEmpty() || fraction.length() > 4 || !digitsOnly(fraction)) return null;
+                String integer = other == 0 ? groupedInteger(body.substring(0, position), groupingSpace)
+                        : groupedInteger(body.substring(0, position), groupingSpace, other);
+                if (integer == null) return null;
+                body = integer + "." + fraction;
+            } else {
+                body = other == 0 ? groupedInteger(body, groupingSpace)
+                        : groupedInteger(body, groupingSpace, other);
+                if (body == null) return null;
+            }
         }
-        if (normalized.length() == 0 || ".".contentEquals(normalized)) return null;
         try {
-            BigDecimal amount = new BigDecimal(normalized.toString()).multiply(BigDecimal.valueOf(sign));
+            BigDecimal amount = new BigDecimal(body).multiply(BigDecimal.valueOf(sign));
             if (amount.precision() > 24 || amount.scale() > 4
-                    || amount.abs().compareTo(new BigDecimal("999999999999999999")) > 0) return null;
-            return amount.doubleValue();
+                    || amount.abs().compareTo(MAX_AMOUNT_RIALS) > 0) return null;
+            return amount;
         } catch (Exception invalid) {
             return null;
         }
     }
 
+    private static void requireSelectedCurrency(String raw, Mapping mapping) {
+        if (raw == null || raw.trim().isEmpty()) return;
+        int marker = explicitCurrency(raw);
+        if (marker < 0) throw new IllegalArgumentException("در یک مبلغ هم‌زمان ریال و تومان درج شده است؛ واحد مبهم است");
+        if (marker == 1 && mapping.amountsInToman)
+            throw new IllegalArgumentException("ردیف صریحاً ریال دارد اما واحد فایل تومان انتخاب شده است");
+        if (marker == 2 && !mapping.amountsInToman)
+            throw new IllegalArgumentException("ردیف صریحاً تومان دارد اما واحد فایل ریال انتخاب شده است");
+    }
+
+    /** 0 = no explicit marker, 1 = Rial, 2 = Toman, -1 = conflicting markers. */
+    private static int explicitCurrency(String raw) {
+        String lower = Money.en(raw).toLowerCase(Locale.US).replace('ي', 'ی').replace('ك', 'ک');
+        boolean toman = lower.contains("تومان")
+                || lower.matches(".*(?<![a-z])(?:irt|toman|tomans)(?![a-z]).*");
+        boolean rial = lower.contains("ریال")
+                || lower.matches(".*(?<![a-z])(?:irr|rial|rials)(?![a-z]).*");
+        if (toman && rial) return -1;
+        if (toman) return 2;
+        return rial ? 1 : 0;
+    }
+
+    private static String stripCurrency(String value) {
+        String result = value.trim();
+        String[] units = {"ریال", "تومان", "tomans", "toman", "rials", "rial", "irr", "irt"};
+        int removed = 0;
+        for (String unit : units) {
+            String lower = result.toLowerCase(Locale.US);
+            if (lower.startsWith(unit)) { result = result.substring(unit.length()).trim(); removed++; }
+            lower = result.toLowerCase(Locale.US);
+            if (lower.endsWith(unit)) { result = result.substring(0, result.length() - unit.length()).trim(); removed++; }
+        }
+        String lower = result.toLowerCase(Locale.US);
+        for (String unit : units) if (lower.contains(unit)) return null;
+        return removed > 1 ? null : result;
+    }
+
+    private static String groupedInteger(String value, char groupingSpace) {
+        return groupedInteger(value, groupingSpace, '\0', '\0');
+    }
+
+    private static String groupedInteger(String value, char groupingSpace, char allowedGrouping) {
+        return groupedInteger(value, groupingSpace, allowedGrouping, '\0');
+    }
+
+    private static String groupedInteger(String value, char groupingSpace, char allowedGrouping, char secondGrouping) {
+        if (value == null || value.isEmpty()) return "0";
+        StringBuilder digits = new StringBuilder(value.length());
+        int groupLength = 0;
+        int groups = 0;
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c >= '0' && c <= '9') {
+                digits.append(c);
+                groupLength++;
+                continue;
+            }
+            boolean grouping = c == groupingSpace || c == allowedGrouping || c == secondGrouping
+                    || (allowedGrouping == '\0' && secondGrouping == '\0' && (c == '.' || c == ','));
+            if (!grouping || groupLength == 0 || (groups == 0 ? groupLength > 3 : groupLength != 3)) return null;
+            groups++;
+            groupLength = 0;
+        }
+        if (groupLength == 0 || (groups > 0 && groupLength != 3)) return null;
+        return digits.toString();
+    }
+
+    private static int count(String value, char needle) {
+        int result = 0;
+        for (int i = 0; i < value.length(); i++) if (value.charAt(i) == needle) result++;
+        return result;
+    }
+
+    private static boolean digitsOnly(String value) {
+        if (value == null || value.isEmpty()) return false;
+        for (int i = 0; i < value.length(); i++) if (value.charAt(i) < '0' || value.charAt(i) > '9') return false;
+        return true;
+    }
+
     public static String normalizeDate(String raw, int dateFormat) {
-        if (raw == null) return "";
+        if (raw == null || dateFormat < DATE_AUTO || dateFormat > DATE_JALALI_MDY) return "";
         String s = Money.en(raw).trim().replace('\uFEFF', ' ');
         if (s.isEmpty()) return "";
         if (dateFormat == DATE_EXCEL_SERIAL) return excelSerialDate(s);
-        if (dateFormat == DATE_AUTO) {
-            String serial = excelSerialDate(s);
-            if (!serial.isEmpty()) return serial;
+        if (dateFormat == DATE_AUTO && s.matches("[0-9]{5}")) {
+            int serial = Integer.parseInt(s);
+            if (serial >= 20000 && serial <= 80000) {
+                String converted = excelSerialDate(s);
+                if (!converted.isEmpty()) return converted;
+            }
         }
-        String token = s.split("[\\sT]", 2)[0].replace('.', '/');
+        String token = s.split("[\\sTt]", 2)[0].replace('.', '/');
         String[] parts = token.split("[/\\-]");
         try {
-            if (dateFormat == DATE_JALALI_YMD) {
-                if (token.matches("[0-9]{8}"))
-                    return safeJalali(Integer.parseInt(token.substring(0, 4)),
-                            Integer.parseInt(token.substring(4, 6)), Integer.parseInt(token.substring(6, 8)));
-                if (parts.length == 3 && parts[0].length() == 4) {
-                    int year = Integer.parseInt(parts[0]);
-                    if (year >= 1300 && year <= 1600)
-                        return safeJalali(year, Integer.parseInt(parts[1]), Integer.parseInt(parts[2]));
-                }
-                return "";
+            if (token.matches("[0-9]{8}") && dateFormat == DATE_JALALI_DMY) {
+                int day = Integer.parseInt(token.substring(0, 2));
+                int month = Integer.parseInt(token.substring(2, 4));
+                int year = Integer.parseInt(token.substring(4, 8));
+                return year >= 1300 && year <= 1600 ? safeJalali(year, month, day) : "";
             }
-            if (dateFormat == DATE_GREGORIAN_YMD) {
-                if (token.matches("[0-9]{8}")) {
-                    int year = Integer.parseInt(token.substring(0, 4));
-                    if (year >= 1700 && year <= 2300)
-                        return gregorianToJalali(year, Integer.parseInt(token.substring(4, 6)),
-                                Integer.parseInt(token.substring(6, 8)));
-                } else if (parts.length == 3 && parts[0].length() == 4) {
-                    int year = Integer.parseInt(parts[0]);
-                    if (year >= 1700 && year <= 2300)
-                        return gregorianToJalali(year, Integer.parseInt(parts[1]), Integer.parseInt(parts[2]));
-                }
-                return "";
+            if (token.matches("[0-9]{8}") && dateFormat == DATE_JALALI_MDY) {
+                int month = Integer.parseInt(token.substring(0, 2));
+                int day = Integer.parseInt(token.substring(2, 4));
+                int year = Integer.parseInt(token.substring(4, 8));
+                return year >= 1300 && year <= 1600 ? safeJalali(year, month, day) : "";
             }
-            if (dateFormat == DATE_GREGORIAN_DMY) {
-                if (parts.length != 3 || parts[2].length() != 4) return "";
-                int year = Integer.parseInt(parts[2]);
-                if (year < 1700 || year > 2300) return "";
-                return gregorianToJalali(year, Integer.parseInt(parts[1]), Integer.parseInt(parts[0]));
+            if (token.matches("[0-9]{8}") && dateFormat == DATE_GREGORIAN_DMY) {
+                int day = Integer.parseInt(token.substring(0, 2));
+                int month = Integer.parseInt(token.substring(2, 4));
+                int year = Integer.parseInt(token.substring(4, 8));
+                return year >= 1700 && year <= 2300 ? gregorianToJalali(year, month, day) : "";
             }
-            if (dateFormat == DATE_AUTO && parts.length == 3 && parts[2].length() == 4) {
-                int year = Integer.parseInt(parts[2]);
-                if (year >= 1700 && year <= 2300)
-                    return gregorianToJalali(year, Integer.parseInt(parts[1]), Integer.parseInt(parts[0]));
-                if (year >= 1300 && year <= 1600)
-                    return safeJalali(year, Integer.parseInt(parts[1]), Integer.parseInt(parts[0]));
-            }
-            if (parts.length == 3 && parts[0].length() == 4) {
-                int year = Integer.parseInt(parts[0]);
-                if (year >= 1700 && year <= 2300)
-                    return gregorianToJalali(year, Integer.parseInt(parts[1]), Integer.parseInt(parts[2]));
-                if (year >= 1300 && year <= 1600)
-                    return safeJalali(year, Integer.parseInt(parts[1]), Integer.parseInt(parts[2]));
+            if (token.matches("[0-9]{8}") && dateFormat == DATE_GREGORIAN_MDY) {
+                int month = Integer.parseInt(token.substring(0, 2));
+                int day = Integer.parseInt(token.substring(2, 4));
+                int year = Integer.parseInt(token.substring(4, 8));
+                return year >= 1700 && year <= 2300 ? gregorianToJalali(year, month, day) : "";
             }
             if (token.matches("[0-9]{8}")) {
                 int year = Integer.parseInt(token.substring(0, 4));
-                int month = Integer.parseInt(token.substring(4, 6));
-                int day = Integer.parseInt(token.substring(6, 8));
-                if (year >= 1700 && year <= 2300) return gregorianToJalali(year, month, day);
-                if (year >= 1300 && year <= 1600) return safeJalali(year, month, day);
+                int first = Integer.parseInt(token.substring(4, 6));
+                int second = Integer.parseInt(token.substring(6, 8));
+                if ((dateFormat == DATE_JALALI_YMD || dateFormat == DATE_AUTO) && year >= 1300 && year <= 1600)
+                    return safeJalali(year, first, second);
+                if ((dateFormat == DATE_GREGORIAN_YMD || dateFormat == DATE_AUTO) && year >= 1700 && year <= 2300)
+                    return gregorianToJalali(year, first, second);
+                return "";
+            }
+            if (dateFormat == DATE_JALALI_YMD || dateFormat == DATE_GREGORIAN_YMD
+                    || dateFormat == DATE_AUTO) {
+                if (parts.length == 3 && parts[0].length() == 4) {
+                    int year = Integer.parseInt(parts[0]);
+                    int month = Integer.parseInt(parts[1]);
+                    int day = Integer.parseInt(parts[2]);
+                    if ((dateFormat == DATE_JALALI_YMD || dateFormat == DATE_AUTO) && year >= 1300 && year <= 1600)
+                        return safeJalali(year, month, day);
+                    if ((dateFormat == DATE_GREGORIAN_YMD || dateFormat == DATE_AUTO) && year >= 1700 && year <= 2300)
+                        return gregorianToJalali(year, month, day);
+                    if (dateFormat != DATE_AUTO) return "";
+                } else if (dateFormat == DATE_JALALI_YMD || dateFormat == DATE_GREGORIAN_YMD) return "";
+            }
+            if (parts.length == 3 && parts[2].length() == 4) {
+                int first = Integer.parseInt(parts[0]);
+                int second = Integer.parseInt(parts[1]);
+                int year = Integer.parseInt(parts[2]);
+                if (dateFormat == DATE_JALALI_DMY)
+                    return year >= 1300 && year <= 1600 ? safeJalali(year, second, first) : "";
+                if (dateFormat == DATE_JALALI_MDY)
+                    return year >= 1300 && year <= 1600 ? safeJalali(year, first, second) : "";
+                if (dateFormat == DATE_GREGORIAN_DMY)
+                    return year >= 1700 && year <= 2300 ? gregorianToJalali(year, second, first) : "";
+                if (dateFormat == DATE_GREGORIAN_MDY)
+                    return year >= 1700 && year <= 2300 ? gregorianToJalali(year, first, second) : "";
+                if (dateFormat == DATE_AUTO) {
+                    if (year >= 1300 && year <= 1600) {
+                        // The Jalali month is 1..12; auto is safe only when the day cannot be a month.
+                        if (first > 12 && second >= 1 && second <= 12)
+                            return safeJalali(year, second, first);
+                        return "";
+                    }
+                    if (year >= 1700 && year <= 2300) {
+                        // DMY and MDY are indistinguishable when both components are <= 12.
+                        if (first > 12 && second <= 12)
+                            return gregorianToJalali(year, second, first);
+                        if (first <= 12 && second > 12)
+                            return gregorianToJalali(year, first, second);
+                    }
+                }
             }
         } catch (Exception invalid) {
             return "";
         }
-        return Jalali.disp(token);
+        // AUTO never falls back to a permissive normalizer; ambiguous/unsupported dates stay unknown.
+        return "";
     }
 
     private static String excelSerialDate(String raw) {
@@ -579,8 +820,8 @@ public final class BankStatementFile {
 
     private static String gregorianToJalali(int year, int month, int day) {
         try {
-            if (month < 1 || month > 12 || day < 1 || day > 31) return "";
-            return Jalali.disp(String.format(Locale.US, "%04d-%02d-%02d", year, month, day));
+            LocalDate date = LocalDate.of(year, month, day);
+            return Jalali.disp(date.toString());
         } catch (Exception invalid) {
             return "";
         }
@@ -597,12 +838,10 @@ public final class BankStatementFile {
         if ("-".equals(literal) || "d".equals(literal) || "dr".equals(literal) || "2".equals(literal)) return -1;
         String s = normalizeHeader(raw);
         if (s.isEmpty()) return 0;
-        if (containsAny(s, "واریز", "بستانکار", "دریافت", "deposit", "credit", "inflow", "افزایش", "cr", "plus")) return 1;
-        if (containsAny(s, "برداشت", "بدهکار", "پرداخت", "withdraw", "debit", "outflow", "کاهش", "dr", "minus")) return -1;
-        String flat = s.replace(" ", "");
-        if ("c".equals(flat) || "cr".equals(flat) || "+".equals(flat) || "1".equals(flat)) return 1;
-        if ("d".equals(flat) || "dr".equals(flat) || "-".equals(flat) || "2".equals(flat)) return -1;
-        return 0;
+        boolean credit = containsAny(s, "واریز", "بستانکار", "دریافت", "deposit", "credit", "inflow", "افزایش", "cr", "plus");
+        boolean debit = containsAny(s, "برداشت", "بدهکار", "پرداخت", "withdraw", "debit", "outflow", "کاهش", "dr", "minus");
+        if (credit == debit) return 0;
+        return credit ? 1 : -1;
     }
 
     private static boolean containsAny(String text, String... needles) {
@@ -647,8 +886,9 @@ public final class BankStatementFile {
         return b.toString();
     }
 
-    private static boolean finiteAmount(double value) {
-        return Double.isFinite(value) && value >= 0d && value <= MAX_AMOUNT_RIALS;
+    private static boolean finiteAmount(BigDecimal value) {
+        return value != null && value.signum() >= 0 && value.precision() <= 24
+                && value.scale() <= 4 && value.compareTo(MAX_AMOUNT_RIALS) <= 0;
     }
 
     private static void appendError(StringBuilder errors, int row, String message) {

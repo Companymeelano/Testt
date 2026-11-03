@@ -242,7 +242,7 @@ public class AtiranSampleSchemaTest {
 
         Queries.Q lines = MasterQueries.returnLines(meta, "123");
         String lineSql = lines.sql.toLowerCase(Locale.ROOT);
-        assertTrue(lineSql, lineSql.contains("vw_allrizaghambargashti"));
+        assertTrue(lineSql, lineSql.contains("vw_allrizaghlambargashti"));
         assertTrue(lineSql, lineSql.contains("x.[sh_back_sanad]"));
         assertTrue(lineSql, lineSql.contains("as linesum"));
         assertTrue(lineSql, lineSql.contains("try_convert(decimal(19,3),x.[tedvah])"));

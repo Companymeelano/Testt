@@ -29,6 +29,9 @@ public final class AiClient {
 
     public static final String GEMINI = "gemini";
     public static final String OPENAI = "openai";
+    /** New installs use ChatGPT/OpenAI without asking the user to choose a provider or model. */
+    public static final String DEFAULT_PROVIDER = OPENAI;
+    public static final String OPENAI_DEFAULT_MODEL = "gpt-4o-mini";
     public static final String GROK = "grok";
     public static final String GROQ = "groq";
     public static final String DEEPSEEK = "deepseek";
@@ -40,7 +43,7 @@ public final class AiClient {
 
     /** User-configurable direct providers; credentials are supplied per call and are never bundled. */
     public static final String[][] NAMES = {
-            {GEMINI, "Gemini"}, {DEEPSEEK, "DeepSeek"}, {GROQ, "Groq"}, {OPENAI, "ChatGPT"}
+            {OPENAI, "ChatGPT"}, {GEMINI, "Gemini"}, {DEEPSEEK, "DeepSeek"}, {GROQ, "Groq"}
     };
 
     public static String nameOf(String provider) {
@@ -58,7 +61,6 @@ public final class AiClient {
         }
     }
 
-    /** Recommended default model per preset (the user may change it in settings). */
     /** Text-to-speech model for providers that offer natural speech; empty when none. */
     public static String defaultTtsModel(String provider) {
         if (GEMINI.equals(provider)) return "gemini-2.5-flash-preview-tts";
@@ -71,22 +73,22 @@ public final class AiClient {
     }
 
     /**
-     * Model for a task. Analysis uses the stronger model where one exists; quick answers and
-     * writing use the fast one. Other providers keep their default model.
+     * Model for a task. OpenAI intentionally uses one default model for every task so a simple
+     * setup needs only an API key; other providers may use task-specific models.
      */
     public static String modelFor(String provider, String task) {
+        if (OPENAI.equals(provider)) return OPENAI_DEFAULT_MODEL;
         if (GEMINI.equals(provider)) {
             if ("analysis".equals(task)) return "gemini-2.5-pro";
             if ("fast".equals(task) || "writing".equals(task)) return "gemini-2.5-flash";
         }
-        if (OPENAI.equals(provider) && "analysis".equals(task)) return "gpt-4o";
         if (DEEPSEEK.equals(provider) && "analysis".equals(task)) return "deepseek-v4-pro";
         return defaultModel(provider);
     }
 
     public static String defaultModel(String provider) {
         if (GEMINI.equals(provider)) return "gemini-2.5-flash";
-        if (OPENAI.equals(provider)) return "gpt-4o-mini";
+        if (OPENAI.equals(provider)) return OPENAI_DEFAULT_MODEL;
         if (GROK.equals(provider)) return "grok-3-mini";
         if (CEREBRAS.equals(provider)) return "llama-3.3-70b";
         if (HUGGINGFACE.equals(provider)) return "meta-llama/Llama-3.3-70B-Instruct";

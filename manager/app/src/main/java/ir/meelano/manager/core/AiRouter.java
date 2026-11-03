@@ -9,8 +9,8 @@ import java.util.List;
 import ir.meelano.manager.screens.AiSettings;
 
 /**
- * Chooses which service answers, with automatic failover between the three services in use:
- * Gemini, DeepSeek and Groq. Each kind of question has its own order (see the plan below).
+ * Chooses which service answers, with automatic failover between configured providers:
+ * ChatGPT/OpenAI, Gemini, DeepSeek and Groq. Each kind of question has its own order (see below).
  * A service that is rate-limited (429) is paused for 10 minutes; one that rejects its key
  * (401/403) is paused for an hour. Only services with a key are used.
  */
@@ -94,7 +94,7 @@ public final class AiRouter {
 
     private static Result attempt(Context c, String task, boolean[] started, Call call) throws Exception {
         SharedPreferences p = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        String active = p.getString("provider", AiClient.GEMINI);
+        String active = p.getString("provider", AiClient.DEFAULT_PROVIDER);
         List<String> order = orderFor(task, active);
         StringBuilder errs = new StringBuilder();
         long now = System.currentTimeMillis();

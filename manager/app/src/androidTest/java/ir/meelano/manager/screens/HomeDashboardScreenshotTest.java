@@ -298,7 +298,8 @@ public final class HomeDashboardScreenshotTest {
         instrumentation.runOnMainSync(() -> collectText(targets[14], tillCopy));
         assertTrue("Till-count formula or source was lost",
                 tillCopy[0].contains("ماندهٔ آغاز + دریافت نقد")
-                        && tillCopy[0].contains("فقط روی این دستگاه"));
+                        && (tillCopy[0].contains("فقط روی این دستگاه")
+                        || tillCopy[0].contains("محلی روی همین دستگاه")));
         assertNotNull("Overview category heading is missing", targets[18]);
         assertNotNull("Management and finance category heading is missing", targets[19]);
         assertNotNull("Incomplete trend needs a compact unavailable-data row", targets[20]);

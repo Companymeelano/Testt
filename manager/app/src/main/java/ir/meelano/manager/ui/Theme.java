@@ -314,32 +314,34 @@ public final class Theme {
         return base(SURFACE, 14, dp(1), BORDER);
     }
 
+    /** Dashboard surface tint levels are shared with contrast checks and muted-ink resolution. */
+    public static float dashboardCardTopTint() { return light ? 0.03f : 0.12f; }
+    public static float dashboardCardBottomTint() { return light ? 0.01f : 0.06f; }
+    public static float dashboardMetricTopTint() { return light ? 0.10f : 0.26f; }
+    public static float dashboardMetricBottomTint() { return light ? 0.04f : 0.13f; }
+
     /**
-     * Raised, softly tinted card used only by the home dashboard. Other screens keep the shared
+     * Quiet, softly tinted card used only by the home dashboard. Other screens keep the shared
      * neutral card so the home refresh does not leak into the rest of the application.
      */
     public static GradientDrawable dashboardCard(int accent) {
         int hue = accent == 0 ? PRIMARY : accent;
-        float topTint = light ? 0.04f : 0.20f;
-        float bottomTint = light ? 0.015f : 0.10f;
         GradientDrawable card = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{DesignTokens.mix(SURFACE, hue, topTint),
-                        DesignTokens.mix(SURFACE, hue, bottomTint)});
+                new int[]{DesignTokens.mix(SURFACE, hue, dashboardCardTopTint()),
+                        DesignTokens.mix(SURFACE, hue, dashboardCardBottomTint())});
         card.setCornerRadius(dp(18));
-        card.setStroke(dp(1), DesignTokens.mix(BORDER, hue, light ? 0.36f : 0.48f));
+        card.setStroke(dp(1), DesignTokens.mix(BORDER, hue, light ? 0.20f : 0.28f));
         return card;
     }
 
-    /** Slightly richer inset tile, still restrained enough for dense financial information. */
+    /** Restrained inset tile: accent stays in the icon and label instead of filling each card. */
     public static GradientDrawable dashboardMetric(int accent) {
         int hue = accent == 0 ? PRIMARY : accent;
-        float topTint = light ? 0.16f : 0.34f;
-        float bottomTint = light ? 0.065f : 0.18f;
         GradientDrawable tile = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{DesignTokens.mix(SURFACE, hue, topTint),
-                        DesignTokens.mix(SURFACE, hue, bottomTint)});
+                new int[]{DesignTokens.mix(SURFACE, hue, dashboardMetricTopTint()),
+                        DesignTokens.mix(SURFACE, hue, dashboardMetricBottomTint())});
         tile.setCornerRadius(dp(14));
-        tile.setStroke(dp(1), DesignTokens.mix(BORDER, hue, light ? 0.48f : 0.56f));
+        tile.setStroke(dp(1), DesignTokens.mix(BORDER, hue, light ? 0.32f : 0.40f));
         return tile;
     }
 
@@ -366,21 +368,21 @@ public final class Theme {
     /** Secondary copy ink adjusted for the strongest part of an inset dashboard tile. */
     public static int dashboardMutedInk(int accent) {
         int hue = accent == 0 ? PRIMARY : accent;
-        int referenceSurface = DesignTokens.mix(SURFACE, hue, light ? 0.16f : 0.34f);
+        int referenceSurface = DesignTokens.mix(SURFACE, hue, dashboardMetricTopTint());
         return DesignTokens.textSafeColor(MUTED, referenceSurface, !light);
     }
 
     /** Semantic success/warning ink adjusted for the inset surface without changing its meaning. */
     public static int dashboardSemanticInk(int accent, int preferred) {
         int hue = accent == 0 ? PRIMARY : accent;
-        int referenceSurface = DesignTokens.mix(SURFACE, hue, light ? 0.16f : 0.34f);
+        int referenceSurface = DesignTokens.mix(SURFACE, hue, dashboardMetricTopTint());
         return DesignTokens.textSafeColor(preferred, referenceSurface, !light);
     }
 
     /** Secondary copy ink for labels placed directly on a home-card surface. */
     public static int dashboardCardMutedInk(int accent) {
         int hue = accent == 0 ? PRIMARY : accent;
-        int referenceSurface = DesignTokens.mix(SURFACE, hue, light ? 0.04f : 0.20f);
+        int referenceSurface = DesignTokens.mix(SURFACE, hue, dashboardCardTopTint());
         return DesignTokens.textSafeColor(MUTED, referenceSurface, !light);
     }
 

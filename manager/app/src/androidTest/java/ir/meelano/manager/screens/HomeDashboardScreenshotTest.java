@@ -41,6 +41,7 @@ import ir.meelano.manager.ui.DesignTokens;
 import ir.meelano.manager.ui.Theme;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 
 /** Seed-only instrumentation preview for real Light/Dark screenshots and large-font Nuts accessibility checks. */
@@ -78,7 +79,37 @@ public final class HomeDashboardScreenshotTest {
         } finally {
             screenshot.recycle();
         }
+        assertValidPng(output);
         finishPreview(activity);
+    }
+
+    private static void assertValidPng(File file) throws Exception {
+        assertTrue("Screenshot PNG is missing or truncated: " + file,
+                file.isFile() && file.length() >= 4096);
+        byte[] header = new byte[24];
+        int read = 0;
+        try (FileInputStream input = new FileInputStream(file)) {
+            while (read < header.length) {
+                int count = input.read(header, read, header.length - read);
+                if (count < 0) break;
+                read += count;
+            }
+        }
+        assertEquals("PNG header is truncated", header.length, read);
+        assertEquals("PNG signature byte 1", 0x89, header[0] & 0xff);
+        assertEquals("PNG signature byte 2", 'P', header[1]);
+        assertEquals("PNG signature byte 3", 'N', header[2]);
+        assertEquals("PNG signature byte 4", 'G', header[3]);
+        assertEquals("PNG IHDR marker", 'I', header[12]);
+        assertEquals("PNG IHDR marker", 'H', header[13]);
+        assertEquals("PNG IHDR marker", 'D', header[14]);
+        assertEquals("PNG IHDR marker", 'R', header[15]);
+        int width = ((header[16] & 0xff) << 24) | ((header[17] & 0xff) << 16)
+                | ((header[18] & 0xff) << 8) | (header[19] & 0xff);
+        int height = ((header[20] & 0xff) << 24) | ((header[21] & 0xff) << 16)
+                | ((header[22] & 0xff) << 8) | (header[23] & 0xff);
+        assertTrue("Screenshot dimensions are too small: " + width + "x" + height,
+                width >= 320 && height >= 480);
     }
 
     /** Exercise the preserved Nuts identity with the app's largest text setting. */
@@ -161,7 +192,7 @@ public final class HomeDashboardScreenshotTest {
                 144, MainActivity.headerTitleWidthDp(320, 2, true, true));
         verifyDashboardColorContrast();
         Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
-        final View[] targets = new View[16];
+        final View[] targets = new View[22];
         final int[] facts = new int[5];
         final String[] reconciliationCopy = {""};
         long layoutDeadline = SystemClock.uptimeMillis() + 3_000L;
@@ -186,6 +217,12 @@ public final class HomeDashboardScreenshotTest {
                 targets[13] = findTaggedView(decor, "home-bank-statement-import");
                 targets[14] = findTaggedView(decor, "home-cash-control-card");
                 targets[15] = findTaggedView(decor, "home-financial-returns");
+                targets[16] = findTaggedView(decor, "home-financial-detail-panels");
+                targets[17] = findTaggedView(decor, "home-financial-details-toggle");
+                targets[18] = findTaggedView(decor, "home-group-overview");
+                targets[19] = findTaggedView(decor, "home-group-management-1");
+                targets[20] = findTaggedView(decor, "home-trend-status-فاکتور ابطالی");
+                targets[21] = findTaggedView(decor, "home-trend-فاکتور ابطالی");
                 reconciliationCopy[0] = "";
                 if (targets[8] != null) collectText(targets[8], reconciliationCopy);
                 facts[0] = targets[0] == null ? 0 : countTaggedViews(targets[0], "home-financial-kpi");
@@ -262,6 +299,24 @@ public final class HomeDashboardScreenshotTest {
         assertTrue("Till-count formula or source was lost",
                 tillCopy[0].contains("ماندهٔ آغاز + دریافت نقد")
                         && tillCopy[0].contains("فقط روی این دستگاه"));
+        assertNotNull("Overview category heading is missing", targets[18]);
+        assertNotNull("Management and finance category heading is missing", targets[19]);
+        assertNotNull("Incomplete trend needs a compact unavailable-data row", targets[20]);
+        assertTrue("Unavailable trend still allocates a blank chart", targets[21] == null);
+        assertNotNull("Financial detail disclosure is missing", targets[17]);
+        assertNotNull("Collapsible financial detail container is missing", targets[16]);
+        assertEquals("Detailed reconciliation panels should start compact", View.GONE,
+                targets[16].getVisibility());
+        assertTrue("Financial detail disclosure is not accessible", targets[17].isClickable()
+                && targets[17].isFocusable());
+        final boolean[] expanded = {false};
+        instrumentation.runOnMainSync(() -> expanded[0] = targets[17].performClick());
+        assertTrue("Financial detail disclosure did not respond", expanded[0]);
+        assertEquals("Financial details did not expand", View.VISIBLE, targets[16].getVisibility());
+        instrumentation.runOnMainSync(() -> expanded[0] = targets[17].performClick());
+        assertTrue("Financial detail disclosure could not be collapsed", expanded[0]);
+        assertEquals("Financial details remained open after collapsing", View.GONE,
+                targets[16].getVisibility());
     }
 
     private static void verifyDashboardColorContrast() {
@@ -275,10 +330,10 @@ public final class HomeDashboardScreenshotTest {
         boolean light = Theme.isLight();
         float badgeTopTint = light ? 0.23f : 0.42f;
         float badgeBottomTint = light ? 0.12f : 0.27f;
-        float metricTopTint = light ? 0.16f : 0.34f;
-        float metricBottomTint = light ? 0.065f : 0.18f;
-        float cardTopTint = light ? 0.04f : 0.20f;
-        float cardBottomTint = light ? 0.015f : 0.10f;
+        float metricTopTint = Theme.dashboardMetricTopTint();
+        float metricBottomTint = Theme.dashboardMetricBottomTint();
+        float cardTopTint = Theme.dashboardCardTopTint();
+        float cardBottomTint = Theme.dashboardCardBottomTint();
         int welcomeRoyal = DesignTokens.mix(DesignTokens.EMERALD, Theme.PRIMARY,
                 Theme.isNuts() ? 0.12f : 0.08f);
         int[] welcomeSurfaces = {welcomeRoyal, DesignTokens.EMERALD, DesignTokens.EMERALD_DEEP};

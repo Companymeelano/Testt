@@ -3,6 +3,26 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$repo_root/manager"
+
+validate_png_image() {
+  python3 - "$1" <<'PY'
+import os
+import struct
+import sys
+
+path = sys.argv[1]
+with open(path, "rb") as image:
+    header = image.read(24)
+if len(header) < 24 or header[:8] != b"\x89PNG\r\n\x1a\n" or header[12:16] != b"IHDR":
+    raise SystemExit("output does not have a valid PNG signature and IHDR header")
+width, height = struct.unpack(">II", header[16:24])
+size = os.path.getsize(path)
+if width < 320 or height < 480 or size < 4096:
+    raise SystemExit(f"PNG is implausibly small: {width}x{height}, {size} bytes")
+print(f"Valid PNG: {width}x{height}, {size} bytes")
+PY
+}
+
 emulator_abi="$(adb shell getprop ro.product.cpu.abi | tr -d '\r')"
 emulator_api="$(adb shell getprop ro.build.version.sdk | tr -d '\r')"
 echo "::notice title=Dashboard emulator::API ${emulator_api}, ABI ${emulator_abi}"
@@ -159,13 +179,21 @@ echo "::notice title=Home UI instrumentation::Light/Dark rendering, Nuts large-f
 mkdir -p ../design/screenshots
 screenshot_dir="files/home-dashboard-screenshots"
 for theme in light dark; do
-  if ! adb exec-out run-as ir.meelano.manager.debug cat "$screenshot_dir/home-dashboard-$theme.png" > "../design/screenshots/home-dashboard-$theme.png"; then
+  png_file="../design/screenshots/home-dashboard-$theme.png"
+  if ! adb exec-out run-as ir.meelano.manager.debug cat "$screenshot_dir/home-dashboard-$theme.png" > "$png_file"; then
     app_files="$(adb shell run-as ir.meelano.manager.debug ls -laR "$screenshot_dir" 2>&1 | tr '\r\n' ' ' || true)"
     echo "::error title=$theme screenshot extraction failed::Could not read the app-private PNG. run-as output: $app_files"
     exit 1
   fi
-  if [ ! -s "../design/screenshots/home-dashboard-$theme.png" ]; then
+  if [ ! -s "$png_file" ]; then
     echo "::error title=$theme screenshot is empty::App-private screenshot output was empty."
     exit 1
   fi
+  if ! png_info="$(validate_png_image "$png_file" 2>&1)"; then
+    app_files="$(adb shell run-as ir.meelano.manager.debug ls -laR "$screenshot_dir" 2>&1 | tr '\r\n' ' ' || true)"
+    bad_file="$(head -c 120 "$png_file" | tr '\r\n' ' ' | sed 's/%/%25/g; s/:/%3A/g')"
+    echo "::error title=$theme screenshot is not a PNG::$png_info; app-private files: $app_files; extracted prefix: $bad_file"
+    exit 1
+  fi
+  echo "::notice title=$theme screenshot validated::$png_info"
 done

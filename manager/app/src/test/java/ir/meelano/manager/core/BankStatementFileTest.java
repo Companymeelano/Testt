@@ -24,6 +24,7 @@ public class BankStatementFileTest {
         BankStatementFile.Mapping mapping = confirmedMapping(table);
         assertTrue(mapping.valid());
         mapping.amountsInToman = false;
+        mapping.amountFormat = BankStatementFile.AMOUNT_GROUPING_ONLY;
         BankStatementFile.Parsed parsed = BankStatementFile.analyze(table, mapping,
                 "۱۴۰۴/۰۸/۱۰", "۱۴۰۴/۰۸/۱۰");
 
@@ -155,8 +156,12 @@ public class BankStatementFileTest {
                 BankStatementFile.AMOUNT_DECIMAL_DOT), 0.001);
         assertEquals(1234, BankStatementFile.parseAmount("1.234",
                 BankStatementFile.AMOUNT_GROUPING_ONLY), 0.001);
-        assertEquals(-1234, BankStatementFile.parseAmount("(−۱٬۲۳۴)"), 0.001);
-        assertEquals(-1234, BankStatementFile.parseAmount("-1,234"), 0.001);
+        assertNull(BankStatementFile.parseAmount("(−۱٬۲۳۴)")); // Conflicting negative markers fail closed.
+        assertEquals(-1234, BankStatementFile.parseAmount("(۱٬۲۳۴)",
+                BankStatementFile.AMOUNT_GROUPING_ONLY), 0.001);
+        assertEquals(-1234, BankStatementFile.parseAmount("-1,234",
+                BankStatementFile.AMOUNT_GROUPING_ONLY), 0.001);
+        assertNull(BankStatementFile.parseAmount("-1,234")); // Auto mode cannot infer decimal vs grouping.
         assertNull(BankStatementFile.parseAmount("—"));
         assertNull(BankStatementFile.parseAmount("12x"));
         assertNull(BankStatementFile.parseAmount("1,234"));

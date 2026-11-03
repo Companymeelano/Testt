@@ -45,7 +45,7 @@ public class BankStatementPeriodReconciliationTest {
                 "1405/01/01", "1405/01/01", statement, ledger, true);
         assertTrue(report.fullyMatched());
         assertEquals(new BigDecimal("9007199254740993.50"), report.statementInflowRialsExact);
-        assertEquals(BigDecimal.ZERO, report.inflowVarianceRialsExact);
+        assertEquals(0, BigDecimal.ZERO.compareTo(report.inflowVarianceRialsExact));
     }
 
     @Test public void incompleteStatementDoesNotAssumeMissingDaysAreZeroOrReturnVariance() throws Exception {

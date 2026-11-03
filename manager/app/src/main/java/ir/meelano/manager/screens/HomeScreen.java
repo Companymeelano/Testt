@@ -51,6 +51,7 @@ import ir.meelano.manager.core.MonthlyGoalEngine;
 import ir.meelano.manager.core.SeasonalCalendarEngine;
 import ir.meelano.manager.R;
 import ir.meelano.manager.core.Queries;
+import ir.meelano.manager.core.ReportCatalog;
 import ir.meelano.manager.core.SalesComparison;
 import ir.meelano.manager.core.SalesForecastEngine;
 import ir.meelano.manager.core.SalesSnapshot;
@@ -65,7 +66,7 @@ import ir.meelano.manager.ui.HomeCashWaterfall;
 import ir.meelano.manager.ui.HomeGoalGauge;
 import ir.meelano.manager.ui.HomeForecastChart;
 import ir.meelano.manager.ui.HomePaymentMixBar;
-import ir.meelano.manager.ui.HomeSalesChart;
+import ir.meelano.manager.ui.HomeTrendChart;
 import ir.meelano.manager.ui.Kit;
 import ir.meelano.manager.ui.MeelanoIcons;
 import ir.meelano.manager.ui.SmartReportImage;
@@ -117,8 +118,14 @@ public class HomeScreen extends Screen {
         List<Row> overdue = new ArrayList<>();
         boolean overdueAvailable;
         List<Row> salesDaily = new ArrayList<>();
+        List<Row> purchaseChartDaily = new ArrayList<>();
+        List<Row> returnsChartDaily = new ArrayList<>();
+        List<Row> voidedChartDaily = new ArrayList<>();
         SalesSnapshot salesSnapshot;
         boolean salesTrendAvailable;
+        boolean purchaseChartAvailable;
+        boolean returnsChartAvailable;
+        boolean voidedChartAvailable;
         String salesHistoryFrom = "";
         List<Row> topItems = new ArrayList<>();
         boolean topItemsAvailable;
@@ -398,7 +405,7 @@ public class HomeScreen extends Screen {
         HomeRange sparkRange = HomeRange.last7Days(todayRange.to);
         d.buyDaily = liveL(token, L, d.notes, "خرید ۷ روزه",
                 () -> Repo.exec(L.c, Queries.factorDaily(L.m, false, sparkRange.from, sparkRange.to)));
-        d.buyTrendAvailable = d.buyDaily != null;
+        d.buyTrendAvailable = dailyMoneyComplete(d.buyDaily);
         d.buyDay = HomeRange.aggregateDay(d.buyDaily, todayRange.to);
         d.inDaily = liveL(token, L, d.notes, "دریافت ۷ روزه",
                 () -> Repo.exec(L.c, MoneyQueries.darDaily(L.m, 0, sparkRange.from, sparkRange.to)));
@@ -420,14 +427,25 @@ public class HomeScreen extends Screen {
         Filter rf = new Filter();
         rf.from = stFrom;
         rf.to = to;
-        d.returns = liveL(token, L, d.notes, "برگشتی", () -> Repo.exec(L.c, MasterQueries.returnsByKind(L.m, rf)));
-        d.returnsAvailable = d.returns != null;
-        Filter previousReturns = new Filter();
-        previousReturns.from = Jalali.addDays(stFrom, -30);
-        previousReturns.to = Jalali.addDays(stFrom, -1);
-        d.returnsPrevious = liveL(token, L, d.notes, "برگشتی دورهٔ قبل",
-                () -> Repo.exec(L.c, MasterQueries.returnsByKind(L.m, previousReturns)));
-        d.returnsPreviousAvailable = d.returnsPrevious != null;
+        if (canAccessReturnRegister()) {
+            d.returns = liveL(token, L, d.notes, "برگشتی", () -> Repo.exec(L.c, MasterQueries.returnsByKind(L.m, rf)));
+            d.returnsAvailable = moneyRowsComplete(d.returns);
+            if (d.returns != null && !d.returnsAvailable)
+                d.notes.put("برگشتی", "حداقل یک مبلغ برگشتی نامعتبر یا ناقص است؛ جمع قطعی نمایش داده نمی‌شود.");
+            Filter previousReturns = new Filter();
+            previousReturns.from = Jalali.addDays(stFrom, -30);
+            previousReturns.to = Jalali.addDays(stFrom, -1);
+            d.returnsPrevious = liveL(token, L, d.notes, "برگشتی دورهٔ قبل",
+                    () -> Repo.exec(L.c, MasterQueries.returnsByKind(L.m, previousReturns)));
+            d.returnsPreviousAvailable = moneyRowsComplete(d.returnsPrevious);
+            if (d.returnsPrevious != null && !d.returnsPreviousAvailable)
+                d.notes.put("برگشتی دورهٔ قبل", "حداقل یک مبلغ دورهٔ قبل نامعتبر یا ناقص است.");
+        } else {
+            d.returns = null;
+            d.returnsAvailable = false;
+            d.returnsPrevious = null;
+            d.returnsPreviousAvailable = false;
+        }
         boolean canCloseout = RoleStore.allowed(a, "closeout");
         boolean needsCashFlow = (canCloseout && homeSectionSelected("closeout"))
                 || (RoleStore.allowed(a, "cash") && homeSectionSelected("cash_position"));
@@ -450,7 +468,9 @@ public class HomeScreen extends Screen {
         if (canCloseout && homeSectionSelected("closeout")) {
             d.returnsToday = liveL(token, L, d.notes, "برگشتی امروز",
                     () -> Repo.exec(L.c, MasterQueries.returnsByKindOn(L.m, todayMix)));
-            d.returnsTodayAvailable = d.returnsToday != null;
+            d.returnsTodayAvailable = moneyRowsComplete(d.returnsToday);
+            if (d.returnsToday != null && !d.returnsTodayAvailable)
+                d.notes.put("برگشتی امروز", "حداقل یک مبلغ برگشتی امروز نامعتبر یا ناقص است.");
 
             // Statement reconciliation is deliberately manager-only, date-scoped and read-only.
             // A missing date/direction column must never turn an unbounded total into a daily zero.
@@ -489,7 +509,42 @@ public class HomeScreen extends Screen {
         final String from = chartsFrom(to);
         d.salesHistoryFrom = from;
         d.salesDaily = liveL(token, L, d.notes, "روند فروش", () -> Repo.exec(L.c, Queries.factorDaily(L.m, true, from, to)));
-        d.salesTrendAvailable = d.salesDaily != null;
+        d.salesTrendAvailable = dailyMoneyComplete(d.salesDaily);
+        if (d.salesDaily != null && !d.salesTrendAvailable)
+            d.notes.put("روند فروش", "حداقل یک مبلغ فروش نامعتبر است؛ نمودار و جمع فروش ناقص نمایش داده نمی‌شود.");
+        Filter chartFilter = new Filter();
+        chartFilter.from = from;
+        chartFilter.to = to;
+        if (RoleStore.allowed(a, "buy")) {
+            d.purchaseChartDaily = liveL(token, L, d.notes, "نمودار خرید",
+                    () -> Repo.exec(L.c, Queries.factorDaily(L.m, false, from, to)));
+            d.purchaseChartAvailable = dailyMoneyComplete(d.purchaseChartDaily);
+            if (d.purchaseChartDaily != null && !d.purchaseChartAvailable)
+                d.notes.put("نمودار خرید", "حداقل یک مبلغ خرید نامعتبر است؛ نمودار کامل نیست.");
+        } else {
+            d.purchaseChartDaily = null;
+            d.purchaseChartAvailable = false;
+        }
+        if (canAccessReturnRegister()) {
+            d.returnsChartDaily = liveL(token, L, d.notes, "نمودار برگشتی‌ها",
+                    () -> Repo.exec(L.c, MasterQueries.returnsDaily(L.m, chartFilter)));
+            d.returnsChartAvailable = dailyMoneyComplete(d.returnsChartDaily);
+            if (d.returnsChartDaily != null && !d.returnsChartAvailable)
+                d.notes.put("نمودار برگشتی‌ها", "حداقل یک مبلغ برگشتی نامعتبر است؛ نمودار کامل نیست.");
+        } else {
+            d.returnsChartDaily = null;
+            d.returnsChartAvailable = false;
+        }
+        if (RoleStore.allowed(a, "sales")) {
+            d.voidedChartDaily = liveL(token, L, d.notes, "نمودار ابطالی‌های فروش",
+                    () -> Repo.exec(L.c, Queries.voidedFactorDaily(L.m, true, from, to)));
+            d.voidedChartAvailable = dailyMoneyComplete(d.voidedChartDaily);
+            if (d.voidedChartDaily != null && !d.voidedChartAvailable)
+                d.notes.put("نمودار ابطالی‌های فروش", "حداقل یک مبلغ فاکتور ابطالی نامعتبر است؛ نمودار کامل نیست.");
+        } else {
+            d.voidedChartDaily = null;
+            d.voidedChartAvailable = false;
+        }
         Filter todayFilter = new Filter();
         todayFilter.from = to;
         todayFilter.to = to;
@@ -552,7 +607,8 @@ public class HomeScreen extends Screen {
     /** Build every Home sales figure and month bucket from the one read-only daily snapshot. */
     private static void rebuildSalesSnapshot(Data d) {
         if (d == null) return;
-        if (!d.salesTrendAvailable || d.salesDaily == null) {
+        if (!d.salesTrendAvailable || !dailyMoneyComplete(d.salesDaily)) {
+            d.salesTrendAvailable = false;
             d.salesSnapshot = SalesSnapshot.empty(d.snapshotDay);
             d.salesDay = null;
             d.monthlySales = new ArrayList<>();
@@ -617,6 +673,12 @@ public class HomeScreen extends Screen {
         s.salesDaily = g.salesDaily;
         s.salesTrendAvailable = g.salesTrendAvailable;
         s.salesHistoryFrom = g.salesHistoryFrom;
+        s.purchaseChartDaily = g.purchaseChartDaily;
+        s.purchaseChartAvailable = g.purchaseChartAvailable;
+        s.returnsChartDaily = g.returnsChartDaily;
+        s.returnsChartAvailable = g.returnsChartAvailable;
+        s.voidedChartDaily = g.voidedChartDaily;
+        s.voidedChartAvailable = g.voidedChartAvailable;
         s.topItems = g.topItems;
         s.topItemsAvailable = g.topItemsAvailable;
         s.topItemsMonth = g.topItemsMonth;
@@ -690,6 +752,9 @@ public class HomeScreen extends Screen {
                     .append("|returnsprevok=").append(d.returnsPreviousAvailable ? "1" : "0")
                     .append("|trendok=").append(d.salesSnapshot != null && d.salesSnapshot.isAvailable() ? "1" : "0")
                     .append("|trendfrom=").append(esc(d.salesHistoryFrom == null ? "" : d.salesHistoryFrom))
+                    .append("|buychartok=").append(d.purchaseChartAvailable ? "1" : "0")
+                    .append("|retchartok=").append(d.returnsChartAvailable ? "1" : "0")
+                    .append("|voidchartok=").append(d.voidedChartAvailable ? "1" : "0")
                     .append("|stockok=").append(d.stockAlertsAvailable ? "1" : "0")
                     .append("|reorderok=").append(d.reorderPointAvailable ? "1" : "0")
                     .append("|priceok=").append(d.purchasePriceTrendAvailable ? "1" : "0")
@@ -777,6 +842,18 @@ public class HomeScreen extends Screen {
                 for (int i = 0; i < Math.min(62, d.salesDaily.size()); i++)
                     s.append("|trend").append(i).append('=').append(rowStr(d.salesDaily.get(i)));
             }
+            if (d.purchaseChartDaily != null) {
+                for (int i = 0; i < Math.min(62, d.purchaseChartDaily.size()); i++)
+                    s.append("|buychart").append(i).append('=').append(rowStr(d.purchaseChartDaily.get(i)));
+            }
+            if (d.returnsChartDaily != null) {
+                for (int i = 0; i < Math.min(62, d.returnsChartDaily.size()); i++)
+                    s.append("|retchart").append(i).append('=').append(rowStr(d.returnsChartDaily.get(i)));
+            }
+            if (d.voidedChartDaily != null) {
+                for (int i = 0; i < Math.min(62, d.voidedChartDaily.size()); i++)
+                    s.append("|voidchart").append(i).append('=').append(rowStr(d.voidedChartDaily.get(i)));
+            }
             if (d.monthlySales != null) {
                 for (int i = 0; i < Math.min(12, d.monthlySales.size()); i++)
                     s.append("|month").append(i).append('=').append(rowStr(d.monthlySales.get(i)));
@@ -834,6 +911,9 @@ public class HomeScreen extends Screen {
                 else if (k.matches("retprev[0-9]|retprev1[0-9]")) { d.returnsPrevious.add(rowFrom(v)); any = true; }
                 else if ("trendok".equals(k)) d.salesTrendAvailable = "1".equals(v);
                 else if ("trendfrom".equals(k)) d.salesHistoryFrom = Jalali.disp(unesc(v));
+                else if ("buychartok".equals(k)) d.purchaseChartAvailable = "1".equals(v);
+                else if ("retchartok".equals(k)) d.returnsChartAvailable = "1".equals(v);
+                else if ("voidchartok".equals(k)) d.voidedChartAvailable = "1".equals(v);
                 else if ("stockok".equals(k)) d.stockAlertsAvailable = "1".equals(v);
                 else if ("reorderok".equals(k)) d.reorderPointAvailable = "1".equals(v);
                 else if ("priceok".equals(k)) d.purchasePriceTrendAvailable = "1".equals(v);
@@ -872,8 +952,24 @@ public class HomeScreen extends Screen {
                 else if (k.matches("trend(?:[0-9]|[1-5][0-9]|6[01])")) {
                     d.salesDaily.add(rowFrom(v)); d.salesTrendAvailable = true; any = true;
                 }
+                else if (k.matches("buychart(?:[0-9]|[1-5][0-9]|6[01])")) {
+                    d.purchaseChartDaily.add(rowFrom(v)); any = true;
+                }
+                else if (k.matches("retchart(?:[0-9]|[1-5][0-9]|6[01])")) {
+                    d.returnsChartDaily.add(rowFrom(v)); any = true;
+                }
+                else if (k.matches("voidchart(?:[0-9]|[1-5][0-9]|6[01])")) {
+                    d.voidedChartDaily.add(rowFrom(v)); any = true;
+                }
                 else if (k.matches("month(?:[0-9]|1[01])")) { d.monthlySales.add(rowFrom(v)); any = true; }
             }
+            d.buyTrendAvailable = d.buyTrendAvailable && dailyMoneyComplete(d.buyDaily);
+            d.returnsAvailable = d.returnsAvailable && moneyRowsComplete(d.returns);
+            d.returnsPreviousAvailable = d.returnsPreviousAvailable && moneyRowsComplete(d.returnsPrevious);
+            d.returnsTodayAvailable = d.returnsTodayAvailable && moneyRowsComplete(d.returnsToday);
+            d.purchaseChartAvailable = d.purchaseChartAvailable && dailyMoneyComplete(d.purchaseChartDaily);
+            d.returnsChartAvailable = d.returnsChartAvailable && dailyMoneyComplete(d.returnsChartDaily);
+            d.voidedChartAvailable = d.voidedChartAvailable && dailyMoneyComplete(d.voidedChartDaily);
             rebuildSalesSnapshot(d);
             return any ? d : null;
         } catch (Exception e) {
@@ -1131,9 +1227,15 @@ public class HomeScreen extends Screen {
     private View salesHero(final Data data, final SyncState syncState) {
         final LinearLayout card = homeCard(Theme.SECTION_SALES);
         card.setPadding(Theme.dp(14), Theme.dp(10), Theme.dp(14), Theme.dp(12));
-        View.OnClickListener salesAction = navAction("sales");
-        View salesDetails = salesAction == null ? null : dashboardHeaderAction("جزئیات",
-                Theme.SECTION_SALES, "جزئیات فروش؛ باز کردن", salesAction);
+        final String[] selectedSalesDate = {data == null ? Jalali.todayStr() : snapshotDay(data)};
+        final HomeTrendChart.Area chart = new HomeTrendChart.Area(a);
+        View.OnClickListener salesAction = RoleStore.allowed(a, "sales")
+                ? v -> {
+                    HomeTrendChart.Point point = chart.selectedPoint();
+                    openSalesList(point == null ? selectedSalesDate[0] : point.date);
+                } : null;
+        View salesDetails = salesAction == null ? null : dashboardHeaderAction("فاکتورهای روز",
+                Theme.SECTION_SALES, "فهرست فاکتورهای روز انتخاب‌شدهٔ فروش", salesAction);
         card.addView(boardHead("فروش", null, R.drawable.mi_point_of_sale, salesDetails,
                 Theme.SECTION_SALES), a.kit.lp(-1, -2));
 
@@ -1143,7 +1245,6 @@ public class HomeScreen extends Screen {
         amountPanel.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
         amountPanel.setPadding(Theme.dp(12), Theme.dp(9), Theme.dp(12), Theme.dp(9));
         final android.animation.ValueAnimator[] amountAnimator = {null};
-        final HomeSalesChart.Area chart = new HomeSalesChart.Area(a);
         final TextView[] chartHint = {null};
         View selector = salesRangeSelector(card, amountPanel, data, amountAnimator);
         LinearLayout.LayoutParams selectorParams = a.kit.lp(-1, -2);
@@ -1164,10 +1265,13 @@ public class HomeScreen extends Screen {
 
         if (data != null && data.salesSnapshot != null && data.salesSnapshot.isAvailable()) {
             chart.setTag("home-sales-chart");
-            chart.setSelectionListener(day -> {
-                if (chartHint[0] != null) chartHint[0].setText(salesPointLabel(day));
+            chart.setSelectionListener(point -> {
+                if (point != null) selectedSalesDate[0] = point.date;
+                if (chartHint[0] != null && point != null)
+                    chartHint[0].setText(salesPointLabel(new SalesSnapshot.Day(
+                            point.date, point.valueRials, point.documents)));
             });
-            chartHint[0] = a.kit.text("روند فروش روزانه · لمس نمودار برای جزئیات",
+            chartHint[0] = a.kit.text("روند فروش روزانه · لمس نمودار برای انتخاب روز",
                     9.5f, Theme.dashboardCardMutedInk(Theme.SECTION_SALES), false);
             chartHint[0].setGravity(Gravity.END);
             refreshSalesChart(chart, chartHint, data, selectedChartRange);
@@ -1179,10 +1283,15 @@ public class HomeScreen extends Screen {
             card.addView(rangeTitle, rangeTitleParams);
             View chartRanges = salesChartRangeSelector(card, chart, data, chartHint);
             card.addView(chartRanges, a.kit.lp(-1, -2));
-            LinearLayout.LayoutParams chartParams = a.kit.lp(-1, Theme.dp(188));
+            LinearLayout.LayoutParams chartParams = a.kit.lp(-1, Theme.dp(176));
             chartParams.topMargin = Theme.dp(8);
             card.addView(chart, chartParams);
             card.addView(chartHint[0], a.kit.lp(-1, -2));
+            String history = Jalali.dispFa(data.salesSnapshot.historyStart()) + " تا "
+                    + snapshotLabel(data);
+            card.addView(a.kit.hint("منبع: فاکتورهای فروش • تاریخچه: " + history
+                    + " • واحد: " + Money.unitName()
+                    + " • تازگی: مطابق وضعیت همگام‌سازی بالای صفحه"), a.kit.lp(-1, -2));
         } else {
             String problem = data != null && data.notes != null && data.notes.containsKey("روند فروش")
                     ? "گزارش فروش در دسترس نیست" : "هنوز داده‌ای برای روند فروش ثبت نشده است";
@@ -1301,7 +1410,7 @@ public class HomeScreen extends Screen {
         return HomeNumberFormatter.integer(availableDays) + " روز تا " + asOf;
     }
 
-    private View salesChartRangeSelector(final LinearLayout card, final HomeSalesChart.Area chart,
+    private View salesChartRangeSelector(final LinearLayout card, final HomeTrendChart.Area chart,
                                          final Data data, final TextView[] chartHint) {
         final List<Integer> ranges = salesChartRanges(data);
         if (ranges.isEmpty()) {
@@ -1344,12 +1453,12 @@ public class HomeScreen extends Screen {
                 + HomeNumberFormatter.integer(day.documents) + " فاکتور";
     }
 
-    private void refreshSalesChart(HomeSalesChart.Area chart, TextView[] chartHint,
+    private void refreshSalesChart(HomeTrendChart.Area chart, TextView[] chartHint,
                                    Data data, int range) {
         List<Integer> ranges = salesChartRanges(data);
         if (ranges.isEmpty()) {
-            chart.setData(java.util.Collections.<SalesSnapshot.Day>emptyList(), 0,
-                    "تاریخچهٔ موجود نیست");
+            chart.setUnavailable("تاریخچهٔ کامل فروش برای این بازه در دسترس نیست",
+                    Theme.SECTION_SALES, "فروش", "بازهٔ انتخاب‌شده");
             if (chartHint != null && chartHint.length > 0 && chartHint[0] != null)
                 chartHint[0].setText("تاریخچهٔ فروش برای این بازه در دسترس نیست");
             return;
@@ -1359,16 +1468,19 @@ public class HomeScreen extends Screen {
             selectedChartRange = range;
         }
         List<SalesSnapshot.Day> series = salesChartSeries(data, range);
-        double average = 0;
-        for (SalesSnapshot.Day day : series) average += day.salesRials;
-        if (!series.isEmpty()) average /= series.size();
+        List<HomeTrendChart.Point> points = new ArrayList<>();
+        for (SalesSnapshot.Day day : series)
+            points.add(new HomeTrendChart.Point(day.date, day.salesRials, day.documents));
         String window = salesChartWindowLabel(data, range, series.size());
-        chart.setData(series, average, window);
+        chart.setData(points, Theme.SECTION_SALES, "فروش", window);
         chart.setSelectedDate(snapshotDay(data));
         if (chartHint != null && chartHint.length > 0 && chartHint[0] != null) {
+            HomeTrendChart.Point selected = chart.selectedPoint();
             String hint = series.isEmpty() ? "تاریخچهٔ فروش برای این بازه در دسترس نیست"
                     : !salesSeriesHasActivity(series) ? "در این بازه فاکتوری ثبت نشده است"
-                    : window + " · لمس نمودار برای جزئیات";
+                    : selected == null ? window + " · لمس نمودار برای انتخاب روز"
+                    : salesPointLabel(new SalesSnapshot.Day(selected.date,
+                            selected.valueRials, selected.documents));
             chartHint[0].setText(hint);
         }
     }
@@ -1863,9 +1975,15 @@ public class HomeScreen extends Screen {
         secKpis(kpiSection, d);
         if (kpiSection.getChildCount() > 0) content.addView(kpiSection, a.kit.lp(-1, -2));
 
-        // Sales and KPIs stay pinned above; lower modules follow the saved visibility/order.
+        // The four financial trend cards use one shared chart contract and fixed, intentional order.
+        if (canAccessReturnRegister()) secReturns(content, d, syncTime);
+        if (RoleStore.allowed(a, "sales")) secVoidedTrend(content, d, syncTime);
+        if (RoleStore.allowed(a, "buy")) secPurchaseTrend(content, d, syncTime);
+
+        // Sales, returns, and purchasing trend cards are pinned; lower modules follow saved visibility/order.
         for (String key : orderedKeys()) {
-            if ("sales_insight".equals(key) || "kpis".equals(key) || !homeSectionVisible(key)) continue;
+            if ("sales_insight".equals(key) || "kpis".equals(key) || "returns".equals(key)
+                    || !homeSectionVisible(key)) continue;
             LinearLayout block = a.kit.v();
             renderHomeSection(block, d, key, syncTime);
             if (block.getChildCount() == 0) continue;
@@ -1948,7 +2066,7 @@ public class HomeScreen extends Screen {
         else if ("sales_insight".equals(key)) secSalesInsight(content, d);
         else if ("cash_mix".equals(key)) secCashMix(content, d);
         else if ("due".equals(key)) secDue(content, d);
-        else if ("returns".equals(key)) secReturns(content, d);
+        else if ("returns".equals(key)) secReturns(content, d, syncTime);
         else if ("eod".equals(key)) secEod(content);
         else if ("market".equals(key)) content.addView(marketCard(), a.kit.lp(-1, -2));
     }
@@ -1961,6 +2079,12 @@ public class HomeScreen extends Screen {
 
     private boolean isSalesManager() {
         return RoleStore.SALES_MANAGER.equals(currentRole());
+    }
+
+    private boolean canAccessReturnRegister() {
+        ReportCatalog.Spec returns = ReportCatalog.byId("returns_list");
+        return RoleStore.allowed(a, "reports") && returns != null
+                && ReportCatalog.availableToRole(returns, currentRole());
     }
 
     /** Dashboard order from settings; unknown keys dropped, missing sections appended. */
@@ -2007,7 +2131,7 @@ public class HomeScreen extends Screen {
         List<Kit.Kpi> tiles = new ArrayList<>();
 
         if (RoleStore.allowed(a, "buy")) {
-            boolean available = d.buyDay != null;
+            boolean available = d.buyDay != null && d.buyTrendAvailable;
             double amount = available ? d.buyDay.d("total") : 0;
             Double previous = d.buyTrendAvailable
                     ? dailyAmount(d.buyDaily, Jalali.addDays(today, -1)) : null;
@@ -2039,7 +2163,7 @@ public class HomeScreen extends Screen {
                     Theme.SECTION_PAY, R.drawable.mi_payments, false, false,
                     () -> a.nav("dar_out")));
         }
-        if (RoleStore.allowed(a, "sales") || RoleStore.allowed(a, "reports")) {
+        if (canAccessReturnRegister()) {
             double amount = sumField(d.returns, "total");
             long documents = sumLongField(d.returns, "docs");
             boolean available = d.returnsAvailable;
@@ -2128,6 +2252,26 @@ public class HomeScreen extends Screen {
         for (int i = 0; i < values.length; i++)
             values[i] = dailyAmount(rows, Jalali.addDays(end, i - values.length + 1));
         return values;
+    }
+
+    /** Missing or malformed money is not a zero; aggregate consumers require explicit completeness. */
+    private static boolean moneyRowsComplete(List<Row> rows) {
+        if (rows == null) return false;
+        for (Row row : rows)
+            if (row == null || !row.has("total") || !row.has("invalidRows")
+                    || row.l("invalidRows") > 0) return false;
+        return true;
+    }
+
+    /** Daily chart rows additionally require a valid date and an exact non-negative document count. */
+    private static boolean dailyMoneyComplete(List<Row> rows) {
+        if (!moneyRowsComplete(rows)) return false;
+        for (Row row : rows) {
+            String day = Jalali.disp(row.s("day"));
+            Long documents = row.exactLong("docs");
+            if (Jalali.parse(day) < 0 || documents == null || documents < 0) return false;
+        }
+        return true;
     }
 
     private static double dailyAmount(List<Row> rows, String date) {
@@ -2796,53 +2940,185 @@ public class HomeScreen extends Screen {
         return joined.toString();
     }
 
-    /**
-     * Return documents of the last 30 days. dbo.back_sanad is the ledger of goods
-     * moving back — out of the warehouse, back from a customer, and so on — so a
-     * sudden rise here is a quality or logistics problem long before it shows up
-     * in the profit figures.
-     */
-    private void secReturns(LinearLayout content, Data d) {
-        LinearLayout card = homeCard(Theme.SECTION_RETURNS);
-        card.addView(boardHead("برگشتی‌های ۳۰ روز اخیر", "ابطال و برگشت، ۳۰ روز گذشته",
-                R.drawable.mi_assignment_return, navChip("گزارش برگشتی‌ها", "reports")),
-                a.kit.lp(-1, -2));
-        long docs = 0;
-        double total = 0;
-        if (d.returns != null) for (Row r : d.returns) {
-            docs += r.l("docs");
-            total += r.d("total");
-        }
-        if (docs == 0) {
-            card.addView(a.kit.emptyRow("سند برگشتی فعالی در این بازه ثبت نشده"), a.kit.lp(-1, -2));
-        } else {
-            // One wide summary line, then one compact tile per kind of return.
-            card.addView(statRow(R.drawable.mi_assignment_return, "برگشتی ۳۰ روز اخیر",
-                    HomeNumberFormatter.integer(docs) + " سند • " + HomeNumberFormatter.compactMoney(total), Theme.SECTION_RETURNS),
-                    a.kit.lp(-1, -2));
-            card.addView(a.kit.gap(10));
-            List<Mini> tiles = new ArrayList<>();
-            int shown = 0;
-            for (Row r : d.returns) {
-                if (shown++ >= 3) break;
-                String label = r.s("label");
-                if (label == null || label.trim().isEmpty()) continue;
-                tiles.add(new Mini(returnIcon(label), label,
-                        HomeNumberFormatter.integer(r.l("docs")) + " سند", HomeNumberFormatter.compactMoney(r.d("total")), Theme.TEXT));
+    private interface HomeTrendAction { void open(String day); }
+
+    /** Fold Jalali and Gregorian SQL date spellings into a complete, daily, zero-filled series. */
+    private static List<HomeTrendChart.Point> trendPoints(List<Row> rows, String from, String to) {
+        if (!dailyMoneyComplete(rows)) return null;
+        String first = Jalali.disp(from);
+        String last = Jalali.disp(to);
+        int firstDay = Jalali.parse(first), lastDay = Jalali.parse(last);
+        if (firstDay < 0 || lastDay < firstDay || lastDay - firstDay > 120) return null;
+        Map<String, BigDecimal> totals = new LinkedHashMap<>();
+        Map<String, Long> documents = new LinkedHashMap<>();
+        for (Row row : rows) {
+            String date = Jalali.disp(row.s("day"));
+            int dateValue = Jalali.parse(date);
+            BigDecimal amount = row.bd("total");
+            Long count = row.exactLong("docs");
+            if (dateValue < firstDay || dateValue > lastDay || amount == null
+                    || count == null || count < 0) return null;
+            try {
+                totals.put(date, totals.containsKey(date) ? totals.get(date).add(amount) : amount);
+                documents.put(date, Math.addExact(documents.containsKey(date) ? documents.get(date) : 0L, count));
+            } catch (ArithmeticException overflow) {
+                return null;
             }
-            if (!tiles.isEmpty())
-                card.addView(miniGrid(tiles, 3, Theme.SECTION_RETURNS), a.kit.lp(-1, -2));
         }
-        card.addView(a.kit.text("ابطالی‌های فاکتور در آمار اسناد برگشتی لحاظ نمی‌شوند.",
-                9.5f, Theme.MUTED, false), a.kit.lp(-1, -2));
+        List<HomeTrendChart.Point> out = new ArrayList<>();
+        for (int offset = 0; offset <= lastDay - firstDay; offset++) {
+            String date = Jalali.addDays(first, offset);
+            BigDecimal amount = totals.get(date);
+            double rials = amount == null ? 0d : amount.doubleValue();
+            if (Double.isNaN(rials) || Double.isInfinite(rials)) return null;
+            out.add(new HomeTrendChart.Point(date, rials,
+                    documents.containsKey(date) ? documents.get(date) : 0L));
+        }
+        return out;
+    }
+
+    private String chartUnavailable(Data d, String key, String fallback) {
+        String detail = d == null || d.notes == null ? null : d.notes.get(key);
+        return detail == null || detail.trim().isEmpty() ? fallback : detail.trim();
+    }
+
+    private String chartWindow(String from, String to) {
+        String first = Jalali.dispFa(from);
+        String last = Jalali.dispFa(to);
+        if (first.isEmpty()) return last;
+        if (last.isEmpty() || first.equals(last)) return first;
+        return first + " تا " + last;
+    }
+
+    private static String trendPointLabel(HomeTrendChart.Point point, String series) {
+        if (point == null) return "نقطه‌ای برای انتخاب وجود ندارد";
+        String document = series != null && (series.contains("فروش") || series.contains("خرید"))
+                ? "فاکتور" : "سند";
+        return Jalali.weekday(point.date) + "، " + Jalali.dispFa(point.date) + " · "
+                + HomeNumberFormatter.money(point.valueRials) + " · "
+                + HomeNumberFormatter.integer(point.documents) + " " + document;
+    }
+
+    private void addHomeTrendCard(LinearLayout content, Data d, String title, String series,
+                                  String source, String noteKey, List<Row> daily, boolean available,
+                                  int accent, int icon, String actionLabel, HomeTrendAction action,
+                                  String syncTime, String fallbackUnavailable) {
+        String from = d == null || d.salesHistoryFrom == null || d.salesHistoryFrom.isEmpty()
+                ? Jalali.addDays(snapshotDay(d), -13) : d.salesHistoryFrom;
+        String to = snapshotDay(d);
+        String window = chartWindow(from, to);
+        final String[] selectedDate = {Jalali.disp(to)};
+        LinearLayout card = homeCard(accent);
+        card.setPadding(Theme.dp(12), Theme.dp(9), Theme.dp(12), Theme.dp(11));
+        View endAction = action == null ? null : dashboardHeaderAction(actionLabel, accent,
+                actionLabel + "؛ روز انتخاب‌شدهٔ " + series, v -> action.open(selectedDate[0]));
+        card.addView(boardHead(title, "روند روزانه • " + window, icon, endAction, accent),
+                a.kit.lp(-1, -2));
+        HomeTrendChart.Area chart = new HomeTrendChart.Area(a);
+        chart.setTag("home-trend-" + series);
+        List<HomeTrendChart.Point> points = available ? trendPoints(daily, from, to) : null;
+        boolean complete = available && points != null;
+        if (complete) {
+            chart.setData(points, accent, series, window);
+            chart.setSelectedDate(to);
+        } else {
+            String reason = available
+                    ? "مقادیر یا تاریخ‌های منبع ناقص است؛ جمع به‌صورت صفر نمایش داده نمی‌شود"
+                    : chartUnavailable(d, noteKey, fallbackUnavailable);
+            chart.setUnavailable(reason, accent, series, window);
+        }
+        final TextView caption = a.kit.text("", 10f, Theme.dashboardCardMutedInk(accent), false);
+        caption.setGravity(Gravity.END);
+        caption.setMaxLines(2);
+        caption.setEllipsize(TextUtils.TruncateAt.END);
+        if (complete) {
+            chart.setSelectionListener(point -> {
+                if (point == null) return;
+                selectedDate[0] = point.date;
+                caption.setText(trendPointLabel(point, series));
+                caption.setContentDescription(trendPointLabel(point, series));
+            });
+            HomeTrendChart.Point selected = chart.selectedPoint();
+            caption.setText(trendPointLabel(selected, series));
+            caption.setContentDescription(trendPointLabel(selected, series));
+        } else {
+            caption.setText(available ? "دادهٔ نمودار ناقص است" : "دادهٔ این نمودار ناموجود است");
+        }
+        LinearLayout.LayoutParams chartParams = a.kit.lp(-1, Theme.dp(176));
+        chartParams.topMargin = Theme.dp(4);
+        card.addView(chart, chartParams);
+        card.addView(caption, a.kit.lp(-1, -2));
+        String freshness = syncTime == null || syncTime.trim().isEmpty()
+                ? "آخرین دریافت ثبت نشده" : "آخرین دریافت موفق: " + syncTime.trim();
+        String meta = "منبع: " + source + " • بازه: " + window + " • واحد: "
+                + Money.unitName() + " • " + freshness
+                + (complete ? " • دادهٔ کامل" : " • دادهٔ ناموجود/ناقص");
+        TextView sourceLine = a.kit.text(meta, 9f, Theme.dashboardCardMutedInk(accent), false);
+        sourceLine.setMaxLines(4);
+        sourceLine.setEllipsize(TextUtils.TruncateAt.END);
+        sourceLine.setContentDescription(meta);
+        LinearLayout.LayoutParams metaParams = a.kit.lp(-1, -2);
+        metaParams.topMargin = Theme.dp(3);
+        card.addView(sourceLine, metaParams);
         a.kit.addCard(content, card);
     }
 
-    /** Vector icon for a return kind: a cancelled document or a returned sale. */
-    private int returnIcon(String label) {
-        String s = label == null ? "" : label;
-        if (s.contains("ابطال")) return R.drawable.mi_sell;
-        return R.drawable.mi_receipt_long;
+    private void openSalesList(String day) {
+        if (!RoleStore.allowed(a, "sales")) return;
+        Screen screen = a.screen("sales");
+        if (screen instanceof TradeScreen) ((TradeScreen) screen).openHomeRange(day, day);
+        else a.kit.toast("فهرست فاکتورهای فروش در دسترس نیست");
+    }
+
+    private void openPurchaseList(String day) {
+        if (!RoleStore.allowed(a, "buy")) return;
+        Screen screen = a.screen("buy");
+        if (screen instanceof TradeScreen) ((TradeScreen) screen).openHomeRange(day, day);
+        else a.kit.toast("فهرست فاکتورهای خرید در دسترس نیست");
+    }
+
+    private void openVoidedList(String day) {
+        if (!RoleStore.allowed(a, "sales")) return;
+        Screen screen = a.screen("sales");
+        if (screen instanceof TradeScreen) ((TradeScreen) screen).openHomeVoidedRange(day, day);
+        else a.kit.toast("فهرست فاکتورهای ابطالی در دسترس نیست");
+    }
+
+    private void openReturnsList(String day) {
+        if (!canAccessReturnRegister()) {
+            a.kit.toast("فهرست اسناد برگشتی برای نقش فعلی مجاز نیست");
+            return;
+        }
+        Screen screen = a.screen("reports");
+        if (screen instanceof ReportsScreen) ((ReportsScreen) screen).openHomeReturnsRange(day, day);
+        else a.kit.toast("فهرست اسناد برگشتی در دسترس نیست");
+    }
+
+    private void secReturns(LinearLayout content, Data d, String syncTime) {
+        addHomeTrendCard(content, d, "روند اسناد برگشتی", "برگشتی",
+                "اسناد برگشتی ثبت‌شده در back_sanad", "نمودار برگشتی‌ها",
+                d == null ? null : d.returnsChartDaily,
+                d != null && d.returnsChartAvailable, Theme.SECTION_RETURNS,
+                R.drawable.mi_assignment_return, "فهرست روز", this::openReturnsList,
+                syncTime, "گزارش روزانهٔ اسناد برگشتی در دسترس نیست");
+    }
+
+    private void secVoidedTrend(LinearLayout content, Data d, String syncTime) {
+        addHomeTrendCard(content, d, "روند فاکتورهای ابطالی", "فاکتور ابطالی",
+                "فاکتور فروش با نشانگر صریح ابطال/لغو", "نمودار ابطالی‌های فروش",
+                d == null ? null : d.voidedChartDaily,
+                d != null && d.voidedChartAvailable, Theme.SECTION_RETURNS,
+                R.drawable.mi_assignment_return, "فهرست ابطالی", this::openVoidedList,
+                syncTime, "منبع معتبرِ نشانگر ابطال در دسترس نیست؛ حذف یا عدم تأیید جایگزین آن نمی‌شود");
+    }
+
+    private void secPurchaseTrend(LinearLayout content, Data d, String syncTime) {
+        addHomeTrendCard(content, d, "روند فاکتورهای خرید", "خرید",
+                "فاکتورهای خرید ثبت‌شده در buyfact", "نمودار خرید",
+                d == null ? null : d.purchaseChartDaily,
+                d != null && d.purchaseChartAvailable, Theme.SECTION_PURCHASE,
+                R.drawable.mi_shopping_cart, "فاکتورهای روز", this::openPurchaseList,
+                syncTime, "گزارش روزانهٔ خرید در دسترس نیست");
     }
 
     /** Compact sales pulse: one useful daily chart, ranked products and month-over-month context. */

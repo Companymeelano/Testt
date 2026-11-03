@@ -2455,16 +2455,54 @@ public final class MasterQueries {
         return new String[]{label, join};
     }
 
+    /** Jalali report bounds also match Gregorian datetimes stored by some Atiran installs. */
+    private static String returnDateRange(String alias, String dateCol, String from, String to,
+                                          List<Object> binds) {
+        boolean hasFrom = from != null && !from.trim().isEmpty();
+        boolean hasTo = to != null && !to.trim().isEmpty();
+        boolean both = hasFrom && hasTo;
+        String gregorianFrom = hasFrom ? Jalali.toGregorian(from.trim()) : "";
+        String gregorianTo = hasTo ? Jalali.toGregorian(to.trim()) : "";
+        String raw = Sql.date10(alias, dateCol);
+        String dateKey = Sql.dateKey(raw);
+        String jalaliText = "CHARINDEX(N'/'," + raw + ")>0";
+        String gregorianText = "CHARINDEX(N'/'," + raw + ")=0";
+        if (!both && hasFrom && !gregorianFrom.isEmpty()) {
+            binds.add(from.trim()); binds.add(gregorianFrom);
+            return "((" + jalaliText + " AND " + dateKey + ">=?) OR (" + gregorianText + " AND " + raw + ">=?))";
+        }
+        if (!both && hasTo && !gregorianTo.isEmpty()) {
+            binds.add(to.trim()); binds.add(gregorianTo);
+            return "((" + jalaliText + " AND " + dateKey + "<=?) OR (" + gregorianText + " AND " + raw + "<=?))";
+        }
+        if (both && !gregorianFrom.isEmpty() && !gregorianTo.isEmpty()) {
+            String first = from.trim();
+            String last = to.trim();
+            if (first.compareTo(last) > 0) {
+                String swap = first; first = last; last = swap;
+                String gregorianSwap = gregorianFrom; gregorianFrom = gregorianTo; gregorianTo = gregorianSwap;
+            }
+            binds.add(first); binds.add(last); binds.add(gregorianFrom); binds.add(gregorianTo);
+            return "((" + jalaliText + " AND " + dateKey + ">=? AND " + dateKey + "<=?) OR ("
+                    + gregorianText + " AND " + raw + ">=? AND " + raw + "<=?))";
+        }
+        return Sql.dateCond(raw, from, to, binds);
+    }
+
     /** Returns grouped by document type: document count + total amount, best for a donut. */
     public static Queries.Q returnsByKind(Meta m, Filter f) throws Queries.Missing {
         RetCols r = retCols(m);
+        if (r.date == null && f != null && f.hasRange())
+            throw new Queries.Missing("ستون تاریخ در «اسناد برگشتی» موجود نیست؛ جمع بازه‌ای قابل گزارش نیست");
         String[] kj = retKindJoin(m, r);
         List<Object> binds = new ArrayList<>();
-        String dc = r.date == null ? "" : Sql.dateCond(Sql.date10("h", r.date), f.from, f.to, binds);
+        String dc = r.date == null ? "" : returnDateRange("h", r.date, f.from, f.to, binds);
         // back_sanad.Active = 1 is the live-document flag Atiran's own views use (deleted/revoked returns are 0).
         String where = " WHERE " + (dc.isEmpty() ? "1=1" : dc) + Sql.activeAnd(m.columns("back_sanad"), "h");
+        String amount = Sql.numNull("h", r.amount);
         return new Queries.Q("SELECT " + kj[0] + " AS label, COUNT_BIG(1) AS docs"
-                + ", ISNULL(SUM(" + Sql.num("h", r.amount) + "),0) AS total"
+                + ", SUM(" + amount + ") AS total"
+                + ", SUM(CASE WHEN " + amount + " IS NULL THEN 1 ELSE 0 END) AS invalidRows"
                 + " FROM dbo.[back_sanad] h" + kj[1] + where
                 + " GROUP BY " + kj[0]
                 + " ORDER BY 3 DESC", binds);
@@ -2481,11 +2519,15 @@ public final class MasterQueries {
     /** The return documents themselves, newest first. */
     public static Queries.Q returnsList(Meta m, Filter f) throws Queries.Missing {
         RetCols r = retCols(m);
+        if (r.date == null)
+            throw new Queries.Missing("ستون تاریخ در «اسناد برگشتی» موجود نیست؛ فهرستِ تاریخ‌فیلترشده قابل تهیه نیست");
+        if (r.no == null)
+            throw new Queries.Missing("ستون شماره سند برگشتی موجود نیست؛ باز کردن اقلام هر سند ممکن نیست");
         String[] kj = retKindJoin(m, r);
         List<Object> binds = new ArrayList<>();
         List<String> conds = new ArrayList<>();
         if (r.date != null) {
-            String dc = Sql.dateCond(Sql.date10("h", r.date), f.from, f.to, binds);
+            String dc = returnDateRange("h", r.date, f.from, f.to, binds);
             if (!dc.isEmpty()) conds.add(dc);
         }
         if (f.search != null && !f.search.trim().isEmpty()) {
@@ -2494,9 +2536,11 @@ public final class MasterQueries {
             if (r.customer != null) exprs.add(Sql.txt("h", r.customer, 250));
             if (r.desc != null) exprs.add(Sql.txt("h", r.desc, 500));
             if (!exprs.isEmpty()) {
-                binds.add("%" + f.search.trim() + "%");
                 List<String> likes = new ArrayList<>();
-                for (String e : exprs) likes.add(e + " LIKE ?");
+                for (String e : exprs) {
+                    likes.add(e + " LIKE ?");
+                    binds.add("%" + f.search.trim() + "%");
+                }
                 conds.add("(" + Sql.join(likes, " OR ") + ")");
             }
         }
@@ -2506,12 +2550,105 @@ public final class MasterQueries {
         String dt = r.date == null ? "CAST(NULL AS nvarchar(20))" : Sql.date10("h", r.date);
         String cu = r.customer == null ? "CAST(NULL AS nvarchar(150))" : Sql.txt("h", r.customer, 150);
         String dz = r.desc == null ? "CAST(NULL AS nvarchar(300))" : Sql.txt("h", r.desc, 300);
+        String amount = Sql.numNull("h", r.amount);
         String orderBy = r.date == null ? kj[0] : Sql.date10("h", r.date) + " DESC, " + kj[0];
         return new Queries.Q("SELECT " + no + " AS no, " + dt + " AS date, " + kj[0] + " AS kind"
-                + ", " + cu + " AS customer, " + Sql.num("h", r.amount) + " AS total, " + dz + " AS descr"
+                + ", " + Sql.txt("h", r.kind, 60) + " AS kindCode"
+                + ", " + cu + " AS customer, " + amount + " AS total"
+                + ", CASE WHEN " + amount + " IS NULL THEN 1 ELSE 0 END AS amountInvalid, " + dz + " AS descr"
                 + " FROM dbo.[back_sanad] h" + kj[1] + where
                 + " ORDER BY " + orderBy
                 + Queries.pageClause(binds, f.page, f.top), binds);
+    }
+
+    /** Dated daily return totals, with invalid amount rows kept visible to the caller. */
+    public static Queries.Q returnsDaily(Meta m, Filter f) throws Queries.Missing {
+        RetCols r = retCols(m);
+        if (r.date == null)
+            throw new Queries.Missing("ستون تاریخ در «اسناد برگشتی» پیدا نشد؛ روند روزانه قابل گزارش نیست");
+        List<Object> binds = new ArrayList<>();
+        String day = Sql.date10("h", r.date);
+        String dc = returnDateRange("h", r.date, f == null ? "" : f.from,
+                f == null ? "" : f.to, binds);
+        String amount = Sql.numNull("h", r.amount);
+        return new Queries.Q("SELECT " + day + " AS day, COUNT_BIG(1) AS docs"
+                + ", SUM(" + amount + ") AS total"
+                + ", SUM(CASE WHEN " + amount + " IS NULL THEN 1 ELSE 0 END) AS invalidRows"
+                + " FROM dbo.[back_sanad] h WHERE " + (dc.isEmpty() ? "1=1" : dc)
+                + Sql.activeAnd(m.columns("back_sanad"), "h")
+                + " GROUP BY " + day + " ORDER BY " + day, binds);
+    }
+
+    private static String decimal3Null(String alias, String column) {
+        return column == null ? "CAST(NULL AS decimal(19,3))"
+                : "TRY_CONVERT(decimal(19,3)," + alias + "." + Sql.q(column) + ")";
+    }
+
+    /** Actual return line items from Atiran's line-level return view; no synthetic item rows. */
+    public static Queries.Q returnLines(Meta m, String documentNo) throws Queries.Missing {
+        return returnLines(m, documentNo, "", "");
+    }
+
+    /** Filter by the return kind wherever the line view exposes its code, label, or both. */
+    public static Queries.Q returnLines(Meta m, String documentNo, String kindCode, String kindLabel) throws Queries.Missing {
+        String view = m.table("VW_AllRizAghlamBargashti") ? "VW_AllRizAghlamBargashti"
+                : m.table("VWRizAghlamBargashti") ? "VWRizAghlamBargashti"
+                : m.table("VW_AllBargashti") ? "VW_AllBargashti" : null;
+        if (view == null)
+            throw new Queries.Missing("نمای اقلام اسناد برگشتی در این پایگاه داده موجود نیست");
+        Set<String> cols = m.columns(view);
+        String link = Sql.pickFlex(cols, "sh_back_sanad", "shback_sanad");
+        String kindCodeCol = Sql.pickFlex(cols, "kind", "kind_rdf");
+        String kindLabelCol = Sql.pickFlex(cols, "type_bargashti");
+        String code = Sql.pickFlex(cols, "shka", "coka");
+        String name = Sql.pickFlex(cols, "naka", "name");
+        String qtyVah = Sql.pickFlex(cols, "tedvah", "qtyvah", "quantity");
+        String qtyJoz = Sql.pickFlex(cols, "tedjoz", "qtyjoz");
+        String vahPrice = Sql.pickFlex(cols, "vahprice");
+        String jozPrice = Sql.pickFlex(cols, "jozprice");
+        String total = Sql.pickFlex(cols, "kol_price", "kol_price_tafif", "linesum", "total");
+        String lineNo = Sql.pickFlex(cols, "rdf", "rdf__", "lineid", "rowid");
+        if (link == null || (name == null && code == null) || qtyVah == null || total == null)
+            throw new Queries.Missing("ستون ارتباط سند، کالا، تعداد یا مبلغ در نمای اقلام برگشتی پیدا نشد");
+        String kindKey = kindCode == null ? "" : kindCode.trim();
+        String kindName = kindLabel == null ? "" : kindLabel.trim();
+        if (!kindKey.isEmpty() && kindCodeCol == null && (kindLabelCol == null || kindName.isEmpty()))
+            throw new Queries.Missing("نوع سند در نمای اقلام برگشتی قابل تشخیص نیست؛ برای جلوگیری از ترکیب اسناد هم‌شماره جزئیات نمایش داده نمی‌شود");
+        String tableSql = m.qTable(view);
+        if (tableSql == null) throw new Queries.Missing("نمای اقلام اسناد برگشتی در دسترس نیست");
+        List<Object> binds = new ArrayList<>();
+        binds.add(documentNo == null ? "" : documentNo.trim());
+        List<String> kindFilters = new ArrayList<>();
+        if (!kindKey.isEmpty() && kindCodeCol != null) {
+            kindFilters.add("LTRIM(RTRIM(TRY_CONVERT(nvarchar(100),x." + Sql.q(kindCodeCol) + "))) = ?");
+            binds.add(kindKey);
+        }
+        if (!kindName.isEmpty() && kindLabelCol != null) {
+            String labelExpr = "LTRIM(RTRIM(TRY_CONVERT(nvarchar(100),x." + Sql.q(kindLabelCol) + ")))";
+            if (!kindKey.isEmpty()) {
+                kindFilters.add("(" + labelExpr + " = ? OR " + labelExpr + " = ?)");
+                binds.add(kindName);
+                binds.add(kindKey);
+            } else {
+                kindFilters.add(labelExpr + " = ?");
+                binds.add(kindName);
+            }
+        }
+        String displayName = "COALESCE(NULLIF(" + (name == null ? "CAST(NULL AS nvarchar(250))" : Sql.txt("x", name, 250))
+                + ",N'')," + (code == null ? "N'—'" : Sql.txt("x", code, 120)) + ")";
+        return new Queries.Q("SELECT TOP (300) "
+                + (code == null ? "CAST(NULL AS nvarchar(60))" : Sql.txt("x", code, 60)) + " AS shka"
+                + ", " + displayName + " AS naka"
+                + ", " + decimal3Null("x", qtyVah) + " AS qtyVah"
+                + ", " + decimal3Null("x", qtyJoz) + " AS qtyJoz"
+                + ", " + Sql.numNull("x", vahPrice) + " AS vahPrice"
+                + ", " + Sql.numNull("x", jozPrice) + " AS jozPrice"
+                + ", " + Sql.numNull("x", total) + " AS lineSum"
+                + (lineNo == null ? "" : ", " + Sql.txt("x", lineNo, 60) + " AS lineNo")
+                + " FROM " + tableSql + " x WHERE TRY_CONVERT(nvarchar(100),x." + Sql.q(link) + ")=?"
+                + (kindFilters.isEmpty() ? "" : " AND " + Sql.join(kindFilters, " AND "))
+                + Sql.activeAnd(cols, "x")
+                + " ORDER BY " + (lineNo == null ? Sql.txt("x", name == null ? code : name, 250) : "x." + Sql.q(lineNo)), binds);
     }
 
 }

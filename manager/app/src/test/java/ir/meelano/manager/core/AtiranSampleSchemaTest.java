@@ -186,6 +186,10 @@ public class AtiranSampleSchemaTest {
 
         assertTrue(purchases.binds.contains(day));
         assertTrue(purchases.binds.contains(Jalali.toGregorian(day)));
+        Queries.Q oneSidedPurchase = Queries.factorDaily(meta, false, day, "");
+        assertTrue(oneSidedPurchase.sql.toLowerCase(Locale.ROOT).contains("charindex(n'/',"));
+        assertEquals(day, oneSidedPurchase.binds.get(0));
+        assertEquals(Jalali.toGregorian(day), oneSidedPurchase.binds.get(1));
         assertEquals(Integer.valueOf(0), receipts.binds.get(0));
         assertEquals(day, receipts.binds.get(1));
         assertEquals(Jalali.toGregorian(day), receipts.binds.get(2));
@@ -197,6 +201,72 @@ public class AtiranSampleSchemaTest {
         // its date by querying a different latest day from dbo.dar.
         assertFalse(receipts.sql.toLowerCase(Locale.ROOT).contains("select max(left(try_convert"));
         assertFalse(payments.sql.toLowerCase(Locale.ROOT).contains("select max(left(try_convert"));
+    }
+
+    @Test public void returnTrendAndRegisterAreDateScopedAndExposeInvalidAmounts() throws Exception {
+        Meta meta = new Meta(connection(loadManifest()));
+        Filter filter = new Filter();
+        filter.from = "1405/07/22";
+        filter.to = "1405/07/22";
+        filter.search = "برگشت ۱۲۳";
+        filter.top = 50;
+
+        Queries.Q daily = MasterQueries.returnsDaily(meta, filter);
+        String dailySql = daily.sql.toLowerCase(Locale.ROOT);
+        assertTrue(dailySql, dailySql.contains("as invalidrows"));
+        assertTrue(dailySql, dailySql.contains("sum(try_convert(decimal(19,2)"));
+        assertTrue(daily.binds.contains(filter.from));
+        assertTrue(daily.binds.contains(Jalali.toGregorian(filter.from)));
+        Filter fromOnly = new Filter();
+        fromOnly.from = filter.from;
+        Queries.Q oneSidedReturns = MasterQueries.returnsDaily(meta, fromOnly);
+        assertTrue(oneSidedReturns.sql.toLowerCase(Locale.ROOT).contains("charindex(n'/',"));
+        assertEquals(filter.from, oneSidedReturns.binds.get(0));
+        assertEquals(Jalali.toGregorian(filter.from), oneSidedReturns.binds.get(1));
+        assertFalse(dailySql, dailySql.contains("insert into "));
+        assertFalse(dailySql, dailySql.contains("update dbo."));
+        assertFalse(dailySql, dailySql.contains("delete from "));
+
+        Queries.Q list = MasterQueries.returnsList(meta, filter);
+        String listSql = list.sql.toLowerCase(Locale.ROOT);
+        assertTrue(listSql, listSql.contains("as amountinvalid"));
+        assertTrue(listSql, listSql.contains("as kindcode"));
+        assertTrue(listSql, listSql.contains("offset ? rows fetch next ? rows only"));
+        assertEquals(3, list.binds.stream().filter(v -> "%برگشت ۱۲۳%".equals(v)).count());
+        assertTrue(list.binds.contains(filter.from));
+        assertTrue(list.binds.contains(Jalali.toGregorian(filter.from)));
+        assertFalse(listSql, listSql.contains("insert into "));
+        assertFalse(listSql, listSql.contains("update dbo."));
+        assertFalse(listSql, listSql.contains("delete from "));
+
+        Queries.Q lines = MasterQueries.returnLines(meta, "123");
+        String lineSql = lines.sql.toLowerCase(Locale.ROOT);
+        assertTrue(lineSql, lineSql.contains("vw_allrizaghambargashti"));
+        assertTrue(lineSql, lineSql.contains("x.[sh_back_sanad]"));
+        assertTrue(lineSql, lineSql.contains("as linesum"));
+        assertTrue(lineSql, lineSql.contains("try_convert(decimal(19,3),x.[tedvah])"));
+        assertEquals("123", lines.binds.get(0));
+        assertFalse(lineSql, lineSql.contains("insert into "));
+        assertFalse(lineSql, lineSql.contains("update dbo."));
+        assertFalse(lineSql, lineSql.contains("delete from "));
+
+        Queries.Q exactLines = MasterQueries.returnLines(meta, "123", "2", "برگشت از فروش");
+        String exactLineSql = exactLines.sql.toLowerCase(Locale.ROOT);
+        assertTrue(exactLineSql, exactLineSql.contains("try_convert(nvarchar(100),x.[type_bargashti])"));
+        assertTrue(exactLineSql, exactLineSql.contains(" or "));
+        assertEquals("123", exactLines.binds.get(0));
+        assertEquals("برگشت از فروش", exactLines.binds.get(1));
+        assertEquals("2", exactLines.binds.get(2));
+    }
+
+    @Test public void missingExplicitVoidMarkerDoesNotBecomeAnEmptyZeroTrend() throws Exception {
+        Meta meta = new Meta(connection(loadManifest()));
+        try {
+            Queries.voidedFactorDaily(meta, true, "1405/07/22", "1405/07/22");
+            throw new AssertionError("the sample has no explicit cancellation marker");
+        } catch (Queries.Missing expected) {
+            assertTrue(expected.getMessage(), expected.getMessage().contains("نشانگر صریح"));
+        }
     }
 
     @Test public void productListAndCountShareNormalizedReadOnlyFiltersAndExactPaging() throws Exception {

@@ -125,6 +125,11 @@ public final class Sql {
         return "(" + n + " IS NULL OR " + n + " IN (N'',N'0',N'F',N'FALSE',N'N',N'NO') OR TRY_CONVERT(int," + field + ")=0)";
     }
 
+    /** True-like form of the same explicit boolean values used by {@link #softAnd}. */
+    public static String trueLike(String field) {
+        return "NOT " + falseLike(field);
+    }
+
     /**
      * De-duplicated factor source: (SELECT DISTINCT x.* FROM dbo.[table] x WHERE …) alias.
      * Inner conditions must reference the x. alias.

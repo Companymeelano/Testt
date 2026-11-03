@@ -699,16 +699,16 @@ public final class HomeDashboardScreenshotTest {
             long sales = 3_800_000_000L + (i * 410_000_000L) + ((i % 4) * 130_000_000L);
             if (i == 13) sales = 9_200_000_000L;
             cache.append("|trend").append(i).append("=day=").append(day)
-                    .append(";total=").append(sales).append(";docs=").append(7 + i % 9);
+                    .append(";total=").append(sales).append(";docs=").append(7 + i % 9).append(";invalidRows=0");
         }
         for (int i = 0; i < 7; i++) {
             String day = Jalali.addDays(today, i - 6);
             cache.append("|buytrend").append(i).append("=day=").append(day)
-                    .append(";total=").append(2_000_000_000L + i * 320_000_000L).append(";docs=").append(8 + i);
+                    .append(";total=").append(2_000_000_000L + i * 320_000_000L).append(";docs=").append(8 + i).append(";invalidRows=0");
             cache.append("|intrend").append(i).append("=day=").append(day)
-                    .append(";total=").append(4_500_000_000L + i * 520_000_000L).append(";docs=").append(12 + i);
+                    .append(";total=").append(4_500_000_000L + i * 520_000_000L).append(";docs=").append(12 + i).append(";invalidRows=0");
             cache.append("|outtrend").append(i).append("=day=").append(day)
-                    .append(";total=").append(1_600_000_000L + i * 180_000_000L).append(";docs=").append(4 + i);
+                    .append(";total=").append(1_600_000_000L + i * 180_000_000L).append(";docs=").append(4 + i).append(";invalidRows=0");
         }
         cache.append("|inmix0=label=نقد;amount=3100000000")
                 .append("|inmix1=label=کارت‌خوان;amount=2800000000")

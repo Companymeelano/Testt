@@ -660,32 +660,28 @@ public final class BankStatementFile {
 
     private static boolean hasStatementHeader(List<List<String>> rows) {
         if (rows == null) return false;
-        for (int i = 0; i < Math.min(30, rows.size()); i++) {
-            List<String> row = rows.get(i);
-            if (blankRow(row)) continue;
-            boolean date = find(row, new String[]{"تاریخ", "تاريخ", "date", "transactiondate"}) >= 0;
-            boolean movement = find(row, new String[]{"واریز", "بستانکار", "deposit", "credit",
-                    "برداشت", "بدهکار", "debit", "withdraw", "مبلغ", "amount", "value"}) >= 0;
-            if (date && movement) return true;
-        }
+        for (int i = 0; i < Math.min(30, rows.size()); i++)
+            if (isStatementHeader(rows.get(i))) return true;
         return false;
     }
 
     private static int detectHeaderRow(List<List<String>> rows) {
-        int best = -1;
-        int bestScore = 0;
         for (int i = 0; i < Math.min(30, rows.size()); i++) {
-            List<String> row = rows.get(i);
-            if (blankRow(row)) continue;
-            int score = 0;
-            if (find(row, new String[]{"تاریخ", "تاريخ", "date", "transactiondate"}) >= 0) score += 3;
-            if (find(row, new String[]{"واریز", "بستانکار", "deposit", "credit", "برداشت", "بدهکار", "debit", "withdraw"}) >= 0) score += 2;
-            if (find(row, new String[]{"مبلغ", "amount", "شرح", "description", "مانده", "balance"}) >= 0) score++;
-            if (score > bestScore) { bestScore = score; best = i; }
+            // Pick the first plausible header; transaction values later in the file may
+            // contain words such as "not-a-date" and outscore the real header by substring.
+            if (isStatementHeader(rows.get(i))) return i;
         }
-        if (bestScore >= 3) return best;
         for (int i = 0; i < rows.size(); i++) if (!blankRow(rows.get(i))) return i;
         return -1;
+    }
+
+    private static boolean isStatementHeader(List<String> row) {
+        if (blankRow(row)) return false;
+        boolean date = find(row, new String[]{"تاریخ", "تاريخ", "date", "transactiondate"}) >= 0;
+        boolean amount = find(row, new String[]{"مبلغ", "amount", "value"}) >= 0;
+        boolean credit = find(row, new String[]{"واریز", "بستانکار", "deposit", "credit", "inflow", "دریافت"}) >= 0;
+        boolean debit = find(row, new String[]{"برداشت", "بدهکار", "withdraw", "debit", "outflow", "پرداخت"}) >= 0;
+        return date && (amount || credit && debit);
     }
 
     private static List<List<String>> parseDelimited(String text, String delimiter) throws IOException {

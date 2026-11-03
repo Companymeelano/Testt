@@ -86,7 +86,9 @@ public class BankStatementFileTest {
     @Test public void malformedRowsAreCountedAndNeverSilentlySavedAsZero() throws Exception {
         String csv = "date,amount,direction\n2026-03-21,100,credit\nnot-a-date,50,debit\n";
         BankStatementFile.Table table = read(csv, "statement.csv");
+        assertEquals(0, table.headerRow);
         BankStatementFile.Mapping mapping = BankStatementFile.Mapping.suggested(table.headers);
+        assertTrue(mapping.valid());
         BankStatementFile.Parsed parsed = BankStatementFile.analyze(table, mapping,
                 "1405/01/01", "1405/01/01");
         assertEquals(1, parsed.invalidRows);

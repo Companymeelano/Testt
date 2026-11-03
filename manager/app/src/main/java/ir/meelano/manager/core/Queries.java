@@ -279,8 +279,10 @@ public final class Queries {
         binds.add(d == null ? "" : d);
         inner += Sql.activeAnd(cols, "x") + Sql.softAnd(cols, "x");
         String src = Sql.dedupe(table, numberCol, "h", inner);
+        String amount = Sql.numNull("h", amountCol);
         String sql = "SELECT " + Sql.lit(d == null ? "" : d) + " AS d"
                 + ", ISNULL(SUM(" + Sql.num("h", amountCol) + "),0) AS total"
+                + ", COALESCE(SUM(CASE WHEN " + amount + " IS NULL THEN 1 ELSE 0 END),0) AS invalidRows"
                 + ", COUNT_BIG(1) AS docs"
                 + ", " + (partyCol == null ? "CAST(0 AS bigint)" : "COUNT(DISTINCT h.[" + partyCol + "])") + " AS parties"
                 + ", ISNULL(SUM(" + Sql.num("h", paidCol) + "),0) AS paid"

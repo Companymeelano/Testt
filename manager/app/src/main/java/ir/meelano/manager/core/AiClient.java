@@ -38,10 +38,7 @@ public final class AiClient {
     public static final String HUGGINGFACE = "huggingface";
     public static final String CUSTOM = "custom";
 
-    /**
-     * The three services the app uses, each for what it does best:
-     * Gemini (natural Persian speech, daily answers), DeepSeek (analysis), Groq (quick answers).
-     */
+    /** User-configurable direct providers; credentials are supplied per call and are never bundled. */
     public static final String[][] NAMES = {
             {GEMINI, "Gemini"}, {DEEPSEEK, "DeepSeek"}, {GROQ, "Groq"}, {OPENAI, "ChatGPT"}
     };

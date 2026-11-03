@@ -89,6 +89,15 @@ public class AssistantEngineTest {
     }
 
     @Test
+    public void missingYesterdayTotalIsNotReportedAsZero() {
+        Assistant.Snap s = snap();
+        s.salesYesterday = new Row();
+        AssistantEngine.Reply r = AssistantEngine.respond(s, "فروش دیروز", null);
+        assertTrue(r.text(), r.text().contains("دادهٔ فروش دیروز در دسترس نیست"));
+        assertFalse(r.text(), r.text().contains(Money.compactRial(0)));
+    }
+
+    @Test
     public void yesterdayOnlyForSales() {
         AssistantEngine.Reply sales = AssistantEngine.respond(snap(), "فروش دیروز", null);
         assertTrue(sales.text(), sales.text().contains(Money.compactRial(2_000_000.0)));

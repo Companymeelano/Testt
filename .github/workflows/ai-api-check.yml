@@ -1,0 +1,36 @@
+name: AI proxy PHP checks
+
+on:
+  push:
+    branches:
+      - arena/e7d9f96e-testt
+    paths:
+      - "ai-api/**"
+      - ".github/workflows/ai-api-check.yml"
+  pull_request:
+    paths:
+      - "ai-api/**"
+      - ".github/workflows/ai-api-check.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  php:
+    name: Lint and test PHP proxy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: curl
+          coverage: none
+      - name: Syntax check
+        run: |
+          php -l ai-api/lib.php
+          php -l ai-api/api.php
+          php -l ai-api/tests/run.php
+      - name: Run dependency-free helper tests
+        run: php ai-api/tests/run.php

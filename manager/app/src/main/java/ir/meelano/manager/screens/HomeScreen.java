@@ -2081,6 +2081,7 @@ public class HomeScreen extends Screen {
             chip.setSingleLine(true);
             chip.setPadding(Theme.dp(13), 0, Theme.dp(13), 0);
             chip.setMinHeight(Theme.dp(48));
+            chip.setMinimumHeight(Theme.dp(48));
             chip.setMinimumWidth(Theme.dp(56));
             chip.setContentDescription("رفتن به بخش " + target.spokenLabel);
             chip.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);

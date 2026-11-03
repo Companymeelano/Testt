@@ -314,7 +314,7 @@ public final class HomeDashboardScreenshotTest {
                 targets[24].isClickable() && targets[24].isFocusable()
                         && targets[24].getContentDescription() != null);
         assertTrue("Management shortcut is below the 48dp touch target",
-                targets[24].getMinimumHeight() >= 48f * activityDensity(targets[24]));
+                targets[24].getHeight() >= 48f * activityDensity(targets[24]));
         assertNotNull("Incomplete trend needs a compact unavailable-data row", targets[20]);
         assertTrue("Unavailable trend still allocates a blank chart", targets[21] == null);
         assertNotNull("Financial detail disclosure is missing", targets[17]);

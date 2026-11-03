@@ -161,7 +161,7 @@ public final class HomeDashboardScreenshotTest {
                 144, MainActivity.headerTitleWidthDp(320, 2, true, true));
         verifyDashboardColorContrast();
         Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
-        final View[] targets = new View[10];
+        final View[] targets = new View[16];
         final int[] facts = new int[5];
         final String[] reconciliationCopy = {""};
         long layoutDeadline = SystemClock.uptimeMillis() + 3_000L;
@@ -180,6 +180,12 @@ public final class HomeDashboardScreenshotTest {
                         : findTaggedView(targets[0], "home-kpi-delta");
                 targets[8] = findTaggedView(decor, "home-financial-reconciliation");
                 targets[9] = findTaggedView(decor, "home-bank-statement-entry");
+                targets[10] = findTaggedView(decor, "home-financial-overview");
+                targets[11] = findTaggedView(decor, "home-financial-exceptions");
+                targets[12] = findTaggedView(decor, "home-bank-reconciliation");
+                targets[13] = findTaggedView(decor, "home-bank-statement-import");
+                targets[14] = findTaggedView(decor, "home-cash-control-card");
+                targets[15] = findTaggedView(decor, "home-financial-returns");
                 reconciliationCopy[0] = "";
                 if (targets[8] != null) collectText(targets[8], reconciliationCopy);
                 facts[0] = targets[0] == null ? 0 : countTaggedViews(targets[0], "home-financial-kpi");
@@ -241,6 +247,21 @@ public final class HomeDashboardScreenshotTest {
         assertTrue("Per-bank statement entry has no accessible explanation",
                 targets[9].getContentDescription() != null
                         && targets[9].getContentDescription().toString().contains("ویرایش صورت‌حساب"));
+        assertNotNull("Executive financial overview is missing", targets[10]);
+        assertNotNull("Separate manager exception panel is missing", targets[11]);
+        assertNotNull("Separate bank reconciliation panel is missing", targets[12]);
+        assertNotNull("Manual statement import action is missing", targets[13]);
+        assertTrue("Statement import action is not clickable and accessible",
+                targets[13].isClickable() && targets[13].isFocusable());
+        assertTrue("Statement import action is below the 48dp touch target",
+                targets[13].getMinimumHeight() >= 48f * activityDensity(targets[13]));
+        assertNotNull("Explicit till-count control panel is missing", targets[14]);
+        assertNotNull("Reported returns panel is missing", targets[15]);
+        String[] tillCopy = {""};
+        instrumentation.runOnMainSync(() -> collectText(targets[14], tillCopy));
+        assertTrue("Till-count formula or source was lost",
+                tillCopy[0].contains("ماندهٔ آغاز + دریافت نقد")
+                        && tillCopy[0].contains("فقط روی این دستگاه"));
     }
 
     private static void verifyDashboardColorContrast() {
@@ -250,7 +271,7 @@ public final class HomeDashboardScreenshotTest {
                 DesignTokens.CASH_POSITION, DesignTokens.TOP_PERFORMERS,
                 DesignTokens.SALES_GOAL, DesignTokens.GROSS_PROFIT,
                 DesignTokens.SEASONAL_CALENDAR, DesignTokens.QUICK_ACTIONS,
-                DesignTokens.SALES_FORECAST};
+                DesignTokens.SALES_FORECAST, Theme.SUCCESS, Theme.DANGER, Theme.WARNING};
         boolean light = Theme.isLight();
         float badgeTopTint = light ? 0.23f : 0.42f;
         float badgeBottomTint = light ? 0.12f : 0.27f;

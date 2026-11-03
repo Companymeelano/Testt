@@ -2157,6 +2157,33 @@ public class HomeScreen extends Screen {
         return total;
     }
 
+    /** Exact sum for financial labels; a missing source value never contributes an invented zero. */
+    private static BigDecimal sumExactField(List<Row> rows, String field) {
+        if (rows == null) return null;
+        BigDecimal total = BigDecimal.ZERO;
+        for (Row row : rows) {
+            if (row == null) return null;
+            BigDecimal value = row.bd(field);
+            if (value == null) return null;
+            total = total.add(value);
+        }
+        return total;
+    }
+
+    /** Exact non-negative document count; overflow or a missing field remains unknown. */
+    private static Long sumExactLongField(List<Row> rows, String field) {
+        if (rows == null) return null;
+        long total = 0;
+        for (Row row : rows) {
+            if (row == null) return null;
+            Long value = row.exactLong(field);
+            if (value == null || value < 0) return null;
+            try { total = Math.addExact(total, value); }
+            catch (ArithmeticException overflow) { return null; }
+        }
+        return total;
+    }
+
     /**
      * Home-only elevated card factory. The shared Kit card stays neutral on every other screen;
      * only the dashboard gets a coloured gradient, champagne edge, and shallow lift.
@@ -3834,13 +3861,18 @@ public class HomeScreen extends Screen {
         String salesNote = salesAvailable
                 ? HomeNumberFormatter.integer(d.salesSnapshot.documentsOn(day)) + " فاکتور"
                 : "داده در دسترس نیست";
+        Long receiveCount = d.inDay == null ? null : d.inDay.exactLong("count");
+        Long paymentCount = d.outDay == null ? null : d.outDay.exactLong("count");
         String receiveNote = d.inDay == null ? "داده در دسترس نیست"
-                : HomeNumberFormatter.integer(d.inDay.l("count")) + " قبض";
+                : receiveCount == null || receiveCount < 0 ? "تعداد قبض نامعتبر است"
+                : HomeNumberFormatter.integer(receiveCount) + " قبض";
         String paymentNote = d.outDay == null ? "داده در دسترس نیست"
-                : HomeNumberFormatter.integer(d.outDay.l("count")) + " قبض";
-        long returnDocs = sumLongField(d.returnsToday, "docs");
-        String returnNote = d.returnsTodayAvailable
-                ? HomeNumberFormatter.integer(returnDocs) + " سند" : "داده در دسترس نیست";
+                : paymentCount == null || paymentCount < 0 ? "تعداد قبض نامعتبر است"
+                : HomeNumberFormatter.integer(paymentCount) + " قبض";
+        Long returnDocs = sumExactLongField(d.returnsToday, "docs");
+        String returnNote = !d.returnsTodayAvailable ? "داده در دسترس نیست"
+                : returnDocs == null ? "تعداد سند نامعتبر است"
+                : HomeNumberFormatter.integer(returnDocs) + " سند";
         String profitNote = d.grossProfitAvailable ? "برآورد بر پایهٔ بهای ثبت‌شده"
                 : "مبنای بهای تمام‌شده موجود نیست";
         String variance = closeoutVarianceLabel(d, day);
@@ -3851,15 +3883,18 @@ public class HomeScreen extends Screen {
         metrics.add(new Mini(R.drawable.mi_sell, "فروش روز",
                 salesAvailable ? HomeNumberFormatter.money(d.salesSnapshot.salesRialsOn(day)) : "—",
                 salesNote, Theme.TEXT));
+        BigDecimal receivedTotal = d.inDay == null ? null : d.inDay.bd("total");
+        BigDecimal paidTotal = d.outDay == null ? null : d.outDay.bd("total");
+        BigDecimal returnedTotal = sumExactField(d.returnsToday, "total");
         metrics.add(new Mini(R.drawable.mi_receipt_long, "دریافت ثبت‌شده",
-                d.inDay == null ? "—" : HomeNumberFormatter.money(d.inDay.d("total")),
-                receiveNote, Theme.TEXT));
+                d.inDay == null ? "—" : receivedTotal == null ? "مبلغ نامعتبر"
+                        : HomeNumberFormatter.preciseMoney(receivedTotal), receiveNote, Theme.TEXT));
         metrics.add(new Mini(R.drawable.mi_payments, "پرداخت ثبت‌شده",
-                d.outDay == null ? "—" : HomeNumberFormatter.money(d.outDay.d("total")),
-                paymentNote, Theme.TEXT));
+                d.outDay == null ? "—" : paidTotal == null ? "مبلغ نامعتبر"
+                        : HomeNumberFormatter.preciseMoney(paidTotal), paymentNote, Theme.TEXT));
         metrics.add(new Mini(R.drawable.mi_assignment_return, "برگشتی امروز",
-                d.returnsTodayAvailable ? HomeNumberFormatter.money(sumField(d.returnsToday, "total")) : "—",
-                returnNote, Theme.TEXT));
+                !d.returnsTodayAvailable ? "—" : returnedTotal == null ? "مبلغ نامعتبر"
+                        : HomeNumberFormatter.preciseMoney(returnedTotal), returnNote, Theme.TEXT));
         metrics.add(new Mini(R.drawable.mi_bar_chart, "سود ناخالص برآوردی",
                 d.grossProfitAvailable ? HomeNumberFormatter.money(grossProfitOnDay(d, day)) : "—",
                 profitNote, Theme.TEXT));
@@ -3889,15 +3924,21 @@ public class HomeScreen extends Screen {
     }
 
     /**
-     * Manager-only daily controls. Internal ledgers and a manager-entered bank statement stay
-     * distinct; no inferred zero or direct sales-minus-receipts verdict is presented as fact.
+     * Manager-only financial review, ordered by decision priority: daily result, exceptions,
+     * bank evidence, till count, then reported returns. Every panel keeps its source and state.
      */
     private void secFinancialReconciliation(LinearLayout content, Data d) {
         if (!RoleStore.allowed(a, "closeout")) return;
         final String day = snapshotDay(d);
-        LinearLayout card = homeCard(Theme.SECTION_CLOSEOUT);
-        card.setTag("home-financial-reconciliation");
-        card.addView(boardHead("مغایرت‌گیری مالی", "کنترل‌های دفتر روزانهٔ آتیران • " + day
+        LinearLayout sections = a.kit.v();
+        sections.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        sections.setClipChildren(false);
+        sections.setClipToPadding(false);
+        sections.setTag("home-financial-reconciliation");
+
+        LinearLayout overview = homeCard(Theme.SECTION_CLOSEOUT);
+        overview.setTag("home-financial-overview");
+        overview.addView(boardHead("مغایرت‌گیری مالی", "دفتر آتیران • " + day
                         + " • نمایش به " + ir.meelano.manager.core.Money.unitName(),
                 R.drawable.mi_fact_check, navChip("گزارش‌ها", "reports"), Theme.SECTION_CLOSEOUT),
                 a.kit.lp(-1, -2));
@@ -3923,103 +3964,199 @@ public class HomeScreen extends Screen {
             status = "ناقص";
             tone = Theme.WARNING;
         }
-        card.addView(financialAuditLine("home-financial-audit-summary", headline,
-                HomeNumberFormatter.integer(summary[2]) + " کنترل اجراشده • "
-                        + HomeNumberFormatter.integer(summary[1]) + " مورد/منبع نیازمند تکمیل؛ "
-                        + "کنترل ناقص به‌معنی نبود مغایرت نیست.", status, tone), a.kit.lp(-1, -2));
+        overview.addView(financialAuditLine("home-financial-audit-summary", headline,
+                "کنترل ناقص به معنی نبود مغایرت نیست؛ هر نتیجه فقط در محدودهٔ منبع و کنترل اعلام‌شده معتبر است.",
+                status, tone, Theme.SECTION_CLOSEOUT), a.kit.lp(-1, -2));
+        overview.addView(financialControlCountStrip(summary), a.kit.lp(-1, -2));
+        overview.addView(a.kit.gap(8));
 
         String salesValue = d.salesSnapshot != null && d.salesSnapshot.isAvailable()
-                ? HomeNumberFormatter.money(d.salesSnapshot.salesRialsOn(day)) : "دادهٔ فروش در دسترس نیست";
-        String receiptValue = d.inDay != null ? HomeNumberFormatter.money(d.inDay.d("total"))
-                : "دادهٔ دریافت در دسترس نیست";
-        card.addView(financialAuditLine("home-sales-receipts-control", "فروش و دریافت • مقایسهٔ نیازمند پیوند فاکتور",
+                ? HomeNumberFormatter.money(d.salesSnapshot.salesRialsOn(day))
+                : "دادهٔ فروش در دسترس نیست";
+        BigDecimal receiptTotal = d.inDay == null ? null : d.inDay.bd("total");
+        String receiptValue = d.inDay == null ? "دادهٔ دریافت در دسترس نیست"
+                : receiptTotal == null ? "مبلغ دریافت نامعتبر است"
+                : HomeNumberFormatter.preciseMoney(receiptTotal);
+        overview.addView(financialAuditLine("home-sales-receipts-control",
+                "فروش و دریافت • پیوند فاکتور لازم است",
                 "فروش روز: " + salesValue + " • دریافت ثبت‌شدهٔ روز: " + receiptValue
-                        + ". دریافت امروز می‌تواند تسویهٔ فاکتورهای روزهای قبل باشد؛ تفاضل این دو به‌تنهایی مغایرت قطعی نیست.",
-                "نیازمند تطبیق فاکتور", Theme.WARNING), a.kit.lp(-1, -2));
+                        + ". دریافت امروز می‌تواند تسویهٔ فاکتورهای روزهای قبل باشد؛ این دو رقم به‌تنهایی مبنای مغایرت قطعی نیستند.",
+                "غیرقطعی", Theme.WARNING, Theme.SECTION_CLOSEOUT), a.kit.lp(-1, -2));
 
-        card.addView(a.kit.text("کنترل جمع و تفکیک قبوض", 12f,
-                Theme.dashboardAccentInk(Theme.SECTION_CLOSEOUT), true), a.kit.lp(-1, -2));
-        card.addView(moneyBreakdownLine("home-receipt-breakdown", "ترکیب دریافت",
+        overview.addView(financialSubheading("کنترل جمع و تفکیک قبوض", Theme.SECTION_CLOSEOUT),
+                a.kit.lp(-1, -2));
+        overview.addView(moneyBreakdownLine("home-receipt-breakdown", "ترکیب دریافت",
                 d.cashReceipts, d.cashReceiptsAvailable), a.kit.lp(-1, -2));
-        card.addView(moneyBreakdownLine("home-payment-breakdown", "ترکیب پرداخت",
+        overview.addView(moneyBreakdownLine("home-payment-breakdown", "ترکیب پرداخت",
                 d.cashPayments, d.cashPaymentsAvailable), a.kit.lp(-1, -2));
-        card.addView(a.kit.hint("فرمول کنترل جمع: مبلغ ثبت‌شده − (نقد + کارت‌خوان + حواله + چک). این کنترل در سطح جمع روز است و جای بررسی ریز قبض‌ها را نمی‌گیرد؛ دادهٔ تفکیک‌نشده صفر فرض نمی‌شود."),
+        overview.addView(a.kit.hint("فرمول: مبلغ ثبت‌شده − (نقد + کارت‌خوان + حواله + چک). کنترل در سطح جمع روز است، نه ریز قبض‌ها؛ تفکیک ناموجود یا نامعتبر صفر فرض نمی‌شود."),
                 a.kit.lp(-1, -2));
+        a.kit.addCard(sections, overview);
 
-        card.addView(a.kit.text("تطبیق هر حساب بانکی با صورت‌حساب واقعی", 12f,
-                Theme.dashboardAccentInk(Theme.SECTION_CLOSEOUT), true), a.kit.lp(-1, -2));
-        card.addView(a.kit.hint("دفتر آتیران از گردش ثبت‌شدهٔ بانکی خوانده می‌شود؛ صورت‌حساب مستقل بانکی به سرویس بانک متصل نیست و برنامه به بانک وصل نمی‌شود. از اپ بانکی خروجی CSV، TSV یا .xlsx بگیرید و همین‌جا انتخاب کنید؛ فایل خام و ریز تراکنش‌ها ذخیره یا ارسال نمی‌شوند. مقایسه پس از تأیید کامل‌بودن بازه انجام می‌شود."),
+        LinearLayout exceptions = homeCard(Theme.SECTION_ALERT);
+        exceptions.setTag("home-financial-exceptions");
+        exceptions.addView(boardHead("استثناهای قابل رسیدگی", "قبوض و اسناد • " + day,
+                R.drawable.mi_error, null, Theme.SECTION_ALERT), a.kit.lp(-1, -2));
+        exceptions.addView(a.kit.hint("این فهرست برای پیگیری است، نه اصلاح خودکار؛ شمارهٔ قبض/سند را در آتیران بررسی کنید. هیچ سندی از این کنترل تغییر نمی‌کند."),
                 a.kit.lp(-1, -2));
-        Button importStatement = dashboardHeaderAction("ورود فایل صورت‌حساب", Theme.SECTION_CLOSEOUT,
-                "انتخاب فایل خروجی بانک برای تحلیل محلی و تطبیق read-only با گردش آتیران",
+        addExceptionRows(exceptions, d);
+        a.kit.addCard(sections, exceptions);
+
+        LinearLayout bankCard = homeCard(Theme.SECTION_CASH_POSITION);
+        bankCard.setTag("home-bank-reconciliation");
+        bankCard.addView(boardHead("تطبیق حساب‌های بانکی", "دفتر روز • " + day + " • "
+                        + ir.meelano.manager.core.Money.unitName(),
+                R.drawable.mi_account_balance_wallet, null, Theme.SECTION_CASH_POSITION),
+                a.kit.lp(-1, -2));
+        bankCard.addView(a.kit.hint("دفتر آتیران فقط‌خواندنی است؛ صورت‌حساب مستقل بانکی از خروجی دستی CSV، TSV یا Excel (.xlsx) اپ بانک وارد می‌شود. برنامه به بانک وصل نمی‌شود و فایل خام یا ریز تراکنش‌ها ذخیره/ارسال نمی‌شوند. مقایسه پس از تأیید کامل‌بودن بازه انجام می‌شود."),
+                a.kit.lp(-1, -2));
+        Button importStatement = dashboardHeaderAction("ورود فایل صورت‌حساب",
+                Theme.SECTION_CASH_POSITION,
+                "انتخاب فایل خروجی بانک برای تحلیل محلی و تطبیق فقط‌خواندنی با گردش آتیران",
                 v -> showBankStatementImport(content, d));
-        LinearLayout bankActions = a.kit.h();
-        bankActions.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        bankActions.addView(importStatement, a.kit.wlp(1f));
-        card.addView(bankActions, a.kit.lp(-1, -2));
+        importStatement.setTag("home-bank-statement-import");
+        importStatement.setTextSize(11.5f * Theme.fontScale());
+        bankCard.addView(importStatement, a.kit.lp(-1, -2));
+        bankCard.addView(a.kit.gap(8), a.kit.lp(-1, Theme.dp(8)));
+
         List<Row> accounts = bankAccountsForHome(d);
         if (!d.bankTurnoverAvailable) {
-            card.addView(financialAuditLine("home-bank-ledger-unavailable", "گردش بانکی روزانه",
+            bankCard.addView(financialAuditLine("home-bank-ledger-unavailable", "گردش بانکی روزانه",
                     "دادهٔ تاریخ‌دار و کامل برای دفتر بانک در دسترس نیست؛ مقایسه انجام نشد.",
-                    "نامشخص", Theme.WARNING), a.kit.lp(-1, -2));
+                    "نامشخص", Theme.WARNING, Theme.SECTION_CASH_POSITION), a.kit.lp(-1, -2));
         } else if (accounts.isEmpty()) {
-            card.addView(financialAuditLine("home-bank-accounts-empty", "حساب بانکی",
+            bankCard.addView(financialAuditLine("home-bank-accounts-empty", "حساب بانکی",
                     d.bankAccountsAvailable ? "حسابی برای این روز در فهرست بانک آتیران پیدا نشد."
-                            : "فهرست حساب‌های بانک در دسترس نیست.", "نامشخص", Theme.WARNING),
-                    a.kit.lp(-1, -2));
+                            : "فهرست حساب‌های بانک در دسترس نیست.", "نامشخص", Theme.WARNING,
+                    Theme.SECTION_CASH_POSITION), a.kit.lp(-1, -2));
         } else {
             for (Row account : accounts)
-                card.addView(bankReconciliationRow(content, d, day, account), a.kit.lp(-1, -2));
+                bankCard.addView(bankReconciliationRow(content, d, day, account), a.kit.lp(-1, -2));
         }
+        a.kit.addCard(sections, bankCard);
 
-        card.addView(a.kit.text("استثناهای قابل رسیدگی", 12f,
-                Theme.dashboardAccentInk(Theme.SECTION_CLOSEOUT), true), a.kit.lp(-1, -2));
-        addExceptionRows(card, d);
-
-        String cashLabel = closeoutVarianceLabel(d, day);
-        boolean cashEntered = d.cashReceiptsAvailable && d.cashPaymentsAvailable
-                && parseLocalRials(a.settings.closeoutCashOpening(day)) != null
-                && parseLocalRials(a.settings.closeoutCashCounted(day)) != null;
-        card.addView(financialAuditLine("home-cash-count-control", "تطبیق شمارش صندوق",
-                cashLabel + " • فرمول: ماندهٔ آغاز + دریافت نقد − پرداخت نقد، در برابر شمارش پایان.",
-                cashEntered ? (cashLabel.startsWith("بدون اختلاف") ? "مطابق" : "رسیدگی") : "ثبت/داده ناقص",
-                cashEntered && cashLabel.startsWith("بدون اختلاف") ? Theme.SUCCESS
-                        : cashEntered ? Theme.DANGER : Theme.WARNING), a.kit.lp(-1, -2));
-        Button cashEntry = dashboardHeaderAction("ثبت شمارش صندوق", Theme.SECTION_CLOSEOUT,
+        LinearLayout cashCard = homeCard(Theme.SECTION_CASH_POSITION);
+        cashCard.setTag("home-cash-control-card");
+        cashCard.addView(boardHead("تطبیق شمارش صندوق", "کنترل محلی • " + day,
+                R.drawable.mi_point_of_sale, null, Theme.SECTION_CASH_POSITION), a.kit.lp(-1, -2));
+        BigDecimal cashVariance = closeoutVarianceExact(d, day);
+        String cashStatus;
+        int cashTone;
+        if (cashVariance == null) {
+            cashStatus = "داده ناقص";
+            cashTone = Theme.WARNING;
+        } else if (cashVariance.signum() == 0) {
+            cashStatus = "دقیقاً برابر";
+            cashTone = Theme.SUCCESS;
+        } else if (cashVariance.abs().compareTo(BankStatementReconciliation.TOLERANCE_RIALS_EXACT) <= 0) {
+            cashStatus = "در تلرانس";
+            cashTone = Theme.WARNING;
+        } else {
+            cashStatus = cashVariance.signum() > 0 ? "مازاد" : "کسری";
+            cashTone = Theme.DANGER;
+        }
+        cashCard.addView(financialAuditLine("home-cash-count-control", "وضعیت امروز",
+                closeoutCashDetail(d, day), cashStatus, cashTone, Theme.SECTION_CASH_POSITION),
+                a.kit.lp(-1, -2));
+        cashCard.addView(a.kit.hint("فرمول: ماندهٔ آغاز + دریافت نقد − پرداخت نقد = ماندهٔ مورد انتظار؛ اختلاف = شمارش پایان − ماندهٔ مورد انتظار. ارقام شمارش فقط روی این دستگاه ذخیره می‌شوند."),
+                a.kit.lp(-1, -2));
+        Button cashEntry = dashboardHeaderAction("ثبت شمارش صندوق", Theme.SECTION_CASH_POSITION,
                 "ثبت ماندهٔ آغاز و شمارش پایان صندوق برای " + day + "؛ فقط روی همین دستگاه",
                 v -> showCloseoutCashDialog(content, d, day));
-        LinearLayout actions = a.kit.h();
-        actions.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        actions.addView(cashEntry, a.kit.wlp(1f));
-        card.addView(actions, a.kit.lp(-1, -2));
+        cashEntry.setTextSize(11.5f * Theme.fontScale());
+        cashCard.addView(cashEntry, a.kit.lp(-1, -2));
+        a.kit.addCard(sections, cashCard);
 
-        card.addView(a.kit.text("اسناد برگشتی امروز", 12f,
-                Theme.dashboardAccentInk(Theme.SECTION_CLOSEOUT), true), a.kit.lp(-1, -2));
+        LinearLayout returnsCard = homeCard(Theme.SECTION_RETURNS);
+        returnsCard.setTag("home-financial-returns");
+        returnsCard.addView(boardHead("اسناد برگشتی امروز", "گزارش فعال آتیران • " + day,
+                R.drawable.mi_assignment_return, null, Theme.SECTION_RETURNS), a.kit.lp(-1, -2));
         if (!d.returnsTodayAvailable) {
-            card.addView(a.kit.hint("گزارش اسناد برگشتی در دسترس نیست؛ صفر تلقی نشده است."), a.kit.lp(-1, -2));
+            returnsCard.addView(financialAuditLine("home-returns-unavailable", "وضعیت گزارش",
+                    "گزارش اسناد برگشتی در دسترس نیست؛ صفر تلقی نشده است.", "نامشخص",
+                    Theme.WARNING, Theme.SECTION_RETURNS), a.kit.lp(-1, -2));
         } else if (d.returnsToday == null || d.returnsToday.isEmpty()) {
-            card.addView(a.kit.hint("در منبع اسناد برگشتی فعال، ردیفی برای این روز برنگشت."), a.kit.lp(-1, -2));
+            returnsCard.addView(a.kit.hint("در منبع اسناد برگشتی فعال، ردیفی برای این روز برنگشت."),
+                    a.kit.lp(-1, -2));
         } else {
             for (int i = 0; i < Math.min(8, d.returnsToday.size()); i++) {
                 Row returned = d.returnsToday.get(i);
-                card.addView(financialAuditLine("home-return-kind-" + i,
-                        returned.s("label").isEmpty() ? "نوع سند برگشتی" : returned.s("label"),
-                        HomeNumberFormatter.money(returned.d("total")) + " • "
-                                + HomeNumberFormatter.integer(returned.l("docs")) + " سند",
-                        "گزارش‌شده", Theme.SECTION_RETURNS), a.kit.lp(-1, -2));
+                BigDecimal amount = returned == null ? null : returned.bd("total");
+                Long docs = returned == null ? null : returned.exactLong("docs");
+                String detail = amount == null || docs == null || docs < 0
+                        ? "مبلغ یا تعداد سند نامعتبر است؛ مقدار صفر فرض نشده است."
+                        : HomeNumberFormatter.preciseMoney(amount) + " • "
+                                + HomeNumberFormatter.integer(docs) + " سند";
+                String label = returned == null || returned.s("label").isEmpty()
+                        ? "نوع سند برگشتی" : returned.s("label");
+                returnsCard.addView(financialAuditLine("home-return-kind-" + i, label, detail,
+                        amount == null || docs == null || docs < 0 ? "داده ناقص" : "گزارش‌شده",
+                        amount == null || docs == null || docs < 0 ? Theme.WARNING : Theme.SECTION_RETURNS,
+                        Theme.SECTION_RETURNS), a.kit.lp(-1, -2));
             }
+            if (d.returnsToday.size() > 8)
+                returnsCard.addView(a.kit.hint("فقط ۸ نوع نخست نمایش داده می‌شود؛ ممکن است موارد بیشتری باشند."),
+                        a.kit.lp(-1, -2));
         }
-        card.addView(a.kit.hint("برگشتی‌ها بر اساس نوع جدا نمایش داده شده‌اند و بدون تشخیص ماهیت مالی از فروش کم نشده‌اند؛ ابطال فاکتور و تسویهٔ مطالبات نیز باید در گزارش همان سند کنترل شود."),
+        returnsCard.addView(a.kit.hint("برگشتی‌ها جداگانه گزارش می‌شوند و بدون تشخیص ماهیت مالی از فروش کم نشده‌اند؛ ابطال فاکتور و تسویهٔ مطالبات باید در گزارش همان سند کنترل شود."),
                 a.kit.lp(-1, -2));
-        a.kit.addCard(content, card);
+        a.kit.addCard(sections, returnsCard);
+
+        a.kit.addCard(content, sections);
+    }
+
+    private View financialSubheading(String title, int accent) {
+        TextView heading = a.kit.text(title, 12f, Theme.dashboardAccentInk(accent), true);
+        heading.setMaxLines(2);
+        heading.setEllipsize(TextUtils.TruncateAt.END);
+        heading.setPadding(0, Theme.dp(8), 0, Theme.dp(4));
+        return heading;
+    }
+
+    private View financialControlCountStrip(int[] summary) {
+        LinearLayout strip = a.kit.h();
+        strip.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        strip.setGravity(Gravity.CENTER_VERTICAL);
+        int issueTone = summary[0] > 0 ? Theme.DANGER : Theme.SUCCESS;
+        int incompleteTone = summary[1] > 0 ? Theme.WARNING : Theme.SUCCESS;
+        int checkedTone = summary[2] > 0 ? Theme.SECTION_CLOSEOUT : Theme.WARNING;
+        strip.addView(financialCountTile("اختلاف ثبت‌شده", summary[0], issueTone),
+                new LinearLayout.LayoutParams(0, -2, 1f));
+        strip.addView(a.kit.space(6));
+        strip.addView(financialCountTile("نیازمند تکمیل", summary[1], incompleteTone),
+                new LinearLayout.LayoutParams(0, -2, 1f));
+        strip.addView(a.kit.space(6));
+        strip.addView(financialCountTile("کنترل اجراشده", summary[2], checkedTone),
+                new LinearLayout.LayoutParams(0, -2, 1f));
+        return strip;
+    }
+
+    private View financialCountTile(String label, int value, int accent) {
+        LinearLayout tile = a.kit.v();
+        tile.setGravity(Gravity.CENTER);
+        tile.setBackground(Theme.dashboardMetric(accent));
+        tile.setPadding(Theme.dp(5), Theme.dp(7), Theme.dp(5), Theme.dp(7));
+        tile.setMinimumHeight(Theme.dp(58));
+        TextView number = a.kit.text(HomeNumberFormatter.integer(value), 14f,
+                Theme.dashboardAccentInk(accent), true);
+        number.setGravity(Gravity.CENTER);
+        number.setSingleLine(true);
+        tile.addView(number, a.kit.lp(-1, -2));
+        TextView name = a.kit.text(label, 9f, Theme.dashboardMutedInk(accent), false);
+        name.setGravity(Gravity.CENTER);
+        name.setMaxLines(2);
+        name.setEllipsize(TextUtils.TruncateAt.END);
+        tile.addView(name, a.kit.lp(-1, -2));
+        tile.setContentDescription(label + "؛ " + value);
+        return tile;
     }
 
     private int[] financialControlCounts(Data d, String day) {
         int issues = 0;
         int incomplete = 0;
         int checked = 0;
-        MoneyBreakdown receipts = breakdown(d.cashReceipts, d.cashReceiptsAvailable);
-        MoneyBreakdown payments = breakdown(d.cashPayments, d.cashPaymentsAvailable);
+        MoneyBreakdown.Exact receipts = breakdown(d.cashReceipts, d.cashReceiptsAvailable);
+        MoneyBreakdown.Exact payments = breakdown(d.cashPayments, d.cashPaymentsAvailable);
         if (receipts.available) { checked++; if (!receipts.matches()) issues++; } else incomplete++;
         if (payments.available) { checked++; if (!payments.matches()) issues++; } else incomplete++;
         // Daily sales/receipts are not linked by settled invoice, and voided invoice effects
@@ -4055,68 +4192,90 @@ public class HomeScreen extends Screen {
             }
         } else incomplete++;
 
-        Double opening = parseLocalRials(a.settings.closeoutCashOpening(day));
-        Double counted = parseLocalRials(a.settings.closeoutCashCounted(day));
-        if (d.cashReceiptsAvailable && d.cashPaymentsAvailable && opening != null && counted != null) {
-            double variance = CashCloseMath.variance(opening, d.cashReceipts.d("cash"),
-                    d.cashPayments.d("cash"), counted);
-            if (Double.isFinite(variance)) { checked++; if (Math.abs(variance) > 0.5d) issues++; }
-            else incomplete++;
+        BigDecimal cashVariance = closeoutVarianceExact(d, day);
+        if (cashVariance != null) {
+            checked++;
+            if (cashVariance.abs().compareTo(BankStatementReconciliation.TOLERANCE_RIALS_EXACT) > 0)
+                issues++;
         } else incomplete++;
         return new int[]{issues, incomplete, checked};
     }
 
-    private MoneyBreakdown breakdown(Row row, boolean available) {
-        if (row == null) return MoneyBreakdown.calculate(false, 0, 0, 0, 0, 0);
-        return MoneyBreakdown.calculate(available, row.d("total"), row.d("cash"), row.d("pos"),
-                row.d("havaleh"), row.d("cheque"));
+    private MoneyBreakdown.Exact breakdown(Row row, boolean available) {
+        if (row == null) return MoneyBreakdown.calculateExact(false, null, null, null, null, null);
+        return MoneyBreakdown.calculateExact(available, row.bd("total"), row.bd("cash"),
+                row.bd("pos"), row.bd("havaleh"), row.bd("cheque"));
     }
 
     private View moneyBreakdownLine(String tag, String title, Row row, boolean available) {
-        MoneyBreakdown result = breakdown(row, available);
+        MoneyBreakdown.Exact result = breakdown(row, available);
         if (!result.available) return financialAuditLine(tag, title,
-                "تفکیک مبلغ در دادهٔ فروشگاه موجود نیست؛ صفر یا تطبیق فرض نشده است.",
-                "نامشخص", Theme.WARNING);
-        String details = "ثبت " + HomeNumberFormatter.money(result.bookedTotal)
-                + " • اجزا " + HomeNumberFormatter.money(result.componentTotal);
+                "تفکیک مبلغ در دادهٔ فروشگاه ناقص یا نامعتبر است؛ صفر یا تطبیق فرض نشده است.",
+                "نامشخص", Theme.WARNING, Theme.SECTION_CLOSEOUT);
+        String details = "ثبت " + HomeNumberFormatter.preciseMoney(result.bookedTotal)
+                + " • اجزا " + HomeNumberFormatter.preciseMoney(result.componentTotal);
         String state;
         int tone;
-        if (result.matches()) {
-            details += " • اختلاف جمعی صفر";
-            state = "برابر";
+        if (result.exactlyEqual()) {
+            details += " • اختلاف دقیق صفر";
+            state = "دقیقاً برابر";
             tone = Theme.SUCCESS;
         } else {
-            details += " • " + (result.unexplained > 0 ? "کسری اجزا " : "اضافهٔ اجزا ")
-                    + HomeNumberFormatter.money(Math.abs(result.unexplained));
-            state = "رسیدگی";
-            tone = Theme.DANGER;
+            String relation = result.unexplained.signum() > 0 ? "ثبت بیش از اجزا " : "اجزا بیش از ثبت ";
+            details += " • " + relation + HomeNumberFormatter.preciseMoney(result.unexplained.abs());
+            if (result.matches()) {
+                details += " • در تلرانس ±۰٫۵ ریال؛ اختلاف صفر نیست";
+                state = "در تلرانس";
+                tone = Theme.WARNING;
+            } else {
+                state = "رسیدگی";
+                tone = Theme.DANGER;
+            }
         }
-        return financialAuditLine(tag, title, details, state, tone);
+        return financialAuditLine(tag, title, details, state, tone, Theme.SECTION_CLOSEOUT);
     }
 
     private View financialAuditLine(String tag, String title, String detail, String status, int tone) {
-        LinearLayout row = a.kit.v();
+        return financialAuditLine(tag, title, detail, status, tone, Theme.SECTION_CLOSEOUT);
+    }
+
+    /** A quiet, accent-keyed audit row; full financial detail remains visible, not ellipsized. */
+    private View financialAuditLine(String tag, String title, String detail, String status,
+                                    int tone, int accent) {
+        LinearLayout row = a.kit.h();
+        row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
         row.setTag(tag);
-        row.setBackground(Theme.dashboardMetric(Theme.SECTION_CLOSEOUT));
-        row.setElevation(Theme.dp(1f));
-        row.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
-        row.setPadding(Theme.dp(12), Theme.dp(9), Theme.dp(12), Theme.dp(9));
+        row.setBackground(Theme.dashboardMetric(accent));
+        row.setElevation(0f);
+        row.setPadding(Theme.dp(10), Theme.dp(8), Theme.dp(10), Theme.dp(8));
+
+        View rail = new View(a);
+        rail.setBackgroundColor(Theme.dashboardAccentInk(accent));
+        row.addView(rail, new LinearLayout.LayoutParams(Theme.dp(3), Theme.dp(24)));
+        row.addView(a.kit.space(8));
+
+        LinearLayout body = a.kit.v();
         LinearLayout head = a.kit.h();
+        head.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         head.setGravity(Gravity.CENTER_VERTICAL);
-        TextView label = a.kit.text(title, 11.5f, Theme.dashboardAccentInk(Theme.SECTION_CLOSEOUT), true);
+        TextView label = a.kit.text(title, 11.5f,
+                Theme.dashboardAccentInk(accent), true);
         label.setMaxLines(2);
         label.setEllipsize(TextUtils.TruncateAt.END);
         head.addView(label, a.kit.wlp(1f));
         head.addView(statusChip(status, tone), a.kit.lp(-2, -2));
-        row.addView(head, a.kit.lp(-1, -2));
-        TextView copy = a.kit.text(detail, 10.5f, Theme.dashboardCardMutedInk(Theme.SECTION_CLOSEOUT), false);
+        body.addView(head, a.kit.lp(-1, -2));
+
+        TextView copy = a.kit.text(detail == null ? "" : detail, 10.5f,
+                Theme.dashboardCardMutedInk(accent), false);
         copy.setGravity(Gravity.START);
-        copy.setMaxLines(4);
-        copy.setEllipsize(TextUtils.TruncateAt.END);
+        copy.setEllipsize(null);
         LinearLayout.LayoutParams cp = a.kit.lp(-1, -2);
         cp.topMargin = Theme.dp(4);
-        row.addView(copy, cp);
-        row.setContentDescription(title + "؛ " + status + "؛ " + detail);
+        body.addView(copy, cp);
+        row.addView(body, a.kit.wlp(1f));
+        row.setContentDescription(title + "؛ " + status + "؛ " + (detail == null ? "" : detail));
         return row;
     }
 
@@ -4170,7 +4329,15 @@ public class HomeScreen extends Screen {
         String badge;
         int tone;
         switch (result.state) {
-            case MATCH: badge = "مطابق"; tone = Theme.SUCCESS; break;
+            case MATCH: {
+                boolean exactMatch = result.inflowVarianceRialsExact != null
+                        && result.outflowVarianceRialsExact != null
+                        && result.inflowVarianceRialsExact.signum() == 0
+                        && result.outflowVarianceRialsExact.signum() == 0;
+                badge = exactMatch ? "دقیقاً برابر" : "در تلرانس";
+                tone = exactMatch ? Theme.SUCCESS : Theme.WARNING;
+                break;
+            }
             case VARIANCE: badge = "مغایرت"; tone = Theme.DANGER; break;
             case NEEDS_STATEMENT: badge = "صورت‌حساب ثبت نشده"; tone = Theme.WARNING; break;
             case LEDGER_UNAVAILABLE: badge = "دفتر ناموجود"; tone = Theme.WARNING; break;
@@ -4199,12 +4366,7 @@ public class HomeScreen extends Screen {
             detail += "\nصورت‌حساب واقعی: ثبت نشده؛ برای ورود ارقام واقعی لمس کنید.";
         }
         LinearLayout row = (LinearLayout) financialAuditLine("home-bank-statement-entry", title,
-                detail, badge, tone);
-        if (row.getChildCount() > 1 && row.getChildAt(1) instanceof TextView) {
-            TextView detailView = (TextView) row.getChildAt(1);
-            detailView.setMaxLines(6);
-            detailView.setEllipsize(null);
-        }
+                detail, badge, tone, Theme.SECTION_CASH_POSITION);
         row.setMinimumHeight(Theme.dp(64));
         row.setClickable(true);
         row.setFocusable(true);
@@ -4216,10 +4378,13 @@ public class HomeScreen extends Screen {
 
     private String bankVariancePiece(String direction, BigDecimal variance) {
         if (variance == null) return direction + " نامشخص";
-        if (variance.abs().compareTo(BankStatementReconciliation.TOLERANCE_RIALS_EXACT) <= 0)
-            return direction + " برابر";
+        if (variance.signum() == 0) return direction + " بدون اختلاف";
         String relation = variance.signum() > 0 ? "صورت‌حساب بیش از دفتر" : "دفتر بیش از صورت‌حساب";
-        return direction + "، " + relation + " " + HomeNumberFormatter.preciseMoney(variance.abs());
+        String detail = direction + "، " + relation + " "
+                + HomeNumberFormatter.preciseMoney(variance.abs());
+        if (variance.abs().compareTo(BankStatementReconciliation.TOLERANCE_RIALS_EXACT) <= 0)
+            return detail + "؛ در تلرانس ±۰٫۵ ریال، نه اختلاف صفر";
+        return detail;
     }
 
     private void showHomeBankStatementEditor(LinearLayout content, String day, Row account) {
@@ -4919,47 +5084,154 @@ public class HomeScreen extends Screen {
     private void addExceptionRows(LinearLayout card, Data d) {
         if (!d.overpaidVouchersAvailable) {
             card.addView(financialAuditLine("home-overpaid-vouchers", "قبض‌های دارای اضافه‌پرداخت",
-                    "گزارش در دسترس نیست؛ نبود نتیجه به‌معنی نبود مورد نیست.", "نامشخص", Theme.WARNING),
-                    a.kit.lp(-1, -2));
+                    "گزارش در دسترس نیست؛ نبود نتیجه به‌معنی نبود مورد نیست.", "نامشخص",
+                    Theme.WARNING, Theme.SECTION_ALERT), a.kit.lp(-1, -2));
         } else if (d.overpaidVouchers == null || d.overpaidVouchers.isEmpty()) {
             card.addView(financialAuditLine("home-overpaid-vouchers", "قبض‌های دارای اضافه‌پرداخت",
-                    "در کنترل قبض‌های فعال امروز موردی با نقد و چک بیش از مبلغ قبض برنگشت.",
-                    "بدون مورد در این کنترل", Theme.SUCCESS), a.kit.lp(-1, -2));
+                    "در کنترل قبض‌های فعال امروز، موردی با نقد و چک بیش از مبلغ قبض برنگشت.",
+                    "بدون مورد در این کنترل", Theme.SUCCESS, Theme.SECTION_ALERT), a.kit.lp(-1, -2));
         } else {
-            for (int i = 0; i < d.overpaidVouchers.size(); i++) {
-                Row item = d.overpaidVouchers.get(i);
-                card.addView(financialAuditLine("home-overpaid-voucher-" + i,
-                        "قبض " + item.s("no") + " • " + item.s("kind"),
-                        item.s("party") + " • مبلغ قبض " + HomeNumberFormatter.money(item.d("total"))
-                                + " • نقد و چک " + HomeNumberFormatter.money(item.d("paid"))
-                                + " • اضافه " + HomeNumberFormatter.money(item.d("excess")),
-                        "بازبینی سند", Theme.DANGER), a.kit.lp(-1, -2));
-            }
+            for (int i = 0; i < d.overpaidVouchers.size(); i++)
+                card.addView(voucherAuditLine(d.overpaidVouchers.get(i), i), a.kit.lp(-1, -2));
             if (d.overpaidVouchers.size() >= 5)
-                card.addView(a.kit.hint("فهرست فقط ۵ مورد نخست را نشان می‌دهد؛ ممکن است موارد بیشتری وجود داشته باشد."), a.kit.lp(-1, -2));
+                card.addView(a.kit.hint("فهرست فقط ۵ مورد نخست را نشان می‌دهد؛ ممکن است موارد بیشتری وجود داشته باشد."),
+                        a.kit.lp(-1, -2));
         }
 
+        card.addView(financialSubheading("اسناد حسابداری نامتوازن", Theme.SECTION_ALERT),
+                a.kit.lp(-1, -2));
         if (!d.unbalancedJournalsAvailable) {
-            card.addView(financialAuditLine("home-unbalanced-journals", "اسناد حسابداری نامتوازن",
-                    "گزارش در دسترس نیست؛ نبود نتیجه به‌معنی توازن قطعی نیست.", "نامشخص", Theme.WARNING),
-                    a.kit.lp(-1, -2));
+            card.addView(financialAuditLine("home-unbalanced-journals", "گزارش اسناد",
+                    "گزارش در دسترس نیست؛ نبود نتیجه به‌معنی توازن قطعی نیست.", "نامشخص",
+                    Theme.WARNING, Theme.SECTION_ALERT), a.kit.lp(-1, -2));
         } else if (d.unbalancedJournals == null || d.unbalancedJournals.isEmpty()) {
-            card.addView(financialAuditLine("home-unbalanced-journals", "اسناد حسابداری نامتوازن",
-                    "در کنترل اسناد ثبت‌شدهٔ این روز، سند نامتوازن برنگشت.",
-                    "بدون مورد در این کنترل", Theme.SUCCESS), a.kit.lp(-1, -2));
+            card.addView(financialAuditLine("home-unbalanced-journals", "نتیجهٔ کنترل",
+                    "در اسناد ثبت‌شدهٔ این روز، سند نامتوازن برنگشت.",
+                    "بدون مورد در این کنترل", Theme.SUCCESS, Theme.SECTION_ALERT), a.kit.lp(-1, -2));
         } else {
-            for (int i = 0; i < d.unbalancedJournals.size(); i++) {
-                Row item = d.unbalancedJournals.get(i);
-                card.addView(financialAuditLine("home-unbalanced-journal-" + i,
-                        "سند حسابداری " + item.s("sanad"),
-                        "بدهکار " + HomeNumberFormatter.money(item.d("debit"))
-                                + " • بستانکار " + HomeNumberFormatter.money(item.d("credit"))
-                                + " • اختلاف " + HomeNumberFormatter.money(item.d("diff")),
-                        "بازبینی سند", Theme.DANGER), a.kit.lp(-1, -2));
-            }
+            for (int i = 0; i < d.unbalancedJournals.size(); i++)
+                card.addView(journalAuditLine(d.unbalancedJournals.get(i), i), a.kit.lp(-1, -2));
             if (d.unbalancedJournals.size() >= 5)
-                card.addView(a.kit.hint("فهرست فقط ۵ سند نخست را نشان می‌دهد؛ ممکن است موارد بیشتری وجود داشته باشد."), a.kit.lp(-1, -2));
+                card.addView(a.kit.hint("فهرست فقط ۵ سند نخست را نشان می‌دهد؛ ممکن است موارد بیشتری وجود داشته باشد."),
+                        a.kit.lp(-1, -2));
         }
+    }
+
+    private View voucherAuditLine(Row item, int index) {
+        if (item == null)
+            return financialAuditLine("home-overpaid-voucher-" + index, "قبض نامشخص",
+                    "ردیف گزارش ناقص است؛ مقدارها صفر فرض نشده‌اند.", "داده ناقص",
+                    Theme.WARNING, Theme.SECTION_ALERT);
+        String title = "قبض " + (item.s("no").isEmpty() ? "نامشخص" : item.s("no"))
+                + (item.s("kind").isEmpty() ? "" : " • " + item.s("kind"));
+        BigDecimal total = item.bd("total");
+        BigDecimal paid = item.bd("paid");
+        BigDecimal excess = item.bd("excess");
+        String meta = (item.s("party").isEmpty() ? "طرف‌حساب نامشخص" : "طرف‌حساب: " + item.s("party"))
+                + " • تاریخ: " + (Jalali.disp(item.s("date")).isEmpty()
+                    ? "نامشخص" : Jalali.disp(item.s("date")));
+        if (total == null || paid == null || excess == null || total.signum() < 0
+                || paid.signum() < 0 || excess.signum() < 0
+                || paid.subtract(total).compareTo(excess) != 0) {
+            return financialAuditLine("home-overpaid-voucher-" + index, title,
+                    meta + " • مبلغ یا فرمول اضافه نامعتبر است؛ سند اصلی را بررسی کنید.",
+                    "داده نامعتبر", Theme.DANGER, Theme.SECTION_ALERT);
+        }
+        return financialDocumentAuditLine("home-overpaid-voucher-" + index, title, meta,
+                "رسیدگی", Theme.DANGER, Theme.SECTION_ALERT,
+                new String[]{"مبلغ قبض", "نقد + چک", "اضافه"},
+                new BigDecimal[]{total, paid, excess});
+    }
+
+    private View journalAuditLine(Row item, int index) {
+        if (item == null)
+            return financialAuditLine("home-unbalanced-journal-" + index, "سند نامشخص",
+                    "ردیف گزارش ناقص است؛ مبلغ‌ها صفر فرض نشده‌اند.", "داده ناقص",
+                    Theme.WARNING, Theme.SECTION_ALERT);
+        String title = "سند حسابداری " + (item.s("sanad").isEmpty() ? "نامشخص" : item.s("sanad"));
+        BigDecimal debit = item.bd("debit");
+        BigDecimal credit = item.bd("credit");
+        BigDecimal diff = item.bd("diff");
+        Long rows = item.exactLong("rows");
+        String rawDate = item.s("date");
+        String normalizedDate = Jalali.disp(rawDate);
+        String meta = "تاریخ ثبت: " + (normalizedDate.isEmpty() ? "نامشخص" : normalizedDate)
+                + " • ردیف‌های سند: " + (rows == null || rows < 0
+                    ? "نامشخص" : HomeNumberFormatter.integer(rows));
+        if (debit == null || credit == null || diff == null || rows == null || rows < 1
+                || debit.signum() < 0 || credit.signum() < 0
+                || debit.subtract(credit).compareTo(diff) != 0 || diff.signum() == 0) {
+            return financialAuditLine("home-unbalanced-journal-" + index, title,
+                    meta + " • جمع بدهکار، بستانکار یا اختلاف نامعتبر/ناسازگار است؛ از نتیجهٔ قطعی خودداری شد.",
+                    "داده ناسازگار", Theme.DANGER, Theme.SECTION_ALERT);
+        }
+        String side = diff.signum() > 0 ? "بدهکار بیشتر است" : "بستانکار بیشتر است";
+        return financialDocumentAuditLine("home-unbalanced-journal-" + index, title,
+                meta + " • " + side, "رسیدگی", Theme.DANGER, Theme.SECTION_ALERT,
+                new String[]{"بدهکار", "بستانکار", "اختلاف"},
+                new BigDecimal[]{debit, credit, diff.abs()});
+    }
+
+    private View financialDocumentAuditLine(String tag, String title, String detail,
+            String status, int tone, int accent, String[] labels, BigDecimal[] values) {
+        LinearLayout card = a.kit.v();
+        card.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        card.setTag(tag);
+        card.setBackground(Theme.dashboardMetric(accent));
+        card.setPadding(Theme.dp(10), Theme.dp(9), Theme.dp(10), Theme.dp(9));
+        LinearLayout head = a.kit.h();
+        head.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        TextView name = a.kit.text(title, 11.5f, Theme.dashboardAccentInk(accent), true);
+        name.setMaxLines(2);
+        name.setEllipsize(TextUtils.TruncateAt.END);
+        head.addView(name, a.kit.wlp(1f));
+        head.addView(statusChip(status, tone), a.kit.lp(-2, -2));
+        card.addView(head, a.kit.lp(-1, -2));
+
+        LinearLayout grid = a.kit.h();
+        grid.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        grid.setGravity(Gravity.CENTER_VERTICAL);
+        for (int i = 0; i < labels.length; i++) {
+            if (i > 0) grid.addView(a.kit.space(5));
+            String amount = HomeNumberFormatter.preciseMoney(values[i]);
+            grid.addView(financialValueCell(labels[i], amount, accent),
+                    new LinearLayout.LayoutParams(0, -2, 1f));
+        }
+        LinearLayout.LayoutParams gridParams = a.kit.lp(-1, -2);
+        gridParams.topMargin = Theme.dp(7);
+        card.addView(grid, gridParams);
+        TextView note = a.kit.text(detail, 9.5f, Theme.dashboardCardMutedInk(accent), false);
+        note.setGravity(Gravity.START);
+        note.setEllipsize(null);
+        LinearLayout.LayoutParams noteParams = a.kit.lp(-1, -2);
+        noteParams.topMargin = Theme.dp(5);
+        card.addView(note, noteParams);
+        String spoken = title + "؛ " + status + "؛ " + detail;
+        for (int i = 0; i < labels.length; i++) spoken += "؛ " + labels[i] + ": "
+                + HomeNumberFormatter.preciseMoney(values[i]);
+        card.setContentDescription(spoken);
+        return card;
+    }
+
+    private View financialValueCell(String label, String value, int accent) {
+        LinearLayout cell = a.kit.v();
+        cell.setGravity(Gravity.CENTER);
+        cell.setBackground(Theme.dashboardBadge(accent));
+        cell.setPadding(Theme.dp(4), Theme.dp(6), Theme.dp(4), Theme.dp(6));
+        cell.setMinimumHeight(Theme.dp(54));
+        TextView caption = a.kit.text(label, 9f, Theme.dashboardMutedInk(accent), false);
+        caption.setGravity(Gravity.CENTER);
+        caption.setMaxLines(1);
+        caption.setEllipsize(TextUtils.TruncateAt.END);
+        cell.addView(caption, a.kit.lp(-1, -2));
+        TextView amount = a.kit.text(value, 10f, Theme.dashboardAccentInk(accent), true);
+        amount.setGravity(Gravity.CENTER);
+        amount.setMaxLines(3);
+        amount.setEllipsize(null);
+        cell.addView(amount, a.kit.lp(-1, -2));
+        cell.setContentDescription(label + "؛ " + value);
+        return cell;
     }
 
     private double grossProfitOnDay(Data d, String day) {
@@ -4972,19 +5244,70 @@ public class HomeScreen extends Screen {
         return total;
     }
 
+    private BigDecimal closeoutVarianceExact(Data d, String day) {
+        if (d == null || !d.cashReceiptsAvailable || !d.cashPaymentsAvailable
+                || d.cashReceipts == null || d.cashPayments == null) return null;
+        BigDecimal opening = parseLocalRialsExact(a.settings.closeoutCashOpening(day));
+        BigDecimal counted = parseLocalRialsExact(a.settings.closeoutCashCounted(day));
+        BigDecimal receipts = d.cashReceipts.bd("cash");
+        BigDecimal payments = d.cashPayments.bd("cash");
+        if (!validBankLedgerAmount(opening) || !validBankLedgerAmount(counted)
+                || !validBankLedgerAmount(receipts) || !validBankLedgerAmount(payments)) return null;
+        return CashCloseMath.varianceExact(opening, receipts, payments, counted);
+    }
+
     private String closeoutVarianceLabel(Data d, String day) {
-        if (d == null || !d.cashReceiptsAvailable || !d.cashPaymentsAvailable)
+        if (d == null || !d.cashReceiptsAvailable || !d.cashPaymentsAvailable
+                || d.cashReceipts == null || d.cashPayments == null)
             return "تفکیک نقد در دادهٔ فروشگاه موجود نیست";
         String openingText = a.settings.closeoutCashOpening(day);
         String countedText = a.settings.closeoutCashCounted(day);
-        Double opening = parseLocalRials(openingText);
-        Double counted = parseLocalRials(countedText);
-        if (opening == null || counted == null) return "شمارش محلی ثبت نشده";
-        double variance = CashCloseMath.variance(opening, d.cashReceipts.d("cash"),
-                d.cashPayments.d("cash"), counted);
-        if (Double.isNaN(variance) || Double.isInfinite(variance)) return "قابل محاسبه نیست";
-        String direction = variance > 0 ? "مازاد " : variance < 0 ? "کسری " : "بدون اختلاف ";
-        return direction + HomeNumberFormatter.money(Math.abs(variance));
+        if (openingText.trim().isEmpty() || countedText.trim().isEmpty())
+            return "شمارش محلی ثبت نشده";
+        BigDecimal opening = parseLocalRialsExact(openingText);
+        BigDecimal counted = parseLocalRialsExact(countedText);
+        if (opening == null || counted == null) return "ورودی شمارش نامعتبر است";
+        BigDecimal variance = closeoutVarianceExact(d, day);
+        if (variance == null) return "دادهٔ نقد نامعتبر یا ناقص است";
+        if (variance.signum() == 0)
+            return "بدون اختلاف • " + HomeNumberFormatter.preciseMoney(BigDecimal.ZERO);
+        String direction = variance.signum() > 0 ? "مازاد " : "کسری ";
+        String amount = HomeNumberFormatter.preciseMoney(variance.abs());
+        if (variance.abs().compareTo(BankStatementReconciliation.TOLERANCE_RIALS_EXACT) <= 0)
+            return "در تلرانس • " + direction + amount + "؛ تلرانس ±۰٫۵ ریال، اختلاف صفر نیست";
+        return direction + amount;
+    }
+
+    private String closeoutCashDetail(Data d, String day) {
+        if (d == null || !d.cashReceiptsAvailable || !d.cashPaymentsAvailable
+                || d.cashReceipts == null || d.cashPayments == null)
+            return "تفکیک دریافت و پرداخت نقد دفتر در دسترس نیست؛ نتیجه صفر فرض نشده است.";
+        String openingText = a.settings.closeoutCashOpening(day);
+        String countedText = a.settings.closeoutCashCounted(day);
+        if (openingText.trim().isEmpty() || countedText.trim().isEmpty())
+            return "برای کنترل، ماندهٔ آغاز روز و شمارش پایان را وارد کنید؛ مبالغ فقط روی این دستگاه می‌مانند.";
+        BigDecimal opening = parseLocalRialsExact(openingText);
+        BigDecimal counted = parseLocalRialsExact(countedText);
+        BigDecimal receipts = d.cashReceipts.bd("cash");
+        BigDecimal payments = d.cashPayments.bd("cash");
+        if (!validBankLedgerAmount(opening) || !validBankLedgerAmount(counted))
+            return "ورودی محلی نامعتبر است؛ اعداد را به ریال، بدون جداکنندهٔ مبهم، دوباره ثبت کنید.";
+        if (!validBankLedgerAmount(receipts) || !validBankLedgerAmount(payments))
+            return "مبلغ دریافت یا پرداخت نقد دفتر نامعتبر است؛ تطبیق انجام نشد.";
+        BigDecimal expected = CashCloseMath.expectedClosingExact(opening, receipts, payments);
+        BigDecimal variance = CashCloseMath.varianceExact(opening, receipts, payments, counted);
+        if (expected == null || variance == null) return "مبنای محاسبه ناقص است؛ تطبیق انجام نشد.";
+        String difference;
+        if (variance.signum() == 0) difference = "اختلاف دقیق صفر";
+        else {
+            difference = (variance.signum() > 0 ? "مازاد " : "کسری ")
+                    + HomeNumberFormatter.preciseMoney(variance.abs());
+            if (variance.abs().compareTo(BankStatementReconciliation.TOLERANCE_RIALS_EXACT) <= 0)
+                difference += " • در تلرانس ±۰٫۵ ریال";
+        }
+        return "مورد انتظار: " + HomeNumberFormatter.preciseMoney(expected)
+                + " • شمارش پایان: " + HomeNumberFormatter.preciseMoney(counted)
+                + " • " + difference;
     }
 
     /** Short face value for narrow closeout tiles; full wording remains in the export report. */
@@ -5001,10 +5324,14 @@ public class HomeScreen extends Screen {
         String value = fullValue == null ? "" : fullValue.trim();
         if ("شمارش محلی ثبت نشده".equals(value))
             return "ماندهٔ آغاز و شمارش پایان را وارد کنید";
-        if ("قابل محاسبه نیست".equals(value))
+        if ("قابل محاسبه نیست".equals(value) || value.startsWith("دادهٔ نقد"))
             return "دادهٔ نقد برای تطبیق کافی نیست";
         if (value.startsWith("تفکیک نقد"))
             return "تفکیک دریافت و پرداخت نقد در دسترس نیست";
+        if (value.startsWith("ورودی شمارش نامعتبر"))
+            return "مبالغ محلی را به ریال دوباره بررسی کنید";
+        if (value.startsWith("در تلرانس"))
+            return "اختلاف صفر نیست؛ در محدودهٔ ±۰٫۵ ریال است";
         return "در برابر ماندهٔ مورد انتظار";
     }
 
@@ -5046,18 +5373,25 @@ public class HomeScreen extends Screen {
         counted.setContentDescription("شمارش نقد پایان روز به ریال");
         form.addView(opening, a.kit.lp(-1, -2));
         form.addView(counted, a.kit.lp(-1, -2));
-        new android.app.AlertDialog.Builder(a).setTitle("ثبت شمارش صندوق • " + day).setView(form)
-                .setPositiveButton("ذخیره روی دستگاه", (dialog, which) -> {
-                    Double open = parseLocalRials(opening.getText().toString());
-                    Double close = parseLocalRials(counted.getText().toString());
-                    if (open == null || close == null) {
-                        a.kit.toast("هر دو مبلغ را به‌صورت عدد صفر یا بیشتر وارد کنید");
-                        return;
-                    }
-                    a.settings.setCloseoutCashOpening(day, opening.getText().toString());
-                    a.settings.setCloseoutCashCounted(day, counted.getText().toString());
-                    render(content);
-                }).setNegativeButton("انصراف", null).show();
+        android.app.AlertDialog dialog = new android.app.AlertDialog.Builder(a)
+                .setTitle("ثبت شمارش صندوق • " + day).setView(form)
+                .setPositiveButton("ذخیره روی دستگاه", null)
+                .setNegativeButton("انصراف", null).create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(
+                android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            BigDecimal open = parseLocalRialsExact(opening.getText().toString());
+            BigDecimal close = parseLocalRialsExact(counted.getText().toString());
+            if (open == null || close == null) {
+                if (open == null) opening.setError("عدد معتبر و بدون جداکنندهٔ مبهم وارد کنید");
+                if (close == null) counted.setError("عدد معتبر و بدون جداکنندهٔ مبهم وارد کنید");
+                return;
+            }
+            a.settings.setCloseoutCashOpening(day, open.stripTrailingZeros().toPlainString());
+            a.settings.setCloseoutCashCounted(day, close.stripTrailingZeros().toPlainString());
+            dialog.dismiss();
+            render(content);
+        }));
+        dialog.show();
     }
 
     private void shareCloseoutReport(Data d, String day, boolean print) {

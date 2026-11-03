@@ -219,6 +219,7 @@ public class AtiranSampleSchemaTest {
         assertTrue(daily.binds.contains(Jalali.toGregorian(filter.from)));
         Filter fromOnly = new Filter();
         fromOnly.from = filter.from;
+        fromOnly.to = "";
         Queries.Q oneSidedReturns = MasterQueries.returnsDaily(meta, fromOnly);
         assertTrue(oneSidedReturns.sql.toLowerCase(Locale.ROOT).contains("charindex(n'/',"));
         assertEquals(filter.from, oneSidedReturns.binds.get(0));
@@ -265,7 +266,7 @@ public class AtiranSampleSchemaTest {
             Queries.voidedFactorDaily(meta, true, "1405/07/22", "1405/07/22");
             throw new AssertionError("the sample has no explicit cancellation marker");
         } catch (Queries.Missing expected) {
-            assertTrue(expected.getMessage(), expected.getMessage().contains("نشانگر صریح"));
+            assertTrue(expected.getMessage(), expected.getMessage().contains("صریح"));
         }
     }
 

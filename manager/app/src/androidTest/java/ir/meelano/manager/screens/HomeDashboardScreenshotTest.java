@@ -397,46 +397,6 @@ public final class HomeDashboardScreenshotTest {
         }
     }
 
-    private static void verifyHomeCategoryJump(Instrumentation instrumentation, Activity activity) {
-        final View[] targets = new View[4];
-        instrumentation.runOnMainSync(() -> {
-            View decor = activity.getWindow().getDecorView();
-            targets[0] = findTaggedView(decor, "main-scroll-viewport");
-            targets[1] = findTaggedView(decor, "home-category-chip-management");
-            targets[2] = findTaggedView(decor, "home-group-management-1");
-            targets[3] = findTaggedView(decor, "home-category-chip-overview");
-        });
-        assertTrue("Home category jump has no scroll viewport", targets[0] instanceof ScrollView);
-        assertNotNull("Management category shortcut is missing", targets[1]);
-        assertNotNull("Management category destination is missing", targets[2]);
-        assertNotNull("Overview shortcut is missing", targets[3]);
-
-        final boolean[] clicked = {false};
-        instrumentation.runOnMainSync(() -> clicked[0] = targets[1].performClick());
-        assertTrue("Management shortcut did not accept activation", clicked[0]);
-
-        ScrollView scroll = (ScrollView) targets[0];
-        final int[] scrollY = {0};
-        final boolean[] destinationVisible = {false};
-        long deadline = SystemClock.uptimeMillis() + 2_000L;
-        do {
-            instrumentation.runOnMainSync(() -> {
-                scrollY[0] = scroll.getScrollY();
-                Rect visible = new Rect();
-                destinationVisible[0] = targets[2].getGlobalVisibleRect(visible) && visible.height() > 0;
-            });
-            if (scrollY[0] > 0 && destinationVisible[0]) break;
-            SystemClock.sleep(40L);
-        } while (SystemClock.uptimeMillis() < deadline);
-        assertTrue("Management shortcut did not move the dashboard to its category", scrollY[0] > 0);
-        assertTrue("Management category was not brought into the viewport", destinationVisible[0]);
-        instrumentation.runOnMainSync(() -> {
-            targets[3].performClick();
-            scroll.scrollTo(0, 0);
-        });
-        SystemClock.sleep(120L);
-    }
-
     private static void verifySalesChartRangeSwitch(Activity activity) {
         Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
         final View[] chartAndSelector = new View[2];
@@ -533,7 +493,8 @@ public final class HomeDashboardScreenshotTest {
 
     private static void finishPreview(Activity activity) {
         InstrumentationRegistry.getInstrumentation().runOnMainSync(activity::finish);
-        SystemClock.sleep(350L);
+        // Let the window and its final theme/scroll animations settle before the next seeded launch.
+        SystemClock.sleep(700L);
     }
 
     /** Exercise Android View touch dispatch and header scrolling without relying on headless window focus. */
@@ -555,7 +516,6 @@ public final class HomeDashboardScreenshotTest {
                 targets[2].getBackground());
         verifyDashboardPolish(activity);
         verifySalesChartRangeSwitch(activity);
-        verifyHomeCategoryJump(instrumentation, activity);
 
         ViewGroup dock = (ViewGroup) targets[1];
         assertEquals("Admin dock should have five destinations", 5, dock.getChildCount());

@@ -115,6 +115,33 @@ public class DesignTokensTest {
         }
     }
 
+    @Test public void sharedHeroSurfaceHasAQuietAccentAndKeepsTextReadable() {
+        int[] accents = {DesignTokens.APP_LIGHT_ACCENT, DesignTokens.GOLD,
+                DesignTokens.PURCHASE, DesignTokens.NEGATIVE};
+        assertEquals(DesignTokens.heroSurface(0, false),
+                DesignTokens.heroSurface(DesignTokens.APP_LIGHT_ACCENT, false));
+        assertEquals(DesignTokens.heroBorder(0, true),
+                DesignTokens.heroBorder(DesignTokens.APP_DARK_ACCENT, true));
+        for (int accent : accents) {
+            int lightSurface = DesignTokens.heroSurface(accent, false);
+            int darkSurface = DesignTokens.heroSurface(accent, true);
+            assertTrue("light hero text contrast for " + Integer.toHexString(accent),
+                    DesignTokens.contrastRatio(DesignTokens.APP_LIGHT_TEXT, lightSurface) >= 4.8);
+            assertTrue("dark hero text contrast for " + Integer.toHexString(accent),
+                    DesignTokens.contrastRatio(DesignTokens.APP_DARK_TEXT, darkSurface) >= 4.8);
+            assertTrue("hero tint remains subtle in light mode",
+                    lightSurface == DesignTokens.mix(DesignTokens.APP_LIGHT_SURFACE, accent, 0.035f));
+            assertTrue("hero tint remains subtle in dark mode",
+                    darkSurface == DesignTokens.mix(DesignTokens.APP_DARK_SURFACE, accent, 0.10f));
+            assertTrue("light hero border is a soft accent blend",
+                    DesignTokens.heroBorder(accent, false)
+                            == DesignTokens.mix(DesignTokens.APP_LIGHT_BORDER, accent, 0.20f));
+            assertTrue("dark hero border is a soft accent blend",
+                    DesignTokens.heroBorder(accent, true)
+                            == DesignTokens.mix(DesignTokens.APP_DARK_BORDER, accent, 0.22f));
+        }
+    }
+
     @Test public void tintedComponentPreviewTextPassesAaInLightAndDarkModes() {
         int[] tones = {DesignTokens.EMERALD, DesignTokens.POSITIVE, DesignTokens.NEGATIVE,
                 DesignTokens.WARNING, DesignTokens.INFO};

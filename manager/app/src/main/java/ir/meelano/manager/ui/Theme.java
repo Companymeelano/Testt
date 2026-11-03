@@ -451,9 +451,11 @@ public final class Theme {
         return rule;
     }
 
-    /** Hero header background. */
+    /** Shared, flat hero surface with a quiet section tint and a fine matching edge. */
     public static GradientDrawable hero(int accent) {
-        return base(SURFACE, 16, dp(1), BORDER);
+        int hue = accent == 0 ? PRIMARY : accent;
+        return base(DesignTokens.heroSurface(hue, !light), 18, dp(1),
+                DesignTokens.heroBorder(hue, !light));
     }
 
     /** Welcome header uses the same calm surface and border as the rest of the shell. */

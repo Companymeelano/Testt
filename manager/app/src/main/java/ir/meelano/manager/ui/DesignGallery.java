@@ -104,6 +104,8 @@ public final class DesignGallery {
         LinearLayout group = vertical(a);
         group.setPadding(Theme.dp(10), Theme.dp(10), Theme.dp(10), Theme.dp(10));
         group.setBackground(rounded(p.surface2, p.border, 12));
+        group.addView(heroPreview(a, p), match());
+        group.addView(gap(a, 6));
         group.addView(sectionHeader(a, p), match());
         group.addView(gap(a, 6));
         group.addView(text(a, "کارت‌های مالی بدون دادهٔ نمونه", 10f, p.muted, false), match());
@@ -135,6 +137,30 @@ public final class DesignGallery {
         rule.setBackgroundColor(p.border);
         group.addView(rule, new LinearLayout.LayoutParams(-1, Theme.dp(1)));
         return group;
+    }
+
+    /** Preview the same softly tinted page hero used across the app's sections. */
+    private static View heroPreview(MainActivity a, Palette p) {
+        LinearLayout hero = horizontal(a);
+        hero.setGravity(Gravity.CENTER_VERTICAL);
+        hero.setPadding(Theme.dp(10), Theme.dp(9), Theme.dp(10), Theme.dp(9));
+        hero.setBackground(rounded(DesignTokens.heroSurface(p.accent, p.dark),
+                DesignTokens.heroBorder(p.accent, p.dark), 18));
+        hero.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+
+        FrameLayout mark = new FrameLayout(a);
+        mark.setBackground(rounded(p.accent, 0, 10));
+        ImageView brand = icon(a, R.drawable.mi_diamond, p.onAccent, 20);
+        mark.addView(brand, new FrameLayout.LayoutParams(
+                Theme.dp(20), Theme.dp(20), Gravity.CENTER));
+        hero.addView(mark, new LinearLayout.LayoutParams(Theme.dp(38), Theme.dp(38)));
+        hero.addView(space(a, 8));
+
+        LinearLayout copy = vertical(a);
+        copy.addView(text(a, "عنوان صفحه", 12.5f, p.text, true), match());
+        copy.addView(text(a, "سرصفحهٔ مشترک، آرام و هماهنگ", 9.5f, p.muted, false), match());
+        hero.addView(copy, new LinearLayout.LayoutParams(0, -2, 1f));
+        return hero;
     }
 
     private static View sectionHeader(MainActivity a, Palette p) {

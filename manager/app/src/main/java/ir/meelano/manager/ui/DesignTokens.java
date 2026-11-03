@@ -103,9 +103,27 @@ public final class DesignTokens {
     }
 
     /**
+     * Quiet page-hero surface: a restrained brand wash makes the shared heading feel intentional
+     * without turning it into a large colored panel. The slightly stronger dark-mode wash preserves
+     * separation from the midnight canvas while keeping the same flat, low-noise visual language.
+     */
+    public static int heroSurface(int accent, boolean dark) {
+        int base = dark ? APP_DARK_SURFACE : APP_LIGHT_SURFACE;
+        int safeAccent = accent == 0 ? (dark ? APP_DARK_ACCENT : APP_LIGHT_ACCENT) : accent;
+        return mix(base, safeAccent, dark ? 0.10f : 0.035f);
+    }
+
+    /** Fine accent-tinted edge for a page hero; other cards keep the neutral shared border. */
+    public static int heroBorder(int accent, boolean dark) {
+        int base = dark ? APP_DARK_BORDER : APP_LIGHT_BORDER;
+        int safeAccent = accent == 0 ? (dark ? APP_DARK_ACCENT : APP_LIGHT_ACCENT) : accent;
+        return mix(base, safeAccent, dark ? 0.22f : 0.20f);
+    }
+
+    /**
      * Near-neutral dashboard metric surface. A 2.5% wash keeps the selected section hue present
      * without the pastel blocks that make a dense financial dashboard feel noisy; the accent is
-     * carried by a distinct outline and its 3D icon instead.
+     * carried by a distinct outline and its vector icon instead.
      */
     public static int dashboardMetricSurface(int accent, boolean dark) {
         int base = dark ? NIGHT_SURFACE : IVORY;

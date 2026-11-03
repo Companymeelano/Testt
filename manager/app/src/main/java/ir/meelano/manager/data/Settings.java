@@ -4,6 +4,8 @@ import ir.meelano.manager.core.Diag;
 import android.content.Context;
 import android.content.SharedPreferences;
 
+import java.util.Map;
+
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.SecretBox;
 
@@ -623,22 +625,85 @@ public final class Settings {
         return key == null ? "" : p.getString(key, "");
     }
 
+    public String homeBankStatementSource(String day, String bankId) {
+        String key = homeBankStatementKey("source", day, bankId);
+        if (key == null) return "";
+        String source = p.getString(key, "");
+        if (!source.isEmpty()) return source;
+        return !homeBankStatementInRials(day, bankId).isEmpty()
+                && !homeBankStatementOutRials(day, bankId).isEmpty() ? "ثبت دستی" : "";
+    }
+
+    public long homeBankStatementUpdatedAt(String day, String bankId) {
+        String key = homeBankStatementKey("updated", day, bankId);
+        return key == null ? 0L : p.getLong(key, 0L);
+    }
+
     /** Both directions are required: a blank is never interpreted as a zero bank movement. */
     public boolean setHomeBankStatementRials(String day, String bankId, String inflow, String outflow) {
         String inKey = homeBankStatementKey("in", day, bankId);
         String outKey = homeBankStatementKey("out", day, bankId);
+        String sourceKey = homeBankStatementKey("source", day, bankId);
+        String updatedKey = homeBankStatementKey("updated", day, bankId);
         String in = normalizeLocalRials(inflow);
         String out = normalizeLocalRials(outflow);
-        if (inKey == null || outKey == null || in == null || out == null) return false;
-        p.edit().putString(inKey, in).putString(outKey, out).apply();
+        if (inKey == null || outKey == null || sourceKey == null || updatedKey == null
+                || in == null || out == null) return false;
+        p.edit().putString(inKey, in).putString(outKey, out)
+                .putString(sourceKey, "ثبت دستی")
+                .putLong(updatedKey, System.currentTimeMillis()).apply();
         return true;
+    }
+
+    /**
+     * Atomically replaces only daily aggregate values inside a manager-confirmed complete range.
+     * The raw file and transaction rows are never copied to preferences or another store.
+     */
+    public boolean setHomeBankStatementRialsBatch(String bankId, String fromDay, String toDay,
+                                                   Map<String, String[]> dailyRials) {
+        String id = bankId == null ? "" : bankId.trim();
+        String from = ir.meelano.manager.core.Jalali.disp(fromDay);
+        String to = ir.meelano.manager.core.Jalali.disp(toDay);
+        int first = ir.meelano.manager.core.Jalali.parse(from);
+        int last = ir.meelano.manager.core.Jalali.parse(to);
+        if (id.isEmpty() || id.length() > 200 || first < 0 || last < first
+                || last - first + 1 > ir.meelano.manager.core.BankStatementFile.MAX_PERIOD_DAYS
+                || dailyRials == null || dailyRials.size() != last - first + 1) return false;
+
+        SharedPreferences.Editor edit = p.edit();
+        String source = "فایل بانکی • " + Money.fa(ir.meelano.manager.core.Jalali.todayStr());
+        long updated = System.currentTimeMillis();
+        for (int offset = 0; offset <= last - first; offset++) {
+            String day = ir.meelano.manager.core.Jalali.format(first + offset);
+            String[] amounts = dailyRials.get(day);
+            if (amounts == null || amounts.length < 2) return false;
+            String in = normalizeLocalRials(amounts[0]);
+            String out = normalizeLocalRials(amounts[1]);
+            String inKey = homeBankStatementKey("in", day, id);
+            String outKey = homeBankStatementKey("out", day, id);
+            String sourceKey = homeBankStatementKey("source", day, id);
+            String updatedKey = homeBankStatementKey("updated", day, id);
+            if (in == null || out == null || inKey == null || outKey == null
+                    || sourceKey == null || updatedKey == null) return false;
+            edit.putString(inKey, in).putString(outKey, out)
+                    .putString(sourceKey, source).putLong(updatedKey, updated);
+        }
+        // Extra keys cannot satisfy the exact day count without a missing date; reject any stray date.
+        for (String key : dailyRials.keySet()) {
+            String day = ir.meelano.manager.core.Jalali.disp(key);
+            int dayNo = ir.meelano.manager.core.Jalali.parse(day);
+            if (dayNo < first || dayNo > last) return false;
+        }
+        return edit.commit();
     }
 
     public void clearHomeBankStatement(String day, String bankId) {
         String inKey = homeBankStatementKey("in", day, bankId);
         String outKey = homeBankStatementKey("out", day, bankId);
+        String sourceKey = homeBankStatementKey("source", day, bankId);
+        String updatedKey = homeBankStatementKey("updated", day, bankId);
         if (inKey == null || outKey == null) return;
-        p.edit().remove(inKey).remove(outKey).apply();
+        p.edit().remove(inKey).remove(outKey).remove(sourceKey).remove(updatedKey).apply();
     }
 
     private String homeBankStatementKey(String direction, String day, String bankId) {

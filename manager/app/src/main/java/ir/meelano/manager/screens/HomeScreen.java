@@ -7,6 +7,16 @@ import android.view.ViewGroup;
 import java.util.Locale;
 import ir.meelano.manager.core.MarketWeather;
 import ir.meelano.manager.core.Diag;
+import android.database.Cursor;
+import android.net.Uri;
+import android.provider.OpenableColumns;
+import android.widget.ArrayAdapter;
+import android.widget.CheckBox;
+import android.widget.ProgressBar;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
+import android.widget.ScrollView;
+import android.widget.Spinner;
 import android.content.Context;
 import android.view.Gravity;
 import android.view.View;
@@ -21,6 +31,8 @@ import ir.meelano.manager.core.AtiranAuth;
 import ir.meelano.manager.core.AtiranSchema;
 import ir.meelano.manager.core.AlertEngine;
 import ir.meelano.manager.core.BankStatementReconciliation;
+import ir.meelano.manager.core.BankStatementFile;
+import ir.meelano.manager.core.BankStatementPeriodReconciliation;
 import ir.meelano.manager.core.CashCloseMath;
 import ir.meelano.manager.core.FinanceReports;
 import ir.meelano.manager.core.MoneyBreakdown;
@@ -31,6 +43,7 @@ import ir.meelano.manager.core.HomeRange;
 import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.MasterQueries;
+import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.RoleStore;
 import ir.meelano.manager.core.MoneyQueries;
 import ir.meelano.manager.core.MonthlyGoalEngine;
@@ -57,6 +70,8 @@ import ir.meelano.manager.ui.MeelanoIcons;
 import ir.meelano.manager.ui.SmartReportImage;
 import ir.meelano.manager.ui.Theme;
 
+import java.io.InputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.LinkedHashMap;
@@ -141,6 +156,22 @@ public class HomeScreen extends Screen {
         List<Row> grossProfitDaily = new ArrayList<>();
         boolean grossProfitAvailable;
         Map<String, String> notes = new LinkedHashMap<>();
+    }
+
+    /** In-memory-only import draft. It is discarded after review; only daily totals can be saved. */
+    private static final class BankImportDraft {
+        BankStatementFile.Table table;
+        BankStatementFile.Mapping mapping;
+        BankStatementFile.Parsed parsed;
+        BankStatementPeriodReconciliation.Report report;
+        Data dashboardData;
+        LinearLayout content;
+        String fromDay = "";
+        String toDay = "";
+        String bankId = "";
+        String bankName = "";
+        int renderToken;
+        long comparedAt;
     }
 
     /** Runs one dashboard query only while this render is still on screen; once the user has moved on, the rest are skipped. */
@@ -3914,8 +3945,15 @@ public class HomeScreen extends Screen {
 
         card.addView(a.kit.text("تطبیق هر حساب بانکی با صورت‌حساب واقعی", 12f,
                 Theme.dashboardAccentInk(Theme.SECTION_CLOSEOUT), true), a.kit.lp(-1, -2));
-        card.addView(a.kit.hint("دفتر آتیران از گردش ثبت‌شدهٔ بانکی خوانده می‌شود؛ صورت‌حساب مستقل بانکی به سرویس متصل نیست. ارقام واریز و برداشت صورت‌حساب را برای همین روز وارد کنید؛ ثبت فقط روی همین دستگاه می‌ماند."),
+        card.addView(a.kit.hint("دفتر آتیران از گردش ثبت‌شدهٔ بانکی خوانده می‌شود؛ برنامه به بانک وصل نمی‌شود. از اپ بانکی خروجی CSV، TSV یا .xlsx بگیرید و همین‌جا انتخاب کنید؛ فایل خام و ریز تراکنش‌ها ذخیره یا ارسال نمی‌شوند. مقایسه پس از تأیید کامل‌بودن بازه انجام می‌شود."),
                 a.kit.lp(-1, -2));
+        Button importStatement = dashboardHeaderAction("ورود فایل صورت‌حساب", Theme.SECTION_CLOSEOUT,
+                "انتخاب فایل خروجی بانک برای تحلیل محلی و تطبیق read-only با گردش آتیران",
+                v -> showBankStatementImport(content, d));
+        LinearLayout bankActions = a.kit.h();
+        bankActions.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        bankActions.addView(importStatement, a.kit.wlp(1f));
+        card.addView(bankActions, a.kit.lp(-1, -2));
         List<Row> accounts = bankAccountsForHome(d);
         if (!d.bankTurnoverAvailable) {
             card.addView(financialAuditLine("home-bank-ledger-unavailable", "گردش بانکی روزانه",
@@ -4141,11 +4179,24 @@ public class HomeScreen extends Screen {
                     + " • برداشت " + HomeNumberFormatter.money(statementOut);
             if (result.comparable()) detail += "\n" + bankVariancePiece("واریز", result.inflowVarianceRials)
                     + " • " + bankVariancePiece("برداشت", result.outflowVarianceRials);
+            String source = a.settings.homeBankStatementSource(day, id);
+            if (!source.isEmpty()) detail += "\nمنبع: " + source;
+            long updated = a.settings.homeBankStatementUpdatedAt(day, id);
+            if (updated > 0) {
+                String time = new java.text.SimpleDateFormat("HH:mm", Locale.getDefault())
+                        .format(new java.util.Date(updated));
+                detail += " • به‌روزرسانی محلی " + ir.meelano.manager.core.Money.fa(time);
+            }
         } else {
             detail += "\nصورت‌حساب واقعی: ثبت نشده؛ برای ورود ارقام واقعی لمس کنید.";
         }
         LinearLayout row = (LinearLayout) financialAuditLine("home-bank-statement-entry", title,
                 detail, badge, tone);
+        if (row.getChildCount() > 1 && row.getChildAt(1) instanceof TextView) {
+            TextView detailView = (TextView) row.getChildAt(1);
+            detailView.setMaxLines(6);
+            detailView.setEllipsize(null);
+        }
         row.setMinimumHeight(Theme.dp(64));
         row.setClickable(true);
         row.setFocusable(true);
@@ -4214,6 +4265,603 @@ public class HomeScreen extends Screen {
             });
         });
         dialog.show();
+    }
+
+    private void showBankStatementImport(LinearLayout content, Data d) {
+        if (!RoleStore.allowed(a, "closeout")) {
+            a.kit.toast("این ابزار فقط برای نقش مدیر مجاز است");
+            return;
+        }
+        List<Row> accounts = bankAccountsForHome(d);
+        if (accounts.isEmpty()) {
+            a.kit.toast("فهرست حساب‌های بانکی آتیران در دسترس نیست؛ ابتدا اتصال read-only را تازه کنید");
+            return;
+        }
+        new android.app.AlertDialog.Builder(a)
+                .setTitle("ورود آفلاین صورت‌حساب")
+                .setMessage("از برنامهٔ بانک، خروجی CSV، TSV یا Excel (.xlsx) بگیرید. فایل در همین دستگاه خوانده می‌شود؛ هیچ اتصال بانکی یا ارسال فایل انجام نمی‌شود. برای مقایسه، بازه و کامل‌بودن صورت‌حساب را خودتان تأیید می‌کنید.")
+                .setNegativeButton("انصراف", null)
+                .setPositiveButton("انتخاب فایل", (dialog, which) -> {
+                    final int token = a.renderGen();
+                    a.startBankStatementPick(uri -> {
+                        if (!bankImportScreenCurrent(token)) return;
+                        readBankStatement(uri, content, d, token);
+                    });
+                })
+                .show();
+    }
+
+    private boolean bankImportScreenCurrent(int token) {
+        return !a.isFinishing() && a.renderGen() == token;
+    }
+
+    private void readBankStatement(Uri uri, LinearLayout content, Data data, int token) {
+        if (uri == null) {
+            a.kit.toast("فایلی انتخاب نشد");
+            return;
+        }
+        android.app.AlertDialog progress = bankImportProgress("فایل فقط برای تحلیل محلی خوانده می‌شود…");
+        progress.show();
+        Thread worker = new Thread(() -> {
+            BankStatementFile.Table table = null;
+            String error = null;
+            try {
+                String displayName = bankStatementDisplayName(uri);
+                InputStream stream = a.getContentResolver().openInputStream(uri);
+                if (stream == null) throw new IOException("فایل انتخاب‌شده قابل‌خواندن نیست");
+                table = BankStatementFile.read(stream, displayName);
+            } catch (Exception failure) {
+                String message = failure instanceof IOException ? failure.getMessage() : null;
+                error = message == null || message.trim().isEmpty()
+                        ? "فایل باز نشد؛ CSV، TSV یا .xlsx را دوباره انتخاب کنید" : message;
+            }
+            final BankStatementFile.Table result = table;
+            final String failureText = error;
+            a.runOnUiThread(() -> {
+                if (progress.isShowing()) progress.dismiss();
+                if (!bankImportScreenCurrent(token)) return;
+                if (failureText != null) {
+                    showBankImportMessage("خواندن فایل ممکن نشد", failureText);
+                    return;
+                }
+                BankImportDraft draft = new BankImportDraft();
+                draft.table = result;
+                draft.mapping = BankStatementFile.Mapping.suggested(result.headers);
+                draft.dashboardData = data;
+                draft.content = content;
+                draft.renderToken = token;
+                BankStatementFile.DateRange range;
+                try { range = BankStatementFile.suggestedRange(result, draft.mapping); }
+                catch (IOException ignored) { range = null; }
+                draft.fromDay = range != null && range.available() ? range.fromDay : Jalali.todayStr();
+                draft.toDay = range != null && range.available() ? range.toDay : draft.fromDay;
+                showBankStatementMapping(draft);
+            });
+        }, "bank-statement-local-read");
+        worker.start();
+    }
+
+    /** Provider display name is used only for format detection and is never retained or logged. */
+    private String bankStatementDisplayName(Uri uri) {
+        String name = "";
+        Cursor cursor = null;
+        try {
+            cursor = a.getContentResolver().query(uri, new String[]{OpenableColumns.DISPLAY_NAME},
+                    null, null, null);
+            if (cursor != null && cursor.moveToFirst()) {
+                int column = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                if (column >= 0) name = cursor.getString(column);
+            }
+        } catch (Exception ignored) {
+            // The byte signature and the parser's content checks remain the primary format checks.
+        } finally {
+            if (cursor != null) try { cursor.close(); } catch (Exception ignored) { }
+        }
+        String mime = "";
+        try { mime = String.valueOf(a.getContentResolver().getType(uri)); }
+        catch (Exception ignored) { }
+        if (name == null || name.trim().isEmpty()) name = "statement";
+        String lower = name.toLowerCase(Locale.US);
+        if (lower.endsWith(".xls") && !lower.endsWith(".xlsx")) return name;
+        if (lower.endsWith(".csv") || lower.endsWith(".tsv") || lower.endsWith(".txt")
+                || lower.endsWith(".xlsx")) return name;
+        if (mime.contains("spreadsheetml.sheet")) return name + ".xlsx";
+        if (mime.equals("application/vnd.ms-excel")) return name + ".xls";
+        return name;
+    }
+
+    private android.app.AlertDialog bankImportProgress(String message) {
+        LinearLayout body = a.kit.h();
+        body.setGravity(Gravity.CENTER_VERTICAL);
+        body.setPadding(Theme.dp(24), Theme.dp(18), Theme.dp(24), Theme.dp(18));
+        ProgressBar progress = new ProgressBar(a);
+        progress.setIndeterminate(true);
+        body.addView(progress, new LinearLayout.LayoutParams(Theme.dp(36), Theme.dp(36)));
+        TextView label = a.kit.text(message, 12f, Theme.TEXT, false);
+        label.setPadding(Theme.dp(14), 0, 0, 0);
+        body.addView(label, a.kit.wlp(1f));
+        return new android.app.AlertDialog.Builder(a).setView(body).setCancelable(false).create();
+    }
+
+    private void showBankImportMessage(String title, String message) {
+        if (a.isFinishing()) return;
+        new android.app.AlertDialog.Builder(a).setTitle(title)
+                .setMessage(message == null ? "عملیات کامل نشد" : message)
+                .setPositiveButton("باشه", null).show();
+    }
+
+    private void showBankStatementMapping(BankImportDraft draft) {
+        if (draft == null || draft.table == null || !bankImportScreenCurrent(draft.renderToken)) return;
+        if (draft.mapping == null) draft.mapping = BankStatementFile.Mapping.suggested(draft.table.headers);
+        BankStatementFile.Mapping initial = draft.mapping;
+        ScrollView scroll = new ScrollView(a);
+        LinearLayout form = a.kit.v();
+        form.setPadding(Theme.dp(20), Theme.dp(8), Theme.dp(20), Theme.dp(12));
+        form.addView(a.kit.hint("ستون‌ها را بازبینی کنید. خروجی‌های بانکی یکسان نیستند؛ پیشنهادها را با سربرگ فایل تطبیق دهید. هیچ ردیف خصوصی به گزارش یا ذخیرهٔ محلی منتقل نمی‌شود."), a.kit.lp(-1, -2));
+
+        Spinner dateColumn = bankColumnSpinner(form, "ستون تاریخ تراکنش", draft.table.headers, initial.date);
+        Spinner creditColumn = bankColumnSpinner(form, "ستون واریز / بستانکار (در صورت وجود)", draft.table.headers, initial.credit);
+        Spinner debitColumn = bankColumnSpinner(form, "ستون برداشت / بدهکار (در صورت وجود)", draft.table.headers, initial.debit);
+        Spinner amountColumn = bankColumnSpinner(form, "ستون مبلغ تکی (در صورت نبود دو ستون بالا)", draft.table.headers, initial.amount);
+        Spinner directionColumn = bankColumnSpinner(form, "ستون جهت تراکنش (واریز/برداشت)", draft.table.headers, initial.direction);
+        Spinner balanceColumn = bankColumnSpinner(form, "ستون مانده (اختیاری؛ برای کنترل جمع استفاده نمی‌شود)", draft.table.headers, initial.balance);
+        Spinner descriptionColumn = bankColumnSpinner(form, "ستون شرح (اختیاری؛ ذخیره نمی‌شود)", draft.table.headers, initial.description);
+        Spinner referenceColumn = bankColumnSpinner(form, "ستون پیگیری (اختیاری؛ ذخیره نمی‌شود)", draft.table.headers, initial.reference);
+        Spinner accountColumn = bankColumnSpinner(form, "ستون شماره حساب / شبا (اختیاری)", draft.table.headers, initial.account);
+        android.widget.EditText accountFilter = a.kit.edit("مقدار دقیق حساب برای فیلتر (اختیاری)", initial.accountValue);
+        accountFilter.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
+        accountFilter.setContentDescription("مقدار دقیق حساب یا شبا برای فیلتر محلی؛ این مقدار ذخیره نمی‌شود");
+        form.addView(accountFilter, a.kit.lp(-1, -2));
+        form.addView(a.kit.hint("اگر فایل چندحسابی است، ستون حساب و مقدار دقیق حساب موردنظر را وارد کنید تا ردیف‌های سایر حساب‌ها کنار گذاشته شوند. در غیر این صورت، پیش از ادامه تأیید می‌کنید که فایل فقط مربوط به حساب انتخابی است."), a.kit.lp(-1, -2));
+
+        form.addView(a.kit.text("قالب تاریخ", 11.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        String[] dateLabels = {"تشخیص خودکار", "شمسی: سال/ماه/روز", "میلادی: سال/ماه/روز", "میلادی: روز/ماه/سال", "شمارهٔ روز Excel"};
+        Spinner dateFormat = new Spinner(a);
+        ArrayAdapter<String> dateAdapter = new ArrayAdapter<>(a, android.R.layout.simple_spinner_item, dateLabels);
+        dateAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        dateFormat.setAdapter(dateAdapter);
+        dateFormat.setSelection(initial.dateFormat >= 0 && initial.dateFormat < dateLabels.length ? initial.dateFormat : 0);
+        dateFormat.setContentDescription("قالب تاریخ صورت‌حساب بانکی");
+        form.addView(dateFormat, a.kit.lp(-1, -2));
+        form.addView(a.kit.text("قالب جداکنندهٔ مبلغ", 11.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        String[] amountLabels = {"تشخیص خودکار (مثل ۱٬۲۳۴ یا ۱,۲۳۴.۵۰)",
+                "ممیز نقطه (مثل ۱,۲۳۴.۵۰)", "ممیز ویرگول (مثل ۱.۲۳۴,۵۰)",
+                "عدد صحیح؛ نقطه/ویرگول فقط جداکنندهٔ هزارگان"};
+        Spinner amountFormat = new Spinner(a);
+        ArrayAdapter<String> amountAdapter = new ArrayAdapter<>(a, android.R.layout.simple_spinner_item, amountLabels);
+        amountAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        amountFormat.setAdapter(amountAdapter);
+        amountFormat.setSelection(initial.amountFormat >= 0 && initial.amountFormat < amountLabels.length
+                ? initial.amountFormat : BankStatementFile.AMOUNT_AUTO);
+        amountFormat.setContentDescription("قالب ممیز اعشاری و جداکنندهٔ هزارگان در مبلغ بانک");
+        form.addView(amountFormat, a.kit.lp(-1, -2));
+
+        form.addView(a.kit.text("واحد مبلغ خروجی بانک", 11.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        RadioGroup unit = new RadioGroup(a);
+        unit.setOrientation(RadioGroup.VERTICAL);
+        RadioButton rials = new RadioButton(a);
+        rials.setId(View.generateViewId());
+        rials.setText("ریال (بدون ضریب تبدیل)");
+        rials.setTextColor(Theme.TEXT);
+        RadioButton tomans = new RadioButton(a);
+        tomans.setId(View.generateViewId());
+        tomans.setText("تومان (تبدیل به ریال × ۱۰)");
+        tomans.setTextColor(Theme.TEXT);
+        unit.addView(rials, a.kit.lp(-1, -2));
+        unit.addView(tomans, a.kit.lp(-1, -2));
+        unit.check(initial.amountsInToman ? tomans.getId() : rials.getId());
+        unit.setContentDescription("انتخاب واحد مبلغ در فایل بانک");
+        form.addView(unit, a.kit.lp(-1, -2));
+        CheckBox signedDirection = new CheckBox(a);
+        signedDirection.setText("در فایل تک‌مبلغی، علامت مثبت/منفی جهت واریز/برداشت را تعیین می‌کند");
+        signedDirection.setTextColor(Theme.TEXT);
+        signedDirection.setChecked(initial.signedAmountDefinesDirection);
+        signedDirection.setContentDescription("تأیید استفاده از علامت مبلغ به‌عنوان جهت تراکنش");
+        form.addView(signedDirection, a.kit.lp(-1, -2));
+
+        form.addView(a.kit.hint("بازه را دقیقاً برابر دورهٔ کامل فایل بانکی تنظیم کنید، حتی اگر روز آغاز یا پایان گردش نداشته باشد. روزهای خارج از این بازه کنار گذاشته می‌شوند."), a.kit.lp(-1, -2));
+        android.widget.EditText fromInput = a.kit.edit("از تاریخ شمسی (مثال ۱۴۰۵/۰۱/۰۱)", draft.fromDay);
+        android.widget.EditText toInput = a.kit.edit("تا تاریخ شمسی (مثال ۱۴۰۵/۰۱/۳۱)", draft.toDay);
+        fromInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
+        toInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
+        fromInput.setContentDescription("تاریخ شروع کامل دورهٔ صورت‌حساب بانکی");
+        toInput.setContentDescription("تاریخ پایان کامل دورهٔ صورت‌حساب بانکی");
+        form.addView(fromInput, a.kit.lp(-1, -2));
+        form.addView(toInput, a.kit.lp(-1, -2));
+        scroll.addView(form);
+
+        android.app.AlertDialog dialog = new android.app.AlertDialog.Builder(a)
+                .setTitle("تنظیم ستون‌ها و بازه")
+                .setView(scroll)
+                .setNegativeButton("انصراف", null)
+                .setPositiveButton("تحلیل و پیش‌نمایش", null)
+                .create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            initial.date = bankColumnValue(dateColumn);
+            initial.credit = bankColumnValue(creditColumn);
+            initial.debit = bankColumnValue(debitColumn);
+            initial.amount = bankColumnValue(amountColumn);
+            initial.direction = bankColumnValue(directionColumn);
+            initial.balance = bankColumnValue(balanceColumn);
+            initial.description = bankColumnValue(descriptionColumn);
+            initial.reference = bankColumnValue(referenceColumn);
+            initial.account = bankColumnValue(accountColumn);
+            initial.accountValue = accountFilter.getText().toString().trim();
+            initial.dateFormat = dateFormat.getSelectedItemPosition();
+            initial.amountFormat = amountFormat.getSelectedItemPosition();
+            initial.amountsInToman = unit.getCheckedRadioButtonId() == tomans.getId();
+            initial.signedAmountDefinesDirection = signedDirection.isChecked();
+            if (!initial.valid()) {
+                a.kit.toast("ستون تاریخ و دو ستون مبلغ یا مبلغ همراه جهت را انتخاب کنید");
+                return;
+            }
+            String from = Jalali.disp(fromInput.getText().toString());
+            String to = Jalali.disp(toInput.getText().toString());
+            if (from.isEmpty() || to.isEmpty() || Jalali.parse(to) < Jalali.parse(from)) {
+                a.kit.toast("بازهٔ شمسی معتبر نیست؛ تاریخ شروع و پایان را بررسی کنید");
+                return;
+            }
+            draft.mapping = initial;
+            draft.fromDay = from;
+            draft.toDay = to;
+            android.widget.Button analyze = dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE);
+            analyze.setEnabled(false);
+            android.app.AlertDialog progress = bankImportProgress("تاریخ و مبلغ ردیف‌ها در حافظه بررسی می‌شود…");
+            progress.show();
+            Thread worker = new Thread(() -> {
+                BankStatementFile.Parsed parsed = null;
+                String error = null;
+                try { parsed = BankStatementFile.analyze(draft.table, initial, from, to); }
+                catch (Exception failure) {
+                    error = failure.getMessage() == null || failure.getMessage().trim().isEmpty()
+                            ? "ساختار فایل با نگاشت انتخاب‌شده سازگار نیست" : failure.getMessage();
+                }
+                final BankStatementFile.Parsed result = parsed;
+                final String failureText = error;
+                a.runOnUiThread(() -> {
+                    if (progress.isShowing()) progress.dismiss();
+                    if (!bankImportScreenCurrent(draft.renderToken)) {
+                        if (dialog.isShowing()) dialog.dismiss();
+                        return;
+                    }
+                    analyze.setEnabled(true);
+                    if (failureText != null) {
+                        showBankImportMessage("تحلیل انجام نشد", failureText);
+                        return;
+                    }
+                    draft.parsed = result;
+                    dialog.dismiss();
+                    showBankStatementPreview(draft);
+                });
+            }, "bank-statement-local-analysis");
+            worker.start();
+        }));
+        dialog.show();
+    }
+
+    private Spinner bankColumnSpinner(LinearLayout form, String label, List<String> headers, int selected) {
+        form.addView(a.kit.text(label, 11.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        List<String> choices = new ArrayList<>();
+        choices.add("— انتخاب نشده —");
+        for (int i = 0; i < headers.size(); i++)
+            choices.add(Money.fa(String.valueOf(i + 1)) + " • " + headers.get(i));
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(a, android.R.layout.simple_spinner_item, choices);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        Spinner spinner = new Spinner(a);
+        spinner.setAdapter(adapter);
+        spinner.setSelection(selected >= 0 && selected < headers.size() ? selected + 1 : 0);
+        spinner.setContentDescription(label);
+        form.addView(spinner, a.kit.lp(-1, -2));
+        return spinner;
+    }
+
+    private int bankColumnValue(Spinner spinner) {
+        return spinner == null ? -1 : spinner.getSelectedItemPosition() - 1;
+    }
+
+    private void showBankStatementPreview(BankImportDraft draft) {
+        if (draft == null || draft.parsed == null || !bankImportScreenCurrent(draft.renderToken)) return;
+        BankStatementFile.Parsed parsed = draft.parsed;
+        StringBuilder text = new StringBuilder();
+        text.append("دورهٔ انتخاب‌شده: ").append(Money.fa(draft.fromDay)).append(" تا ")
+                .append(Money.fa(draft.toDay)).append("\n")
+                .append("تراکنش‌های پذیرفته‌شده: ").append(HomeNumberFormatter.integer(parsed.transactionCount)).append("\n")
+                .append("جمع واریز فایل: ").append(HomeNumberFormatter.money(parsed.totalCreditRials)).append("\n")
+                .append("جمع برداشت فایل: ").append(HomeNumberFormatter.money(parsed.totalDebitRials)).append("\n")
+                .append("ردیف‌های خالی/بدون گردش کنارگذاشته‌شده: ").append(HomeNumberFormatter.integer(parsed.skippedRows)).append("\n")
+                .append("ردیف‌های بیرون از بازه و مستثناشده: ").append(HomeNumberFormatter.integer(parsed.outsideRangeRows)).append("\n")
+                .append("ردیف‌های حساب‌های دیگر که فیلتر شدند: ").append(HomeNumberFormatter.integer(parsed.filteredAccountRows)).append("\n")
+                .append("واحد پایهٔ محاسبه: ریال؛ نمایش با واحد فعلی برنامه.\n\n")
+                .append("فایل خام و شرح/شمارهٔ تراکنش ذخیره نمی‌شود. پس از تأیید، فقط جمع روزانهٔ واریز و برداشت روی همین دستگاه می‌ماند.\n");
+        if (parsed.invalidRows > 0) {
+            text.append("\nذخیره و مقایسه مسدود است: ").append(HomeNumberFormatter.integer(parsed.invalidRows))
+                    .append(" ردیف نیازمند اصلاح یا نگاشت دوباره است.\n");
+            if (parsed.errorSummary != null && !parsed.errorSummary.isEmpty())
+                text.append(parsed.errorSummary).append('\n');
+        }
+        if (parsed.warnings != null) for (String warning : parsed.warnings)
+            if (warning != null && !warning.trim().isEmpty()) text.append("\n• ").append(warning);
+
+        ScrollView scroll = new ScrollView(a);
+        LinearLayout body = a.kit.v();
+        body.setPadding(Theme.dp(20), Theme.dp(10), Theme.dp(20), Theme.dp(12));
+        TextView details = a.kit.text(text.toString(), 12f, Theme.TEXT, false);
+        details.setTextIsSelectable(true);
+        details.setContentDescription("پیش‌نمایش جمع‌ها، ردیف‌های خطادار و محدودیت‌های فایل صورت‌حساب");
+        body.addView(details, a.kit.lp(-1, -2));
+        scroll.addView(body);
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(a)
+                .setTitle("پیش‌نمایش محلی صورت‌حساب")
+                .setView(scroll)
+                .setNegativeButton("بستن و دورریختن", (dialog, which) -> discardBankImportDraft(draft));
+        if (parsed.invalidRows > 0) {
+            builder.setPositiveButton("بازگشت به نگاشت", (dialog, which) -> showBankStatementMapping(draft));
+        } else {
+            builder.setNeutralButton("ویرایش ستون‌ها", (dialog, which) -> showBankStatementMapping(draft));
+            builder.setPositiveButton("انتخاب حساب و مقایسه", (dialog, which) -> showBankStatementConfirmation(draft));
+        }
+        android.app.AlertDialog preview = builder.create();
+        preview.setOnCancelListener(dialog -> discardBankImportDraft(draft));
+        preview.show();
+    }
+
+    private void showBankStatementConfirmation(BankImportDraft draft) {
+        if (draft == null || draft.parsed == null || draft.parsed.invalidRows > 0
+                || !bankImportScreenCurrent(draft.renderToken)) return;
+        List<Row> accounts = bankAccountsForHome(draft.dashboardData);
+        if (accounts.isEmpty()) {
+            showBankImportMessage("حساب بانکی در دسترس نیست", "فهرست حساب‌های آتیران برای انتخاب حساب پیدا نشد؛ فایل ذخیره نشد.");
+            return;
+        }
+        ScrollView scroll = new ScrollView(a);
+        LinearLayout body = a.kit.v();
+        body.setPadding(Theme.dp(20), Theme.dp(10), Theme.dp(20), Theme.dp(12));
+        body.addView(a.kit.hint("حساب مقصد را با دقت انتخاب کنید. مقایسه از Query فقط‌خواندنی آتیران و همان بازهٔ شمسی استفاده می‌کند؛ هیچ تغییری در DB/API انجام نمی‌شود."), a.kit.lp(-1, -2));
+        List<String> labels = new ArrayList<>();
+        for (Row account : accounts) {
+            String name = account.s("name").trim();
+            String id = account.s("id").trim();
+            labels.add((name.isEmpty() ? "حساب بانکی" : name) + " • کد " + id);
+        }
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(a, android.R.layout.simple_spinner_item, labels);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        Spinner accountSpinner = new Spinner(a);
+        accountSpinner.setAdapter(adapter);
+        accountSpinner.setContentDescription("انتخاب حساب آتیران برای تطبیق با فایل بانک");
+        body.addView(accountSpinner, a.kit.lp(-1, -2));
+        TextView period = a.kit.text("بازهٔ دقیق: " + Money.fa(draft.fromDay) + " تا " + Money.fa(draft.toDay),
+                12f, Theme.TEXT, true);
+        period.setPadding(0, Theme.dp(10), 0, Theme.dp(5));
+        body.addView(period, a.kit.lp(-1, -2));
+        CheckBox complete = new CheckBox(a);
+        complete.setText("تأیید می‌کنم فایل کامل و فقط مربوط به همین حساب آتیران است؛ روز بدون ردیف واقعاً گردش صفر داشته است (یا ردیف‌های حساب‌های دیگر با فیلتر دقیق کنار گذاشته شده‌اند).");
+        complete.setTextColor(Theme.TEXT);
+        complete.setContentDescription("تأیید پوشش کامل و تک‌حسابی صورت‌حساب برای تمام روزهای بازه؛ روزهای بدون ردیف فقط با این تأیید صفر تلقی می‌شوند");
+        body.addView(complete, a.kit.lp(-1, -2));
+        body.addView(a.kit.hint("اگر خروجی ناقص است یا پوشش کامل را نمی‌دانید، تأیید نکنید؛ روزهای غایب نباید صفر فرض شوند. در آن حالت هیچ مقایسه یا ذخیره‌ای انجام نمی‌شود."), a.kit.lp(-1, -2));
+        scroll.addView(body);
+
+        android.app.AlertDialog dialog = new android.app.AlertDialog.Builder(a)
+                .setTitle("تأیید دوره و حساب")
+                .setView(scroll)
+                .setNegativeButton("لغو", null)
+                .setPositiveButton("اجرای مقایسهٔ read-only", null)
+                .create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            if (!complete.isChecked()) {
+                a.kit.toast("برای جلوگیری از فرض صفر، ابتدا کامل‌بودن کل بازه را تأیید کنید یا لغو کنید");
+                return;
+            }
+            int selected = accountSpinner.getSelectedItemPosition();
+            if (selected < 0 || selected >= accounts.size()) {
+                a.kit.toast("حساب بانکی انتخاب نشده است");
+                return;
+            }
+            Row account = accounts.get(selected);
+            draft.bankId = account.s("id").trim();
+            draft.bankName = account.s("name").trim();
+            if (draft.bankId.isEmpty()) {
+                a.kit.toast("شناسهٔ حساب آتیران در دسترس نیست");
+                return;
+            }
+            dialog.dismiss();
+            compareBankStatementWithLedger(draft);
+        }));
+        dialog.show();
+    }
+
+    private void compareBankStatementWithLedger(BankImportDraft draft) {
+        if (draft == null || a.repo == null || !bankImportScreenCurrent(draft.renderToken)) {
+            showBankImportMessage("مقایسه انجام نشد", "اتصال read-only آتیران در دسترس نیست؛ فایل ذخیره نشده است.");
+            return;
+        }
+        android.app.AlertDialog progress = bankImportProgress("گردش روزانهٔ همان حساب از آتیران به‌صورت فقط‌خواندنی خوانده می‌شود…");
+        progress.show();
+        final String bankId = draft.bankId;
+        final String from = draft.fromDay;
+        final String to = draft.toDay;
+        a.repo.run(connection -> Repo.exec(connection,
+                        MasterQueries.bankTurnoverDaily(new Meta(connection), bankId, from, to)),
+                new Repo.Cb<List<Row>>() {
+                    @Override public void ok(List<Row> rows) {
+                        if (progress.isShowing()) progress.dismiss();
+                        if (!bankImportScreenCurrent(draft.renderToken)) return;
+                        try {
+                            Map<String, BankStatementPeriodReconciliation.DailyFlow> ledger = bankLedgerFlows(rows, draft);
+                            draft.report = BankStatementPeriodReconciliation.compare(from, to,
+                                    draft.parsed, ledger, true);
+                            draft.comparedAt = System.currentTimeMillis();
+                            draft.parsed = BankStatementFile.aggregateOnly(draft.parsed);
+                            draft.table = null;
+                            draft.mapping = null;
+                            draft.dashboardData = null;
+                            showBankStatementReport(draft);
+                        } catch (Exception invalid) {
+                            showBankImportMessage("دادهٔ گردش برای نتیجه‌گیری کافی نیست",
+                                    invalid.getMessage() == null ? "روز یا مبلغی از گردش آتیران قابل‌اعتبارسنجی نبود؛ هیچ فایل یا جمعی ذخیره نشد."
+                                            : invalid.getMessage());
+                        }
+                    }
+
+                    @Override public void fail(String error) {
+                        if (progress.isShowing()) progress.dismiss();
+                        if (!bankImportScreenCurrent(draft.renderToken)) return;
+                        showBankImportMessage("گردش آتیران در دسترس نیست",
+                                "Query فقط‌خواندنی برای همین حساب و بازه کامل نشد؛ نتیجه نامشخص است و هیچ فایلی ذخیره نشده است. پس از بررسی اتصال یا دسترسی، دوباره تلاش کنید.");
+                    }
+                });
+    }
+
+    private Map<String, BankStatementPeriodReconciliation.DailyFlow> bankLedgerFlows(
+            List<Row> rows, BankImportDraft draft) throws IOException {
+        Map<String, BankStatementPeriodReconciliation.DailyFlow> result = new LinkedHashMap<>();
+        int from = Jalali.parse(draft.fromDay);
+        int to = Jalali.parse(draft.toDay);
+        if (rows == null) throw new IOException("گردش روزانهٔ آتیران برنگشت؛ صفر فرض نشده است.");
+        for (Row row : rows) {
+            if (row == null) continue;
+            if (row.l("invalidIn") > 0 || row.l("invalidOut") > 0 || row.l("negativeRows") > 0)
+                throw new IOException("در گردش آتیران مبلغ تبدیل‌ناپذیر یا منفی وجود دارد؛ دادهٔ روزانه برای تطبیق معتبر نیست.");
+            String day = Jalali.disp(row.s("day"));
+            int dayNumber = Jalali.parse(day);
+            if (dayNumber < from || dayNumber > to)
+                throw new IOException("یک تاریخ از گردش آتیران نامعتبر یا بیرون از بازه است؛ مقایسه لغو شد.");
+            double inflow = row.d("in");
+            double outflow = row.d("out");
+            long txCount = row.l("count");
+            if (!Double.isFinite(inflow) || !Double.isFinite(outflow) || inflow < 0 || outflow < 0
+                    || txCount < 0 || txCount > Integer.MAX_VALUE)
+                throw new IOException("مبلغ یا تعداد تراکنش آتیران خارج از محدودهٔ معتبر است.");
+            if (result.containsKey(day))
+                throw new IOException("گردش آتیران یک روز را چندبار برگرداند؛ از جمع‌کردن مبهم داده خودداری شد.");
+            result.put(day, new BankStatementPeriodReconciliation.DailyFlow(inflow, outflow, (int) txCount));
+        }
+        return result;
+    }
+
+    private void showBankStatementReport(BankImportDraft draft) {
+        if (draft == null || draft.report == null || !bankImportScreenCurrent(draft.renderToken)) return;
+        BankStatementPeriodReconciliation.Report report = draft.report;
+        StringBuilder text = new StringBuilder();
+        text.append("حساب آتیران: ").append(draft.bankName.isEmpty() ? "حساب بانکی" : draft.bankName)
+                .append(" • کد ").append(draft.bankId).append('\n')
+                .append("بازهٔ شمسی: ").append(Money.fa(report.fromDay)).append(" تا ")
+                .append(Money.fa(report.toDay)).append('\n')
+                .append("منبع بانکی: خروجی دستی انتخاب‌شده • منبع دفتر: Query فقط‌خواندنی آتیران\n")
+                .append("زمان تکمیل Query (ساعت دستگاه): ").append(bankImportTimestamp(draft.comparedAt)).append('\n')
+                .append("پوشش کامل فایل برای کل دوره: تأیید مدیر؛ روز بدون ردیف فقط با همین فرض صفر است.\n")
+                .append("واحد پایهٔ محاسبه: ریال؛ واحد نمایش فعلی برنامه: ").append(Money.unitName()).append(".\n\n")
+                .append("صورت‌حساب: واریز ").append(HomeNumberFormatter.money(report.statementInflowRials))
+                .append(" • برداشت ").append(HomeNumberFormatter.money(report.statementOutflowRials)).append('\n')
+                .append("دفتر آتیران: واریز ").append(HomeNumberFormatter.money(report.ledgerInflowRials))
+                .append(" • برداشت ").append(HomeNumberFormatter.money(report.ledgerOutflowRials)).append('\n')
+                .append("اختلاف کل واریز: ").append(bankVariancePiece("واریز", report.inflowVarianceRials)).append('\n')
+                .append("اختلاف کل برداشت: ").append(bankVariancePiece("برداشت", report.outflowVarianceRials)).append("\n\n")
+                .append("روزهای برابر: ").append(HomeNumberFormatter.integer(report.matchedDays))
+                .append(" • روزهای دارای اختلاف: ").append(HomeNumberFormatter.integer(report.varianceDays))
+                .append(" • روزهای نامشخص: ").append(HomeNumberFormatter.integer(report.unavailableDays)).append('\n')
+                .append("روز با گردش فقط در فایل: ").append(HomeNumberFormatter.integer(report.bankOnlyDays))
+                .append(" • روز با گردش فقط در دفتر: ").append(HomeNumberFormatter.integer(report.ledgerOnlyDays)).append('\n')
+                .append("تراکنش‌های فایل پس از فیلتر حساب: ").append(HomeNumberFormatter.integer(draft.parsed.transactionCount))
+                .append(" • ردیف‌های حساب‌های دیگرِ فیلترشده: ").append(HomeNumberFormatter.integer(draft.parsed.filteredAccountRows)).append('\n')
+                .append("ردیف‌های دفتر آتیران: ").append(HomeNumberFormatter.integer(report.ledgerTransactions)).append("\n\n")
+                .append("فرمول روزانه: اختلاف واریز = واریز صورت‌حساب − واریز دفتر؛ اختلاف برداشت = برداشت صورت‌حساب − برداشت دفتر. هر دو جهت جداگانه و برای تک‌تک روزها سنجیده شده‌اند؛ اختلاف خالص برای اعلام تطبیق به‌کار نمی‌رود. آستانهٔ هر جهت: نیم ریال (۰٫۵ ریال).\n")
+                .append("این گزارش تطبیق گردش روزانه است، نه تطبیق ماندهٔ ابتدا/پایان یا تأیید قطعی حسابداری. کنترل صندوق جداگانه با ماندهٔ آغاز + دریافت نقد − پرداخت نقد در برابر شمارش پایان انجام می‌شود؛ از گردش بانک به‌تنهایی مبلغ صندوق استنتاج نشده است. فقط جمع‌های روزانهٔ تأییدشده ذخیره می‌شوند؛ فایل خام و ریز تراکنش‌ها ذخیره نمی‌شوند.\n");
+        if (report.varianceDays > 0) {
+            text.append("\nجزئیات روزهای دارای اختلاف (حداکثر ۲۰ روز):\n");
+            int shown = 0;
+            for (BankStatementPeriodReconciliation.DayResult day : report.days) {
+                if (day.comparison.state != BankStatementReconciliation.State.VARIANCE) continue;
+                text.append(Money.fa(day.day)).append(" — ")
+                        .append(bankVariancePiece("واریز", day.comparison.inflowVarianceRials)).append("؛ ")
+                        .append(bankVariancePiece("برداشت", day.comparison.outflowVarianceRials)).append('\n');
+                if (++shown >= 20) break;
+            }
+            if (report.varianceDays > 20) text.append("روزهای بیشتر در جمع روزهای دارای اختلاف آمده‌اند؛ جزئیات فقط ۲۰ روز نخست را نشان می‌دهد.\n");
+        } else if (report.fullyMatched()) {
+            text.append("\nدر بازهٔ تأییدشده، جمع واریز و برداشت هر روز در محدودهٔ آستانه برابر است.");
+        }
+
+        ScrollView scroll = new ScrollView(a);
+        LinearLayout body = a.kit.v();
+        body.setPadding(Theme.dp(20), Theme.dp(10), Theme.dp(20), Theme.dp(12));
+        TextView details = a.kit.text(text.toString(), 12f, Theme.TEXT, false);
+        details.setTextIsSelectable(true);
+        details.setContentDescription("گزارش کامل تطبیق روزانهٔ صورت‌حساب فایل با دفتر read-only آتیران");
+        body.addView(details, a.kit.lp(-1, -2));
+        scroll.addView(body);
+        android.app.AlertDialog dialog = new android.app.AlertDialog.Builder(a)
+                .setTitle(report.fullyMatched() ? "گزارش تطبیق روزانه • برابر" : "گزارش مغایرت‌گیری روزانه")
+                .setView(scroll)
+                .setNegativeButton("بستن", (ignored, which) -> discardBankImportDraft(draft))
+                .setPositiveButton(report.fullyComparable() ? "ذخیره فقط جمع‌های روزانه" : "ذخیره در دسترس نیست", null)
+                .create();
+        dialog.setOnCancelListener(ignored -> discardBankImportDraft(draft));
+        dialog.setOnShowListener(ignored -> {
+            android.widget.Button save = dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE);
+            if (!report.fullyComparable() || draft.parsed.invalidRows > 0) {
+                save.setEnabled(false);
+                return;
+            }
+            save.setContentDescription("ذخیرهٔ جمع‌های روزانهٔ تأییدشده روی همین دستگاه؛ فایل و ریز تراکنش‌ها ذخیره نمی‌شوند");
+            save.setOnClickListener(v -> {
+                Map<String, String[]> batch = bankStatementDailyBatch(draft);
+                boolean saved = batch != null && a.settings.setHomeBankStatementRialsBatch(
+                        draft.bankId, draft.fromDay, draft.toDay, batch);
+                if (!saved) {
+                    a.kit.toast("ذخیرهٔ جمع‌های روزانه کامل نشد؛ داده‌ای به آتیران فرستاده نشده است");
+                    return;
+                }
+                LinearLayout content = draft.content;
+                dialog.dismiss();
+                discardBankImportDraft(draft);
+                a.kit.toast("فقط جمع‌های روزانهٔ صورت‌حساب روی همین دستگاه ذخیره شد");
+                render(content);
+            });
+        });
+        dialog.show();
+    }
+
+    private Map<String, String[]> bankStatementDailyBatch(BankImportDraft draft) {
+        if (draft == null || draft.parsed == null || draft.parsed.invalidRows > 0
+                || draft.report == null || !draft.report.fullyComparable()) return null;
+        int from = Jalali.parse(draft.fromDay);
+        int to = Jalali.parse(draft.toDay);
+        if (from < 0 || to < from || to - from + 1 > BankStatementFile.MAX_PERIOD_DAYS) return null;
+        Map<String, String[]> batch = new LinkedHashMap<>();
+        for (int offset = 0; offset <= to - from; offset++) {
+            String day = Jalali.format(from + offset);
+            BankStatementFile.DailyTotal daily = draft.parsed.daily.get(day);
+            double in = daily == null ? 0d : daily.creditRials;
+            double out = daily == null ? 0d : daily.debitRials;
+            if (!Double.isFinite(in) || !Double.isFinite(out) || in < 0 || out < 0) return null;
+            batch.put(day, new String[]{bankRialsStorageValue(in), bankRialsStorageValue(out)});
+        }
+        return batch;
+    }
+
+    private String bankRialsStorageValue(double amount) {
+        return java.math.BigDecimal.valueOf(amount)
+                .setScale(4, java.math.RoundingMode.HALF_UP)
+                .stripTrailingZeros().toPlainString();
+    }
+
+    private String bankImportTimestamp(long timestamp) {
+        String value = new java.text.SimpleDateFormat("yyyy/MM/dd HH:mm:ss", Locale.getDefault())
+                .format(new java.util.Date(timestamp));
+        return Money.fa(value);
+    }
+
+    private void discardBankImportDraft(BankImportDraft draft) {
+        if (draft == null) return;
+        draft.table = null;
+        draft.mapping = null;
+        draft.parsed = null;
+        draft.report = null;
+        draft.dashboardData = null;
+        draft.content = null;
+        draft.bankName = "";
+        draft.bankId = "";
     }
 
     private void addExceptionRows(LinearLayout card, Data d) {

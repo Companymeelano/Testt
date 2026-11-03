@@ -1276,6 +1276,48 @@ public final class MasterQueries {
                 + " GROUP BY " + label + ", " + bankId + " ORDER BY 2 DESC", binds);
     }
 
+    /** Exact daily, direction-separated movements for one Atiran bank account (read-only). */
+    public static Queries.Q bankTurnoverDaily(Meta m, String bankId, String from, String to)
+            throws Queries.Missing {
+        if (!m.table("ban_act")) throw new Queries.Missing("«گردش بانک» در دیتابیس پیدا نشد");
+        if (bankId == null || bankId.trim().isEmpty())
+            throw new Queries.Missing("شناسهٔ حساب بانکی برای فیلتر گردش در دسترس نیست");
+        String bank = m.must("ban_act", "بانک", "bank_rdf", "BankRdf", "bankrdf");
+        String date = m.colFlex("ban_act", "act_date", "done_act");
+        if (date == null) throw new Queries.Missing("تاریخ عملیات بانکی در دیتابیس پیدا نشد");
+        String bed = m.colFlex("ban_act", "act_bed", "bed", "bedehkar");
+        String bes = m.colFlex("ban_act", "act_bes", "bes", "bestankar");
+        if (bed == null || bes == null)
+            throw new Queries.Missing("ستون واریز یا برداشت در دفتر بانک پیدا نشد؛ مقایسهٔ دوطرفه ممکن نیست");
+
+        String day = Sql.dateKey(Sql.date10("h", date));
+        String in = Sql.num("h", bes);
+        String out = Sql.num("h", bed);
+        String invalidIn = "SUM(CASE WHEN h.[" + bes + "] IS NOT NULL AND NULLIF(LTRIM(RTRIM(TRY_CONVERT(nvarchar(60),h.["
+                + bes + "]))),N'') IS NOT NULL AND TRY_CONVERT(decimal(19,2),h.[" + bes + "]) IS NULL THEN 1 ELSE 0 END)";
+        String invalidOut = "SUM(CASE WHEN h.[" + bed + "] IS NOT NULL AND NULLIF(LTRIM(RTRIM(TRY_CONVERT(nvarchar(60),h.["
+                + bed + "]))),N'') IS NOT NULL AND TRY_CONVERT(decimal(19,2),h.[" + bed + "]) IS NULL THEN 1 ELSE 0 END)";
+        String negative = "SUM(CASE WHEN TRY_CONVERT(decimal(19,2),h.[" + bes + "])<0 OR TRY_CONVERT(decimal(19,2),h.["
+                + bed + "])<0 THEN 1 ELSE 0 END)";
+        List<Object> binds = new ArrayList<>();
+        List<String> conds = new ArrayList<>();
+        conds.add("LTRIM(RTRIM(TRY_CONVERT(nvarchar(60),h.[" + bank + "])) )=?");
+        binds.add(bankId.trim());
+        String dateCondition = Sql.dateCond(Sql.date10("h", date), from, to, binds);
+        if (!dateCondition.isEmpty()) conds.add(dateCondition);
+        String bankIsActive = m.col("ban_act", "isActive", "IsActive");
+        if (bankIsActive != null) conds.add(boolTrue("h.[" + bankIsActive + "]"));
+        String active = Sql.activeAnd(m.columns("ban_act"), "h");
+        String soft = Sql.softAnd(m.columns("ban_act"), "h");
+        if (!active.isEmpty()) conds.add(active.substring(5));
+        if (!soft.isEmpty()) conds.add(soft.substring(5));
+        return new Queries.Q("SELECT " + day + " AS day, ISNULL(SUM(" + in + "),0) AS [in]"
+                + ", ISNULL(SUM(" + out + "),0) AS [out], COUNT_BIG(1) AS count"
+                + ", " + invalidIn + " AS invalidIn, " + invalidOut + " AS invalidOut"
+                + ", " + negative + " AS negativeRows FROM dbo.ban_act h WHERE "
+                + Sql.join(conds, " AND ") + " GROUP BY " + day + " ORDER BY 1", binds);
+    }
+
     /** Bank operations per account and month (banking only): bank,month,in,out,net,count. */
     public static Queries.Q bankOpsMonthly(Meta m, Filter f) throws Queries.Missing {
         if (!m.table("ban_act")) throw new Queries.Missing("«گردش بانک» در دیتابیس پیدا نشد");

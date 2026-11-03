@@ -1578,6 +1578,19 @@ public class MainActivity extends Activity {
             }
             scanCb = null;
         }
+        if (requestCode == BANK_STATEMENT_REQ) {
+            java.util.function.Consumer<android.net.Uri> callback = bankStatementCb;
+            bankStatementCb = null;
+            if (callback == null) return;
+            try {
+                if (resultCode == Activity.RESULT_OK && data != null && data.getData() != null)
+                    callback.accept(data.getData());
+                else kit.toast("فایلی انتخاب نشد");
+            } catch (Exception e) {
+                kit.toast("دسترسی به فایل ممکن نشد؛ دوباره انتخاب کنید");
+            }
+            return;
+        }
         if (requestCode == DOC_REQ && docCb != null) {
             try {
                 if (resultCode == Activity.RESULT_OK && data != null && data.getData() != null) {
@@ -1677,7 +1690,9 @@ public class MainActivity extends Activity {
     // ================= document pick + photo =================
     private static final int DOC_REQ = 904;
     private static final int PHOTO_REQ = 905;
+    private static final int BANK_STATEMENT_REQ = 906;
     private java.util.function.Consumer<String> docCb;
+    private java.util.function.Consumer<android.net.Uri> bankStatementCb;
     private java.util.function.Consumer<android.net.Uri> photoCb;
     private android.net.Uri photoUri;
 
@@ -1695,6 +1710,25 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             kit.toast("انتخاب فایل ممکن نشد");
             docCb = null;
+        }
+    }
+
+    /** Choose a bank-export file through Android's document picker; the URI is read locally once. */
+    public void startBankStatementPick(java.util.function.Consumer<android.net.Uri> cb) {
+        bankStatementCb = cb;
+        try {
+            android.content.Intent i = new android.content.Intent(
+                    android.content.Intent.ACTION_OPEN_DOCUMENT);
+            i.addCategory(android.content.Intent.CATEGORY_OPENABLE);
+            i.setType("*/*");
+            i.putExtra(android.content.Intent.EXTRA_MIME_TYPES, new String[]{
+                    "text/csv", "text/tab-separated-values", "text/plain",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    "application/octet-stream"});
+            startActivityForResult(i, BANK_STATEMENT_REQ);
+        } catch (Exception e) {
+            kit.toast("انتخاب فایل صورت‌حساب ممکن نشد");
+            bankStatementCb = null;
         }
     }
 

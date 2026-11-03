@@ -38,6 +38,27 @@ public class AtiranSampleSchemaTest {
         assertEquals(12, report.totalSections);
     }
 
+    @Test public void bankStatementQueryIsAccountScopedDailyAndReadOnly() throws Exception {
+        Meta meta = new Meta(connection(loadManifest()));
+        Queries.Q q = MasterQueries.bankTurnoverDaily(meta, "17", "1405/01/01", "1405/01/31");
+        String sql = q.sql.toLowerCase(Locale.ROOT);
+        assertTrue(sql, sql.startsWith("select "));
+        assertTrue(sql, sql.contains("h.[bank_rdf]"));
+        assertTrue(sql, sql.contains("as day"));
+        assertTrue(sql, sql.contains("as [in]"));
+        assertTrue(sql, sql.contains("as [out]"));
+        assertTrue(sql, sql.contains("as invalidin"));
+        assertTrue(sql, sql.contains("as invalidout"));
+        assertTrue(sql, sql.contains("group by"));
+        assertTrue(sql, sql.contains("h.[act_date]"));
+        assertEquals("17", q.binds.get(0));
+        assertEquals("1405/01/01", q.binds.get(1));
+        assertEquals("1405/01/31", q.binds.get(2));
+        assertFalse(sql, sql.contains("insert into "));
+        assertFalse(sql, sql.contains("update dbo."));
+        assertFalse(sql, sql.contains("delete from "));
+    }
+
     /** Purchase unit price comes from JOZPRICE: subbuyfact has no LINESUM in the sample schema. */
     @Test public void purchasePriceUsesJozPriceNotLineSum() throws Exception {
         Meta meta = new Meta(connection(loadManifest()));

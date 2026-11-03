@@ -184,6 +184,23 @@ public class HomeScreen extends Screen {
         long comparedAt;
     }
 
+    /** One compact shortcut in the home page's section navigator. */
+    private static final class HomeCategoryTarget {
+        final String key;
+        final String label;
+        final String spokenLabel;
+        final String viewTag;
+        final int accent;
+
+        HomeCategoryTarget(String key, String label, String spokenLabel, String viewTag, int accent) {
+            this.key = key;
+            this.label = label;
+            this.spokenLabel = spokenLabel;
+            this.viewTag = viewTag;
+            this.accent = accent;
+        }
+    }
+
     /** Runs one dashboard query only while this render is still on screen; once the user has moved on, the rest are skipped. */
     private <T> T live(final int token, Map<String, String> notes, String key, Soft<T> t) {
         if (a.renderGen() != token) return null;
@@ -1968,6 +1985,10 @@ public class HomeScreen extends Screen {
         content.addView(status, a.kit.lp(-1, -2));
         content.addView(a.kit.gap(4));
 
+        List<HomeCategoryTarget> categoryTargets = new ArrayList<>();
+        categoryTargets.add(new HomeCategoryTarget("overview", "امروز", "مرور روز",
+                "home-group-overview", Theme.SECTION_SALES));
+
         LinearLayout overview = dashboardGroup("overview", "مرور روز",
                 "فروش و شاخص‌های کلیدی", R.drawable.mi_point_of_sale, Theme.SECTION_SALES);
         content.addView(overview, a.kit.lp(-1, -2));
@@ -1982,6 +2003,8 @@ public class HomeScreen extends Screen {
 
         // Related document trends share a single, calm heading and keep their source-aware cards.
         if (canAccessReturnRegister() || RoleStore.allowed(a, "sales") || RoleStore.allowed(a, "buy")) {
+            categoryTargets.add(new HomeCategoryTarget("trends", "روند", "روند اسناد",
+                    "home-group-trends", Theme.SECTION_RETURNS));
             LinearLayout trends = dashboardGroup("trends", "روند اسناد",
                     "خرید، برگشتی و ابطالی؛ دادهٔ ناموجود صفر فرض نمی‌شود",
                     R.drawable.mi_bar_chart, Theme.SECTION_RETURNS);
@@ -1991,10 +2014,10 @@ public class HomeScreen extends Screen {
             if (RoleStore.allowed(a, "buy")) secPurchaseTrend(trends, d, syncTime);
         }
 
-        // Related optional modules are grouped without changing the saved order within each group.
-        String activeCategory = null;
-        LinearLayout activeGroup = null;
-        int groupOrdinal = 0;
+        // Aggregate each category once. Category order follows its first selected module;
+        // the saved order of modules inside that category is unchanged.
+        LinkedHashMap<String, LinearLayout> moduleGroups = new LinkedHashMap<>();
+        LinkedHashMap<String, Integer> moduleGroupOrdinals = new LinkedHashMap<>();
         for (String key : orderedKeys()) {
             if ("sales_insight".equals(key) || "kpis".equals(key) || "returns".equals(key)
                     || !homeSectionVisible(key)) continue;
@@ -2003,20 +2026,114 @@ public class HomeScreen extends Screen {
             if (block.getChildCount() == 0) continue;
 
             String category = homeModuleCategory(key);
-            if (!category.equals(activeCategory)) {
-                groupOrdinal++;
-                activeGroup = homeModuleGroup(category, groupOrdinal);
-                content.addView(activeGroup, a.kit.lp(-1, -2));
-                activeCategory = category;
+            if (!moduleGroups.containsKey(category)) {
+                int ordinal = moduleGroups.size() + 1;
+                moduleGroups.put(category, homeModuleGroup(category, ordinal));
+                moduleGroupOrdinals.put(category, ordinal);
             }
-            activeGroup.addView(block, a.kit.lp(-1, -2));
+            moduleGroups.get(category).addView(block, a.kit.lp(-1, -2));
         }
+        for (Map.Entry<String, LinearLayout> entry : moduleGroups.entrySet()) {
+            String category = entry.getKey();
+            int ordinal = moduleGroupOrdinals.get(category);
+            content.addView(entry.getValue(), a.kit.lp(-1, -2));
+            HomeCategoryTarget target = homeModuleCategoryTarget(category, ordinal);
+            if (target != null) categoryTargets.add(target);
+        }
+
+        // Compact RTL shortcuts keep a long dashboard navigable without replacing its full page.
+        View categoryNav = homeCategoryNavigation(content, categoryTargets);
+        if (categoryNav != null) content.addView(categoryNav, 3, a.kit.lp(-1, -2));
+
         renderHomeNotes(content, d.notes);
         View safeTail = a.kit.gap(20);
         safeTail.setTag("home-bottom-safe-space");
         content.addView(safeTail, a.kit.lp(-1, Theme.dp(20)));
         localizeHomeNumbers(content);
         staggerIn(content);
+    }
+
+    /** Build the horizontally scrollable, accessible shortcuts for the groups in this render. */
+    private View homeCategoryNavigation(final LinearLayout page,
+                                       final List<HomeCategoryTarget> targets) {
+        if (targets == null || targets.size() < 2) return null;
+
+        HorizontalScrollView viewport = new HorizontalScrollView(a);
+        viewport.setTag("home-category-nav");
+        viewport.setHorizontalScrollBarEnabled(false);
+        viewport.setFillViewport(false);
+        viewport.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        viewport.setClipToPadding(false);
+        viewport.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        viewport.setPadding(Theme.dp(12), Theme.dp(1), Theme.dp(12), Theme.dp(5));
+
+        LinearLayout row = a.kit.h();
+        row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        List<TextView> chips = new ArrayList<>();
+        for (int i = 0; i < targets.size(); i++) {
+            final int index = i;
+            final HomeCategoryTarget target = targets.get(i);
+            TextView chip = a.kit.text(target.label, 10.5f,
+                    Theme.dashboardAccentInk(target.accent), true);
+            chip.setTag("home-category-chip-" + target.key);
+            chip.setGravity(Gravity.CENTER);
+            chip.setSingleLine(true);
+            chip.setPadding(Theme.dp(13), 0, Theme.dp(13), 0);
+            chip.setMinHeight(Theme.dp(48));
+            chip.setMinimumWidth(Theme.dp(56));
+            chip.setContentDescription("رفتن به بخش " + target.spokenLabel);
+            chip.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
+            styleHomeCategoryChip(chip, target.accent, i == 0);
+            Theme.pressable(chip);
+            chip.setOnClickListener(v -> {
+                for (int j = 0; j < chips.size(); j++)
+                    styleHomeCategoryChip(chips.get(j), targets.get(j).accent, j == index);
+                scrollHomeToCategory(page, target.viewTag);
+            });
+
+            LinearLayout.LayoutParams chipParams = a.kit.lp(-2, -2);
+            chipParams.setMarginEnd(Theme.dp(6));
+            row.addView(chip, chipParams);
+            chips.add(chip);
+        }
+        viewport.addView(row, new HorizontalScrollView.LayoutParams(-2, -2));
+        return viewport;
+    }
+
+    private void styleHomeCategoryChip(TextView chip, int accent, boolean selected) {
+        chip.setTextColor(selected ? Theme.dashboardActionInk(accent)
+                : Theme.dashboardAccentInk(accent));
+        chip.setBackground(selected ? Theme.dashboardAction(accent) : Theme.dashboardMetric(accent));
+        chip.setSelected(selected);
+    }
+
+    /** Scroll to a tagged category using the actual ancestor viewport, not a device-specific offset. */
+    private void scrollHomeToCategory(LinearLayout page, String targetTag) {
+        View target = page.findViewWithTag(targetTag);
+        if (target == null) return;
+
+        ScrollView viewport = null;
+        View current = page;
+        while (current != null) {
+            if (current instanceof ScrollView) {
+                viewport = (ScrollView) current;
+                break;
+            }
+            android.view.ViewParent parent = current.getParent();
+            current = parent instanceof View ? (View) parent : null;
+        }
+        if (viewport == null) return;
+
+        int y = 0;
+        current = target;
+        while (current != null && current != viewport) {
+            y += current.getTop();
+            android.view.ViewParent parent = current.getParent();
+            current = parent instanceof View ? (View) parent : null;
+        }
+        if (current == viewport)
+            viewport.smoothScrollTo(0, Math.max(0, y - Theme.dp(10)));
     }
 
     /** Summarize unavailable source notes and reveal their full diagnostics only on request. */
@@ -2137,24 +2254,40 @@ public class HomeScreen extends Screen {
 
     private String homeModuleCategory(String key) {
         if ("smart_report".equals(key) || "closeout".equals(key)
-                || "cash_position".equals(key)) return "management";
+                || "cash_position".equals(key) || "cash_mix".equals(key)
+                || "due".equals(key) || "eod".equals(key)) return "management";
         if ("top_performers".equals(key) || "sales_goal".equals(key)
-                || "gross_profit".equals(key) || "seasonal_calendar".equals(key))
+                || "gross_profit".equals(key) || "forecast_7d".equals(key)
+                || "seasonal_calendar".equals(key))
             return "insights";
         return "operations";
+    }
+
+    private HomeCategoryTarget homeModuleCategoryTarget(String category, int ordinal) {
+        String tag = "home-group-" + category + "-" + ordinal;
+        if ("management".equals(category))
+            return new HomeCategoryTarget(category, "مالی", "مدیریت و مالی", tag,
+                    Theme.SECTION_CLOSEOUT);
+        if ("insights".equals(category))
+            return new HomeCategoryTarget(category, "تحلیل", "تحلیل و برنامه‌ریزی", tag,
+                    Theme.SECTION_TOP_PERFORMERS);
+        if ("operations".equals(category))
+            return new HomeCategoryTarget(category, "عملیات", "پایش و عملیات", tag,
+                    Theme.SECTION_ALERT);
+        return null;
     }
 
     private LinearLayout homeModuleGroup(String category, int ordinal) {
         if ("management".equals(category))
             return dashboardGroup("management-" + ordinal, "مدیریت و مالی",
-                    "گزارش روز، بستن روز و موقعیت نقدی",
+                    "بستن روز، نقدینگی، دریافت‌ها و تطبیق مالی",
                     R.drawable.mi_account_balance_wallet, Theme.SECTION_CLOSEOUT);
         if ("insights".equals(category))
             return dashboardGroup("insights-" + ordinal, "تحلیل و برنامه‌ریزی",
-                    "عملکرد، هدف‌گذاری و چشم‌انداز فروش",
+                    "گزارش هوشمند، عملکرد، هدف‌گذاری و پیش‌بینی فروش",
                     R.drawable.mi_bar_chart, Theme.SECTION_TOP_PERFORMERS);
         return dashboardGroup("operations-" + ordinal, "پایش و عملیات",
-                "پیش‌بینی، بازار، میان‌برها و پیگیری‌های روزانه",
+                "هشدارها، بازار، ابزارهای سریع و پیگیری روزانه",
                 R.drawable.mi_warning, Theme.SECTION_ALERT);
     }
 

@@ -633,6 +633,8 @@ public class SettingsScreen extends Screen {
                 }));
         editor.addView(a.kit.hint("تغییرات خودکار ذخیره می‌شوند. برای جابه‌جایی، دستگیره را لمس طولانی کنید و بکشید؛ فلش‌ها جایگزین دسترس‌پذیر هستند."),
                 a.kit.lp(-1, -2));
+        editor.addView(a.kit.hint("در داشبورد، بخش‌های مرتبط در دسته‌های مالی، تحلیل و عملیات کنار هم می‌آیند؛ ترتیب انتخابی داخل هر دسته حفظ می‌شود."),
+                a.kit.lp(-1, -2));
 
         final java.util.List<String> order = new java.util.ArrayList<>();
         for (String key : a.settings.homeOrder().split(",")) {

@@ -192,7 +192,7 @@ public final class HomeDashboardScreenshotTest {
                 144, MainActivity.headerTitleWidthDp(320, 2, true, true));
         verifyDashboardColorContrast();
         Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
-        final View[] targets = new View[22];
+        final View[] targets = new View[25];
         final int[] facts = new int[5];
         final String[] reconciliationCopy = {""};
         long layoutDeadline = SystemClock.uptimeMillis() + 3_000L;
@@ -223,6 +223,9 @@ public final class HomeDashboardScreenshotTest {
                 targets[19] = findTaggedView(decor, "home-group-management-1");
                 targets[20] = findTaggedView(decor, "home-trend-status-فاکتور ابطالی");
                 targets[21] = findTaggedView(decor, "home-trend-فاکتور ابطالی");
+                targets[22] = findTaggedView(decor, "home-category-nav");
+                targets[23] = findTaggedView(decor, "home-category-chip-overview");
+                targets[24] = findTaggedView(decor, "home-category-chip-management");
                 reconciliationCopy[0] = "";
                 if (targets[8] != null) collectText(targets[8], reconciliationCopy);
                 facts[0] = targets[0] == null ? 0 : countTaggedViews(targets[0], "home-financial-kpi");
@@ -302,6 +305,16 @@ public final class HomeDashboardScreenshotTest {
                         || tillCopy[0].contains("محلی روی همین دستگاه")));
         assertNotNull("Overview category heading is missing", targets[18]);
         assertNotNull("Management and finance category heading is missing", targets[19]);
+        assertNotNull("Dashboard category navigation is missing", targets[22]);
+        assertTrue("Category navigation should be horizontally scrollable",
+                targets[22] instanceof HorizontalScrollView);
+        assertNotNull("Overview shortcut is missing", targets[23]);
+        assertNotNull("Management shortcut is missing", targets[24]);
+        assertTrue("Management shortcut is not accessible and clickable",
+                targets[24].isClickable() && targets[24].isFocusable()
+                        && targets[24].getContentDescription() != null);
+        assertTrue("Management shortcut is below the 48dp touch target",
+                targets[24].getMinimumHeight() >= 48f * activityDensity(targets[24]));
         assertNotNull("Incomplete trend needs a compact unavailable-data row", targets[20]);
         assertTrue("Unavailable trend still allocates a blank chart", targets[21] == null);
         assertNotNull("Financial detail disclosure is missing", targets[17]);
@@ -360,6 +373,11 @@ public final class HomeDashboardScreenshotTest {
                     DesignTokens.contrastRatio(mutedInk, metricTop) >= 4.8);
             assertTrue("Dashboard metric label contrast across gradient for " + Integer.toHexString(accent),
                     DesignTokens.contrastRatio(mutedInk, metricBottom) >= 4.8);
+            int categoryInk = Theme.dashboardAccentInk(accent);
+            assertTrue("Dashboard category shortcut contrast for " + Integer.toHexString(accent),
+                    DesignTokens.contrastRatio(categoryInk, metricTop) >= 4.8);
+            assertTrue("Dashboard category shortcut contrast across gradient for " + Integer.toHexString(accent),
+                    DesignTokens.contrastRatio(categoryInk, metricBottom) >= 4.8);
 
             int cardTop = DesignTokens.mix(Theme.SURFACE, accent, cardTopTint);
             int cardBottom = DesignTokens.mix(Theme.SURFACE, accent, cardBottomTint);
@@ -377,6 +395,46 @@ public final class HomeDashboardScreenshotTest {
             assertTrue("Dashboard action text contrast across gradient for " + Integer.toHexString(accent),
                     DesignTokens.contrastRatio(actionInk, actionEnd) >= 4.8);
         }
+    }
+
+    private static void verifyHomeCategoryJump(Instrumentation instrumentation, Activity activity) {
+        final View[] targets = new View[4];
+        instrumentation.runOnMainSync(() -> {
+            View decor = activity.getWindow().getDecorView();
+            targets[0] = findTaggedView(decor, "main-scroll-viewport");
+            targets[1] = findTaggedView(decor, "home-category-chip-management");
+            targets[2] = findTaggedView(decor, "home-group-management-1");
+            targets[3] = findTaggedView(decor, "home-category-chip-overview");
+        });
+        assertTrue("Home category jump has no scroll viewport", targets[0] instanceof ScrollView);
+        assertNotNull("Management category shortcut is missing", targets[1]);
+        assertNotNull("Management category destination is missing", targets[2]);
+        assertNotNull("Overview shortcut is missing", targets[3]);
+
+        final boolean[] clicked = {false};
+        instrumentation.runOnMainSync(() -> clicked[0] = targets[1].performClick());
+        assertTrue("Management shortcut did not accept activation", clicked[0]);
+
+        ScrollView scroll = (ScrollView) targets[0];
+        final int[] scrollY = {0};
+        final boolean[] destinationVisible = {false};
+        long deadline = SystemClock.uptimeMillis() + 2_000L;
+        do {
+            instrumentation.runOnMainSync(() -> {
+                scrollY[0] = scroll.getScrollY();
+                Rect visible = new Rect();
+                destinationVisible[0] = targets[2].getGlobalVisibleRect(visible) && visible.height() > 0;
+            });
+            if (scrollY[0] > 0 && destinationVisible[0]) break;
+            SystemClock.sleep(40L);
+        } while (SystemClock.uptimeMillis() < deadline);
+        assertTrue("Management shortcut did not move the dashboard to its category", scrollY[0] > 0);
+        assertTrue("Management category was not brought into the viewport", destinationVisible[0]);
+        instrumentation.runOnMainSync(() -> {
+            targets[3].performClick();
+            scroll.scrollTo(0, 0);
+        });
+        SystemClock.sleep(120L);
     }
 
     private static void verifySalesChartRangeSwitch(Activity activity) {
@@ -497,6 +555,7 @@ public final class HomeDashboardScreenshotTest {
                 targets[2].getBackground());
         verifyDashboardPolish(activity);
         verifySalesChartRangeSwitch(activity);
+        verifyHomeCategoryJump(instrumentation, activity);
 
         ViewGroup dock = (ViewGroup) targets[1];
         assertEquals("Admin dock should have five destinations", 5, dock.getChildCount());

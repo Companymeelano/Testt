@@ -24,4 +24,16 @@ public class HomeFeatureDefaultsTest {
         assertEquals("only the first three features are enabled by default", 3, enabled.size());
         for (int i = 3; i < 9; i++) assertTrue("unexpected default-on feature: " + order[i], !enabled.contains(order[i]));
     }
+
+    @Test public void defaultOrderKeepsEachDashboardCategoryContiguous() {
+        String[] order = Settings.HOME_ORDER_DEFAULT.split(",");
+        assertEquals("cash_mix", order[3]);
+        assertEquals("due", order[4]);
+        assertEquals("eod", order[5]);
+        assertEquals("top_performers", order[6]);
+        assertEquals("forecast_7d", order[9]);
+        assertEquals("quick_actions", order[11]);
+        assertEquals("market", order[13]);
+        assertEquals("returns", order[14]);
+    }
 }

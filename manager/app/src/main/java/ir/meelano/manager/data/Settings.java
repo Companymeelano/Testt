@@ -445,8 +445,8 @@ public final class Settings {
     public void setWhDirect(boolean on) { p.edit().putBoolean("wh_direct", on).apply(); }
 
     // ---------------- home dashboard order ----------------
-    /** Orderable lower Home modules; sales Hero and KPI stay pinned at the top. */
-    public static final String HOME_ORDER_DEFAULT = "smart_report,closeout,cash_position,top_performers,sales_goal,gross_profit,seasonal_calendar,quick_actions,forecast_7d,alerts,cash_mix,market,due,returns,eod";
+    /** Orderable lower Home modules; the default keeps finance, insight and operation groups adjacent. */
+    public static final String HOME_ORDER_DEFAULT = "smart_report,closeout,cash_position,cash_mix,due,eod,top_performers,sales_goal,gross_profit,forecast_7d,seasonal_calendar,quick_actions,alerts,market,returns";
     /** First three new modules are enabled by default; existing compact modules remain available. */
     public static final String HOME_SECTIONS_DEFAULT = "smart_report,closeout,cash_position";
     private static final String[] HOME_SECTION_KEYS = {"smart_report", "closeout", "cash_position",

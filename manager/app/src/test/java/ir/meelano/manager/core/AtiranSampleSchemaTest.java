@@ -43,7 +43,7 @@ public class AtiranSampleSchemaTest {
         Queries.Q query = Queries.overdueInvoices(meta, 5);
         String sql = query.sql.toLowerCase(Locale.ROOT);
         assertTrue(sql, sql.contains("count_big(1) over() as totalcount"));
-        assertTrue(sql, sql.contains("select top (5)"));
+        assertTrue(sql, sql.contains("select top (20)"));
         assertTrue(sql, sql.contains("s.[tasvieh]='f'"));
         assertFalse(sql, sql.contains("insert into "));
         assertFalse(sql, sql.contains("update dbo."));

@@ -38,6 +38,18 @@ public class AtiranSampleSchemaTest {
         assertEquals(12, report.totalSections);
     }
 
+    @Test public void homeOverduePreviewCarriesAnExactTotalWithoutLoadingEveryInvoice() throws Exception {
+        Meta meta = new Meta(connection(loadManifest()));
+        Queries.Q query = Queries.overdueInvoices(meta, 5);
+        String sql = query.sql.toLowerCase(Locale.ROOT);
+        assertTrue(sql, sql.contains("count_big(1) over() as totalcount"));
+        assertTrue(sql, sql.contains("select top (5)"));
+        assertTrue(sql, sql.contains("s.[tasvieh]='f'"));
+        assertFalse(sql, sql.contains("insert into "));
+        assertFalse(sql, sql.contains("update dbo."));
+        assertFalse(sql, sql.contains("delete from "));
+    }
+
     @Test public void bankStatementQueryIsAccountScopedDailyAndReadOnly() throws Exception {
         Meta meta = new Meta(connection(loadManifest()));
         Queries.Q q = MasterQueries.bankTurnoverDaily(meta, "17", "1405/01/01", "1405/01/31");

@@ -482,6 +482,7 @@ public final class Queries {
         }
         String sql = "SELECT TOP (" + clampTop(top) + ") " + codeExpr + " AS code, " + nameExpr + " AS party"
                 + ", COALESCE(TRY_CONVERT(decimal(19,2),s.[all_fel]),TRY_CONVERT(decimal(19,2),s.[all])) AS amount"
+                + ", COUNT_BIG(1) OVER() AS totalCount"
                 + ", LEFT(TRY_CONVERT(nvarchar(30),s.[t_date]),10) AS dueDate, " + daysExpr + " AS days"
                 + ", " + visitorExpr + " AS visitor, " + numExpr + " AS invoice"
                 + " FROM dbo.sailfact s" + joinSql + " WHERE " + Sql.join(where, " AND ")

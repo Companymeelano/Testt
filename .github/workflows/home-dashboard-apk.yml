@@ -141,6 +141,17 @@ jobs:
           fi
           exit "$result"
 
+      - name: Verify debug APK package and signer
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="manager/app/build/outputs/apk/debug/app-debug.apk"
+          build_tools="$ANDROID_HOME/build-tools/35.0.0"
+          test -s "$apk"
+          "$build_tools/aapt" dump badging "$apk" | grep -F "package: name='ir.meelano.manager.debug' versionCode='76' versionName='36.43.0'"
+          "$build_tools/apksigner" verify --verbose --print-certs "$apk" | tee manager-debug-signing.txt
+          sha256sum "$apk" | tee manager-debug-sha256.txt
+
       - name: Summarize failing unit tests
         if: failure()
         working-directory: manager
@@ -189,7 +200,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: meelano-manager-home-dashboard-${{ github.sha }}
-          path: manager/app/build/outputs/apk/debug/app-debug.apk
+          path: |
+            manager/app/build/outputs/apk/debug/app-debug.apk
+            manager-debug-signing.txt
+            manager-debug-sha256.txt
           if-no-files-found: error
           retention-days: 30
 
@@ -206,11 +220,21 @@ jobs:
           tag="manager-home-debug-${short_sha}"
           asset="meelano-manager-home-dashboard-debug-${short_sha}.apk"
           cp "$apk" "$asset"
+          apk_sha256="$(sha256sum "$apk" | cut -d' ' -f1)"
+          signer_sha256="$(awk -F': ' '/Signer #1 certificate SHA-256 digest:/ {print $2; exit}' manager-debug-signing.txt)"
+          test -n "$signer_sha256"
+          notes_file="$RUNNER_TEMP/manager-release-notes.md"
+          {
+            echo "Installable debug APK built from ${GITHUB_SHA}. This is signed with the Android debug key, not the production release key."
+            echo
+            echo "APK SHA-256: ${apk_sha256}"
+            echo "Debug signer certificate SHA-256: ${signer_sha256}"
+          } > "$notes_file"
           gh release create "$tag" "$asset" \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "MEELANO Manager Home Dashboard Debug ${short_sha}" \
-            --notes "Installable debug APK built from ${GITHUB_SHA}. This is not a production-signed release." \
+            --notes-file "$notes_file" \
             --prerelease
 
   screenshots:

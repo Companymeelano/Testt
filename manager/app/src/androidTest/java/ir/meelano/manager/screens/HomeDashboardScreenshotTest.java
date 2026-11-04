@@ -170,11 +170,11 @@ public final class HomeDashboardScreenshotTest {
             visibleText[0] = "";
             instrumentation.runOnMainSync(() ->
                     collectText(activity.getWindow().getDecorView(), visibleText));
-            if (visibleText[0].contains("شاخص‌های مالی")) break;
+            if (visibleText[0].contains("شاخص‌های روزانه")) break;
             SystemClock.sleep(250L);
         }
         assertTrue("Home dashboard was not visible; current UI text: " + visibleText[0],
-                visibleText[0].contains("شاخص‌های مالی"));
+                visibleText[0].contains("شاخص‌های روزانه"));
         assertFalse("Preview screenshot contains a live connection error",
                 visibleText[0].contains("جزئیات اتصال"));
     }
@@ -192,9 +192,11 @@ public final class HomeDashboardScreenshotTest {
                 144, MainActivity.headerTitleWidthDp(320, 2, true, true));
         verifyDashboardColorContrast();
         Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
-        final View[] targets = new View[25];
-        final int[] facts = new int[5];
+        final View[] targets = new View[26];
+        final int[] facts = new int[6];
         final String[] reconciliationCopy = {""};
+        final String[] dailyKpiCopy = {""};
+        final String[] returnKpiCopy = {""};
         long layoutDeadline = SystemClock.uptimeMillis() + 3_000L;
         do {
             instrumentation.runOnMainSync(() -> {
@@ -226,9 +228,16 @@ public final class HomeDashboardScreenshotTest {
                 targets[22] = findTaggedView(decor, "home-category-nav");
                 targets[23] = findTaggedView(decor, "home-category-chip-overview");
                 targets[24] = findTaggedView(decor, "home-category-chip-management");
+                targets[25] = findTaggedView(decor, "home-returns-kpis");
                 reconciliationCopy[0] = "";
+                dailyKpiCopy[0] = "";
+                returnKpiCopy[0] = "";
                 if (targets[8] != null) collectText(targets[8], reconciliationCopy);
+                if (targets[0] != null) collectText(targets[0], dailyKpiCopy);
+                if (targets[25] != null) collectText(targets[25], returnKpiCopy);
                 facts[0] = targets[0] == null ? 0 : countTaggedViews(targets[0], "home-financial-kpi");
+                facts[5] = targets[25] == null ? 0
+                        : countTaggedViews(targets[25], "home-financial-kpi");
                 facts[1] = targets[0] != null
                         && containsViewType(targets[0], HorizontalScrollView.class) ? 1 : 0;
                 facts[2] = targets[1] == null ? 0 : targets[1].getWidth();
@@ -237,12 +246,20 @@ public final class HomeDashboardScreenshotTest {
                 facts[4] = targets[6] != null && targets[6].getGlobalVisibleRect(visibleLicense)
                         && visibleLicense.width() == targets[6].getWidth() ? 1 : 0;
             });
-            if (facts[2] > 0 && facts[3] > 0 && facts[4] > 0) break;
+            if (facts[2] > 0 && facts[3] > 0 && facts[4] > 0 && facts[5] > 0) break;
             SystemClock.sleep(40L);
         } while (SystemClock.uptimeMillis() < layoutDeadline);
         assertNotNull("Financial KPI section is missing", targets[0]);
         assertEquals("Financial KPIs still use a clipping horizontal carousel", 0, facts[1]);
-        assertEquals("Admin preview should show four complete financial metrics", 4, facts[0]);
+        assertEquals("Daily KPIs must remain separate from the 30-day returns KPI", 3, facts[0]);
+        assertNotNull("The separate 30-day returns KPI section is missing", targets[25]);
+        assertEquals("The returns section should contain its own single KPI", 1, facts[5]);
+        assertTrue("Daily KPI period and comparison basis are not readable",
+                dailyKpiCopy[0].contains("بازه:") && dailyKpiCopy[0].contains("روز قبل"));
+        assertTrue("The returns KPI does not expose both 30-day date ranges",
+                returnKpiCopy[0].contains("اسناد برگشتی")
+                        && returnKpiCopy[0].contains("پیشین:")
+                        && returnKpiCopy[0].contains("جاری:"));
         assertNotNull("Financial metric tiles were not rendered", targets[1]);
         assertTrue("Financial metric tile is too narrow for its value",
                 facts[2] >= 120f * activityDensity(targets[1]));

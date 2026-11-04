@@ -485,9 +485,10 @@ public final class Kit {
         if (k.detail != null && !k.detail.trim().isEmpty()) {
             TextView detail = text(k.detail, dashboardStyle ? 9.5f : 9f,
                     dashboardStyle ? Theme.dashboardMutedInk(accent) : Theme.MUTED, false);
-            detail.setSingleLine(true);
+            detail.setSingleLine(!dashboardStyle);
+            detail.setMaxLines(dashboardStyle ? 2 : 1);
             detail.setEllipsize(TextUtils.TruncateAt.END);
-            detail.setMinHeight(Theme.dp(18));
+            detail.setMinHeight(Theme.dp(dashboardStyle ? 32 : 18));
             tile.addView(detail, lp(-1, -2));
         }
         if (k.spark != null && k.spark.length > 1) {
@@ -594,7 +595,8 @@ public final class Kit {
     }
 
     public View kpiGrid(List<Kpi> kpis, int cols) {
-        int span = Math.max(1, isWide() ? Math.max(cols, 4) : cols);
+        int span = Math.max(1, isWide()
+                ? Math.min(4, Math.max(1, kpis == null ? 1 : kpis.size())) : cols);
         LinearLayout root = v();
         root.setTag("home-kpi-grid");
         LinearLayout row = null;

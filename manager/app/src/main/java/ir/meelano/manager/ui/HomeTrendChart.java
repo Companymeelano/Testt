@@ -88,7 +88,7 @@ public final class HomeTrendChart {
             catch (Exception ignored) { touchSlop = Theme.dp(8); }
             setFocusable(true);
             setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
-            setMinimumHeight(Theme.dp(148));
+            setMinimumHeight(Theme.dp(166));
         }
 
         private static Paint paint(Paint.Style style) {
@@ -195,7 +195,7 @@ public final class HomeTrendChart {
             geometryDirty = false;
             float width = getWidth();
             float height = getHeight();
-            float textSize = sp(8.5f);
+            float textSize = sp(9.25f);
             textPaint.setTextSize(textSize);
             double minimum = 0d;
             double maximum = 0d;
@@ -229,7 +229,7 @@ public final class HomeTrendChart {
             plotLeft = Math.min(width * 0.42f,
                     Math.max(Theme.dp(44), labelWidth + Theme.dp(14)));
             plotRight = Math.max(plotLeft + Theme.dp(44), width - Theme.dp(10));
-            plotTop = Theme.dp(24);
+            plotTop = Theme.dp(27);
             plotBottom = Math.max(plotTop + Theme.dp(42), height - Theme.dp(34));
             spacing = points.size() <= 1 ? 0d : (plotRight - plotLeft) / (points.size() - 1);
             pointX = new float[points.size()];
@@ -327,7 +327,7 @@ public final class HomeTrendChart {
 
         private void drawAxes(Canvas canvas) {
             textPaint.setColor(Theme.MUTED);
-            textPaint.setTextSize(sp(8.25f));
+            textPaint.setTextSize(sp(9.25f));
             textPaint.setTypeface(Theme.face(false));
             textPaint.setTextAlign(Paint.Align.RIGHT);
             int ticks = Math.max(1, Math.min(5,
@@ -341,7 +341,7 @@ public final class HomeTrendChart {
                 canvas.drawText(HomeNumberFormatter.chartMoney(value), (float) plotLeft - Theme.dp(7),
                         y + textPaint.getTextSize() * 0.34f, textPaint);
             }
-            textPaint.setTextSize(sp(8f));
+            textPaint.setTextSize(sp(9f));
             textPaint.setColor(Theme.MUTED);
             textPaint.setTextAlign(Paint.Align.LEFT);
             canvas.drawText("جدیدتر", (float) plotLeft, Theme.dp(11) + textPaint.getTextSize(), textPaint);
@@ -424,7 +424,7 @@ public final class HomeTrendChart {
         private void drawDateLabels(Canvas canvas) {
             if (points.isEmpty()) return;
             textPaint.setTypeface(Theme.face(false));
-            textPaint.setTextSize(sp(8f));
+            textPaint.setTextSize(sp(9f));
             textPaint.setColor(Theme.MUTED);
             textPaint.setTextAlign(Paint.Align.CENTER);
             int n = points.size();
@@ -468,7 +468,7 @@ public final class HomeTrendChart {
             bubbleText.setColor(Theme.TEXT);
             canvas.drawText(Charts.fitText(primary, bubbleText, width - Theme.dp(16)),
                     bubble.centerX(), bubble.top + Theme.dp(18), bubbleText);
-            bubbleText.setTextSize(sp(8.5f));
+            bubbleText.setTextSize(sp(9f));
             bubbleText.setColor(Theme.MUTED);
             canvas.drawText(HomeNumberFormatter.integer(point.documents) + " " + documentNoun()
                             + " · " + seriesLabel,

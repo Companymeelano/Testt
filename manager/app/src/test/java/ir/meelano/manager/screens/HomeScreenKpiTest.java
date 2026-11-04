@@ -1,9 +1,12 @@
 package ir.meelano.manager.screens;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 import ir.meelano.manager.ui.Kit;
+import ir.meelano.manager.ui.Theme;
 import org.junit.Test;
 
 public class HomeScreenKpiTest {
@@ -27,10 +30,65 @@ public class HomeScreenKpiTest {
         HomeScreen screen = new HomeScreen(null);
 
         Kit.Kpi kpi = screen.homeKpi("فروش", 0, 0, "فاکتور", true, 0d, null,
-                ir.meelano.manager.ui.Theme.SECTION_SALES,
-                ir.meelano.manager.R.drawable.mi_point_of_sale, true, false, null);
+                Theme.SECTION_SALES, ir.meelano.manager.R.drawable.mi_point_of_sale,
+                true, false, null);
 
         assertEquals("بدون تغییر · نسبت به روز قبل", kpi.sub);
+    }
+
+    @Test
+    public void purchaseIncreaseUsesUnfavorableColorAndShowsItsComparisonBase() {
+        HomeScreen screen = new HomeScreen(null);
+
+        Kit.Kpi kpi = screen.homeKpi("خرید", 2_000_000, 3, "فاکتور امروز", true,
+                1_000_000d, null, Theme.SECTION_PURCHASE,
+                ir.meelano.manager.R.drawable.mi_shopping_cart, false, false, null);
+
+        assertEquals(Theme.DANGER, kpi.subColor);
+        assertTrue(kpi.sub.contains("+"));
+        assertTrue(kpi.detail.contains("مبنای مقایسه (روز قبل)"));
+        assertTrue(kpi.detail.contains("تومان") || kpi.detail.contains("ریال"));
+    }
+
+    @Test
+    public void hugeKpiChangesAreCappedWhileTheSmallBaseRemainsVisible() {
+        HomeScreen screen = new HomeScreen(null);
+
+        Kit.Kpi kpi = screen.homeKpi("خرید", 1_000_000_000_000d, 1, "فاکتور", true,
+                1d, null, Theme.SECTION_PURCHASE,
+                ir.meelano.manager.R.drawable.mi_shopping_cart, false, false, null);
+
+        assertTrue(kpi.sub.startsWith("+بیش از ۹۹۹٪"));
+        assertTrue(kpi.detail.contains("مبنای مقایسه (روز قبل)"));
+        assertEquals("+بیش از ۹۹۹٪", HomeScreen.cappedKpiPercent(Double.POSITIVE_INFINITY, 1));
+    }
+
+    @Test
+    public void zeroReturnsAfterANonzeroPreviousPeriodShowAFavorableDrop() {
+        HomeScreen screen = new HomeScreen(null);
+
+        Kit.Kpi kpi = screen.homeKpi("برگشتی", 0, 0, "سند در ۳۰ روز", true,
+                500_000d, null, Theme.SECTION_RETURNS,
+                ir.meelano.manager.R.drawable.mi_assignment_return, false, true, null);
+
+        assertFalse(kpi.neutralStatus);
+        assertTrue(kpi.sub.contains("−۱۰۰"));
+        assertTrue(kpi.sub.contains("۳۰روزهٔ پیشین"));
+        assertEquals(Theme.SUCCESS, kpi.subColor);
+    }
+
+    @Test
+    public void negativeGrossProfitIsGivenDangerTone() {
+        assertEquals(Theme.DANGER, HomeScreen.grossProfitValueTone(-8_546_444d));
+        assertEquals(Theme.TEXT, HomeScreen.grossProfitValueTone(0d));
+    }
+
+    @Test
+    public void unavailableTrendSourcesCannotExposeAListAction() {
+        assertFalse(HomeScreen.shouldShowTrendAction(true, false, false));
+        assertFalse(HomeScreen.shouldShowTrendAction(true, true, false));
+        assertFalse(HomeScreen.shouldShowTrendAction(false, true, true));
+        assertTrue(HomeScreen.shouldShowTrendAction(true, true, true));
     }
 
     @Test

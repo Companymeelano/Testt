@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/lib.php';
+require_once __DIR__ . '/providers.php';
 
 ini_set('display_errors', '0');
 header('Content-Type: application/json; charset=utf-8');
@@ -96,80 +97,6 @@ function ai_default_system_prompt(): string
         . "If the source is incomplete or ambiguous, say so plainly and identify the report or period used.";
 }
 
-function ai_openai_responses(string $apiKey, string $model, string $system, string $message): string
-{
-    if (!function_exists('curl_init')) {
-        throw new RuntimeException('curl extension is required');
-    }
-    $payload = [
-        'model' => $model,
-        'store' => false,
-        'max_output_tokens' => 1200,
-        'input' => [
-            [
-                'role' => 'system',
-                'content' => [['type' => 'input_text', 'text' => $system]],
-            ],
-            [
-                'role' => 'user',
-                'content' => [['type' => 'input_text', 'text' => $message]],
-            ],
-        ],
-    ];
-    $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
-    $handle = curl_init('https://api.openai.com/v1/responses');
-    if ($handle === false) {
-        throw new RuntimeException('Unable to create provider request');
-    }
-    $raw = '';
-    $tooLarge = false;
-    curl_setopt_array($handle, [
-        CURLOPT_POST => true,
-        CURLOPT_POSTFIELDS => $json,
-        CURLOPT_HTTPHEADER => [
-            'Authorization: Bearer ' . $apiKey,
-            'Content-Type: application/json',
-            'Accept: application/json',
-        ],
-        CURLOPT_RETURNTRANSFER => false,
-        CURLOPT_WRITEFUNCTION => static function ($curl, string $chunk) use (&$raw, &$tooLarge): int {
-            if (strlen($raw) + strlen($chunk) > 1_048_576) {
-                $tooLarge = true;
-                return 0;
-            }
-            $raw .= $chunk;
-            return strlen($chunk);
-        },
-        CURLOPT_FOLLOWLOCATION => false,
-        CURLOPT_CONNECTTIMEOUT => 10,
-        CURLOPT_TIMEOUT => 60,
-        CURLOPT_SSL_VERIFYPEER => true,
-        CURLOPT_SSL_VERIFYHOST => 2,
-        CURLOPT_MAXFILESIZE => 1_048_576,
-    ]);
-    $executed = curl_exec($handle);
-    $status = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
-    $ok = $executed === true && !$tooLarge && $status >= 200 && $status < 300;
-    curl_close($handle);
-    if (!$ok || strlen($raw) > 1_048_576) {
-        // Never reflect the upstream body: it can contain request details or provider diagnostics.
-        throw new RuntimeException('Provider request failed');
-    }
-    try {
-        $result = json_decode($raw, true, 64, JSON_THROW_ON_ERROR);
-    } catch (Throwable $error) {
-        throw new RuntimeException('Provider response was not valid JSON');
-    }
-    if (!is_array($result)) {
-        throw new RuntimeException('Provider response was not an object');
-    }
-    $text = ai_responses_text($result);
-    if ($text === '' || strlen($text) > 32_000) {
-        throw new RuntimeException('Provider returned no usable text');
-    }
-    return $text;
-}
-
 try {
     $method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
     $action = (string) ($_GET['action'] ?? '');
@@ -240,20 +167,23 @@ try {
     }
     $message = isset($body['message']) && is_string($body['message']) ? trim($body['message']) : '';
     $clientSystem = isset($body['system']) && is_string($body['system']) ? trim($body['system']) : '';
+    $task = 'general';
+    if (array_key_exists('task', $body)) {
+        if (!is_string($body['task'])) {
+            ai_reply(400, ['ok' => false, 'error' => 'نوع درخواست هوش مصنوعی معتبر نیست']);
+        }
+        $task = ai_normalize_task($body['task']);
+        if ($task === null) {
+            ai_reply(400, ['ok' => false, 'error' => 'نوع درخواست هوش مصنوعی معتبر نیست']);
+        }
+    }
     if ($message === '' || strlen($message) > 24_000 || preg_match('//u', $message) !== 1
         || strlen($clientSystem) > 8_000 || preg_match('//u', $clientSystem) !== 1) {
         ai_reply(400, ['ok' => false, 'error' => 'متن درخواست خالی، نامعتبر یا بیش از حد بزرگ است']);
     }
-    $apiKey = ai_environment('OPENAI_API_KEY');
-    if ($apiKey === '') {
-        ai_reply(503, ['ok' => false, 'error' => 'ارائه‌دهندهٔ AI روی سرور پیکربندی نشده است']);
-    }
-    $model = ai_environment('AI_MODEL');
-    if ($model === '') {
-        $model = 'gpt-4o-mini';
-    }
-    if (!preg_match('/^[A-Za-z0-9._:-]{1,100}$/D', $model)) {
-        ai_reply(503, ['ok' => false, 'error' => 'مدل AI پیکربندی معتبر ندارد']);
+    $providers = ai_configured_providers($task);
+    if ($providers === []) {
+        ai_reply(503, ['ok' => false, 'error' => 'سرویس هوش مصنوعی هنوز پیکربندی نشده است']);
     }
     // The app supplies task-specific Persian/planner instructions. The server's safety rules
     // remain first and are repeated after the client text; this endpoint has no tools or SQL access.
@@ -262,7 +192,17 @@ try {
         $system .= "\n\nدستور تکمیلی برنامه:\n" . $clientSystem;
     }
     $system .= "\n\nقید نهایی: هیچ SQL، کد یا عملیات تغییردهنده اجرا نکن؛ دادهٔ غایب را صفر قطعی فرض نکن.";
-    $reply = ai_openai_responses($apiKey, $model, $system, $message);
+    // The three bounded upstream attempts need room to finish inside the app's read timeout.
+    if (function_exists('set_time_limit')) {
+        @set_time_limit(60);
+    }
+    try {
+        $reply = ai_complete_with_fallback($providers, $system, $message);
+    } catch (AiProviderFailure $error) {
+        // Provider diagnostics and response bodies can contain sensitive prompt details.
+        error_log('Meelano AI API: all configured providers unavailable');
+        ai_reply(502, ['ok' => false, 'error' => 'سرویس هوش مصنوعی موقتاً پاسخ‌گو نیست']);
+    }
     ai_reply(200, ['ok' => true, 'reply' => $reply]);
 } catch (Throwable $error) {
     // Intentionally do not log exception text, request bodies, tokens, or provider responses.

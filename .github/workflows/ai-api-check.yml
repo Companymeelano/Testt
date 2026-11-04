@@ -30,6 +30,7 @@ jobs:
       - name: Syntax check
         run: |
           php -l ai-api/lib.php
+          php -l ai-api/providers.php
           php -l ai-api/api.php
           php -l ai-api/tests/run.php
       - name: Run dependency-free helper tests

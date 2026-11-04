@@ -389,7 +389,7 @@ public final class AssistantScreen extends Screen {
     }
 
     private String completeAi(String task, String system, String user) throws Exception {
-        if (AiBackendClient.selected(a)) return AiBackendClient.complete(a, system, user);
+        if (AiBackendClient.selected(a)) return AiBackendClient.complete(a, task, system, user);
         return AiRouter.complete(a, task, system, user).text;
     }
 
@@ -401,6 +401,7 @@ public final class AssistantScreen extends Screen {
 
     private void askAi(final String q, final String facts, final String fallback) {
         final String userPrompt = AssistantPrompt.build(facts, new ArrayList<>(msgs), q);
+        final String aiTask = AiRouter.taskFor(q);
         final boolean useProxy = AiBackendClient.selected(a);
         aiBusy = true;
         final String[] slot = {"ai", "…"};
@@ -420,7 +421,7 @@ public final class AssistantScreen extends Screen {
             try {
                 if (useProxy) {
                     // The PHP proxy owns the provider key. Its response is complete, not streamed.
-                    reply = AiPromptRedactor.redact(AiBackendClient.complete(a, SYSTEM_PROMPT, userPrompt));
+                    reply = AiPromptRedactor.redact(AiBackendClient.complete(a, aiTask, SYSTEM_PROMPT, userPrompt));
                     acc.append(reply);
                     final String shown = reply;
                     a.runOnUiThread(() -> {
@@ -430,7 +431,7 @@ public final class AssistantScreen extends Screen {
                         }
                     });
                 } else {
-                    AiRouter.Result result = AiRouter.completeStream(a, AiRouter.taskFor(q), SYSTEM_PROMPT,
+                    AiRouter.Result result = AiRouter.completeStream(a, aiTask, SYSTEM_PROMPT,
                             userPrompt, piece -> {
                                 acc.append(piece);
                                 long now = System.currentTimeMillis();

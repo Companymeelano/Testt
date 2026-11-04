@@ -11,6 +11,7 @@ import android.widget.TextView;
 
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.R;
+import ir.meelano.manager.core.AiBackendClient;
 import ir.meelano.manager.core.AiRouter;
 import ir.meelano.manager.core.AtiranAuth;
 import ir.meelano.manager.core.Jalali;
@@ -618,8 +619,10 @@ public final class VisitorDeskScreen extends Screen {
         aiExecutor.execute(()->{
             try{
                 String system="فقط یک JSON معتبر برگردان: {\"items\":[{\"product\":\"نام کالا\",\"quantity\":1,\"unit\":\"واحد\"}]}. هیچ قیمت یا شناسه‌ای نساز. اگر نام کالا مشخص نیست items را خالی کن.";
-                AiRouter.Result r=AiRouter.complete(a,"fast",system,input);
-                org.json.JSONObject root=new org.json.JSONObject(r.text);org.json.JSONArray items=root.optJSONArray("items");
+                String aiText = AiBackendClient.selected(a)
+                        ? AiBackendClient.complete(a, "fast", system, input)
+                        : AiRouter.complete(a,"fast",system,input).text;
+                org.json.JSONObject root=new org.json.JSONObject(aiText);org.json.JSONArray items=root.optJSONArray("items");
                 if(items==null||items.length()==0)throw new Exception("نام/تعداد کالا به شکل قابل‌تأیید تشخیص داده نشد.");
                 if(items.length()!=1)throw new Exception("برای جلوگیری از حذف یا اشتباه در اقلام، هر بار فقط یک کالا را بگویید.");
                 org.json.JSONObject first=items.optJSONObject(0);if(first==null)throw new Exception("پاسخ هوش مصنوعی ساختار معتبر نداشت.");

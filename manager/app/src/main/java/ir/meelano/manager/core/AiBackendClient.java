@@ -12,6 +12,7 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 
 /** HTTPS client for the optional, separately deployed PHP AI proxy. */
 public final class AiBackendClient {
@@ -25,7 +26,7 @@ public final class AiBackendClient {
     private static final String ENABLED = "ai_backend_enabled";
     private static final int MAX_BODY_BYTES = 64 * 1024;
     private static final int CONNECT_TIMEOUT_MS = 10_000;
-    private static final int READ_TIMEOUT_MS = 60_000;
+    private static final int READ_TIMEOUT_MS = 65_000;
 
     private static SharedPreferences prefs(Context c) {
         return c.getApplicationContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
@@ -102,19 +103,26 @@ public final class AiBackendClient {
                 .apply();
     }
 
-    /** Sends one bounded chat request; the PHP service owns the provider key. */
+    /** Uses the generic server route for small connection checks and legacy callers. */
     public static String complete(Context c, String system, String message) throws Exception {
+        return complete(c, "general", system, message);
+    }
+
+    /** Sends one bounded chat request; the PHP service owns provider keys and failover. */
+    public static String complete(Context c, String task, String system, String message) throws Exception {
         if (!hasSession(c)) {
             clearSession(c);
             throw new IOException("نشست سرور AI منقضی است؛ دوباره وارد شوید");
         }
         String endpoint = AiEndpoint.normalize(savedEndpoint(c));
         String token = SecretBox.get(c, TOKEN);
+        String routeTask = normalizedTask(task);
         if (message == null || message.trim().isEmpty() || message.length() > 24_000) {
             throw new IllegalArgumentException("متن درخواست AI خالی یا بیش از حد طولانی است");
         }
         JSONObject request = new JSONObject();
         request.put("action", "chat");
+        request.put("task", routeTask);
         request.put("system", bounded(system, 8_000));
         request.put("message", message);
         try {
@@ -139,6 +147,15 @@ public final class AiBackendClient {
     private static void clearSession(Context c) {
         SecretBox.put(c, TOKEN, "");
         prefs(c).edit().remove(EXPIRES).apply();
+    }
+
+    private static String normalizedTask(String task) {
+        String value = task == null ? "" : task.trim().toLowerCase(Locale.ROOT);
+        if (!"analysis".equals(value) && !"fast".equals(value)
+                && !"writing".equals(value) && !"general".equals(value)) {
+            throw new IllegalArgumentException("نوع درخواست هوش مصنوعی معتبر نیست");
+        }
+        return value;
     }
 
     private static String bounded(String text, int maxChars) {

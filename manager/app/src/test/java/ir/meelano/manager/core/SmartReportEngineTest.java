@@ -31,7 +31,7 @@ public class SmartReportEngineTest {
 
         assertEquals(3, result.size());
         assertTrue(result.get(0).contains("فروش امروز"));
-        assertTrue(result.get(0).contains("همان روز هفته"));
+        assertTrue(result.get(0).contains("میانگین روزهای هم‌نام"));
         assertTrue(result.get(1).contains("پسته اکبری"));
         assertTrue(result.get(2).contains("فاکتور معوق"));
         assertTrue(result.get(2).contains("چک دریافتی"));
@@ -77,11 +77,12 @@ public class SmartReportEngineTest {
 
         String first = SmartReportEngine.compose(input).get(0);
 
-        assertTrue(first.contains("افزایش"));
+        String change = HomeNumberFormatter.signedCompactMoney(
+                input.salesRials - input.salesBaselineRials);
+        assertTrue(change.startsWith("+"));
+        assertTrue(first.contains(change));
         assertTrue(first.contains("میانگین روزهای هم‌نام"));
         assertFalse(first.contains("٪"));
-        assertTrue(first.contains(HomeNumberFormatter.compactMoney(
-                input.salesRials - input.salesBaselineRials)));
     }
 
     @Test public void urgencyBadgeBelongsToTheOverdueRowNotEveryFollowUp() {

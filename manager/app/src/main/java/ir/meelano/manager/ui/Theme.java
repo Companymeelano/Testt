@@ -317,8 +317,8 @@ public final class Theme {
     /** Dashboard surface tint levels are shared with contrast checks and muted-ink resolution. */
     public static float dashboardCardTopTint() { return light ? 0.03f : 0.12f; }
     public static float dashboardCardBottomTint() { return light ? 0.01f : 0.06f; }
-    public static float dashboardMetricTopTint() { return light ? 0.10f : 0.26f; }
-    public static float dashboardMetricBottomTint() { return light ? 0.04f : 0.13f; }
+    public static float dashboardMetricTopTint() { return light ? 0.045f : 0.12f; }
+    public static float dashboardMetricBottomTint() { return light ? 0.018f : 0.055f; }
 
     /**
      * Quiet, softly tinted card used only by the home dashboard. Other screens keep the shared
@@ -570,9 +570,9 @@ public final class Theme {
         return base(accent, 10, 0, 0);
     }
 
-    /** Header tools and brand row share the same flat, theme-aware surface. */
+    /** Header and page share one full-width surface so the top chrome does not look inset. */
     public static android.graphics.drawable.Drawable toolbarPanel() {
-        return new android.graphics.drawable.ColorDrawable(SURFACE);
+        return new android.graphics.drawable.ColorDrawable(BG);
     }
 
     /** Compatibility factory for the shared flat dock surface. */
@@ -580,9 +580,9 @@ public final class Theme {
         return base(SURFACE, 0, 0, 0);
     }
 
-    /** Flat app dock surface. */
+    /** Flat app dock surface, continuous with the screen background. */
     public static GradientDrawable bottomBar() {
-        return base(SURFACE, 0, 0, 0);
+        return base(BG, 0, 0, 0);
     }
 
     public static GradientDrawable dialogBg() {

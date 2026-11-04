@@ -62,7 +62,18 @@ public class ProfitScreen extends Screen {
         List<Row> byProduct = new ArrayList<>();
         List<Row> byCust = new ArrayList<>();
         List<Row> costs = new ArrayList<>();
+        boolean grossProfitCoverageComplete;
         Map<String, String> notes = new LinkedHashMap<>();
+    }
+
+    static boolean grossProfitCoverageComplete(List<Row> daily, boolean summaryAvailable) {
+        if (!summaryAvailable || daily == null) return false;
+        for (Row row : daily) {
+            Long issues = row == null ? null : row.exactLong("qualityIssues");
+            if (issues == null || issues != 0L || row.bd("sales") == null
+                    || row.bd("cogs") == null || row.bd("profit") == null) return false;
+        }
+        return true;
     }
 
     @Override
@@ -82,6 +93,8 @@ public class ProfitScreen extends Screen {
             d.byProduct = soft(d.notes, "سود کالاها", () -> Repo.exec(c, MasterQueries.profitByProduct(m, f, 30)));
             d.byCust = soft(d.notes, "سود مشتریان", () -> Repo.exec(c, MasterQueries.profitByCustomer(m, f, 20)));
             d.costs = soft(d.notes, "هزینه‌ها", () -> Repo.exec(c, MasterQueries.profitCosts(m, f)));
+            d.grossProfitCoverageComplete = grossProfitCoverageComplete(d.daily,
+                    d.sales != null && d.cogs != null);
             if (d.sales == null && d.cogs == null) throw new Exception(firstNote(d.notes));
             return d;
         }, new Repo.Cb<Data>() {
@@ -134,6 +147,8 @@ public class ProfitScreen extends Screen {
         d.byProduct = CacheStore.rows(m, "byProduct");
         d.byCust = CacheStore.rows(m, "byCust");
         d.costs = CacheStore.rows(m, "costs");
+        d.grossProfitCoverageComplete = grossProfitCoverageComplete(d.daily,
+                d.sales != null && d.cogs != null);
         return d;
     }
     private void build(LinearLayout content, Data d) {
@@ -142,6 +157,27 @@ public class ProfitScreen extends Screen {
         content.addView(a.kit.hint("مبنای بهای تمام‌شده: قیمت خرید روز کالا • سود خالص تقریبی است"), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
         addSearchRow(content);
+
+        if (!d.grossProfitCoverageComplete) {
+            java.math.BigDecimal knownSales = d.sales == null ? null : d.sales.bd("total");
+            if (knownSales != null) {
+                List<Kit.Kpi> safeKpis = new ArrayList<>();
+                safeKpis.add(new Kit.Kpi("فروش", Money.compactRial(knownSales.doubleValue()),
+                        "مبلغ ثبت‌شده", Theme.GOLD));
+                content.addView(a.kit.kpiGrid(safeKpis, 1), a.kit.lp(-1, -2));
+            }
+            boolean queryIncomplete = d.daily == null || d.sales == null || d.cogs == null;
+            LinearLayout warning = a.kit.card(Theme.WARNING);
+            warning.addView(a.kit.text("سود و زیان نمایش داده نمی‌شود", 13f,
+                    Theme.TEXT, true), a.kit.lp(-1, -2));
+            warning.addView(a.kit.hint(queryIncomplete
+                    ? "دادهٔ لازم برای محاسبهٔ کامل در دسترس نیست؛ سود صفر فرض نشده است."
+                    : "بهای خرید یک یا چند ردیف فروش ناموجود یا نامعتبر است؛ پس از تکمیل آن دوباره بررسی کنید."),
+                    a.kit.lp(-1, -2));
+            a.kit.addCard(content, warning);
+            renderNotes(content, d.notes);
+            return;
+        }
 
         double sales = d.sales == null ? 0 : d.sales.d("total");
         double discount = d.sales == null ? 0 : d.sales.d("discount");

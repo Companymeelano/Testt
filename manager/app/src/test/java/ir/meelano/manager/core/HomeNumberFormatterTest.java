@@ -5,6 +5,8 @@ import org.junit.Test;
 import java.math.BigDecimal;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 public class HomeNumberFormatterTest {
     @Test public void homeNumbersUsePersianDigitsAndArabicSeparators() {
@@ -57,6 +59,46 @@ public class HomeNumberFormatterTest {
     @Test public void timeAndExternalLabelsAreLocalized() {
         assertEquals("\u2066۰۸:۰۵\u2069", HomeNumberFormatter.time(8, 5));
         assertEquals("پرداخت ۱۲۳۴ / ۵۶۷۸", HomeNumberFormatter.localizeText("پرداخت 1234 / ٥٦٧٨"));
+        assertEquals("مبلغ ۱٬۲۳۴٫۵٪، تاریخ ۱۴۰۵/۰۸/۰۴ تا ۱۴۰۵/۰۸/۳۰",
+                HomeNumberFormatter.localizeText("مبلغ 1,234.5%, تاریخ 1405/08/04 تا 1405/08/30"));
+        assertEquals("−۵٪", HomeNumberFormatter.localizeText("-5%"));
+    }
+
+    @Test public void chartScaleAndLargeChangeUseActualAmounts() {
+        int old = Money.unit();
+        try {
+            Money.setUnit(Money.UNIT_TOMAN);
+            assertEquals(1_000_000_000_000d,
+                    HomeNumberFormatter.chartScale(12_000_000_000_000d), 0.1d);
+            assertEquals("۱٫۲", HomeNumberFormatter.chartTick(
+                    12_000_000_000_000d, 1_000_000_000_000d));
+            String readableChange = HomeNumberFormatter.changeLabel(34_000_000_000d,
+                    4_300_000_000d, 690d, "فروش دورهٔ قبل");
+            assertTrue(readableChange.contains(HomeNumberFormatter.signedPercent(690d)));
+            assertTrue(readableChange.contains("فروش دورهٔ قبل"));
+
+            String extremeChange = HomeNumberFormatter.changeLabel(34_000_000_000d,
+                    1_000_000_000d, 3_300d, "میانگین روزهای هم‌نام");
+            assertTrue(extremeChange.contains(HomeNumberFormatter.signedCompactMoney(33_000_000_000d)));
+            assertTrue(extremeChange.contains("میانگین روزهای هم‌نام"));
+            assertFalse(extremeChange.contains("٪"));
+            assertTrue(HomeNumberFormatter.changeLabel(100d, 0d, Double.NaN, "مبنای قبل")
+                    .contains("صفر است"));
+        } finally {
+            Money.setUnit(old);
+        }
+    }
+
+    @Test public void comparisonSwitchesToSignedMoneyOnlyAboveReadablePercentRange() {
+        assertEquals(HomeNumberFormatter.signedPercent(999d),
+                HomeNumberFormatter.changeValue(1_099d, 100d, 999d));
+        assertEquals(HomeNumberFormatter.signedCompactMoney(1_000d),
+                HomeNumberFormatter.changeValue(1_100d, 100d, 1_000d));
+        assertEquals(HomeNumberFormatter.signedCompactMoney(1_000d),
+                HomeNumberFormatter.changeValue(1_100d, 100d, Double.POSITIVE_INFINITY));
+        assertEquals("شروع از صفر", HomeNumberFormatter.changeValue(1d, 0d, Double.NaN));
+        assertEquals("شروع از صفر", HomeNumberFormatter.changeValue(1d, 0d, 10_000d));
+        assertFalse(HomeNumberFormatter.changeValue(1d, 0d, 10_000d).contains("٪"));
     }
 
     @Test public void displayNameDropsReplacementGlyphsAndCollapsesWhitespace() {

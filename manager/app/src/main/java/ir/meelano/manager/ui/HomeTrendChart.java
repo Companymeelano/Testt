@@ -3,11 +3,9 @@ package ir.meelano.manager.ui;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RectF;
-import android.graphics.Shader;
 import android.view.HapticFeedbackConstants;
 import android.view.MotionEvent;
 import android.view.View;
@@ -15,7 +13,6 @@ import android.view.ViewConfiguration;
 
 import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Jalali;
-import ir.meelano.manager.core.MonotoneCubic;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -39,23 +36,17 @@ public final class HomeTrendChart {
 
     public interface SelectionListener { void onSelect(Point point); }
 
-    /** Canvas-only 3D-area chart; source order is oldest-to-newest, newest is shown on the left. */
+    /** Canvas-only, zero-based area chart; source order is oldest-to-newest, newest is left. */
     public static final class Area extends View {
         private final Paint axisPaint = paint(Paint.Style.STROKE);
         private final Paint textPaint = paint(Paint.Style.FILL);
         private final Paint areaPaint = paint(Paint.Style.FILL);
-        private final Paint extrusionPaint = paint(Paint.Style.FILL);
-        private final Paint lineShadowPaint = paint(Paint.Style.STROKE);
         private final Paint linePaint = paint(Paint.Style.STROKE);
-        private final Paint highlightPaint = paint(Paint.Style.STROKE);
         private final Paint markerPaint = paint(Paint.Style.FILL);
-        private final Paint bubblePaint = paint(Paint.Style.FILL);
-        private final Paint bubbleText = paint(Paint.Style.FILL);
         private final Path areaPath = new Path();
         private final Path linePath = new Path();
         private final Path guidePath = new Path();
-        private final RectF bubble = new RectF();
-        private final RectF plot = new RectF();
+        private final Path peakPath = new Path();
         private final List<Point> points = new ArrayList<>();
 
         private float[] pointX = new float[0];
@@ -63,7 +54,7 @@ public final class HomeTrendChart {
         private float[] displayX = new float[0];
         private float[] displayY = new float[0];
         private double plotLeft, plotRight, plotTop, plotBottom, spacing;
-        private double axisMinimum, axisMaximum = 1d, axisStep = 1d;
+        private double axisMinimum, axisMaximum = 1d, axisStep = 1d, axisScale = 1d;
         private int accent = Theme.SECTION_SALES;
         private int selectedIndex = -1;
         private int touchSlop;
@@ -81,9 +72,6 @@ public final class HomeTrendChart {
             super(context);
             textPaint.setTypeface(Theme.face(false));
             textPaint.setFontFeatureSettings("tnum");
-            bubbleText.setTypeface(Theme.face(true));
-            bubbleText.setFontFeatureSettings("tnum");
-            bubbleText.setTextAlign(Paint.Align.CENTER);
             try { touchSlop = ViewConfiguration.get(context).getScaledTouchSlop(); }
             catch (Exception ignored) { touchSlop = Theme.dp(8); }
             setFocusable(true);
@@ -207,29 +195,29 @@ public final class HomeTrendChart {
                 haveValue = true;
             }
             if (!haveValue) { minimum = 0d; maximum = 1d; }
-            double span = maximum - minimum;
+            // Monetary trends start at zero so the visual height does not exaggerate a small
+            // day-to-day difference. Negative values, if a source genuinely has them, remain visible.
+            double floor = Math.min(0d, minimum);
+            double span = maximum - floor;
             if (!(span > 0d) || !finite(span)) span = Math.max(1d, Math.abs(maximum) * 0.2d);
             axisStep = niceStep(span / 4d);
-            axisMinimum = Math.floor(minimum / axisStep) * axisStep;
+            axisMinimum = Math.floor(floor / axisStep) * axisStep;
             axisMaximum = Math.ceil(maximum / axisStep) * axisStep;
             if (!(axisMaximum > axisMinimum)) axisMaximum = axisMinimum + axisStep;
-            if (axisMaximum - axisMinimum < axisStep * 3d) {
-                double pad = Math.max(axisStep, (axisMaximum - axisMinimum) * 0.12d);
-                axisMinimum = Math.floor((axisMinimum - pad) / axisStep) * axisStep;
-                axisMaximum = Math.ceil((axisMaximum + pad) / axisStep) * axisStep;
-            }
+            axisScale = HomeNumberFormatter.chartScale(axisMaximum);
 
-            int ticks = Math.max(1, Math.min(5, (int) Math.ceil((axisMaximum - axisMinimum) / axisStep)));
+            int ticks = Math.max(1, (int) Math.ceil((axisMaximum - axisMinimum) / axisStep));
             float labelWidth = 0f;
             for (int i = 0; i <= ticks; i++) {
-                double value = axisMinimum + i * axisStep;
+                double value = Math.min(axisMaximum, axisMinimum + i * axisStep);
                 labelWidth = Math.max(labelWidth,
-                        textPaint.measureText(HomeNumberFormatter.chartMoney(value)));
+                        textPaint.measureText(HomeNumberFormatter.chartTick(value, axisScale)));
             }
             plotLeft = Math.min(width * 0.42f,
-                    Math.max(Theme.dp(44), labelWidth + Theme.dp(14)));
-            plotRight = Math.max(plotLeft + Theme.dp(44), width - Theme.dp(10));
-            plotTop = Theme.dp(27);
+                    Math.max(Theme.dp(42), labelWidth + Theme.dp(13)));
+            // Keep the newest point and its date label away from the clipped right edge.
+            plotRight = Math.max(plotLeft + Theme.dp(44), width - Theme.dp(31));
+            plotTop = Theme.dp(31);
             plotBottom = Math.max(plotTop + Theme.dp(42), height - Theme.dp(34));
             spacing = points.size() <= 1 ? 0d : (plotRight - plotLeft) / (points.size() - 1);
             pointX = new float[points.size()];
@@ -251,11 +239,8 @@ public final class HomeTrendChart {
                 yValues[displayIndex] = y;
             }
             buildPaths(xValues, yValues);
-            plot.set((float) plotLeft, (float) plotTop, (float) plotRight, (float) plotBottom);
             axisPaint.setStrokeWidth(Theme.dp(0.8f));
-            lineShadowPaint.setStrokeWidth(Theme.dp(5f));
-            linePaint.setStrokeWidth(Theme.dp(2.6f));
-            highlightPaint.setStrokeWidth(Theme.dp(0.85f));
+            linePaint.setStrokeWidth(Theme.dp(2.2f));
         }
 
         private void buildPaths(double[] x, double[] y) {
@@ -266,19 +251,9 @@ public final class HomeTrendChart {
             linePath.moveTo((float) x[0], (float) y[0]);
             areaPath.moveTo((float) x[0], (float) plotBottom);
             areaPath.lineTo((float) x[0], (float) y[0]);
-            if (n > 1) {
-                double[] tangents = MonotoneCubic.tangents(x, y);
-                for (int i = 0; i < n - 1; i++) {
-                    float x0 = (float) x[i];
-                    float x1 = (float) x[i + 1];
-                    float y0 = (float) y[i];
-                    float y1 = (float) y[i + 1];
-                    float dx = x1 - x0;
-                    float c1y = y0 + (float) tangents[i] * dx / 3f;
-                    float c2y = y1 - (float) tangents[i + 1] * dx / 3f;
-                    linePath.cubicTo(x0 + dx / 3f, c1y, x1 - dx / 3f, c2y, x1, y1);
-                    areaPath.cubicTo(x0 + dx / 3f, c1y, x1 - dx / 3f, c2y, x1, y1);
-                }
+            for (int i = 1; i < n; i++) {
+                linePath.lineTo((float) x[i], (float) y[i]);
+                areaPath.lineTo((float) x[i], (float) y[i]);
             }
             areaPath.lineTo((float) x[n - 1], (float) plotBottom);
             areaPath.close();
@@ -302,7 +277,8 @@ public final class HomeTrendChart {
             drawArea(canvas);
             drawMarkers(canvas);
             drawDateLabels(canvas);
-            if (touched && selectedIndex >= 0) drawTooltip(canvas);
+            // The selected value is shown in the label above the chart by HomeScreen; keeping
+            // overlays off the canvas leaves the axis and data points unobscured.
         }
 
         private void drawUnavailable(Canvas canvas) {
@@ -330,67 +306,55 @@ public final class HomeTrendChart {
             textPaint.setTextSize(sp(9.25f));
             textPaint.setTypeface(Theme.face(false));
             textPaint.setTextAlign(Paint.Align.RIGHT);
-            int ticks = Math.max(1, Math.min(5,
-                    (int) Math.ceil((axisMaximum - axisMinimum) / axisStep)));
+            int ticks = Math.max(1, (int) Math.ceil((axisMaximum - axisMinimum) / axisStep));
             for (int i = 0; i <= ticks; i++) {
                 double value = Math.min(axisMaximum, axisMinimum + i * axisStep);
                 float y = valueY(value);
                 axisPaint.setPathEffect(null);
-                axisPaint.setColor(Theme.alpha(Theme.MUTED, i == 0 ? 78 : 36));
+                axisPaint.setColor(Theme.alpha(Theme.MUTED, Math.abs(value) < 0.000001d ? 78 : 36));
                 canvas.drawLine((float) plotLeft, y, (float) plotRight, y, axisPaint);
-                canvas.drawText(HomeNumberFormatter.chartMoney(value), (float) plotLeft - Theme.dp(7),
-                        y + textPaint.getTextSize() * 0.34f, textPaint);
+                canvas.drawText(HomeNumberFormatter.chartTick(value, axisScale),
+                        (float) plotLeft - Theme.dp(7), y + textPaint.getTextSize() * 0.34f, textPaint);
             }
             textPaint.setTextSize(sp(9f));
             textPaint.setColor(Theme.MUTED);
             textPaint.setTextAlign(Paint.Align.LEFT);
-            canvas.drawText("جدیدتر", (float) plotLeft, Theme.dp(11) + textPaint.getTextSize(), textPaint);
+            canvas.drawText("جدیدتر", (float) plotLeft, Theme.dp(13) + textPaint.getTextSize(), textPaint);
             textPaint.setTextAlign(Paint.Align.RIGHT);
-            canvas.drawText("قدیمی‌تر", (float) plotRight, Theme.dp(11) + textPaint.getTextSize(), textPaint);
+            canvas.drawText("قدیمی‌تر", (float) plotRight, Theme.dp(13) + textPaint.getTextSize(), textPaint);
+            textPaint.setTextAlign(Paint.Align.CENTER);
+            canvas.drawText("مقیاس: " + HomeNumberFormatter.chartScaleLabel(axisScale),
+                    (float) ((plotLeft + plotRight) / 2d), Theme.dp(13) + textPaint.getTextSize(), textPaint);
         }
 
-        /** A translucent extruded underside plus a gradient surface gives the line its 3D depth. */
+        /** A quiet, transparent fill and a single straight line keep the values easy to read. */
         private void drawArea(Canvas canvas) {
             if (points.isEmpty()) return;
             canvas.save();
-            canvas.clipRect((float) plotLeft, (float) plotTop,
-                    (float) plotRight + Theme.dp(5), (float) plotBottom + Theme.dp(7));
-            canvas.translate(Theme.dp(4), Theme.dp(5));
-            extrusionPaint.setShader(null);
-            extrusionPaint.setColor(Theme.alpha(DesignTokens.mix(accent, Color.BLACK, 0.42f),
-                    Theme.isLight() ? 90 : 135));
-            canvas.drawPath(areaPath, extrusionPaint);
-            canvas.restore();
-
-            int top = Theme.alpha(accent, Theme.isLight() ? 72 : 88);
-            int bottom = Theme.alpha(accent, Theme.isLight() ? 3 : 8);
-            areaPaint.setShader(new LinearGradient(0f, (float) plotTop, 0f, (float) plotBottom,
-                    top, bottom, Shader.TileMode.CLAMP));
-            canvas.drawPath(areaPath, areaPaint);
+            canvas.clipRect((float) plotLeft - Theme.dp(1), (float) plotTop,
+                    (float) plotRight + Theme.dp(1), (float) plotBottom + Theme.dp(1));
             areaPaint.setShader(null);
-
-            lineShadowPaint.setShader(null);
-            lineShadowPaint.setColor(Theme.alpha(DesignTokens.mix(accent, Color.BLACK, 0.26f),
-                    Theme.isLight() ? 105 : 155));
-            canvas.drawPath(linePath, lineShadowPaint);
-            linePaint.setShader(new LinearGradient((float) plotLeft, (float) plotTop,
-                    (float) plotRight, (float) plotBottom,
-                    DesignTokens.mix(accent, Color.WHITE, Theme.isLight() ? 0.12f : 0.24f),
-                    accent, Shader.TileMode.CLAMP));
-            canvas.drawPath(linePath, linePaint);
+            areaPaint.setColor(Theme.alpha(accent, Theme.isLight() ? 13 : 22));
+            canvas.drawPath(areaPath, areaPaint);
             linePaint.setShader(null);
-            highlightPaint.setShader(null);
-            highlightPaint.setColor(Theme.alpha(Theme.SURFACE, Theme.isLight() ? 155 : 110));
-            canvas.drawPath(linePath, highlightPaint);
+            linePaint.setColor(accent);
+            linePaint.setStrokeWidth(Theme.dp(2.2f));
+            canvas.drawPath(linePath, linePaint);
+            canvas.restore();
         }
 
         private void drawMarkers(Canvas canvas) {
             if (points.isEmpty()) return;
+            int peakIndex = 0;
+            for (int i = 1; i < points.size(); i++) {
+                if (points.get(i).valueRials > points.get(peakIndex).valueRials) peakIndex = i;
+            }
             int step = Math.max(1, points.size() / 10);
             for (int i = 0; i < points.size(); i++) {
                 boolean selected = touched && i == selectedIndex;
                 boolean latest = i == points.size() - 1;
-                if (!selected && !latest && i % step != 0) continue;
+                boolean peak = i == peakIndex;
+                if (!selected && !latest && !peak && i % step != 0) continue;
                 float x = pointX[i];
                 float y = pointY[i];
                 markerPaint.setStyle(Paint.Style.FILL);
@@ -406,6 +370,19 @@ public final class HomeTrendChart {
                 markerPaint.setStyle(Paint.Style.FILL);
                 markerPaint.setColor(accent);
                 canvas.drawCircle(x, y, Theme.dp(selected ? 2.0f : 1.45f), markerPaint);
+                if (peak) {
+                    float r = Theme.dp(4.2f);
+                    peakPath.reset();
+                    peakPath.moveTo(x, y - r);
+                    peakPath.lineTo(x + r, y);
+                    peakPath.lineTo(x, y + r);
+                    peakPath.lineTo(x - r, y);
+                    peakPath.close();
+                    markerPaint.setColor(Theme.BG);
+                    canvas.drawCircle(x, y, r + Theme.dp(1.5f), markerPaint);
+                    markerPaint.setColor(accent);
+                    canvas.drawPath(peakPath, markerPaint);
+                }
             }
             if (touched && selectedIndex >= 0 && selectedIndex < points.size()) {
                 float x = pointX[selectedIndex];
@@ -428,51 +405,30 @@ public final class HomeTrendChart {
             textPaint.setColor(Theme.MUTED);
             textPaint.setTextAlign(Paint.Align.CENTER);
             int n = points.size();
-            int[] ticks = {0, Math.max(0, (n - 1) / 4), Math.max(0, (n - 1) / 2),
-                    Math.max(0, (3 * (n - 1)) / 4), n - 1};
+            int interval = Math.max(1, (int) Math.ceil((n - 1) / 4d));
             int previous = -1;
-            for (int displayIndex : ticks) {
-                if (displayIndex == previous) continue;
-                previous = displayIndex;
-                int sourceIndex = n - 1 - displayIndex;
-                String label = HomeNumberFormatter.localizeText(Jalali.shortLabel(points.get(sourceIndex).date));
-                canvas.drawText(label, displayX[displayIndex], getHeight() - Theme.dp(5), textPaint);
+            for (int displayIndex = 0; displayIndex < n; displayIndex += interval) {
+                previous = drawDateLabel(canvas, displayIndex, previous);
             }
+            if (n > 1 && previous != n - 1) drawDateLabel(canvas, n - 1, previous);
         }
 
-        private void drawTooltip(Canvas canvas) {
-            Point point = selectedPoint();
-            if (point == null) return;
-            float x = pointX[selectedIndex];
-            float y = pointY[selectedIndex];
-            float availableWidth = Math.max(Theme.dp(1), getWidth() - Theme.dp(12));
-            float width = Math.min(Theme.dp(202), availableWidth);
-            float height = Theme.dp(48);
-            float left = Math.max(0f, Math.min(Math.max(0f, getWidth() - width), x - width / 2f));
-            float top = y - height - Theme.dp(9);
-            if (top < plotTop) top = Math.min((float) plotBottom - height, y + Theme.dp(9));
-            bubble.set(left, Math.max((float) plotTop, top), left + width,
-                    Math.max((float) plotTop, top) + height);
-            bubblePaint.setShader(null);
-            bubblePaint.setColor(Theme.alpha(Theme.SURFACE, Theme.isLight() ? 250 : 244));
-            canvas.drawRoundRect(bubble, Theme.dp(12), Theme.dp(12), bubblePaint);
-            bubblePaint.setStyle(Paint.Style.STROKE);
-            bubblePaint.setStrokeWidth(Theme.dp(1f));
-            bubblePaint.setColor(Theme.alpha(accent, Theme.isLight() ? 120 : 160));
-            canvas.drawRoundRect(bubble, Theme.dp(12), Theme.dp(12), bubblePaint);
-            bubblePaint.setStyle(Paint.Style.FILL);
-
-            String value = HomeNumberFormatter.money(point.valueRials);
-            String primary = Jalali.dispFa(point.date) + "  ·  " + value;
-            bubbleText.setTextSize(sp(9.25f));
-            bubbleText.setColor(Theme.TEXT);
-            canvas.drawText(Charts.fitText(primary, bubbleText, width - Theme.dp(16)),
-                    bubble.centerX(), bubble.top + Theme.dp(18), bubbleText);
-            bubbleText.setTextSize(sp(9f));
-            bubbleText.setColor(Theme.MUTED);
-            canvas.drawText(HomeNumberFormatter.integer(point.documents) + " " + documentNoun()
-                            + " · " + seriesLabel,
-                    bubble.centerX(), bubble.top + Theme.dp(37), bubbleText);
+        private int drawDateLabel(Canvas canvas, int displayIndex, int previous) {
+            int n = points.size();
+            if (displayIndex == previous || displayIndex < 0 || displayIndex >= n) return previous;
+            int sourceIndex = n - 1 - displayIndex;
+            String label = HomeNumberFormatter.localizeText(Jalali.shortLabel(points.get(sourceIndex).date));
+            if (n > 1 && displayIndex == 0) {
+                textPaint.setTextAlign(Paint.Align.LEFT);
+                canvas.drawText(label, displayX[displayIndex] + Theme.dp(2), getHeight() - Theme.dp(5), textPaint);
+            } else if (n > 1 && displayIndex == n - 1) {
+                textPaint.setTextAlign(Paint.Align.RIGHT);
+                canvas.drawText(label, displayX[displayIndex] - Theme.dp(2), getHeight() - Theme.dp(5), textPaint);
+            } else {
+                textPaint.setTextAlign(Paint.Align.CENTER);
+                canvas.drawText(label, displayX[displayIndex], getHeight() - Theme.dp(5), textPaint);
+            }
+            return displayIndex;
         }
 
         @Override public boolean onTouchEvent(MotionEvent event) {

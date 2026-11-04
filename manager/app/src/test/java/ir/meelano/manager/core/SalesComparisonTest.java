@@ -31,7 +31,9 @@ public class SalesComparisonTest {
         assertEquals(1_200d, result.projectedRials, 0.001);
         assertEquals(250d, result.sameWeekdayAverageRials, 0.001);
         assertEquals(4, result.comparableDays);
-        assertEquals(380d, result.changePercent(), 0.001);
+        assertTrue(Double.isNaN(result.actualChangePercent()));
+        assertEquals(380d, result.projectedChangePercent(), 0.001);
+        assertEquals(result.projectedChangePercent(), result.changePercent(), 0.001);
     }
 
     @Test public void missingTransactionsCountAsZeroWithinTheLoadedHistoryWindow() {
@@ -47,7 +49,8 @@ public class SalesComparisonTest {
         assertEquals(100d, result.sameWeekdayAverageRials, 0.001);
         assertEquals(4, result.comparableDays);
         assertEquals(0d, result.projectedRials, 0.001);
-        assertEquals(-100d, result.changePercent(), 0.001);
+        assertEquals(-100d, result.actualChangePercent(), 0.001);
+        assertEquals(-100d, result.projectedChangePercent(), 0.001);
     }
 
     @Test public void midnightHasNoProjectionAndCompletedDayEqualsActual() {
@@ -60,7 +63,8 @@ public class SalesComparisonTest {
         SalesComparison.DayResult complete = SalesComparison.evaluate(snapshot, today, 1_440, 4);
 
         assertFalse(midnight.projectionAvailable);
-        assertTrue(Double.isNaN(midnight.changePercent()));
+        assertTrue(Double.isNaN(midnight.projectedChangePercent()));
+        assertTrue(Double.isNaN(midnight.actualChangePercent()));
         assertTrue(complete.complete);
         assertEquals(1_000d, complete.projectedRials, 0.001);
     }

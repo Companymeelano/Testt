@@ -5,6 +5,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.ui.Kit;
 import ir.meelano.manager.ui.Theme;
 import org.junit.Test;
@@ -51,16 +52,20 @@ public class HomeScreenKpiTest {
     }
 
     @Test
-    public void hugeKpiChangesAreCappedWhileTheSmallBaseRemainsVisible() {
+    public void hugeKpiChangesUseSignedMoneyWhileKeepingTheComparisonBaseVisible() {
         HomeScreen screen = new HomeScreen(null);
+        double current = 1_000_000_000_000d;
+        double previous = 1d;
 
-        Kit.Kpi kpi = screen.homeKpi("خرید", 1_000_000_000_000d, 1, "فاکتور", true,
-                1d, null, Theme.SECTION_PURCHASE,
+        Kit.Kpi kpi = screen.homeKpi("خرید", current, 1, "فاکتور", true,
+                previous, null, Theme.SECTION_PURCHASE,
                 ir.meelano.manager.R.drawable.mi_shopping_cart, false, false, null);
 
-        assertTrue(kpi.sub.startsWith("+بیش از ۹۹۹٪"));
+        assertTrue(kpi.sub.contains(HomeNumberFormatter.signedCompactMoney(current - previous)));
+        assertFalse(kpi.sub.contains("٪"));
         assertTrue(kpi.detail.contains("مبنای مقایسه (روز قبل)"));
-        assertEquals("+بیش از ۹۹۹٪", HomeScreen.cappedKpiPercent(Double.POSITIVE_INFINITY, 1));
+        assertEquals(HomeNumberFormatter.signedCompactMoney(current - previous),
+                HomeScreen.kpiChangeText(current, previous, Double.POSITIVE_INFINITY));
     }
 
     @Test

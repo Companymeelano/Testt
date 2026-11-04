@@ -75,6 +75,20 @@ public class AtiranSampleSchemaTest {
         assertFalse(sql, sql.contains("delete from "));
     }
 
+    @Test public void grossProfitQueryReportsMissingCostCoverageInsteadOfTreatingItAsZero() throws Exception {
+        Meta meta = new Meta(connection(loadManifest()));
+        Queries.Q query = MasterQueries.profitDaily(meta, new Filter());
+        String sql = query.sql.toLowerCase(Locale.ROOT);
+        assertTrue(sql, sql.contains("as qualityissues"));
+        assertTrue(sql, sql.contains("sum(qualityissues)"));
+        assertTrue(sql, sql.contains("left join dbo.subsailfact"));
+        assertTrue(sql, sql.contains("left join dbo.inventory"));
+        assertTrue(sql, sql.contains("try_convert(decimal(19,2)"));
+        assertFalse(sql, sql.contains("insert into "));
+        assertFalse(sql, sql.contains("update dbo."));
+        assertFalse(sql, sql.contains("delete from "));
+    }
+
     /** Purchase unit price comes from JOZPRICE: subbuyfact has no LINESUM in the sample schema. */
     @Test public void purchasePriceUsesJozPriceNotLineSum() throws Exception {
         Meta meta = new Meta(connection(loadManifest()));

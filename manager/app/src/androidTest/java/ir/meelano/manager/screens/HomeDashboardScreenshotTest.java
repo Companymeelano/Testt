@@ -32,6 +32,7 @@ import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.R;
 import ir.meelano.manager.core.AtiranAuth;
 import ir.meelano.manager.core.DeviceId;
+import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.LicenseStore;
 import ir.meelano.manager.core.Money;
@@ -52,6 +53,26 @@ public final class HomeDashboardScreenshotTest {
         capture(target, "light", "home-dashboard-light.png");
         capture(target, "dark", "home-dashboard-dark.png");
         verifyLargeFontNuts(target);
+    }
+
+    @Test public void emptyCashPositionOffersDirectOpeningBalanceAction() throws Exception {
+        Context target = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        Activity activity = startPreview(target, "light", 1, false);
+        try {
+            View action = findTaggedView(activity.getWindow().getDecorView(),
+                    "home-cash-position-action");
+            assertNotNull("Empty cash position must link directly to opening-balance entry", action);
+            assertTrue("Opening-balance action is not clickable and accessible",
+                    action.isClickable() && action.isFocusable());
+            assertTrue("Opening-balance CTA is not explicit",
+                    action instanceof TextView
+                            && ((TextView) action).getText().toString().contains("ماندهٔ آغاز"));
+            assertTrue("Opening-balance CTA has no local-storage explanation",
+                    action.getContentDescription() != null
+                            && action.getContentDescription().toString().contains("فقط روی این دستگاه"));
+        } finally {
+            finishPreview(activity);
+        }
     }
 
     private void capture(Context target, String theme, String filename) throws Exception {
@@ -127,6 +148,11 @@ public final class HomeDashboardScreenshotTest {
     }
 
     private Activity startPreview(Context target, String theme, int zoomIndex) throws Exception {
+        return startPreview(target, theme, zoomIndex, true);
+    }
+
+    private Activity startPreview(Context target, String theme, int zoomIndex,
+                                  boolean seedTillBalances) throws Exception {
         target.getSharedPreferences("meelano_manager7", Context.MODE_PRIVATE).edit().clear().commit();
         target.getSharedPreferences("meelano_login", Context.MODE_PRIVATE).edit().clear().commit();
         target.getSharedPreferences("meelano_roles", Context.MODE_PRIVATE).edit().clear().commit();
@@ -140,8 +166,10 @@ public final class HomeDashboardScreenshotTest {
         settings.setHomeSimpleMode(true);
         settings.setHomeOrder(Settings.HOME_ORDER_DEFAULT);
         settings.setHomeSections(Settings.HOME_SECTIONS_DEFAULT);
-        settings.setCloseoutCashOpening(Jalali.todayStr(), "1000000000");
-        settings.setCloseoutCashCounted(Jalali.todayStr(), "1100000000");
+        if (seedTillBalances) {
+            settings.setCloseoutCashOpening(Jalali.todayStr(), "1000000000");
+            settings.setCloseoutCashCounted(Jalali.todayStr(), "1100000000");
+        }
         settings.saveConnection("127.0.0.1", "1", "HOME_PREVIEW", "preview", "preview");
         settings.saveHomeCache(sampleCache());
         verifyLocalBankStatementStore(settings, Jalali.todayStr());
@@ -192,11 +220,14 @@ public final class HomeDashboardScreenshotTest {
                 144, MainActivity.headerTitleWidthDp(320, 2, true, true));
         verifyDashboardColorContrast();
         Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
-        final View[] targets = new View[26];
+        final View[] targets = new View[30];
         final int[] facts = new int[6];
+        final int[] firstKpiRowHeights = new int[2];
         final String[] reconciliationCopy = {""};
         final String[] dailyKpiCopy = {""};
         final String[] returnKpiCopy = {""};
+        final String[] salesChartCopy = {""};
+        final String[] followUpCopy = {""};
         long layoutDeadline = SystemClock.uptimeMillis() + 3_000L;
         do {
             instrumentation.runOnMainSync(() -> {
@@ -229,15 +260,38 @@ public final class HomeDashboardScreenshotTest {
                 targets[23] = findTaggedView(decor, "home-category-chip-overview");
                 targets[24] = findTaggedView(decor, "home-category-chip-management");
                 targets[25] = findTaggedView(decor, "home-returns-kpis");
+                targets[26] = findTaggedView(decor, "home-sales-chart-hint");
+                targets[27] = findTaggedView(decor, "home-smart-followup-overdue");
+                targets[28] = findTaggedView(decor, "home-cash-position-action");
+                targets[29] = findTaggedView(decor, "home-closeout-cash-entry");
                 reconciliationCopy[0] = "";
                 dailyKpiCopy[0] = "";
                 returnKpiCopy[0] = "";
+                salesChartCopy[0] = "";
+                followUpCopy[0] = "";
                 if (targets[8] != null) collectText(targets[8], reconciliationCopy);
                 if (targets[0] != null) collectText(targets[0], dailyKpiCopy);
                 if (targets[25] != null) collectText(targets[25], returnKpiCopy);
+                if (targets[26] != null) collectText(targets[26], salesChartCopy);
+                if (targets[27] != null) collectText(targets[27], followUpCopy);
                 facts[0] = targets[0] == null ? 0 : countTaggedViews(targets[0], "home-financial-kpi");
                 facts[5] = targets[25] == null ? 0
                         : countTaggedViews(targets[25], "home-financial-kpi");
+                firstKpiRowHeights[0] = 0;
+                firstKpiRowHeights[1] = 0;
+                View kpiGrid = targets[0] == null ? null : findTaggedView(targets[0], "home-kpi-grid");
+                if (kpiGrid instanceof ViewGroup && ((ViewGroup) kpiGrid).getChildCount() > 0) {
+                    View firstRow = ((ViewGroup) kpiGrid).getChildAt(0);
+                    if (firstRow instanceof ViewGroup) {
+                        ViewGroup row = (ViewGroup) firstRow;
+                        int captured = 0;
+                        for (int i = 0; i < row.getChildCount() && captured < 2; i++) {
+                            View child = row.getChildAt(i);
+                            if ("home-financial-kpi".equals(child.getTag()))
+                                firstKpiRowHeights[captured++] = child.getHeight();
+                        }
+                    }
+                }
                 facts[1] = targets[0] != null
                         && containsViewType(targets[0], HorizontalScrollView.class) ? 1 : 0;
                 facts[2] = targets[1] == null ? 0 : targets[1].getWidth();
@@ -246,7 +300,9 @@ public final class HomeDashboardScreenshotTest {
                 facts[4] = targets[6] != null && targets[6].getGlobalVisibleRect(visibleLicense)
                         && visibleLicense.width() == targets[6].getWidth() ? 1 : 0;
             });
-            if (facts[2] > 0 && facts[3] > 0 && facts[4] > 0 && facts[5] > 0) break;
+            if (facts[2] > 0 && facts[3] > 0 && facts[4] > 0 && facts[5] > 0
+                    && targets[26] != null && targets[27] != null
+                    && targets[28] != null && targets[29] != null) break;
             SystemClock.sleep(40L);
         } while (SystemClock.uptimeMillis() < layoutDeadline);
         assertNotNull("Financial KPI section is missing", targets[0]);
@@ -263,10 +319,24 @@ public final class HomeDashboardScreenshotTest {
         assertNotNull("Financial metric tiles were not rendered", targets[1]);
         assertTrue("Financial metric tile is too narrow for its value",
                 facts[2] >= 120f * activityDensity(targets[1]));
+        assertTrue("First-row KPI cards are not aligned to a common height",
+                firstKpiRowHeights[0] > 0
+                        && firstKpiRowHeights[0] == firstKpiRowHeights[1]);
         assertNotNull("Cash-position module is missing", targets[2]);
         assertNotNull("Closeout module is missing", targets[3]);
         assertNotNull("Smart-report share action is missing", targets[4]);
         assertTrue("Smart-report share action is not clickable", targets[4].isClickable());
+        assertNotNull("Cash-position closeout action is missing", targets[28]);
+        assertNotNull("Till registration action is missing from closeout", targets[29]);
+        assertTrue("Cash-position CTA should clearly lead to closing the day",
+                targets[28] instanceof TextView
+                        && ((TextView) targets[28]).getText().toString().contains("بستن روز"));
+        assertTrue("Closeout CTA should clearly lead to cash entry",
+                targets[29] instanceof TextView
+                        && ((TextView) targets[29]).getText().toString().contains("ثبت صندوق"));
+        assertTrue("Closeout cash-entry CTA is not accessible or is too small",
+                targets[29].isClickable() && targets[29].isFocusable()
+                        && targets[29].getMinimumHeight() >= 48f * activityDensity(targets[29]));
         assertTrue("Smart-report share action is not accessible", targets[4].isFocusable());
         assertNotNull("Home has no clearance below the last card", targets[5]);
         assertTrue("Home's bottom clearance is smaller than 16dp",
@@ -332,8 +402,16 @@ public final class HomeDashboardScreenshotTest {
                         && targets[24].getContentDescription() != null);
         assertTrue("Management shortcut is below the 48dp touch target",
                 targets[24].getHeight() >= 48f * activityDensity(targets[24]));
-        assertNotNull("Incomplete trend needs a compact unavailable-data row", targets[20]);
-        assertTrue("Unavailable trend still allocates a blank chart", targets[21] == null);
+        assertTrue("A voided-invoice trend with no data should be omitted", targets[20] == null);
+        assertTrue("A voided-invoice trend with no data should not allocate a chart", targets[21] == null);
+        assertNotNull("Sales chart peak summary is missing", targets[26]);
+        assertTrue("Outlier peak does not show its actual selected-unit value",
+                salesChartCopy[0].contains("قلهٔ پرت")
+                        && salesChartCopy[0].contains(HomeNumberFormatter.money(34_000_000_000d)));
+        assertNotNull("Overdue follow-up is not displayed in its own row", targets[27]);
+        assertTrue("Follow-up priority is not attached to the specific overdue row",
+                followUpCopy[0].contains("فاکتورهای معوق")
+                        && followUpCopy[0].contains("نیازمند پیگیری"));
         assertNotNull("Financial detail disclosure is missing", targets[17]);
         assertNotNull("Collapsible financial detail container is missing", targets[16]);
         assertEquals("Detailed reconciliation panels should start compact", View.GONE,
@@ -429,7 +507,7 @@ public final class HomeDashboardScreenshotTest {
         assertNotNull("Sales chart range selector is missing", chartAndSelector[1]);
         assertTrue("Initial chart window was not identified: " + initialDescription[0],
                 initialDescription[0].contains("۱۴ روز"));
-        assertTrue("Sales chart selector must offer real 7- and 14-day ranges",
+        assertTrue("Sales chart selector must offer a focused and full-history range",
                 chartAndSelector[1] instanceof ViewGroup
                         && ((ViewGroup) chartAndSelector[1]).getChildCount() >= 2);
 
@@ -453,7 +531,7 @@ public final class HomeDashboardScreenshotTest {
                 ViewGroup group = (ViewGroup) refreshedSelector[0];
                 for (int i = 0; i < group.getChildCount(); i++) {
                     CharSequence label = group.getChildAt(i).getContentDescription();
-                    if (label != null && "۱۴ روز".contentEquals(label)) {
+                    if (label != null && "همه".contentEquals(label)) {
                         fortnightSegment[0] = group.getChildAt(i);
                         break;
                     }
@@ -461,14 +539,14 @@ public final class HomeDashboardScreenshotTest {
             }
         });
         assertNotNull("Updated sales range selector was not rendered", refreshedSelector[0]);
-        assertNotNull("Actual 14-day chart option disappeared after range change", fortnightSegment[0]);
+        assertNotNull("Full-history sales chart option disappeared after range change", fortnightSegment[0]);
         final boolean[] fortnightClicked = {false};
         instrumentation.runOnMainSync(() -> fortnightClicked[0] = fortnightSegment[0].performClick());
-        assertTrue("Fourteen-day sales chart option is not clickable", fortnightClicked[0]);
+        assertTrue("Full-history sales chart option is not clickable", fortnightClicked[0]);
         String[] restoredDescription = {""};
         instrumentation.runOnMainSync(() ->
                 restoredDescription[0] = normalizedAccessibleText(chartAndSelector[0].getContentDescription()));
-        assertTrue("Sales chart did not return to its initial 14-day range",
+        assertTrue("Sales chart did not return to the available full-history window",
                 restoredDescription[0].contains("۱۴ روز"));
     }
 
@@ -776,7 +854,7 @@ public final class HomeDashboardScreenshotTest {
                 .append("|returnsok=1|returnsprevok=1|trendok=1")
                 .append("|trendfrom=").append(Jalali.addDays(today, -13))
                 .append("|stockok=1|reorderok=1|priceok=1|dueinok=1|dueoutok=1|topok=1|overdueok=1")
-                .append("|retodayok=1|cashinok=1|cashoutok=1|gpok=1")
+                .append("|retodayok=1|cashinok=1|cashoutok=1|gpok=1|gpqok=1")
                 .append("|bankaccountsok=1|bankturnok=1|overpaidvok=1|unbalancedjok=1")
                 .append("|bankacct0=id=10;name=بانک نمونه")
                 .append("|bankacct1=id=11;name=بانک دوم")
@@ -789,6 +867,7 @@ public final class HomeDashboardScreenshotTest {
         for (int i = 0; i < 14; i++) {
             String day = Jalali.addDays(today, i - 13);
             long sales = 3_800_000_000L + (i * 410_000_000L) + ((i % 4) * 130_000_000L);
+            if (i == 8) sales = 34_000_000_000L;
             if (i == 13) sales = 9_200_000_000L;
             cache.append("|trend").append(i).append("=day=").append(day)
                     .append(";total=").append(sales).append(";docs=").append(7 + i % 9).append(";invalidRows=0");
@@ -809,7 +888,7 @@ public final class HomeDashboardScreenshotTest {
                 .append("|cashin=total=8400000000;cash=3100000000;pos=2800000000;havaleh=1800000000;cheque=700000000;breakdownAvailable=1")
                 .append("|cashout=total=2900000000;cash=1600000000;pos=900000000;havaleh=400000000;cheque=0;breakdownAvailable=1")
                 .append("|retoday0=label=فاکتور برگشتی;docs=1;total=250000000")
-                .append("|gp0=day=").append(today).append(";sales=9200000000;cogs=6100000000;profit=3100000000")
+                .append("|gp0=day=").append(today).append(";sales=9200000000;cogs=6100000000;profit=3100000000;qualityIssues=0")
                 .append("|ret0=total=0;docs=0")
                 .append("|retprev0=total=500000000;docs=2")
                 .append("|stock0=shka=1001;name=بادام نمونه;stockPieces=0;reorderPoint=5;reorderKnown=1;isOut=1")

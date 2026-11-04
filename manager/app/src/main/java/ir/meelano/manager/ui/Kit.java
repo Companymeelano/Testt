@@ -409,8 +409,9 @@ public final class Kit {
         LinearLayout tile = v();
         tile.setBackground(dashboardStyle ? Theme.dashboardMetric(accent) : Theme.kpi(accent));
         if (dashboardStyle) {
-            tile.setElevation(Theme.dp(1f));
+            tile.setElevation(0f);
             tile.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
+            tile.setMinimumHeight(Theme.dp(148));
         }
         int horizontalPad = dashboardStyle ? 8 : 12;
         int verticalPad = dashboardStyle ? 9 : 11;
@@ -430,7 +431,7 @@ public final class Kit {
                 symbol.setBackground(Theme.dashboardBadge(accent));
                 int inset = Theme.dp(3);
                 symbol.setPadding(inset, inset, inset, inset);
-                symbol.setElevation(Theme.dp(1f));
+                symbol.setElevation(0f);
                 symbol.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
             }
             symbol.setContentDescription(null);
@@ -499,6 +500,12 @@ public final class Kit {
                     ? "روند هفت‌روزهٔ " + k.label : k.sparkDescription);
             sparkline.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
             tile.addView(sparkline, sp);
+        } else if (dashboardStyle) {
+            View spacer = new View(a);
+            spacer.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+            LinearLayout.LayoutParams sp = lp(-1, Theme.dp(22));
+            sp.setMargins(0, Theme.dp(3), 0, Theme.dp(2));
+            tile.addView(spacer, sp);
         }
         if (!Double.isNaN(k.countTo) && Ui.motionOk(a)) {
             ValueAnimator animator = ValueAnimator.ofFloat(0f, 1f);

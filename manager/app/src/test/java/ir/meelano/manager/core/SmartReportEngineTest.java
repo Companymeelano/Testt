@@ -16,6 +16,7 @@ public class SmartReportEngineTest {
         input.salesRials = 12_000_000;
         input.documents = 4;
         input.comparisonAvailable = true;
+        input.salesBaselineRials = 11_059_907.834d;
         input.changePercent = 8.5;
         input.productsAvailable = true;
         input.leadingProduct = "پسته اکبری";
@@ -49,15 +50,55 @@ public class SmartReportEngineTest {
         input.comparisonAvailable = true;
         input.comparisonProjected = true;
         input.projectedSalesRials = 12_000_000;
+        input.salesBaselineRials = 10_000_000;
+        input.salesElapsedMinutes = 12 * 60;
         input.changePercent = 20d;
         input.productsAvailable = true;
 
         String first = SmartReportEngine.compose(input).get(0);
 
         assertTrue(first.contains("تا این لحظه"));
-        assertTrue(first.contains("برآورد خطی فروش پایان روز"));
+        assertTrue(first.contains("برآورد پایان روز"));
+        assertTrue(first.contains("تا ساعت " + HomeNumberFormatter.time(12, 0)));
         assertTrue(first.contains(HomeNumberFormatter.signedPercent(20d)));
-        assertTrue(first.contains("میانگین همان روز هفته"));
+        assertTrue(first.contains("میانگین روزهای هم‌نام"));
+        assertFalse(first.contains("برآورد خطی"));
+    }
+
+    @Test public void veryLargeSalesChangeUsesCurrencyAmountBesideItsBaseline() {
+        SmartReportEngine.Input input = completeFollowUpSources();
+        input.salesAvailable = true;
+        input.salesDayComplete = true;
+        input.salesRials = 34_000_000_000d;
+        input.salesBaselineRials = 1_000_000_000d;
+        input.documents = 3;
+        input.comparisonAvailable = true;
+        input.changePercent = 3_300d;
+
+        String first = SmartReportEngine.compose(input).get(0);
+
+        assertTrue(first.contains("افزایش"));
+        assertTrue(first.contains("میانگین روزهای هم‌نام"));
+        assertFalse(first.contains("٪"));
+        assertTrue(first.contains(HomeNumberFormatter.compactMoney(
+                input.salesRials - input.salesBaselineRials)));
+    }
+
+    @Test public void urgencyBadgeBelongsToTheOverdueRowNotEveryFollowUp() {
+        SmartReportEngine.Input input = completeFollowUpSources();
+        input.overdueInvoices = 1;
+        input.oldestOverdueDays = 8;
+        input.dueOutCheques = 2;
+
+        List<SmartReportEngine.FollowUpItem> rows = SmartReportEngine.followUpItems(input);
+        SmartReportEngine.FollowUpPriority overdue = null;
+        SmartReportEngine.FollowUpPriority dueOut = null;
+        for (SmartReportEngine.FollowUpItem row : rows) {
+            if ("overdue".equals(row.key)) overdue = row.priority;
+            if ("due-out".equals(row.key)) dueOut = row.priority;
+        }
+        assertEquals(SmartReportEngine.FollowUpPriority.URGENT, overdue);
+        assertEquals(SmartReportEngine.FollowUpPriority.FOLLOW_UP, dueOut);
     }
 
     @Test public void missingSourcesAreCalledOutInsteadOfPresentedAsZeroes() {

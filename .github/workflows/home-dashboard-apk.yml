@@ -207,36 +207,6 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      # Explicit opt-in: a push commit containing [publish-apk] publishes a direct-download Debug APK release asset.
-      - name: Publish direct-download debug APK
-        if: ${{ success() && github.event_name == 'push' && contains(github.event.head_commit.message, '[publish-apk]') && hashFiles('manager/app/build/outputs/apk/debug/app-debug.apk') != '' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          apk="manager/app/build/outputs/apk/debug/app-debug.apk"
-          test -s "$apk"
-          short_sha="${GITHUB_SHA:0:7}"
-          tag="manager-home-debug-${short_sha}"
-          asset="meelano-manager-home-dashboard-debug-${short_sha}.apk"
-          cp "$apk" "$asset"
-          apk_sha256="$(sha256sum "$apk" | cut -d' ' -f1)"
-          signer_sha256="$(awk -F': ' '/Signer #1 certificate SHA-256 digest:/ {print $2; exit}' manager-debug-signing.txt)"
-          test -n "$signer_sha256"
-          notes_file="$RUNNER_TEMP/manager-release-notes.md"
-          {
-            echo "Installable debug APK built from ${GITHUB_SHA}. This is signed with the Android debug key, not the production release key."
-            echo
-            echo "APK SHA-256: ${apk_sha256}"
-            echo "Debug signer certificate SHA-256: ${signer_sha256}"
-          } > "$notes_file"
-          gh release create "$tag" "$asset" \
-            --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" \
-            --title "MEELANO Manager Home Dashboard Debug ${short_sha}" \
-            --notes-file "$notes_file" \
-            --prerelease
-
   screenshots:
     name: Capture Light and Dark Home screenshots
     needs: build
@@ -301,3 +271,53 @@ jobs:
           git fetch origin arena/e7d9f96e-testt
           git rebase origin/arena/e7d9f96e-testt
           git push origin HEAD:arena/e7d9f96e-testt
+
+  publish:
+    name: Publish verified direct-download Debug APK
+    needs: [build, screenshots]
+    if: ${{ needs.build.result == 'success' && needs.screenshots.result == 'success' && github.event_name == 'push' && contains(github.event.head_commit.message, '[publish-apk]') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified APK build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: meelano-manager-home-dashboard-${{ github.sha }}
+          path: verified-apk
+
+      - name: Verify the artifact and publish a direct APK download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          apk="$(find verified-apk -type f -name app-debug.apk -print -quit)"
+          signing="$(find verified-apk -type f -name manager-debug-signing.txt -print -quit)"
+          checksum="$(find verified-apk -type f -name manager-debug-sha256.txt -print -quit)"
+          test -n "$apk" && test -s "$apk"
+          test -n "$signing" && test -s "$signing"
+          test -n "$checksum" && test -s "$checksum"
+          actual_sha256="$(sha256sum "$apk" | awk '{print $1}')"
+          expected_sha256="$(awk '{print $1}' "$checksum")"
+          test "$actual_sha256" = "$expected_sha256"
+          signer_sha256="$(awk -F': ' '/Signer #1 certificate SHA-256 digest:/ {print $2; exit}' "$signing")"
+          test -n "$signer_sha256"
+
+          short_sha="${GITHUB_SHA:0:7}"
+          tag="manager-home-debug-${short_sha}"
+          asset="meelano-manager-home-dashboard-debug-${short_sha}.apk"
+          cp "$apk" "$asset"
+          notes_file="$RUNNER_TEMP/manager-release-notes.md"
+          {
+            echo "Installable debug APK built from ${GITHUB_SHA}. This is signed with the Android debug key, not the production release key."
+            echo
+            echo "APK SHA-256: ${actual_sha256}"
+            echo "Debug signer certificate SHA-256: ${signer_sha256}"
+            echo "Home emulator screenshot, unit test, lint, package, and signer checks all passed."
+          } > "$notes_file"
+          gh release create "$tag" "$asset" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "MEELANO Manager Home Dashboard Debug ${short_sha}" \
+            --notes-file "$notes_file" \
+            --prerelease

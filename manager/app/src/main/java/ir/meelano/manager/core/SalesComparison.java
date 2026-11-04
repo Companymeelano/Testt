@@ -36,10 +36,20 @@ public final class SalesComparison {
 
         public boolean hasBaseline() { return comparableDays > 0 && sameWeekdayAverageRials > 0; }
 
-        public double changePercent() {
+        /** Change from the same-weekday baseline for the observed sales amount. */
+        public double actualChangePercent() {
+            if (!hasBaseline() || !available || !complete) return Double.NaN;
+            return (actualRials - sameWeekdayAverageRials) * 100.0 / sameWeekdayAverageRials;
+        }
+
+        /** Change from the same-weekday baseline for the end-of-day estimate. */
+        public double projectedChangePercent() {
             if (!hasBaseline() || !projectionAvailable) return Double.NaN;
             return (projectedRials - sameWeekdayAverageRials) * 100.0 / sameWeekdayAverageRials;
         }
+
+        /** Backwards-compatible alias; callers should choose actual or projected explicitly. */
+        public double changePercent() { return projectedChangePercent(); }
     }
 
     /**

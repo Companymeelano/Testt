@@ -31,7 +31,25 @@ public final class HomeNumberFormatter {
      * decimal separators, signs and bidi isolation.
      */
     public static String localizeText(String value) {
-        return persianDigits(value);
+        if (value == null || value.isEmpty()) return value == null ? "" : value;
+        StringBuilder normalized = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char ch = value.charAt(i);
+            boolean digitBefore = i > 0 && isDigit(value.charAt(i - 1));
+            boolean digitAfter = i + 1 < value.length() && isDigit(value.charAt(i + 1));
+            if (ch == ',') normalized.append(digitBefore && digitAfter ? '٬' : '،');
+            else if (ch == '.' && digitBefore && digitAfter) normalized.append('٫');
+            else if (ch == '%') normalized.append('٪');
+            else if (ch == '-' && digitAfter && !digitBefore) normalized.append('−');
+            else normalized.append(ch);
+        }
+        return persianDigits(normalized.toString());
+    }
+
+    private static boolean isDigit(char value) {
+        return (value >= '0' && value <= '9')
+                || (value >= '\u0660' && value <= '\u0669')
+                || (value >= '\u06F0' && value <= '\u06F9');
     }
 
     /**
@@ -149,9 +167,70 @@ public final class HomeNumberFormatter {
         return isolate(localizeFormatted(format.format(display))) + " " + Money.unitName();
     }
 
-    /** Compact Rial value for chart axes, without repeating the currency unit. */
+    /** Compact Rial value for chart labels, without repeating the currency unit. */
     public static String chartMoney(double rials) {
         return compactUnit(Money.toUnit(rials));
+    }
+
+    /** Scale divisor for a chart axis, calculated in the selected display currency. */
+    public static double chartScale(double maxRials) {
+        double value = Math.abs(Money.toUnit(maxRials));
+        if (value >= 1_000_000_000_000d) return 1_000_000_000_000d;
+        if (value >= 1_000_000_000d) return 1_000_000_000d;
+        if (value >= 1_000_000d) return 1_000_000d;
+        if (value >= 1_000d) return 1_000d;
+        return 1d;
+    }
+
+    /** Unit label paired with a scaled chart axis so the axis never shows a misleading peak. */
+    public static String chartScaleLabel(double scale) {
+        String suffix = scale >= 1_000_000_000_000d ? "هزار میلیارد"
+                : scale >= 1_000_000_000d ? "میلیارد"
+                : scale >= 1_000_000d ? "میلیون"
+                : scale >= 1_000d ? "هزار" : "";
+        return suffix.isEmpty() ? Money.unitName() : suffix + " " + Money.unitName();
+    }
+
+    /** Compact axis tick in the scale selected by {@link #chartScale(double)}. */
+    public static String chartTick(double rials, double scale) {
+        if (!isFinite(rials) || !isFinite(scale) || scale <= 0d) return "—";
+        double value = Money.toUnit(rials) / scale;
+        return formatNumber(value, Math.abs(value) >= 100d ? 0 : 1);
+    }
+
+    /**
+     * Numeric part of a comparison: percentage with a positive baseline when readable,
+     * otherwise a clear zero-baseline state or a signed currency difference.
+     */
+    public static String changeValue(double currentRials, double baselineRials, double percent) {
+        if (!isFinite(currentRials) || !isFinite(baselineRials)) return "—";
+        if (baselineRials <= 0d) {
+            if (baselineRials == 0d && currentRials > 0d) return "شروع از صفر";
+            if (baselineRials == 0d && currentRials == 0d) return "بدون تغییر";
+            return "مبنای نامعتبر";
+        }
+        if (!isFinite(percent) || Math.abs(percent) > 999d)
+            return signedCompactMoney(currentRials - baselineRials);
+        return signedPercent(percent);
+    }
+
+    public static String changeLabel(double currentRials, double baselineRials, double percent,
+                                     String baselineLabel) {
+        String baseline = baselineLabel == null || baselineLabel.trim().isEmpty()
+                ? "مبنای مقایسه" : baselineLabel.trim();
+        if (!isFinite(currentRials) || !isFinite(baselineRials)) return "مقایسه در دسترس نیست";
+        if (baselineRials <= 0d) return "مبنای مقایسه صفر است؛ درصد تغییر محاسبه نمی‌شود";
+        double difference = currentRials - baselineRials;
+        if (Math.abs(difference) < 0.5d) return "بدون تغییر نسبت به " + baseline;
+        return changeValue(currentRials, baselineRials, percent) + " نسبت به " + baseline;
+    }
+
+    /** Signed compact currency variance used when a relative percentage would be misleading. */
+    public static String signedCompactMoney(double differenceRials) {
+        if (!isFinite(differenceRials)) return "—";
+        if (Math.abs(differenceRials) < 0.5d) return compactMoney(0d);
+        return (differenceRials > 0d ? "+ " : "− ")
+                + compactMoney(Math.abs(differenceRials));
     }
 
     /** Percentage, preserving a negative sign and placing the Persian percent mark with the value. */

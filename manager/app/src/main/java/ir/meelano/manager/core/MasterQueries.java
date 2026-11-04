@@ -925,18 +925,33 @@ public final class MasterQueries {
         if (!dc.isEmpty()) conds.add(dc);
         String inner = "WHERE " + (conds.isEmpty() ? "1=1" : Sql.join(conds, " AND ")) + Sql.activeAnd(cols, "x") + Sql.softAnd(cols, "x");
         String day = monthly ? Sql.month7("h", dateCol) : Sql.date10("h", dateCol);
-        // Sales per day from the header; COGS per day from the lines (avoid fan-out by aggregating separately).
+        String quantity = "TRY_CONVERT(decimal(19,3),d.[" + qty + "])";
+        String unitCost = "TRY_CONVERT(decimal(19,2),i.[" + buy + "])";
+        String qualityIssue = "CASE WHEN d.[" + linkCol + "] IS NULL OR " + quantity
+                + " IS NULL OR i.[" + invShka + "] IS NULL OR " + unitCost
+                + " IS NULL OR " + unitCost + "<0 THEN CONVERT(bigint,1) ELSE CONVERT(bigint,0) END";
+        // Sales, COGS and data-quality checks are aggregated separately to avoid fan-out. A
+        // missing line or unmatched/invalid item cost marks the day incomplete, not as zero COGS.
         String sql = "SELECT day AS day, ISNULL(SUM(sales),0) AS sales, ISNULL(SUM(cogs),0) AS cogs"
-                + ", ISNULL(SUM(sales),0)-ISNULL(SUM(cogs),0) AS profit FROM ("
-                + "SELECT " + day + " AS day, " + Sql.num("h", amountCol) + " AS sales, CAST(0 AS decimal(19,2)) AS cogs"
+                + ", ISNULL(SUM(sales),0)-ISNULL(SUM(cogs),0) AS profit"
+                + ", ISNULL(SUM(qualityIssues),0) AS qualityIssues FROM ("
+                + "SELECT " + day + " AS day, " + Sql.num("h", amountCol)
+                + " AS sales, CAST(0 AS decimal(19,2)) AS cogs, CAST(0 AS bigint) AS qualityIssues"
                 + " FROM " + Sql.dedupe("sailfact", numberCol, "h", inner)
                 + " UNION ALL SELECT " + day + " AS day, CAST(0 AS decimal(19,2)) AS sales"
-                + ", " + cogsLine(m, qty, "d", "i") + " AS cogs"
+                + ", " + cogsLine(m, qty, "d", "i") + " AS cogs, CAST(0 AS bigint) AS qualityIssues"
                 + " FROM " + Sql.dedupe("sailfact", numberCol, "h", inner)
                 + " JOIN dbo.subsailfact d ON TRY_CONVERT(nvarchar(100),d.[" + linkCol + "])=TRY_CONVERT(nvarchar(100),h.[" + numberCol + "])"
                 + " LEFT JOIN dbo.inventory i ON TRY_CONVERT(nvarchar(100),i.[" + invShka + "])=TRY_CONVERT(nvarchar(100),d.[" + shka + "])"
+                + " UNION ALL SELECT " + day + " AS day, CAST(0 AS decimal(19,2)) AS sales"
+                + ", CAST(0 AS decimal(19,2)) AS cogs, SUM(" + qualityIssue + ") AS qualityIssues"
+                + " FROM " + Sql.dedupe("sailfact", numberCol, "h", inner)
+                + " LEFT JOIN dbo.subsailfact d ON TRY_CONVERT(nvarchar(100),d.[" + linkCol + "])=TRY_CONVERT(nvarchar(100),h.[" + numberCol + "])"
+                + " LEFT JOIN dbo.inventory i ON TRY_CONVERT(nvarchar(100),i.[" + invShka + "])=TRY_CONVERT(nvarchar(100),d.[" + shka + "])"
+                + " GROUP BY " + day
                 + ") u GROUP BY day ORDER BY day";
         List<Object> binds2 = new ArrayList<>(binds);
+        binds2.addAll(binds);
         binds2.addAll(binds);
         return new Queries.Q(sql, binds2);
     }

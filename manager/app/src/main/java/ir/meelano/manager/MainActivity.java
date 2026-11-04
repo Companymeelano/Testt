@@ -1045,7 +1045,8 @@ public class MainActivity extends Activity {
             b.addView(marker, markerParams);
 
             b.setTag(id);
-            b.setContentDescription(label + "، رفتن به بخش");
+            b.setContentDescription("more".equals(id) ? "همهٔ بخش‌ها، رفتن به فهرست بخش‌ها"
+                    : label + "، رفتن به بخش");
             if (!RoleStore.allowed(this, id)) b.setAlpha(0.35f);
             Theme.pressable(b);
             b.setOnClickListener(v -> nav(id));

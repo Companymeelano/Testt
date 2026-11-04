@@ -143,8 +143,8 @@ public final class RoleStore {
             return new String[]{"sales", "customers", "cheques", "dues", "more"};
         if (MOADIAN.equals(role))
             return new String[]{"sales", "customers", "reports", "search", "more"};
-        // Manager's bar: home, product file, customers, a dedicated assistant tab, and the
-        // command room («اتاق فرمان») which holds reports and every section.
+        // Manager's bar: home, product file, customers, a dedicated assistant tab, and
+        // «بخش‌ها», which holds reports and every other section.
         return new String[]{"home", "products", "customers", "assistant", "more"};
     }
 
@@ -155,7 +155,7 @@ public final class RoleStore {
         if ("shomarsh".equals(screenId)) return "شمارش";
         if ("score".equals(screenId)) return "امتیاز";
         if ("assistant".equals(screenId)) return "دستیار";
-        if ("more".equals(screenId)) return "اتاق فرمان";
+        if ("more".equals(screenId)) return "بخش‌ها";
         return null; // fall back to the screen title
     }
 

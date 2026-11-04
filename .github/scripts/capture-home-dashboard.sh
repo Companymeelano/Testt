@@ -38,8 +38,11 @@ wait_for_package_service() {
       service_status="$(adb shell service check package 2>/dev/null | tr -d '\r' || true)"
       if printf '%s' "$service_status" | grep -Eqi 'service package: found'; then
         # Binder may report the service before PackageManager can answer install requests.
-        # Probe the same shell command path used by adb install before treating the emulator as ready.
-        if timeout 5 adb shell pm list packages >/dev/null 2>&1; then
+        # ADB shell commands may exit 0 even when `cmd` prints "Can't find service: package",
+        # so require actual package output before treating the emulator as ready.
+        local package_probe
+        package_probe="$(timeout 5 adb shell pm list packages 2>&1 || true)"
+        if printf '%s\n' "$package_probe" | grep -q '^package:'; then
           return 0
         fi
       fi

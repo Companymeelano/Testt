@@ -50,21 +50,21 @@ import java.io.FileOutputStream;
 import java.util.List;
 import java.util.Locale;
 
-/** Seed-only instrumentation preview for real Light/Dark screenshots and large-font Nuts accessibility checks. */
+/** Seed-only instrumentation preview for real Light/Dark, 100%/130% dashboard and sales-chart captures. */
 @RunWith(AndroidJUnit4.class)
 public final class HomeDashboardScreenshotTest {
     @Test public void captureThemesSectionsAndVerifyLargeFontNutsAccessibility() throws Exception {
         Context target = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        // Exercise the animation-heavy input checks first so no final Activity launch is attempted
+        // after the full series of real-display captures. Each capture independently rejects overlays.
+        verifyLargeFontNuts(target);
+        verifyEmptyCashPositionOffersDirectOpeningBalanceAction(target);
         capture(target, "light", "home-dashboard-light.png");
         capture(target, "dark", "home-dashboard-dark.png");
         captureTodayTrendAndFinancialSections(target);
-        // Run input/scroll interaction checks only after every screenshot is saved. Those checks
-        // deliberately send touch events and should not contribute system dialogs to the images.
-        verifyLargeFontNuts(target);
     }
 
-    @Test public void emptyCashPositionOffersDirectOpeningBalanceAction() throws Exception {
-        Context target = InstrumentationRegistry.getInstrumentation().getTargetContext();
+    private void verifyEmptyCashPositionOffersDirectOpeningBalanceAction(Context target) throws Exception {
         Activity activity = startPreview(target, "light", 1, false);
         try {
             View action = findTaggedView(activity.getWindow().getDecorView(),

@@ -73,12 +73,17 @@ public final class Theme {
     public static int MUTED = DesignTokens.APP_DARK_MUTED;
     public static int BORDER = DesignTokens.APP_DARK_BORDER;
     public static int ACCENT_SOFT = DesignTokens.APP_DARK_ACCENT_SOFT;
-    public static int SUCCESS = 0xFF64C99C;
-    public static int DANGER = 0xFFF19AA0;
-    public static int WARNING = 0xFFEAB776;
-    public static int INFO = 0xFF8ABBDD;
-    public static int VIOLET = 0xFFB5A0E5;
-    public static int STEEL = 0xFFB8C4BE;
+    public static int SUCCESS = DesignTokens.textSafeColor(
+            DesignTokens.POSITIVE, DesignTokens.APP_DARK_SURFACE, true);
+    public static int DANGER = DesignTokens.textSafeColor(
+            DesignTokens.NEGATIVE, DesignTokens.APP_DARK_SURFACE, true);
+    public static int WARNING = DesignTokens.textSafeColor(
+            DesignTokens.WARNING, DesignTokens.APP_DARK_SURFACE, true);
+    public static int INFO = DesignTokens.textSafeColor(
+            DesignTokens.INFO, DesignTokens.APP_DARK_SURFACE, true);
+    public static int VIOLET = DesignTokens.textSafeColor(
+            DesignTokens.RETURNS, DesignTokens.APP_DARK_SURFACE, true);
+    public static int STEEL = DesignTokens.APP_DARK_STEEL;
     public static final int NEUTRAL = DesignTokens.NEUTRAL;
     /** Legacy aliases; semantic outcome colors are intentionally not section colors. */
     public static final int SALES_HUE = DesignTokens.SALES;
@@ -172,7 +177,7 @@ public final class Theme {
             WARNING = DesignTokens.textSafeColor(DesignTokens.WARNING, SURFACE, false);
             INFO = DesignTokens.textSafeColor(DesignTokens.INFO, SURFACE, false);
             VIOLET = DesignTokens.textSafeColor(DesignTokens.RETURNS, SURFACE, false);
-            STEEL = 0xFF59675F;
+            STEEL = DesignTokens.APP_LIGHT_STEEL;
         } else {
             BG = DesignTokens.APP_DARK_BG;
             SURFACE = DesignTokens.APP_DARK_SURFACE;
@@ -189,7 +194,7 @@ public final class Theme {
             WARNING = DesignTokens.textSafeColor(DesignTokens.WARNING, SURFACE, true);
             INFO = DesignTokens.textSafeColor(DesignTokens.INFO, SURFACE, true);
             VIOLET = DesignTokens.textSafeColor(DesignTokens.RETURNS, SURFACE, true);
-            STEEL = 0xFFB8C4BE;
+            STEEL = DesignTokens.APP_DARK_STEEL;
         }
     }
 
@@ -514,7 +519,7 @@ public final class Theme {
     }
 
     /** Existing expense-category accent; primary CTAs use the approved emerald/champagne palette. */
-    public static final int ROSE = 0xFFC2527E;
+    public static final int ROSE = DesignTokens.ROSE;
 
     /** Solid primary action; the foreground is chosen separately for sufficient contrast. */
     public static GradientDrawable startButton() {

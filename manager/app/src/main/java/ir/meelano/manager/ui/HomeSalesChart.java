@@ -63,7 +63,6 @@ public final class HomeSalesChart {
         private double average;
         private boolean hasSalesActivity;
         private float drawProgress = 1f;
-        private float pulse = 0.5f;
         private int selectedIndex = -1;
         private int touchSlop;
         private float downX, downY;
@@ -72,7 +71,6 @@ public final class HomeSalesChart {
         private boolean geometryDirty = true;
         private SelectionListener selectionListener;
         private ValueAnimator drawAnimator;
-        private ValueAnimator pulseAnimator;
         private final DashPathEffect dotted = new DashPathEffect(new float[]{Theme.dp(3), Theme.dp(4)}, 0);
 
         public Area(Context context) {
@@ -158,20 +156,20 @@ public final class HomeSalesChart {
 
         @Override protected void onDetachedFromWindow() {
             cancel(drawAnimator);
-            cancel(pulseAnimator);
-            drawAnimator = pulseAnimator = null;
+            drawAnimator = null;
             super.onDetachedFromWindow();
         }
 
         private void startMotion() {
             cancel(drawAnimator);
-            cancel(pulseAnimator);
+            drawAnimator = null;
             if (!hasSalesActivity || days.size() < 2 || !Ui.motionOk(getContext())) {
                 drawProgress = 1f;
-                pulse = 0.5f;
                 invalidate();
                 return;
             }
+            // A single chart reveal is sufficient; the latest-day marker stays static instead
+            // of pulsing forever, reducing distraction and idle rendering work.
             drawProgress = 0f;
             drawAnimator = ValueAnimator.ofFloat(0f, 1f);
             drawAnimator.setDuration(600);
@@ -181,15 +179,6 @@ public final class HomeSalesChart {
                 invalidate();
             });
             drawAnimator.start();
-            pulseAnimator = ValueAnimator.ofFloat(0f, 1f);
-            pulseAnimator.setDuration(1700);
-            pulseAnimator.setRepeatCount(ValueAnimator.INFINITE);
-            pulseAnimator.setRepeatMode(ValueAnimator.REVERSE);
-            pulseAnimator.addUpdateListener(a -> {
-                pulse = (float) a.getAnimatedValue();
-                invalidate();
-            });
-            pulseAnimator.start();
         }
 
         private static void cancel(ValueAnimator animator) {
@@ -375,7 +364,7 @@ public final class HomeSalesChart {
             float todayY = pointY[0];
             if (Jalali.todayStr().equals(days.get(latest).date)) {
                 markerPaint.setColor(Theme.alpha(Theme.PRIMARY, Theme.isLight() ? 26 : 38));
-                canvas.drawCircle(todayX, todayY, Theme.dp(7) + Theme.dp(5) * pulse, markerPaint);
+                canvas.drawCircle(todayX, todayY, Theme.dp(9.5f), markerPaint);
                 markerPaint.setStyle(Paint.Style.STROKE);
                 markerPaint.setStrokeWidth(Theme.dp(1.5f));
                 markerPaint.setColor(Theme.PRIMARY);

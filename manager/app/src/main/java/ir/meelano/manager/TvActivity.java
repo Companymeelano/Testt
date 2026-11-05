@@ -28,6 +28,7 @@ import ir.meelano.manager.data.Settings;
 import ir.meelano.manager.ui.Charts;
 import ir.meelano.manager.ui.Kit;
 import ir.meelano.manager.ui.Theme;
+import ir.meelano.manager.ui.Ui;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -233,12 +234,14 @@ public class TvActivity extends Activity {
             slideBox.addView(kit.loading("در حال دریافت داده…"), kit.lp(-1, -2));
             return;
         }
-        slideBox.setAlpha(0f);
-        slideBox.animate().alpha(1f).setDuration(400).start();
+        boolean motion = Ui.motionOk(this);
+        slideBox.setAlpha(motion ? 0f : 1f);
+        if (motion) slideBox.animate().alpha(1f).setDuration(240).start();
         if (progress != null) {
             progress.animate().cancel();
+            progress.setVisibility(motion ? View.VISIBLE : View.INVISIBLE);
             progress.setScaleX(0f);
-            progress.animate().scaleX(1f).setDuration(SLIDE_MS)
+            if (motion) progress.animate().scaleX(1f).setDuration(SLIDE_MS)
                     .setInterpolator(new android.view.animation.LinearInterpolator()).start();
         }
         if (slide == 0) slideSales();

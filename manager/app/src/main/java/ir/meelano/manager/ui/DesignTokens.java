@@ -48,6 +48,9 @@ public final class DesignTokens {
     public static final int APP_DARK_BORDER = 0xFF2D3A33;
     public static final int APP_DARK_ACCENT = 0xFF70B99A;
     public static final int APP_DARK_ACCENT_SOFT = 0xFF20372C;
+    public static final int APP_LIGHT_STEEL = 0xFF59675F;
+    public static final int APP_DARK_STEEL = 0xFFB8C4BE;
+    public static final int ROSE = 0xFFC2527E;
 
     // Section accents: hue identifies the section, never the outcome of a metric.
     public static final int SALES = EMERALD;

@@ -73,6 +73,7 @@ import ir.meelano.manager.ui.Kit;
 import ir.meelano.manager.ui.MeelanoIcons;
 import ir.meelano.manager.ui.SmartReportImage;
 import ir.meelano.manager.ui.Theme;
+import ir.meelano.manager.ui.Ui;
 
 import java.io.InputStream;
 import java.io.IOException;
@@ -2098,8 +2099,12 @@ public class HomeScreen extends Screen {
         View status = syncStatus(syncTime, syncState, null, retry);
         // The compact status changes state in place after the first cache/live transition.
         if (syncWasRefreshing && entered) {
-            status.setAlpha(0f);
-            status.animate().alpha(1f).setDuration(220).start();
+            if (Ui.motionOk(a)) {
+                status.setAlpha(0f);
+                status.animate().alpha(1f).setDuration(220).start();
+            } else {
+                status.setAlpha(1f);
+            }
         }
         syncWasRefreshing = false;
         content.addView(greetingHero(d), a.kit.lp(-1, -2));
@@ -2352,10 +2357,7 @@ public class HomeScreen extends Screen {
     private void staggerIn(LinearLayout content) {
         if (entered) return;
         entered = true;
-        try {
-            if (android.provider.Settings.Global.getFloat(a.getContentResolver(),
-                    android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f) return;
-        } catch (Exception ignored) { Diag.ignored("HomeScreen:stagger", ignored); }
+        if (!Ui.motionOk(a)) return;
         float dy = Theme.dp(14);
         int n = Math.min(content.getChildCount(), 8);
         for (int i = 0; i < n; i++) {

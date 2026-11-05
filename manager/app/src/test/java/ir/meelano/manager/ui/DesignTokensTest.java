@@ -11,6 +11,12 @@ public class DesignTokensTest {
         assertEquals(0xFFFFFFFF, DesignTokens.APP_LIGHT_SURFACE);
         assertEquals(0xFF101814, DesignTokens.APP_DARK_BG);
         assertEquals(0xFF18231E, DesignTokens.APP_DARK_SURFACE);
+        assertTrue("application dark surfaces stay independent from the older brand-night palette",
+                DesignTokens.APP_DARK_BG != DesignTokens.NIGHT_BG
+                        && DesignTokens.APP_DARK_SURFACE != DesignTokens.NIGHT_SURFACE);
+        assertEquals(0xFF59675F, DesignTokens.APP_LIGHT_STEEL);
+        assertEquals(0xFFB8C4BE, DesignTokens.APP_DARK_STEEL);
+        assertEquals(0xFFC2527E, DesignTokens.ROSE);
         assertTrue("light primary text contrast on canvas",
                 DesignTokens.contrastRatio(DesignTokens.APP_LIGHT_TEXT, DesignTokens.APP_LIGHT_BG) >= 4.8);
         assertTrue("light muted text contrast on canvas",

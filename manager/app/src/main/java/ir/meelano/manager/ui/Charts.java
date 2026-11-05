@@ -188,7 +188,7 @@ public final class Charts {
         }
 
         void animateIn() {
-            if (!hasActivity()) {
+            if (!hasActivity() || !Ui.motionOk(getContext())) {
                 progress = 1f;
                 invalidate();
                 return;

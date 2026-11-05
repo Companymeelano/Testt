@@ -254,6 +254,16 @@ public final class WhatsNew {
                         ViewGroup.LayoutParams.MATCH_PARENT);
         } catch (Exception ignored) { Diag.ignored("WhatsNew:251", ignored); }
         // Staged entrance: badge pops, cards rise one by one.
+        if (!Ui.motionOk(a)) {
+            badge.setScaleX(1f);
+            badge.setScaleY(1f);
+            badge.setAlpha(1f);
+            for (View card : cards) {
+                card.setAlpha(1f);
+                card.setTranslationY(0f);
+            }
+            return;
+        }
         try {
             badge.setScaleX(0.5f);
             badge.setScaleY(0.5f);

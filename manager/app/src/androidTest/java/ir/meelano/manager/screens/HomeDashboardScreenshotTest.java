@@ -312,10 +312,10 @@ public final class HomeDashboardScreenshotTest {
         assertEquals("The returns section should contain its own single KPI", 1, facts[5]);
         assertTrue("Daily KPI period and comparison basis are not readable",
                 dailyKpiCopy[0].contains("بازه:") && dailyKpiCopy[0].contains("روز قبل"));
-        assertTrue("The returns KPI does not expose both 30-day date ranges",
+        assertTrue("The returns KPI does not expose both labeled 30-day date ranges",
                 returnKpiCopy[0].contains("اسناد برگشتی")
-                        && returnKpiCopy[0].contains("پیشین:")
-                        && returnKpiCopy[0].contains("جاری:"));
+                        && returnKpiCopy[0].contains("بازهٔ جاری (۳۰ روز):")
+                        && returnKpiCopy[0].contains("بازهٔ قبل (۳۰ روز):"));
         assertNotNull("Financial metric tiles were not rendered", targets[1]);
         assertTrue("Financial metric tile is too narrow for its value",
                 facts[2] >= 120f * activityDensity(targets[1]));

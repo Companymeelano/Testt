@@ -49,7 +49,7 @@ jobs:
           gradle-version: 8.11.1
 
       - name: Cache the pinned offline Persian voice engine
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: manager/app/libs/sherpa-onnx-1.13.8.aar
           key: sherpa-onnx-1.13.8-633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96
@@ -262,7 +262,7 @@ jobs:
           gradle-version: 8.11.1
 
       - name: Download pinned offline Persian voice engine
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: pinned-offline-voice-engine-${{ github.sha }}
           path: manager/app/libs
@@ -282,7 +282,11 @@ jobs:
           target: default
           arch: x86_64
           profile: pixel_2
+          cores: 4
+          ram-size: 4096M
+          heap-size: 512M
           disable-animations: true
+          disable-spellchecker: true
           script: HOME_SCREENSHOT_APKS_PREBUILT=1 bash .github/scripts/capture-home-dashboard.sh
 
       - name: Upload screenshot pair
@@ -317,7 +321,7 @@ jobs:
       contents: write
     steps:
       - name: Download verified APK build artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: meelano-manager-home-dashboard-${{ github.sha }}
           path: verified-apk

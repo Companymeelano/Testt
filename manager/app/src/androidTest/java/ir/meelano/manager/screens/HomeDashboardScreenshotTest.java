@@ -156,12 +156,12 @@ public final class HomeDashboardScreenshotTest {
 
     private static void saveDeviceScreenshot(Context target, String filename) throws Exception {
         Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
-        assertNoBlockingDialogs(instrumentation, filename);
+        waitForTransientSystemUi(instrumentation, filename);
         Bitmap screenshot = instrumentation.getUiAutomation().takeScreenshot();
         assertNotNull("Android emulator could not capture the current display", screenshot);
         try {
-            // Guard both sides of the real display capture: system/application dialogs are not
-            // acceptable screenshot content, even when the PNG itself is otherwise valid.
+            // A dialog appearing during the capture invalidates the screenshot even when the PNG
+            // itself is otherwise valid. Do not dismiss it after capture; fail rather than mask it.
             assertNoBlockingDialogs(instrumentation, filename);
             File directory = new File(target.getFilesDir(), "home-dashboard-screenshots");
             if (!directory.exists() && !directory.mkdirs())
@@ -177,7 +177,66 @@ public final class HomeDashboardScreenshotTest {
         }
     }
 
+    private static void waitForTransientSystemUi(Instrumentation instrumentation, String filename) {
+        for (int attempt = 1; attempt <= 3; attempt++) {
+            AccessibilitySnapshot snapshot = readAccessibilitySnapshot(instrumentation);
+            String normalized = snapshot.text.toLowerCase(Locale.ROOT);
+            if (!hasSystemUiAnr(normalized)) {
+                assertNoBlockingDialogs(instrumentation, filename);
+                return;
+            }
+            assertFalse(filename + " found the Android System UI recovery prompt but no Wait button",
+                    snapshot.waitButtonBounds.isEmpty());
+            System.out.println("Home screenshot: tapping Wait on transient System UI ANR ("
+                    + attempt + "/3)");
+            injectTap(instrumentation.getUiAutomation(), snapshot.waitButtonBounds);
+            SystemClock.sleep(2_000L);
+        }
+        assertNoBlockingDialogs(instrumentation, filename);
+    }
+
+    private static void injectTap(UiAutomation automation, Rect bounds) {
+        float x = bounds.exactCenterX();
+        float y = bounds.exactCenterY();
+        long downTime = SystemClock.uptimeMillis();
+        MotionEvent down = MotionEvent.obtain(downTime, downTime, MotionEvent.ACTION_DOWN, x, y, 0);
+        down.setSource(InputDevice.SOURCE_TOUCHSCREEN);
+        try {
+            assertTrue("Android emulator rejected the System UI recovery tap",
+                    automation.injectInputEvent(down, true));
+        } finally {
+            down.recycle();
+        }
+        SystemClock.sleep(80L);
+        MotionEvent up = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(),
+                MotionEvent.ACTION_UP, x, y, 0);
+        up.setSource(InputDevice.SOURCE_TOUCHSCREEN);
+        try {
+            assertTrue("Android emulator rejected the System UI recovery tap release",
+                    automation.injectInputEvent(up, true));
+        } finally {
+            up.recycle();
+        }
+    }
+
     private static void assertNoBlockingDialogs(Instrumentation instrumentation, String filename) {
+        AccessibilitySnapshot snapshot = readAccessibilitySnapshot(instrumentation);
+        String normalized = snapshot.text.toLowerCase(Locale.ROOT);
+        String details = normalized.length() > 900 ? normalized.substring(0, 900) : normalized;
+        assertFalse(filename + " is covered by the Android System UI not-responding dialog: " + details,
+                hasSystemUiAnr(normalized));
+        assertFalse(filename + " contains the Persian speech-engine setup dialog: " + details,
+                normalized.contains("راه‌اندازی صدای فارسی")
+                        || normalized.contains("موتور صدای این گوشی زبان فارسی ندارد"));
+    }
+
+    private static boolean hasSystemUiAnr(String normalizedText) {
+        return normalizedText.contains("system ui isn't responding")
+                || normalizedText.contains("system ui isn’t responding")
+                || normalizedText.contains("system ui is not responding");
+    }
+
+    private static AccessibilitySnapshot readAccessibilitySnapshot(Instrumentation instrumentation) {
         UiAutomation automation = instrumentation.getUiAutomation();
         AccessibilityServiceInfo serviceInfo = automation.getServiceInfo();
         if (serviceInfo != null
@@ -186,32 +245,39 @@ public final class HomeDashboardScreenshotTest {
             automation.setServiceInfo(serviceInfo);
         }
         StringBuilder visibleText = new StringBuilder();
-        appendAccessibilityText(automation.getRootInActiveWindow(), visibleText, 0);
+        Rect waitButtonBounds = new Rect();
+        appendAccessibilityText(automation.getRootInActiveWindow(), visibleText, waitButtonBounds, 0);
         List<AccessibilityWindowInfo> windows = automation.getWindows();
         if (windows != null) {
             for (AccessibilityWindowInfo window : windows)
-                appendAccessibilityText(window.getRoot(), visibleText, 0);
+                appendAccessibilityText(window.getRoot(), visibleText, waitButtonBounds, 0);
         }
-        String normalized = visibleText.toString().toLowerCase(Locale.ROOT);
-        String details = normalized.length() > 900 ? normalized.substring(0, 900) : normalized;
-        assertFalse(filename + " is covered by the Android System UI not-responding dialog: " + details,
-                normalized.contains("system ui isn't responding")
-                        || normalized.contains("system ui isn’t responding")
-                        || normalized.contains("system ui is not responding"));
-        assertFalse(filename + " contains the Persian speech-engine setup dialog: " + details,
-                normalized.contains("راه‌اندازی صدای فارسی")
-                        || normalized.contains("موتور صدای این گوشی زبان فارسی ندارد"));
+        return new AccessibilitySnapshot(visibleText.toString(), waitButtonBounds);
     }
 
-    private static void appendAccessibilityText(AccessibilityNodeInfo node,
-                                                StringBuilder text, int depth) {
+    private static void appendAccessibilityText(AccessibilityNodeInfo node, StringBuilder text,
+                                                Rect waitButtonBounds, int depth) {
         if (node == null || depth > 64) return;
         CharSequence label = node.getText();
         CharSequence description = node.getContentDescription();
-        if (label != null) text.append(label).append(' ');
+        if (label != null) {
+            text.append(label).append(' ');
+            if (waitButtonBounds.isEmpty() && "wait".equalsIgnoreCase(label.toString().trim()))
+                node.getBoundsInScreen(waitButtonBounds);
+        }
         if (description != null) text.append(description).append(' ');
         for (int i = 0; i < node.getChildCount(); i++)
-            appendAccessibilityText(node.getChild(i), text, depth + 1);
+            appendAccessibilityText(node.getChild(i), text, waitButtonBounds, depth + 1);
+    }
+
+    private static final class AccessibilitySnapshot {
+        final String text;
+        final Rect waitButtonBounds;
+
+        AccessibilitySnapshot(String text, Rect waitButtonBounds) {
+            this.text = text;
+            this.waitButtonBounds = new Rect(waitButtonBounds);
+        }
     }
 
     private static void assertValidPng(File file) throws Exception {

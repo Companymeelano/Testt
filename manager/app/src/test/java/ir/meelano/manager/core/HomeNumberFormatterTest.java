@@ -16,19 +16,19 @@ public class HomeNumberFormatterTest {
     }
 
     @Test public void compactValuesHaveAtMostOneFractionDigitAndKeepZeroReadable() {
-        assertEquals("\u2066۱٫۲\u2069 میلیون", HomeNumberFormatter.compactUnit(1_234_567));
-        assertEquals("\u2066۰\u2069", HomeNumberFormatter.compactUnit(0));
+        assertEquals("\u2068۱٫۲ میلیون\u2069", HomeNumberFormatter.compactUnit(1_234_567));
+        assertEquals("\u2068۰\u2069", HomeNumberFormatter.compactUnit(0));
     }
 
     @Test public void compactAndFullMoneyUseSelectedUnitWithoutChangingStoredRials() {
         int old = Money.unit();
         try {
             Money.setUnit(Money.UNIT_TOMAN);
-            assertEquals("\u2066۱٫۳\u2069 هزار تومان", HomeNumberFormatter.compactMoney(12_500));
-            assertEquals("\u2066۱٬۲۵۰\u2069 تومان", HomeNumberFormatter.money(12_500));
-            assertEquals("\u2066۱٫۳\u2069 هزار", HomeNumberFormatter.chartMoney(12_500));
+            assertEquals("\u2068۱٫۳ هزار\u202Fتومان\u2069", HomeNumberFormatter.compactMoney(12_500));
+            assertEquals("\u2068۱٬۲۵۰\u202Fتومان\u2069", HomeNumberFormatter.money(12_500));
+            assertEquals("۱٫۳ هزار", HomeNumberFormatter.chartMoney(12_500));
             Money.setUnit(Money.UNIT_RIAL);
-            assertEquals("\u2066۱۲٬۵۰۰\u2069 ریال", HomeNumberFormatter.money(12_500));
+            assertEquals("\u2068۱۲٬۵۰۰\u202Fریال\u2069", HomeNumberFormatter.money(12_500));
         } finally {
             Money.setUnit(old);
         }
@@ -38,9 +38,9 @@ public class HomeNumberFormatterTest {
         int old = Money.unit();
         try {
             Money.setUnit(Money.UNIT_RIAL);
-            assertEquals("\u2066۰٫۵۱\u2069 ریال", HomeNumberFormatter.preciseMoney(new BigDecimal("0.51")));
+            assertEquals("\u2068۰٫۵۱\u202Fریال\u2069", HomeNumberFormatter.preciseMoney(new BigDecimal("0.51")));
             Money.setUnit(Money.UNIT_TOMAN);
-            assertEquals("\u2066۰٫۰۵۱\u2069 تومان", HomeNumberFormatter.preciseMoney(new BigDecimal("0.51")));
+            assertEquals("\u2068۰٫۰۵۱\u202Fتومان\u2069", HomeNumberFormatter.preciseMoney(new BigDecimal("0.51")));
         } finally {
             Money.setUnit(old);
         }
@@ -58,10 +58,29 @@ public class HomeNumberFormatterTest {
 
     @Test public void timeAndExternalLabelsAreLocalized() {
         assertEquals("\u2066۰۸:۰۵\u2069", HomeNumberFormatter.time(8, 5));
-        assertEquals("پرداخت ۱۲۳۴ / ۵۶۷۸", HomeNumberFormatter.localizeText("پرداخت 1234 / ٥٦٧٨"));
-        assertEquals("مبلغ ۱٬۲۳۴٫۵٪، تاریخ ۱۴۰۵/۰۸/۰۴ تا ۱۴۰۵/۰۸/۳۰",
+        assertEquals("پرداخت \u2066۱۲۳۴\u2069 / \u2066۵۶۷۸\u2069",
+                HomeNumberFormatter.localizeText("پرداخت 1234 / ٥٦٧٨"));
+        assertEquals("مبلغ \u2066۱٬۲۳۴٫۵٪\u2069، تاریخ \u2066۱۴۰۵/۰۸/۰۴\u2069 تا \u2066۱۴۰۵/۰۸/۳۰\u2069",
                 HomeNumberFormatter.localizeText("مبلغ 1,234.5%, تاریخ 1405/08/04 تا 1405/08/30"));
-        assertEquals("−۵٪", HomeNumberFormatter.localizeText("-5%"));
+        assertEquals("\u2066−۵٪\u2069", HomeNumberFormatter.localizeText("-5%"));
+        assertEquals(HomeNumberFormatter.localizeText("مبلغ 12,345"),
+                HomeNumberFormatter.localizeText(HomeNumberFormatter.localizeText("مبلغ 12,345")));
+        int[] offsetMap = HomeNumberFormatter.localizedOffsetMap("قیمت 123 ریال");
+        assertTrue(offsetMap["قیمت ".length()] > "قیمت ".length());
+        assertEquals(HomeNumberFormatter.localizeText("قیمت 123 ریال").length(),
+                offsetMap["قیمت 123 ریال".length()]);
+    }
+
+    @Test public void datesUseTextAndTableFormatsWithoutMixingTheTwo() {
+        assertEquals("\u2068۱۳ آبان ۱۴۰۵\u2069", HomeNumberFormatter.dateText("1405/08/13"));
+        assertEquals("\u2066۱۴۰۵/۰۸/۱۳\u2069", HomeNumberFormatter.dateTable("1405/08/13"));
+        assertEquals("\u2068۱۳ آبان\u2069", HomeNumberFormatter.dateShortLabel("1405/08/13"));
+        assertEquals("\u2068۱۳ آبان ۱۴۰۵\u2069، ساعت \u2066۰۸:۰۵:۵۹\u2069",
+                HomeNumberFormatter.dateTime("1405/08/13 08:05:59"));
+        assertEquals("\u2066۱۴۰۵/۰۸/۱۳\u2069 · \u2066۰۸:۰۵:۰۰\u2069",
+                HomeNumberFormatter.dateTimeTable("1405/08/13T08:05:00"));
+        assertEquals(HomeNumberFormatter.dateText("1405/08/13"), Jalali.dispFa("1405/08/13"));
+        assertEquals(HomeNumberFormatter.dateTable("1405/08/13"), Jalali.dispTableFa("1405/08/13"));
     }
 
     @Test public void chartScaleAndLargeChangeUseActualAmounts() {

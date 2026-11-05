@@ -26,11 +26,12 @@ import ir.meelano.manager.core.AssistantPrompt;
 import ir.meelano.manager.core.AiPromptRedactor;
 import ir.meelano.manager.core.AtiranAuth;
 import ir.meelano.manager.core.Filter;
+import ir.meelano.manager.core.HomeNumberFormatter;
+import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.ReportAssistant;
 import ir.meelano.manager.core.ReportCatalog;
 import ir.meelano.manager.core.RoleStore;
 import ir.meelano.manager.core.Diag;
-import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.Notify;
 import ir.meelano.manager.core.OfflineAsr;
 import ir.meelano.manager.core.SpeechQueue;
@@ -303,9 +304,11 @@ public final class AssistantScreen extends Screen {
         StringBuilder b = new StringBuilder("منبع: ابزار داخلیِ فقط‌خواندنی و snapshot آتیران؛ این پاسخ به گزارش کامل پایگاه‌داده تعمیم داده نمی‌شود.\n");
         if (snap != null && snap.loadedAt > 0) {
             long minutes = Math.max(0, (System.currentTimeMillis() - snap.loadedAt) / 60_000L);
-            String time = new SimpleDateFormat("HH:mm", Locale.US).format(new Date(snap.loadedAt));
-            b.append("تاریخ داده: ").append(snap.day).append("؛ آخرین خواندن: ").append(Money.fa(time))
-                    .append("؛ سن snapshot: ").append(Money.fa(String.valueOf(minutes))).append(" دقیقه.\n");
+            String time = HomeNumberFormatter.time(
+                    new SimpleDateFormat("HH:mm", Locale.US).format(new Date(snap.loadedAt)));
+            b.append("تاریخ داده: ").append(Jalali.dispFa(snap.day)).append("؛ آخرین خواندن: ").append(time)
+                    .append("؛ سن snapshot: ").append(HomeNumberFormatter.integer(minutes))
+                    .append(" دقیقه.\n");
         }
         return b.append("نتیجهٔ ابزار:\n").append(fact == null ? "" : fact).toString();
     }
@@ -653,9 +656,10 @@ public final class AssistantScreen extends Screen {
         } else if (!hasData) {
             status = lastError != null ? "اتصال برقرار نشد؛ پایین صفحه را بزنید" : "در حال اتصال به پایگاه‌داده…";
         } else {
-            String time = new SimpleDateFormat("HH:mm", Locale.US).format(new Date(snap.loadedAt));
-            status = "داده‌های زنده • آخرین خواندن ساعت " + Money.fa(time)
-                    + (lastError != null ? " • اتصال موقتاً قطع است" : " • نوسازی هر دقیقه");
+            String time = HomeNumberFormatter.time(
+                    new SimpleDateFormat("HH:mm", Locale.US).format(new Date(snap.loadedAt)));
+            status = HomeNumberFormatter.rtlText("داده‌های زنده • آخرین خواندن ساعت " + time
+                    + (lastError != null ? " • اتصال موقتاً قطع است" : " • نوسازی هر دقیقه"));
         }
         return a.kit.hero("✦", "دستیار هوشمند میلانو", status, Theme.GOLD);
     }

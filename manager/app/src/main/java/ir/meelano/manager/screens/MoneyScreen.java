@@ -11,6 +11,7 @@ import android.widget.TextView;
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.core.AtiranSchema;
 import ir.meelano.manager.core.Filter;
+import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.MoneyQueries;
@@ -168,10 +169,12 @@ public class MoneyScreen extends Screen {
             c.addView(a.kit.text("روند روزانه", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
             Charts.Area ch = new Charts.Area(a);
             List<Charts.Point> pts = new ArrayList<>();
-            for (Row r : d.daily) pts.add(new Charts.Point(Jalali.shortLabel(r.s("day")), r.d("total")));
+            for (Row r : d.daily) pts.add(new Charts.Point(
+                    HomeNumberFormatter.dateShortLabel(r.s("day")), r.d("total")));
             final TextView cap = a.kit.text("", 11f, Theme.MUTED, false);
             ch.setData(pts, accent(), Charts.MONEY);
-            ch.setListener((idx, pt) -> cap.setText(Money.fa(pt.label) + " • " + Money.rial(pt.value)));
+            ch.setListener((idx, pt) -> cap.setText(ir.meelano.manager.core.HomeNumberFormatter.rtlText(
+                    Money.fa(pt.label) + " • " + Money.compactRial(pt.value))));
             c.addView(ch, new LinearLayout.LayoutParams(-1, Theme.dp(175)));
             c.addView(cap, a.kit.lp(-1, -2));
             a.kit.addCard(content, c);
@@ -264,7 +267,7 @@ public class MoneyScreen extends Screen {
             String pill = r.s("kind");
             if (pill.isEmpty()) pill = "—";
             View v = a.kit.docRow("قبض " + Money.fa(ghno), r.s("customer"),
-                    Jalali.shortLabel(r.s("date")), Money.rial(r.d("total")),
+                    Jalali.dispFa(r.s("date")), Money.compactRial(r.d("total")),
                     pill, methodColor(r), receiptFoot(r), v2 -> openDetail(ghno));
             LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
             p.setMargins(0, 0, 0, Theme.dp(10));

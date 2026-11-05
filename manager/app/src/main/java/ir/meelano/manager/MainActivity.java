@@ -22,6 +22,7 @@ import ir.meelano.manager.core.RoleStore;
 import ir.meelano.manager.core.SmartLink;
 import ir.meelano.manager.ui.LinkPanel;
 import ir.meelano.manager.data.NetRoute;
+import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.PersianText;
 import ir.meelano.manager.core.Notify;
@@ -2187,10 +2188,10 @@ public class MainActivity extends Activity {
     }
 
     public static String zoomLabel(int idx) {
-        if (idx == 0) return "٪۹۰";
-        if (idx == 2) return "٪۱۱۵";
-        if (idx == 3) return "٪۱۳۰";
-        return "٪۱۰۰";
+        if (idx == 0) return HomeNumberFormatter.percent(90d);
+        if (idx == 2) return HomeNumberFormatter.percent(115d);
+        if (idx == 3) return HomeNumberFormatter.percent(130d);
+        return HomeNumberFormatter.percent(100d);
     }
 
     /** Share a bitmap (shop card) via the FileProvider. */

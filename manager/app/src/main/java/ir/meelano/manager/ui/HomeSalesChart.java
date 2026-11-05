@@ -400,7 +400,7 @@ public final class HomeSalesChart {
                 if (index == previous) continue;
                 previous = index;
                 float x = plotRight - spacing * index;
-                String label = HomeNumberFormatter.localizeText(Jalali.shortLabel(days.get(index).date));
+                String label = HomeNumberFormatter.dateShortLabel(days.get(index).date);
                 canvas.drawText(label, x, getHeight() - Theme.dp(5), textPaint);
             }
         }

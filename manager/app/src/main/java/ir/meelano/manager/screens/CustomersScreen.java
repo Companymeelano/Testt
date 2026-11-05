@@ -188,7 +188,8 @@ public class CustomersScreen extends Screen {
         LinearLayout amt = a.kit.v();
         amt.addView(a.kit.text(bal > 0.5 ? "مانده بدهی" : (bal < -0.5 ? "مانده بستانکاری" : "وضعیت حساب"),
                 10.5f, Theme.MUTED, false), a.kit.lp(-1, -2));
-        String amount = bal > 0.5 ? Money.rial(bal) : (bal < -0.5 ? Money.rial(-bal) : "تسویه");
+        String amount = bal > 0.5 ? Money.compactRial(bal)
+                : (bal < -0.5 ? Money.compactRial(-bal) : "تسویه");
         amt.addView(a.kit.text(amount, 15f, col, true), a.kit.lp(-1, -2));
         bottom.addView(amt, a.kit.wlp(1f));
         String pillText = bal > 0.5 ? "بدهکار" : (bal < -0.5 ? "بستانکار" : "تسویه");

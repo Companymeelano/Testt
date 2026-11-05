@@ -944,7 +944,9 @@ public class SettingsScreen extends Screen {
                 try {
                     dlg.dismiss();
                 } catch (Exception ignored) { Diag.ignored("SettingsScreen:715", ignored); }
-                a.settings.saveBackupInfo(Jalali.faDate(Jalali.todayStr()), Backup.sizeFa(bytes));
+                a.settings.saveBackupInfo(
+                        ir.meelano.manager.core.HomeNumberFormatter.dateText(Jalali.todayStr()),
+                        Backup.sizeFa(bytes));
                 a.kit.toast("بکاپ ساخته شد (" + Backup.sizeFa(bytes) + ") • " + notes);
                 render(content);
                 try {

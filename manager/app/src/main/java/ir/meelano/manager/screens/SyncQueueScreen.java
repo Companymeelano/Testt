@@ -58,13 +58,13 @@ public class SyncQueueScreen extends Screen {
         if (handovers.isEmpty()) content.addView(a.kit.hint("تحویلِ منتظر ندارید."), a.kit.lp(-1, -2));
         else {
             for (JSONObject e : handovers) {
-                String day = e.optString("dt", "—");
+                String day = ir.meelano.manager.core.HomeNumberFormatter.dateTime(e.optString("dt", "—"));
                 String no = e.optString("no", "—");
                 String receiver = e.optString("receiver", "گیرنده ثبت نشده");
                 String detail = e.optString("cust", "") + " • " + receiver
                         + (e.optString("worker", "").isEmpty() ? "" : " • کارگر: " + e.optString("worker"));
                 View row = a.kit.personRow("فاکتور " + ir.meelano.manager.core.Money.fa(no),
-                        ir.meelano.manager.core.Money.fa(day) + " • " + detail,
+                        day + " • " + detail,
                         e.optString("items", ""), "در صف", Theme.WARNING, null);
                 content.addView(row, a.kit.lp(-1, -2));
                 content.addView(a.kit.gap(4));
@@ -119,7 +119,8 @@ public class SyncQueueScreen extends Screen {
                     String state = approved ? "تأیید مدیر • تعدیل موجودی ثبت نشده"
                             : (rejected ? "رد شده" : "در انتظار بررسی مدیر");
                     String note = row.optString("reviewNote", "");
-                    String sub = ir.meelano.manager.core.Money.fa(row.optString("day", ""))
+                    String sub = ir.meelano.manager.core.HomeNumberFormatter.dateTime(
+                            row.optString("day", ""))
                             + " • " + row.optString("anbar", "سراسری")
                             + (note.isEmpty() ? "" : " • علت/یادداشت: " + note);
                     card.addView(a.kit.kv(state, sub, approved ? Theme.SUCCESS

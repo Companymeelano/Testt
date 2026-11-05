@@ -15,6 +15,7 @@ import android.text.TextPaint;
 import android.widget.LinearLayout;
 
 import ir.meelano.manager.MainActivity;
+import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.data.Company;
@@ -204,7 +205,8 @@ public final class FisPrint {
                         ? r.d("qtyJoz") : r.d("qtyVah");
                 double pr = Math.abs(r.d("vahPrice")) < 0.005 && Math.abs(r.d("jozPrice")) > 0.005
                         ? r.d("jozPrice") : r.d("vahPrice");
-                String l2 = Money.fa(trimNum(q)) + " × " + Money.rial(pr) + " = " + Money.rial(r.d("lineSum"));
+                String l2 = HomeNumberFormatter.quantity(q) + " × " + Money.rial(pr)
+                        + " = " + Money.rial(r.d("lineSum"));
                 blocks.add(new Block(lay(l2, 26, false, Layout.Alignment.ALIGN_NORMAL), 6));
             }
         }
@@ -219,7 +221,8 @@ public final class FisPrint {
         if (Math.abs(remain) > 0.5)
             blocks.add(new Block(lay("مانده: " + Money.rial(remain), 28, true, Layout.Alignment.ALIGN_NORMAL), 2));
         blocks.add(new Block(lay("سپاس از خرید شما", 28, true, Layout.Alignment.ALIGN_CENTER), 2));
-        blocks.add(new Block(lay(Jalali.todayStr() + " • میلانو", 22, false, Layout.Alignment.ALIGN_CENTER), 0));
+        blocks.add(new Block(lay(HomeNumberFormatter.dateText(Jalali.todayStr())
+                + " • میلانو", 22, false, Layout.Alignment.ALIGN_CENTER), 0));
 
         int h = 16;
         for (Block b : blocks) h += b.lay.getHeight() + b.gapAfter;
@@ -235,11 +238,6 @@ public final class FisPrint {
             y += b.lay.getHeight() + b.gapAfter;
         }
         return raster(bmp);
-    }
-
-    private static String trimNum(double v) {
-        if (Math.abs(v - Math.round(v)) < 0.0005) return String.valueOf(Math.round(v));
-        return String.valueOf(Math.round(v * 100) / 100.0);
     }
 
     /** Bitmap → ESC/POS raster (GS v 0) + init + feed + cut. */

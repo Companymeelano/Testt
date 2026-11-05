@@ -6,6 +6,7 @@ import android.widget.TextView;
 
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.core.Filter;
+import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.Money;
@@ -201,10 +202,12 @@ public class ProfitScreen extends Screen {
             Charts.Area ch = new Charts.Area(a);
             List<Charts.Point> pts = new ArrayList<>();
             for (Row r : d.daily)
-                pts.add(new Charts.Point(Jalali.shortLabel(r.s("day")), r.d("sales") - r.d("cogs")));
+                pts.add(new Charts.Point(HomeNumberFormatter.dateShortLabel(r.s("day")),
+                        r.d("sales") - r.d("cogs")));
             final TextView cap = a.kit.text("", 11f, Theme.MUTED, false);
             ch.setData(pts, accent(), Charts.COMPACT);
-            ch.setListener((idx, p) -> cap.setText(Money.fa(p.label) + " • " + Money.rial(p.value)));
+            ch.setListener((idx, p) -> cap.setText(ir.meelano.manager.core.HomeNumberFormatter.rtlText(
+                    Money.fa(p.label) + " • " + Money.compactRial(p.value))));
             c.addView(ch, new LinearLayout.LayoutParams(-1, Theme.dp(175)));
             c.addView(cap, a.kit.lp(-1, -2));
             a.kit.addCard(content, c);
@@ -255,7 +258,7 @@ public class ProfitScreen extends Screen {
 
         if (d.costs != null && !d.costs.isEmpty()) {
             LinearLayout c = a.kit.card(Theme.DANGER);
-            c.addView(a.kit.kv("سایر هزینه‌ها", Money.rial(costs), Theme.DANGER), a.kit.lp(-1, -2));
+            c.addView(a.kit.kv("سایر هزینه‌ها", Money.compactRial(costs), Theme.DANGER), a.kit.lp(-1, -2));
             ReportCatalog.Col[] cols = new ReportCatalog.Col[]{
                     new ReportCatalog.Col("label", "سرفصل", ReportCatalog.T_TEXT),
                     new ReportCatalog.Col("total", "جمع", ReportCatalog.T_MONEY),

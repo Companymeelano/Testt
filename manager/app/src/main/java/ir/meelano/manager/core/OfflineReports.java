@@ -29,7 +29,7 @@ public final class OfflineReports {
         boolean bound = s.directConn() && NetRoute.bindDirect(app);
         try (Connection c = SmartLink.open(app, s)) {
             Meta m = new Meta(c);
-            String label = "بکاپ شبانه " + Jalali.faDate(Jalali.todayStr());
+            String label = "بکاپ شبانه " + HomeNumberFormatter.dateText(Jalali.todayStr());
             for (ReportCatalog.Spec sp : ReportCatalog.ALL) {
                 try {
                     boolean daily = "returns_by_kind".equals(sp.id) || "returns_list".equals(sp.id);

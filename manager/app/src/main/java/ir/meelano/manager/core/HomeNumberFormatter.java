@@ -5,10 +5,13 @@ import java.text.DecimalFormatSymbols;
 import java.math.BigDecimal;
 import java.util.Locale;
 
-/** One RTL-safe number formatter for text rendered on the Home dashboard. */
+/** Shared Persian number, date, time, and RTL text formatter for app display surfaces. */
 public final class HomeNumberFormatter {
     private static final char LRI = '\u2066';
+    private static final char RLI = '\u2067';
+    private static final char FSI = '\u2068';
     private static final char PDI = '\u2069';
+    private static final char NNBSP = '\u202F';
 
     private HomeNumberFormatter() { }
 
@@ -26,24 +29,123 @@ public final class HomeNumberFormatter {
     }
 
     /**
-     * Apply Persian digits to arbitrary Home labels (names, timestamps and error details).
-     * Numeric values should use one of the typed formatting methods below for grouping,
-     * decimal separators, signs and bidi isolation.
+     * Localize free-form display text and isolate every numeric run. Typed values should still
+     * use the methods below so grouping, decimal separators, signs and units are unambiguous.
      */
     public static String localizeText(String value) {
         if (value == null || value.isEmpty()) return value == null ? "" : value;
+        return isolateNumericRuns(normalizeText(value), null);
+    }
+
+    /** Alias used at the final Android text-view boundary. */
+    public static String rtlText(String value) {
+        return localizeText(value);
+    }
+
+    /** Output offsets for mapping existing text spans after digit localization and isolation. */
+    public static int[] localizedOffsetMap(String value) {
+        if (value == null) return new int[]{0};
+        int[] map = new int[value.length() + 1];
+        isolateNumericRuns(normalizeText(value), map);
+        return map;
+    }
+
+    private static String normalizeText(String value) {
         StringBuilder normalized = new StringBuilder(value.length());
         for (int i = 0; i < value.length(); i++) {
             char ch = value.charAt(i);
             boolean digitBefore = i > 0 && isDigit(value.charAt(i - 1));
             boolean digitAfter = i + 1 < value.length() && isDigit(value.charAt(i + 1));
             if (ch == ',') normalized.append(digitBefore && digitAfter ? '٬' : '،');
-            else if (ch == '.' && digitBefore && digitAfter) normalized.append('٫');
+            else if ((ch == '.' || ch == '\u066B') && digitBefore && digitAfter) normalized.append('٫');
             else if (ch == '%') normalized.append('٪');
             else if (ch == '-' && digitAfter && !digitBefore) normalized.append('−');
             else normalized.append(ch);
         }
         return persianDigits(normalized.toString());
+    }
+
+    private static String isolateNumericRuns(String value, int[] offsetMap) {
+        StringBuilder result = new StringBuilder(value.length() + 12);
+        if (offsetMap != null) offsetMap[0] = 0;
+        for (int i = 0; i < value.length();) {
+            char ch = value.charAt(i);
+            if (isolateStart(ch)) {
+                int end = findIsolateEnd(value, i);
+                int outputStart = result.length();
+                result.append(value, i, end);
+                if (offsetMap != null) {
+                    for (int boundary = i; boundary <= end; boundary++)
+                        offsetMap[boundary] = outputStart + boundary - i;
+                }
+                i = end;
+                continue;
+            }
+            if (!isNumericStart(value, i)) {
+                if (offsetMap != null) offsetMap[i] = result.length();
+                result.append(ch);
+                i++;
+                if (offsetMap != null) offsetMap[i] = result.length();
+                continue;
+            }
+            int end = i;
+            if (isSign(ch)) end++;
+            while (end < value.length()) {
+                char current = value.charAt(end);
+                if (isDigit(current)) {
+                    end++;
+                    continue;
+                }
+                if (isNumberSeparator(current) && end + 1 < value.length()
+                        && isDigit(value.charAt(end + 1))) {
+                    end += 2;
+                    continue;
+                }
+                if ((current == '٪' || current == '%') && end > i) end++;
+                break;
+            }
+            result.append(LRI);
+            if (offsetMap != null) offsetMap[i] = result.length();
+            result.append(value, i, end);
+            if (offsetMap != null) {
+                for (int boundary = i + 1; boundary <= end; boundary++)
+                    offsetMap[boundary] = result.length() - (end - boundary);
+            }
+            result.append(PDI);
+            if (offsetMap != null) offsetMap[end] = result.length();
+            i = end;
+        }
+        if (offsetMap != null) offsetMap[value.length()] = result.length();
+        return result.toString();
+    }
+
+    private static boolean isNumericStart(String value, int index) {
+        char ch = value.charAt(index);
+        if (isDigit(ch)) return true;
+        return isSign(ch) && index + 1 < value.length() && isDigit(value.charAt(index + 1));
+    }
+
+    private static boolean isSign(char value) {
+        return value == '+' || value == '-' || value == '−';
+    }
+
+    private static boolean isNumberSeparator(char value) {
+        return value == '٬' || value == '٫' || value == '/' || value == ':'
+                || value == '.' || value == '-' || value == '−';
+    }
+
+    private static boolean isolateStart(char value) {
+        return value == LRI || value == RLI || value == FSI;
+    }
+
+    private static int findIsolateEnd(String value, int start) {
+        int depth = 0;
+        for (int i = start; i < value.length(); i++) {
+            char ch = value.charAt(i);
+            if (isolateStart(ch)) depth++;
+            else if (ch == PDI && --depth == 0) return i + 1;
+        }
+        return value.length();
     }
 
     private static boolean isDigit(char value) {
@@ -106,6 +208,30 @@ public final class HomeNumberFormatter {
         return isolate(formatNumber(value, 0));
     }
 
+    /** Number with up to three fractional digits, used for quantities. */
+    public static String quantity(double value) {
+        return isolate(quantityRaw(value));
+    }
+
+    /** Quantity with an explicit sign held next to the number in one LTR isolate. */
+    public static String signedQuantity(double value) {
+        if (!isFinite(value)) return isolate("—");
+        String sign = value < 0d ? "−" : "+";
+        return isolate(sign + quantityRaw(Math.abs(value)));
+    }
+
+    private static String quantityRaw(double value) {
+        if (!isFinite(value)) return "—";
+        if (Math.abs(value - Math.round(value)) < 0.0005d) return formatNumber(value, 0);
+        DecimalFormat format = new DecimalFormat("#,##0.###", DecimalFormatSymbols.getInstance(Locale.US));
+        format.setGroupingUsed(true);
+        format.setMaximumFractionDigits(3);
+        format.setMinimumFractionDigits(0);
+        format.setRoundingMode(java.math.RoundingMode.HALF_UP);
+        if (Math.abs(value) < 0.0005d) value = 0d;
+        return localizeFormatted(format.format(value));
+    }
+
     /** Number with at most one fractional digit, grouped and isolated. */
     public static String decimal(double value) {
         return isolate(formatNumber(value, 1));
@@ -113,6 +239,47 @@ public final class HomeNumberFormatter {
 
     /** A compact value that is already in the selected display unit, without a currency name. */
     public static String compactUnit(double value) {
+        return isolatePhrase(compactUnitRaw(value));
+    }
+
+    /** Compact Rial amount in the app's selected display unit (Toman or Rial). */
+    public static String compactMoney(double rials) {
+        return isolatePhrase(compactUnitRaw(Money.toUnit(rials)) + NNBSP + Money.unitName());
+    }
+
+    /** Full Rial amount in the selected display unit (Toman or Rial). */
+    public static String money(double rials) {
+        return isolatePhrase(formatNumber(Money.toUnit(rials), 0) + NNBSP + Money.unitName());
+    }
+
+    /** Exact Rial amount formatted without converting through binary floating point. */
+    public static String money(BigDecimal rials) {
+        if (rials == null) return isolatePhrase("—" + NNBSP + Money.unitName());
+        BigDecimal display = Money.isToman()
+                ? rials.divide(BigDecimal.TEN, 0, java.math.RoundingMode.HALF_UP)
+                : rials.setScale(0, java.math.RoundingMode.HALF_UP);
+        DecimalFormat format = new DecimalFormat("#,##0", DecimalFormatSymbols.getInstance(Locale.US));
+        format.setRoundingMode(java.math.RoundingMode.HALF_UP);
+        return isolatePhrase(localizeFormatted(format.format(display)) + NNBSP + Money.unitName());
+    }
+
+    /** Exact-enough variance display: unlike normal totals, do not hide fractional Rials by rounding. */
+    public static String preciseMoney(BigDecimal rials) {
+        if (rials == null) return isolatePhrase("—" + NNBSP + Money.unitName());
+        BigDecimal display = Money.isToman() ? rials.movePointLeft(1) : rials;
+        DecimalFormat format = new DecimalFormat("#,##0.#####", DecimalFormatSymbols.getInstance(Locale.US));
+        format.setMaximumFractionDigits(Money.isToman() ? 5 : 4);
+        format.setMinimumFractionDigits(0);
+        format.setRoundingMode(java.math.RoundingMode.HALF_UP);
+        return isolatePhrase(localizeFormatted(format.format(display)) + NNBSP + Money.unitName());
+    }
+
+    /** Compact Rial value for chart labels; Canvas draws this as an isolated plot annotation. */
+    public static String chartMoney(double rials) {
+        return compactUnitRaw(Money.toUnit(rials));
+    }
+
+    private static String compactUnitRaw(double value) {
         if (!isFinite(value)) return "—";
         double absolute = Math.abs(value);
         double scale = 1d;
@@ -132,44 +299,7 @@ public final class HomeNumberFormatter {
         }
         double scaled = value / scale;
         int decimals = Math.abs(scaled) >= 100d ? 0 : 1;
-        return isolate(formatNumber(scaled, decimals)) + suffix;
-    }
-
-    /** Compact Rial amount in the app's selected display unit (Toman or Rial). */
-    public static String compactMoney(double rials) {
-        return compactUnit(Money.toUnit(rials)) + " " + Money.unitName();
-    }
-
-    /** Full Rial amount in the selected display unit (Toman or Rial). */
-    public static String money(double rials) {
-        return isolate(formatNumber(Money.toUnit(rials), 0)) + " " + Money.unitName();
-    }
-
-    /** Exact Rial amount formatted without converting through binary floating point. */
-    public static String money(BigDecimal rials) {
-        if (rials == null) return isolate("—") + " " + Money.unitName();
-        BigDecimal display = Money.isToman()
-                ? rials.divide(BigDecimal.TEN, 0, java.math.RoundingMode.HALF_UP)
-                : rials.setScale(0, java.math.RoundingMode.HALF_UP);
-        DecimalFormat format = new DecimalFormat("#,##0", DecimalFormatSymbols.getInstance(Locale.US));
-        format.setRoundingMode(java.math.RoundingMode.HALF_UP);
-        return isolate(localizeFormatted(format.format(display))) + " " + Money.unitName();
-    }
-
-    /** Exact-enough variance display: unlike normal totals, do not hide fractional Rials by rounding. */
-    public static String preciseMoney(BigDecimal rials) {
-        if (rials == null) return isolate("—") + " " + Money.unitName();
-        BigDecimal display = Money.isToman() ? rials.movePointLeft(1) : rials;
-        DecimalFormat format = new DecimalFormat("#,##0.#####", DecimalFormatSymbols.getInstance(Locale.US));
-        format.setMaximumFractionDigits(Money.isToman() ? 5 : 4);
-        format.setMinimumFractionDigits(0);
-        format.setRoundingMode(java.math.RoundingMode.HALF_UP);
-        return isolate(localizeFormatted(format.format(display))) + " " + Money.unitName();
-    }
-
-    /** Compact Rial value for chart labels, without repeating the currency unit. */
-    public static String chartMoney(double rials) {
-        return compactUnit(Money.toUnit(rials));
+        return formatNumber(scaled, decimals) + suffix;
     }
 
     /** Scale divisor for a chart axis, calculated in the selected display currency. */
@@ -227,10 +357,11 @@ public final class HomeNumberFormatter {
 
     /** Signed compact currency variance used when a relative percentage would be misleading. */
     public static String signedCompactMoney(double differenceRials) {
-        if (!isFinite(differenceRials)) return "—";
+        if (!isFinite(differenceRials)) return isolatePhrase("—");
         if (Math.abs(differenceRials) < 0.5d) return compactMoney(0d);
-        return (differenceRials > 0d ? "+ " : "− ")
-                + compactMoney(Math.abs(differenceRials));
+        String sign = differenceRials > 0d ? "+" : "−";
+        return isolatePhrase(sign + compactUnitRaw(Money.toUnit(Math.abs(differenceRials)))
+                + NNBSP + Money.unitName());
     }
 
     /** Percentage, preserving a negative sign and placing the Persian percent mark with the value. */
@@ -259,6 +390,116 @@ public final class HomeNumberFormatter {
         if (Math.abs(value) < 0.05d) return isolate("۰٪");
         String direction = value > 0d ? "↗ +" : "↘ −";
         return isolate(direction + formatNumber(Math.abs(value), 1) + "٪");
+    }
+
+    /**
+     * Human-facing Jalali date used in prose and cards: «۱۳ آبان ۱۴۰۵».
+     * Invalid date strings are safely localized rather than silently rewritten.
+     */
+    public static String dateText(String value) {
+        String normalized = Jalali.disp(value);
+        if (normalized == null || normalized.isEmpty()) return localizeText(value);
+        String[] parts = normalized.split("/");
+        if (parts.length != 3) return localizeText(normalized);
+        String month = Jalali.monthName(normalized);
+        if (month == null || month.isEmpty()) return localizeText(normalized);
+        return isolatePhrase(persianDigits(String.valueOf(Integer.parseInt(parts[2])))
+                + " " + month + " " + persianDigits(parts[0]));
+    }
+
+    /** Compact Jalali date for dense table columns: «۱۴۰۵/۰۸/۱۳». */
+    public static String dateTable(String value) {
+        String normalized = Jalali.disp(value);
+        if (normalized == null || normalized.isEmpty()) return localizeText(value);
+        return isolate(normalized.replace('-', '/'));
+    }
+
+    /** Full human-facing Jalali date and optional clock time for prose/cards. */
+    public static String dateTime(String value) {
+        String normalized = Jalali.disp(value);
+        if (normalized == null || normalized.isEmpty()) return localizeText(value);
+        String date = dateText(normalized);
+        String clock = clockAfterDate(value);
+        return clock.isEmpty() ? date : date + "، ساعت " + time(clock);
+    }
+
+    /** Compact Jalali date and optional clock time for dense table/report cells. */
+    public static String dateTimeTable(String value) {
+        String normalized = Jalali.disp(value);
+        if (normalized == null || normalized.isEmpty()) return localizeText(value);
+        String date = dateTable(normalized);
+        String clock = clockAfterDate(value);
+        return clock.isEmpty() ? date : date + " · " + time(clock);
+    }
+
+    private static String clockAfterDate(String value) {
+        if (value == null || value.isEmpty()) return "";
+        String text = Money.en(value.trim());
+        int separator = Math.max(text.indexOf('T'), text.indexOf(' '));
+        if (separator < 0 || separator + 1 >= text.length()) return "";
+        String[] tokens = text.substring(separator + 1).trim().split("\\s+");
+        for (String token : tokens) {
+            int colon = token.indexOf(':');
+            if (colon < 1 || colon + 2 >= token.length()) continue;
+            int hourStart = colon >= 2 && isAsciiDigit(token.charAt(colon - 2))
+                    ? colon - 2 : colon - 1;
+            if (hourStart < 0 || !isAsciiDigits(token, hourStart, colon)
+                    || !isAsciiDigits(token, colon + 1, colon + 3)) continue;
+            try {
+                int hour = Integer.parseInt(token.substring(hourStart, colon));
+                int minute = Integer.parseInt(token.substring(colon + 1, colon + 3));
+                if (hour < 0 || hour >= 24 || minute < 0 || minute >= 60) continue;
+                int secondsColon = colon + 3;
+                if (secondsColon + 2 < token.length() && token.charAt(secondsColon) == ':'
+                        && isAsciiDigits(token, secondsColon + 1, secondsColon + 3)) {
+                    int second = Integer.parseInt(token.substring(secondsColon + 1, secondsColon + 3));
+                    if (second >= 0 && second < 60)
+                        return String.format(Locale.US, "%02d:%02d:%02d", hour, minute, second);
+                }
+                return String.format(Locale.US, "%02d:%02d", hour, minute);
+            } catch (NumberFormatException ignored) {
+                // Skip non-clock tokens such as a malformed timestamp suffix.
+            }
+        }
+        return "";
+    }
+
+    private static boolean isAsciiDigits(String value, int start, int end) {
+        if (start < 0 || end > value.length() || start >= end) return false;
+        for (int i = start; i < end; i++) if (!isAsciiDigit(value.charAt(i))) return false;
+        return true;
+    }
+
+    private static boolean isAsciiDigit(char value) {
+        return value >= '0' && value <= '9';
+    }
+
+    /** Short chart label formatted as a single date phrase: «۱۳ آبان». */
+    public static String dateShortLabel(String value) {
+        String normalized = Jalali.disp(value);
+        if (normalized == null || normalized.isEmpty()) return localizeText(value);
+        String[] parts = normalized.split("/");
+        if (parts.length != 3) return localizeText(normalized);
+        String month = Jalali.monthName(normalized);
+        if (month == null || month.isEmpty()) return localizeText(normalized);
+        return isolatePhrase(persianDigits(String.valueOf(Integer.parseInt(parts[2])))
+                + " " + month);
+    }
+
+    /** Remove isolate controls for internal suffix parsing; do not use for rendering. */
+    public static String stripIsolates(String value) {
+        if (value == null || value.isEmpty()) return value == null ? "" : value;
+        StringBuilder result = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char ch = value.charAt(i);
+            if (ch != LRI && ch != RLI && ch != FSI && ch != PDI) result.append(ch);
+        }
+        return result.toString();
+    }
+
+    /** Explicit LTR isolate for product codes and other non-numeric identifiers. */
+    public static String isolateLtr(String value) {
+        return isolate(value);
     }
 
     /** Fixed-width clock time (HH:mm) in Persian digits and one LTR isolate. */
@@ -299,5 +540,9 @@ public final class HomeNumberFormatter {
 
     private static String isolate(String value) {
         return LRI + (value == null ? "" : value) + PDI;
+    }
+
+    private static String isolatePhrase(String value) {
+        return FSI + (value == null ? "" : value) + PDI;
     }
 }

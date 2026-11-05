@@ -671,7 +671,8 @@ public final class Settings {
                 || dailyRials == null || dailyRials.size() != last - first + 1) return false;
 
         SharedPreferences.Editor edit = p.edit();
-        String source = "فایل بانکی • " + Money.fa(ir.meelano.manager.core.Jalali.todayStr());
+        String source = "فایل بانکی • " + ir.meelano.manager.core.HomeNumberFormatter.dateText(
+                ir.meelano.manager.core.Jalali.todayStr());
         long updated = System.currentTimeMillis();
         for (int offset = 0; offset <= last - first; offset++) {
             String day = ir.meelano.manager.core.Jalali.format(first + offset);

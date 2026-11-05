@@ -96,7 +96,7 @@ public class ResidScreen extends Screen {
                 a.kit.lp(-1, -2));
         String keeper = AtiranAuth.sessionName(a);
         if (keeper.isEmpty()) keeper = AtiranAuth.sessionUser(a);
-        String sub = "امروز " + Money.fa(Jalali.todayStr());
+        String sub = "امروز " + Jalali.dispFa(Jalali.todayStr());
         if (!keeper.isEmpty()) sub += " • انباردار: " + keeper;
         if (editingDraft > 0) sub += " • پیش‌نویس " + Money.fa(String.valueOf(editingDraft));
         card.addView(a.kit.text(sub, 12f, Theme.MUTED, false), a.kit.lp(-1, -2));

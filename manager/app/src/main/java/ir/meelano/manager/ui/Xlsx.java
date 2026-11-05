@@ -3,6 +3,7 @@ package ir.meelano.manager.ui;
 import android.content.Context;
 
 import ir.meelano.manager.ShareProvider;
+import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.LicenseStore;
 import ir.meelano.manager.core.ReportCatalog;
@@ -45,21 +46,23 @@ public final class Xlsx {
         // Title (merged) + subtitle + date.
         int r = 1;
         rowOpen(sheet, r, 30);
-        sheet.append(cellStr("A" + r, sh.add(safe(title)), 1));
+        sheet.append(cellStr("A" + r, sh.add(HomeNumberFormatter.rtlText(safe(title))), 1));
         rowClose(sheet);
         r++;
         rowOpen(sheet, r, 20);
         String sub = safe(subtitle);
         if (!sub.isEmpty()) sub += "  •  ";
-        sub += LicenseStore.brandName(c) + " • " + Jalali.todayStr();
-        sheet.append(cellStr("A" + r, sh.add(sub), 2));
+        sub += LicenseStore.brandName(c) + " • "
+                + HomeNumberFormatter.dateText(Jalali.todayStr());
+        sheet.append(cellStr("A" + r, sh.add(HomeNumberFormatter.rtlText(sub)), 2));
         rowClose(sheet);
         // Header.
         r++;
         rowOpen(sheet, r, 22);
         sheet.append(cellStr(colName(1) + r, sh.add("ردیف"), 3));
         for (int i = 0; i < cols.length; i++)
-            sheet.append(cellStr(colName(i + 2) + r, sh.add(safe(cols[i].title)), 3));
+            sheet.append(cellStr(colName(i + 2) + r,
+                    sh.add(HomeNumberFormatter.localizeText(safe(cols[i].title))), 3));
         rowClose(sheet);
         // Data.
         double[] sums = new double[cols.length];
@@ -78,10 +81,12 @@ public final class Xlsx {
                 } else if (cols[j].type == ReportCatalog.T_NUM) {
                     sheet.append(cellNum(ref, row.d(cols[j].key), zebra ? 6 : 4));
                 } else if (cols[j].type == ReportCatalog.T_DATE) {
-                    sheet.append(cellStr(ref, sh.add(Jalali.disp(row.s(cols[j].key))), zebra ? 6 : 4));
+                    sheet.append(cellStr(ref, sh.add(Jalali.dispTableFa(row.s(cols[j].key))),
+                            zebra ? 6 : 4));
                 } else {
                     String t = row.s(cols[j].key, "—");
-                    if (!"—".equals(t)) t = Jalali.faDate(t);
+                    if (!"—".equals(t)) t = Jalali.disp(t).isEmpty()
+                            ? HomeNumberFormatter.localizeText(t) : Jalali.dispTableFa(t);
                     sheet.append(cellStr(ref, sh.add(t), zebra ? 6 : 4));
                 }
             }

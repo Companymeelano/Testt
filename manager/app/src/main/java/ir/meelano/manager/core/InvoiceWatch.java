@@ -165,8 +165,8 @@ public final class InvoiceWatch {
         try {
             Notify.whChannel(c);
             int n = fresh.size();
-            String now = Money.fa(new java.text.SimpleDateFormat("HH:mm", java.util.Locale.US)
-                    .format(new java.util.Date()));
+            String now = HomeNumberFormatter.time(new java.text.SimpleDateFormat(
+                    "HH:mm", java.util.Locale.US).format(new java.util.Date()));
             int hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY);
             double sum = 0;
             List<String> lines = new ArrayList<>();

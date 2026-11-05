@@ -6,6 +6,7 @@ import android.graphics.Paint;
 import android.graphics.pdf.PdfDocument;
 
 import ir.meelano.manager.ShareProvider;
+import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.LicenseStore;
 import ir.meelano.manager.core.Money;
@@ -78,11 +79,12 @@ public final class Pdf {
             head.setColor(DesignTokens.INK);
             head.setTextSize(21);
             head.setTextAlign(Paint.Align.RIGHT);
-            g.drawText(safe(title), W - margin, 62, head);
+            g.drawText(HomeNumberFormatter.rtlText(safe(title)), W - margin, 62, head);
             muted.setTextSize(12);
             muted.setTextAlign(Paint.Align.RIGHT);
             if (subtitle != null && !subtitle.isEmpty()) g.drawText(safe(subtitle), W - margin, 86, muted);
-            g.drawText(LicenseStore.brandName(c) + " • " + Money.fa(Jalali.todayStr()), W - margin, 106, muted);
+            g.drawText(HomeNumberFormatter.rtlText(LicenseStore.brandName(c) + " • "
+                    + HomeNumberFormatter.dateText(Jalali.todayStr())), W - margin, 106, muted);
             // header row
             int y = 130;
             paint.setColor(DesignTokens.EMERALD);
@@ -93,7 +95,8 @@ public final class Pdf {
             int x = W - margin;
             for (int i = 0; i < cols.length; i++) {
                 x -= widths[i];
-                g.drawText(fit(cols[i].title, widths[i] - 10, bold), x + widths[i] / 2f, y + 26, bold);
+                g.drawText(HomeNumberFormatter.rtlText(
+                        fit(cols[i].title, widths[i] - 10, bold)), x + widths[i] / 2f, y + 26, bold);
             }
             y += headH;
             // rows
@@ -119,7 +122,9 @@ public final class Pdf {
             // footer
             muted.setTextSize(11);
             muted.setTextAlign(Paint.Align.CENTER);
-            g.drawText("صفحه " + Money.fa(String.valueOf(pg + 1)) + " از " + Money.fa(String.valueOf(pages)), W / 2f, H - 30, muted);
+            g.drawText(HomeNumberFormatter.rtlText("صفحه "
+                    + HomeNumberFormatter.integer(pg + 1) + " از "
+                    + HomeNumberFormatter.integer(pages)), W / 2f, H - 30, muted);
             muted.setTextSize(10);
             g.drawText("Milad Yaghoobi • طراح و توسعه‌دهنده", W / 2f, H - 48, muted);
             doc.finishPage(page);
@@ -137,7 +142,7 @@ public final class Pdf {
                 head.setColor(DesignTokens.INK);
                 head.setTextSize(19);
                 head.setTextAlign(Paint.Align.RIGHT);
-                g.drawText(safe(im.cap), W - margin, 62, head);
+                g.drawText(HomeNumberFormatter.rtlText(safe(im.cap)), W - margin, 62, head);
                 int iw = im.bmp.getWidth(), ih = im.bmp.getHeight();
                 float maxW = W - margin * 2f, maxH = H - 220f;
                 float sc = Math.min(maxW / Math.max(1, iw), maxH / Math.max(1, ih));
@@ -150,7 +155,8 @@ public final class Pdf {
                 g.drawBitmap(im.bmp, null, dst, imgP);
                 muted.setTextSize(11);
                 muted.setTextAlign(Paint.Align.CENTER);
-                g.drawText("پیوست • " + Money.fa(Jalali.todayStr()), W / 2f, H - 30, muted);
+                g.drawText(HomeNumberFormatter.rtlText("پیوست • "
+                        + HomeNumberFormatter.dateText(Jalali.todayStr())), W / 2f, H - 30, muted);
                 doc.finishPage(page);
             }
         }
@@ -170,14 +176,16 @@ public final class Pdf {
         if (col.type == ReportCatalog.T_MONEY) return Money.rial(r.d(col.key));
         if (col.type == ReportCatalog.T_NUM) {
             double v = r.d(col.key);
-            if (Math.abs(v - Math.round(v)) < 0.001) return Money.num(Math.round(v));
-            return Money.fa(String.format(java.util.Locale.US, "%.1f", v).replace('.', '٫').replace('-', '−'));
+            if (Math.abs(v - Math.round(v)) < 0.001) return HomeNumberFormatter.rounded(v);
+            return HomeNumberFormatter.decimal(v);
         }
         if (col.type == ReportCatalog.T_DATE) {
-            return Jalali.dispFa(r.s(col.key));
+            return Jalali.dispTableFa(r.s(col.key));
         }
         String t = r.s(col.key, "—");
-        return "—".equals(t) ? t : Money.fa(Jalali.faDate(t));
+        if ("—".equals(t)) return t;
+        return Jalali.disp(t).isEmpty() ? HomeNumberFormatter.localizeText(t)
+                : HomeNumberFormatter.dateTimeTable(t);
     }
 
     private static String safe(String s) {

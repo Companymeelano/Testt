@@ -283,7 +283,7 @@ public class ChequesScreen extends Screen {
                 if (!myBucket.isEmpty())
                     c.addView(a.kit.kv("وضعیت", bucketLabel(myBucket), Theme.TEXT), a.kit.lp(-1, -2));
                 c.addView(a.kit.kv("تعداد", Money.fa(String.valueOf(g.count)) + " فقره", Theme.TEXT), a.kit.lp(-1, -2));
-                c.addView(a.kit.kv("جمع", Money.rial(g.total), Theme.GOLD_SOFT), a.kit.lp(-1, -2));
+                c.addView(a.kit.kv("جمع", Money.compactRial(g.total), Theme.GOLD_SOFT), a.kit.lp(-1, -2));
                 a.kit.addCard(content, c);
             }
         }
@@ -295,8 +295,8 @@ public class ChequesScreen extends Screen {
                 final Row row = r;
                 String eventDate = Jalali.disp(row.s("getdate"));
                 String dueDate = Jalali.disp(row.s("sardate"));
-                if (!eventDate.isEmpty()) eventDate = Money.fa(eventDate);
-                if (!dueDate.isEmpty()) dueDate = Money.fa(dueDate);
+                if (!eventDate.isEmpty()) eventDate = Jalali.dispFa(eventDate);
+                if (!dueDate.isEmpty()) dueDate = Jalali.dispFa(dueDate);
                 String eventLabel = myIn ? "دریافت " : "صدور ";
                 String eventText = eventDate.isEmpty() ? "" : eventLabel + eventDate;
                 String dueText = dueDate.isEmpty() ? "" : "سررسید " + dueDate;
@@ -389,7 +389,8 @@ public class ChequesScreen extends Screen {
         LinearLayout side = a.kit.v();
         side.setGravity(android.view.Gravity.END);
         side.setPadding(Theme.dp(8), 0, 0, 0);
-        side.addView(a.kit.text(Money.rial(row.d("amount")), 13.5f, Theme.GOLD_SOFT, true), a.kit.lp(-2, -2));
+        side.addView(a.kit.text(Money.compactRial(row.d("amount")), 13.5f, Theme.GOLD_SOFT, true),
+                a.kit.lp(-2, -2));
         if (pill != null && !pill.isEmpty()) {
             android.widget.LinearLayout.LayoutParams pp = a.kit.lp(-2, -2);
             pp.setMargins(0, Theme.dp(6), 0, 0);
@@ -497,7 +498,7 @@ public class ChequesScreen extends Screen {
         }
         LinearLayout c = a.kit.card(accent());
         c.addView(a.kit.kv("سررسید " + title, Money.fa(String.valueOf(mN)) + " فقره", Theme.TEXT), a.kit.lp(-1, -2));
-        c.addView(a.kit.kv("جمع مبالغ", Money.rial(mSum), Theme.GOLD_SOFT), a.kit.lp(-1, -2));
+        c.addView(a.kit.kv("جمع مبالغ", Money.compactRial(mSum), Theme.GOLD_SOFT), a.kit.lp(-1, -2));
         a.kit.addCard(content, c);
         renderNotes(content, d.notes);
     }
@@ -515,7 +516,7 @@ public class ChequesScreen extends Screen {
         for (final Row r : rows) {
             String eventDate = Jalali.disp(r.s("getdate"));
             String dates = "سررسید " + Jalali.dispFa(r.s("sardate"));
-            if (!eventDate.isEmpty()) dates += "\n" + (inc ? "دریافت " : "صدور ") + Money.fa(eventDate);
+            if (!eventDate.isEmpty()) dates += "\n" + (inc ? "دریافت " : "صدور ") + Jalali.dispFa(eventDate);
             View v = chequeCard(r, inc, dates, rowLabel(inc, r));
             LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
             p.setMargins(0, 0, 0, Theme.dp(8));

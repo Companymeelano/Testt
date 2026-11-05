@@ -14,6 +14,7 @@ import ir.meelano.manager.R;
 import ir.meelano.manager.core.AiBackendClient;
 import ir.meelano.manager.core.AiRouter;
 import ir.meelano.manager.core.AtiranAuth;
+import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.VisitorData;
@@ -231,7 +232,7 @@ public final class VisitorDeskScreen extends Screen {
                 if(v==null||v.length<4)return;
                 java.util.List<ir.meelano.manager.ui.Kit.Kpi> kpis=new ArrayList<>();
                 kpis.add(new ir.meelano.manager.ui.Kit.Kpi("بازدید امروز",Money.fa(String.valueOf((long)v[0])),"",Theme.INFO));
-                kpis.add(new ir.meelano.manager.ui.Kit.Kpi("پیش‌فاکتور امروز",Money.fa(String.valueOf((long)v[1])),Money.rial(v[2]),Theme.GOLD));
+                kpis.add(new ir.meelano.manager.ui.Kit.Kpi("پیش‌فاکتور امروز",Money.fa(String.valueOf((long)v[1])),Money.compactRial(v[2]),Theme.GOLD));
                 kpis.add(new ir.meelano.manager.ui.Kit.Kpi("در انتظار بررسی",Money.fa(String.valueOf((long)v[3])),"منتظر تأیید مدیر",Theme.WARNING));
                 holder.removeAllViews();
                 holder.addView(a.kit.kpiGrid(kpis,3),a.kit.lp(-1,-2));
@@ -414,7 +415,8 @@ public final class VisitorDeskScreen extends Screen {
                 +(customer.phone.isEmpty()?"":"\nتماس: "+customer.phone)
                 +(customer.address.isEmpty()?"":"\nنشانی: "+customer.address)
                 +"\n"+balance;
-        new AlertDialog.Builder(a).setTitle(customer.name).setMessage(message)
+        new AlertDialog.Builder(a).setTitle(HomeNumberFormatter.rtlText(customer.name))
+                .setMessage(HomeNumberFormatter.rtlText(message))
                 .setPositiveButton("پیش‌فاکتور",(d,w)->{selectedCustomer=customer;page=ORDER;persistDraft();render(contentRef);})
                 .setNeutralButton("ثبت ویزیت",(d,w)->recordVisit(customer))
                 .setNegativeButton("دریافت وجه",(d,w)->{receiptCustomer=customer;page=RECEIPT;render(contentRef);})
@@ -445,11 +447,11 @@ public final class VisitorDeskScreen extends Screen {
             a.repo.run(db->{VisitorIdentity.Identity id=identity(db);VisitorPrefactorWriter.ensureTables(db);ensureVisitTable(db);long count=0,visits=0;double amount=0;
                 try(java.sql.PreparedStatement ps=db.prepareStatement("SELECT COUNT_BIG(1),ISNULL(SUM(ISNULL(grand_total,total_amount)),0) FROM dbo.meelano_prefactors WHERE CONVERT(date,created_at)=CONVERT(date,SYSDATETIME()) AND visitor_id IN ("+placeholders(ownerIds(id).size())+")")){bindOwner(ps,ownerIds(id),1);try(java.sql.ResultSet rs=ps.executeQuery()){if(rs.next()){count=rs.getLong(1);amount=rs.getDouble(2);}}}
                 try(java.sql.PreparedStatement ps=db.prepareStatement("SELECT COUNT_BIG(1) FROM dbo.meelano_visit_results WHERE CONVERT(date,created_at)=CONVERT(date,SYSDATETIME()) AND visitor_id IN ("+placeholders(ownerIds(id).size())+")")){bindOwner(ps,ownerIds(id),1);try(java.sql.ResultSet rs=ps.executeQuery()){if(rs.next())visits=rs.getLong(1);}}
-                String report="گزارش پایان روز ویزیتور «"+id.displayName+"» • "+Jalali.todayStr()+"\nبازدید ثبت‌شده: "+visits+"\nپیش‌فاکتور امروز: "+count+"\nجمع پیش‌فاکتورها: "+Money.rial(amount)+(extra.isEmpty()?"":"\nیادداشت: "+extra);
+                String report="گزارش پایان روز ویزیتور «"+id.displayName+"» • "+Jalali.dispFa(Jalali.todayStr())+"\nبازدید ثبت‌شده: "+visits+"\nپیش‌فاکتور امروز: "+count+"\nجمع پیش‌فاکتورها: "+Money.rial(amount)+(extra.isEmpty()?"":"\nیادداشت: "+extra);
                 try(java.sql.Statement st=db.createStatement()){st.execute("IF OBJECT_ID(N'dbo.meelano_day_reports',N'U') IS NULL CREATE TABLE dbo.meelano_day_reports(id bigint IDENTITY(1,1) PRIMARY KEY,visitor_username nvarchar(160) NULL,visitor_id nvarchar(80) NULL,report_text nvarchar(max) NULL,created_at datetime2 NOT NULL DEFAULT SYSDATETIME())");}
                 try(java.sql.PreparedStatement ps=db.prepareStatement("INSERT INTO dbo.meelano_day_reports(visitor_username,visitor_id,report_text,created_at) VALUES(?,?,?,SYSDATETIME())")){ps.setString(1,id.username);ps.setString(2,String.valueOf(id.visitorId));ps.setString(3,report);ps.executeUpdate();}
                 return report;
-            },new Repo.Cb<String>(){@Override public void ok(String report){new AlertDialog.Builder(a).setTitle("گزارش پایان روز ثبت شد").setMessage(report).setPositiveButton("بستن",null).show();}@Override public void fail(String e){a.kit.toast("گزارش پایان روز ثبت نشد: "+e);}});
+            },new Repo.Cb<String>(){@Override public void ok(String report){new AlertDialog.Builder(a).setTitle("گزارش پایان روز ثبت شد").setMessage(HomeNumberFormatter.rtlText(report)).setPositiveButton("بستن",null).show();}@Override public void fail(String e){a.kit.toast("گزارش پایان روز ثبت نشد: "+e);}});
         }).show();
     }
 
@@ -679,7 +681,12 @@ public final class VisitorDeskScreen extends Screen {
             }return out;
         },new Repo.Cb<List<String[]>>(){
             @Override public void ok(List<String[]> rows){daily.removeAllViews();if(rows.isEmpty()){daily.addView(a.kit.empty("گزارشی ثبت نشده است","برای ساخت گزارش، دکمهٔ بالا را بزنید."),a.kit.lp(-1,-2));return;}
-                for(String[] r:rows)daily.addView(a.kit.personRow("گزارش روزانهٔ "+r[0],r[2],"","نمایش",Theme.INFO,v->new AlertDialog.Builder(a).setTitle("گزارش روزانهٔ "+r[0]).setMessage(r[1]).setPositiveButton("بستن",null).show()),a.kit.lp(-1,-2));}
+                for(String[] r:rows)daily.addView(a.kit.personRow("گزارش روزانهٔ "+r[0],
+                        HomeNumberFormatter.dateTime(r[2]),"","نمایش",Theme.INFO,
+                                v->new AlertDialog.Builder(a).setTitle(
+                                        HomeNumberFormatter.rtlText("گزارش روزانهٔ "+r[0]))
+                                .setMessage(HomeNumberFormatter.rtlText(r[1]))
+                                .setPositiveButton("بستن",null).show()),a.kit.lp(-1,-2));}
             @Override public void fail(String e){daily.removeAllViews();daily.addView(visitorErrorCard("گزارش روزانه دریافت نشد",e,()->loadReports(c)),a.kit.lp(-1,-2));}
         });
         a.repo.run(db->{VisitorData.beginRead(db);VisitorIdentity.Identity id=identity(db);ensureVisitTable(db);List<String[]> out=new ArrayList<>();
@@ -688,7 +695,14 @@ public final class VisitorDeskScreen extends Screen {
             }return out;
         },new Repo.Cb<List<String[]>>(){
             @Override public void ok(List<String[]> rows){visits.removeAllViews();if(rows.isEmpty()){visits.addView(a.kit.empty("هنوز ویزیتی ثبت نشده است",null),a.kit.lp(-1,-2));return;}
-                for(String[] r:rows){String detail=r[3]+(r[2].isEmpty()?"":" • "+r[2]);visits.addView(a.kit.personRow(r[0],detail,"",r[1],Theme.GOLD,v->new AlertDialog.Builder(a).setTitle(r[0]).setMessage("نتیجه: "+r[1]+(r[2].isEmpty()?"":"\nتوضیحات: "+r[2])+"\nزمان: "+r[3]).setPositiveButton("بستن",null).show()),a.kit.lp(-1,-2));}}
+                for(String[] r:rows){String created = HomeNumberFormatter.dateTime(r[3]);
+                    String detail=created+(r[2].isEmpty()?"":" • "+r[2]);
+                    visits.addView(a.kit.personRow(r[0],detail,"",r[1],Theme.GOLD,
+                            v->new AlertDialog.Builder(a).setTitle(r[0])
+                                    .setMessage(HomeNumberFormatter.rtlText("نتیجه: "+r[1]
+                                            +(r[2].isEmpty()?"":"\nتوضیحات: "+r[2])
+                                            +"\nزمان: "+created))
+                                    .setPositiveButton("بستن",null).show()),a.kit.lp(-1,-2));}}
             @Override public void fail(String e){visits.removeAllViews();visits.addView(visitorErrorCard("بازدیدها دریافت نشدند",e,()->loadReports(c)),a.kit.lp(-1,-2));}
         });
     }
@@ -700,12 +714,12 @@ public final class VisitorDeskScreen extends Screen {
             try(java.sql.PreparedStatement ps=db.prepareStatement("SELECT TOP (100) id,ISNULL(customer_name,N''),ISNULL(grand_total,0),status,CONVERT(nvarchar(19),created_at,120) FROM dbo.meelano_prefactors WHERE visitor_id IN ("+placeholders(ownerIds(id).size())+") ORDER BY id DESC")){
                 bindOwner(ps,ownerIds(id),1);try(java.sql.ResultSet rs=ps.executeQuery()){while(rs.next()){Row r=new Row();r.put("id",rs.getString(1));r.put("customer",rs.getString(2));r.put("total",rs.getString(3));r.put("status",rs.getString(4));r.put("created",rs.getString(5));rows.add(r);}}
             }return rows;
-        },new Repo.Cb<List<Row>>(){@Override public void ok(List<Row> rows){c.removeAllViews();c.addView(a.kit.text("پیش‌فاکتورهای من",16,Theme.TEXT,true),a.kit.lp(-1,-2));for(Row r:rows)c.addView(a.kit.personRow("شماره "+r.s("id")+" • "+r.s("customer"),r.s("created"),Money.rial(r.d("total")),statusFa(r.s("status")),Theme.INFO,v->showOrderDetails(r)),a.kit.lp(-1,-2));if(rows.isEmpty())c.addView(a.kit.empty("هنوز پیش‌فاکتوری ثبت نشده است",null),a.kit.lp(-1,-2));}
+        },new Repo.Cb<List<Row>>(){@Override public void ok(List<Row> rows){c.removeAllViews();c.addView(a.kit.text("پیش‌فاکتورهای من",16,Theme.TEXT,true),a.kit.lp(-1,-2));for(Row r:rows)c.addView(a.kit.personRow("شماره "+r.s("id")+" • "+r.s("customer"),HomeNumberFormatter.dateTime(r.s("created")),Money.compactRial(r.d("total")),statusFa(r.s("status")),Theme.INFO,v->showOrderDetails(r)),a.kit.lp(-1,-2));if(rows.isEmpty())c.addView(a.kit.empty("هنوز پیش‌فاکتوری ثبت نشده است",null),a.kit.lp(-1,-2));}
             @Override public void fail(String e){c.removeAllViews();c.addView(visitorErrorCard("سفارش‌ها دریافت نشدند",e,()->loadMyOrders(c)),a.kit.lp(-1,-2));}});
     }
 
     private void showOrderDetails(Row row){
-        a.repo.run(db->{VisitorIdentity.Identity id=identity(db);List<String> items=new ArrayList<>();try(java.sql.PreparedStatement ps=db.prepareStatement("SELECT i.product_name,i.qty,i.unit,i.amount FROM dbo.meelano_prefactor_items i JOIN dbo.meelano_prefactors p ON p.id=i.prefactor_id WHERE p.id=? AND p.visitor_id IN ("+placeholders(ownerIds(id).size())+") ORDER BY i.id")){ps.setLong(1,Long.parseLong(row.s("id")));bindOwner(ps,ownerIds(id),2);try(java.sql.ResultSet rs=ps.executeQuery()){while(rs.next())items.add(rs.getString(1)+" • "+qty(rs.getBigDecimal(2))+" "+rs.getString(3)+" • "+money(rs.getBigDecimal(4)));}}return items;},new Repo.Cb<List<String>>(){@Override public void ok(List<String> v){StringBuilder b=new StringBuilder("وضعیت: ").append(statusFa(row.s("status"))).append("\nجمع: ").append(Money.rial(row.d("total")));for(String x:v)b.append("\n\n").append(x);new AlertDialog.Builder(a).setTitle("پیش‌فاکتور "+row.s("id")).setMessage(b.toString()).setPositiveButton("بستن",null).show();}@Override public void fail(String e){a.kit.toast(e);}});
+        a.repo.run(db->{VisitorIdentity.Identity id=identity(db);List<String> items=new ArrayList<>();try(java.sql.PreparedStatement ps=db.prepareStatement("SELECT i.product_name,i.qty,i.unit,i.amount FROM dbo.meelano_prefactor_items i JOIN dbo.meelano_prefactors p ON p.id=i.prefactor_id WHERE p.id=? AND p.visitor_id IN ("+placeholders(ownerIds(id).size())+") ORDER BY i.id")){ps.setLong(1,Long.parseLong(row.s("id")));bindOwner(ps,ownerIds(id),2);try(java.sql.ResultSet rs=ps.executeQuery()){while(rs.next())items.add(rs.getString(1)+" • "+qty(rs.getBigDecimal(2))+" "+rs.getString(3)+" • "+money(rs.getBigDecimal(4)));}}return items;},new Repo.Cb<List<String>>(){@Override public void ok(List<String> v){StringBuilder b=new StringBuilder("وضعیت: ").append(statusFa(row.s("status"))).append("\nجمع: ").append(Money.rial(row.d("total")));for(String x:v)b.append("\n\n").append(x);new AlertDialog.Builder(a).setTitle(HomeNumberFormatter.rtlText("پیش‌فاکتور "+row.s("id"))).setMessage(HomeNumberFormatter.rtlText(b.toString())).setPositiveButton("بستن",null).show();}@Override public void fail(String e){a.kit.toast(e);}});
     }
 
     private void chooseCustomerForOrder(){customerPickerReturnPage=ORDER;loadCustomers(pageBodyRef,true);}
@@ -757,7 +771,7 @@ public final class VisitorDeskScreen extends Screen {
         if(!fingerprint.equals(receiptFingerprint)){receiptUuid=UUID.randomUUID().toString();receiptFingerprint=fingerprint;saveReceiptKey();}
         final String requestKey=receiptUuid;
         a.repo.run(db->{VisitorIdentity.Identity id=identity(db);return VisitorReceiptWriter.submit(a,db,id,customer.code,note,receiptMethod,selectedBankId,amount,cheque,requestKey);},new Repo.Cb<VisitorReceiptWriter.Result>(){
-            @Override public void ok(VisitorReceiptWriter.Result r){new AlertDialog.Builder(a).setTitle("قبض ثبت شد").setMessage("شماره قبض: "+Money.fa(String.valueOf(r.receiptNo))+"\nمبلغ: "+money(r.amount)+(r.duplicate?"\nاین همان ارسال قبلی است.":"" )).setPositiveButton("پایان",(d,w)->{receiptUuid=UUID.randomUUID().toString();receiptFingerprint="";saveReceiptKey();receiptAmount="";receiptNote="پیش‌دریافت مشتری";receiptCustomer=null;selectedBankId=0;selectedBankName="";render(contentRef);}).show();}
+            @Override public void ok(VisitorReceiptWriter.Result r){new AlertDialog.Builder(a).setTitle("قبض ثبت شد").setMessage(HomeNumberFormatter.rtlText("شماره قبض: "+Money.fa(String.valueOf(r.receiptNo))+"\nمبلغ: "+money(r.amount)+(r.duplicate?"\nاین همان ارسال قبلی است.":"" ))).setPositiveButton("پایان",(d,w)->{receiptUuid=UUID.randomUUID().toString();receiptFingerprint="";saveReceiptKey();receiptAmount="";receiptNote="پیش‌دریافت مشتری";receiptCustomer=null;selectedBankId=0;selectedBankName="";render(contentRef);}).show();}
             @Override public void fail(String e){a.kit.toast("ثبت قبض انجام نشد: "+e);}
         });
     }

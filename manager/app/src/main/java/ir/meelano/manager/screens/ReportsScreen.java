@@ -12,6 +12,7 @@ import ir.meelano.manager.core.AtiranSpecialReports;
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.R;
 import ir.meelano.manager.core.Filter;
+import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.MasterQueries;
@@ -536,7 +537,8 @@ public class ReportsScreen extends Screen {
         u.setGravity(Gravity.CENTER);
         u.setSingleLine(true);
         c.addView(u, a.kit.lp(-1, -2));
-        c.setContentDescription(section + "؛ " + Money.fa(String.valueOf(count)) + " گزارش");
+        c.setContentDescription(ir.meelano.manager.core.HomeNumberFormatter.localizeText(
+                section + "؛ " + Money.fa(String.valueOf(count)) + " گزارش"));
         c.addView(a.kit.gap(2));
         Theme.pressable(c);
         c.setOnClickListener(v -> {
@@ -945,7 +947,7 @@ java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
             if (col.type != ReportCatalog.T_MONEY) continue;
             double sum = 0;
             for (Row r : rows) sum += r.d(col.key);
-            c.addView(a.kit.kv("جمع " + col.title, Money.rial(sum), Theme.GOLD_SOFT), a.kit.lp(-1, -2));
+            c.addView(a.kit.kv("جمع " + col.title, Money.compactRial(sum), Theme.GOLD_SOFT), a.kit.lp(-1, -2));
         }
         int show = Math.min(rows.size(), 300);
         final boolean callable = "fleeing_customers".equals(spec.id) || "cheque_reliability".equals(spec.id);
@@ -1003,7 +1005,7 @@ java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
     private String chartLabel(ReportCatalog.Spec spec, String x) {
         if (x == null) return "";
         try {
-            if ("day".equals(spec.chartX)) return Jalali.shortLabel(x);
+            if ("day".equals(spec.chartX)) return HomeNumberFormatter.dateShortLabel(x);
             if ("month".equals(spec.chartX)) return Jalali.monthName(x + "/01") + " " + Money.fa(x.substring(0, 4));
         } catch (Exception ignored) { Diag.ignored("ReportsScreen:691", ignored); }
         String t = Money.fa(x);

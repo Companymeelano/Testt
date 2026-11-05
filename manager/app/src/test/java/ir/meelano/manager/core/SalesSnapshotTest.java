@@ -40,8 +40,8 @@ public class SalesSnapshotTest {
         double rawRials = snapshot.salesRialsOn("1405/07/02");
         assertEquals(4_250_000_000d, rawRials, 0.001);
         assertEquals(425_000_000d, Money.toUnit(rawRials), 0.001);
-        assertEquals("۴۲۵ میلیون", Money.compact(Money.toUnit(rawRials)));
-        assertEquals("۴۲۵ میلیون تومان", Money.compactRial(rawRials));
+        assertEquals("\u2068۴۲۵ میلیون\u2069", Money.compact(Money.toUnit(rawRials)));
+        assertEquals("\u2068۴۲۵ میلیون\u202Fتومان\u2069", Money.compactRial(rawRials));
     }
 
     @Test public void chartSeriesFillsMissingDaysWithZeroAndKeepsRawRials() {

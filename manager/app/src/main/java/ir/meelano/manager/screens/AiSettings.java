@@ -177,7 +177,10 @@ public final class AiSettings {
             card.addView(a.kit.btnGhost("⬇ دانلود شنیدن فارسی", Theme.VIOLET, v -> {
                 if (OfflineAsr.downloading()) { a.kit.toast("دانلود در حال انجام است"); return; }
                 asrStatus.setText("در حال دانلود…");
-                OfflineAsr.download(a, pct -> asrStatus.setText("در حال دانلود " + pct + "٪"), (t, err) -> {
+                OfflineAsr.download(a, pct -> asrStatus.setText(
+                        ir.meelano.manager.core.HomeNumberFormatter.rtlText(
+                                "در حال دانلود " + ir.meelano.manager.core.HomeNumberFormatter.percent(pct))),
+                        (t, err) -> {
                     if (err == null) {
                         a.kit.toast("شنیدن فارسی آفلاین آماده شد");
                         if (rerender != null) rerender.run();
@@ -208,7 +211,10 @@ public final class AiSettings {
                     Theme.VIOLET, v -> {
                 if (OfflineVoice.downloading()) { a.kit.toast("دانلود در حال انجام است"); return; }
                 vStatus.setText("در حال دانلود…");
-                OfflineVoice.download(a, pct -> vStatus.setText("در حال دانلود " + pct + "٪"), err -> {
+                OfflineVoice.download(a, pct -> vStatus.setText(
+                        ir.meelano.manager.core.HomeNumberFormatter.rtlText(
+                                "در حال دانلود " + ir.meelano.manager.core.HomeNumberFormatter.percent(pct))),
+                        err -> {
                     if (err == null) {
                         // Persian becomes the default voice as soon as it is installed.
                         p.edit().putBoolean("speak", true).apply();

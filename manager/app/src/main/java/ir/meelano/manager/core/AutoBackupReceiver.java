@@ -37,7 +37,7 @@ public final class AutoBackupReceiver extends BroadcastReceiver {
                 @Override
                 public void onDone(File zip, long bytes, String notes) {
                     try {
-                        fs.saveBackupInfo(Jalali.faDate(Jalali.todayStr()), Backup.sizeFa(bytes));
+                        fs.saveBackupInfo(HomeNumberFormatter.dateText(Jalali.todayStr()), Backup.sizeFa(bytes));
                         AutoBackup.notifyResult(app, true, Backup.sizeFa(bytes));
                         new Thread(() -> {
                             try { OfflineReports.refresh(app); } catch (Exception ignored) { Diag.ignored("AutoBackup:offline", ignored); }

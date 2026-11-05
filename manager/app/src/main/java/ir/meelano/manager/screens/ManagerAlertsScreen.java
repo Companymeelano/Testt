@@ -8,6 +8,7 @@ import android.widget.LinearLayout;
 
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.core.AlertEngine;
+import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.Money;
@@ -200,7 +201,7 @@ public class ManagerAlertsScreen extends Screen {
 
     private void showResults(Data d, int dropThreshold, int marginThreshold, int coverThreshold) {
         LinearLayout box = a.kit.card(Theme.INFO);
-        box.addView(a.kit.sectionHead("نتیجهٔ بررسی زنده • " + Money.fa(Jalali.todayStr()), null, null),
+        box.addView(a.kit.sectionHead("نتیجهٔ بررسی زنده • " + Jalali.dispFa(Jalali.todayStr()), null, null),
                 a.kit.lp(-1, -2));
         List<AlertItem> alerts = new ArrayList<>();
         SalesComparison.DayResult dayComparison = SalesComparison.evaluate(d.salesSnapshot,
@@ -237,9 +238,9 @@ public class ManagerAlertsScreen extends Screen {
                 double days = r.d("daysLeft");
                 if (days <= coverThreshold) {
                     alerts.add(new AlertItem("پوشش موجودی کم: " + r.s("label"),
-                            "حدود " + Money.fa(String.format(java.util.Locale.US, "%.1f", days))
-                                    + " روز باقی‌مانده • موجودی " + Money.fa(String.format(
-                                    java.util.Locale.US, "%.2f", r.d("vah"))), "products", Theme.WARNING));
+                            "حدود " + HomeNumberFormatter.decimal(days)
+                                    + " روز باقی‌مانده • موجودی " + HomeNumberFormatter.quantity(r.d("vah")),
+                            "products", Theme.WARNING));
                     shown++;
                     if (shown >= 8) break;
                 }

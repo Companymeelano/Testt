@@ -169,10 +169,16 @@ public final class Jalali {
         return String.format(Locale.US, "%04d/%02d/%02d", y, mo, d);
     }
 
-    /** disp() with Persian digits, or «—» when there is no real date. Never "". */
+    /** Human-facing date in text/cards: «۱۳ آبان ۱۴۰۵», or «—» when unavailable. */
     public static String dispFa(String raw) {
         String d = disp(raw);
-        return d.isEmpty() ? "—" : Money.fa(d);
+        return d.isEmpty() ? "—" : HomeNumberFormatter.dateText(d);
+    }
+
+    /** Compact date for dense table cells: «۱۴۰۵/۰۸/۱۳», or «—» when unavailable. */
+    public static String dispTableFa(String raw) {
+        String d = disp(raw);
+        return d.isEmpty() ? "—" : HomeNumberFormatter.dateTable(d);
     }
 
     /** Days in a Jalali month (leap Esfand handled via day arithmetic, no leap tables). */
@@ -243,13 +249,9 @@ public final class Jalali {
         return MONTHS[j[1] - 1];
     }
 
-    /** Short label for charts: "۶ مهر". Accepts any Atiran date form (incl. Gregorian). */
+    /** Short, isolated chart date such as «۶ مهر». Accepts Jalali or Gregorian input. */
     public static String shortLabel(String date) {
-        String norm = disp(date);
-        int d = norm.isEmpty() ? -1 : parse(norm);
-        if (d < 0) return date == null ? "" : date;
-        int[] j = fromDay(d);
-        return Money.fa(String.valueOf(j[2])) + " " + MONTHS[j[1] - 1];
+        return HomeNumberFormatter.dateShortLabel(date);
     }
 
     private static final String[] WEEKDAYS = {"شنبه", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه"};

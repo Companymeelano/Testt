@@ -1,6 +1,7 @@
 package ir.meelano.manager.ui;
 
 import ir.meelano.manager.core.Diag;
+import ir.meelano.manager.core.HomeNumberFormatter;
 import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -45,7 +46,7 @@ public final class Kit {
     // ---------------- text ----------------
     public TextView text(String s, float sp, int color, boolean bold) {
         TextView t = new TextView(a);
-        t.setText(s == null ? "" : s);
+        t.setText(HomeNumberFormatter.rtlText(s));
         boolean micro = sp < 12f;
         float base = micro ? (sp < 9f ? 9f : sp) : (sp < 12.5f ? 12.5f : sp);
         float grow = micro ? Theme.fontScale() : Theme.fontScale() * Theme.typeScale();
@@ -178,8 +179,8 @@ public final class Kit {
             button.setPadding(Theme.dp(8), Theme.dp(4), Theme.dp(8), Theme.dp(4));
             button.setMinHeight(Theme.dp(48));
             button.setMinWidth(Theme.dp(48));
-            button.setContentDescription(actionLabel.replace("›", "").replace("‹", "").trim()
-                    + "؛ باز کردن");
+            button.setContentDescription(HomeNumberFormatter.localizeText(
+                    actionLabel.replace("›", "").replace("‹", "").trim() + "؛ باز کردن"));
             Theme.pressable(button);
             button.setOnClickListener(action);
             row.addView(space(6));
@@ -268,8 +269,9 @@ public final class Kit {
         } else amount.addView(figure, lp(-1, -2));
         copy.addView(amount, lp(-1, -2));
         chip.addView(copy, wlp(1f));
-        String spoken = (label == null ? "" : label) + ": " + (value == null ? "" : value)
-                + (unit == null || unit.trim().isEmpty() ? "" : " " + unit);
+        String spoken = HomeNumberFormatter.localizeText(
+                (label == null ? "" : label) + ": " + (value == null ? "" : value)
+                        + (unit == null || unit.trim().isEmpty() ? "" : " " + unit));
         chip.setContentDescription(spoken);
         figure.setContentDescription(spoken);
         return chip;
@@ -281,7 +283,8 @@ public final class Kit {
     }
 
     public View amountLine(String formattedValue, float numberSp, int gravity, int textColor) {
-        String full = formattedValue == null ? "" : formattedValue.trim();
+        String full = HomeNumberFormatter.stripIsolates(
+                formattedValue == null ? "" : formattedValue.trim()).replace('\u202F', ' ');
         String unit = "";
         String number = full;
         int split = full.lastIndexOf(' ');
@@ -321,8 +324,9 @@ public final class Kit {
         unitText.setSingleLine(true);
         unitText.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         amount.addView(unitText, lp(-2, -2));
-        amount.setContentDescription(full);
-        figure.setContentDescription(full);
+        String spoken = HomeNumberFormatter.localizeText(full);
+        amount.setContentDescription(spoken);
+        figure.setContentDescription(spoken);
         return amount;
     }
 
@@ -333,9 +337,10 @@ public final class Kit {
                 Theme.sectionText(tone), true);
         badge.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
         badge.setMinHeight(Theme.dp(28));
-        badge.setContentDescription(spokenDescription == null || spokenDescription.trim().isEmpty()
-                ? (direction > 0 ? "افزایش " : direction < 0 ? "کاهش " : "تغییر ") + label
-                : spokenDescription);
+        badge.setContentDescription(HomeNumberFormatter.localizeText(
+                spokenDescription == null || spokenDescription.trim().isEmpty()
+                        ? (direction > 0 ? "افزایش " : direction < 0 ? "کاهش " : "تغییر ") + label
+                        : spokenDescription));
         return badge;
     }
 
@@ -446,7 +451,8 @@ public final class Kit {
         heading.addView(label, wlp(1f));
         tile.addView(heading, lp(-1, -2));
 
-        String fullDisplayValue = k.value == null ? "" : k.value;
+        String fullDisplayValue = HomeNumberFormatter.stripIsolates(
+                k.value == null ? "" : k.value).replace('\u202F', ' ');
         String moneyUnit = "";
         String numberDisplayValue = fullDisplayValue;
         int lastSpace = fullDisplayValue.lastIndexOf(' ');
@@ -487,8 +493,7 @@ public final class Kit {
             TextView detail = text(k.detail, dashboardStyle ? 9.5f : 9f,
                     dashboardStyle ? Theme.dashboardMutedInk(accent) : Theme.MUTED, false);
             detail.setSingleLine(!dashboardStyle);
-            detail.setMaxLines(dashboardStyle ? 2 : 1);
-            detail.setEllipsize(TextUtils.TruncateAt.END);
+            detail.setEllipsize(null);
             detail.setMinHeight(Theme.dp(dashboardStyle ? 32 : 18));
             tile.addView(detail, lp(-1, -2));
         }
@@ -496,8 +501,8 @@ public final class Kit {
             LinearLayout.LayoutParams sp = lp(-1, Theme.dp(dashboardStyle ? 22 : 26));
             sp.setMargins(0, Theme.dp(3), 0, Theme.dp(2));
             Sparkline sparkline = new Sparkline(a, k.spark, accent);
-            sparkline.setContentDescription(k.sparkDescription == null
-                    ? "روند هفت‌روزهٔ " + k.label : k.sparkDescription);
+            sparkline.setContentDescription(HomeNumberFormatter.localizeText(
+                    k.sparkDescription == null ? "روند هفت‌روزهٔ " + k.label : k.sparkDescription));
             sparkline.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
             tile.addView(sparkline, sp);
         } else if (dashboardStyle) {
@@ -511,16 +516,16 @@ public final class Kit {
             ValueAnimator animator = ValueAnimator.ofFloat(0f, 1f);
             animator.setDuration(600);
             animator.setInterpolator(new android.view.animation.DecelerateInterpolator());
-            animator.addUpdateListener(an -> value.setText(Money.fa(
+            animator.addUpdateListener(an -> value.setText(HomeNumberFormatter.rtlText(
                     Money.compact(k.countTo * (float) an.getAnimatedValue()))));
             animator.addListener(new android.animation.AnimatorListenerAdapter() {
                 @Override public void onAnimationEnd(android.animation.Animator animation) {
-                    value.setText(stableNumberValue);
+                    value.setText(HomeNumberFormatter.rtlText(stableNumberValue));
                 }
             });
             animator.start();
         } else {
-            value.setText(stableNumberValue);
+            value.setText(HomeNumberFormatter.rtlText(stableNumberValue));
             if (Ui.motionOk(a)) {
                 value.setAlpha(0f);
                 value.animate().alpha(1f).setDuration(350).start();
@@ -573,9 +578,10 @@ public final class Kit {
             tile.addView(more, lp(-1, -2));
         }
         String complete = k.fullValue == null || k.fullValue.trim().isEmpty() ? k.value : k.fullValue;
-        String spoken = k.label + ": " + (complete == null ? "" : complete)
+        String spoken = HomeNumberFormatter.localizeText(k.label + ": "
+                + (complete == null ? "" : complete)
                 + (k.detail == null || k.detail.trim().isEmpty() ? "" : "؛ " + k.detail)
-                + (sub0.isEmpty() ? "" : "؛ " + sub0);
+                + (sub0.isEmpty() ? "" : "؛ " + sub0));
         tile.setContentDescription(spoken);
         if (android.os.Build.VERSION.SDK_INT >= 26) tile.setTooltipText(spoken);
         View.OnLongClickListener reveal = vw -> {
@@ -583,7 +589,7 @@ public final class Kit {
             return true;
         };
         tile.setOnLongClickListener(reveal);
-        value.setContentDescription(complete == null ? "" : complete);
+        value.setContentDescription(HomeNumberFormatter.localizeText(complete == null ? "" : complete));
         value.setOnLongClickListener(reveal);
         if (k.action != null) {
             Theme.pressable(tile);
@@ -941,7 +947,7 @@ public final class Kit {
             text.setEllipsize(TextUtils.TruncateAt.END);
             text.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
             segment.addView(text, lp(-2, -2));
-            segment.setContentDescription(label);
+            segment.setContentDescription(HomeNumberFormatter.localizeText(label));
             segment.setSelected(chosen);
             segment.setFocusable(true);
             Theme.pressable(segment);
@@ -996,7 +1002,7 @@ public final class Kit {
         TextView title = text(label, 11.5f, ink, true);
         title.setSingleLine(true);
         c.addView(title, lp(-2, -2));
-        c.setContentDescription(label);
+        c.setContentDescription(HomeNumberFormatter.localizeText(label));
         c.setSelected(selected);
         c.setFocusable(true);
         Theme.pressable(c);
@@ -1116,9 +1122,10 @@ public final class Kit {
             copy.addView(caption, lp(-1, -2));
         }
         pill.addView(copy, wlp(1f));
-        String spoken = (title == null ? "" : title)
-                + (detail == null || detail.trim().isEmpty() ? "" : ". " + detail);
-        pill.setContentDescription(spoken + (retry == null ? "" : "؛ لمس کنید برای تلاش دوباره"));
+        String spoken = HomeNumberFormatter.localizeText((title == null ? "" : title)
+                + (detail == null || detail.trim().isEmpty() ? "" : ". " + detail));
+        pill.setContentDescription(HomeNumberFormatter.localizeText(
+                spoken + (retry == null ? "" : "؛ لمس کنید برای تلاش دوباره")));
         if (busy && Ui.motionOk(a)) {
             android.animation.ObjectAnimator rotation = android.animation.ObjectAnimator.ofFloat(
                     symbol, View.ROTATION, 0f, 360f);
@@ -1153,8 +1160,8 @@ public final class Kit {
                 ? "همه‌چیز مرتب است" : message, 11.5f, Theme.MUTED, false);
         caption.setMaxLines(2);
         row.addView(caption, wlp(1f));
-        row.setContentDescription(message == null || message.trim().isEmpty()
-                ? "همه‌چیز مرتب است" : message);
+        row.setContentDescription(HomeNumberFormatter.localizeText(
+                message == null || message.trim().isEmpty() ? "همه‌چیز مرتب است" : message));
         return row;
     }
 
@@ -1222,7 +1229,8 @@ public final class Kit {
             params.topMargin = Theme.dp(i == 0 ? 12 : 8);
             card.addView(line, params);
         }
-        card.setContentDescription(msg == null ? "در حال بارگذاری" : msg);
+        card.setContentDescription(HomeNumberFormatter.localizeText(
+                msg == null ? "در حال بارگذاری" : msg));
         return card;
     }
 
@@ -1349,15 +1357,17 @@ public final class Kit {
         if (col.type == ReportCatalog.T_MONEY) return Money.rial(r.d(col.key));
         if (col.type == ReportCatalog.T_NUM) {
             double v = r.d(col.key);
-            if (Math.abs(v - Math.round(v)) < 0.001) return Money.num(Math.round(v));
-            return Money.fa(String.format(java.util.Locale.US, "%.1f", v).replace('.', '٫').replace('-', '−'));
+            if (Math.abs(v - Math.round(v)) < 0.001) return HomeNumberFormatter.rounded(v);
+            return HomeNumberFormatter.decimal(v);
         }
         if (col.type == ReportCatalog.T_DATE) {
-            return Jalali.dispFa(r.s(col.key));
+            return Jalali.dispTableFa(r.s(col.key));
         }
         String t = r.s(col.key, "—");
-        // Gregorian datetimes (logins, change log) → Jalali; anything else passes through.
-        return "—".equals(t) ? t : Money.fa(Jalali.faDate(t));
+        // Keep date/time cells compact; arbitrary text still receives number localization.
+        if ("—".equals(t)) return t;
+        return Jalali.disp(t).isEmpty() ? HomeNumberFormatter.localizeText(t)
+                : HomeNumberFormatter.dateTimeTable(t);
     }
 
     /**
@@ -1437,7 +1447,7 @@ public final class Kit {
 
     // ---------------- misc ----------------
     public void toast(String msg) {
-        Toast.makeText(a, msg, Toast.LENGTH_SHORT).show();
+        Toast.makeText(a, HomeNumberFormatter.rtlText(msg), Toast.LENGTH_SHORT).show();
         try { Ui.haptic(a.getWindow().getDecorView(), !isFailureText(msg)); } catch (Exception ignored) { Diag.ignored("Kit:toastHaptic", ignored); }
     }
 
@@ -1508,8 +1518,8 @@ public final class Kit {
                         }
                     }), lp(-1, -2));
                 }
-                count.setText(Money.fa(String.valueOf(shown)) + " \u0627\u0632 "
-                        + Money.fa(String.valueOf(all.size())) + " \u0645\u0648\u0631\u062f");
+                count.setText(HomeNumberFormatter.rtlText(Money.fa(String.valueOf(shown)) + " \u0627\u0632 "
+                        + Money.fa(String.valueOf(all.size())) + " \u0645\u0648\u0631\u062f"));
                 if (shown == 0) list.addView(empty("\u0645\u0648\u0631\u062f\u06cc \u06cc\u0627\u0641\u062a \u0646\u0634\u062f", null), lp(-1, -2));
             }
         };
@@ -1596,10 +1606,11 @@ public final class Kit {
         return image;
     }
 
-    /** «امروز ۱۴ مهر» style date line. */
+    /** Full human-facing Jalali date line, with the weekday retained for orientation. */
     public String todayLine() {
         String t = Jalali.todayStr();
-        return Jalali.weekday(t) + " " + Jalali.shortLabel(t);
+        return HomeNumberFormatter.rtlText(Jalali.weekday(t) + "، "
+                + HomeNumberFormatter.dateText(t));
     }
 
     // ---------------- extra rows & helpers (used by screens) ----------------
@@ -1794,7 +1805,7 @@ public final class Kit {
         if (qty != null && !qty.isEmpty()) spoken.append(". ").append(qty);
         if (price != null && !price.isEmpty()) spoken.append(". ").append(price);
         if (status != null && !status.isEmpty()) spoken.append(". ").append(status);
-        c.setContentDescription(spoken.toString());
+        c.setContentDescription(HomeNumberFormatter.localizeText(spoken.toString()));
         if (onClick != null) {
             Theme.pressable(c);
             c.setOnClickListener(onClick);

@@ -417,7 +417,7 @@ public final class HomeTrendChart {
             int n = points.size();
             if (displayIndex == previous || displayIndex < 0 || displayIndex >= n) return previous;
             int sourceIndex = n - 1 - displayIndex;
-            String label = HomeNumberFormatter.localizeText(Jalali.shortLabel(points.get(sourceIndex).date));
+            String label = HomeNumberFormatter.dateShortLabel(points.get(sourceIndex).date);
             if (n > 1 && displayIndex == 0) {
                 textPaint.setTextAlign(Paint.Align.LEFT);
                 canvas.drawText(label, displayX[displayIndex] + Theme.dp(2), getHeight() - Theme.dp(5), textPaint);

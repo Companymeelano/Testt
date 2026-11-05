@@ -11,6 +11,7 @@ import android.widget.TextView;
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.core.AtiranSchema;
 import ir.meelano.manager.core.Filter;
+import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.MoneyQueries;
@@ -250,10 +251,12 @@ public class TradeScreen extends Screen {
             c.addView(a.kit.text("روند روزانه", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
             Charts.Area ch = new Charts.Area(a);
             List<Charts.Point> pts = new ArrayList<>();
-            for (Row r : d.daily) pts.add(new Charts.Point(Jalali.shortLabel(r.s("day")), r.d("total")));
+            for (Row r : d.daily) pts.add(new Charts.Point(
+                    HomeNumberFormatter.dateShortLabel(r.s("day")), r.d("total")));
             final TextView cap = a.kit.text("", 11f, Theme.MUTED, false);
             ch.setData(pts, accent(), Charts.COMPACT);
-            ch.setListener((idx, p) -> cap.setText(Money.fa(p.label) + " • " + Money.rial(p.value)));
+            ch.setListener((idx, p) -> cap.setText(HomeNumberFormatter.rtlText(
+                    p.label + " • " + Money.compactRial(p.value))));
             c.addView(ch, new LinearLayout.LayoutParams(-1, Theme.dp(175)));
             c.addView(cap, a.kit.lp(-1, -2));
             a.kit.addCard(content, c);
@@ -322,7 +325,8 @@ public class TradeScreen extends Screen {
         List<Kit.Kpi> kpis = new ArrayList<>();
         kpis.add(new Kit.Kpi("پیش‌بینی ۷ روز", Money.compactRial(p7), "مدل رفتار روز هفته", Theme.GOLD));
         kpis.add(new Kit.Kpi("پیش‌بینی ۳۰ روز", Money.compactRial(avg * 30.0), "میانگین روزانه " + Money.compactRial(avg), Theme.INFO));
-        kpis.add(new Kit.Kpi("روند هفته", (trend >= 0 ? "+" : "") + Money.pct(trend), "نسبت به هفته قبل", trend >= 0 ? Theme.SUCCESS : Theme.DANGER));
+        kpis.add(new Kit.Kpi("روند هفته", ir.meelano.manager.core.HomeNumberFormatter.signedPercent(trend),
+                "نسبت به هفته قبل", trend >= 0 ? Theme.SUCCESS : Theme.DANGER));
         kpis.add(new Kit.Kpi("فروش ۳۰ روز", Money.compactRial(sum), "مبنای مدل", accent()));
         content.addView(a.kit.kpiGrid(kpis, 2), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(12));
@@ -332,7 +336,8 @@ public class TradeScreen extends Screen {
         Charts.Bars bars = new Charts.Bars(a);
         List<Charts.Point> pts = new ArrayList<>();
         for (int i = 1; i <= 7; i++)
-            pts.add(new Charts.Point(Jalali.shortLabel(Jalali.addDays(today, i)), proj[i - 1]));
+            pts.add(new Charts.Point(HomeNumberFormatter.dateShortLabel(
+                    Jalali.addDays(today, i)), proj[i - 1]));
         bars.setData(pts, Charts.COMPACT);
         c.addView(bars, new LinearLayout.LayoutParams(-1, Theme.dp(200)));
         a.kit.addCard(content, c);
@@ -378,11 +383,12 @@ public class TradeScreen extends Screen {
             boolean settled = (remainValid && Math.abs(r.d("remain")) <= AtiranSchema.SETTLE_TOLERANCE)
                     || "t".equalsIgnoreCase(r.s("tasvieh").trim());
             String status = voidedOnly ? "ابطالی" : settled ? "settled" : "unsettled";
-            String amount = amountValid ? Money.rial(r.d("total")) : "مبلغ نامعتبر";
-            r.put("totalLabel", amount);
+            String fullAmount = amountValid ? Money.rial(r.d("total")) : "مبلغ نامعتبر";
+            String cardAmount = amountValid ? Money.compactRial(r.d("total")) : "مبلغ نامعتبر";
+            r.put("totalLabel", fullAmount);
             r.put("remainLabel", remainValid ? Money.rial(r.d("remain")) : "نامشخص");
             View v = a.kit.invoiceRow("فاکتور " + Money.fa(no), r.s("customer"),
-                    Jalali.shortLabel(r.s("date")), amount,
+                    Jalali.dispFa(r.s("date")), cardAmount,
                     status, v2 -> openDetailByNo(no, voidedOnly));
             LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
             p.setMargins(0, 0, 0, Theme.dp(10));
@@ -413,7 +419,7 @@ public class TradeScreen extends Screen {
         double sum = 0;
         for (Row r : d.overdue) sum += r.d("amount");
         LinearLayout c = a.kit.card(Theme.DANGER);
-        c.addView(a.kit.kv("جمع معوق", Money.rial(sum), Theme.DANGER), a.kit.lp(-1, -2));
+        c.addView(a.kit.kv("جمع معوق", Money.compactRial(sum), Theme.DANGER), a.kit.lp(-1, -2));
         c.addView(a.kit.kv("تعداد", Money.fa(String.valueOf(d.overdue.size())) + " فاکتور", Theme.DANGER), a.kit.lp(-1, -2));
         a.kit.addCard(content, c);
         for (Row r : d.overdue) {
@@ -422,7 +428,9 @@ public class TradeScreen extends Screen {
             // Without dif_date_alan the server sends −1: derive the delay from the due date.
             if (dd < 0) dd = Jalali.diffDays(r.s("dueDate"), Jalali.todayStr());
             String days = dd >= 0 ? "تأخیر " + Money.fa(String.valueOf(dd)) + " روز • " : "";
-            View v = a.kit.alertRow("فاکتور " + Money.fa(no), days + r.s("party") + " • " + Money.rial(r.d("amount")),
+            View v = a.kit.alertRow("فاکتور " + Money.fa(no),
+                    days + r.s("party") + " • " + Money.compactRial(r.d("amount")),
+
                     Theme.DANGER, v2 -> openDetailByNo(no));
             LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
             p.setMargins(0, 0, 0, Theme.dp(10));
@@ -475,7 +483,7 @@ public class TradeScreen extends Screen {
     }
 
     private String pct(double part, double whole) {
-        if (whole <= 0) return "٪۰";
+        if (whole <= 0) return Money.pct(0d);
         return Money.pct(part * 100.0 / whole);
     }
 

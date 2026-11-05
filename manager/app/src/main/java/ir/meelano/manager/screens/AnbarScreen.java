@@ -5,6 +5,7 @@ import android.widget.LinearLayout;
 
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.core.AtiranAuth;
+import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.Money;
@@ -199,8 +200,8 @@ public class AnbarScreen extends Screen {
                             12.5f, Theme.SUCCESS, false), a.kit.lp(-1, -2));
                 } else {
                     for (Row r : shortage) {
-                        String detail = "موجودی " + Money.fa(fmtNum(r.d("stock")))
-                                + " • نقطه سفارش " + Money.fa(fmtNum(r.d("reopoint")))
+                        String detail = "موجودی " + HomeNumberFormatter.quantity(r.d("stock"))
+                                + " • نقطه سفارش " + HomeNumberFormatter.quantity(r.d("reopoint"))
                                 + (r.s("unit").isEmpty() ? "" : " " + r.s("unit"));
                         card.addView(a.kit.kv(r.s("name"), detail, Theme.WARNING), a.kit.lp(-1, -2));
                     }
@@ -316,7 +317,7 @@ public class AnbarScreen extends Screen {
     private android.view.View topCard() {
         String keeper = AtiranAuth.sessionName(a);
         if (keeper.isEmpty()) keeper = AtiranAuth.sessionUser(a);
-        String sub = "امروز " + Money.fa(Jalali.todayStr());
+        String sub = "امروز " + Jalali.dispFa(Jalali.todayStr());
         if (!keeper.isEmpty()) sub += " • انباردار: " + keeper;
         return a.kit.hero("📦", "میزکار انبار", sub, Theme.GOLD);
     }

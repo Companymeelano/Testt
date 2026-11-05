@@ -761,7 +761,7 @@ public class HomeScreen extends Screen {
     private void saveCache(Data d) {
         try {
             Calendar c = Calendar.getInstance();
-            String hm = String.format(java.util.Locale.US, "%02d:%02d",
+            String hm = HomeNumberFormatter.time(
                     c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE));
             StringBuilder s = new StringBuilder("ts=")
                     .append(esc(a.kit.todayLine() + " ساعت " + hm))
@@ -1060,7 +1060,7 @@ public class HomeScreen extends Screen {
         String day = d == null ? "" : Jalali.disp(d.snapshotDay);
         if (day.isEmpty()) return "آخرین داده";
         return day.equals(Jalali.todayStr()) ? "امروز"
-                : HomeNumberFormatter.localizeText("روز " + Jalali.shortLabel(day));
+                : HomeNumberFormatter.rtlText("روز " + HomeNumberFormatter.dateText(day));
     }
 
     private String monthLabel(String monthStart) {
@@ -1622,13 +1622,12 @@ public class HomeScreen extends Screen {
 
         String comparisonCopy = display.baselineAvailable
                 ? "مبنای مقایسه: " + display.comparisonLabel + " · "
-                    + HomeNumberFormatter.compactMoney(display.baselineRials)
+                    + HomeNumberFormatter.money(display.baselineRials)
                     + (display.baselineRials <= 0d ? " · درصد محاسبه نمی‌شود" : "")
                 : "مبنای مقایسه در تاریخچهٔ موجود نیست";
         TextView comparison = a.kit.text(comparisonCopy, 9.5f,
                 Theme.dashboardMutedInk(Theme.SECTION_SALES), false);
         comparison.setGravity(Gravity.END);
-        comparison.setMaxLines(3);
         comparison.setEllipsize(null);
         panel.addView(comparison, a.kit.lp(-1, -2));
 
@@ -1993,7 +1992,7 @@ public class HomeScreen extends Screen {
         String date = String.format(Locale.US, "%04d/%02d/%02d", jalali[0], jalali[1], jalali[2]);
         String today = Jalali.todayStr();
         String day = date.equals(today) ? "امروز" : date.equals(Jalali.addDays(today, -1))
-                ? "دیروز" : Jalali.shortLabel(date);
+                ? "دیروز" : HomeNumberFormatter.dateText(date);
         String time = HomeNumberFormatter.time(saved.get(Calendar.HOUR_OF_DAY), saved.get(Calendar.MINUTE));
         return (live ? "هم‌اکنون · " : "ذخیره‌شده · ") + day + " " + time;
     }
@@ -2309,7 +2308,15 @@ public class HomeScreen extends Screen {
         if (source.equals(localized)) return value;
         SpannableString result = new SpannableString(localized);
         if (value instanceof Spanned) {
-            TextUtils.copySpansFrom((Spanned) value, 0, source.length(), Object.class, result, 0);
+            Spanned original = (Spanned) value;
+            int[] offsets = HomeNumberFormatter.localizedOffsetMap(source);
+            Object[] spans = original.getSpans(0, source.length(), Object.class);
+            for (Object span : spans) {
+                int start = original.getSpanStart(span);
+                int end = original.getSpanEnd(span);
+                if (start < 0 || end < start || end > source.length()) continue;
+                result.setSpan(span, offsets[start], offsets[end], original.getSpanFlags(span));
+            }
         }
         return result;
     }
@@ -2514,9 +2521,9 @@ public class HomeScreen extends Screen {
             String currentFrom = Jalali.addDays(today, -29);
             String previousFrom = Jalali.addDays(today, -59);
             String previousTo = Jalali.addDays(today, -30);
-            String subtitle = "دو بازهٔ پیاپی ۳۰روزه · جاری: " + Jalali.dispFa(currentFrom)
-                    + " تا " + Jalali.dispFa(today) + " · پیشین: " + Jalali.dispFa(previousFrom)
-                    + " تا " + Jalali.dispFa(previousTo);
+            String subtitle = "بازهٔ جاری (۳۰ روز): " + Jalali.dispFa(currentFrom)
+                    + " تا " + Jalali.dispFa(today) + "\nبازهٔ قبل (۳۰ روز): "
+                    + Jalali.dispFa(previousFrom) + " تا " + Jalali.dispFa(previousTo);
             addKpiSection(content, "home-returns-kpis", "اسناد برگشتی فروش · ۳۰ روز",
                     subtitle, R.drawable.mi_assignment_return, Theme.SECTION_RETURNS, returnTiles);
         }
@@ -2547,12 +2554,12 @@ public class HomeScreen extends Screen {
         String amount = available
                 ? HomeNumberFormatter.compactUnit(ir.meelano.manager.core.Money.toUnit(amountRials)) : "—";
         String unit = available ? ir.meelano.manager.core.Money.unitName() : "";
-        String comparisonPeriod = returnsMetric ? "۳۰ روز پیشین" : "روز قبل";
+        String comparisonPeriod = returnsMetric ? "۳۰ روز قبل" : "روز قبل";
         String detail = available ? HomeNumberFormatter.integer(documents) + " " + countLabel
                 : "داده در دسترس نیست";
         if (available && previousRials != null)
-            detail += "\nمبنای مقایسه (" + comparisonPeriod + "): "
-                    + HomeNumberFormatter.compactMoney(previousRials);
+            detail += " · مبنای مقایسهٔ " + comparisonPeriod + ": "
+                    + HomeNumberFormatter.money(previousRials);
         String sub;
         String comparisonBasis = returnsMetric ? " · نسبت به بازهٔ ۳۰روزهٔ پیشین" : " · نسبت به روز قبل";
         int subTone = Theme.MUTED;
@@ -2569,7 +2576,7 @@ public class HomeScreen extends Screen {
                 int direction = Double.isNaN(change) || Double.isInfinite(change)
                         ? (amountRials > previous ? 1 : amountRials < previous ? -1 : 0)
                         : Math.abs(change) < 0.05d ? 0 : change > 0 ? 1 : -1;
-                if (direction == 0) sub = "۰٪" + comparisonBasis;
+                if (direction == 0) sub = HomeNumberFormatter.percent(0d) + comparisonBasis;
                 else {
                     sub = kpiChangeText(amountRials, previous, change) + comparisonBasis;
                     boolean favorable = (direction > 0) == increaseIsGood;
@@ -2840,9 +2847,10 @@ public class HomeScreen extends Screen {
                     Theme.dashboardCardMutedInk(accent), false);
             sub.setGravity(Gravity.START);
             sub.setSingleLine(false);
-            sub.setMaxLines(2);
+            boolean explicitMultiLine = subtitle.indexOf('\n') >= 0;
+            sub.setMaxLines(explicitMultiLine ? Integer.MAX_VALUE : 2);
             sub.setLineSpacing(Theme.dp(1), 1f);
-            sub.setEllipsize(TextUtils.TruncateAt.END);
+            sub.setEllipsize(explicitMultiLine ? null : TextUtils.TruncateAt.END);
             box.addView(sub, a.kit.lp(-1, -2));
         }
         return box;
@@ -4047,12 +4055,12 @@ public class HomeScreen extends Screen {
                     R.drawable.mi_cheque, navChip("گزارش چک‌ها", "cheques")), a.kit.lp(-1, -2));
             if (d.dueIn != null && !d.dueIn.isEmpty()) {
                 c.addView(statRow(R.drawable.mi_cheque, "دریافتی " + HomeNumberFormatter.integer(d.dueIn.size()) + " فقره",
-                        HomeNumberFormatter.money(dueInSum), Theme.SECTION_RECEIVE), a.kit.lp(-1, -2));
+                        HomeNumberFormatter.compactMoney(dueInSum), Theme.SECTION_RECEIVE), a.kit.lp(-1, -2));
                 c.addView(a.kit.gap(8));
             }
             if (d.dueOut != null && !d.dueOut.isEmpty())
                 c.addView(statRow(R.drawable.mi_cheque, "پرداختی " + HomeNumberFormatter.integer(d.dueOut.size()) + " فقره",
-                        HomeNumberFormatter.money(dueOutSum), Theme.SECTION_PAY), a.kit.lp(-1, -2));
+                        HomeNumberFormatter.compactMoney(dueOutSum), Theme.SECTION_PAY), a.kit.lp(-1, -2));
             a.kit.addCard(content, c);
         }
     }
@@ -4088,19 +4096,19 @@ public class HomeScreen extends Screen {
 
         List<Mini> metrics = new ArrayList<>();
         metrics.add(new Mini(R.drawable.mi_receipt_long, "دریافت نقد امروز",
-                receiptsAvailable ? HomeNumberFormatter.money(receipts) : "—",
+                receiptsAvailable ? HomeNumberFormatter.compactMoney(receipts) : "—",
                 !receiptsAvailable ? "تفکیک نقد موجود نیست"
                         : Math.abs(receipts) < 0.005d ? "دریافت نقدی ثبت نشده" : "ورودی ثبت‌شده",
                 Theme.TEXT));
         metrics.add(new Mini(R.drawable.mi_payments, "پرداخت نقد امروز",
-                paymentsAvailable ? HomeNumberFormatter.money(payments) : "—",
+                paymentsAvailable ? HomeNumberFormatter.compactMoney(payments) : "—",
                 !paymentsAvailable ? "تفکیک نقد موجود نیست"
                         : Math.abs(payments) < 0.005d ? "پرداخت نقدی ثبت نشده" : "خروجی ثبت‌شده",
                 Theme.TEXT));
         if (!steps.isEmpty()) {
             double expectedClosing = steps.get(steps.size() - 1).endRials;
             metrics.add(new Mini(R.drawable.mi_account_balance_wallet, "ماندهٔ نقد مورد انتظار",
-                    HomeNumberFormatter.money(expectedClosing), "برآورد پایان روز", Theme.TEXT));
+                    HomeNumberFormatter.compactMoney(expectedClosing), "برآورد پایان روز", Theme.TEXT));
         }
         int cashMetricColumns = ir.meelano.manager.ui.Ui.widthDp(a) >= 380
                 && Theme.fontScale() <= 1.1f ? 3 : 2;
@@ -4550,12 +4558,12 @@ public class HomeScreen extends Screen {
         } else {
             card.addView(a.kit.text("برآورد نقطه‌ای مجموع هفت روز", 10.5f, Theme.MUTED, false),
                     a.kit.lp(-1, -2));
-            card.addView(a.kit.amountLine(HomeNumberFormatter.money(forecast.expectedTotalRials),
+            card.addView(a.kit.amountLine(HomeNumberFormatter.compactMoney(forecast.expectedTotalRials),
                     16f, Gravity.START), a.kit.lp(-1, -2));
             card.addView(a.kit.gap(3));
             card.addView(a.kit.text("دامنهٔ نوسان تجربی مجموع: "
-                            + HomeNumberFormatter.money(forecast.lowerTotalRials) + " تا "
-                            + HomeNumberFormatter.money(forecast.upperTotalRials),
+                            + HomeNumberFormatter.compactMoney(forecast.lowerTotalRials) + " تا "
+                            + HomeNumberFormatter.compactMoney(forecast.upperTotalRials),
                     10.5f, Theme.TEXT, false), a.kit.lp(-1, -2));
             HomeForecastChart chart = new HomeForecastChart(a);
             chart.setData(forecast.days, accent);
@@ -4589,17 +4597,17 @@ public class HomeScreen extends Screen {
             double profit = sumField(d.grossProfitDaily, "profit");
             double todayProfit = grossProfitOnDay(d, snapshotDay(d));
             card.addView(statRow(R.drawable.mi_sell, "فروش ماه تا امروز",
-                    HomeNumberFormatter.money(sales), Theme.SECTION_GROSS_PROFIT), a.kit.lp(-1, -2));
+                    HomeNumberFormatter.compactMoney(sales), Theme.SECTION_GROSS_PROFIT), a.kit.lp(-1, -2));
             card.addView(a.kit.gap(6));
             card.addView(statRow(R.drawable.mi_shopping_cart, "بهای تمام‌شدهٔ برآوردشده",
-                    HomeNumberFormatter.money(cogs), Theme.SECTION_GROSS_PROFIT), a.kit.lp(-1, -2));
+                    HomeNumberFormatter.compactMoney(cogs), Theme.SECTION_GROSS_PROFIT), a.kit.lp(-1, -2));
             card.addView(a.kit.gap(6));
             card.addView(statRow(R.drawable.mi_profit, "سود ناخالص ماه تا امروز",
-                    HomeNumberFormatter.money(profit), Theme.SECTION_GROSS_PROFIT,
+                    HomeNumberFormatter.compactMoney(profit), Theme.SECTION_GROSS_PROFIT,
                     grossProfitValueTone(profit)), a.kit.lp(-1, -2));
             card.addView(a.kit.gap(6));
             card.addView(statRow(R.drawable.mi_event, "سود ناخالص امروز",
-                    HomeNumberFormatter.money(todayProfit), Theme.SECTION_GROSS_PROFIT,
+                    HomeNumberFormatter.compactMoney(todayProfit), Theme.SECTION_GROSS_PROFIT,
                     grossProfitValueTone(todayProfit)), a.kit.lp(-1, -2));
             card.addView(a.kit.hint("این برآورد از مبلغ فروش و بهای خرید ذخیره‌شده ساخته می‌شود؛ هزینه‌های عملیاتی، مالی و مالیاتی را ندارد. اگر بهای خرید حتی یک ردیف فروش نامعتبر یا ناقص باشد، سود نمایش داده نمی‌شود."),
                     a.kit.lp(-1, -2));
@@ -4668,11 +4676,11 @@ public class HomeScreen extends Screen {
                 card.addView(gaugeFrame, a.kit.lp(-1, Theme.dp(176)));
 
                 card.addView(a.kit.kv("فروش ماه تا روز " + HomeNumberFormatter.integer(elapsedDays),
-                        HomeNumberFormatter.money(result.salesRials), Theme.TEXT), a.kit.lp(-1, -2));
-                card.addView(a.kit.kv("هدف ثبت‌شدهٔ ماه", HomeNumberFormatter.money(result.targetRials),
+                        HomeNumberFormatter.compactMoney(result.salesRials), Theme.TEXT), a.kit.lp(-1, -2));
+                card.addView(a.kit.kv("هدف ثبت‌شدهٔ ماه", HomeNumberFormatter.compactMoney(result.targetRials),
                         Theme.TEXT), a.kit.lp(-1, -2));
                 card.addView(a.kit.kv("برآورد پایان ماه با نرخ روز تقویمی",
-                        HomeNumberFormatter.money(result.projectedMonthRials), Theme.TEXT),
+                        HomeNumberFormatter.compactMoney(result.projectedMonthRials), Theme.TEXT),
                         a.kit.lp(-1, -2));
                 card.addView(a.kit.hint("برآورد خطی است: فروش ماه تا امروز ÷ روزهای تقویمی گذشته × تعداد روزهای ماه؛ جمعه و تعطیلات رسمی جداگانه از محاسبه کم نشده‌اند."),
                         a.kit.lp(-1, -2));
@@ -4798,16 +4806,16 @@ public class HomeScreen extends Screen {
 
         List<Mini> metrics = new ArrayList<>();
         metrics.add(new Mini(R.drawable.mi_sell, "فروش روز",
-                salesAvailable ? HomeNumberFormatter.money(d.salesSnapshot.salesRialsOn(day)) : "—",
+                salesAvailable ? HomeNumberFormatter.compactMoney(d.salesSnapshot.salesRialsOn(day)) : "—",
                 salesNote, Theme.TEXT));
         BigDecimal returnedTotal = sumExactField(d.returnsToday, "total");
         metrics.add(new Mini(R.drawable.mi_assignment_return, "برگشتی امروز",
                 !d.returnsTodayAvailable ? "—" : returnedTotal == null ? "مبلغ نامعتبر"
-                        : HomeNumberFormatter.preciseMoney(returnedTotal), returnNote, Theme.TEXT));
+                        : HomeNumberFormatter.compactMoney(returnedTotal.doubleValue()), returnNote, Theme.TEXT));
         double closeoutGrossProfit = d.grossProfitQualityComplete
                 ? grossProfitOnDay(d, day) : Double.NaN;
         metrics.add(new Mini(R.drawable.mi_bar_chart, "سود ناخالص برآوردی",
-                d.grossProfitQualityComplete ? HomeNumberFormatter.money(closeoutGrossProfit) : "—",
+                d.grossProfitQualityComplete ? HomeNumberFormatter.compactMoney(closeoutGrossProfit) : "—",
                 profitNote, d.grossProfitQualityComplete
                         ? grossProfitValueTone(closeoutGrossProfit) : Theme.TEXT));
         metrics.add(new Mini(R.drawable.mi_point_of_sale, "اختلاف شمارش صندوق",
@@ -5292,7 +5300,7 @@ public class HomeScreen extends Screen {
             if (updated > 0) {
                 String time = new java.text.SimpleDateFormat("HH:mm", Locale.getDefault())
                         .format(new java.util.Date(updated));
-                detail += " • به‌روزرسانی محلی " + ir.meelano.manager.core.Money.fa(time);
+                detail += " • به‌روزرسانی محلی " + HomeNumberFormatter.time(time);
             }
         } else if (statementProvided) {
             detail += "\nمبلغ صورت‌حساب ناقص یا نامعتبر است؛ صفر فرض نشده، برای اصلاح لمس کنید.";
@@ -5683,8 +5691,8 @@ public class HomeScreen extends Screen {
         if (draft == null || draft.parsed == null || !bankImportScreenCurrent(draft.renderToken)) return;
         BankStatementFile.Parsed parsed = draft.parsed;
         StringBuilder text = new StringBuilder();
-        text.append("دورهٔ انتخاب‌شده: ").append(Money.fa(draft.fromDay)).append(" تا ")
-                .append(Money.fa(draft.toDay)).append("\n")
+        text.append("دورهٔ انتخاب‌شده: ").append(HomeNumberFormatter.dateText(draft.fromDay))
+                .append(" تا ").append(HomeNumberFormatter.dateText(draft.toDay)).append("\n")
                 .append("تراکنش‌های پذیرفته‌شده: ").append(HomeNumberFormatter.integer(parsed.transactionCount)).append("\n")
                 .append("جمع واریز فایل: ").append(HomeNumberFormatter.preciseMoney(parsed.totalCreditRialsExact)).append("\n")
                 .append("جمع برداشت فایل: ").append(HomeNumberFormatter.preciseMoney(parsed.totalDebitRialsExact)).append("\n")
@@ -5750,7 +5758,8 @@ public class HomeScreen extends Screen {
         accountSpinner.setAdapter(adapter);
         accountSpinner.setContentDescription("انتخاب حساب آتیران برای تطبیق با فایل بانک");
         body.addView(accountSpinner, a.kit.lp(-1, -2));
-        TextView period = a.kit.text("بازهٔ دقیق: " + Money.fa(draft.fromDay) + " تا " + Money.fa(draft.toDay),
+        TextView period = a.kit.text("بازهٔ دقیق: " + HomeNumberFormatter.dateText(draft.fromDay)
+                        + " تا " + HomeNumberFormatter.dateText(draft.toDay),
                 12f, Theme.TEXT, true);
         period.setPadding(0, Theme.dp(10), 0, Theme.dp(5));
         body.addView(period, a.kit.lp(-1, -2));
@@ -5893,8 +5902,8 @@ public class HomeScreen extends Screen {
         StringBuilder text = new StringBuilder();
         text.append("حساب آتیران: ").append(draft.bankName.isEmpty() ? "حساب بانکی" : draft.bankName)
                 .append(" • کد ").append(draft.bankId).append('\n')
-                .append("بازهٔ شمسی: ").append(Money.fa(report.fromDay)).append(" تا ")
-                .append(Money.fa(report.toDay)).append('\n')
+                .append("بازهٔ شمسی: ").append(HomeNumberFormatter.dateText(report.fromDay)).append(" تا ")
+                .append(HomeNumberFormatter.dateText(report.toDay)).append('\n')
                 .append("منبع بانکی: خروجی دستی انتخاب‌شده • منبع دفتر: Query فقط‌خواندنی آتیران\n")
                 .append("زمان تکمیل Query (ساعت دستگاه): ").append(bankImportTimestamp(draft.comparedAt)).append('\n')
                 .append("تازگی منبع: زمان ساخت فایل بانک و زمان آخرین تغییر سند در آتیران از این داده‌ها قابل‌اثبات نیست؛ Query فقط وضعیت بازگشتی در زمان بالا را خوانده است.\n")
@@ -5923,7 +5932,7 @@ public class HomeScreen extends Screen {
             int shown = 0;
             for (BankStatementPeriodReconciliation.DayResult day : report.days) {
                 if (day.comparison.state != BankStatementReconciliation.State.VARIANCE) continue;
-                text.append(Money.fa(day.day)).append(" — ")
+                text.append(HomeNumberFormatter.dateText(day.day)).append(" — ")
                         .append(bankVariancePiece("واریز", day.comparison.inflowVarianceRialsExact)).append("؛ ")
                         .append(bankVariancePiece("برداشت", day.comparison.outflowVarianceRialsExact)).append('\n');
                 if (++shown >= 20) break;
@@ -5996,9 +6005,9 @@ public class HomeScreen extends Screen {
     }
 
     private String bankImportTimestamp(long timestamp) {
-        String value = new java.text.SimpleDateFormat("yyyy/MM/dd HH:mm:ss", Locale.getDefault())
+        String value = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
                 .format(new java.util.Date(timestamp));
-        return Money.fa(value);
+        return HomeNumberFormatter.dateTime(value);
     }
 
     private void discardBankImportDraft(BankImportDraft draft) {
@@ -6063,7 +6072,7 @@ public class HomeScreen extends Screen {
         BigDecimal excess = item.bd("excess");
         String meta = (item.s("party").isEmpty() ? "طرف‌حساب نامشخص" : "طرف‌حساب: " + item.s("party"))
                 + " • تاریخ: " + (Jalali.disp(item.s("date")).isEmpty()
-                    ? "نامشخص" : Jalali.disp(item.s("date")));
+                    ? "نامشخص" : Jalali.dispFa(item.s("date")));
         if (total == null || paid == null || excess == null || total.signum() < 0
                 || paid.signum() < 0 || excess.signum() < 0
                 || paid.subtract(total).compareTo(excess) != 0) {
@@ -6089,7 +6098,7 @@ public class HomeScreen extends Screen {
         Long rows = item.exactLong("rows");
         String rawDate = item.s("date");
         String normalizedDate = Jalali.disp(rawDate);
-        String meta = "تاریخ ثبت: " + (normalizedDate.isEmpty() ? "نامشخص" : normalizedDate)
+        String meta = "تاریخ ثبت: " + (normalizedDate.isEmpty() ? "نامشخص" : Jalali.dispFa(rawDate))
                 + " • ردیف‌های سند: " + (rows == null || rows < 0
                     ? "نامشخص" : HomeNumberFormatter.integer(rows));
         if (debit == null || credit == null || diff == null || rows == null || rows < 1
@@ -6359,7 +6368,8 @@ public class HomeScreen extends Screen {
                 new ir.meelano.manager.core.ReportCatalog.Col("label", "شرح", ir.meelano.manager.core.ReportCatalog.T_TEXT),
                 new ir.meelano.manager.core.ReportCatalog.Col("value", "مبلغ / وضعیت", ir.meelano.manager.core.ReportCatalog.T_TEXT)
         };
-        String subtitle = day + " • خلاصهٔ خواندنی از دفتر و شمارش محلی دستگاه";
+        String subtitle = HomeNumberFormatter.dateText(day)
+                + " • خلاصهٔ خواندنی از دفتر و شمارش محلی دستگاه";
         if (print) a.printPdf("گزارش بستن روز", subtitle, columns, rows);
         else a.sharePdf("گزارش بستن روز", subtitle, columns, rows);
     }
@@ -6394,8 +6404,6 @@ public class HomeScreen extends Screen {
                 "سه نکته بر پایهٔ داده‌های ثبت‌شده", R.drawable.mi_star_shine,
                 share, Theme.SECTION_SALES), a.kit.lp(-1, -2));
 
-        card.addView(a.kit.hint("هر موضوع و اولویتش جداگانه نمایش داده می‌شود."),
-                a.kit.lp(-1, -2));
         String[] headings = {"نتیجهٔ فروش", "کالای پیشتاز"};
         int[] icons = {R.drawable.mi_point_of_sale, R.drawable.mi_inventory_2};
         int[] tones = {Theme.SECTION_SALES, Theme.SECTION_WAREHOUSE};
@@ -6450,7 +6458,6 @@ public class HomeScreen extends Screen {
         }
         copy.addView(titleRow, a.kit.lp(-1, -2));
         TextView detail = a.kit.text(text, 12f, Theme.TEXT, false);
-        detail.setMaxLines(4);
         detail.setEllipsize(null);
         copy.addView(detail, a.kit.lp(-1, -2));
         line.addView(copy, a.kit.wlp(1f));
@@ -6605,7 +6612,7 @@ public class HomeScreen extends Screen {
         String today = Jalali.todayStr();
         if (d.equals(today)) return "امروز";
         if (d.equals(Jalali.addDays(today, -1))) return "دیروز";
-        return HomeNumberFormatter.localizeText(Jalali.shortLabel(d));
+        return HomeNumberFormatter.dateText(d);
     }
 
     /** Open a section narrowed to the KPI day (custom 1-day range). */
@@ -6651,7 +6658,7 @@ public class HomeScreen extends Screen {
         if (end < 0 || start < 0 || end < start) return out;
         int availableDays = Math.min(14, end - start + 1);
         for (SalesSnapshot.Day day : snapshot.dailySeries(to, availableDays))
-            out.add(new Charts.Point(HomeNumberFormatter.localizeText(Jalali.shortLabel(day.date)), day.salesRials));
+            out.add(new Charts.Point(HomeNumberFormatter.dateShortLabel(day.date), day.salesRials));
         return out;
     }
 

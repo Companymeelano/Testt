@@ -12,6 +12,7 @@ import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.core.AtiranSchema;
 import ir.meelano.manager.core.Filter;
 import ir.meelano.manager.core.FollowUps;
+import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.Money;
@@ -708,18 +709,18 @@ public class CustomersScreen extends Screen {
         nb.setPadding(Theme.dp(4), Theme.dp(4), Theme.dp(4), Theme.dp(4));
         // Facts sit in one card so the sheet reads as a single record.
         LinearLayout facts = a.kit.card(Theme.GOLD);
-        facts.addView(a.kit.kv("تاریخ", Jalali.dispFa(r.s("date")), Theme.TEXT), a.kit.lp(-1, -2));
+        facts.addView(a.kit.kv("تاریخ", HomeNumberFormatter.dateTime(r.s("date")), Theme.TEXT), a.kit.lp(-1, -2));
         facts.addView(a.kit.kv("عملیات", r.s("opLabel").isEmpty() ? r.s("op") : r.s("opLabel"), Theme.TEXT), a.kit.lp(-1, -2));
         if (r.d("bed") > 0) facts.addView(a.kit.kv("بدهکار", Money.rial(r.d("bed")), Theme.DANGER), a.kit.lp(-1, -2));
         if (r.d("bes") > 0) facts.addView(a.kit.kv("بستانکار", Money.rial(r.d("bes")), Theme.SUCCESS), a.kit.lp(-1, -2));
         if (!r.s("ghno").isEmpty()) facts.addView(a.kit.kv("شماره سند", Money.fa(r.s("ghno")), Theme.TEXT), a.kit.lp(-1, -2));
         if (!r.s("descrip").isEmpty()) facts.addView(a.kit.kv("شرح", r.s("descrip"), Theme.MUTED), a.kit.lp(-1, -2));
-        if (!r.s("doneDate").isEmpty()) facts.addView(a.kit.kv("تاریخ ثبت", Jalali.dispFa(r.s("doneDate")), Theme.MUTED), a.kit.lp(-1, -2));
+        if (!r.s("doneDate").isEmpty()) facts.addView(a.kit.kv("تاریخ ثبت", HomeNumberFormatter.dateTime(r.s("doneDate")), Theme.MUTED), a.kit.lp(-1, -2));
         nb.addView(facts, a.kit.lp(-1, -2));
         nb.addView(a.kit.gap(12));
         nb.addView(a.kit.text("خروجی این سند", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
         nb.addView(a.kit.gap(6));
-        nb.addView(a.exportBar("سند گردش حساب", Jalali.dispFa(r.s("date")), LEDGER_COLS,
+        nb.addView(a.exportBar("سند گردش حساب", HomeNumberFormatter.dateTime(r.s("date")), LEDGER_COLS,
                 java.util.Collections.singletonList(r)), a.kit.lp(-1, -2));
         nb.addView(a.kit.gap(14));
         final AlertDialog[] box = new AlertDialog[1];
@@ -775,7 +776,7 @@ public class CustomersScreen extends Screen {
         LinearLayout body = a.kit.v();
         body.setPadding(Theme.dp(16), Theme.dp(8), Theme.dp(16), Theme.dp(8));
         body.addView(a.kit.kv("شماره", Money.fa(head.s("no")), Theme.TEXT), a.kit.lp(-1, -2));
-        body.addView(a.kit.kv("تاریخ", Jalali.dispFa(head.s("date")), Theme.TEXT), a.kit.lp(-1, -2));
+        body.addView(a.kit.kv("تاریخ", HomeNumberFormatter.dateTime(head.s("date")), Theme.TEXT), a.kit.lp(-1, -2));
         body.addView(a.kit.kv("مشتری", head.s("customer"), Theme.TEXT), a.kit.lp(-1, -2));
         if (!head.s("visitor").isEmpty() && !"بدون ویزیتور".equals(head.s("visitor")))
             body.addView(a.kit.kv("ویزیتور", head.s("visitor"), Theme.TEXT), a.kit.lp(-1, -2));
@@ -823,7 +824,7 @@ public class CustomersScreen extends Screen {
         }
         final String fNo = head.s("no");
         final String fParty = head.s("customer");
-        final String fDate = Jalali.dispFa(head.s("date"));
+        final String fDate = HomeNumberFormatter.dateTime(head.s("date"));
         final List<Row> fLines = dt.lines;
         final Row fHead = head;
         body.addView(a.kit.gap(8));
@@ -891,7 +892,7 @@ public class CustomersScreen extends Screen {
         LinearLayout body = a.kit.v();
         body.setPadding(Theme.dp(16), Theme.dp(8), Theme.dp(16), Theme.dp(8));
         body.addView(a.kit.kv("شماره قبض", Money.fa(head.s("ghno")), Theme.TEXT), a.kit.lp(-1, -2));
-        body.addView(a.kit.kv("تاریخ", Jalali.dispFa(head.s("date")), Theme.TEXT), a.kit.lp(-1, -2));
+        body.addView(a.kit.kv("تاریخ", HomeNumberFormatter.dateTime(head.s("date")), Theme.TEXT), a.kit.lp(-1, -2));
         if (!head.s("customer").isEmpty()) body.addView(a.kit.kv("طرف‌حساب", head.s("customer"), Theme.TEXT), a.kit.lp(-1, -2));
         if (!head.s("kind").isEmpty()) body.addView(a.kit.kv("نوع", head.s("kind"), Theme.TEXT), a.kit.lp(-1, -2));
         // ---- separated type breakdown (cash / card / havaleh / cheque) ----
@@ -939,7 +940,7 @@ public class CustomersScreen extends Screen {
             };
             body.addView(a.kit.dataTable(cols, dt.invs, r -> openInvoiceDetail(r.s("no"))), a.kit.lp(-1, -2));
             body.addView(a.kit.gap(4));
-            body.addView(a.exportBar("تسویه‌های قبض " + head.s("ghno"), Jalali.dispFa(head.s("date")), cols, dt.invs), a.kit.lp(-1, -2));
+            body.addView(a.exportBar("تسویه‌های قبض " + head.s("ghno"), HomeNumberFormatter.dateTime(head.s("date")), cols, dt.invs), a.kit.lp(-1, -2));
         } else if (!dt.pos.isEmpty()) {
             ReportCatalog.Col[] cols = new ReportCatalog.Col[]{
                     new ReportCatalog.Col("bank", "بانک", ReportCatalog.T_TEXT),
@@ -947,7 +948,7 @@ public class CustomersScreen extends Screen {
                     new ReportCatalog.Col("tracking", "پیگیری", ReportCatalog.T_TEXT),
             };
             body.addView(a.kit.gap(4));
-            body.addView(a.exportBar("قبض " + head.s("ghno"), Jalali.dispFa(head.s("date")), cols, dt.pos), a.kit.lp(-1, -2));
+            body.addView(a.exportBar("قبض " + head.s("ghno"), HomeNumberFormatter.dateTime(head.s("date")), cols, dt.pos), a.kit.lp(-1, -2));
         }
         body.addView(a.kit.gap(8));
         final AlertDialog[] box = new AlertDialog[1];

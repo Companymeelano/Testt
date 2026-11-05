@@ -388,7 +388,7 @@ public class TradeScreen extends Screen {
             r.put("totalLabel", fullAmount);
             r.put("remainLabel", remainValid ? Money.rial(r.d("remain")) : "نامشخص");
             View v = a.kit.invoiceRow("فاکتور " + Money.fa(no), r.s("customer"),
-                    Jalali.dispFa(r.s("date")), cardAmount,
+                    HomeNumberFormatter.dateTime(r.s("date")), cardAmount,
                     status, v2 -> openDetailByNo(no, voidedOnly));
             LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
             p.setMargins(0, 0, 0, Theme.dp(10));
@@ -569,7 +569,7 @@ public class TradeScreen extends Screen {
         Row head = dt.head;
         LinearLayout body = a.kit.v();
         body.addView(a.kit.kv("شماره", Money.fa(head.s("no")), Theme.TEXT), a.kit.lp(-1, -2));
-        body.addView(a.kit.kv("تاریخ", Jalali.dispFa(head.s("date")), Theme.TEXT), a.kit.lp(-1, -2));
+        body.addView(a.kit.kv("تاریخ", HomeNumberFormatter.dateTime(head.s("date")), Theme.TEXT), a.kit.lp(-1, -2));
         body.addView(a.kit.kv(sales ? "مشتری" : "طرف‌حساب", head.s("customer"), Theme.TEXT), a.kit.lp(-1, -2));
         if (sales && !head.s("visitor").isEmpty() && !"بدون ویزیتور".equals(head.s("visitor")))
             body.addView(a.kit.kv("ویزیتور", head.s("visitor"), Theme.TEXT), a.kit.lp(-1, -2));
@@ -641,7 +641,7 @@ public class TradeScreen extends Screen {
         final List<Row> fLines = dt.lines;
         final String fNo = head.s("no");
         final String fParty = head.s("customer");
-        final String fDate = Jalali.dispFa(head.s("date"));
+        final String fDate = HomeNumberFormatter.dateTime(head.s("date"));
         ReportCatalog.Col[] expCols = new ReportCatalog.Col[]{
                 new ReportCatalog.Col("naka", "کالا", ReportCatalog.T_TEXT),
                 new ReportCatalog.Col("qtyLabel", "مقدار", ReportCatalog.T_TEXT),

@@ -192,7 +192,7 @@ public final class FisPrint {
         blocks.add(new Block(lay(dash(), 24, false, Layout.Alignment.ALIGN_CENTER), 6));
         String kind = sales ? "فاکتور فروش" : "فاکتور خرید";
         blocks.add(new Block(lay(kind + "  " + Money.fa(head.s("no")), 32, true, Layout.Alignment.ALIGN_CENTER), 4));
-        blocks.add(new Block(lay("تاریخ: " + Jalali.dispFa(head.s("date")), 26, false, Layout.Alignment.ALIGN_NORMAL), 2));
+        blocks.add(new Block(lay("تاریخ: " + HomeNumberFormatter.dateTime(head.s("date")), 26, false, Layout.Alignment.ALIGN_NORMAL), 2));
         blocks.add(new Block(lay((sales ? "مشتری: " : "طرف‌حساب: ") + head.s("customer"), 28, true, Layout.Alignment.ALIGN_NORMAL), 2));
         String vis = head.s("visitor");
         if (sales && !vis.isEmpty() && !"بدون ویزیتور".equals(vis))

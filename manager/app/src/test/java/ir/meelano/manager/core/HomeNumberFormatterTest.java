@@ -58,6 +58,11 @@ public class HomeNumberFormatterTest {
 
     @Test public void timeAndExternalLabelsAreLocalized() {
         assertEquals("\u2066۰۸:۰۵\u2069", HomeNumberFormatter.time(8, 5));
+        assertTrue(HomeNumberFormatter.stripIsolates(HomeNumberFormatter.time(1L))
+                .matches("[۰-۹]{2}:[۰-۹]{2}"));
+        assertTrue(HomeNumberFormatter.dateTime(1L).contains("، ساعت "));
+        assertEquals("", HomeNumberFormatter.time(0L));
+        assertEquals("", HomeNumberFormatter.dateTime(0L));
         assertEquals("پرداخت \u2066۱۲۳۴\u2069 / \u2066۵۶۷۸\u2069",
                 HomeNumberFormatter.localizeText("پرداخت 1234 / ٥٦٧٨"));
         assertEquals("مبلغ \u2066۱٬۲۳۴٫۵٪\u2069، تاریخ \u2066۱۴۰۵/۰۸/۰۴\u2069 تا \u2066۱۴۰۵/۰۸/۳۰\u2069",

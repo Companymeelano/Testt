@@ -345,8 +345,43 @@ public class AtiranSampleSchemaTest {
         assertTrue(lookup.sql.contains("FROM [dbo].[sys_users] t"));
 
         Queries.Q handover = MasterQueries.whDeliveries(meta, "1405/08/13");
-        assertTrue("Handover rows should retain any source clock for TahvilScreen",
-                handover.sql.contains("LEFT(TRY_CONVERT(nvarchar(30),f.[date],121),19) AS dt"));
+        assertTrue("Handover rows should combine sailfact.date with its separate clock",
+                handover.sql.contains("f.[time_]") && handover.sql.contains("CHARINDEX(N' ',"));
+
+        Queries.Q changes = MasterQueries.tableChanges(meta, new Filter());
+        assertTrue("TableChanges should combine DateServer and TimeServer for the shared formatter",
+                changes.sql.contains("t.[TimeServer]") && changes.sql.contains(" AS at"));
+
+        Queries.Q receipts = MoneyQueries.darList(meta, new Filter(), 0);
+        assertTrue("Receipt lists should retain the separate ClockTime",
+                receipts.sql.contains("h.[ClockTime]"));
+        Queries.Q sales = Queries.factorList(meta, true, new Filter());
+        assertTrue("Sales invoices should retain the separate time_ clock",
+                sales.sql.contains("h.[time_]"));
+        Queries.Q purchases = Queries.factorList(meta, false, new Filter());
+        assertTrue("Purchase invoices should retain the separate Hour value",
+                purchases.sql.contains("h.[Hour]"));
+        Queries.Q overpaid = FinanceReports.overpaidVouchers(meta, new Filter(), 10);
+        assertTrue("Home finance audit should retain receipt ClockTime",
+                overpaid.sql.contains("h.[ClockTime]"));
+        Queries.Q journals = FinanceReports.unbalancedJournals(meta, new Filter(), 10);
+        assertTrue("Journal summaries should retain their separate TimeServer field",
+                journals.sql.contains("a.[TimeServer]"));
+        Queries.Q biggestJournals = FinanceReports.biggestJournals(meta, new Filter(), 10);
+        assertTrue("Largest journal documents should retain their separate TimeServer field",
+                biggestJournals.sql.contains("a.[TimeServer]"));
+        Queries.Q customerLedger = MasterQueries.customerTurnover(meta, "7", new Filter());
+        assertTrue("Customer ledger should retain its t_time timestamp",
+                customerLedger.sql.contains("h.[t_time]"));
+        Queries.Q customerReceipts = MasterQueries.customerDars(meta, "7", 0, new Filter());
+        assertTrue("Customer receipt rows should retain ClockTime",
+                customerReceipts.sql.contains("h.[ClockTime]"));
+        Queries.Q customerInvoices = MasterQueries.partyInvoices(meta, true, "7", new Filter());
+        assertTrue("Customer invoice rows should retain the separate time_ clock",
+                customerInvoices.sql.contains("h.[time_]"));
+        Queries.Q returns = MasterQueries.returnsList(meta, new Filter());
+        assertTrue("Return documents should retain their separate Hour value",
+                returns.sql.contains("h.[Hour]"));
     }
 
     private static JSONObject loadManifest() throws Exception {

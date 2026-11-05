@@ -353,6 +353,7 @@ public final class Queries {
             throw new Missing("در «" + AtiranSchema.faTitle(table)
                     + "» ستون صریحِ ابطال/لغو فاکتور پیدا نشد؛ وضعیت حذف یا تأییدنشده جای آن نیست");
         String dateCol = sales ? m.must(table, "تاریخ", "date") : m.must(table, "تاریخ", "DATE", "date");
+        String timeCol = sales ? Sql.pick(cols, "time_") : Sql.pick(cols, "Hour", "hour");
         String amountCol = m.must(table, "مبلغ", "all");
         String numberCol = sales ? m.must(table, "شماره فاکتور", "shfacfo")
                 : m.must(table, "شماره فاکتور", "shfackh", "shfac");
@@ -389,7 +390,7 @@ public final class Queries {
         if ("total_desc".equals(f.sort) || "remain_desc".equals(f.sort))
             orderBy += ", h.[" + dateCol + "] DESC";
         String sql = "SELECT " + Sql.txt("h", numberCol, 80) + " AS no"
-                + ", " + Sql.date10("h", dateCol) + " AS date"
+                + ", " + Sql.dateTimeDisplay("h", dateCol, timeCol) + " AS date"
                 + ", " + (partyCol == null ? "CAST(NULL AS nvarchar(100))" : Sql.txt("h", partyCol, 100)) + " AS code"
                 + ", " + custNameExpr(m, "h", partyCol, "cu") + " AS customer"
                 + ", " + (sales ? "N'بدون ویزیتور'" : "N'—'") + " AS visitor"
@@ -559,6 +560,7 @@ public final class Queries {
         String table = sales ? "sailfact" : "buyfact";
         Set<String> cols = m.columns(table);
         String dateCol = sales ? m.must(table, "تاریخ", "date") : m.must(table, "تاریخ", "DATE", "date");
+        String timeCol = sales ? Sql.pick(cols, "time_") : Sql.pick(cols, "Hour", "hour");
         String amountCol = m.must(table, "مبلغ", "all");
         String numberCol = sales ? m.must(table, "شماره فاکتور", "shfacfo") : m.must(table, "شماره فاکتور", "shfackh", "shfac");
         String partyCol = Sql.pick(cols, "shmo", "SHMO");
@@ -621,7 +623,7 @@ public final class Queries {
         String totalNullable = Sql.numNull("h", amountCol);
         String paidNullable = Sql.numNull("h", paidCol);
         String sql = "SELECT " + Sql.txt("h", numberCol, 80) + " AS no"
-                + ", " + Sql.date10("h", dateCol) + " AS date"
+                + ", " + Sql.dateTimeDisplay("h", dateCol, timeCol) + " AS date"
                 + ", " + (partyCol == null ? "CAST(NULL AS nvarchar(100))" : Sql.txt("h", partyCol, 100)) + " AS code"
                 + ", " + custNameExpr(m, "h", partyCol, "cu") + " AS customer"
                 + ", " + (sales ? (visCol == null ? "N'بدون ویزیتور'" : visNameExpr(m, "h", visCol, "v")) : "N'—'") + " AS visitor"
@@ -697,15 +699,16 @@ public final class Queries {
         String table = sales ? "sailfact" : "buyfact";
         Set<String> cols = m.columns(table);
         String dateCol = sales ? m.must(table, "تاریخ", "date") : m.must(table, "تاریخ", "DATE", "date");
+        String timeCol = sales ? Sql.pick(cols, "time_") : Sql.pick(cols, "Hour", "hour");
         String amountCol = m.must(table, "مبلغ", "all");
         String numberCol = sales ? m.must(table, "شماره فاکتور", "shfacfo") : m.must(table, "شماره فاکتور", "shfackh", "shfac");
         String partyCol = Sql.pick(cols, "shmo", "SHMO");
         String paidCol = sales ? Sql.pick(cols, "MabDaryaftFactor", "Daryaft") : Sql.pick(cols, "MablaghPardakht", "Pardakht");
         String visCol = sales ? Sql.pick(cols, "vis_rdf", "VisitorID") : null;
         String[] extra = {"tafif", "tax", "avarez", "barbari", "sumlineall", "tasvieh", "t_date", "done_date",
-                "description", "Status", "TaeedUser", "TaeedDate", "tdf", "moname", "shpish", "time_"};
+                "description", "Status", "TaeedUser", "TaeedDate", "tdf", "moname", "shpish", "time_", "Hour"};
         StringBuilder sb = new StringBuilder("SELECT TOP (1) ");
-        sb.append(Sql.txt("h", numberCol, 80)).append(" AS no, ").append(Sql.date10("h", dateCol)).append(" AS date, ");
+        sb.append(Sql.txt("h", numberCol, 80)).append(" AS no, ").append(Sql.dateTimeDisplay("h", dateCol, timeCol)).append(" AS date, ");
         sb.append(partyCol == null ? "CAST(NULL AS nvarchar(100))" : Sql.txt("h", partyCol, 100)).append(" AS code, ");
         sb.append(custNameExpr(m, "h", partyCol, "cu")).append(" AS customer, ");
         sb.append(sales ? (visCol == null ? "N'بدون ویزیتور'" : visNameExpr(m, "h", visCol, "v")) : "N'—'").append(" AS visitor, ");
@@ -719,7 +722,7 @@ public final class Queries {
             sb.append(", ");
             if (c == null) sb.append("CAST(NULL AS nvarchar(400))");
             else if (e.equals("description") || e.equals("TaeedUser") || e.equals("TaeedDate") || e.equals("moname")
-                    || e.equals("shpish") || e.equals("time_") || e.equals("tasvieh")) sb.append(Sql.txt("h", c, 400));
+                    || e.equals("shpish") || e.equals("time_") || e.equals("Hour") || e.equals("tasvieh")) sb.append(Sql.txt("h", c, 400));
             else if (e.equals("t_date") || e.equals("done_date")) sb.append(Sql.date10("h", c));
             else if (e.equals("Status")) sb.append("TRY_CONVERT(int,h.[").append(c).append("])");
             else sb.append(Sql.num("h", c));

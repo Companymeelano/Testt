@@ -171,7 +171,7 @@ public final class TableShot {
             if (Math.abs(v - Math.round(v)) < 0.001) return HomeNumberFormatter.rounded(v);
             return HomeNumberFormatter.decimal(v);
         }
-        if (col.type == ReportCatalog.T_DATE) return Jalali.dispTableFa(r.s(col.key));
+        if (col.type == ReportCatalog.T_DATE) return HomeNumberFormatter.dateTimeTable(r.s(col.key));
         String t = r.s(col.key, "—");
         if ("—".equals(t)) return t;
         return Jalali.disp(t).isEmpty() ? HomeNumberFormatter.localizeText(t)

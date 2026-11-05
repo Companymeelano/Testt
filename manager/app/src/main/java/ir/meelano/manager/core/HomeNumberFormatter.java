@@ -2,7 +2,9 @@ package ir.meelano.manager.core;
 
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
+import java.text.SimpleDateFormat;
 import java.math.BigDecimal;
+import java.util.Date;
 import java.util.Locale;
 
 /** Shared Persian number, date, time, and RTL text formatter for app display surfaces. */
@@ -507,6 +509,21 @@ public final class HomeNumberFormatter {
         String hh = hour < 10 ? "0" + hour : String.valueOf(hour);
         String mm = minute < 10 ? "0" + minute : String.valueOf(minute);
         return time(hh + ":" + mm);
+    }
+
+    /** Format a Unix timestamp as a local, Persian-digit clock without exposing format policy to screens. */
+    public static String time(long epochMillis) {
+        if (epochMillis <= 0) return "";
+        String value = new SimpleDateFormat("HH:mm", Locale.US).format(new Date(epochMillis));
+        return time(value);
+    }
+
+    /** Format a Unix timestamp as a local Jalali date and clock. */
+    public static String dateTime(long epochMillis) {
+        if (epochMillis <= 0) return "";
+        String value = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+                .format(new Date(epochMillis));
+        return dateTime(value);
     }
 
     /** Localize an already formatted clock token while keeping its colon and order stable. */

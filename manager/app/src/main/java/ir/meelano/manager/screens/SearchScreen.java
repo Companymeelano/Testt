@@ -7,6 +7,7 @@ import ir.meelano.manager.core.CacheStore;
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.core.AtiranSchema;
 import ir.meelano.manager.core.Filter;
+import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.Money;
@@ -197,7 +198,7 @@ public class SearchScreen extends Screen {
                 boolean settled = Math.abs(r.d("remain")) <= AtiranSchema.SETTLE_TOLERANCE
                         || "t".equalsIgnoreCase(r.s("tasvieh").trim());
                 View v = a.kit.invoiceRow("فاکتور " + Money.fa(no), r.s("customer"),
-                        Jalali.dispFa(r.s("date")), Money.compactRial(r.d("total")),
+                        HomeNumberFormatter.dateTime(r.s("date")), Money.compactRial(r.d("total")),
                         settled ? "settled" : "unsettled", v2 -> gotoFiltered("sales", no));
                 LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
                 p.setMargins(0, 0, 0, Theme.dp(10));

@@ -100,6 +100,7 @@ public final class FinanceReports {
      */
     public static Queries.Q overpaidVouchers(Meta m, Filter f, int top) throws Queries.Missing {
         String dateCol = m.must("dar", "تاریخ", "date", "DATE");
+        String clockCol = m.col("dar", "ClockTime", "clocktime", "clock_time");
         String gh = m.must("dar", "شماره قبض", "ghno", "GHNO");
         String p = m.must("dar", "نوع", "p");
         String mab = m.must("dar", "مبلغ", "mab", "Mab", "MAB");
@@ -119,7 +120,7 @@ public final class FinanceReports {
         return new Queries.Q("SELECT TOP (" + Queries.clampTop(top) + ") " + Sql.txt("h", gh, 60) + " AS no"
                 + ", CASE WHEN TRY_CONVERT(int,h.[" + p + "])=0 THEN N'دریافت' ELSE N'پرداخت' END AS kind"
                 + ", " + party + " AS party"
-                + ", " + Sql.date10("h", dateCol) + " AS date"
+                + ", " + Sql.dateTimeDisplay("h", dateCol, clockCol) + " AS date"
                 + ", " + Sql.num("h", mab) + " AS total"
                 + ", " + paid + " AS paid"
                 + ", " + paid + "-" + Sql.num("h", mab) + " AS excess"
@@ -227,6 +228,7 @@ public final class FinanceReports {
     /** Journal documents whose debit and credit do not match: sanad,date,rows,debit,credit,diff. */
     public static Queries.Q unbalancedJournals(Meta m, Filter f, int top) throws Queries.Missing {
         String dateCol = m.must("act_zirsarfasls", "تاریخ", "date");
+        String timeCol = m.col("act_zirsarfasls", "TimeServer", "time");
         String sanad = m.must("act_zirsarfasls", "شماره سند", "sanadno");
         String bed = m.must("act_zirsarfasls", "بدهکار", "bed");
         String bes = m.must("act_zirsarfasls", "بستانکار", "bes");
@@ -236,7 +238,7 @@ public final class FinanceReports {
         String dSum = "ISNULL(SUM(" + Sql.num("a", bed) + "),0)";
         String cSum = "ISNULL(SUM(" + Sql.num("a", bes) + "),0)";
         return new Queries.Q("SELECT TOP (" + Queries.clampTop(top) + ") " + Sql.txt("a", sanad, 40) + " AS sanad"
-                + ", MIN(" + Sql.date10("a", dateCol) + ") AS date"
+                + ", MIN(" + Sql.dateTimeDisplay("a", dateCol, timeCol) + ") AS date"
                 + ", COUNT_BIG(1) AS rows"
                 + ", " + dSum + " AS debit, " + cSum + " AS credit"
                 + ", " + dSum + "-" + cSum + " AS diff"
@@ -248,6 +250,7 @@ public final class FinanceReports {
     /** Largest journal documents by debit: sanad,date,rows,debit,credit. */
     public static Queries.Q biggestJournals(Meta m, Filter f, int top) throws Queries.Missing {
         String dateCol = m.must("act_zirsarfasls", "تاریخ", "date");
+        String timeCol = m.col("act_zirsarfasls", "TimeServer", "time");
         String sanad = m.must("act_zirsarfasls", "شماره سند", "sanadno");
         String bed = m.must("act_zirsarfasls", "بدهکار", "bed");
         String bes = m.must("act_zirsarfasls", "بستانکار", "bes");
@@ -255,7 +258,7 @@ public final class FinanceReports {
         List<Object> binds = actDateBinds(m, f, conds, dateCol);
         String where = conds.isEmpty() ? "" : " WHERE " + Sql.join(conds, " AND ");
         return new Queries.Q("SELECT TOP (" + Queries.clampTop(top) + ") " + Sql.txt("a", sanad, 40) + " AS sanad"
-                + ", MIN(" + Sql.date10("a", dateCol) + ") AS date"
+                + ", MIN(" + Sql.dateTimeDisplay("a", dateCol, timeCol) + ") AS date"
                 + ", COUNT_BIG(1) AS rows"
                 + ", ISNULL(SUM(" + Sql.num("a", bed) + "),0) AS debit"
                 + ", ISNULL(SUM(" + Sql.num("a", bes) + "),0) AS credit"

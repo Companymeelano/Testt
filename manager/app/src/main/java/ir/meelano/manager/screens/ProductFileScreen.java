@@ -240,7 +240,7 @@ public class ProductFileScreen extends Screen {
             String opLabel = r.s("opLabel").isEmpty() ? AtiranSchema.actNameFallback(r.s("act")) : r.s("opLabel");
             String mid = (r.s("doc").isEmpty() ? "بدون شماره سند" : "سند " + Money.fa(r.s("doc")))
                     + (r.s("warehouse").isEmpty() ? "" : "  •  انبار " + Money.fa(r.s("warehouse")));
-            View row = a.kit.docRow(opLabel, mid, Jalali.dispFa(r.s("date")),
+            View row = a.kit.docRow(opLabel, mid, HomeNumberFormatter.dateTime(r.s("date")),
                     Money.signedQty(outFlag ? -Math.abs(r.d("qty")) : Math.abs(r.d("qty"))),
                     outFlag ? "خروج" : "ورود", outFlag ? Theme.DANGER : Theme.SUCCESS,
                     v -> openMovement(r));
@@ -323,7 +323,7 @@ public class ProductFileScreen extends Screen {
         head.addView(a.kit.space(8));
         head.addView(a.kit.text(opLabel, 15f, Theme.TEXT, true), a.kit.wlp(1f));
         body.addView(head, a.kit.lp(-1, -2));
-        body.addView(a.kit.text(Jalali.dispFa(r.s("date")), 11.5f, Theme.MUTED, false), a.kit.lp(-1, -2));
+        body.addView(a.kit.text(HomeNumberFormatter.dateTime(r.s("date")), 11.5f, Theme.MUTED, false), a.kit.lp(-1, -2));
         body.addView(a.kit.gap(6));
 
         // facts — quantity first, then price and the line value it adds up to

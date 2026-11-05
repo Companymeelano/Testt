@@ -54,7 +54,23 @@ public final class Sql {
      */
     public static String dateTimeDisplay(String alias, String col) {
         if (col == null || col.trim().isEmpty()) return "CAST(NULL AS nvarchar(30))";
-        return "LEFT(TRY_CONVERT(nvarchar(30)," + ref(alias, col) + ",121),19)";
+        return "LEFT(LTRIM(RTRIM(TRY_CONVERT(nvarchar(30)," + ref(alias, col) + ",121))),19)";
+    }
+
+    /** Display a stored date plus a separate time/timestamp column without changing either source field. */
+    public static String dateTimeDisplay(String alias, String dateCol, String timeCol) {
+        String date = dateTimeDisplay(alias, dateCol);
+        if (timeCol == null || timeCol.trim().isEmpty()) return date;
+        String cleanDate = "NULLIF(LTRIM(RTRIM(" + date + ")),N'')";
+        String rawClock = "LTRIM(RTRIM(TRY_CONVERT(nvarchar(30)," + ref(alias, timeCol) + ",121)))";
+        String clockSeparator = "CASE WHEN CHARINDEX(N' '," + rawClock + ")>0 THEN CHARINDEX(N' '," + rawClock + ")"
+                + " WHEN CHARINDEX(N'T'," + rawClock + ")>0 THEN CHARINDEX(N'T'," + rawClock + ") ELSE 0 END";
+        String clock = "NULLIF(LTRIM(RTRIM(CASE WHEN " + clockSeparator + ">0 THEN SUBSTRING(" + rawClock
+                + "," + clockSeparator + "+1,12) ELSE " + rawClock + " END)),N'')";
+        return "CASE WHEN " + cleanDate + " IS NULL THEN CAST(NULL AS nvarchar(30))"
+                + " WHEN CHARINDEX(N':'," + cleanDate + ")>0 THEN " + cleanDate
+                + " WHEN " + clock + " IS NULL THEN " + cleanDate
+                + " ELSE LEFT(" + cleanDate + "+N' '+" + clock + ",19) END";
     }
 
     /** «YYYY/MM» of a date column. */

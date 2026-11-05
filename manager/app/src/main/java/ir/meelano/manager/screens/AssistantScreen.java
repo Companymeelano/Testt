@@ -43,11 +43,8 @@ import ir.meelano.manager.data.Row;
 import ir.meelano.manager.ui.Card3D;
 import ir.meelano.manager.ui.Theme;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
-import java.util.Locale;
 
 /**
  * «دستیار میلانو»: a Persian manager chat over the live store data.
@@ -304,8 +301,7 @@ public final class AssistantScreen extends Screen {
         StringBuilder b = new StringBuilder("منبع: ابزار داخلیِ فقط‌خواندنی و snapshot آتیران؛ این پاسخ به گزارش کامل پایگاه‌داده تعمیم داده نمی‌شود.\n");
         if (snap != null && snap.loadedAt > 0) {
             long minutes = Math.max(0, (System.currentTimeMillis() - snap.loadedAt) / 60_000L);
-            String time = HomeNumberFormatter.time(
-                    new SimpleDateFormat("HH:mm", Locale.US).format(new Date(snap.loadedAt)));
+            String time = HomeNumberFormatter.time(snap.loadedAt);
             b.append("تاریخ داده: ").append(Jalali.dispFa(snap.day)).append("؛ آخرین خواندن: ").append(time)
                     .append("؛ سن snapshot: ").append(HomeNumberFormatter.integer(minutes))
                     .append(" دقیقه.\n");
@@ -656,8 +652,7 @@ public final class AssistantScreen extends Screen {
         } else if (!hasData) {
             status = lastError != null ? "اتصال برقرار نشد؛ پایین صفحه را بزنید" : "در حال اتصال به پایگاه‌داده…";
         } else {
-            String time = HomeNumberFormatter.time(
-                    new SimpleDateFormat("HH:mm", Locale.US).format(new Date(snap.loadedAt)));
+            String time = HomeNumberFormatter.time(snap.loadedAt);
             status = HomeNumberFormatter.rtlText("داده‌های زنده • آخرین خواندن ساعت " + time
                     + (lastError != null ? " • اتصال موقتاً قطع است" : " • نوسازی هر دقیقه"));
         }

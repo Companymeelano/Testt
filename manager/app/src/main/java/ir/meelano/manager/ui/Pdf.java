@@ -180,7 +180,7 @@ public final class Pdf {
             return HomeNumberFormatter.decimal(v);
         }
         if (col.type == ReportCatalog.T_DATE) {
-            return Jalali.dispTableFa(r.s(col.key));
+            return HomeNumberFormatter.dateTimeTable(r.s(col.key));
         }
         String t = r.s(col.key, "—");
         if ("—".equals(t)) return t;

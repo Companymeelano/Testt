@@ -1362,7 +1362,7 @@ public final class Kit {
             return HomeNumberFormatter.decimal(v);
         }
         if (col.type == ReportCatalog.T_DATE) {
-            return Jalali.dispTableFa(r.s(col.key));
+            return HomeNumberFormatter.dateTimeTable(r.s(col.key));
         }
         String t = r.s(col.key, "—");
         // Keep date/time cells compact; arbitrary text still receives number localization.

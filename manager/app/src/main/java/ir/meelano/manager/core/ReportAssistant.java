@@ -8,11 +8,9 @@ import ir.meelano.manager.data.Row;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.DecimalFormat;
-import java.text.SimpleDateFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
@@ -181,9 +179,9 @@ public final class ReportAssistant {
         List<Row> safeRows = rows == null ? new ArrayList<Row>() : rows;
         Filter range = filter(plan);
         StringBuilder b = new StringBuilder();
-        String readAt = new SimpleDateFormat("HH:mm", Locale.US).format(new Date());
+        String readAt = HomeNumberFormatter.time(System.currentTimeMillis());
         b.append("منبع: گزارش فقط‌خواندنی «").append(plan.report.title).append("» از پایگاه‌داده آتیران.\n")
-                .append("زمان خواندن گزارش: ").append(Jalali.todayStr()).append(" ساعت ").append(Money.fa(readAt)).append(".\n")
+                .append("زمان خواندن گزارش: ").append(Jalali.todayStr()).append(" ساعت ").append(readAt).append(".\n")
                 .append("بازهٔ انتخاب‌شده: ").append(plan.report.needsRange ? range.rangeFa() : "طبق تعریف گزارش")
                 .append("؛ واحد مبلغ: ").append(Money.unitName()).append(".\n");
         if (rows == null) {

@@ -177,13 +177,8 @@ public class ShomarshScreen extends Screen {
         session.addView(a.kit.hint("تاریخ انتخاب‌شده برای همهٔ اقلام این نشست استفاده می‌شود."), a.kit.lp(-1, -2));
         if (restoredLocalDraft && lines.length() > 0) {
             String recovered = "نشست ناتمام از حافظهٔ خصوصی همین گوشی بازیابی شد؛ تغییرات جدید هم خودکار ذخیره می‌شوند.";
-            if (restoredAt > 0) {
-                try {
-                    String time = new java.text.SimpleDateFormat("HH:mm", java.util.Locale.US)
-                            .format(new java.util.Date(restoredAt));
-                    recovered += " آخرین ذخیره: " + HomeNumberFormatter.time(time) + ".";
-                } catch (Exception ignored) { Diag.ignored("ShomarshScreen:182", ignored); }
-            }
+            if (restoredAt > 0)
+                recovered += " آخرین ذخیره: " + HomeNumberFormatter.time(restoredAt) + ".";
             session.addView(a.kit.hint(recovered), a.kit.lp(-1, -2));
         } else {
             session.addView(a.kit.hint("اقلام و تعدادهای واردشده تا زمان ثبت گزارش، روی همین گوشی نگه‌داری می‌شوند."),

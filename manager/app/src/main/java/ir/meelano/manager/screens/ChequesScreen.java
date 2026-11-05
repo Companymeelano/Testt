@@ -9,6 +9,7 @@ import android.widget.ScrollView;
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.core.AtiranSchema;
 import ir.meelano.manager.core.Filter;
+import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.MoneyQueries;
@@ -293,10 +294,10 @@ public class ChequesScreen extends Screen {
         } else {
             for (Row r : d.list) {
                 final Row row = r;
-                String eventDate = Jalali.disp(row.s("getdate"));
-                String dueDate = Jalali.disp(row.s("sardate"));
-                if (!eventDate.isEmpty()) eventDate = Jalali.dispFa(eventDate);
-                if (!dueDate.isEmpty()) dueDate = Jalali.dispFa(dueDate);
+                String eventDate = row.s("getdate").isEmpty() ? ""
+                        : HomeNumberFormatter.dateTime(row.s("getdate"));
+                String dueDate = Jalali.dispFa(row.s("sardate"));
+                if ("—".equals(dueDate)) dueDate = "";
                 String eventLabel = myIn ? "دریافت " : "صدور ";
                 String eventText = eventDate.isEmpty() ? "" : eventLabel + eventDate;
                 String dueText = dueDate.isEmpty() ? "" : "سررسید " + dueDate;
@@ -514,9 +515,10 @@ public class ChequesScreen extends Screen {
         body.addView(a.kit.kv("روز", Jalali.dispFa(key) + " • " + Jalali.weekday(key), Theme.TEXT), a.kit.lp(-1, -2));
         body.addView(a.kit.kv("جمع", Money.rial(tot), Theme.GOLD_SOFT), a.kit.lp(-1, -2));
         for (final Row r : rows) {
-            String eventDate = Jalali.disp(r.s("getdate"));
+            String eventDate = r.s("getdate").isEmpty() ? ""
+                    : HomeNumberFormatter.dateTime(r.s("getdate"));
             String dates = "سررسید " + Jalali.dispFa(r.s("sardate"));
-            if (!eventDate.isEmpty()) dates += "\n" + (inc ? "دریافت " : "صدور ") + Jalali.dispFa(eventDate);
+            if (!eventDate.isEmpty()) dates += "\n" + (inc ? "دریافت " : "صدور ") + eventDate;
             View v = chequeCard(r, inc, dates, rowLabel(inc, r));
             LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
             p.setMargins(0, 0, 0, Theme.dp(8));
@@ -549,8 +551,9 @@ public class ChequesScreen extends Screen {
         if (!r.s("branch").isEmpty()) body.addView(a.kit.kv(inc ? "شعبه" : "گیرنده", r.s("branch"), Theme.TEXT), a.kit.lp(-1, -2));
         body.addView(a.kit.kv("وضعیت", rowLabel(inc, r), Theme.TEXT), a.kit.lp(-1, -2));
         if (!r.s("sayad").isEmpty()) body.addView(a.kit.kv("شناسه صیادی", Money.fa(r.s("sayad")), Theme.TEXT), a.kit.lp(-1, -2));
-        if (!Jalali.disp(r.s("getdate")).isEmpty())
-            body.addView(a.kit.kv(incoming ? "تاریخ دریافت" : "تاریخ صدور", Jalali.dispFa(r.s("getdate")), Theme.TEXT), a.kit.lp(-1, -2));
+        if (!r.s("getdate").isEmpty())
+            body.addView(a.kit.kv(incoming ? "تاریخ دریافت" : "تاریخ صدور",
+                    HomeNumberFormatter.dateTime(r.s("getdate")), Theme.TEXT), a.kit.lp(-1, -2));
         if (!r.s("descrip").isEmpty()) body.addView(a.kit.kv("شرح", r.s("descrip"), Theme.MUTED), a.kit.lp(-1, -2));
         body.addView(a.kit.text("مبلغ به حروف: " + Money.words(r.d("amount")), 11f, Theme.MUTED, false), a.kit.lp(-1, -2));
 

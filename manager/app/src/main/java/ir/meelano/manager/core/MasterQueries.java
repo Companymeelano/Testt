@@ -532,6 +532,7 @@ public final class MasterQueries {
         if (!m.table("cust_act")) throw new Queries.Missing("«گردش حساب مشتری» در دیتابیس پیدا نشد");
         String shmo = m.must("cust_act", "کد مشتری", "shmo");
         String date = m.must("cust_act", "تاریخ", "date", "DATE");
+        String time = m.col("cust_act", "t_time", "TimeServer", "time");
         String bed = m.must("cust_act", "بدهکار", "act_bed", "bed");
         String bes = m.must("cust_act", "بستانکار", "act_bes", "bes");
         String op = m.col("cust_act", "act_id", "ActID");
@@ -544,7 +545,7 @@ public final class MasterQueries {
         conds.add("TRY_CONVERT(nvarchar(100),h.[" + shmo + "])=?");
         String dc = Sql.dateCond(Sql.date10("h", date), f.from, f.to, binds);
         if (!dc.isEmpty()) conds.add(dc);
-        return new Queries.Q("SELECT " + Sql.date10("h", date) + " AS date"
+        return new Queries.Q("SELECT " + Sql.dateTimeDisplay("h", date, time) + " AS date"
                 + ", " + (op == null ? "N''" : "COALESCE(" + Sql.txt("h", op, 40) + ",N'')") + " AS op"
                 + ", " + Queries.actLabelExpr(m, "h", op, "an") + " AS opLabel"
                 + ", " + Sql.num("h", bed) + " AS bed, " + Sql.num("h", bes) + " AS bes"
@@ -562,6 +563,7 @@ public final class MasterQueries {
         String ghno = m.must("dar", "شماره قبض", "ghno", "GHNO");
         String shmo = m.must("dar", "کد مشتری", "shmo", "SHMO");
         String date = m.must("dar", "تاریخ", "date", "DATE");
+        String clock = m.col("dar", "ClockTime", "clocktime", "clock_time");
         String cash = m.col("dar", "naghd", "cash");
         // POS/transfer amounts are not dar columns (they live in PosDetails); no dar equivalent for them.
         String pos = null;
@@ -577,7 +579,7 @@ public final class MasterQueries {
         String dc = Sql.dateCond(Sql.date10("h", date), f.from, f.to, binds);
         if (!dc.isEmpty()) conds.add(dc);
         return new Queries.Q("SELECT " + Sql.txt("h", ghno, 60) + " AS ghno"
-                + ", " + Sql.date10("h", date) + " AS date"
+                + ", " + Sql.dateTimeDisplay("h", date, clock) + " AS date"
                 + ", (" + Sql.num("h", cash) + "+" + Sql.num("h", pos) + "+" + Sql.num("h", hav) + "+" + Sql.num("h", chq) + ") AS total"
                 + ", " + (desc == null ? "N''" : "COALESCE(" + Sql.txt("h", desc, 500) + ",N'')") + " AS descrip"
                 + " FROM dbo.dar h WHERE " + Sql.join(conds, " AND ")
@@ -614,7 +616,7 @@ public final class MasterQueries {
         String where = conds.isEmpty() ? "" : " WHERE " + Sql.join(conds, " AND ");
         return new Queries.Q("SELECT " + Sql.txt("c", shmo, 100) + " AS code"
                 + ", " + (name == null ? Sql.txt("c", shmo, 120) : "COALESCE(" + Sql.txt("c", name, 250) + "," + Sql.txt("c", shmo, 120) + ")") + " AS name"
-                + ", " + Sql.date10("c", date) + " AS date"
+                + ", " + Sql.dateTimeDisplay("c", date) + " AS date"
                 + ", " + (vis == null ? "N''" : Queries.visNameExpr(m, "c", vis)) + " AS visitor"
                 + " FROM dbo.CUSTOMERS c" + (vis == null ? "" : Queries.visJoin(m, "c", vis))
                 + where + " ORDER BY c.[" + date + "] DESC" + Queries.pageClause(binds, f.page, f.top), binds);
@@ -1411,6 +1413,7 @@ public final class MasterQueries {
         // Schema: TableChanges(DateServer, TimeServer, UserID, KindID, DescriptionOfChanges, Comment)
         // and TableChangesKinds(KindID, KindName) via FK_TableChanges_TableChangesKinds.
         String date = m.col("TableChanges", "DateServer");
+        String time = m.col("TableChanges", "TimeServer");
         String kind = m.col("TableChanges", "KindID");
         String kindName = m.col("TableChangesKinds", "KindName");
         String user = m.col("TableChanges", "UserID");
@@ -1431,7 +1434,7 @@ public final class MasterQueries {
         String where = conds.isEmpty() ? "" : " WHERE " + Sql.join(conds, " AND ");
         String order = date == null ? "1" : "t.[" + date + "] DESC";
         String join = joinKind ? " LEFT JOIN dbo.TableChangesKinds k ON TRY_CONVERT(nvarchar(60),k.[KindID])=TRY_CONVERT(nvarchar(60),t.[" + kind + "])" : "";
-        return new Queries.Q("SELECT " + (date == null ? "CAST(NULL AS nvarchar(16))" : "LEFT(TRY_CONVERT(nvarchar(30),t.[" + date + "]),16)") + " AS at"
+        return new Queries.Q("SELECT " + Sql.dateTimeDisplay("t", date, time) + " AS at"
                 + ", " + (joinKind ? "COALESCE(" + Sql.txt("k", kindName, 150) + ",N'')" : "N''") + " AS tableName"
                 + ", " + (user == null ? "N''" : "COALESCE(" + Sql.txt("t", user, 120) + ",N'')") + " AS username"
                 + ", " + (desc == null ? "N''" : "COALESCE(" + Sql.txt("t", desc, 400) + ",N'')") + " AS descrip"
@@ -1448,6 +1451,7 @@ public final class MasterQueries {
         String table = sales ? "sailfact" : "buyfact";
         Set<String> cols = m.columns(table);
         String dateCol = sales ? m.must(table, "تاریخ", "date") : m.must(table, "تاریخ", "DATE", "date");
+        String timeCol = sales ? Sql.pick(cols, "time_") : Sql.pick(cols, "Hour", "hour");
         String amountCol = m.must(table, "مبلغ", "all");
         String numberCol = sales ? m.must(table, "شماره فاکتور", "shfacfo") : m.must(table, "شماره فاکتور", "shfackh", "shfac");
         String partyCol = m.must(table, "طرف‌حساب", "shmo", "SHMO");
@@ -1465,7 +1469,7 @@ public final class MasterQueries {
         String total = Sql.num("h", amountCol);
         String paid = Sql.num("h", paidCol);
         return new Queries.Q("SELECT " + Sql.txt("h", numberCol, 80) + " AS no"
-                + ", " + Sql.date10("h", dateCol) + " AS date"
+                + ", " + Sql.dateTimeDisplay("h", dateCol, timeCol) + " AS date"
                 + ", " + total + " AS total, " + paid + " AS paid, ((" + total + ")-(" + paid + ")) AS remain"
                 + ", " + (tasviehCol == null ? "N''" : "COALESCE(" + Sql.txt("h", tasviehCol, 10) + ",N'')") + " AS tasvieh"
                 + ", " + (dueCol == null ? "CAST(NULL AS nvarchar(10))" : Sql.date10("h", dueCol)) + " AS dueDate"
@@ -1805,6 +1809,7 @@ public final class MasterQueries {
     public static Queries.Q invoiceProfit(Meta m, Filter f) throws Queries.Missing {
         Set<String> cols = m.columns("sailfact");
         String dateCol = m.must("sailfact", "تاریخ", "date");
+        String timeCol = m.col("sailfact", "time_", "TimeServer", "time");
         String amountCol = m.must("sailfact", "مبلغ", "all_fel", "all");
         String numberCol = m.must("sailfact", "شماره فاکتور", "shfacfo");
         String partyCol = Sql.pick(cols, "shmo", "SHMO");
@@ -1839,7 +1844,7 @@ public final class MasterQueries {
         String where = conds.isEmpty() ? "" : " WHERE " + Sql.join(conds, " AND ");
         return new Queries.Q("SELECT TOP (" + Queries.clampTop(f.top) + ") " + no + " AS no"
                 + ", " + Queries.custNameExpr(m, "h", partyCol, "cu") + " AS customer"
-                + ", " + Sql.date10("h", dateCol) + " AS date, " + amt + " AS amount"
+                + ", " + Sql.dateTimeDisplay("h", dateCol, timeCol) + " AS date, " + amt + " AS amount"
                 + ", " + disc + " AS discount, " + cogs + " AS cogs"
                 + ", " + profit + " AS profit, " + margin + " AS margin"
                 + " FROM " + Sql.dedupe("sailfact", numberCol, "h", inner)
@@ -2037,6 +2042,7 @@ public final class MasterQueries {
     private static Queries.Q whDeliveries(Meta m, String day, int limit) throws Queries.Missing {
         String no = m.must("sailfact", "شماره فاکتور", "shfacfo", "shFacFo");
         String dt = m.must("sailfact", "تاریخ فاکتور", "date");
+        String time = m.col("sailfact", "time_", "time");
         String shmo = m.col("sailfact", "shmo", "SHMO");
         String vis = m.col("sailfact", "vis_rdf", "visrdf");
         String all = m.col("sailfact", "all_fel", "all", "All", "sumall");
@@ -2093,7 +2099,7 @@ public final class MasterQueries {
                 + Sql.activeAnd(cols, "f") + Sql.softAnd(cols, "f");
         return new Queries.Q("SELECT TOP " + Math.max(1, Math.min(500, limit))
                 + " TRY_CONVERT(bigint,f.[" + no + "]) AS id, "
-                + Sql.dateTimeDisplay("f", dt) + " AS dt, " + custExpr + " AS cust, " + phoneExpr + " AS phone, "
+                + Sql.dateTimeDisplay("f", dt, time) + " AS dt, " + custExpr + " AS cust, " + phoneExpr + " AS phone, "
                 + visExpr + " AS visitor, " + routeIdExpr + " AS routeId, " + routeNameExpr + " AS route, "
                 + (all == null ? "0" : "TRY_CONVERT(money,f.[" + all + "])") + " AS amount, "
                 + (tas == null ? "N''" : "COALESCE(" + Sql.txt("f", tas, 10) + ",N'')") + " AS settled"
@@ -2562,7 +2568,8 @@ public final class MasterQueries {
         String where = " WHERE " + (conds.isEmpty() ? "1=1" : Sql.join(conds, " AND "))
                 + Sql.activeAnd(m.columns("back_sanad"), "h");
         String no = r.no == null ? "CAST(NULL AS nvarchar(80))" : Sql.txt("h", r.no, 80);
-        String dt = r.date == null ? "CAST(NULL AS nvarchar(20))" : Sql.date10("h", r.date);
+        String time = m.col("back_sanad", "Hour", "hour");
+        String dt = r.date == null ? "CAST(NULL AS nvarchar(30))" : Sql.dateTimeDisplay("h", r.date, time);
         String cu = r.customer == null ? "CAST(NULL AS nvarchar(150))" : Sql.txt("h", r.customer, 150);
         String dz = r.desc == null ? "CAST(NULL AS nvarchar(300))" : Sql.txt("h", r.desc, 300);
         String amount = Sql.numNull("h", r.amount);

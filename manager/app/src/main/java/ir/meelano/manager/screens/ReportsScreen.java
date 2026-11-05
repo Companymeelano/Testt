@@ -813,7 +813,7 @@ java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
         body.setPadding(Theme.dp(14), Theme.dp(12), Theme.dp(14), Theme.dp(12));
         body.addView(a.kit.kv("شماره سند", Money.fa(no), Theme.TEXT), a.kit.lp(-1, -2));
         if (invoice != null && !invoice.s("date").isEmpty())
-            body.addView(a.kit.kv("تاریخ", Jalali.dispFa(invoice.s("date")), Theme.TEXT), a.kit.lp(-1, -2));
+            body.addView(a.kit.kv("تاریخ", HomeNumberFormatter.dateTime(invoice.s("date")), Theme.TEXT), a.kit.lp(-1, -2));
         if (invoice != null && !invoice.s("kind").isEmpty())
             body.addView(a.kit.kv("نوع برگشت", invoice.s("kind"), Theme.TEXT), a.kit.lp(-1, -2));
         if (invoice != null && !invoice.s("customer").isEmpty())

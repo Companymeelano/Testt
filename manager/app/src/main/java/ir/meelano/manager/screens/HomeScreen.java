@@ -2543,9 +2543,9 @@ public class HomeScreen extends Screen {
             String currentFrom = Jalali.addDays(today, -29);
             String previousFrom = Jalali.addDays(today, -59);
             String previousTo = Jalali.addDays(today, -30);
-            String subtitle = "بازهٔ جاری (۳۰ روز): " + Jalali.dispFa(currentFrom)
-                    + " تا " + Jalali.dispFa(today) + "\nبازهٔ قبل (۳۰ روز): "
-                    + Jalali.dispFa(previousFrom) + " تا " + Jalali.dispFa(previousTo);
+            String subtitle = "بازهٔ جاری: " + Jalali.dispFa(currentFrom)
+                    + " تا " + Jalali.dispFa(today) + " (۳۰ روز)\nبازهٔ قبل: "
+                    + Jalali.dispFa(previousFrom) + " تا " + Jalali.dispFa(previousTo) + " (۳۰ روز)";
             addKpiSection(content, "home-returns-kpis", "اسناد برگشتی فروش · ۳۰ روز",
                     subtitle, R.drawable.mi_assignment_return, Theme.SECTION_RETURNS, returnTiles);
         }
@@ -5358,9 +5358,7 @@ public class HomeScreen extends Screen {
             if (!source.isEmpty()) detail += "\nمنبع: " + source;
             long updated = a.settings.homeBankStatementUpdatedAt(day, id);
             if (updated > 0) {
-                String time = new java.text.SimpleDateFormat("HH:mm", Locale.getDefault())
-                        .format(new java.util.Date(updated));
-                detail += " • به‌روزرسانی محلی " + HomeNumberFormatter.time(time);
+                detail += " • به‌روزرسانی محلی " + HomeNumberFormatter.time(updated);
             }
         } else if (statementProvided) {
             detail += "\nمبلغ صورت‌حساب ناقص یا نامعتبر است؛ صفر فرض نشده، برای اصلاح لمس کنید.";
@@ -6065,9 +6063,7 @@ public class HomeScreen extends Screen {
     }
 
     private String bankImportTimestamp(long timestamp) {
-        String value = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
-                .format(new java.util.Date(timestamp));
-        return HomeNumberFormatter.dateTime(value);
+        return HomeNumberFormatter.dateTime(timestamp);
     }
 
     private void discardBankImportDraft(BankImportDraft draft) {
@@ -6132,7 +6128,7 @@ public class HomeScreen extends Screen {
         BigDecimal excess = item.bd("excess");
         String meta = (item.s("party").isEmpty() ? "طرف‌حساب نامشخص" : "طرف‌حساب: " + item.s("party"))
                 + " • تاریخ: " + (Jalali.disp(item.s("date")).isEmpty()
-                    ? "نامشخص" : Jalali.dispFa(item.s("date")));
+                    ? "نامشخص" : HomeNumberFormatter.dateTime(item.s("date")));
         if (total == null || paid == null || excess == null || total.signum() < 0
                 || paid.signum() < 0 || excess.signum() < 0
                 || paid.subtract(total).compareTo(excess) != 0) {
@@ -6158,7 +6154,7 @@ public class HomeScreen extends Screen {
         Long rows = item.exactLong("rows");
         String rawDate = item.s("date");
         String normalizedDate = Jalali.disp(rawDate);
-        String meta = "تاریخ ثبت: " + (normalizedDate.isEmpty() ? "نامشخص" : Jalali.dispFa(rawDate))
+        String meta = "تاریخ ثبت: " + (normalizedDate.isEmpty() ? "نامشخص" : HomeNumberFormatter.dateTime(rawDate))
                 + " • ردیف‌های سند: " + (rows == null || rows < 0
                     ? "نامشخص" : HomeNumberFormatter.integer(rows));
         if (debit == null || credit == null || diff == null || rows == null || rows < 1

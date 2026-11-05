@@ -249,10 +249,10 @@ public class CloseoutScreen extends Screen {
                 if (status.isEmpty()) status = incoming
                         ? AtiranSchema.chequeInStatusFa(r.s("st"), r.s("back"))
                         : AtiranSchema.chequeOutStatusFa(r.s("st"));
-                String eventDate = Jalali.disp(r.s("getdate"));
-                String dueDate = Jalali.disp(r.s("sardate"));
-                if (!eventDate.isEmpty()) eventDate = HomeNumberFormatter.dateText(eventDate);
-                if (!dueDate.isEmpty()) dueDate = HomeNumberFormatter.dateText(dueDate);
+                String eventDate = r.s("getdate").isEmpty() ? ""
+                        : HomeNumberFormatter.dateTime(r.s("getdate"));
+                String dueDate = Jalali.dispFa(r.s("sardate"));
+                if ("—".equals(dueDate)) dueDate = "";
                 String extra = Money.compactRial(r.d("amount"));
                 if (!eventDate.isEmpty()) extra += " • " + (incoming ? "دریافت " : "صدور ") + eventDate;
                 if (!dueDate.isEmpty()) extra += " • سررسید " + dueDate;
@@ -319,8 +319,7 @@ public class CloseoutScreen extends Screen {
             long ts = d.closed.optLong("closedAt", 0);
             card.addView(a.kit.text("روز ثبت شده است", 14f, Theme.SUCCESS, true), a.kit.lp(-1, -2));
             card.addView(a.kit.kv("ثبت‌کننده", d.closed.optString("username", "—"), Theme.TEXT), a.kit.lp(-1, -2));
-            card.addView(a.kit.kv("زمان ثبت", ts > 0 ? "ساعت " + HomeNumberFormatter.time(
-                    new java.text.SimpleDateFormat("HH:mm", java.util.Locale.US).format(new java.util.Date(ts)))
+            card.addView(a.kit.kv("زمان ثبت", ts > 0 ? "ساعت " + HomeNumberFormatter.time(ts)
                     : "—", Theme.TEXT),
                     a.kit.lp(-1, -2));
             String note = d.closed.optString("note", "");
@@ -390,15 +389,7 @@ public class CloseoutScreen extends Screen {
     }
 
     private String historyTime(long millis) {
-        if (millis <= 0) return "زمان نامشخص";
-        try {
-            java.util.Date d = new java.util.Date(millis);
-            java.text.SimpleDateFormat date = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US);
-            java.text.SimpleDateFormat time = new java.text.SimpleDateFormat("HH:mm", java.util.Locale.US);
-            return HomeNumberFormatter.dateTime(date.format(d) + " " + time.format(d));
-        } catch (Exception ignored) {
-            return "زمان نامشخص";
-        }
+        return millis <= 0 ? "زمان نامشخص" : HomeNumberFormatter.dateTime(millis);
     }
 
     private JSONObject historySnapshot(JSONObject record) {

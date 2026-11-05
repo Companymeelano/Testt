@@ -81,7 +81,7 @@ public final class Xlsx {
                 } else if (cols[j].type == ReportCatalog.T_NUM) {
                     sheet.append(cellNum(ref, row.d(cols[j].key), zebra ? 6 : 4));
                 } else if (cols[j].type == ReportCatalog.T_DATE) {
-                    sheet.append(cellStr(ref, sh.add(Jalali.dispTableFa(row.s(cols[j].key))),
+                    sheet.append(cellStr(ref, sh.add(HomeNumberFormatter.dateTimeTable(row.s(cols[j].key))),
                             zebra ? 6 : 4));
                 } else {
                     String t = row.s(cols[j].key, "—");

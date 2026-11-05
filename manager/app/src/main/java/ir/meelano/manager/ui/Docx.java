@@ -73,7 +73,7 @@ public final class Docx {
                 } else if (cols[j].type == ReportCatalog.T_NUM) {
                     t = HomeNumberFormatter.quantity(r.d(cols[j].key));
                 } else if (cols[j].type == ReportCatalog.T_DATE) {
-                    t = Jalali.dispTableFa(r.s(cols[j].key));
+                    t = HomeNumberFormatter.dateTimeTable(r.s(cols[j].key));
                 } else {
                     t = r.s(cols[j].key, "—");
                     if (!"—".equals(t)) t = Jalali.disp(t).isEmpty()

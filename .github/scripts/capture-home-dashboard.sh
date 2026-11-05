@@ -59,6 +59,7 @@ if ! wait_for_package_service 120; then
   exit 1
 fi
 
+if [ "${HOME_SCREENSHOT_APKS_PREBUILT:-0}" != "1" ]; then
 build_log="$(mktemp)"
 attempt=1
 result=1
@@ -124,6 +125,7 @@ PY
   done <<< "$diagnostics"
   exit 1
 fi
+fi
 
 app_apk="app/build/outputs/apk/debug/app-debug.apk"
 test_apk="app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk"
@@ -135,8 +137,6 @@ for apk in "$app_apk" "$test_apk"; do
 done
 
 adb wait-for-device
-adb uninstall ir.meelano.manager.debug.test >/dev/null 2>&1 || true
-adb uninstall ir.meelano.manager.debug >/dev/null 2>&1 || true
 for apk in "$app_apk" "$test_apk"; do
   install_log="$(mktemp)"
   installed=0

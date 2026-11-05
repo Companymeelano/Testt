@@ -20,6 +20,22 @@ import ir.meelano.manager.data.Settings;
 public final class Theme {
     private Theme() { }
 
+    // Shared 4dp layout rhythm and nested card radii for the Java/View design system.
+    public static final int SPACE_UNIT_DP = 4;
+    public static final int CARD_PADDING_HORIZONTAL_DP = 16;
+    public static final int CARD_PADDING_VERTICAL_DP = 12;
+    public static final int CARD_RADIUS_DP = 16;
+    public static final int DASHBOARD_CARD_RADIUS_DP = 20;
+    public static final int DASHBOARD_METRIC_RADIUS_DP = 16;
+    public static final int DASHBOARD_BADGE_RADIUS_DP = 12;
+
+    /** Clamp a requested gap to the nearest 4dp step; zero remains zero for optional spaces. */
+    public static int snapSpacingDp(int requestedDp) {
+        if (requestedDp <= 0) return 0;
+        return Math.max(SPACE_UNIT_DP,
+                Math.round(requestedDp / (float) SPACE_UNIT_DP) * SPACE_UNIT_DP);
+    }
+
     // ---------------- dynamic palette (set by apply) ----------------
     public static final int EMERALD_DEEP = DesignTokens.EMERALD_DEEP;
     public static final int EMERALD = DesignTokens.EMERALD;
@@ -306,12 +322,12 @@ public final class Theme {
     }
 
     public static android.graphics.drawable.Drawable card() {
-        return base(SURFACE, 14, dp(1), BORDER);
+        return base(SURFACE, CARD_RADIUS_DP, dp(1), BORDER);
     }
 
     /** Flat neutral section card; the icon and heading carry section identity. */
     public static GradientDrawable cardAccent(int accent) {
-        return base(SURFACE, 14, dp(1), BORDER);
+        return base(SURFACE, CARD_RADIUS_DP, dp(1), BORDER);
     }
 
     /** Dashboard surface tint levels are shared with contrast checks and muted-ink resolution. */
@@ -329,7 +345,7 @@ public final class Theme {
         GradientDrawable card = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
                 new int[]{DesignTokens.mix(SURFACE, hue, dashboardCardTopTint()),
                         DesignTokens.mix(SURFACE, hue, dashboardCardBottomTint())});
-        card.setCornerRadius(dp(18));
+        card.setCornerRadius(dp(DASHBOARD_CARD_RADIUS_DP));
         card.setStroke(dp(1), DesignTokens.mix(BORDER, hue, light ? 0.20f : 0.28f));
         return card;
     }
@@ -340,7 +356,7 @@ public final class Theme {
         GradientDrawable tile = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
                 new int[]{DesignTokens.mix(SURFACE, hue, dashboardMetricTopTint()),
                         DesignTokens.mix(SURFACE, hue, dashboardMetricBottomTint())});
-        tile.setCornerRadius(dp(14));
+        tile.setCornerRadius(dp(DASHBOARD_METRIC_RADIUS_DP));
         tile.setStroke(dp(1), DesignTokens.mix(BORDER, hue, light ? 0.32f : 0.40f));
         return tile;
     }
@@ -353,7 +369,7 @@ public final class Theme {
         GradientDrawable badge = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
                 new int[]{DesignTokens.mix(SURFACE, hue, topTint),
                         DesignTokens.mix(SURFACE, hue, bottomTint)});
-        badge.setCornerRadius(dp(12));
+        badge.setCornerRadius(dp(DASHBOARD_BADGE_RADIUS_DP));
         badge.setStroke(dp(1), DesignTokens.mix(BORDER, hue, light ? 0.42f : 0.52f));
         return badge;
     }
@@ -488,7 +504,7 @@ public final class Theme {
 
     /** Flat neutral KPI surface with a one-pixel border. */
     public static GradientDrawable kpi(int accent) {
-        return base(SURFACE, 14, dp(1), BORDER);
+        return base(SURFACE, CARD_RADIUS_DP, dp(1), BORDER);
     }
 
 

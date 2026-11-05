@@ -1102,13 +1102,13 @@ public class HomeScreen extends Screen {
         intro.setElevation(0f);
         intro.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
         intro.setClipToPadding(false);
-        intro.setPadding(Theme.dp(14), Theme.dp(12), Theme.dp(14), Theme.dp(12));
+        intro.setPadding(Theme.dp(16), Theme.dp(12), Theme.dp(16), Theme.dp(12));
 
         LinearLayout row = a.kit.h();
         row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.addView(dashboardArt(R.drawable.mi_diamond, Theme.GOLD_METAL),
-                a.kit.lp(Theme.dp(42), Theme.dp(42)));
+                a.kit.lp(Theme.dp(44), Theme.dp(44)));
         row.addView(a.kit.space(10));
         LinearLayout copy = a.kit.v();
         TextView title = a.kit.text(greeting + "، " + name, 17f,
@@ -1285,7 +1285,10 @@ public class HomeScreen extends Screen {
 
     private View salesHero(final Data data, final SyncState syncState) {
         final LinearLayout card = homeCard(Theme.SECTION_SALES);
-        card.setPadding(Theme.dp(16), Theme.dp(10), Theme.dp(16), Theme.dp(12));
+        card.setPadding(Theme.dp(Theme.CARD_PADDING_HORIZONTAL_DP),
+                Theme.dp(Theme.CARD_PADDING_VERTICAL_DP),
+                Theme.dp(Theme.CARD_PADDING_HORIZONTAL_DP),
+                Theme.dp(Theme.CARD_PADDING_VERTICAL_DP));
         final String[] selectedSalesDate = {data == null ? Jalali.todayStr() : snapshotDay(data)};
         final HomeTrendChart.Area chart = new HomeTrendChart.Area(a);
         View.OnClickListener salesAction = RoleStore.allowed(a, "sales")
@@ -1302,7 +1305,7 @@ public class HomeScreen extends Screen {
         amountPanel.setBackground(Theme.dashboardMetric(Theme.SECTION_SALES));
         amountPanel.setElevation(0f);
         amountPanel.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
-        amountPanel.setPadding(Theme.dp(12), Theme.dp(9), Theme.dp(12), Theme.dp(9));
+        amountPanel.setPadding(Theme.dp(12), Theme.dp(8), Theme.dp(12), Theme.dp(8));
         final android.animation.ValueAnimator[] amountAnimator = {null};
         final TextView[] chartHint = {null};
         View selector = salesRangeSelector(card, amountPanel, data, amountAnimator);
@@ -1649,7 +1652,7 @@ public class HomeScreen extends Screen {
 
         if (display.showForecast) {
             LinearLayout forecast = a.kit.v();
-            forecast.setPadding(Theme.dp(9), Theme.dp(7), Theme.dp(9), Theme.dp(7));
+            forecast.setPadding(Theme.dp(8), Theme.dp(8), Theme.dp(8), Theme.dp(8));
             forecast.setBackground(Theme.pill(Theme.SECTION_SALES));
             LinearLayout forecastHeading = a.kit.h();
             forecastHeading.setGravity(Gravity.CENTER_VERTICAL);
@@ -1688,7 +1691,7 @@ public class HomeScreen extends Screen {
                 forecast.addView(forecastDelta, a.kit.lp(-1, -2));
             }
             LinearLayout.LayoutParams fp = a.kit.lp(-1, -2);
-            fp.topMargin = Theme.dp(6);
+            fp.topMargin = Theme.dp(8);
             panel.addView(forecast, fp);
         }
     }
@@ -1846,7 +1849,7 @@ public class HomeScreen extends Screen {
         head.setGravity(Gravity.CENTER_VERTICAL);
         head.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         head.addView(a.kit.iconBadge(R.drawable.mi_storefront, Theme.SECTION_MARKET, 30),
-                a.kit.lp(Theme.dp(30), Theme.dp(30)));
+                a.kit.lp(Theme.dp(32), Theme.dp(32)));
         head.addView(a.kit.space(7));
         LinearLayout title = a.kit.v();
         title.addView(a.kit.text("بازار", 13f, Theme.sectionText(Theme.SECTION_MARKET), true),
@@ -1901,7 +1904,7 @@ public class HomeScreen extends Screen {
             }
             ticker.addView(row, new android.view.ViewGroup.LayoutParams(-2, -2));
             LinearLayout.LayoutParams tickerParams = a.kit.lp(-1, -2);
-            tickerParams.topMargin = Theme.dp(6);
+            tickerParams.topMargin = Theme.dp(8);
             card.addView(ticker, tickerParams);
         }
 
@@ -1915,7 +1918,7 @@ public class HomeScreen extends Screen {
         freshness.setMaxLines(2);
         freshness.setEllipsize(TextUtils.TruncateAt.END);
         LinearLayout.LayoutParams freshnessParams = a.kit.lp(-1, -2);
-        freshnessParams.topMargin = Theme.dp(5);
+        freshnessParams.topMargin = Theme.dp(4);
         card.addView(freshness, freshnessParams);
 
         if (marketExpanded) {
@@ -1980,10 +1983,10 @@ public class HomeScreen extends Screen {
                     : "فعال‌کردن آب‌وهوا با موقعیت دستگاه؛ ارسال موقعیت تنها با اجازهٔ شما انجام می‌شود");
             loc.setSingleLine(true);
             loc.setTextSize(10.5f * Theme.fontScale());
-            loc.setPadding(Theme.dp(10), Theme.dp(4), Theme.dp(10), Theme.dp(4));
+            loc.setPadding(Theme.dp(8), Theme.dp(4), Theme.dp(8), Theme.dp(4));
             loc.setMinHeight(Theme.dp(48));
             LinearLayout.LayoutParams locationParams = a.kit.lp(-2, -2);
-            locationParams.setMargins(0, Theme.dp(5), 0, 0);
+            locationParams.setMargins(0, Theme.dp(4), 0, 0);
             locationParams.gravity = Gravity.END;
             card.addView(loc, locationParams);
 
@@ -2023,7 +2026,7 @@ public class HomeScreen extends Screen {
         LinearLayout tile = a.kit.v();
         tile.setGravity(Gravity.CENTER);
         tile.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        tile.setPadding(Theme.dp(7), Theme.dp(6), Theme.dp(7), Theme.dp(7));
+        tile.setPadding(Theme.dp(8), Theme.dp(8), Theme.dp(8), Theme.dp(8));
         tile.setBackground(Theme.dashboardMetric(Theme.SECTION_MARKET));
         tile.setElevation(0f);
         tile.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
@@ -2042,7 +2045,7 @@ public class HomeScreen extends Screen {
 
         String priceText = hasPrice ? HomeNumberFormatter.rounded(r.toman) + " تومان" : "ناموجود";
         LinearLayout.LayoutParams priceParams = a.kit.lp(-1, -2);
-        priceParams.topMargin = Theme.dp(3);
+        priceParams.topMargin = Theme.dp(4);
         View price = a.kit.amountLine(priceText, 12.5f, Gravity.CENTER);
         tile.addView(price, priceParams);
         if (hasPrice) {
@@ -2185,7 +2188,7 @@ public class HomeScreen extends Screen {
         viewport.setOverScrollMode(View.OVER_SCROLL_NEVER);
         viewport.setClipToPadding(false);
         viewport.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        viewport.setPadding(Theme.dp(12), Theme.dp(1), Theme.dp(12), Theme.dp(5));
+        viewport.setPadding(Theme.dp(12), Theme.dp(4), Theme.dp(12), Theme.dp(8));
 
         LinearLayout row = a.kit.h();
         row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
@@ -2199,7 +2202,7 @@ public class HomeScreen extends Screen {
             chip.setTag("home-category-chip-" + target.key);
             chip.setGravity(Gravity.CENTER);
             chip.setSingleLine(true);
-            chip.setPadding(Theme.dp(13), 0, Theme.dp(13), 0);
+            chip.setPadding(Theme.dp(12), 0, Theme.dp(12), 0);
             chip.setMinHeight(Theme.dp(48));
             chip.setMinimumHeight(Theme.dp(48));
             chip.setMinimumWidth(Theme.dp(56));
@@ -2214,7 +2217,7 @@ public class HomeScreen extends Screen {
             });
 
             LinearLayout.LayoutParams chipParams = a.kit.lp(-2, -2);
-            chipParams.setMarginEnd(Theme.dp(6));
+            chipParams.setMarginEnd(Theme.dp(8));
             row.addView(chip, chipParams);
             chips.add(chip);
         }
@@ -2262,7 +2265,10 @@ public class HomeScreen extends Screen {
         if (notes == null || notes.isEmpty()) return;
         LinearLayout card = homeCard(Theme.SECTION_ALERT);
         card.setTag("home-data-notes");
-        card.setPadding(Theme.dp(12), Theme.dp(8), Theme.dp(12), Theme.dp(10));
+        card.setPadding(Theme.dp(Theme.CARD_PADDING_HORIZONTAL_DP),
+                Theme.dp(Theme.CARD_PADDING_VERTICAL_DP),
+                Theme.dp(Theme.CARD_PADDING_HORIZONTAL_DP),
+                Theme.dp(Theme.CARD_PADDING_VERTICAL_DP));
         card.addView(boardHead("منابع نیازمند توجه",
                 HomeNumberFormatter.integer(notes.size()) + " گزارش با دادهٔ کامل ارائه نشد",
                 R.drawable.mi_warning, null, Theme.SECTION_ALERT), a.kit.lp(-1, -2));
@@ -2293,7 +2299,7 @@ public class HomeScreen extends Screen {
                 });
         toggle.setTag("home-data-notes-toggle");
         LinearLayout.LayoutParams toggleParams = a.kit.lp(-1, -2);
-        toggleParams.topMargin = Theme.dp(6);
+        toggleParams.topMargin = Theme.dp(8);
         card.addView(toggle, toggleParams);
         card.addView(details, a.kit.lp(-1, -2));
         a.kit.addCard(content, card);
@@ -2720,6 +2726,10 @@ public class HomeScreen extends Screen {
     private LinearLayout homeCard(int accent) {
         LinearLayout card = a.kit.card(accent);
         card.setBackground(Theme.dashboardCard(accent));
+        card.setPadding(Theme.dp(Theme.CARD_PADDING_HORIZONTAL_DP),
+                Theme.dp(Theme.CARD_PADDING_VERTICAL_DP),
+                Theme.dp(Theme.CARD_PADDING_HORIZONTAL_DP),
+                Theme.dp(Theme.CARD_PADDING_VERTICAL_DP));
         card.setElevation(0f);
         card.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
         card.setClipToPadding(false);
@@ -2738,9 +2748,9 @@ public class HomeScreen extends Screen {
         LinearLayout heading = a.kit.h();
         heading.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         heading.setGravity(Gravity.CENTER_VERTICAL);
-        heading.setPadding(0, Theme.dp(11), 0, Theme.dp(7));
+        heading.setPadding(0, Theme.dp(12), 0, Theme.dp(8));
         heading.addView(dashboardArt(icon, accent),
-                new LinearLayout.LayoutParams(Theme.dp(30), Theme.dp(30)));
+                new LinearLayout.LayoutParams(Theme.dp(32), Theme.dp(32)));
         heading.addView(a.kit.space(8));
 
         LinearLayout copy = a.kit.v();
@@ -2761,7 +2771,7 @@ public class HomeScreen extends Screen {
         View divider = new View(a);
         divider.setBackgroundColor(Theme.BORDER);
         LinearLayout.LayoutParams dividerParams = a.kit.lp(-1, Theme.dp(1));
-        dividerParams.bottomMargin = Theme.dp(6);
+        dividerParams.bottomMargin = Theme.dp(8);
         group.addView(divider, dividerParams);
         return group;
     }
@@ -2848,7 +2858,7 @@ public class HomeScreen extends Screen {
         LinearLayout box = a.kit.v();
         LinearLayout row = a.kit.h();
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(Theme.dp(3), Theme.dp(4), Theme.dp(3), Theme.dp(7));
+        row.setPadding(Theme.dp(4), Theme.dp(4), Theme.dp(4), Theme.dp(8));
         row.addView(dashboardArt(iconVector, accent),
                 new LinearLayout.LayoutParams(Theme.dp(36), Theme.dp(36)));
         row.addView(a.kit.space(8));
@@ -2908,7 +2918,7 @@ public class HomeScreen extends Screen {
         TextView chip = a.kit.text(label, 10.5f, color, true);
         chip.setGravity(Gravity.CENTER);
         chip.setSingleLine(true);
-        chip.setPadding(Theme.dp(12), Theme.dp(6), Theme.dp(12), Theme.dp(6));
+        chip.setPadding(Theme.dp(12), Theme.dp(8), Theme.dp(12), Theme.dp(8));
         chip.setBackground(Theme.pill(color));
         return chip;
     }
@@ -2925,8 +2935,8 @@ public class HomeScreen extends Screen {
         row.setBackground(Theme.dashboardMetric(accent));
         row.setElevation(0f);
         row.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
-        row.setPadding(Theme.dp(12), Theme.dp(10), Theme.dp(12), Theme.dp(10));
-        row.addView(dashboardArt(iconVector), a.kit.lp(Theme.dp(42), Theme.dp(42)));
+        row.setPadding(Theme.dp(12), Theme.dp(12), Theme.dp(12), Theme.dp(12));
+        row.addView(dashboardArt(iconVector), a.kit.lp(Theme.dp(44), Theme.dp(44)));
         row.addView(a.kit.space(10));
         LinearLayout copy = a.kit.v();
         TextView l = a.kit.text(label, 11f, Theme.dashboardMutedInk(accent), false);
@@ -2953,7 +2963,7 @@ public class HomeScreen extends Screen {
             if (i % cols == 0) {
                 row = a.kit.h();
                 LinearLayout.LayoutParams rp = a.kit.lp(-1, -2);
-                if (i > 0) rp.setMargins(0, Theme.dp(10), 0, 0);
+                if (i > 0) rp.setMargins(0, Theme.dp(12), 0, 0);
                 root.addView(row, rp);
             }
             Mini m = tiles.get(i);
@@ -2962,12 +2972,12 @@ public class HomeScreen extends Screen {
             tile.setBackground(Theme.dashboardMetric(tileAccent));
             tile.setElevation(0f);
             tile.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
-            tile.setPadding(Theme.dp(10), Theme.dp(12), Theme.dp(10), Theme.dp(12));
+            tile.setPadding(Theme.dp(12), Theme.dp(12), Theme.dp(12), Theme.dp(12));
             tile.setGravity(Gravity.CENTER_HORIZONTAL);
             ImageView ic = dashboardArt(m.icon);
             LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(Theme.dp(36), Theme.dp(36));
             ip.gravity = Gravity.CENTER_HORIZONTAL;
-            ip.bottomMargin = Theme.dp(6);
+            ip.bottomMargin = Theme.dp(8);
             tile.addView(ic, ip);
             TextView l = a.kit.text(m.label, 11f, Theme.dashboardMutedInk(tileAccent), false);
             l.setGravity(Gravity.CENTER_HORIZONTAL);
@@ -3001,7 +3011,7 @@ public class HomeScreen extends Screen {
             int count = Math.min(span, metrics.size() - start);
             LinearLayout row = a.kit.h();
             row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-            row.setGravity(Gravity.TOP);
+            row.setGravity(Gravity.FILL_VERTICAL);
             LinearLayout.LayoutParams rowParams = a.kit.lp(-1, -2);
             if (start > 0) rowParams.topMargin = Theme.dp(8);
             root.addView(row, rowParams);
@@ -3009,20 +3019,22 @@ public class HomeScreen extends Screen {
             for (int offset = 0; offset < count; offset++) {
                 Mini metric = metrics.get(start + offset);
                 LinearLayout tile = a.kit.v();
+                tile.setTag(accent == Theme.SECTION_CASH_POSITION
+                        ? "home-cash-position-metric" : "home-closeout-metric");
                 int metricAccent = dashboardAccent(metric.icon);
                 tile.setBackground(Theme.dashboardMetric(metricAccent));
                 tile.setElevation(0f);
                 tile.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
-                tile.setPadding(Theme.dp(10), Theme.dp(9), Theme.dp(10), Theme.dp(9));
-                tile.setMinimumHeight(Theme.dp(100));
+                tile.setPadding(Theme.dp(12), Theme.dp(8), Theme.dp(12), Theme.dp(8));
+                tile.setMinimumHeight(Theme.dp(112));
 
                 LinearLayout heading = a.kit.h();
                 heading.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
                 heading.setGravity(Gravity.CENTER_VERTICAL);
-                heading.setMinimumHeight(Theme.dp(34));
+                heading.setMinimumHeight(Theme.dp(36));
                 ImageView mark = dashboardArt(metric.icon, dashboardAccent(metric.icon));
                 heading.addView(mark, new LinearLayout.LayoutParams(Theme.dp(28), Theme.dp(28)));
-                heading.addView(a.kit.space(6));
+                heading.addView(a.kit.space(8));
                 TextView label = a.kit.text(metric.label, 10.5f,
                         Theme.dashboardMutedInk(metricAccent), false);
                 label.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
@@ -3046,13 +3058,13 @@ public class HomeScreen extends Screen {
                             Theme.dashboardMutedInk(metricAccent), false);
                     note.setGravity(Gravity.START);
                     note.setMaxLines(2);
-                    note.setMinHeight(Theme.dp(28));
+                    note.setMinHeight(Theme.dp(32));
                     note.setEllipsize(TextUtils.TruncateAt.END);
                     tile.addView(note, a.kit.lp(-1, -2));
                 } else {
                     View spacer = new View(a);
                     spacer.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-                    tile.addView(spacer, a.kit.lp(-1, Theme.dp(28)));
+                    tile.addView(spacer, a.kit.lp(-1, Theme.dp(32)));
                 }
                 String spoken = metric.label + "، " + metric.value
                         + (metric.note == null || metric.note.trim().isEmpty() ? "" : "؛ " + metric.note);
@@ -3115,7 +3127,10 @@ public class HomeScreen extends Screen {
         List<HomeAttention> items = homeAttentionItems(d);
         List<String> unavailable = unavailableAlertSources(d);
         LinearLayout card = homeCard(Theme.SECTION_ALERT);
-        card.setPadding(Theme.dp(13), Theme.dp(10), Theme.dp(13), Theme.dp(12));
+        card.setPadding(Theme.dp(Theme.CARD_PADDING_HORIZONTAL_DP),
+                Theme.dp(Theme.CARD_PADDING_VERTICAL_DP),
+                Theme.dp(Theme.CARD_PADDING_HORIZONTAL_DP),
+                Theme.dp(Theme.CARD_PADDING_VERTICAL_DP));
         card.addView(boardHead("مرکز توجه", null, R.drawable.mi_priority_high,
                 null, Theme.SECTION_ALERT), a.kit.lp(-1, -2));
 
@@ -3133,7 +3148,7 @@ public class HomeScreen extends Screen {
         } else {
             HomeAttention primary = items.get(0);
             LinearLayout focus = a.kit.v();
-            focus.setPadding(Theme.dp(11), Theme.dp(10), Theme.dp(11), Theme.dp(10));
+            focus.setPadding(Theme.dp(12), Theme.dp(12), Theme.dp(12), Theme.dp(12));
             focus.setBackground(Theme.dashboardMetric(Theme.SECTION_ALERT));
             focus.setElevation(0f);
             focus.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
@@ -3157,7 +3172,7 @@ public class HomeScreen extends Screen {
                 android.widget.Button action = a.kit.btnGhost("بررسی مورد ›", primary.accent,
                         v -> primary.action.run());
                 LinearLayout.LayoutParams actionParams = a.kit.lp(-2, -2);
-                actionParams.topMargin = Theme.dp(6);
+                actionParams.topMargin = Theme.dp(8);
                 focus.addView(action, actionParams);
             }
             focus.setContentDescription(primary.title + "؛ " + primary.detail + "؛ اولویت "
@@ -3169,7 +3184,7 @@ public class HomeScreen extends Screen {
                 final HomeAttention item = items.get(i);
                 View.OnClickListener action = item.action == null ? null : v -> item.action.run();
                 LinearLayout.LayoutParams rowParams = a.kit.lp(-1, -2);
-                rowParams.topMargin = Theme.dp(6);
+                rowParams.topMargin = Theme.dp(8);
                 card.addView(a.kit.alertRow(item.title, item.detail, item.accent, action), rowParams);
             }
             if (items.size() > shown) {
@@ -3600,7 +3615,10 @@ public class HomeScreen extends Screen {
         boolean complete = available && points != null;
         final String[] selectedDate = {Jalali.disp(to)};
         LinearLayout card = homeCard(accent);
-        card.setPadding(Theme.dp(16), Theme.dp(9), Theme.dp(16), Theme.dp(11));
+        card.setPadding(Theme.dp(Theme.CARD_PADDING_HORIZONTAL_DP),
+                Theme.dp(Theme.CARD_PADDING_VERTICAL_DP),
+                Theme.dp(Theme.CARD_PADDING_HORIZONTAL_DP),
+                Theme.dp(Theme.CARD_PADDING_VERTICAL_DP));
         boolean showAction = shouldShowTrendAction(action != null, available, complete);
         View endAction = showAction ? dashboardHeaderAction(actionLabel, accent,
                 actionLabel + "؛ روز انتخاب‌شدهٔ " + series, v -> action.open(selectedDate[0])) : null;
@@ -3650,12 +3668,12 @@ public class HomeScreen extends Screen {
             rangeLabel.setMaxLines(3);
             rangeLabel.setEllipsize(null);
             LinearLayout.LayoutParams rangeParams = a.kit.lp(-1, -2);
-            rangeParams.topMargin = Theme.dp(5);
+            rangeParams.topMargin = Theme.dp(4);
             card.addView(rangeLabel, rangeParams);
 
             TextView peakNote = a.kit.text("", 10.5f,
                     Theme.dashboardCardMutedInk(accent), false);
-            peakNote.setPadding(Theme.dp(9), Theme.dp(7), Theme.dp(9), Theme.dp(7));
+            peakNote.setPadding(Theme.dp(8), Theme.dp(8), Theme.dp(8), Theme.dp(8));
             peakNote.setBackground(Theme.dashboardMetric(accent));
             peakNote.setElevation(0f);
             peakNote.setMaxLines(4);
@@ -3672,12 +3690,12 @@ public class HomeScreen extends Screen {
             if (options.size() > 1) {
                 View selector = binding.selectorView();
                 LinearLayout.LayoutParams selectorParams = a.kit.lp(-1, -2);
-                selectorParams.topMargin = Theme.dp(3);
+                selectorParams.topMargin = Theme.dp(4);
                 card.addView(selector, 1, selectorParams);
             }
 
-            LinearLayout.LayoutParams chartParams = a.kit.lp(-1, Theme.dp(174));
-            chartParams.topMargin = Theme.dp(2);
+            LinearLayout.LayoutParams chartParams = a.kit.lp(-1, Theme.dp(176));
+            chartParams.topMargin = Theme.dp(4);
             card.addView(chart, chartParams);
             card.addView(caption, a.kit.lp(-1, -2));
         } else {
@@ -3799,7 +3817,7 @@ public class HomeScreen extends Screen {
                 double comparisonValue = dayComparison.complete ? today : dayComparison.projectedRials;
                 LinearLayout pulse = a.kit.h();
                 pulse.setGravity(Gravity.CENTER_VERTICAL);
-                pulse.setPadding(Theme.dp(9), Theme.dp(7), Theme.dp(9), Theme.dp(7));
+                pulse.setPadding(Theme.dp(8), Theme.dp(8), Theme.dp(8), Theme.dp(8));
                 pulse.setBackground(Theme.kpi(color));
                 pulse.addView(a.kit.text(metric + snapshotLabel(d), 10.5f, Theme.MUTED, false), a.kit.lp(-2, -2));
                 pulse.addView(a.kit.space(7));
@@ -3832,7 +3850,7 @@ public class HomeScreen extends Screen {
                 chart.setData(points, Theme.SECTION_SALES, HomeNumberFormatter::chartMoney);
                 chart.setListener((idx, point) -> caption.setText(HomeNumberFormatter.localizeText(point.label)
                         + " • " + HomeNumberFormatter.money(point.value)));
-                trend.addView(chart, new LinearLayout.LayoutParams(-1, Theme.dp(126)));
+                trend.addView(chart, new LinearLayout.LayoutParams(-1, Theme.dp(128)));
                 trend.addView(caption, a.kit.lp(-1, -2));
             }
             a.kit.addCard(content, trend);
@@ -3913,7 +3931,10 @@ public class HomeScreen extends Screen {
     private void secCashMix(LinearLayout content, Data d) {
         if (!RoleStore.allowed(a, "dar_in")) return;
         LinearLayout card = homeCard(Theme.SECTION_RECEIVE);
-        card.setPadding(Theme.dp(13), Theme.dp(10), Theme.dp(13), Theme.dp(11));
+        card.setPadding(Theme.dp(Theme.CARD_PADDING_HORIZONTAL_DP),
+                Theme.dp(Theme.CARD_PADDING_VERTICAL_DP),
+                Theme.dp(Theme.CARD_PADDING_HORIZONTAL_DP),
+                Theme.dp(Theme.CARD_PADDING_VERTICAL_DP));
         card.addView(dashboardSectionHead("ترکیب دریافت", R.drawable.mi_receipt_long,
                 Theme.SECTION_RECEIVE, "دریافت‌ها ›", navAction("dar_in")), a.kit.lp(-1, -2));
 
@@ -3995,13 +4016,13 @@ public class HomeScreen extends Screen {
         for (int i = 0; i < labels.size(); i++) {
             View item = mixLegendItem(labels.get(i), amounts.get(i), denominator, colors.get(i));
             LinearLayout.LayoutParams itemParams = a.kit.lp(Theme.dp(104), -2);
-            if (i < labels.size() - 1) itemParams.setMarginEnd(Theme.dp(6));
+            if (i < labels.size() - 1) itemParams.setMarginEnd(Theme.dp(8));
             legend.addView(item, itemParams);
         }
         legendScroll.addView(legend, new HorizontalScrollView.LayoutParams(-2, -2));
         legendScroll.setContentDescription("تفکیک دریافت به نقد، کارت، حواله و چک");
         LinearLayout.LayoutParams legendParams = a.kit.lp(-1, -2);
-        legendParams.topMargin = Theme.dp(7);
+        legendParams.topMargin = Theme.dp(8);
         card.addView(legendScroll, legendParams);
         if (mismatch) {
             TextView note = a.kit.text("مجموع اجزا با کل قبض اختلاف دارد؛ درصدها بر پایهٔ مجموع اجزای قابل تفکیک‌اند.",
@@ -4017,7 +4038,7 @@ public class HomeScreen extends Screen {
     private View mixLegendItem(String label, double amount, double denominator, int color) {
         LinearLayout item = a.kit.v();
         item.setGravity(Gravity.CENTER);
-        item.setPadding(Theme.dp(6), Theme.dp(5), Theme.dp(6), Theme.dp(5));
+        item.setPadding(Theme.dp(8), Theme.dp(4), Theme.dp(8), Theme.dp(4));
         item.setBackground(Theme.dashboardMetric(Theme.SECTION_RECEIVE));
         item.setElevation(0f);
         item.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
@@ -4052,7 +4073,7 @@ public class HomeScreen extends Screen {
 
     private View insightMetric(String label, String value, int accent) {
         LinearLayout tile = a.kit.v();
-        tile.setPadding(Theme.dp(9), Theme.dp(7), Theme.dp(9), Theme.dp(7));
+        tile.setPadding(Theme.dp(8), Theme.dp(8), Theme.dp(8), Theme.dp(8));
         tile.setBackground(Theme.dashboardMetric(accent));
         tile.setElevation(0f);
         tile.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
@@ -4194,10 +4215,10 @@ public class HomeScreen extends Screen {
         ImageView image = a.kit.icon(icon, Theme.sectionText(Theme.SECTION_TOP_PERFORMERS), 22);
         image.setBackground(Theme.avatar(Theme.alpha(Theme.SECTION_TOP_PERFORMERS,
                 Theme.isLight() ? 24 : 38)));
-        int inset = Theme.dp(5);
+        int inset = Theme.dp(4);
         image.setPadding(inset, inset, inset, inset);
         image.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-        row.addView(image, a.kit.lp(Theme.dp(30), Theme.dp(30)));
+        row.addView(image, a.kit.lp(Theme.dp(32), Theme.dp(32)));
         row.addView(a.kit.space(6));
         TextView label = a.kit.text(title, 11.5f,
                 Theme.sectionText(Theme.SECTION_TOP_PERFORMERS), true);
@@ -4239,7 +4260,7 @@ public class HomeScreen extends Screen {
 
         LinearLayout row = a.kit.h();
         row.setMinimumHeight(Theme.dp(56));
-        row.setPadding(Theme.dp(5), Theme.dp(5), Theme.dp(5), Theme.dp(5));
+        row.setPadding(Theme.dp(4), Theme.dp(4), Theme.dp(4), Theme.dp(4));
         row.setBackground(Theme.dashboardMetric(Theme.SECTION_TOP_PERFORMERS));
         row.setElevation(0f);
         row.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
@@ -4248,7 +4269,7 @@ public class HomeScreen extends Screen {
         rankView.setGravity(Gravity.CENTER);
         rankView.setBackground(Theme.chip(true, Theme.SECTION_TOP_PERFORMERS));
         rankView.setContentDescription("رتبهٔ " + HomeNumberFormatter.integer(rank));
-        row.addView(rankView, new LinearLayout.LayoutParams(Theme.dp(30), Theme.dp(30)));
+        row.addView(rankView, new LinearLayout.LayoutParams(Theme.dp(32), Theme.dp(32)));
         row.addView(a.kit.space(8));
 
         LinearLayout info = a.kit.v();
@@ -4267,7 +4288,7 @@ public class HomeScreen extends Screen {
                 Gravity.END);
         LinearLayout.LayoutParams amountParams = new LinearLayout.LayoutParams(
                 Theme.dp(112), -2);
-        amountParams.setMarginStart(Theme.dp(6));
+        amountParams.setMarginStart(Theme.dp(8));
         row.addView(amount, amountParams);
         row.setContentDescription("رتبهٔ " + HomeNumberFormatter.integer(rank) + "، " + name
                 + "، " + sub + "، " + HomeNumberFormatter.money(total));
@@ -4328,7 +4349,7 @@ public class HomeScreen extends Screen {
                 localizeHomeNumbers(content);
             });
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, -2, 1f);
-            if (position > 0) params.setMarginStart(Theme.dp(6));
+            if (position > 0) params.setMarginStart(Theme.dp(8));
             months.addView(monthChip, params);
         }
         card.addView(months, a.kit.lp(-1, -2));
@@ -4344,7 +4365,7 @@ public class HomeScreen extends Screen {
                     a.kit.lp(-1, -2));
         } else {
             TextView plan = a.kit.text(note, 11.5f, Theme.TEXT, false);
-            plan.setPadding(Theme.dp(10), Theme.dp(8), Theme.dp(10), Theme.dp(8));
+            plan.setPadding(Theme.dp(12), Theme.dp(8), Theme.dp(12), Theme.dp(8));
             plan.setBackground(Theme.dashboardMetric(accent));
             plan.setElevation(0f);
             plan.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
@@ -4361,7 +4382,7 @@ public class HomeScreen extends Screen {
 
     private void showSeasonalPlanDialog(LinearLayout content, String monthKey, String currentNote) {
         LinearLayout form = a.kit.v();
-        form.setPadding(Theme.dp(20), Theme.dp(10), Theme.dp(20), Theme.dp(8));
+        form.setPadding(Theme.dp(20), Theme.dp(12), Theme.dp(20), Theme.dp(8));
         form.addView(a.kit.hint("یادداشت برنامهٔ خرید، نگهداری یا آماده‌سازی؛ فقط در تنظیمات محلی ذخیره می‌شود."),
                 a.kit.lp(-1, -2));
         android.widget.EditText input = a.kit.edit("یادداشت این ماه", currentNote);
@@ -4418,21 +4439,24 @@ public class HomeScreen extends Screen {
 
         LinearLayout card = homeCard(Theme.SECTION_QUICK_ACTIONS);
         card.setTag("home-quick-actions");
-        card.setPadding(Theme.dp(12), Theme.dp(8), Theme.dp(12), Theme.dp(8));
+        card.setPadding(Theme.dp(Theme.CARD_PADDING_HORIZONTAL_DP),
+                Theme.dp(Theme.CARD_PADDING_VERTICAL_DP),
+                Theme.dp(Theme.CARD_PADDING_HORIZONTAL_DP),
+                Theme.dp(Theme.CARD_PADDING_VERTICAL_DP));
         card.addView(boardHead("دسترسی سریع", null, R.drawable.mi_bolt,
                 null, Theme.SECTION_QUICK_ACTIONS), a.kit.lp(-1, -2));
         TextView summary = a.kit.text(
                 HomeNumberFormatter.integer(allowed.size()) + " مقصد مجاز برای نقش شما",
                 10f, Theme.dashboardCardMutedInk(Theme.SECTION_QUICK_ACTIONS), false);
         LinearLayout.LayoutParams summaryParams = a.kit.lp(-1, -2);
-        summaryParams.topMargin = Theme.dp(3);
+        summaryParams.topMargin = Theme.dp(4);
         card.addView(summary, summaryParams);
 
         LinearLayout row = a.kit.h();
         row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         row.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout.LayoutParams rowParams = a.kit.lp(-1, -2);
-        rowParams.topMargin = Theme.dp(5);
+        rowParams.topMargin = Theme.dp(4);
         for (int index : allowed)
             row.addView(topQuickAction(labels[index], targets[index], icons[index]), a.kit.wlp(1f));
         card.addView(row, rowParams);
@@ -4444,7 +4468,7 @@ public class HomeScreen extends Screen {
         item.setGravity(Gravity.CENTER);
         item.setMinimumWidth(Theme.dp(48));
         item.setMinimumHeight(Theme.dp(56));
-        item.setPadding(Theme.dp(2), Theme.dp(3), Theme.dp(2), Theme.dp(3));
+        item.setPadding(Theme.dp(4), Theme.dp(4), Theme.dp(4), Theme.dp(4));
         item.setTag("home-quick-action-" + screenId);
         item.setContentDescription(label + "؛ باز کردن بخش " + label);
 
@@ -4457,7 +4481,7 @@ public class HomeScreen extends Screen {
         title.setIncludeFontPadding(false);
         title.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         LinearLayout.LayoutParams titleParams = a.kit.lp(-1, -2);
-        titleParams.topMargin = Theme.dp(3);
+        titleParams.topMargin = Theme.dp(4);
         item.addView(title, titleParams);
         Theme.pressable(item);
         item.setOnClickListener(v -> a.nav(screenId));
@@ -4510,7 +4534,7 @@ public class HomeScreen extends Screen {
                 HomeNumberFormatter.integer(allowed.size()) + " مقصد در دسترس نقش شما",
                 10f, Theme.dashboardCardMutedInk(accent), false);
         LinearLayout.LayoutParams summaryParams = a.kit.lp(-1, -2);
-        summaryParams.topMargin = Theme.dp(3);
+        summaryParams.topMargin = Theme.dp(4);
         card.addView(summary, summaryParams);
         if (allowed.isEmpty()) {
             card.addView(a.kit.emptyRow("برای نقش فعلی مقصد میان‌بر مجازی وجود ندارد."),
@@ -4547,7 +4571,7 @@ public class HomeScreen extends Screen {
         item.setGravity(Gravity.CENTER_VERTICAL);
         item.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         item.setMinimumHeight(Theme.dp(48));
-        item.setPadding(Theme.dp(6), Theme.dp(5), Theme.dp(6), Theme.dp(5));
+        item.setPadding(Theme.dp(8), Theme.dp(4), Theme.dp(8), Theme.dp(4));
         ImageView symbol = dashboardArt(icon, dashboardAccent(icon));
         item.addView(symbol, a.kit.lp(Theme.dp(28), Theme.dp(28)));
         item.addView(a.kit.space(7));
@@ -4746,7 +4770,7 @@ public class HomeScreen extends Screen {
 
     private void showMonthlySalesGoalDialog(LinearLayout content, String monthKey, Double currentRials) {
         LinearLayout form = a.kit.v();
-        form.setPadding(Theme.dp(20), Theme.dp(10), Theme.dp(20), Theme.dp(8));
+        form.setPadding(Theme.dp(20), Theme.dp(12), Theme.dp(20), Theme.dp(8));
         form.addView(a.kit.hint("هدف فقط در تنظیمات همین دستگاه و برای این ماه ذخیره می‌شود؛ هیچ رکوردی در دیتابیس فروشگاه نوشته نمی‌شود."),
                 a.kit.lp(-1, -2));
         String current = "";
@@ -5096,8 +5120,8 @@ public class HomeScreen extends Screen {
         LinearLayout tile = a.kit.v();
         tile.setGravity(Gravity.CENTER);
         tile.setBackground(Theme.dashboardMetric(accent));
-        tile.setPadding(Theme.dp(5), Theme.dp(7), Theme.dp(5), Theme.dp(7));
-        tile.setMinimumHeight(Theme.dp(58));
+        tile.setPadding(Theme.dp(4), Theme.dp(8), Theme.dp(4), Theme.dp(8));
+        tile.setMinimumHeight(Theme.dp(60));
         TextView number = a.kit.text(HomeNumberFormatter.integer(value), 14f,
                 Theme.TEXT, true);
         number.setGravity(Gravity.CENTER);
@@ -5215,7 +5239,7 @@ public class HomeScreen extends Screen {
         row.setTag(tag);
         row.setBackground(Theme.dashboardMetric(accent));
         row.setElevation(0f);
-        row.setPadding(Theme.dp(10), Theme.dp(8), Theme.dp(10), Theme.dp(8));
+        row.setPadding(Theme.dp(12), Theme.dp(8), Theme.dp(12), Theme.dp(8));
 
         View rail = new View(a);
         rail.setBackgroundColor(Theme.dashboardAccentInk(accent));
@@ -5374,7 +5398,7 @@ public class HomeScreen extends Screen {
         String bankName = account.s("name").trim();
         if (bankName.isEmpty()) bankName = "حساب بانکی";
         LinearLayout form = a.kit.v();
-        form.setPadding(Theme.dp(20), Theme.dp(10), Theme.dp(20), Theme.dp(8));
+        form.setPadding(Theme.dp(20), Theme.dp(12), Theme.dp(20), Theme.dp(8));
         form.addView(a.kit.hint("جمع واقعی واریز و برداشت صورت‌حساب را برای همین روز به ریال وارد کنید؛ ارقام را بدون جداکنندهٔ هزارگان بنویسید. هر دو مبلغ لازم‌اند؛ صفر را فقط وقتی واقعاً صفر است وارد کنید. داده فقط روی این دستگاه ذخیره می‌شود و به آتیران فرستاده نمی‌شود."), a.kit.lp(-1, -2));
         android.widget.EditText inflow = a.kit.edit("واریز صورت‌حساب به ریال",
                 a.settings.homeBankStatementInRials(day, bankId));
@@ -5525,12 +5549,12 @@ public class HomeScreen extends Screen {
     private android.app.AlertDialog bankImportProgress(String message) {
         LinearLayout body = a.kit.h();
         body.setGravity(Gravity.CENTER_VERTICAL);
-        body.setPadding(Theme.dp(24), Theme.dp(18), Theme.dp(24), Theme.dp(18));
+        body.setPadding(Theme.dp(24), Theme.dp(16), Theme.dp(24), Theme.dp(16));
         ProgressBar progress = new ProgressBar(a);
         progress.setIndeterminate(true);
         body.addView(progress, new LinearLayout.LayoutParams(Theme.dp(36), Theme.dp(36)));
         TextView label = a.kit.text(message, 12f, Theme.TEXT, false);
-        label.setPadding(Theme.dp(14), 0, 0, 0);
+        label.setPadding(Theme.dp(16), 0, 0, 0);
         body.addView(label, a.kit.wlp(1f));
         return new android.app.AlertDialog.Builder(a).setView(body).setCancelable(false).create();
     }
@@ -5749,7 +5773,7 @@ public class HomeScreen extends Screen {
 
         ScrollView scroll = new ScrollView(a);
         LinearLayout body = a.kit.v();
-        body.setPadding(Theme.dp(20), Theme.dp(10), Theme.dp(20), Theme.dp(12));
+        body.setPadding(Theme.dp(20), Theme.dp(12), Theme.dp(20), Theme.dp(12));
         TextView details = a.kit.text(text.toString(), 12f, Theme.TEXT, false);
         details.setTextIsSelectable(true);
         details.setContentDescription("پیش‌نمایش جمع‌ها، ردیف‌های خطادار و محدودیت‌های فایل صورت‌حساب");
@@ -5780,7 +5804,7 @@ public class HomeScreen extends Screen {
         }
         ScrollView scroll = new ScrollView(a);
         LinearLayout body = a.kit.v();
-        body.setPadding(Theme.dp(20), Theme.dp(10), Theme.dp(20), Theme.dp(12));
+        body.setPadding(Theme.dp(20), Theme.dp(12), Theme.dp(20), Theme.dp(12));
         body.addView(a.kit.hint("حساب مقصد را با دقت انتخاب کنید. مقایسه از Query فقط‌خواندنی آتیران و همان بازهٔ شمسی استفاده می‌کند؛ هیچ تغییری در DB/API انجام نمی‌شود."), a.kit.lp(-1, -2));
         List<String> labels = new ArrayList<>();
         for (Row account : accounts) {
@@ -5797,7 +5821,7 @@ public class HomeScreen extends Screen {
         TextView period = a.kit.text("بازهٔ دقیق: " + HomeNumberFormatter.dateText(draft.fromDay)
                         + " تا " + HomeNumberFormatter.dateText(draft.toDay),
                 12f, Theme.TEXT, true);
-        period.setPadding(0, Theme.dp(10), 0, Theme.dp(5));
+        period.setPadding(0, Theme.dp(12), 0, Theme.dp(4));
         body.addView(period, a.kit.lp(-1, -2));
         CheckBox complete = new CheckBox(a);
         complete.setText("تأیید می‌کنم فایل کامل و فقط مربوط به همین حساب آتیران است؛ روز بدون ردیف واقعاً گردش صفر داشته است (یا ردیف‌های حساب‌های دیگر با فیلتر دقیق کنار گذاشته شده‌اند).");
@@ -5980,7 +6004,7 @@ public class HomeScreen extends Screen {
 
         ScrollView scroll = new ScrollView(a);
         LinearLayout body = a.kit.v();
-        body.setPadding(Theme.dp(20), Theme.dp(10), Theme.dp(20), Theme.dp(12));
+        body.setPadding(Theme.dp(20), Theme.dp(12), Theme.dp(20), Theme.dp(12));
         TextView details = a.kit.text(text.toString(), 12f, Theme.TEXT, false);
         details.setTextIsSelectable(true);
         details.setContentDescription("گزارش کامل تطبیق روزانهٔ صورت‌حساب فایل با دفتر read-only آتیران");
@@ -6157,7 +6181,7 @@ public class HomeScreen extends Screen {
         card.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         card.setTag(tag);
         card.setBackground(Theme.dashboardMetric(accent));
-        card.setPadding(Theme.dp(10), Theme.dp(9), Theme.dp(10), Theme.dp(9));
+        card.setPadding(Theme.dp(12), Theme.dp(8), Theme.dp(12), Theme.dp(8));
         LinearLayout head = a.kit.h();
         head.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         head.setGravity(Gravity.CENTER_VERTICAL);
@@ -6178,13 +6202,13 @@ public class HomeScreen extends Screen {
                     new LinearLayout.LayoutParams(0, -2, 1f));
         }
         LinearLayout.LayoutParams gridParams = a.kit.lp(-1, -2);
-        gridParams.topMargin = Theme.dp(7);
+        gridParams.topMargin = Theme.dp(8);
         card.addView(grid, gridParams);
         TextView note = a.kit.text(detail, 9.5f, Theme.dashboardCardMutedInk(accent), false);
         note.setGravity(Gravity.START);
         note.setEllipsize(null);
         LinearLayout.LayoutParams noteParams = a.kit.lp(-1, -2);
-        noteParams.topMargin = Theme.dp(5);
+        noteParams.topMargin = Theme.dp(4);
         card.addView(note, noteParams);
         String spoken = title + "؛ " + status + "؛ " + detail;
         for (int i = 0; i < labels.length; i++) spoken += "؛ " + labels[i] + ": "
@@ -6197,8 +6221,8 @@ public class HomeScreen extends Screen {
         LinearLayout cell = a.kit.v();
         cell.setGravity(Gravity.CENTER);
         cell.setBackground(Theme.dashboardBadge(accent));
-        cell.setPadding(Theme.dp(4), Theme.dp(6), Theme.dp(4), Theme.dp(6));
-        cell.setMinimumHeight(Theme.dp(54));
+        cell.setPadding(Theme.dp(4), Theme.dp(8), Theme.dp(4), Theme.dp(8));
+        cell.setMinimumHeight(Theme.dp(56));
         TextView caption = a.kit.text(label, 9f, Theme.dashboardMutedInk(accent), false);
         caption.setGravity(Gravity.CENTER);
         caption.setMaxLines(1);
@@ -6340,7 +6364,7 @@ public class HomeScreen extends Screen {
     private void showCloseoutCashDialog(LinearLayout content, String day,
                                         boolean openingOnly) {
         android.widget.LinearLayout form = a.kit.v();
-        form.setPadding(Theme.dp(20), Theme.dp(10), Theme.dp(20), Theme.dp(8));
+        form.setPadding(Theme.dp(20), Theme.dp(12), Theme.dp(20), Theme.dp(8));
         form.addView(a.kit.hint("مبالغ به ریال وارد می‌شوند و فقط روی این دستگاه برای همین روز می‌مانند. هیچ تغییری در دفتر فروشگاه ثبت نمی‌شود."), a.kit.lp(-1, -2));
         android.widget.EditText opening = a.kit.edit("موجودی نقد آغاز روز به ریال",
                 a.settings.closeoutCashOpening(day));
@@ -6423,7 +6447,10 @@ public class HomeScreen extends Screen {
         final List<String> sentences = SmartReportEngine.compose(report);
         LinearLayout card = homeCard(Theme.SECTION_SALES);
         card.setTag("home-smart-report");
-        card.setPadding(Theme.dp(12), Theme.dp(9), Theme.dp(12), Theme.dp(12));
+        card.setPadding(Theme.dp(Theme.CARD_PADDING_HORIZONTAL_DP),
+                Theme.dp(Theme.CARD_PADDING_VERTICAL_DP),
+                Theme.dp(Theme.CARD_PADDING_HORIZONTAL_DP),
+                Theme.dp(Theme.CARD_PADDING_VERTICAL_DP));
         Button share = dashboardHeaderAction("اشتراک", Theme.SECTION_SALES,
                 "اشتراک تصویر برندشدهٔ گزارش هوشمند امروز", v -> {
                     try {
@@ -6464,7 +6491,7 @@ public class HomeScreen extends Screen {
         line.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         line.setGravity(Gravity.TOP | Gravity.CENTER_VERTICAL);
         line.setMinimumHeight(Theme.dp(60));
-        line.setPadding(Theme.dp(8), Theme.dp(7), Theme.dp(8), Theme.dp(7));
+        line.setPadding(Theme.dp(8), Theme.dp(8), Theme.dp(8), Theme.dp(8));
         line.setBackground(Theme.dashboardMetric(tone));
         line.setElevation(0f);
         line.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
@@ -6485,7 +6512,7 @@ public class HomeScreen extends Screen {
             TextView chip = a.kit.text(badge, 9f, Theme.sectionText(tone), true);
             chip.setGravity(Gravity.CENTER);
             chip.setSingleLine(true);
-            chip.setPadding(Theme.dp(7), Theme.dp(3), Theme.dp(7), Theme.dp(3));
+            chip.setPadding(Theme.dp(8), Theme.dp(4), Theme.dp(8), Theme.dp(4));
             chip.setBackground(Theme.pill(tone));
             chip.setContentDescription("اولویت همین مورد: " + badge);
             LinearLayout.LayoutParams chipParams = a.kit.lp(-2, -2);
@@ -6506,7 +6533,7 @@ public class HomeScreen extends Screen {
             line.setOnClickListener(action);
         }
         LinearLayout.LayoutParams params = a.kit.lp(-1, -2);
-        if (card.getChildCount() > 1) params.topMargin = Theme.dp(6);
+        if (card.getChildCount() > 1) params.topMargin = Theme.dp(8);
         card.addView(line, params);
     }
 

@@ -93,7 +93,7 @@ public final class Kit {
 
     public Space space(int dpW) {
         Space s = new Space(a);
-        s.setMinimumWidth(Theme.dp(dpW));
+        s.setMinimumWidth(Theme.dp(step(dpW)));
         return s;
     }
 
@@ -103,15 +103,8 @@ public final class Kit {
         return v;
     }
 
-    /** v35: snap every gap to one rhythm so vertical spacing is consistent in all sections. */
-    private static int step(int dp) {
-        if (dp <= 0) return 0;
-        if (dp > 24) return Math.round(dp / 8f) * 8;
-        int[] scale = {2, 4, 6, 8, 12, 16, 20, 24};
-        int best = scale[0];
-        for (int s : scale) if (Math.abs(s - dp) < Math.abs(best - dp)) best = s;
-        return best;
-    }
+    /** Snap horizontal and vertical layout gaps to the shared four-dp rhythm. */
+    private static int step(int dp) { return Theme.snapSpacingDp(dp); }
 
     /** Shared flat card surface with a neutral fill, compact corner radius and border. */
     public LinearLayout luxCard() { return luxCard(0); }
@@ -120,7 +113,10 @@ public final class Kit {
     public LinearLayout luxCard(int accent) {
         LinearLayout c = v();
         c.setBackground(accent == 0 ? Theme.card() : Theme.cardAccent(accent));
-        c.setPadding(Theme.dp(14), Theme.dp(14), Theme.dp(14), Theme.dp(14));
+        c.setPadding(Theme.dp(Theme.CARD_PADDING_HORIZONTAL_DP),
+                Theme.dp(Theme.CARD_PADDING_VERTICAL_DP),
+                Theme.dp(Theme.CARD_PADDING_HORIZONTAL_DP),
+                Theme.dp(Theme.CARD_PADDING_VERTICAL_DP));
         Theme.lift(c, Theme.cardElevation());
         return c;
     }
@@ -131,7 +127,7 @@ public final class Kit {
 
     public void addCard(LinearLayout parent, View card) {
         LinearLayout.LayoutParams p = lp(-1, -2);
-        p.setMargins(0, 0, 0, Theme.dp(10));
+        p.setMargins(0, 0, 0, Theme.dp(12));
         parent.addView(card, p);
     }
 
@@ -139,7 +135,10 @@ public final class Kit {
     public View hero(String glyph, String title, String subtitle, int accent) {
         LinearLayout card = v();
         card.setBackground(Theme.hero(accent));
-        card.setPadding(Theme.dp(14), Theme.dp(12), Theme.dp(14), Theme.dp(12));
+        card.setPadding(Theme.dp(Theme.CARD_PADDING_HORIZONTAL_DP),
+                Theme.dp(Theme.CARD_PADDING_VERTICAL_DP),
+                Theme.dp(Theme.CARD_PADDING_HORIZONTAL_DP),
+                Theme.dp(Theme.CARD_PADDING_VERTICAL_DP));
         LinearLayout row = h();
         row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         int heroVector = MeelanoIcons.iconFor(glyph);
@@ -416,10 +415,10 @@ public final class Kit {
         if (dashboardStyle) {
             tile.setElevation(0f);
             tile.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
-            tile.setMinimumHeight(Theme.dp(148));
         }
+        tile.setMinimumHeight(Theme.dp(dashboardStyle ? 180 : 160));
         int horizontalPad = dashboardStyle ? 8 : 12;
-        int verticalPad = dashboardStyle ? 9 : 11;
+        int verticalPad = dashboardStyle ? 8 : 12;
         tile.setPadding(Theme.dp(horizontalPad), Theme.dp(verticalPad),
                 Theme.dp(horizontalPad), Theme.dp(verticalPad));
         tile.setGravity(Gravity.START);
@@ -442,7 +441,7 @@ public final class Kit {
             symbol.setContentDescription(null);
             symbol.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
             heading.addView(symbol, lp(Theme.dp(20), Theme.dp(20)));
-            heading.addView(space(6));
+            heading.addView(space(8));
         }
         TextView label = text(k.label, 10.5f,
                 dashboardStyle ? Theme.dashboardMutedInk(accent) : Theme.MUTED, false);
@@ -486,7 +485,7 @@ public final class Kit {
             amount.addView(unit, lp(-2, -2));
         } else amount.addView(value, lp(-1, -2));
         LinearLayout.LayoutParams amountParams = lp(-1, -2);
-        amountParams.topMargin = Theme.dp(3);
+        amountParams.topMargin = Theme.dp(4);
         tile.addView(amount, amountParams);
 
         if (k.detail != null && !k.detail.trim().isEmpty()) {
@@ -494,12 +493,12 @@ public final class Kit {
                     dashboardStyle ? Theme.dashboardMutedInk(accent) : Theme.MUTED, false);
             detail.setSingleLine(!dashboardStyle);
             detail.setEllipsize(null);
-            detail.setMinHeight(Theme.dp(dashboardStyle ? 32 : 18));
+            detail.setMinHeight(Theme.dp(dashboardStyle ? 48 : 20));
             tile.addView(detail, lp(-1, -2));
         }
         if (k.spark != null && k.spark.length >= 7) {
-            LinearLayout.LayoutParams sp = lp(-1, Theme.dp(dashboardStyle ? 22 : 26));
-            sp.setMargins(0, Theme.dp(3), 0, Theme.dp(2));
+            LinearLayout.LayoutParams sp = lp(-1, Theme.dp(dashboardStyle ? 24 : 28));
+            sp.setMargins(0, Theme.dp(4), 0, Theme.dp(4));
             Sparkline sparkline = new Sparkline(a, k.spark, accent);
             sparkline.setContentDescription(HomeNumberFormatter.localizeText(
                     k.sparkDescription == null ? "روند هفت‌روزهٔ " + k.label : k.sparkDescription));
@@ -508,8 +507,8 @@ public final class Kit {
         } else if (dashboardStyle) {
             View spacer = new View(a);
             spacer.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-            LinearLayout.LayoutParams sp = lp(-1, Theme.dp(22));
-            sp.setMargins(0, Theme.dp(3), 0, Theme.dp(2));
+            LinearLayout.LayoutParams sp = lp(-1, Theme.dp(24));
+            sp.setMargins(0, Theme.dp(4), 0, Theme.dp(4));
             tile.addView(spacer, sp);
         }
         if (!Double.isNaN(k.countTo) && Ui.motionOk(a)) {
@@ -546,7 +545,7 @@ public final class Kit {
             note.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
             note.setSingleLine(true);
             note.setEllipsize(TextUtils.TruncateAt.END);
-            note.setMinHeight(Theme.dp(28));
+            note.setMinHeight(Theme.dp(dashboardStyle ? 32 : 28));
             tile.addView(note, lp(-1, -2));
         } else if (direction != 0) {
             String detail = sub0.replaceFirst("^(▲|▼|↗|↘)\\s*", "").trim();
@@ -561,7 +560,7 @@ public final class Kit {
             delta.setSingleLine(true);
             delta.setEllipsize(TextUtils.TruncateAt.END);
             if (dashboardStyle) delta.setTag("home-kpi-delta");
-            LinearLayout.LayoutParams deltaParams = lp(-1, Theme.dp(28));
+            LinearLayout.LayoutParams deltaParams = lp(-1, Theme.dp(dashboardStyle ? 32 : 28));
             tile.addView(delta, deltaParams);
         } else {
             TextView note = text(sub0.isEmpty() ? " " : sub0, 10f,
@@ -569,12 +568,13 @@ public final class Kit {
             note.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
             note.setSingleLine(true);
             note.setEllipsize(TextUtils.TruncateAt.END);
-            note.setMinHeight(Theme.dp(28));
+            note.setMinHeight(Theme.dp(dashboardStyle ? 32 : 28));
             tile.addView(note, lp(-1, -2));
         }
         if (!dashboardStyle) {
             TextView more = text(k.action != null ? "مشاهده جزئیات ›" : " ", 9.5f, Theme.PRIMARY, true);
             more.setSingleLine(true);
+            more.setMinHeight(Theme.dp(20));
             tile.addView(more, lp(-1, -2));
         }
         String complete = k.fullValue == null || k.fullValue.trim().isEmpty() ? k.value : k.fullValue;
@@ -616,8 +616,9 @@ public final class Kit {
         for (int i = 0; i < kpis.size(); i++) {
             if (i % span == 0) {
                 row = h();
+                row.setGravity(Gravity.FILL_VERTICAL);
                 LinearLayout.LayoutParams rowParams = lp(-1, -2);
-                if (i > 0) rowParams.setMargins(0, Theme.dp(6), 0, 0);
+                if (i > 0) rowParams.setMargins(0, Theme.dp(8), 0, 0);
                 root.addView(row, rowParams);
             }
             View tile = kpiTile(kpis.get(i));
@@ -626,7 +627,7 @@ public final class Kit {
             row.addView(tile, params);
             if (Ui.motionOk(a)) {
                 tile.setAlpha(0f);
-                tile.setTranslationY(Theme.dp(7));
+                tile.setTranslationY(Theme.dp(8));
                 tile.animate().alpha(1f).translationY(0f)
                         .setStartDelay(Math.min(180, (i % span) * 45L)).setDuration(260).start();
             }

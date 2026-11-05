@@ -215,13 +215,13 @@ public final class HomeDashboardScreenshotTest {
         assertFalse("The new visual system should not substitute 3D artwork",
                 Theme.isIcon3d(Theme.icon3d(R.drawable.mi_account_balance_wallet)));
         assertEquals("Expanded 30-day chip leaves too little title room on a narrow phone",
-                196, MainActivity.headerTitleWidthDp(320, 2, true, false));
+                192, MainActivity.headerTitleWidthDp(320, 4, true, false));
         assertEquals("Collapsed header controls are not included in the narrow-width budget",
-                144, MainActivity.headerTitleWidthDp(320, 2, true, true));
+                140, MainActivity.headerTitleWidthDp(320, 4, true, true));
         verifyDashboardColorContrast();
         Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
         final View[] targets = new View[30];
-        final int[] facts = new int[6];
+        final int[] facts = new int[9];
         final int[] firstKpiRowHeights = new int[2];
         final String[] reconciliationCopy = {""};
         final String[] dailyKpiCopy = {""};
@@ -295,12 +295,18 @@ public final class HomeDashboardScreenshotTest {
                 facts[1] = targets[0] != null
                         && containsViewType(targets[0], HorizontalScrollView.class) ? 1 : 0;
                 facts[2] = targets[1] == null ? 0 : targets[1].getWidth();
+                facts[8] = targets[1] == null ? 0 : targets[1].getHeight();
                 facts[3] = targets[5] == null ? 0 : targets[5].getHeight();
                 Rect visibleLicense = new Rect();
                 facts[4] = targets[6] != null && targets[6].getGlobalVisibleRect(visibleLicense)
                         && visibleLicense.width() == targets[6].getWidth() ? 1 : 0;
+                facts[6] = targets[2] != null
+                        && taggedViewsShareHeight(targets[2], "home-cash-position-metric", 2) ? 1 : 0;
+                facts[7] = targets[3] != null
+                        && taggedViewsShareHeight(targets[3], "home-closeout-metric", 2) ? 1 : 0;
             });
             if (facts[2] > 0 && facts[3] > 0 && facts[4] > 0 && facts[5] > 0
+                    && facts[6] > 0 && facts[7] > 0 && facts[8] > 0
                     && targets[26] != null && targets[27] != null
                     && targets[28] != null && targets[29] != null) break;
             SystemClock.sleep(40L);
@@ -319,11 +325,15 @@ public final class HomeDashboardScreenshotTest {
         assertNotNull("Financial metric tiles were not rendered", targets[1]);
         assertTrue("Financial metric tile is too narrow for its value",
                 facts[2] >= 120f * activityDensity(targets[1]));
+        assertTrue("Financial KPI tile height is not on the common dashboard size",
+                facts[8] >= 180f * activityDensity(targets[1]));
         assertTrue("First-row KPI cards are not aligned to a common height",
                 firstKpiRowHeights[0] > 0
                         && firstKpiRowHeights[0] == firstKpiRowHeights[1]);
         assertNotNull("Cash-position module is missing", targets[2]);
         assertNotNull("Closeout module is missing", targets[3]);
+        assertEquals("Cash-position metric cards are not equal height", 1, facts[6]);
+        assertEquals("Closeout metric cards are not equal height", 1, facts[7]);
         assertNotNull("Smart-report share action is missing", targets[4]);
         assertTrue("Smart-report share action is not clickable", targets[4].isClickable());
         assertNotNull("Cash-position closeout action is missing", targets[28]);
@@ -584,6 +594,26 @@ public final class HomeDashboardScreenshotTest {
                 count += countTaggedViews(group.getChildAt(i), tag);
         }
         return count;
+    }
+
+    private static boolean taggedViewsShareHeight(View view, String tag, int minimumCount) {
+        int[] heights = {-1, 0};
+        collectTaggedHeights(view, tag, heights);
+        return heights[1] >= minimumCount && heights[0] > 0;
+    }
+
+    private static void collectTaggedHeights(View view, String tag, int[] state) {
+        if (view == null) return;
+        if (tag.equals(view.getTag())) {
+            if (state[0] == -1) state[0] = view.getHeight();
+            else if (state[0] != -2 && state[0] != view.getHeight()) state[0] = -2;
+            state[1]++;
+        }
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++)
+                collectTaggedHeights(group.getChildAt(i), tag, state);
+        }
     }
 
     private static void finishPreview(Activity activity) {

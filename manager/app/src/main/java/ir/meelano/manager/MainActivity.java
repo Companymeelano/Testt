@@ -588,11 +588,11 @@ public class MainActivity extends Activity {
         headerWidthDp = widthDp;
         compactHeaderLayout = compact;
         brandMarkExpandedDp = 36;
-        brandHeaderSideInsetDp = compact ? 2 : 4;
+        brandHeaderSideInsetDp = 4;
         brandTitleExpandedSp = compact ? 17 : 18;
         titleExpandedWidthDp = headerTitleWidthDp(widthDp, brandHeaderSideInsetDp, compact, false);
         headerRoot = kit.v();
-        headerRoot.setPadding(Theme.dp(12), Theme.dp(compact ? 4 : 6), Theme.dp(12), Theme.dp(2));
+        headerRoot.setPadding(Theme.dp(12), Theme.dp(8), Theme.dp(12), Theme.dp(8));
 
         // ---- compact, flat brand mark; the company name remains the data-backed identity ----
         brandRow = kit.h();
@@ -637,7 +637,7 @@ public class MainActivity extends Activity {
         licChip.setBackground(Theme.pill(Theme.GOLD));
         licChip.setPadding(Theme.dp(8), Theme.dp(4), Theme.dp(8), Theme.dp(4));
         licChip.setSingleLine(true);
-        licChip.setMinWidth(Theme.dp(tiny ? 52 : 56));
+        licChip.setMinWidth(Theme.dp(56));
         licChip.setMinHeight(Theme.dp(48));
         // A shield + remaining-time label is recognizable as a licence, not a clipped date.
         licChip.setMaxWidth(Theme.dp(tiny ? 72 : 92));
@@ -693,7 +693,7 @@ public class MainActivity extends Activity {
         headerRoot.addView(brandBlock, kit.lp(-1, -2));
         refreshUserChip();
         updateHeaderSyncPill(linkKind);
-        headerToolbarGap = kit.space(compact ? 2 : 4);
+        headerToolbarGap = kit.space(4);
         headerRoot.addView(headerToolbarGap);
 
         // ---- row 2: compact, role-aware tools (the refresh action is intentionally absent) ----
@@ -870,7 +870,7 @@ public class MainActivity extends Activity {
         cell.setContentDescription(desc);
         cell.setMinimumHeight(Theme.dp(52));
         cell.setMinimumWidth(Theme.dp(48));
-        cell.setPadding(Theme.dp(2), Theme.dp(3), Theme.dp(2), Theme.dp(3));
+        cell.setPadding(Theme.dp(4), Theme.dp(4), Theme.dp(4), Theme.dp(4));
         Theme.pressable(cell);
         cell.setOnClickListener(v -> onTap.run());
         icon.setClickable(false);
@@ -896,7 +896,7 @@ public class MainActivity extends Activity {
     /** Accessible overflow for header controls when the full tool row is collapsed or compact. */
     private void showHeaderMenu() {
         LinearLayout body = kit.v();
-        body.setPadding(Theme.dp(14), Theme.dp(10), Theme.dp(14), Theme.dp(14));
+        body.setPadding(Theme.dp(16), Theme.dp(12), Theme.dp(16), Theme.dp(16));
         final AlertDialog[] dialog = new AlertDialog[1];
         if (!history.isEmpty() || !"home".equals(currentId))
             addHeaderMenuAction(body, "بازگشت به صفحهٔ قبلی", R.drawable.mi_arrow_forward,
@@ -924,12 +924,12 @@ public class MainActivity extends Activity {
                                      AlertDialog[] dialog, Runnable action) {
         LinearLayout item = kit.h();
         item.setGravity(Gravity.CENTER_VERTICAL);
-        item.setPadding(Theme.dp(14), Theme.dp(6), Theme.dp(14), Theme.dp(6));
+        item.setPadding(Theme.dp(16), Theme.dp(8), Theme.dp(16), Theme.dp(8));
         item.setMinimumHeight(Theme.dp(56));
         item.setBackground(Theme.ghostButton(Theme.bottomNavAccent()));
         item.addView(kit.icon(icon, Theme.sectionText(Theme.bottomNavAccent()), 28),
                 new LinearLayout.LayoutParams(Theme.dp(28), Theme.dp(28)));
-        item.addView(kit.space(10));
+        item.addView(kit.space(12));
         TextView text = kit.text(label, 13f, Theme.TEXT, true);
         text.setMaxLines(2);
         text.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -941,7 +941,7 @@ public class MainActivity extends Activity {
             action.run();
         });
         LinearLayout.LayoutParams p = kit.lp(-1, -2);
-        p.bottomMargin = Theme.dp(6);
+        p.bottomMargin = Theme.dp(8);
         body.addView(item, p);
     }
 
@@ -1169,9 +1169,9 @@ public class MainActivity extends Activity {
     /** Set the compact header's controls and line count without duplicating the brand mark. */
     private void applyHeaderDensity(boolean collapsed) {
         if (headerRoot == null || brandRow == null) return;
-        int verticalPad = collapsed ? 4 : (compactHeaderLayout ? 6 : 9);
+        int verticalPad = collapsed ? 4 : 8;
         headerRoot.setPadding(Theme.dp(12), Theme.dp(verticalPad), Theme.dp(12),
-                Theme.dp(collapsed ? 4 : 5));
+                Theme.dp(collapsed ? 4 : 8));
         if (brandHeaderBlock != null) {
             int blockVerticalInset = collapsed ? 0 : 4;
             brandHeaderBlock.setPadding(Theme.dp(brandHeaderSideInsetDp),

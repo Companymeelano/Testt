@@ -179,9 +179,10 @@ timeout 900 adb shell am instrument -w -r ir.meelano.manager.debug.test/androidx
 instrumentation_result=${PIPESTATUS[0]}
 set -e
 if [ "$instrumentation_result" -ne 0 ] \
-  || ! grep -Eq 'OK \([1-9][0-9]* tests?\)|INSTRUMENTATION_STATUS: numtests=[1-9]' "$instrumentation_log" \
+  || ! grep -Eq 'OK \([1-9][0-9]* tests?\)' "$instrumentation_log" \
+  || ! grep -Eq 'INSTRUMENTATION_CODE: -1' "$instrumentation_log" \
   || grep -Eq 'INSTRUMENTATION_FAILED|INSTRUMENTATION_STATUS_CODE: -2|FAILURES!!!|Tests run: [0-9]+, Failures: [1-9]' "$instrumentation_log"; then
-  grep -E 'INSTRUMENTATION_STATUS|INSTRUMENTATION_RESULT|INSTRUMENTATION_CODE|INSTRUMENTATION_FAILED|FAILURES!!!|Tests run:|AssertionError|Exception|Error:' "$instrumentation_log" | tail -n 10 | while IFS= read -r line; do
+  grep -E 'INSTRUMENTATION_STATUS|INSTRUMENTATION_RESULT|INSTRUMENTATION_CODE|INSTRUMENTATION_FAILED|FAILURES!!!|Tests run:|OK \(|AssertionError|Exception|Error:' "$instrumentation_log" | tail -n 10 | while IFS= read -r line; do
     safe_line="$(printf '%s' "$line" | sed 's/%/%25/g; s/:/%3A/g')"
     echo "::error title=Home screenshot instrumentation::$safe_line"
   done || true

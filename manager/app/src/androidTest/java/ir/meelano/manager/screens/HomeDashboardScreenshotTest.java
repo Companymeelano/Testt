@@ -53,15 +53,22 @@ import java.util.Locale;
 /** Seed-only instrumentation preview for real Light/Dark, 100%/130% dashboard and sales-chart captures. */
 @RunWith(AndroidJUnit4.class)
 public final class HomeDashboardScreenshotTest {
-    @Test public void captureThemesSectionsAndVerifyLargeFontNutsAccessibility() throws Exception {
+    @Test public void captureThemesAndVerifyLargeFontNutsAccessibility() throws Exception {
         Context target = InstrumentationRegistry.getInstrumentation().getTargetContext();
-        // Exercise the animation-heavy input checks first so no final Activity launch is attempted
-        // after the full series of real-display captures. Each capture independently rejects overlays.
         verifyLargeFontNuts(target);
         verifyEmptyCashPositionOffersDirectOpeningBalanceAction(target);
         capture(target, "light", "home-dashboard-light.png");
         capture(target, "dark", "home-dashboard-dark.png");
-        captureTodayTrendAndFinancialSections(target);
+    }
+
+    @Test public void captureDashboardSectionsAt100Percent() throws Exception {
+        captureDashboardSections(
+                InstrumentationRegistry.getInstrumentation().getTargetContext(), "100", 1);
+    }
+
+    @Test public void captureDashboardSectionsAt130Percent() throws Exception {
+        captureDashboardSections(
+                InstrumentationRegistry.getInstrumentation().getTargetContext(), "130", 3);
     }
 
     private void verifyEmptyCashPositionOffersDirectOpeningBalanceAction(Context target) throws Exception {
@@ -83,28 +90,27 @@ public final class HomeDashboardScreenshotTest {
         }
     }
 
-    private void captureTodayTrendAndFinancialSections(Context target) throws Exception {
-        String[][] scales = {{"100", "1"}, {"130", "3"}};
+    private void captureDashboardSections(Context target, String scale, int zoom) throws Exception {
         String[][] sections = {
                 {"today", "home-financial-kpis", "شاخص‌های روزانه"},
                 {"trend", "home-sales-trend-card", "فروش"},
                 {"financial", "home-financial-overview", "مغایرت‌گیری مالی"}
         };
-        for (String[] scale : scales) {
-            int zoom = Integer.parseInt(scale[1]);
-            Activity activity = startPreview(target, "light", zoom);
-            try {
-                verifyDashboardPolish(activity);
-                for (String[] section : sections) {
-                    String filename = "home-dashboard-" + section[0] + "-" + scale[0] + ".png";
-                    captureSection(target, activity, section[1], section[2], filename);
-                    if ("trend".equals(section[0]))
-                        captureSalesChart(target, activity,
-                                "home-dashboard-trend-chart-" + scale[0] + ".png");
-                }
-            } finally {
-                finishPreview(activity);
+        Activity activity = startPreview(target, "light", zoom);
+        try {
+            verifyDashboardPolish(activity);
+            float expectedFontScale = zoom == 3 ? 1.3f : 1.0f;
+            assertEquals("Dashboard text zoom does not match the requested screenshot scale",
+                    expectedFontScale, Theme.fontScale(), 0.001f);
+            for (String[] section : sections) {
+                String filename = "home-dashboard-" + section[0] + "-" + scale + ".png";
+                captureSection(target, activity, section[1], section[2], filename);
+                if ("trend".equals(section[0]))
+                    captureSalesChart(target, activity,
+                            "home-dashboard-trend-chart-" + scale + ".png");
             }
+        } finally {
+            finishPreview(activity);
         }
     }
 

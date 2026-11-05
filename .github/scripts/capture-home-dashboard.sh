@@ -23,8 +23,16 @@ print(f"Valid PNG: {width}x{height}, {size} bytes")
 PY
 }
 
-emulator_abi="$(adb shell getprop ro.product.cpu.abi | tr -d '\r')"
-emulator_api="$(adb shell getprop ro.build.version.sdk | tr -d '\r')"
+if ! timeout 120 adb wait-for-device; then
+  echo "::error title=Dashboard emulator unavailable::ADB did not report a booted device within 120 seconds."
+  exit 1
+fi
+# Wake and unlock before querying PackageManager; a locked headless user can leave installs pending.
+timeout 5 adb shell input keyevent 224 >/dev/null 2>&1 || true
+timeout 5 adb shell wm dismiss-keyguard >/dev/null 2>&1 || true
+timeout 5 adb shell input keyevent 82 >/dev/null 2>&1 || true
+emulator_abi="$(timeout 10 adb shell getprop ro.product.cpu.abi | tr -d '\r')"
+emulator_api="$(timeout 10 adb shell getprop ro.build.version.sdk | tr -d '\r')"
 echo "::notice title=Dashboard emulator::API ${emulator_api}, ABI ${emulator_abi}"
 
 wait_for_package_service() {
@@ -32,10 +40,10 @@ wait_for_package_service() {
   local elapsed=0
   while [ "$elapsed" -lt "$seconds" ]; do
     local booted
-    booted="$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
+    booted="$(timeout 5 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
     if [ "$booted" = "1" ]; then
       local service_status
-      service_status="$(adb shell service check package 2>/dev/null | tr -d '\r' || true)"
+      service_status="$(timeout 5 adb shell service check package 2>/dev/null | tr -d '\r' || true)"
       if printf '%s' "$service_status" | grep -Eqi 'service package: found'; then
         # Binder may report the service before PackageManager can answer install requests.
         # ADB shell commands may exit 0 even when `cmd` prints "Can't find service: package",
@@ -54,7 +62,7 @@ wait_for_package_service() {
 }
 
 if ! wait_for_package_service 120; then
-  service_status="$(adb shell service check package 2>&1 | tr '\r\n' ' ' || true)"
+  service_status="$(timeout 5 adb shell service check package 2>&1 | tr '\r\n' ' ' || true)"
   echo "::error title=Dashboard emulator not ready::Android package service did not become available within 120 seconds. $service_status"
   exit 1
 fi
@@ -136,36 +144,38 @@ for apk in "$app_apk" "$test_apk"; do
   fi
 done
 
-adb wait-for-device
+timeout 120 adb wait-for-device
 for apk in "$app_apk" "$test_apk"; do
   install_log="$(mktemp)"
   installed=0
   for install_attempt in 1 2 3 4 5; do
-    if wait_for_package_service 60 && adb install -r "$apk" > "$install_log" 2>&1; then
+    if wait_for_package_service 60 && timeout 60 adb install -r "$apk" > "$install_log" 2>&1; then
       installed=1
       break
     fi
     if [ "$install_attempt" -lt 5 ]; then
       echo "::warning::Android package service was temporarily unavailable while installing $apk; retry $((install_attempt + 1))/5."
-      adb wait-for-device
+      timeout 120 adb wait-for-device
       sleep 5
     fi
   done
   if [ "$installed" -ne 1 ]; then
-    install_output="$(tail -n 8 "$install_log" | tr '\r\n' ' ' | sed 's/%/%25/g; s/:/%3A/g')"
+    install_output="$(head -n 3 "$install_log"; tail -n 8 "$install_log")"
+    install_output="$(printf '%s' "$install_output" | tr '\r\n' ' ' | sed 's/%/%25/g; s/:/%3A/g')"
     echo "::error title=Screenshot APK install failed::$apk: $install_output"
     exit 1
   fi
   cat "$install_log"
 done
 
-# Wake the headless emulator and dismiss any pre-existing keyguard before starting the preview.
-adb shell input keyevent 224 >/dev/null 2>&1 || true
-adb shell wm dismiss-keyguard >/dev/null 2>&1 || true
+# Keep the emulator interactive for screenshot capture and start the real instrumentation suite.
+timeout 5 adb shell input keyevent 224 >/dev/null 2>&1 || true
+timeout 5 adb shell wm dismiss-keyguard >/dev/null 2>&1 || true
+timeout 5 adb shell input keyevent 82 >/dev/null 2>&1 || true
 
 instrumentation_log="$(mktemp)"
 set +e
-adb shell am instrument -w -r ir.meelano.manager.debug.test/androidx.test.runner.AndroidJUnitRunner 2>&1 | tee "$instrumentation_log"
+timeout 900 adb shell am instrument -w -r ir.meelano.manager.debug.test/androidx.test.runner.AndroidJUnitRunner 2>&1 | tee "$instrumentation_log"
 instrumentation_result=${PIPESTATUS[0]}
 set -e
 if [ "$instrumentation_result" -ne 0 ] \
@@ -177,26 +187,26 @@ if [ "$instrumentation_result" -ne 0 ] \
   done || true
   exit 1
 fi
-echo "::notice title=Home UI instrumentation::Light/Dark rendering, Nuts large-font layout, 48dp touch targets, and accessibility labels passed."
+echo "::notice title=Home UI instrumentation::Light/Dark rendering, 100%/130% section captures, 48dp touch targets, and accessibility labels passed."
 
 mkdir -p ../design/screenshots
 screenshot_dir="files/home-dashboard-screenshots"
-for theme in light dark; do
-  png_file="../design/screenshots/home-dashboard-$theme.png"
-  if ! adb exec-out run-as ir.meelano.manager.debug cat "$screenshot_dir/home-dashboard-$theme.png" > "$png_file"; then
-    app_files="$(adb shell run-as ir.meelano.manager.debug ls -laR "$screenshot_dir" 2>&1 | tr '\r\n' ' ' || true)"
-    echo "::error title=$theme screenshot extraction failed::Could not read the app-private PNG. run-as output: $app_files"
+for screenshot in light dark today-100 today-130 trend-100 trend-130 financial-100 financial-130; do
+  png_file="../design/screenshots/home-dashboard-$screenshot.png"
+  if ! timeout 30 adb exec-out run-as ir.meelano.manager.debug cat "$screenshot_dir/home-dashboard-$screenshot.png" > "$png_file"; then
+    app_files="$(timeout 10 adb shell run-as ir.meelano.manager.debug ls -laR "$screenshot_dir" 2>&1 | tr '\r\n' ' ' || true)"
+    echo "::error title=$screenshot screenshot extraction failed::Could not read the app-private PNG. run-as output: $app_files"
     exit 1
   fi
   if [ ! -s "$png_file" ]; then
-    echo "::error title=$theme screenshot is empty::App-private screenshot output was empty."
+    echo "::error title=$screenshot screenshot is empty::App-private screenshot output was empty."
     exit 1
   fi
   if ! png_info="$(validate_png_image "$png_file" 2>&1)"; then
-    app_files="$(adb shell run-as ir.meelano.manager.debug ls -laR "$screenshot_dir" 2>&1 | tr '\r\n' ' ' || true)"
+    app_files="$(timeout 10 adb shell run-as ir.meelano.manager.debug ls -laR "$screenshot_dir" 2>&1 | tr '\r\n' ' ' || true)"
     bad_file="$(head -c 120 "$png_file" | tr '\r\n' ' ' | sed 's/%/%25/g; s/:/%3A/g')"
-    echo "::error title=$theme screenshot is not a PNG::$png_info; app-private files: $app_files; extracted prefix: $bad_file"
+    echo "::error title=$screenshot screenshot is not a PNG::$png_info; app-private files: $app_files; extracted prefix: $bad_file"
     exit 1
   fi
-  echo "::notice title=$theme screenshot validated::$png_info"
+  echo "::notice title=$screenshot screenshot validated::$png_info"
 done

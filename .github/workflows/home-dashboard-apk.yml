@@ -17,6 +17,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: home-dashboard-screenshots-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     name: Test, lint, and package Manager debug APK
@@ -208,9 +212,10 @@ jobs:
           retention-days: 30
 
   screenshots:
-    name: Capture Light and Dark Home screenshots
+    name: Capture Home sections at 100% and 130%
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     permissions:
       contents: write
     steps:
@@ -243,7 +248,8 @@ jobs:
         working-directory: manager
         run: gradle :app:assembleDebug :app:assembleDebugAndroidTest -PhomeScreenshotAbi=true -Pandroid.useAndroidX=true --console=plain --no-daemon
 
-      - name: Run the real Home Views on an Android emulator and save both themes
+      - name: Capture the real Home screen and sections at 100% and 130%
+        timeout-minutes: 20
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 30
@@ -266,12 +272,12 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add design/screenshots/home-dashboard-light.png design/screenshots/home-dashboard-dark.png
+          git add design/screenshots/home-dashboard-*.png
           if git diff --cached --quiet; then
             echo "Instrumented screenshots already match the committed Light/Dark pair."
             exit 0
           fi
-          git commit -m "docs(home): add Light and Dark dashboard screenshots"
+          git commit -m "docs(home): add emulator screenshots at 100 and 130 percent"
           git fetch origin arena/e7d9f96e-testt
           git rebase origin/arena/e7d9f96e-testt
           git push origin HEAD:arena/e7d9f96e-testt

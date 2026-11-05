@@ -1286,6 +1286,7 @@ public class HomeScreen extends Screen {
 
     private View salesHero(final Data data, final SyncState syncState) {
         final LinearLayout card = homeCard(Theme.SECTION_SALES);
+        card.setTag("home-sales-trend-card");
         card.setPadding(Theme.dp(Theme.CARD_PADDING_HORIZONTAL_DP),
                 Theme.dp(Theme.CARD_PADDING_VERTICAL_DP),
                 Theme.dp(Theme.CARD_PADDING_HORIZONTAL_DP),

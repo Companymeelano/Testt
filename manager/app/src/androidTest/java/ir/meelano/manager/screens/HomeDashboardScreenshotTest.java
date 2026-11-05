@@ -10,7 +10,6 @@ import android.app.Instrumentation;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
-import android.graphics.Canvas;
 import android.graphics.Rect;
 import android.os.SystemClock;
 import android.view.InputDevice;
@@ -75,24 +74,85 @@ public final class HomeDashboardScreenshotTest {
         }
     }
 
+    @Test public void captureTodayTrendAndFinancialSectionsAt100And130Percent() throws Exception {
+        Context target = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        String[][] scales = {{"100", "1"}, {"130", "3"}};
+        String[][] sections = {
+                {"today", "home-financial-kpis", "شاخص‌های روزانه"},
+                {"trend", "home-sales-trend-card", "فروش"},
+                {"financial", "home-financial-overview", "مغایرت‌گیری مالی"}
+        };
+        for (String[] scale : scales) {
+            int zoom = Integer.parseInt(scale[1]);
+            Activity activity = startPreview(target, "light", zoom);
+            try {
+                verifyDashboardPolish(activity);
+                for (String[] section : sections) {
+                    String filename = "home-dashboard-" + section[0] + "-" + scale[0] + ".png";
+                    captureSection(target, activity, section[1], section[2], filename);
+                }
+            } finally {
+                finishPreview(activity);
+            }
+        }
+    }
+
     private void capture(Context target, String theme, String filename) throws Exception {
         Activity activity = startPreview(target, theme, 1);
-        verifyShellInteractions(activity);
-        // Do not wait for global UI idleness: the live chart may animate continuously.
-        SystemClock.sleep(500L);
+        try {
+            verifyShellInteractions(activity);
+            // Avoid global UI idleness: the live chart can animate while the system screenshot is taken.
+            SystemClock.sleep(500L);
+            saveDeviceScreenshot(target, filename);
+        } finally {
+            finishPreview(activity);
+        }
+    }
+
+    private void captureSection(Context target, Activity activity, String tag,
+                                String expectedTitle, String filename) throws Exception {
         Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
-        final Bitmap[] captured = {null};
+        final View[] section = {null};
+        final ScrollView[] scroll = {null};
+        final String[] copy = {""};
         instrumentation.runOnMainSync(() -> {
             View decor = activity.getWindow().getDecorView();
-            if (decor.getWidth() <= 0 || decor.getHeight() <= 0) return;
-            Bitmap bitmap = Bitmap.createBitmap(decor.getWidth(), decor.getHeight(), Bitmap.Config.ARGB_8888);
-            decor.draw(new Canvas(bitmap));
-            captured[0] = bitmap;
+            section[0] = findTaggedView(decor, tag);
+            View viewport = findTaggedView(decor, "main-scroll-viewport");
+            scroll[0] = viewport instanceof ScrollView ? (ScrollView) viewport : null;
+            if (section[0] != null) collectText(section[0], copy);
         });
-        Bitmap screenshot = captured[0];
-        assertNotNull("Home activity could not render a screenshot", screenshot);
+        assertNotNull("Dashboard section is missing for screenshot: " + tag, section[0]);
+        assertNotNull("Dashboard scroll viewport is missing for screenshot: " + tag, scroll[0]);
+        assertTrue("Dashboard section title is missing for screenshot: " + tag,
+                normalizedAccessibleText(copy[0]).contains(expectedTitle));
+        instrumentation.runOnMainSync(() -> scrollToTarget(scroll[0], section[0]));
+        SystemClock.sleep(500L);
+        Rect visible = new Rect();
+        boolean[] hasVisibleArea = {false};
+        instrumentation.runOnMainSync(() -> hasVisibleArea[0] = section[0].getGlobalVisibleRect(visible));
+        assertTrue("Dashboard section is not visible after scrolling: " + tag,
+                hasVisibleArea[0] && visible.width() > 0 && visible.height() > 0);
+        saveDeviceScreenshot(target, filename);
+    }
+
+    private static void scrollToTarget(ScrollView scroll, View target) {
+        int[] targetLocation = new int[2];
+        int[] viewportLocation = new int[2];
+        target.getLocationOnScreen(targetLocation);
+        scroll.getLocationOnScreen(viewportLocation);
+        int targetTop = targetLocation[1] - viewportLocation[1] + scroll.getScrollY();
+        int margin = Math.round(16f * target.getResources().getDisplayMetrics().density);
+        scroll.scrollTo(scroll.getScrollX(), Math.max(0, targetTop - margin));
+    }
+
+    private static void saveDeviceScreenshot(Context target, String filename) throws Exception {
+        Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
+        Bitmap screenshot = instrumentation.getUiAutomation().takeScreenshot();
+        assertNotNull("Android emulator could not capture the current display", screenshot);
         File directory = new File(target.getFilesDir(), "home-dashboard-screenshots");
-        if (!directory.exists() && !directory.mkdirs()) throw new IllegalStateException("Cannot create screenshot directory");
+        if (!directory.exists() && !directory.mkdirs())
+            throw new IllegalStateException("Cannot create screenshot directory");
         File output = new File(directory, filename);
         try (FileOutputStream stream = new FileOutputStream(output)) {
             if (!screenshot.compress(Bitmap.CompressFormat.PNG, 100, stream))
@@ -101,7 +161,6 @@ public final class HomeDashboardScreenshotTest {
             screenshot.recycle();
         }
         assertValidPng(output);
-        finishPreview(activity);
     }
 
     private static void assertValidPng(File file) throws Exception {
@@ -322,8 +381,9 @@ public final class HomeDashboardScreenshotTest {
         assertTrue("The returns KPI does not expose both labeled 30-day date ranges: "
                         + normalizedReturnsCopy,
                 normalizedReturnsCopy.contains("اسناد برگشتی")
-                        && normalizedReturnsCopy.contains("بازهٔ جاری (۳۰ روز):")
-                        && normalizedReturnsCopy.contains("بازهٔ قبل (۳۰ روز):"));
+                        && normalizedReturnsCopy.contains("بازهٔ جاری:")
+                        && normalizedReturnsCopy.contains("بازهٔ قبل:")
+                        && occurrences(normalizedReturnsCopy, "۳۰ روز") >= 2);
         assertNotNull("Financial metric tiles were not rendered", targets[1]);
         assertTrue("Financial metric tile is too narrow for its value",
                 facts[2] >= 120f * activityDensity(targets[1]));
@@ -560,6 +620,13 @@ public final class HomeDashboardScreenshotTest {
                 restoredDescription[0] = normalizedAccessibleText(chartAndSelector[0].getContentDescription()));
         assertTrue("Sales chart did not return to the available full-history window",
                 restoredDescription[0].contains("۱۴ روز"));
+    }
+
+    private static int occurrences(String text, String needle) {
+        if (text == null || needle == null || needle.isEmpty()) return 0;
+        int count = 0;
+        for (int from = 0; (from = text.indexOf(needle, from)) >= 0; from += needle.length()) count++;
+        return count;
     }
 
     /** Remove bidi isolation controls before matching human-readable accessibility text. */

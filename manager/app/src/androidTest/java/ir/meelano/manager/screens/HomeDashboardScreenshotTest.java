@@ -391,10 +391,20 @@ public final class HomeDashboardScreenshotTest {
         launch.putExtra(MainActivity.EXTRA_HOME_SCREENSHOT_PREVIEW, true);
         launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
-        Activity activity = instrumentation.startActivitySync(launch);
-        assertNotNull("Manager shell did not start", activity);
-        awaitDashboard(instrumentation, activity);
-        return activity;
+        // The live sales chart can keep posting animation frames, so startActivitySync's global
+        // idle wait may time out before a new preview starts. Observe the launch instead of waiting
+        // for the main looper to become idle.
+        Instrumentation.ActivityMonitor monitor = instrumentation.addMonitor(
+                MainActivity.class.getName(), null, false);
+        try {
+            target.startActivity(launch);
+            Activity activity = monitor.waitForActivityWithTimeout(45_000L);
+            assertNotNull("Manager shell did not start within 45 seconds", activity);
+            awaitDashboard(instrumentation, activity);
+            return activity;
+        } finally {
+            instrumentation.removeMonitor(monitor);
+        }
     }
 
     private static void awaitDashboard(Instrumentation instrumentation, Activity activity) {

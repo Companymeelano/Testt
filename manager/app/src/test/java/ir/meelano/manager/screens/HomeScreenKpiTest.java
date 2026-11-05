@@ -47,7 +47,7 @@ public class HomeScreenKpiTest {
 
         assertEquals(Theme.DANGER, kpi.subColor);
         assertTrue(kpi.sub.contains("+"));
-        assertTrue(kpi.detail.contains("مبنای مقایسه (روز قبل)"));
+        assertTrue(kpi.detail.contains("مبنای مقایسهٔ روز قبل"));
         assertTrue(kpi.detail.contains("تومان") || kpi.detail.contains("ریال"));
     }
 
@@ -63,7 +63,7 @@ public class HomeScreenKpiTest {
 
         assertTrue(kpi.sub.contains(HomeNumberFormatter.signedCompactMoney(current - previous)));
         assertFalse(kpi.sub.contains("٪"));
-        assertTrue(kpi.detail.contains("مبنای مقایسه (روز قبل)"));
+        assertTrue(kpi.detail.contains("مبنای مقایسهٔ روز قبل"));
         assertEquals(HomeNumberFormatter.signedCompactMoney(current - previous),
                 HomeScreen.kpiChangeText(current, previous, Double.POSITIVE_INFINITY));
     }

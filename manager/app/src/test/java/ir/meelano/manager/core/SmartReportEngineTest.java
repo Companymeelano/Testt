@@ -79,7 +79,7 @@ public class SmartReportEngineTest {
 
         String change = HomeNumberFormatter.signedCompactMoney(
                 input.salesRials - input.salesBaselineRials);
-        assertTrue(change.startsWith("+"));
+        assertTrue(HomeNumberFormatter.stripIsolates(change).startsWith("+"));
         assertTrue(first.contains(change));
         assertTrue(first.contains("میانگین روزهای هم‌نام"));
         assertFalse(first.contains("٪"));

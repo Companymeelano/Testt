@@ -1,5 +1,8 @@
 package ir.meelano.manager.screens;
 
+import android.app.AlertDialog;
+import android.view.View;
+import android.widget.Button;
 import android.widget.LinearLayout;
 import ir.meelano.manager.core.CacheStore;
 import android.widget.TextView;
@@ -12,6 +15,7 @@ import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.Queries;
 import ir.meelano.manager.core.ReportCatalog;
+import ir.meelano.manager.core.RoleStore;
 import ir.meelano.manager.data.Meta;
 import ir.meelano.manager.data.Repo;
 import ir.meelano.manager.data.Row;
@@ -75,6 +79,63 @@ public class ProfitScreen extends Screen {
                     || row.bd("cogs") == null || row.bd("profit") == null) return false;
         }
         return true;
+    }
+
+    static String grossProfitCoverageWarningTitle(boolean queryIncomplete) {
+        return queryIncomplete ? "سود و زیان نمایش داده نمی‌شود" : "بهای کالا ناقص است";
+    }
+
+    static String grossProfitCoverageDetails(List<Row> daily) {
+        StringBuilder message = new StringBuilder("برای نمایش معتبر سود و حاشیهٔ سود، هر ردیف فروش باید به کالایی با بهای خرید معتبر و غیرمنفی وصل باشد؛ ردیف ناقص با مبلغ صفر جایگزین نمی‌شود.");
+        if (daily == null) return message.append("\nریز روزانه در دسترس نیست.").toString();
+
+        long totalIssues = 0L;
+        int affectedDays = 0;
+        boolean metadataMissing = false;
+        List<String> examples = new ArrayList<>();
+        for (Row row : daily) {
+            Long count = row == null ? null : row.exactLong("qualityIssues");
+            if (count == null || count < 0L) {
+                metadataMissing = true;
+                continue;
+            }
+            if (count == 0L) continue;
+            totalIssues = count > Long.MAX_VALUE - totalIssues ? Long.MAX_VALUE : totalIssues + count;
+            affectedDays++;
+            if (examples.size() < 5) {
+                String date = row.s("day").isEmpty() ? "تاریخ نامشخص" : Jalali.dispFa(row.s("day"));
+                examples.add(date + " · " + HomeNumberFormatter.integer(count) + " ردیف");
+            }
+        }
+        if (totalIssues > 0L) {
+            message.append("\nردیف‌های نیازمند بررسی: ")
+                    .append(HomeNumberFormatter.integer(totalIssues)).append('.');
+            if (!examples.isEmpty()) {
+                message.append("\nنمونهٔ روزها: ");
+                for (int i = 0; i < examples.size(); i++) {
+                    if (i > 0) message.append("؛ ");
+                    message.append(examples.get(i));
+                }
+                if (affectedDays > examples.size()) message.append("؛ و روزهای دیگر");
+            }
+        }
+        if (metadataMissing)
+            message.append("\nجزئیات برخی روزها در دادهٔ موجود نیست؛ مقدار ناقص صفر فرض نشده است.");
+        return message.toString();
+    }
+
+    private void showGrossProfitCoverageDetails(Data data, boolean queryIncomplete) {
+        String title = queryIncomplete ? "جزئیات دادهٔ سود و زیان" : "جزئیات بهای کالا";
+        String detail = queryIncomplete
+                ? "دادهٔ لازم برای محاسبهٔ کامل در دسترس نیست؛ تا دریافت دادهٔ معتبر، سود و حاشیهٔ سود نمایش داده نمی‌شود."
+                : grossProfitCoverageDetails(data == null ? null : data.daily);
+        AlertDialog.Builder dialog = new AlertDialog.Builder(a)
+                .setTitle(title)
+                .setMessage(HomeNumberFormatter.rtlText(detail))
+                .setNegativeButton("بستن", null);
+        if (RoleStore.allowed(a, "products"))
+            dialog.setPositiveButton("فهرست کالاها", (ignored, which) -> a.nav("products"));
+        dialog.show();
     }
 
     @Override
@@ -169,12 +230,18 @@ public class ProfitScreen extends Screen {
             }
             boolean queryIncomplete = d.daily == null || d.sales == null || d.cogs == null;
             LinearLayout warning = a.kit.card(Theme.WARNING);
-            warning.addView(a.kit.text("سود و زیان نمایش داده نمی‌شود", 13f,
-                    Theme.TEXT, true), a.kit.lp(-1, -2));
+            warning.addView(a.kit.text(grossProfitCoverageWarningTitle(queryIncomplete),
+                    13f, Theme.TEXT, true), a.kit.lp(-1, -2));
             warning.addView(a.kit.hint(queryIncomplete
                     ? "دادهٔ لازم برای محاسبهٔ کامل در دسترس نیست؛ سود صفر فرض نشده است."
-                    : "بهای خرید یک یا چند ردیف فروش ناموجود یا نامعتبر است؛ پس از تکمیل آن دوباره بررسی کنید."),
+                    : "بهای خرید یک یا چند ردیف فروش ناموجود یا نامعتبر است؛ سود و حاشیهٔ سود نمایش داده نمی‌شود."),
                     a.kit.lp(-1, -2));
+            Button details = a.kit.btnGhost("جزئیات", Theme.WARNING,
+                    v -> showGrossProfitCoverageDetails(d, queryIncomplete));
+            details.setContentDescription("جزئیات وضعیت بهای کالا و ردیف‌های فروش");
+            LinearLayout.LayoutParams detailsParams = a.kit.lp(-2, -2);
+            detailsParams.topMargin = Theme.dp(6);
+            warning.addView(details, detailsParams);
             a.kit.addCard(content, warning);
             renderNotes(content, d.notes);
             return;

@@ -55,6 +55,19 @@ public final class HomeTrendAnalysis {
         return new Peak(peakIndex, peak, median, multiple);
     }
 
+    /**
+     * Nonlinear, display-only coordinate for a trend chart with a flagged outlier. The raw
+     * values remain untouched for labels, tooltips, and totals; callers should label this scale
+     * as compressed so the visual distance is not mistaken for a linear comparison.
+     */
+    public static double compressedDisplayValue(double value, double referenceValue) {
+        if (!finite(value)) return 0d;
+        if (!finite(referenceValue) || referenceValue <= 0d) return value;
+        double ratio = Math.abs(value) / referenceValue;
+        if (!finite(ratio)) ratio = Double.MAX_VALUE;
+        return Math.copySign(Math.log1p(ratio), value);
+    }
+
     private static boolean finite(double value) {
         return !Double.isNaN(value) && !Double.isInfinite(value);
     }

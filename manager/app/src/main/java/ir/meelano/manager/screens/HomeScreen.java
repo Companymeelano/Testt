@@ -1461,11 +1461,27 @@ public class HomeScreen extends Screen {
         return selector[0];
     }
 
-    private boolean salesSeriesHasActivity(List<SalesSnapshot.Day> series) {
+    static String latestSalesChartDate(List<SalesSnapshot.Day> series) {
+        if (series == null) return "";
+        for (int i = series.size() - 1; i >= 0; i--) {
+            SalesSnapshot.Day day = series.get(i);
+            if (day != null && day.date != null && !day.date.isEmpty()) return day.date;
+        }
+        return "";
+    }
+
+    static boolean salesSeriesHasActivity(List<SalesSnapshot.Day> series) {
         if (series == null) return false;
         for (SalesSnapshot.Day day : series)
             if (day != null && (Math.abs(day.salesRials) >= 0.005d || day.documents > 0)) return true;
         return false;
+    }
+
+    static String salesChartEmptyState(List<SalesSnapshot.Day> series, String window) {
+        if (series == null || series.isEmpty()) return "تاریخچهٔ فروش برای این بازه در دسترس نیست";
+        if (salesSeriesHasActivity(series)) return "";
+        String label = window == null || window.trim().isEmpty() ? "" : " · " + window.trim();
+        return "در این بازه فاکتوری ثبت نشده است" + label;
     }
 
     private HomeTrendAnalysis.Peak salesDominantPeak(List<SalesSnapshot.Day> series) {
@@ -1478,9 +1494,8 @@ public class HomeScreen extends Screen {
 
     private String salesChartHint(List<SalesSnapshot.Day> series,
                                   HomeTrendChart.Point selected, String window) {
-        String hint = series == null || series.isEmpty()
-                ? "تاریخچهٔ فروش برای این بازه در دسترس نیست"
-                : !salesSeriesHasActivity(series) ? "در این بازه فاکتوری ثبت نشده است · " + window
+        String emptyState = salesChartEmptyState(series, window);
+        String hint = !emptyState.isEmpty() ? emptyState
                 : selected == null ? window + " · لمس نمودار برای انتخاب روز"
                 : salesPointLabel(new SalesSnapshot.Day(selected.date,
                         selected.valueRials, selected.documents)) + " · " + window;
@@ -1520,7 +1535,8 @@ public class HomeScreen extends Screen {
             points.add(new HomeTrendChart.Point(day.date, day.salesRials, day.documents));
         String window = salesChartWindowLabel(data, range, series.size());
         chart.setData(points, Theme.SECTION_SALES, "فروش", window);
-        chart.setSelectedDate(snapshotDay(data));
+        String latestDate = latestSalesChartDate(series);
+        chart.setSelectedDate(latestDate.isEmpty() ? snapshotDay(data) : latestDate);
         if (chartHint != null && chartHint.length > 0 && chartHint[0] != null) {
             HomeTrendChart.Point selected = chart.selectedPoint();
             chartHint[0].setText(salesChartHint(series, selected, window));
@@ -3464,9 +3480,12 @@ public class HomeScreen extends Screen {
             return;
         }
         HomeTrendChart.Point point = points.get(peak.index);
+        String graphNote = series != null && series.contains("خرید")
+                ? "قله با مقیاس فشرده نمایش داده شده و مبلغ واقعی تغییر نکرده است."
+                : "این روز از بیشتر روزها خیلی بالاتر است؛ در نمودار حذف نشده است.";
         String message = "روز متفاوت در «" + series + "»: " + Jalali.dispFa(point.date)
                 + " · مبلغ واقعی " + HomeNumberFormatter.money(point.valueRials)
-                + " است. این روز از بیشتر روزها خیلی بالاتر است؛ در نمودار حذف نشده.";
+                + " است. " + graphNote;
         note.setText(message);
         note.setContentDescription(message);
         note.setVisibility(View.VISIBLE);
@@ -4584,10 +4603,10 @@ public class HomeScreen extends Screen {
                     a.kit.lp(-1, -2));
         } else if (!d.grossProfitQualityComplete) {
             card.addView(financialAuditLine("home-gross-profit-incomplete",
-                    "سود نمایش داده نمی‌شود؛ بهای تمام‌شده کامل نیست",
-                    "هزینهٔ خرید یک یا چند ردیف فروش ناموجود یا نامعتبر است. پس از تکمیل بهای کالاها، دوباره بررسی کنید.",
-                    "نیاز به بررسی", Theme.WARNING, Theme.SECTION_GROSS_PROFIT),
-                    a.kit.lp(-1, -2));
+                    ProfitScreen.grossProfitCoverageWarningTitle(false),
+                    "بهای خرید یک یا چند ردیف فروش ناموجود یا نامعتبر است؛ سود نمایش داده نمی‌شود.",
+                    "نیاز به بررسی", Theme.WARNING, Theme.WARNING,
+                    "جزئیات", navAction("profit")), a.kit.lp(-1, -2));
         } else if (d.grossProfitDaily.isEmpty()) {
             card.addView(a.kit.emptyRow("برای ماه جاری فروش قابل محاسبه‌ای ثبت نشده است."),
                     a.kit.lp(-1, -2));
@@ -5184,6 +5203,12 @@ public class HomeScreen extends Screen {
     /** A quiet, accent-keyed audit row; full financial detail remains visible, not ellipsized. */
     private View financialAuditLine(String tag, String title, String detail, String status,
                                     int tone, int accent) {
+        return financialAuditLine(tag, title, detail, status, tone, accent, null, null);
+    }
+
+    private View financialAuditLine(String tag, String title, String detail, String status,
+                                    int tone, int accent, String actionLabel,
+                                    View.OnClickListener action) {
         LinearLayout row = a.kit.h();
         row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         row.setGravity(Gravity.CENTER_VERTICAL);
@@ -5216,8 +5241,19 @@ public class HomeScreen extends Screen {
         LinearLayout.LayoutParams cp = a.kit.lp(-1, -2);
         cp.topMargin = Theme.dp(4);
         body.addView(copy, cp);
+        if (actionLabel != null && !actionLabel.trim().isEmpty() && action != null) {
+            LinearLayout actions = a.kit.h();
+            actions.setGravity(Gravity.END);
+            Button actionButton = dashboardHeaderAction(actionLabel, accent,
+                    actionLabel + "؛ مشاهدهٔ جزئیات", action);
+            actions.addView(actionButton, a.kit.lp(-2, -2));
+            LinearLayout.LayoutParams actionParams = a.kit.lp(-1, -2);
+            actionParams.topMargin = Theme.dp(4);
+            body.addView(actions, actionParams);
+        }
         row.addView(body, a.kit.wlp(1f));
-        row.setContentDescription(title + "؛ " + status + "؛ " + (detail == null ? "" : detail));
+        row.setContentDescription(title + "؛ " + status + "؛ " + (detail == null ? "" : detail)
+                + (actionLabel == null || action == null ? "" : "؛ اقدام " + actionLabel));
         return row;
     }
 

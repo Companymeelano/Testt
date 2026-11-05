@@ -12,6 +12,7 @@ import android.view.View;
 import android.view.ViewConfiguration;
 
 import ir.meelano.manager.core.HomeNumberFormatter;
+import ir.meelano.manager.core.HomeTrendAnalysis;
 import ir.meelano.manager.core.Jalali;
 
 import java.util.ArrayList;
@@ -63,6 +64,8 @@ public final class HomeTrendChart {
         private boolean touched;
         private boolean scrubbing;
         private boolean geometryDirty = true;
+        private boolean compressPurchaseOutlier;
+        private double compressionReference = 1d;
         private String seriesLabel = "روند";
         private String windowLabel = "بازهٔ انتخاب‌شده";
         private String unavailableMessage = "دادهٔ این نمودار در دسترس نیست";
@@ -107,6 +110,7 @@ public final class HomeTrendChart {
             this.accent = accent;
             this.seriesLabel = nonEmpty(series, "روند");
             this.windowLabel = nonEmpty(window, "بازهٔ انتخاب‌شده");
+            updatePurchaseDisplayScale();
             this.unavailableMessage = "دادهٔ این نمودار در این بازه موجود نیست";
             this.available = values != null;
             this.selectedIndex = points.isEmpty() ? -1 : points.size() - 1;
@@ -117,12 +121,25 @@ public final class HomeTrendChart {
             invalidate();
         }
 
+        private void updatePurchaseDisplayScale() {
+            compressPurchaseOutlier = false;
+            compressionReference = 1d;
+            if (!seriesLabel.contains("خرید") || points.isEmpty()) return;
+            double[] values = new double[points.size()];
+            for (int i = 0; i < points.size(); i++) values[i] = points.get(i).valueRials;
+            HomeTrendAnalysis.Peak peak = HomeTrendAnalysis.dominantPeak(values);
+            if (peak == null || !(peak.medianPositiveValue > 0d)) return;
+            compressionReference = peak.medianPositiveValue;
+            compressPurchaseOutlier = true;
+        }
+
         /** No source, failed query, or incomplete monetary data: never render it as zero. */
         public void setUnavailable(String message, int accent, String series, String window) {
             points.clear();
             this.accent = accent;
             this.seriesLabel = nonEmpty(series, "روند");
             this.windowLabel = nonEmpty(window, "بازهٔ انتخاب‌شده");
+            updatePurchaseDisplayScale();
             this.unavailableMessage = nonEmpty(message, "دادهٔ این نمودار در دسترس نیست");
             this.available = false;
             this.selectedIndex = -1;
@@ -162,7 +179,9 @@ public final class HomeTrendChart {
             if (points.isEmpty()) return "نمودار " + seriesLabel + "، " + windowLabel
                     + "؛ در این بازه سندی ثبت نشده است";
             Point latest = points.get(points.size() - 1);
-            return "نمودار " + seriesLabel + "، " + windowLabel
+            String scaleNote = compressPurchaseOutlier
+                    ? "؛ قلهٔ خرید در مقیاس فشرده نمایش داده شده و مبلغ واقعی حفظ شده" : "";
+            return "نمودار " + seriesLabel + "، " + windowLabel + scaleNote
                     + "؛ مبلغ‌ها بر حسب " + MoneyUnit.name()
                     + "؛ روزهای جدیدتر در چپ و قدیمی‌تر در راست؛ آخرین روز "
                     + Jalali.dispFa(latest.date) + "، " + HomeNumberFormatter.money(latest.valueRials)
@@ -259,10 +278,19 @@ public final class HomeTrendChart {
             areaPath.close();
         }
 
+        private double displayScale(double value) {
+            return compressPurchaseOutlier
+                    ? HomeTrendAnalysis.compressedDisplayValue(value, compressionReference) : value;
+        }
+
         private float valueY(double value) {
             double safe = finite(value) ? Math.max(axisMinimum, Math.min(axisMaximum, value)) : axisMinimum;
-            double range = Math.max(1d, axisMaximum - axisMinimum);
-            return (float) (plotBottom - ((safe - axisMinimum) / range) * (plotBottom - plotTop));
+            double minimum = displayScale(axisMinimum);
+            double maximum = displayScale(axisMaximum);
+            double scaled = displayScale(safe);
+            double range = maximum - minimum;
+            if (!(range > 0d) || !finite(range)) range = 1d;
+            return (float) (plotBottom - ((scaled - minimum) / range) * (plotBottom - plotTop));
         }
 
         @Override protected void onDraw(Canvas canvas) {
@@ -323,8 +351,11 @@ public final class HomeTrendChart {
             textPaint.setTextAlign(Paint.Align.RIGHT);
             canvas.drawText("قدیمی‌تر", (float) plotRight, Theme.dp(13) + textPaint.getTextSize(), textPaint);
             textPaint.setTextAlign(Paint.Align.CENTER);
-            canvas.drawText("مقیاس: " + HomeNumberFormatter.chartScaleLabel(axisScale),
-                    (float) ((plotLeft + plotRight) / 2d), Theme.dp(13) + textPaint.getTextSize(), textPaint);
+            String scale = compressPurchaseOutlier
+                    ? "مقیاس فشردهٔ خرید · " + HomeNumberFormatter.chartScaleLabel(axisScale)
+                    : "مقیاس: " + HomeNumberFormatter.chartScaleLabel(axisScale);
+            canvas.drawText(scale, (float) ((plotLeft + plotRight) / 2d),
+                    Theme.dp(13) + textPaint.getTextSize(), textPaint);
         }
 
         /** A quiet, transparent fill and a single straight line keep the values easy to read. */

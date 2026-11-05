@@ -52,6 +52,24 @@ public class HomeScreenKpiTest {
     }
 
     @Test
+    public void receiptsRiseFavorablyWhilePaymentsAndReturnsRiseUnfavorably() {
+        HomeScreen screen = new HomeScreen(null);
+        Kit.Kpi receipt = screen.homeKpi("دریافت", 2_000_000, 1, "قبض امروز", true,
+                1_000_000d, null, Theme.SECTION_RECEIVE,
+                ir.meelano.manager.R.drawable.mi_receipt_long, true, false, null);
+        Kit.Kpi payment = screen.homeKpi("پرداخت", 2_000_000, 1, "قبض امروز", true,
+                1_000_000d, null, Theme.SECTION_PAY,
+                ir.meelano.manager.R.drawable.mi_payments, false, false, null);
+        Kit.Kpi returns = screen.homeKpi("اسناد برگشتی", 1_000_000, 1, "سند", true,
+                500_000d, null, Theme.SECTION_RETURNS,
+                ir.meelano.manager.R.drawable.mi_assignment_return, false, true, null);
+
+        assertEquals(Theme.SUCCESS, receipt.subColor);
+        assertEquals(Theme.DANGER, payment.subColor);
+        assertEquals(Theme.DANGER, returns.subColor);
+    }
+
+    @Test
     public void hugeKpiChangesUseSignedMoneyWhileKeepingTheComparisonBaseVisible() {
         HomeScreen screen = new HomeScreen(null);
         double current = 1_000_000_000_000d;

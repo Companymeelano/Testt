@@ -48,13 +48,34 @@ jobs:
         with:
           gradle-version: 8.11.1
 
-      - name: Fetch pinned offline Persian voice engine
+      - name: Cache the pinned offline Persian voice engine
+        uses: actions/cache@v4
+        with:
+          path: manager/app/libs/sherpa-onnx-1.13.8.aar
+          key: sherpa-onnx-1.13.8-633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96
+
+      - name: Restore or fetch pinned offline Persian voice engine
+        shell: bash
         run: |
+          set -euo pipefail
           mkdir -p manager/app/libs
-          curl --retry 5 --retry-delay 3 --retry-max-time 180 --connect-timeout 15 --max-time 90 -fsSL \
-            -o manager/app/libs/sherpa-onnx-1.13.8.aar \
-            https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-1.13.8.aar
-          echo "633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96  manager/app/libs/sherpa-onnx-1.13.8.aar" | sha256sum -c -
+          aar="manager/app/libs/sherpa-onnx-1.13.8.aar"
+          expected="633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96"
+          if [ -s "$aar" ] && printf '%s  %s\n' "$expected" "$aar" | sha256sum --check --status; then
+            echo "Restored and verified the pinned Persian voice engine from cache."
+          else
+            rm -f "$aar"
+            curl --retry-all-errors --retry 8 --retry-delay 4 --retry-max-time 360 --connect-timeout 20 --max-time 120 -fsSL -o "$aar" https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-1.13.8.aar
+          fi
+          printf '%s  %s\n' "$expected" "$aar" | sha256sum -c -
+
+      - name: Share pinned voice engine with emulator job
+        uses: actions/upload-artifact@v4
+        with:
+          name: pinned-offline-voice-engine-${{ github.sha }}
+          path: manager/app/libs/sherpa-onnx-1.13.8.aar
+          if-no-files-found: error
+          retention-days: 1
 
       - name: Run unit tests, lint, and build debug APK
         working-directory: manager
@@ -240,13 +261,14 @@ jobs:
         with:
           gradle-version: 8.11.1
 
-      - name: Fetch pinned offline Persian voice engine
-        run: |
-          mkdir -p manager/app/libs
-          curl --retry 5 --retry-delay 3 --retry-max-time 180 --connect-timeout 15 --max-time 90 -fsSL \
-            -o manager/app/libs/sherpa-onnx-1.13.8.aar \
-            https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-1.13.8.aar
-          echo "633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96  manager/app/libs/sherpa-onnx-1.13.8.aar" | sha256sum -c -
+      - name: Download pinned offline Persian voice engine
+        uses: actions/download-artifact@v4
+        with:
+          name: pinned-offline-voice-engine-${{ github.sha }}
+          path: manager/app/libs
+
+      - name: Verify pinned offline Persian voice engine
+        run: echo "633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96  manager/app/libs/sherpa-onnx-1.13.8.aar" | sha256sum -c -
 
       - name: Build screenshot APKs before emulator boot
         working-directory: manager

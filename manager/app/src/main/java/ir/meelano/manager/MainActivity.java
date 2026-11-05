@@ -88,6 +88,9 @@ import java.util.Map;
  * Bottom nav (5 hubs) + collapsible brand/sync header + content.
  */
 public class MainActivity extends Activity {
+    public static final String EXTRA_HOME_SCREENSHOT_PREVIEW =
+            "ir.meelano.manager.HOME_SCREENSHOT_PREVIEW";
+
     public Kit kit;
     public Repo repo;
     public Settings settings;
@@ -194,23 +197,32 @@ public class MainActivity extends Activity {
         splash();
     }
 
+    /** Debug-only, seed-data dashboard preview used by the emulator screenshot tests. */
+    public boolean isHomeScreenshotPreview() {
+        return (getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
+                && getIntent() != null
+                && getIntent().getBooleanExtra(EXTRA_HOME_SCREENSHOT_PREVIEW, false);
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
+        final boolean homeScreenshotPreview = isHomeScreenshotPreview();
         // Re-validate the license every time the app comes to the foreground
         // (expired / clock-tampered devices fall back to the activation screen).
         if (!isFinishing() && !LicenseStore.unlocked(this)) toLicense();
         if (!isFinishing() && LicenseStore.unlocked(this)
                 && !new Settings(this).connConfigured()) toLicense();
-        // Secure updater / voice / sync run only after a normal launch; recovery stays quiet.
-        if (!crashRecoveryMode && !isFinishing() && LicenseStore.unlocked(this)) UpdateCenter.autoCheck(this);
-        if (!crashRecoveryMode && !isFinishing() && LicenseStore.unlocked(this)
-                && new Settings(this).connConfigured()) {
+        // Updater, voice, and sync are normal-launch side effects; recovery and screenshot previews stay quiet.
+        if (!homeScreenshotPreview && !crashRecoveryMode && !isFinishing()
+                && LicenseStore.unlocked(this)) UpdateCenter.autoCheck(this);
+        if (!homeScreenshotPreview && !crashRecoveryMode && !isFinishing()
+                && LicenseStore.unlocked(this) && new Settings(this).connConfigured()) {
             ir.meelano.manager.core.Speaker.onResume(this);
         }
         if (!isFinishing() && AtiranAuth.gate(this)) toLogin();
         if (!crashRecoveryMode) Usage.touch(this);
-        if (!crashRecoveryMode && repo != null && !isFinishing()
+        if (!homeScreenshotPreview && !crashRecoveryMode && repo != null && !isFinishing()
                 && RoleStore.WAREHOUSE.equals(effRole())) WarehouseSync.retry(this, null);
         refreshLicChip();
         refreshUserChip();

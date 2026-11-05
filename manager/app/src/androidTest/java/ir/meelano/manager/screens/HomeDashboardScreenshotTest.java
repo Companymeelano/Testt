@@ -5,8 +5,10 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+import android.accessibilityservice.AccessibilityServiceInfo;
 import android.app.Activity;
 import android.app.Instrumentation;
+import android.app.UiAutomation;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
@@ -16,6 +18,8 @@ import android.view.InputDevice;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.accessibility.AccessibilityNodeInfo;
+import android.view.accessibility.AccessibilityWindowInfo;
 import android.widget.HorizontalScrollView;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -43,14 +47,19 @@ import ir.meelano.manager.ui.Theme;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.util.List;
+import java.util.Locale;
 
 /** Seed-only instrumentation preview for real Light/Dark screenshots and large-font Nuts accessibility checks. */
 @RunWith(AndroidJUnit4.class)
 public final class HomeDashboardScreenshotTest {
-    @Test public void captureThemesAndVerifyLargeFontNutsAccessibility() throws Exception {
+    @Test public void captureThemesSectionsAndVerifyLargeFontNutsAccessibility() throws Exception {
         Context target = InstrumentationRegistry.getInstrumentation().getTargetContext();
         capture(target, "light", "home-dashboard-light.png");
         capture(target, "dark", "home-dashboard-dark.png");
+        captureTodayTrendAndFinancialSections(target);
+        // Run input/scroll interaction checks only after every screenshot is saved. Those checks
+        // deliberately send touch events and should not contribute system dialogs to the images.
         verifyLargeFontNuts(target);
     }
 
@@ -74,8 +83,7 @@ public final class HomeDashboardScreenshotTest {
         }
     }
 
-    @Test public void captureTodayTrendAndFinancialSectionsAt100And130Percent() throws Exception {
-        Context target = InstrumentationRegistry.getInstrumentation().getTargetContext();
+    private void captureTodayTrendAndFinancialSections(Context target) throws Exception {
         String[][] scales = {{"100", "1"}, {"130", "3"}};
         String[][] sections = {
                 {"today", "home-financial-kpis", "شاخص‌های روزانه"},
@@ -100,7 +108,7 @@ public final class HomeDashboardScreenshotTest {
     private void capture(Context target, String theme, String filename) throws Exception {
         Activity activity = startPreview(target, theme, 1);
         try {
-            verifyShellInteractions(activity);
+            verifyDashboardPolish(activity);
             // Avoid global UI idleness: the live chart can animate while the system screenshot is taken.
             SystemClock.sleep(500L);
             saveDeviceScreenshot(target, filename);
@@ -148,19 +156,62 @@ public final class HomeDashboardScreenshotTest {
 
     private static void saveDeviceScreenshot(Context target, String filename) throws Exception {
         Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
+        assertNoBlockingDialogs(instrumentation, filename);
         Bitmap screenshot = instrumentation.getUiAutomation().takeScreenshot();
         assertNotNull("Android emulator could not capture the current display", screenshot);
-        File directory = new File(target.getFilesDir(), "home-dashboard-screenshots");
-        if (!directory.exists() && !directory.mkdirs())
-            throw new IllegalStateException("Cannot create screenshot directory");
-        File output = new File(directory, filename);
-        try (FileOutputStream stream = new FileOutputStream(output)) {
-            if (!screenshot.compress(Bitmap.CompressFormat.PNG, 100, stream))
-                throw new IllegalStateException("PNG encoding failed: " + filename);
+        try {
+            // Guard both sides of the real display capture: system/application dialogs are not
+            // acceptable screenshot content, even when the PNG itself is otherwise valid.
+            assertNoBlockingDialogs(instrumentation, filename);
+            File directory = new File(target.getFilesDir(), "home-dashboard-screenshots");
+            if (!directory.exists() && !directory.mkdirs())
+                throw new IllegalStateException("Cannot create screenshot directory");
+            File output = new File(directory, filename);
+            try (FileOutputStream stream = new FileOutputStream(output)) {
+                if (!screenshot.compress(Bitmap.CompressFormat.PNG, 100, stream))
+                    throw new IllegalStateException("PNG encoding failed: " + filename);
+            }
+            assertValidPng(output);
         } finally {
             screenshot.recycle();
         }
-        assertValidPng(output);
+    }
+
+    private static void assertNoBlockingDialogs(Instrumentation instrumentation, String filename) {
+        UiAutomation automation = instrumentation.getUiAutomation();
+        AccessibilityServiceInfo serviceInfo = automation.getServiceInfo();
+        if (serviceInfo != null
+                && (serviceInfo.flags & AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS) == 0) {
+            serviceInfo.flags |= AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS;
+            automation.setServiceInfo(serviceInfo);
+        }
+        StringBuilder visibleText = new StringBuilder();
+        appendAccessibilityText(automation.getRootInActiveWindow(), visibleText, 0);
+        List<AccessibilityWindowInfo> windows = automation.getWindows();
+        if (windows != null) {
+            for (AccessibilityWindowInfo window : windows)
+                appendAccessibilityText(window.getRoot(), visibleText, 0);
+        }
+        String normalized = visibleText.toString().toLowerCase(Locale.ROOT);
+        String details = normalized.length() > 900 ? normalized.substring(0, 900) : normalized;
+        assertFalse(filename + " is covered by the Android System UI not-responding dialog: " + details,
+                normalized.contains("system ui isn't responding")
+                        || normalized.contains("system ui isn’t responding")
+                        || normalized.contains("system ui is not responding"));
+        assertFalse(filename + " contains the Persian speech-engine setup dialog: " + details,
+                normalized.contains("راه‌اندازی صدای فارسی")
+                        || normalized.contains("موتور صدای این گوشی زبان فارسی ندارد"));
+    }
+
+    private static void appendAccessibilityText(AccessibilityNodeInfo node,
+                                                StringBuilder text, int depth) {
+        if (node == null || depth > 64) return;
+        CharSequence label = node.getText();
+        CharSequence description = node.getContentDescription();
+        if (label != null) text.append(label).append(' ');
+        if (description != null) text.append(description).append(' ');
+        for (int i = 0; i < node.getChildCount(); i++)
+            appendAccessibilityText(node.getChild(i), text, depth + 1);
     }
 
     private static void assertValidPng(File file) throws Exception {
@@ -241,7 +292,7 @@ public final class HomeDashboardScreenshotTest {
         AtiranAuth.saveSession(target, 1, "arena-preview", "مدیر نمونه", RoleStore.ADMIN, true, true);
 
         Intent launch = new Intent(target, MainActivity.class);
-        launch.putExtra("ir.meelano.manager.HOME_SCREENSHOT_PREVIEW", true);
+        launch.putExtra(MainActivity.EXTRA_HOME_SCREENSHOT_PREVIEW, true);
         launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
         Activity activity = instrumentation.startActivitySync(launch);

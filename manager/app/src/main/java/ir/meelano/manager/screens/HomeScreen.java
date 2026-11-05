@@ -325,9 +325,7 @@ public class HomeScreen extends Screen {
         final Data cached = loadCached(cachedTs);
         // Instrumentation-only preview: render its seeded cache without attempting a live DB refresh.
         // The intent flag is ignored in non-debug builds, so normal users always get live refreshes.
-        if (cached != null && (a.getApplicationInfo().flags
-                & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0 && a.getIntent() != null
-                && a.getIntent().getBooleanExtra("ir.meelano.manager.HOME_SCREENSHOT_PREVIEW", false)) {
+        if (cached != null && a.isHomeScreenshotPreview()) {
             syncWasRefreshing = false;
             build(content, cached, SyncState.FRESH, cachedTs[0]);
             return;

@@ -411,7 +411,7 @@ public final class HomeNumberFormatter {
     public static String dateTable(String value) {
         String normalized = Jalali.disp(value);
         if (normalized == null || normalized.isEmpty()) return localizeText(value);
-        return isolate(normalized.replace('-', '/'));
+        return isolate(persianDigits(normalized.replace('-', '/')));
     }
 
     /** Full human-facing Jalali date and optional clock time for prose/cards. */

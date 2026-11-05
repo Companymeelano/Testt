@@ -187,11 +187,11 @@ if [ "$instrumentation_result" -ne 0 ] \
   done || true
   exit 1
 fi
-echo "::notice title=Home UI instrumentation::Light/Dark rendering, 100%/130% section captures, 48dp touch targets, and accessibility labels passed."
+echo "::notice title=Home UI instrumentation::Light/Dark rendering, 100%/130% section and sales-chart captures, 48dp touch targets, and accessibility labels passed."
 
 mkdir -p ../design/screenshots
 screenshot_dir="files/home-dashboard-screenshots"
-for screenshot in light dark today-100 today-130 trend-100 trend-130 financial-100 financial-130; do
+for screenshot in light dark today-100 today-130 trend-100 trend-chart-100 trend-130 trend-chart-130 financial-100 financial-130; do
   png_file="../design/screenshots/home-dashboard-$screenshot.png"
   if ! timeout 30 adb exec-out run-as ir.meelano.manager.debug cat "$screenshot_dir/home-dashboard-$screenshot.png" > "$png_file"; then
     app_files="$(timeout 10 adb shell run-as ir.meelano.manager.debug ls -laR "$screenshot_dir" 2>&1 | tr '\r\n' ' ' || true)"

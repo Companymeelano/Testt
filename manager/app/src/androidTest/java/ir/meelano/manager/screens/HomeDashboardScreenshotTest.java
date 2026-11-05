@@ -98,6 +98,9 @@ public final class HomeDashboardScreenshotTest {
                 for (String[] section : sections) {
                     String filename = "home-dashboard-" + section[0] + "-" + scale[0] + ".png";
                     captureSection(target, activity, section[1], section[2], filename);
+                    if ("trend".equals(section[0]))
+                        captureSalesChart(target, activity,
+                                "home-dashboard-trend-chart-" + scale[0] + ".png");
                 }
             } finally {
                 finishPreview(activity);
@@ -141,6 +144,33 @@ public final class HomeDashboardScreenshotTest {
         instrumentation.runOnMainSync(() -> hasVisibleArea[0] = section[0].getGlobalVisibleRect(visible));
         assertTrue("Dashboard section is not visible after scrolling: " + tag,
                 hasVisibleArea[0] && visible.width() > 0 && visible.height() > 0);
+        saveDeviceScreenshot(target, filename);
+    }
+
+    private void captureSalesChart(Context target, Activity activity, String filename) throws Exception {
+        Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
+        final View[] chart = {null};
+        final ScrollView[] scroll = {null};
+        instrumentation.runOnMainSync(() -> {
+            View decor = activity.getWindow().getDecorView();
+            chart[0] = findTaggedView(decor, "home-sales-chart");
+            View viewport = findTaggedView(decor, "main-scroll-viewport");
+            scroll[0] = viewport instanceof ScrollView ? (ScrollView) viewport : null;
+        });
+        assertNotNull("Sales trend chart is missing at this zoom: " + filename, chart[0]);
+        assertNotNull("Dashboard scroll viewport is missing for chart screenshot", scroll[0]);
+        instrumentation.runOnMainSync(() -> scrollToTarget(scroll[0], chart[0]));
+        SystemClock.sleep(500L);
+        Rect visible = new Rect();
+        boolean[] fullyVisible = {false};
+        instrumentation.runOnMainSync(() -> {
+            boolean hasVisibleArea = chart[0].getGlobalVisibleRect(visible);
+            fullyVisible[0] = hasVisibleArea && visible.height() >= chart[0].getHeight()
+                    && visible.width() >= chart[0].getWidth();
+        });
+        assertTrue("Sales chart is clipped in its dedicated screenshot: " + filename
+                + " visible=" + visible.toShortString() + " size="
+                + chart[0].getWidth() + "x" + chart[0].getHeight(), fullyVisible[0]);
         saveDeviceScreenshot(target, filename);
     }
 

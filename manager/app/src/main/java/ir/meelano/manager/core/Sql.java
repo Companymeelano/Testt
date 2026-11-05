@@ -48,6 +48,15 @@ public final class Sql {
         return "LEFT(TRY_CONVERT(nvarchar(30)," + ref(alias, col) + "),10)";
     }
 
+    /**
+     * Display-only date/time text: ISO style for native SQL date types, otherwise preserve
+     * Atiran's stored Jalali text. The caller formats this with HomeNumberFormatter.
+     */
+    public static String dateTimeDisplay(String alias, String col) {
+        if (col == null || col.trim().isEmpty()) return "CAST(NULL AS nvarchar(30))";
+        return "LEFT(TRY_CONVERT(nvarchar(30)," + ref(alias, col) + ",121),19)";
+    }
+
     /** «YYYY/MM» of a date column. */
     public static String month7(String alias, String col) {
         if (col == null || col.trim().isEmpty()) return "CAST(NULL AS nvarchar(7))";

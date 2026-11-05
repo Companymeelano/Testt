@@ -759,10 +759,10 @@ public final class MasterQueries {
         String loginDate = m.colFlex("LoginDetails", "DateServer", "DateClient", "login_date", "logindate", "date", "event_time", "time");
         String loginTable = m.table("LoginDetails") && m.canSelect("LoginDetails") ? m.qTable("LoginDetails") : null;
         String loginApply = loginUser != null && loginDate != null && loginTable != null
-                ? "OUTER APPLY (SELECT MAX(" + Sql.date10("lg", loginDate) + ") lastDay FROM " + loginTable + " lg"
+                ? "OUTER APPLY (SELECT MAX(" + Sql.dateTimeDisplay("lg", loginDate) + ") lastDay FROM " + loginTable + " lg"
                 + " WHERE TRY_CONVERT(nvarchar(100),lg.[" + loginUser + "]) IN (TRY_CONVERT(nvarchar(100),u.[" + id + "])"
                 + (uname == null ? "" : ",TRY_CONVERT(nvarchar(100),u.[" + uname + "])") + ")) ll"
-                : "OUTER APPLY (SELECT CAST(NULL AS nvarchar(10)) lastDay) ll";
+                : "OUTER APPLY (SELECT CAST(NULL AS nvarchar(30)) lastDay) ll";
         // Today's actions (best-effort); the sample keeps these in security.Log.
         String logUser = m.colFlex("Log", "user_id", "userid", "username", "user_name");
         String logDate = m.colFlex("Log", "date", "event_time", "time", "logdate");
@@ -793,7 +793,7 @@ public final class MasterQueries {
         if (date == null && desc == null) throw new Queries.Missing("ساختار «ورودهای کاربران» قابل تشخیص نیست");
         List<Object> binds = new ArrayList<>();
         binds.add(userId);
-        return new Queries.Q("SELECT TOP (100) " + (date == null ? "CAST(NULL AS nvarchar(16))" : "LEFT(TRY_CONVERT(nvarchar(30),[" + date + "]),16)") + " AS at"
+        return new Queries.Q("SELECT TOP (100) " + Sql.dateTimeDisplay(null, date) + " AS at"
                 + ", " + (ip == null ? "N''" : "COALESCE(" + Sql.txt(null, ip, 120) + ",N'')") + " AS ip"
                 + ", " + (desc == null ? "N''" : "COALESCE(" + Sql.txt(null, desc, 400) + ",N'')") + " AS descrip"
                 + " FROM " + m.qTable("LoginDetails") + " WHERE TRY_CONVERT(nvarchar(100),[" + user + "])=?"
@@ -2093,7 +2093,7 @@ public final class MasterQueries {
                 + Sql.activeAnd(cols, "f") + Sql.softAnd(cols, "f");
         return new Queries.Q("SELECT TOP " + Math.max(1, Math.min(500, limit))
                 + " TRY_CONVERT(bigint,f.[" + no + "]) AS id, "
-                + Sql.date10("f", dt) + " AS dt, " + custExpr + " AS cust, " + phoneExpr + " AS phone, "
+                + Sql.dateTimeDisplay("f", dt) + " AS dt, " + custExpr + " AS cust, " + phoneExpr + " AS phone, "
                 + visExpr + " AS visitor, " + routeIdExpr + " AS routeId, " + routeNameExpr + " AS route, "
                 + (all == null ? "0" : "TRY_CONVERT(money,f.[" + all + "])") + " AS amount, "
                 + (tas == null ? "N''" : "COALESCE(" + Sql.txt("f", tas, 10) + ",N'')") + " AS settled"

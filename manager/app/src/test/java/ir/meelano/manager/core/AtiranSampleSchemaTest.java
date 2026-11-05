@@ -334,11 +334,19 @@ public class AtiranSampleSchemaTest {
         assertTrue(users.sql.contains("LEFT JOIN [dbo].[Roles] r"));
         assertTrue(users.sql.contains("FROM [security].[LoginDetails] lg"));
         assertTrue(users.sql.contains("FROM [security].[Log] lo"));
+        assertTrue("User list should retain the login clock for display",
+                users.sql.contains("MAX(LEFT(TRY_CONVERT(nvarchar(30),lg.[DateServer],121),19)) lastDay"));
 
         Queries.Q logins = MasterQueries.userLogins(meta, "7");
         assertTrue(logins.sql.contains("FROM [security].[LoginDetails]"));
+        assertTrue("Login history should return an ISO timestamp for the shared formatter",
+                logins.sql.contains("LEFT(TRY_CONVERT(nvarchar(30),[DateServer],121),19) AS at"));
         Queries.Q lookup = MasterQueries.lookupUsers(meta);
         assertTrue(lookup.sql.contains("FROM [dbo].[sys_users] t"));
+
+        Queries.Q handover = MasterQueries.whDeliveries(meta, "1405/08/13");
+        assertTrue("Handover rows should retain any source clock for TahvilScreen",
+                handover.sql.contains("LEFT(TRY_CONVERT(nvarchar(30),f.[date],121),19) AS dt"));
     }
 
     private static JSONObject loadManifest() throws Exception {

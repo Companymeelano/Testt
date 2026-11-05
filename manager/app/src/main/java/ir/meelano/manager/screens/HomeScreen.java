@@ -3026,7 +3026,8 @@ public class HomeScreen extends Screen {
                 tile.setElevation(0f);
                 tile.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
                 tile.setPadding(Theme.dp(12), Theme.dp(8), Theme.dp(12), Theme.dp(8));
-                tile.setMinimumHeight(Theme.dp(112));
+                // A shared minimum keeps every row at the same height even when a note wraps.
+                tile.setMinimumHeight(Theme.dp(144));
 
                 LinearLayout heading = a.kit.h();
                 heading.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
@@ -3071,7 +3072,9 @@ public class HomeScreen extends Screen {
                 tile.setContentDescription(spoken);
                 if (android.os.Build.VERSION.SDK_INT >= 26) tile.setTooltipText(spoken);
 
-                row.addView(tile, a.kit.wlp(span / (float) count));
+                LinearLayout.LayoutParams tileParams = a.kit.wlp(span / (float) count);
+                tileParams.height = Theme.dp(144);
+                row.addView(tile, tileParams);
                 if (offset < count - 1) row.addView(a.kit.space(8));
             }
             start += count;

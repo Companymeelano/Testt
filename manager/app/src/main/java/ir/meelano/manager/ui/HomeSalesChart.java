@@ -14,6 +14,7 @@ import android.view.ViewConfiguration;
 import android.view.animation.DecelerateInterpolator;
 
 import ir.meelano.manager.core.HomeNumberFormatter;
+import ir.meelano.manager.core.HomeTrendWindow;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.MonotoneCubic;
 import ir.meelano.manager.core.SalesComparison;
@@ -58,6 +59,7 @@ public final class HomeSalesChart {
         private float plotLeft, plotRight, plotTop, plotBottom, spacing;
         private double axisMaximum = 1d;
         private double axisStep = 1d;
+        private double axisScale = 1d;
         private double average;
         private boolean hasSalesActivity;
         private float drawProgress = 1f;
@@ -205,12 +207,14 @@ public final class HomeSalesChart {
             for (SalesSnapshot.Day day : days) maximum = Math.max(maximum, finite(day.salesRials) ? day.salesRials : 0);
             axisStep = niceStep(Math.max(1d, maximum / 5d));
             axisMaximum = Math.max(axisStep, Math.ceil(maximum / axisStep) * axisStep);
+            axisScale = HomeNumberFormatter.chartScale(axisMaximum);
             int tickCount = Math.max(1, Math.min(6, (int) Math.ceil(axisMaximum / axisStep)));
             float labelWidth = 0;
             for (int i = 0; i <= tickCount; i++)
-                labelWidth = Math.max(labelWidth, textPaint.measureText(HomeNumberFormatter.chartMoney(i * axisStep)));
+                labelWidth = Math.max(labelWidth, textPaint.measureText(
+                        HomeNumberFormatter.chartTick(i * axisStep, axisScale)));
             plotLeft = Math.min(width * 0.39f, Math.max(Theme.dp(42), labelWidth + Theme.dp(14)));
-            plotRight = Math.max(plotLeft + Theme.dp(40), width - Theme.dp(8));
+            plotRight = Math.max(plotLeft + Theme.dp(40), width - Theme.dp(16));
             plotTop = Theme.dp(26);
             plotBottom = Math.max(plotTop + Theme.dp(36), height - Theme.dp(34));
             int n = days.size();
@@ -318,15 +322,29 @@ public final class HomeSalesChart {
                 gridPaint.setPathEffect(null);
                 gridPaint.setColor(Theme.alpha(Theme.MUTED, i == 0 ? 80 : 38));
                 canvas.drawLine(plotLeft, y, plotRight, y, gridPaint);
-                canvas.drawText(HomeNumberFormatter.chartMoney(value), plotLeft - Theme.dp(7),
+                canvas.drawText(HomeNumberFormatter.chartTick(value, axisScale), plotLeft - Theme.dp(7),
                         y + textPaint.getTextSize() * 0.34f, textPaint);
             }
             textPaint.setTextSize(sp(8));
             textPaint.setColor(Theme.MUTED);
-            textPaint.setTextAlign(Paint.Align.LEFT);
-            canvas.drawText("جدیدتر", plotLeft, Theme.dp(11) + textPaint.getTextSize(), textPaint);
-            textPaint.setTextAlign(Paint.Align.RIGHT);
-            canvas.drawText("قدیمی‌تر", plotRight, Theme.dp(11) + textPaint.getTextSize(), textPaint);
+            String unitScale = HomeNumberFormatter.chartScaleLabel(axisScale);
+            String scale = "مقیاس: " + unitScale;
+            float plotWidth = plotRight - plotLeft;
+            float sideWidth = textPaint.measureText("جدیدتر")
+                    + textPaint.measureText("قدیمی‌تر") + Theme.dp(12);
+            if (textPaint.measureText(scale) + sideWidth <= plotWidth) {
+                textPaint.setTextAlign(Paint.Align.LEFT);
+                canvas.drawText("جدیدتر", plotLeft, Theme.dp(11) + textPaint.getTextSize(), textPaint);
+                textPaint.setTextAlign(Paint.Align.RIGHT);
+                canvas.drawText("قدیمی‌تر", plotRight, Theme.dp(11) + textPaint.getTextSize(), textPaint);
+            }
+            if (textPaint.measureText(scale) > plotWidth) {
+                textPaint.setTextSize(sp(7f));
+                if (textPaint.measureText(scale) > plotWidth) scale = unitScale;
+            }
+            textPaint.setTextAlign(Paint.Align.CENTER);
+            canvas.drawText(scale, (plotLeft + plotRight) / 2f,
+                    Theme.dp(11) + textPaint.getTextSize(), textPaint);
         }
 
         private void drawFridayBands(Canvas canvas) {
@@ -367,7 +385,7 @@ public final class HomeSalesChart {
                 canvas.drawCircle(todayX, todayY, Theme.dp(2.2f), markerPaint);
             }
             if (touched && selectedIndex >= 0) {
-                float x = plotRight - spacing * selectedIndex;
+                float x = dayX(selectedIndex);
                 float y = pointY[days.size() - 1 - selectedIndex];
                 guidePath.reset();
                 guidePath.moveTo(x, plotTop);
@@ -387,28 +405,31 @@ public final class HomeSalesChart {
             }
         }
 
+        private float dayX(int sourceIndex) {
+            return days.size() <= 1 ? plotLeft : plotRight - spacing * sourceIndex;
+        }
+
         private void drawXLabels(Canvas canvas) {
             if (days.isEmpty()) return;
             textPaint.setTypeface(Theme.face(false));
             textPaint.setTextSize(sp(8));
             textPaint.setColor(Theme.MUTED);
-            textPaint.setTextAlign(Paint.Align.CENTER);
-            int[] ticks = {0, 3, 6, 10, days.size() - 1};
-            int previous = -1;
-            for (int tick : ticks) {
-                int index = Math.max(0, Math.min(days.size() - 1, tick));
-                if (index == previous) continue;
-                previous = index;
-                float x = plotRight - spacing * index;
-                String label = HomeNumberFormatter.dateShortLabel(days.get(index).date);
-                canvas.drawText(label, x, getHeight() - Theme.dp(5), textPaint);
+            for (int index : HomeTrendWindow.dateLabelIndexes(
+                    days.size(), plotRight - plotLeft, Theme.dp(52))) {
+                if (days.size() == 1) textPaint.setTextAlign(Paint.Align.LEFT);
+                else if (index == 0) textPaint.setTextAlign(Paint.Align.RIGHT);
+                else if (index == days.size() - 1) textPaint.setTextAlign(Paint.Align.LEFT);
+                else textPaint.setTextAlign(Paint.Align.CENTER);
+                canvas.drawText(HomeNumberFormatter.dateShortLabel(days.get(index).date),
+                        dayX(index), getHeight() - Theme.dp(5), textPaint);
             }
+            textPaint.setTextAlign(Paint.Align.CENTER);
         }
 
         private void drawTooltip(Canvas canvas) {
             int index = Math.max(0, Math.min(days.size() - 1, selectedIndex));
             SalesSnapshot.Day day = days.get(index);
-            float x = plotRight - spacing * index;
+            float x = dayX(index);
             float y = pointY[days.size() - 1 - index];
             float width = Math.min(Theme.dp(184), plotRight - plotLeft - Theme.dp(8));
             float height = Theme.dp(47);

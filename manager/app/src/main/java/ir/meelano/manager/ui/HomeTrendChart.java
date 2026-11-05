@@ -13,6 +13,7 @@ import android.view.ViewConfiguration;
 
 import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.HomeTrendAnalysis;
+import ir.meelano.manager.core.HomeTrendWindow;
 import ir.meelano.manager.core.Jalali;
 
 import java.util.ArrayList;
@@ -346,14 +347,25 @@ public final class HomeTrendChart {
             }
             textPaint.setTextSize(sp(9f));
             textPaint.setColor(Theme.MUTED);
-            textPaint.setTextAlign(Paint.Align.LEFT);
-            canvas.drawText("جدیدتر", (float) plotLeft, Theme.dp(13) + textPaint.getTextSize(), textPaint);
-            textPaint.setTextAlign(Paint.Align.RIGHT);
-            canvas.drawText("قدیمی‌تر", (float) plotRight, Theme.dp(13) + textPaint.getTextSize(), textPaint);
-            textPaint.setTextAlign(Paint.Align.CENTER);
+            String unitScale = HomeNumberFormatter.chartScaleLabel(axisScale);
             String scale = compressPurchaseOutlier
-                    ? "مقیاس فشردهٔ خرید · " + HomeNumberFormatter.chartScaleLabel(axisScale)
-                    : "مقیاس: " + HomeNumberFormatter.chartScaleLabel(axisScale);
+                    ? "خرید فشرده · " + unitScale : "مقیاس: " + unitScale;
+            float plotWidth = (float) (plotRight - plotLeft);
+            float sideWidth = textPaint.measureText("جدیدتر")
+                    + textPaint.measureText("قدیمی‌تر") + Theme.dp(12);
+            if (textPaint.measureText(scale) + sideWidth <= plotWidth) {
+                textPaint.setTextAlign(Paint.Align.LEFT);
+                canvas.drawText("جدیدتر", (float) plotLeft,
+                        Theme.dp(13) + textPaint.getTextSize(), textPaint);
+                textPaint.setTextAlign(Paint.Align.RIGHT);
+                canvas.drawText("قدیمی‌تر", (float) plotRight,
+                        Theme.dp(13) + textPaint.getTextSize(), textPaint);
+            }
+            if (textPaint.measureText(scale) > plotWidth) {
+                textPaint.setTextSize(sp(8f));
+                if (textPaint.measureText(scale) > plotWidth) scale = unitScale;
+            }
+            textPaint.setTextAlign(Paint.Align.CENTER);
             canvas.drawText(scale, (float) ((plotLeft + plotRight) / 2d),
                     Theme.dp(13) + textPaint.getTextSize(), textPaint);
         }
@@ -436,12 +448,11 @@ public final class HomeTrendChart {
             textPaint.setColor(Theme.MUTED);
             textPaint.setTextAlign(Paint.Align.CENTER);
             int n = points.size();
-            int interval = Math.max(1, (int) Math.ceil((n - 1) / 4d));
             int previous = -1;
-            for (int displayIndex = 0; displayIndex < n; displayIndex += interval) {
+            for (int displayIndex : HomeTrendWindow.dateLabelIndexes(
+                    n, plotRight - plotLeft, Theme.dp(52)))
                 previous = drawDateLabel(canvas, displayIndex, previous);
-            }
-            if (n > 1 && previous != n - 1) drawDateLabel(canvas, n - 1, previous);
+            textPaint.setTextAlign(Paint.Align.CENTER);
         }
 
         private int drawDateLabel(Canvas canvas, int displayIndex, int previous) {

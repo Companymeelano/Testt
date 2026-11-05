@@ -1285,7 +1285,7 @@ public class HomeScreen extends Screen {
 
     private View salesHero(final Data data, final SyncState syncState) {
         final LinearLayout card = homeCard(Theme.SECTION_SALES);
-        card.setPadding(Theme.dp(14), Theme.dp(10), Theme.dp(14), Theme.dp(12));
+        card.setPadding(Theme.dp(16), Theme.dp(10), Theme.dp(16), Theme.dp(12));
         final String[] selectedSalesDate = {data == null ? Jalali.todayStr() : snapshotDay(data)};
         final HomeTrendChart.Area chart = new HomeTrendChart.Area(a);
         View.OnClickListener salesAction = RoleStore.allowed(a, "sales")
@@ -3600,7 +3600,7 @@ public class HomeScreen extends Screen {
         boolean complete = available && points != null;
         final String[] selectedDate = {Jalali.disp(to)};
         LinearLayout card = homeCard(accent);
-        card.setPadding(Theme.dp(12), Theme.dp(9), Theme.dp(12), Theme.dp(11));
+        card.setPadding(Theme.dp(16), Theme.dp(9), Theme.dp(16), Theme.dp(11));
         boolean showAction = shouldShowTrendAction(action != null, available, complete);
         View endAction = showAction ? dashboardHeaderAction(actionLabel, accent,
                 actionLabel + "؛ روز انتخاب‌شدهٔ " + series, v -> action.open(selectedDate[0])) : null;

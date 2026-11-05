@@ -26,4 +26,13 @@ public class HomeTrendWindowTest {
         assertEquals(62, HomeTrendWindow.visibleDays(HomeTrendWindow.ALL, 62));
         assertEquals(8, HomeTrendWindow.visibleDays(30, 8));
     }
+
+    @Test public void dateLabelsStayEvenAndWithinTheReadableWidthBudget() {
+        assertEquals(Arrays.asList(0, 3, 6, 9),
+                HomeTrendWindow.dateLabelIndexes(10, 180d, 60d));
+        assertEquals(Arrays.asList(0, 8, 16, 24, 29),
+                HomeTrendWindow.dateLabelIndexes(30, 240d, 60d));
+        assertEquals(Arrays.asList(0, 1), HomeTrendWindow.dateLabelIndexes(2, 40d, 60d));
+        assertTrue(HomeTrendWindow.dateLabelIndexes(1, 0d, 0d).contains(0));
+    }
 }

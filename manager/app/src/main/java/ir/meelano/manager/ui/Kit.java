@@ -497,7 +497,7 @@ public final class Kit {
             detail.setMinHeight(Theme.dp(dashboardStyle ? 32 : 18));
             tile.addView(detail, lp(-1, -2));
         }
-        if (k.spark != null && k.spark.length > 1) {
+        if (k.spark != null && k.spark.length >= 7) {
             LinearLayout.LayoutParams sp = lp(-1, Theme.dp(dashboardStyle ? 22 : 26));
             sp.setMargins(0, Theme.dp(3), 0, Theme.dp(2));
             Sparkline sparkline = new Sparkline(a, k.spark, accent);

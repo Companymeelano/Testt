@@ -37,4 +37,28 @@ public final class HomeTrendWindow {
         int count = Math.max(0, availableDays);
         return requestedDays == ALL ? count : Math.min(count, Math.max(0, requestedDays));
     }
+
+    /** Evenly spaced date-label indexes, capped by readable pixel spacing and five labels. */
+    public static List<Integer> dateLabelIndexes(int pointCount, double availableWidth,
+                                                 double minimumGap) {
+        int count = Math.max(0, pointCount);
+        if (count == 0) return Collections.emptyList();
+        if (count == 1) return Collections.singletonList(0);
+        int maxLabels = 5;
+        if (finite(availableWidth) && finite(minimumGap) && availableWidth >= 0d
+                && minimumGap > 0d) {
+            int byWidth = (int) Math.floor(availableWidth / minimumGap) + 1;
+            maxLabels = Math.min(maxLabels, Math.max(2, byWidth));
+        }
+        int interval = Math.max(1, (int) Math.ceil((count - 1d) / (maxLabels - 1d)));
+        List<Integer> indexes = new ArrayList<>();
+        for (int index = 0; index < count; index += interval) indexes.add(index);
+        int last = count - 1;
+        if (indexes.get(indexes.size() - 1) != last) indexes.add(last);
+        return Collections.unmodifiableList(indexes);
+    }
+
+    private static boolean finite(double value) {
+        return !Double.isNaN(value) && !Double.isInfinite(value);
+    }
 }

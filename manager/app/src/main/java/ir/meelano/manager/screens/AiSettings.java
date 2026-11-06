@@ -28,7 +28,7 @@ public final class AiSettings {
 
     static final String PREFS = "meelano_ai";
     /** Consent text/scope version; changing it requires the user to opt in again. */
-    private static final int CONSENT_VERSION = 5;
+    private static final int CONSENT_VERSION = 6;
     /** Legacy single-key slot (migrated once into the per-provider slot). */
     static final String KEY_NAME = "ai_key";
 
@@ -151,7 +151,7 @@ public final class AiSettings {
         key.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
 
         final CheckBox consent = new CheckBox(a);
-        consent.setText("با رضایت من، متن پرسش و حداکثر ۶ نوبت اخیر همین گفتگو و فقط نتیجهٔ گزارش/ابزارِ ازپیش‌تعریف‌شده و فقط‌خواندنی آتیران برای پردازش به سرویس AI فرستاده می‌شود. نتیجه ممکن است شامل نام مشتری/تأمین‌کننده/ویزیتور، مانده، فاکتور یا شاخص کارکنان باشد؛ اطلاعات تماس، نشانی و احراز هویت حذف می‌شوند. کل جدول یا پایگاه‌داده ارسال نمی‌شود. در پروکسی، اگر سرویس اصلی پاسخ ندهد ممکن است همان محتوا به سرویس پشتیبانِ پیکربندی‌شده (OpenAI، Gemini یا Groq) هم ارسال شود. اگر صدای طبیعی ابری را روشن کنم، متن پاسخ هم به سرویس گفتار می‌رود؛ صدای فارسی پیش‌فرض محلی است. نگهداری و استفادهٔ ارائه‌دهندگان تابع سیاست خودشان است.");
+        consent.setText("با رضایت من، متن پرسش، حداکثر ۲۰ پیام اخیر همین گفتگو و فقط زمینه/نتیجهٔ گزارش یا ابزارِ ازپیش‌تعریف‌شده و فقط‌خواندنی آتیران برای پردازش به سرویس AI فرستاده می‌شود. نتیجه ممکن است شامل نام مشتری/تأمین‌کننده/ویزیتور، مانده، فاکتور یا شاخص کارکنان باشد؛ اطلاعات تماس، نشانی و احراز هویت حذف می‌شوند. کل جدول یا پایگاه‌داده ارسال نمی‌شود. در پروکسی، اگر سرویس اصلی پاسخ ندهد ممکن است همان محتوا به سرویس پشتیبانِ پیکربندی‌شده (AvalAI، OpenAI، Gemini یا Groq) هم ارسال شود. اگر صدای طبیعی ابری را روشن کنم، متن پاسخ هم به سرویس گفتار می‌رود؛ صدای فارسی پیش‌فرض محلی است. نگهداری و استفادهٔ ارائه‌دهندگان تابع سیاست خودشان است.");
         consent.setTextColor(Theme.TEXT);
         consent.setTextSize(12.5f * Theme.fontScale());
         consent.setChecked(p.getBoolean("consent", false));
@@ -317,7 +317,7 @@ public final class AiSettings {
     private static void buildBackendCard(final MainActivity a, LinearLayout content, final Runnable rerender) {
         LinearLayout card = a.kit.card(Theme.VIOLET);
         card.addView(a.kit.text("🔐 سرور AI امن (PHP)", 14.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
-        card.addView(a.kit.hint("این سرویس جدا از سرور آتیران است. کلیدهای OpenAI، Gemini و Groq فقط در secret manager هاست نگه‌داری می‌شوند؛ پروکسی می‌تواند بین سرویس‌های پیکربندی‌شده جابه‌جا شود. برنامه فقط از HTTPS استفاده می‌کند و نشست را رمزنگاری‌شده نگه می‌دارد. تا استقرار endpoint و تنظیم حساب، این نمونه آنلاین نیست."),
+        card.addView(a.kit.hint("این سرویس جدا از سرور آتیران است. کلیدهای AvalAI، OpenAI، Gemini و Groq فقط در secret manager هاست نگه‌داری می‌شوند؛ پروکسی می‌تواند بین سرویس‌های پیکربندی‌شده جابه‌جا شود. برنامه فقط از HTTPS استفاده می‌کند و نشست را رمزنگاری‌شده نگه می‌دارد. تا استقرار endpoint و تنظیم حساب، این نمونه آنلاین نیست."),
                 a.kit.lp(-1, -2));
         card.addView(a.kit.gap(8));
 

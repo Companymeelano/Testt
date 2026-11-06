@@ -3,6 +3,7 @@ package ir.meelano.manager.core;
 import android.content.Context;
 import android.content.SharedPreferences;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
@@ -12,6 +13,7 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Locale;
 
 /** HTTPS client for the optional, separately deployed PHP AI proxy. */
@@ -24,9 +26,9 @@ public final class AiBackendClient {
     private static final String EXPIRES = "ai_backend_expires";
     private static final String TOKEN = "ai_backend_token";
     private static final String ENABLED = "ai_backend_enabled";
-    private static final int MAX_BODY_BYTES = 64 * 1024;
+    private static final int MAX_BODY_BYTES = 192 * 1024;
     private static final int CONNECT_TIMEOUT_MS = 10_000;
-    private static final int READ_TIMEOUT_MS = 65_000;
+    private static final int READ_TIMEOUT_MS = 100_000;
 
     private static SharedPreferences prefs(Context c) {
         return c.getApplicationContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
@@ -110,6 +112,51 @@ public final class AiBackendClient {
 
     /** Sends one bounded chat request; the PHP service owns provider keys and failover. */
     public static String complete(Context c, String task, String system, String message) throws Exception {
+        return completeRequest(c, task, system, message, null, null, null);
+    }
+
+    /** Sends extracted facts separately from up to twenty role-labeled messages to the secure proxy. */
+    public static String complete(Context c, String task, String system, String context,
+                                  List<String[]> messages) throws Exception {
+        return complete(c, task, system, context, messages, null);
+    }
+
+    /** The optional legacy prompt keeps separately deployed older proxy versions compatible. */
+    public static String complete(Context c, String task, String system, String context,
+                                  List<String[]> messages, String legacyPrompt) throws Exception {
+        if (messages == null || messages.isEmpty() || messages.size() > AssistantPrompt.MAX_CONVERSATION_MESSAGES) {
+            throw new IllegalArgumentException("سابقهٔ گفتگو برای درخواست AI معتبر نیست");
+        }
+        String currentMessage = null;
+        int totalCharacters = 0;
+        for (int i = 0; i < messages.size(); i++) {
+            String[] entry = messages.get(i);
+            if (entry == null || entry.length < 2 || entry[1] == null
+                    || (!"user".equals(entry[0]) && !"assistant".equals(entry[0]))) {
+                throw new IllegalArgumentException("نقش پیام گفتگو معتبر نیست");
+            }
+            String content = entry[1].trim();
+            if (content.isEmpty() || content.length() > 2_000) {
+                throw new IllegalArgumentException("پیام گفتگو خالی یا بیش از حد طولانی است");
+            }
+            totalCharacters += content.length();
+            if (totalCharacters > 24_000) {
+                throw new IllegalArgumentException("سابقهٔ گفتگو بیش از حد طولانی است");
+            }
+            if (i == messages.size() - 1) {
+                if (!"user".equals(entry[0])) {
+                    throw new IllegalArgumentException("پرسش فعلی باید آخرین پیام گفتگو باشد");
+                }
+                currentMessage = content;
+            }
+        }
+        String fallbackPrompt = legacyPrompt == null ? currentMessage : legacyPrompt.trim();
+        return completeRequest(c, task, system, fallbackPrompt, context, messages, currentMessage);
+    }
+
+    private static String completeRequest(Context c, String task, String system, String message,
+                                          String context, List<String[]> messages,
+                                          String currentMessage) throws Exception {
         if (!hasSession(c)) {
             clearSession(c);
             throw new IOException("نشست سرور AI منقضی است؛ دوباره وارد شوید");
@@ -125,6 +172,21 @@ public final class AiBackendClient {
         request.put("task", routeTask);
         request.put("system", bounded(system, 8_000));
         request.put("message", message);
+        if (messages != null) {
+            if (currentMessage == null || currentMessage.trim().isEmpty() || currentMessage.length() > 24_000) {
+                throw new IllegalArgumentException("پرسش فعلی گفتگو معتبر نیست");
+            }
+            request.put("currentMessage", currentMessage);
+            request.put("context", bounded(context, 8_000));
+            JSONArray chat = new JSONArray();
+            for (String[] entry : messages) {
+                JSONObject item = new JSONObject();
+                item.put("role", entry[0]);
+                item.put("content", entry[1].trim());
+                chat.put(item);
+            }
+            request.put("messages", chat);
+        }
         try {
             JSONObject response = post(endpoint, token, request);
             String reply = response.optString("reply", "").trim();

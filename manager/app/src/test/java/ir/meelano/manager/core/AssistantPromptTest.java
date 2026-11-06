@@ -62,6 +62,59 @@ public class AssistantPromptTest {
         assertTrue(prompt, prompt.contains("حذف شد"));
     }
 
+    @Test
+    public void proxyConversationSeparatesFactsAndPreservesOnlyChatRoles() {
+        List<String[]> messages = new ArrayList<>();
+        messages.add(new String[]{"bot", "پیام خوش‌آمدگویی که نباید ارسال شود"});
+        messages.add(new String[]{"user", "فروش امروز؟"});
+        messages.add(new String[]{"bot", "طبق گزارش، ۵۰۰ ریال."});
+        messages.add(new String[]{"user", "سود امروز چقدر است؟"});
+
+        AssistantPrompt.Conversation conversation = AssistantPrompt.buildConversation(
+                "فروش ثبت‌شده: ۵۰۰ ریال", messages, "سود امروز چقدر است؟");
+        assertTrue(conversation.context.contains("فروش ثبت‌شده"));
+        assertTrue(conversation.messages.size() == 3);
+        assertTrue("user".equals(conversation.messages.get(0)[0]));
+        assertTrue("assistant".equals(conversation.messages.get(1)[0]));
+        assertTrue("user".equals(conversation.messages.get(2)[0]));
+        assertFalse(conversation.messages.get(2)[1].contains("خوش‌آمدگویی"));
+        assertEqualsOne(conversation.messages.get(2)[1], "سود امروز چقدر است؟");
+    }
+
+    @Test
+    public void proxyConversationRedactsCredentialLikeContext() {
+        StringBuilder marker = new StringBuilder("sk-");
+        for (int i = 0; i < 24; i++) marker.append('X');
+        AssistantPrompt.Conversation conversation = AssistantPrompt.buildConversation(
+                "گزارش مجاز " + marker, new ArrayList<String[]>(), "سؤال");
+        assertFalse(conversation.context.contains(marker));
+        assertTrue(conversation.context.contains("محرمانه حذف شد"));
+    }
+
+    @Test
+    public void proxyConversationSendsAtMostTwentyRecentMessages() {
+        List<String[]> messages = new ArrayList<>();
+        messages.add(new String[]{"bot", "خوش‌آمدگویی"});
+        for (int i = 0; i < 30; i++) {
+            messages.add(new String[]{"user", "پرسش " + i});
+            messages.add(new String[]{"bot", "پاسخ " + i});
+        }
+        messages.add(new String[]{"user", "پرسش جاری"});
+
+        AssistantPrompt.Conversation conversation = AssistantPrompt.buildConversation("", messages, "پرسش جاری");
+        assertTrue(conversation.messages.size() == AssistantPrompt.MAX_CONVERSATION_MESSAGES);
+        assertTrue("پاسخ 20".equals(conversation.messages.get(0)[1]));
+        assertTrue("پرسش جاری".equals(conversation.messages.get(conversation.messages.size() - 1)[1]));
+        assertEqualsOne(joinMessages(conversation.messages), "پرسش جاری");
+        assertFalse(joinMessages(conversation.messages).contains("پرسش 0"));
+    }
+
+    private static String joinMessages(List<String[]> messages) {
+        StringBuilder text = new StringBuilder();
+        for (String[] message : messages) text.append(message[1]).append('\n');
+        return text.toString();
+    }
+
     private static void assertEqualsOne(String text, String needle) {
         int first = text.indexOf(needle);
         assertTrue(first >= 0);

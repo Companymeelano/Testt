@@ -605,9 +605,9 @@ public final class VisitorDeskScreen extends Screen {
     private void showAiInput(){
         if(!AiSettings.ready(a)){a.kit.toast("دستیار آنلاین هنوز با تأیید مدیر و کلید سرویس فعال نشده است؛ از ورود صوتی آفلاین یا جستجوی کالا استفاده کنید.");return;}
         android.content.SharedPreferences privacy=a.getSharedPreferences("meelano_visitor_ai",0);
-        String consentKey="order_phrase_consent_"+AtiranAuth.sessionUid(a);
+        String consentKey="order_phrase_consent_v2_"+AtiranAuth.sessionUid(a);
         if(!privacy.getBoolean(consentKey,false)){
-            new AlertDialog.Builder(a).setTitle("اجازهٔ پردازش گفتار سفارش").setMessage("فقط جملهٔ نام کالا و تعداد برای پیشنهاد نام/مقدار به سرویس هوش مصنوعی پیکربندی‌شده ارسال می‌شود؛ نام مشتری، قیمت و اطلاعات حساب ارسال نمی‌شوند. هیچ قلمی بدون انتخاب کالا و تأیید شما به سبد افزوده نمی‌شود.").setNegativeButton("فعلاً نه",null).setPositiveButton("می‌پذیرم",(d,w)->{privacy.edit().putBoolean(consentKey,true).apply();showAiInput();}).show();return;
+            new AlertDialog.Builder(a).setTitle("اجازهٔ پردازش گفتار سفارش").setMessage("فقط جملهٔ نام کالا و تعداد برای پیشنهاد نام/مقدار به سرویس هوش مصنوعی پیکربندی‌شده ارسال می‌شود. در پروکسی سازمانی، درخواست ممکن است به ارائه‌دهندهٔ اصلی یا پشتیبانِ تنظیم‌شده (AvalAI، OpenAI، Gemini یا Groq) برسد. نام مشتری، قیمت و اطلاعات حساب ارسال نمی‌شوند. هیچ قلمی بدون انتخاب کالا و تأیید شما به سبد افزوده نمی‌شود.").setNegativeButton("فعلاً نه",null).setPositiveButton("می‌پذیرم",(d,w)->{privacy.edit().putBoolean(consentKey,true).apply();showAiInput();}).show();return;
         }
         EditText phrase=a.kit.edit("مثلاً: دو بسته پسته اکبری و یک کیلو بادام"," ");
         phrase.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);

@@ -13,6 +13,18 @@ on:
       - ".github/workflows/home-dashboard-apk.yml"
       - ".github/scripts/**"
       - "design/home-dashboard-data.md"
+  workflow_dispatch:
+    inputs:
+      publish_apk:
+        description: "Publish the verified debug APK to a GitHub prerelease"
+        required: true
+        type: boolean
+        default: false
+      capture_screenshots:
+        description: "Also run the Home emulator screenshot suite"
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -237,6 +249,7 @@ jobs:
   screenshots:
     name: Capture Home sections at 100% and 130%
     needs: build
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.capture_screenshots }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     permissions:
@@ -314,8 +327,11 @@ jobs:
 
   publish:
     name: Publish verified direct-download Debug APK
-    needs: [build, screenshots]
-    if: ${{ needs.build.result == 'success' && needs.screenshots.result == 'success' && github.event_name == 'push' && contains(github.event.head_commit.message, '[publish-apk]') }}
+    needs: build
+    if: >-
+      ${{ needs.build.result == 'success' &&
+          ((github.event_name == 'push' && contains(github.event.head_commit.message, '[publish-apk]')) ||
+           (github.event_name == 'workflow_dispatch' && inputs.publish_apk)) }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -353,7 +369,7 @@ jobs:
             echo
             echo "APK SHA-256: ${actual_sha256}"
             echo "Debug signer certificate SHA-256: ${signer_sha256}"
-            echo "Home emulator screenshot, unit test, lint, package, and signer checks all passed."
+            echo "Unit tests, lint, debug package, and signer verification passed. Home emulator screenshot capture is a separate check and is not a release prerequisite."
           } > "$notes_file"
           gh release create "$tag" "$asset" \
             --repo "$GITHUB_REPOSITORY" \

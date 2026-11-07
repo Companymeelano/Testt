@@ -32,11 +32,40 @@ public class RoleVisibilityTest {
     }
 
     @Test
-    public void roleTabsStayInsideTheirOwnAllowedList() {
+    public void roleTabsStayInsideTheirOwnAllowedListAndFitTheDock() {
         for (String role : RoleStore.ALL) {
-            for (String tab : RoleStore.tabsFor(role)) {
+            String[] tabs = RoleStore.tabsFor(role);
+            assertTrue(role + " dock exceeds five destinations", tabs.length <= 5);
+            int expectedSlots = RoleStore.VISITOR.equals(role) ? 2 : 5;
+            assertTrue(role + " dock has an unexpected number of useful destinations",
+                    tabs.length == expectedSlots);
+            boolean hasMore = false;
+            for (String tab : tabs) {
                 assertTrue(role + "/" + tab, RoleStore.allowedForRole(role, tab));
+                hasMore |= "more".equals(tab);
             }
+            assertTrue(role + " must retain role-filtered More access", hasMore);
+        }
+    }
+
+    @Test
+    public void destinationsRemovedFromDockRemainAuthorizedForMore() {
+        // MoreScreen filters by this same policy, so these stay reachable without taking
+        // a sixth slot or broadening any role's permissions.
+        assertTrue(RoleStore.allowedForRole(RoleStore.SALES_MANAGER, "reports"));
+        assertTrue(RoleStore.allowedForRole(RoleStore.SELLER, "dues"));
+        assertTrue(RoleStore.allowedForRole(RoleStore.ACCOUNTANT, "reports"));
+        assertTrue(RoleStore.allowedForRole(RoleStore.WAREHOUSE, "shomarsh"));
+        assertTrue(RoleStore.allowedForRole(RoleStore.WAREHOUSE, "score"));
+    }
+
+    @Test
+    public void closeoutFinancialReconciliationRemainsManagerOnly() {
+        assertTrue(RoleStore.allowedForRole(RoleStore.ADMIN, "closeout"));
+        for (String role : RoleStore.ALL) {
+            if (!RoleStore.ADMIN.equals(role))
+                assertFalse(role + " must not open manager closeout reconciliation",
+                        RoleStore.allowedForRole(role, "closeout"));
         }
     }
 

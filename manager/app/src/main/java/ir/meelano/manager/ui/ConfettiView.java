@@ -76,7 +76,13 @@ public class ConfettiView extends View {
     protected void onDraw(Canvas c) {
         int w = getWidth(), h = getHeight();
         if (w <= 0 || h <= 0) return;
-        if (!fired) fire(w, h);
+        if (!fired) {
+            if (!Ui.motionOk(getContext())) {
+                fired = true;
+                return;
+            }
+            fire(w, h);
+        }
         if (x == null) return;
         float fade = frames > 50 ? Math.max(0, 1f - (frames - 50) / 20f) : 1f;
         for (int i = 0; i < n; i++) {

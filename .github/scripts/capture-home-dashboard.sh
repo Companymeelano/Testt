@@ -1,0 +1,213 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$repo_root/manager"
+
+validate_png_image() {
+  python3 - "$1" <<'PY'
+import os
+import struct
+import sys
+
+path = sys.argv[1]
+with open(path, "rb") as image:
+    header = image.read(24)
+if len(header) < 24 or header[:8] != b"\x89PNG\r\n\x1a\n" or header[12:16] != b"IHDR":
+    raise SystemExit("output does not have a valid PNG signature and IHDR header")
+width, height = struct.unpack(">II", header[16:24])
+size = os.path.getsize(path)
+if width < 320 or height < 480 or size < 4096:
+    raise SystemExit(f"PNG is implausibly small: {width}x{height}, {size} bytes")
+print(f"Valid PNG: {width}x{height}, {size} bytes")
+PY
+}
+
+if ! timeout 120 adb wait-for-device; then
+  echo "::error title=Dashboard emulator unavailable::ADB did not report a booted device within 120 seconds."
+  exit 1
+fi
+# Wake and unlock before querying PackageManager; a locked headless user can leave installs pending.
+timeout 5 adb shell input keyevent 224 >/dev/null 2>&1 || true
+timeout 5 adb shell wm dismiss-keyguard >/dev/null 2>&1 || true
+timeout 5 adb shell input keyevent 82 >/dev/null 2>&1 || true
+emulator_abi="$(timeout 10 adb shell getprop ro.product.cpu.abi | tr -d '\r')"
+emulator_api="$(timeout 10 adb shell getprop ro.build.version.sdk | tr -d '\r')"
+echo "::notice title=Dashboard emulator::API ${emulator_api}, ABI ${emulator_abi}"
+
+wait_for_package_service() {
+  local seconds="${1:-90}"
+  local elapsed=0
+  while [ "$elapsed" -lt "$seconds" ]; do
+    local booted
+    booted="$(timeout 5 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
+    if [ "$booted" = "1" ]; then
+      local service_status
+      service_status="$(timeout 5 adb shell service check package 2>/dev/null | tr -d '\r' || true)"
+      if printf '%s' "$service_status" | grep -Eqi 'service package: found'; then
+        # Binder may report the service before PackageManager can answer install requests.
+        # ADB shell commands may exit 0 even when `cmd` prints "Can't find service: package",
+        # so require actual package output before treating the emulator as ready.
+        local package_probe
+        package_probe="$(timeout 5 adb shell pm list packages 2>&1 || true)"
+        if printf '%s\n' "$package_probe" | grep -q '^package:'; then
+          return 0
+        fi
+      fi
+    fi
+    sleep 2
+    elapsed=$((elapsed + 2))
+  done
+  return 1
+}
+
+if ! wait_for_package_service 120; then
+  service_status="$(timeout 5 adb shell service check package 2>&1 | tr '\r\n' ' ' || true)"
+  echo "::error title=Dashboard emulator not ready::Android package service did not become available within 120 seconds. $service_status"
+  exit 1
+fi
+
+if [ "${HOME_SCREENSHOT_APKS_PREBUILT:-0}" != "1" ]; then
+build_log="$(mktemp)"
+attempt=1
+result=1
+while [ "$attempt" -le 3 ]; do
+  set +e
+  gradle :app:assembleDebug :app:assembleDebugAndroidTest -PhomeScreenshotAbi=true -Pandroid.useAndroidX=true --console=plain --stacktrace --no-daemon 2>&1 | tee "$build_log"
+  result=${PIPESTATUS[0]}
+  set -e
+  [ "$result" -eq 0 ] && break
+  if [ "$attempt" -ge 3 ] || ! grep -Eq 'Could not resolve|Could not GET|Could not download|Could not find' "$build_log"; then
+    break
+  fi
+  attempt=$((attempt + 1))
+  echo "::warning::Screenshot APK dependency resolution failed; retrying (${attempt}/3)."
+  sleep 15
+done
+
+if [ "$result" -ne 0 ]; then
+  report_file="$(mktemp)"
+  python3 - <<'PY' > "$report_file"
+from pathlib import Path
+from xml.etree import ElementTree
+
+reports = sorted(Path("app/build").rglob("TEST-*.xml"))
+summary = []
+for report in reports:
+    try:
+        root = ElementTree.parse(report).getroot()
+    except Exception as error:
+        summary.append(f"Could not parse {report}: {error}")
+        continue
+    suites = [root] + [node for node in root.iter("testsuite") if node is not root]
+    for suite in suites:
+        summary.append(
+            f"{report}: {suite.tag} name={suite.get('name', '')} "
+            f"tests={suite.get('tests', '?')} failures={suite.get('failures', '?')} "
+            f"errors={suite.get('errors', '?')} skipped={suite.get('skipped', '?')}"
+        )
+    for node in root.iter():
+        if node.tag in ("failure", "error"):
+            summary.append(f"{node.tag}: {node.get('message', '')} {(node.text or '').strip()[:1800]}")
+        elif node.tag == "system-err" and (node.text or '').strip():
+            summary.append("system-err: " + (node.text or '').strip()[:1200])
+if not summary:
+    summary.append("No JUnit XML report was found under app/build.")
+print("\n".join(summary)[:8000])
+PY
+  report_count=0
+  while IFS= read -r line; do
+    [ "$report_count" -ge 5 ] && break
+    [ -n "$line" ] || continue
+    safe_line="$(printf '%s' "$line" | sed 's/%/%25/g; s/:/%3A/g')"
+    echo "::error title=Screenshot APK build report::$safe_line"
+    report_count=$((report_count + 1))
+  done < "$report_file"
+
+  diagnostics="$(grep -E 'FAILURE:|Execution failed|Could not |Caused by:|error:|FAILED$|ErrorName:|ErrorCode:' "$build_log" | tail -n 4 || true)"
+  if [ -z "$diagnostics" ]; then diagnostics="$(tail -n 4 "$build_log")"; fi
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    safe_line="$(printf '%s' "$line" | sed 's/%/%25/g; s/:/%3A/g')"
+    echo "::error title=Screenshot APK build diagnostics::$safe_line"
+  done <<< "$diagnostics"
+  exit 1
+fi
+fi
+
+app_apk="app/build/outputs/apk/debug/app-debug.apk"
+test_apk="app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk"
+for apk in "$app_apk" "$test_apk"; do
+  if [ ! -s "$apk" ]; then
+    echo "::error title=Screenshot APK missing::$apk was not produced by the Android build."
+    exit 1
+  fi
+done
+
+timeout 120 adb wait-for-device
+for apk in "$app_apk" "$test_apk"; do
+  install_log="$(mktemp)"
+  installed=0
+  for install_attempt in 1 2 3 4 5; do
+    if wait_for_package_service 60 && timeout 60 adb install -r "$apk" > "$install_log" 2>&1; then
+      installed=1
+      break
+    fi
+    if [ "$install_attempt" -lt 5 ]; then
+      echo "::warning::Android package service was temporarily unavailable while installing $apk; retry $((install_attempt + 1))/5."
+      timeout 120 adb wait-for-device
+      sleep 5
+    fi
+  done
+  if [ "$installed" -ne 1 ]; then
+    install_output="$(head -n 3 "$install_log"; tail -n 8 "$install_log")"
+    install_output="$(printf '%s' "$install_output" | tr '\r\n' ' ' | sed 's/%/%25/g; s/:/%3A/g')"
+    echo "::error title=Screenshot APK install failed::$apk: $install_output"
+    exit 1
+  fi
+  cat "$install_log"
+done
+
+# Keep the emulator interactive for screenshot capture and start the real instrumentation suite.
+timeout 5 adb shell input keyevent 224 >/dev/null 2>&1 || true
+timeout 5 adb shell wm dismiss-keyguard >/dev/null 2>&1 || true
+timeout 5 adb shell input keyevent 82 >/dev/null 2>&1 || true
+
+instrumentation_log="$(mktemp)"
+set +e
+timeout 900 adb shell am instrument -w -r ir.meelano.manager.debug.test/androidx.test.runner.AndroidJUnitRunner 2>&1 | tee "$instrumentation_log"
+instrumentation_result=${PIPESTATUS[0]}
+set -e
+if [ "$instrumentation_result" -ne 0 ] \
+  || ! grep -Eq 'OK \([1-9][0-9]* tests?\)' "$instrumentation_log" \
+  || ! grep -Eq 'INSTRUMENTATION_CODE: -1' "$instrumentation_log" \
+  || grep -Eq 'INSTRUMENTATION_FAILED|INSTRUMENTATION_STATUS_CODE: -2|FAILURES!!!|Tests run: [0-9]+, Failures: [1-9]' "$instrumentation_log"; then
+  grep -E 'INSTRUMENTATION_STATUS|INSTRUMENTATION_RESULT|INSTRUMENTATION_CODE|INSTRUMENTATION_FAILED|FAILURES!!!|Tests run:|OK \(|AssertionError|Exception|Error:' "$instrumentation_log" | tail -n 10 | while IFS= read -r line; do
+    safe_line="$(printf '%s' "$line" | sed 's/%/%25/g; s/:/%3A/g')"
+    echo "::error title=Home screenshot instrumentation::$safe_line"
+  done || true
+  exit 1
+fi
+echo "::notice title=Home UI instrumentation::Light/Dark rendering, 100%/130% section and sales-chart captures, 48dp touch targets, and accessibility labels passed."
+
+mkdir -p ../design/screenshots
+screenshot_dir="files/home-dashboard-screenshots"
+for screenshot in light dark today-100 today-130 trend-100 trend-chart-100 trend-130 trend-chart-130 financial-100 financial-130; do
+  png_file="../design/screenshots/home-dashboard-$screenshot.png"
+  if ! timeout 30 adb exec-out run-as ir.meelano.manager.debug cat "$screenshot_dir/home-dashboard-$screenshot.png" > "$png_file"; then
+    app_files="$(timeout 10 adb shell run-as ir.meelano.manager.debug ls -laR "$screenshot_dir" 2>&1 | tr '\r\n' ' ' || true)"
+    echo "::error title=$screenshot screenshot extraction failed::Could not read the app-private PNG. run-as output: $app_files"
+    exit 1
+  fi
+  if [ ! -s "$png_file" ]; then
+    echo "::error title=$screenshot screenshot is empty::App-private screenshot output was empty."
+    exit 1
+  fi
+  if ! png_info="$(validate_png_image "$png_file" 2>&1)"; then
+    app_files="$(timeout 10 adb shell run-as ir.meelano.manager.debug ls -laR "$screenshot_dir" 2>&1 | tr '\r\n' ' ' || true)"
+    bad_file="$(head -c 120 "$png_file" | tr '\r\n' ' ' | sed 's/%/%25/g; s/:/%3A/g')"
+    echo "::error title=$screenshot screenshot is not a PNG::$png_info; app-private files: $app_files; extracted prefix: $bad_file"
+    exit 1
+  fi
+  echo "::notice title=$screenshot screenshot validated::$png_info"
+done

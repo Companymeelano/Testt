@@ -5,6 +5,7 @@ import android.widget.LinearLayout;
 import ir.meelano.manager.core.CacheStore;
 
 import ir.meelano.manager.MainActivity;
+import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.MoneyQueries;
@@ -62,7 +63,8 @@ public class CashScreen extends Screen {
         content.addView(heroCard(), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(12));
         String[] names = new String[HORIZONS.length];
-        for (int i = 0; i < HORIZONS.length; i++) names[i] = Money.fa(String.valueOf(HORIZONS[i])) + " روزه";
+        for (int i = 0; i < HORIZONS.length; i++)
+            names[i] = HomeNumberFormatter.integer(HORIZONS[i]) + " روزه";
         content.addView(a.kit.chips(names, horizonIdx, idx -> {
             horizonIdx = idx;
             render(content);
@@ -162,14 +164,14 @@ public class CashScreen extends Screen {
         // ---- KPIs ----
         List<Kit.Kpi> kpis = new ArrayList<>();
         kpis.add(new Kit.Kpi("ورودی چک‌ها", inT, Money.compactRial(inT),
-                Money.fa(String.valueOf(Math.round(inN))) + " فقره", Theme.SUCCESS));
+                HomeNumberFormatter.integer(Math.round(inN)) + " فقره", Theme.SUCCESS));
         kpis.add(new Kit.Kpi("خروجی چک‌ها", outT, Money.compactRial(outT),
-                Money.fa(String.valueOf(Math.round(outN))) + " فقره", Theme.WARNING));
+                HomeNumberFormatter.integer(Math.round(outN)) + " فقره", Theme.WARNING));
         kpis.add(new Kit.Kpi("خالص دوره", net, Money.compactRial(net),
                 net >= 0 ? "مازاد نقدینگی" : "کسری نقدینگی",
                 net >= 0 ? Theme.SUCCESS : Theme.DANGER));
         String cover = outT > 0 ? Money.pct(inT * 100.0 / outT) : "—";
-        kpis.add(new Kit.Kpi("نسبت پوشش", Money.fa(cover), "ورودی به خروجی", Theme.INFO));
+        kpis.add(new Kit.Kpi("نسبت پوشش", cover, "ورودی به خروجی", Theme.INFO));
         content.addView(a.kit.kpiGrid(kpis, 2), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(12));
 
@@ -177,7 +179,7 @@ public class CashScreen extends Screen {
         final List<Charts.Point> pts = new ArrayList<>();
         for (Map.Entry<String, double[]> e : days.entrySet()) {
             double nv = e.getValue()[1] - e.getValue()[3];
-            pts.add(new Charts.Point(Jalali.shortLabel(Jalali.faDate(e.getKey())), nv,
+            pts.add(new Charts.Point(HomeNumberFormatter.dateShortLabel(e.getKey()), nv,
                     nv >= 0 ? Theme.SUCCESS : Theme.DANGER));
         }
         LinearLayout chart = a.kit.card(accent());

@@ -17,6 +17,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import ir.meelano.manager.data.Settings;
+
 /**
  * Smart LAN discovery (v31): the customer types ONE server address and the
  * app finds the reachable SQL Server itself — the typed host first, then the
@@ -59,6 +61,22 @@ public final class LanDiscover {
         } catch (Exception e) {
             return 0;
         }
+    }
+
+    /**
+     * Resolve the endpoint port. An explicit host:port is authoritative, so a stale
+     * prefilled port field cannot silently replace (for example) 5050 with 1433.
+     */
+    public static int resolvePort(String portText, String typedAddress) {
+        int inAddress = typedPort(typedAddress);
+        return inAddress > 0 ? inAddress : Settings.parsePort(portText);
+    }
+
+    /** Same endpoint only when both normalized hosts AND their effective ports match. */
+    public static boolean sameEndpoint(String hostA, int portA, String hostB, int portB) {
+        String a = clean(hostA);
+        String b = clean(hostB);
+        return !a.isEmpty() && a.equalsIgnoreCase(b) && portA == portB;
     }
 
     private static final int TCP_MS = 600;

@@ -180,8 +180,8 @@ public final class UpdateCenter {
             if (last <= 0) return "آخرین بررسی نسخه جدید: هنوز بررسی نشده";
             long days = (System.currentTimeMillis() - last) / 86400000L;
             String when = days <= 0 ? "امروز" : (days == 1 ? "دیروز"
-                    : Money.fa(String.valueOf(days)) + " روز پیش");
-            return "آخرین بررسی نسخه جدید: " + when;
+                    : HomeNumberFormatter.integer(days) + " روز پیش");
+            return HomeNumberFormatter.rtlText("آخرین بررسی نسخه جدید: " + when);
         } catch (Exception e) {
             return "";
         }
@@ -486,13 +486,14 @@ public final class UpdateCenter {
                                         bar.setIndeterminate(false);
                                     } catch (Exception ignored) { Diag.ignored("UpdateCenter:436", ignored); }
                                     bar.setProgress(p);
-                                    pct.setText(Money.fa(String.valueOf(p)) + "٪ • "
-                                            + faSize(fDone) + " از " + faSize(fTotal));
+                                    pct.setText(HomeNumberFormatter.rtlText(
+                                            HomeNumberFormatter.percent(p) + " • "
+                                                    + faSize(fDone) + " از " + faSize(fTotal)));
                                 } else {
                                     try {
                                         bar.setIndeterminate(true);
                                     } catch (Exception ignored) { Diag.ignored("UpdateCenter:443", ignored); }
-                                    pct.setText(faSize(fDone));
+                                    pct.setText(HomeNumberFormatter.rtlText(faSize(fDone)));
                                 }
                             } catch (Exception ignored) { Diag.ignored("UpdateCenter:446", ignored); }
                         });
@@ -863,10 +864,8 @@ public final class UpdateCenter {
 
     public static String faSize(long bytes) {
         if (bytes <= 0) return "—";
-        if (bytes < 1048576) return Money.fa(String.valueOf(bytes / 1024)) + " کیلوبایت";
-        String s = String.format(Locale.US, "%.1f", bytes / 1048576.0);
-        if (s.endsWith(".0")) s = s.substring(0, s.length() - 2);
-        return Money.fa(s).replace('.', '٫') + " مگابایت";
+        if (bytes < 1048576) return HomeNumberFormatter.integer(bytes / 1024) + " کیلوبایت";
+        return HomeNumberFormatter.decimal(bytes / 1048576.0) + " مگابایت";
     }
 
     private static String sha256Of(File f) {

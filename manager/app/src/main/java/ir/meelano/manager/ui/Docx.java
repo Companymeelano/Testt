@@ -3,6 +3,7 @@ package ir.meelano.manager.ui;
 import android.content.Context;
 
 import ir.meelano.manager.ShareProvider;
+import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.LicenseStore;
 import ir.meelano.manager.core.ReportCatalog;
@@ -11,7 +12,6 @@ import ir.meelano.manager.data.Row;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.util.List;
-import java.util.Locale;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -33,10 +33,12 @@ public final class Docx {
         doc.append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>")
                 .append("<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">")
                 .append("<w:body>");
-        para(doc, safe(title), 32, true, "101828");
+        para(doc, HomeNumberFormatter.rtlText(safe(title)), 32, true, "101828");
         String sub = safe(subtitle);
         if (!sub.isEmpty()) sub += "  •  ";
-        para(doc, sub + brand + " • " + Jalali.todayStr(), 20, false, "5A6478");
+        para(doc, HomeNumberFormatter.rtlText(
+                sub + brand + " • " + HomeNumberFormatter.dateText(Jalali.todayStr())),
+                20, false, "5A6478");
         // Table.
         doc.append("<w:tbl><w:tblPr><w:bidiVisual/><w:tblW w:w=\"5000\" w:type=\"pct\"/>")
                 .append("<w:tblBorders><w:top w:val=\"single\" w:sz=\"4\" w:color=\"D9D2C0\"/>")
@@ -52,7 +54,8 @@ public final class Docx {
         // Header row.
         rowOpen(doc);
         cell(doc, "ردیف", 700, "101828", "F1D493", true);
-        for (ReportCatalog.Col col : cols) cell(doc, safe(col.title), widthOf(col), "101828", "F1D493", true);
+        for (ReportCatalog.Col col : cols) cell(doc, HomeNumberFormatter.localizeText(safe(col.title)),
+                widthOf(col), "101828", "F1D493", true);
         doc.append("</w:tr>");
         // Data.
         double[] sums = new double[cols.length];
@@ -60,20 +63,21 @@ public final class Docx {
             Row r = rows.get(i);
             String shd = (i % 2 == 1) ? "F4F1E8" : "FFFFFF";
             rowOpen(doc);
-            cell(doc, String.valueOf(i + 1), 700, shd, "333C4E", false);
+            cell(doc, HomeNumberFormatter.integer(i + 1), 700, shd, "333C4E", false);
             for (int j = 0; j < cols.length; j++) {
                 String t;
                 if (cols[j].type == ReportCatalog.T_MONEY) {
                     double v = r.d(cols[j].key);
                     sums[j] += v;
-                    t = num(v);
+                    t = HomeNumberFormatter.money(v);
                 } else if (cols[j].type == ReportCatalog.T_NUM) {
-                    t = num(r.d(cols[j].key));
+                    t = HomeNumberFormatter.quantity(r.d(cols[j].key));
                 } else if (cols[j].type == ReportCatalog.T_DATE) {
-                    t = Jalali.disp(r.s(cols[j].key));
+                    t = HomeNumberFormatter.dateTimeTable(r.s(cols[j].key));
                 } else {
                     t = r.s(cols[j].key, "—");
-                    if (!"—".equals(t)) t = Jalali.faDate(t);
+                    if (!"—".equals(t)) t = Jalali.disp(t).isEmpty()
+                            ? HomeNumberFormatter.localizeText(t) : Jalali.dispTableFa(t);
                 }
                 cell(doc, t, widthOf(cols[j]), shd,
                         cols[j].type == ReportCatalog.T_MONEY ? "101828" : "333C4E",
@@ -85,11 +89,13 @@ public final class Docx {
         rowOpen(doc);
         cell(doc, "جمع", 700, "F6E7C6", "101828", true);
         for (int j = 0; j < cols.length; j++)
-            cell(doc, cols[j].type == ReportCatalog.T_MONEY ? num(sums[j]) : "",
+            cell(doc, cols[j].type == ReportCatalog.T_MONEY
+                            ? HomeNumberFormatter.money(sums[j]) : "",
                     widthOf(cols[j]), "F6E7C6", "101828", true);
         doc.append("</w:tr>");
         doc.append("</w:tbl>");
-        para(doc, brand + " • " + Jalali.todayStr(), 16, false, "9AA3B5");
+        para(doc, HomeNumberFormatter.rtlText(brand + " • "
+                + HomeNumberFormatter.dateText(Jalali.todayStr())), 16, false, "9AA3B5");
         doc.append("<w:sectPr><w:pgSz w:w=\"11906\" w:h=\"16838\"/>")
                 .append("<w:pgMar w:top=\"720\" w:right=\"720\" w:bottom=\"720\" w:left=\"720\"/></w:sectPr>");
         doc.append("</w:body></w:document>");
@@ -111,13 +117,6 @@ public final class Docx {
         if (col.type == ReportCatalog.T_TEXT) return 2600;
         if (col.type == ReportCatalog.T_DATE) return 1500;
         return 1100;
-    }
-
-    private static String num(double v) {
-        if (Double.isNaN(v) || Double.isInfinite(v)) return "0";
-        if (Math.abs(v - Math.round(v)) < 0.005)
-            return String.format(Locale.US, "%,d", Math.round(v));
-        return String.format(Locale.US, "%,.2f", v);
     }
 
     private static String safe(String s) {

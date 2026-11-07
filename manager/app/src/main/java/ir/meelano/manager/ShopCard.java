@@ -21,7 +21,7 @@ import ir.meelano.manager.ui.Theme;
 import java.io.File;
 import java.io.FileOutputStream;
 
-/** Digital shop card: a luxurious shareable PNG (logo + shop + date + developer credit). */
+/** Digital shop card: a flat shareable PNG with the real shop details and QR code. */
 public final class ShopCard {
     private ShopCard() { }
 
@@ -39,37 +39,33 @@ public final class ShopCard {
         Kit k = a.kit;
         LinearLayout c = k.v();
         c.setGravity(Gravity.CENTER);
-        boolean darkInk = Theme.darkAccentInk(Theme.GOLD);
-        GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                darkInk
-                        ? new int[]{Theme.shade(Theme.GOLD, 0.04f), Theme.GOLD,
-                                Theme.shade(Theme.GOLD, 0.12f)}
-                        : new int[]{Theme.shade(Theme.GOLD, -0.22f),
-                                Theme.shade(Theme.GOLD, -0.08f), Theme.GOLD});
-        bg.setCornerRadius(hiRes ? 84 : Theme.dp(28));
-        bg.setStroke(hiRes ? 4 : Theme.dp(1), Theme.alpha(0xFFFFFFFF, 120));
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(Theme.SURFACE);
+        bg.setCornerRadius(hiRes ? 56 : Theme.dp(16));
+        bg.setStroke(hiRes ? 3 : Theme.dp(1), Theme.BORDER);
         c.setBackground(bg);
-        int pad = hiRes ? 84 : Theme.dp(26);
+        int pad = hiRes ? 56 : Theme.dp(20);
         c.setPadding(pad, pad, pad, pad);
-        int ink = Theme.onAccent();
-        int inkSoft = Theme.alpha(ink, 200);
+        int ink = Theme.TEXT;
+        int inkSoft = Theme.MUTED;
         String shop = Company.get(a).displayName(a);
 
         ImageView logo = k.logo(hiRes ? 0 : 76);
-        if (hiRes) logo.setLayoutParams(new LinearLayout.LayoutParams(216, 216));
-        else logo.setLayoutParams(new LinearLayout.LayoutParams(Theme.dp(76), Theme.dp(76)));
+        logo.setColorFilter(Theme.isNuts() ? Theme.GOLD_DARK : Theme.PRIMARY);
+        if (hiRes) logo.setLayoutParams(new LinearLayout.LayoutParams(152, 152));
+        else logo.setLayoutParams(new LinearLayout.LayoutParams(Theme.dp(56), Theme.dp(56)));
         c.addView(logo);
         TextView nm = k.text(shop, hiRes ? 64 : 23, ink, true);
         if (hiRes) nm.setTextSize(TypedValue.COMPLEX_UNIT_PX, 64);
         nm.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams np = k.lp(-1, -2);
-        np.setMargins(0, hiRes ? 30 : Theme.dp(10), 0, 0);
+        np.setMargins(0, hiRes ? 20 : Theme.dp(8), 0, 0);
         c.addView(nm, np);
         View line = new View(a);
-        line.setBackgroundColor(Theme.alpha(ink, 140));
-        LinearLayout.LayoutParams llp = new LinearLayout.LayoutParams(hiRes ? 420 : Theme.dp(140), hiRes ? 5 : Theme.dp(2));
+        line.setBackgroundColor(Theme.BORDER);
+        LinearLayout.LayoutParams llp = new LinearLayout.LayoutParams(hiRes ? 320 : Theme.dp(96), hiRes ? 2 : Theme.dp(1));
         llp.gravity = Gravity.CENTER;
-        llp.setMargins(0, hiRes ? 36 : Theme.dp(12), 0, hiRes ? 36 : Theme.dp(12));
+        llp.setMargins(0, hiRes ? 24 : Theme.dp(10), 0, hiRes ? 24 : Theme.dp(10));
         c.addView(line, llp);
         TextView t1 = k.text("میلانو • داشبورد مدیریتی آتیران", hiRes ? 34 : 12.5f, inkSoft, true);
         if (hiRes) t1.setTextSize(TypedValue.COMPLEX_UNIT_PX, 34);
@@ -103,14 +99,14 @@ public final class ShopCard {
             LinearLayout.LayoutParams qlp = hiRes ? new LinearLayout.LayoutParams(336, 336)
                     : new LinearLayout.LayoutParams(Theme.dp(148), Theme.dp(148));
             qlp.gravity = Gravity.CENTER;
-            qlp.setMargins(0, hiRes ? 30 : Theme.dp(12), 0, 0);
+            qlp.setMargins(0, hiRes ? 22 : Theme.dp(10), 0, 0);
             c.addView(qv, qlp);
         }
         TextView dv = k.text("Milad Yaghoobi • طراح و توسعه‌دهنده", hiRes ? 28 : 11f, inkSoft, false);
         if (hiRes) dv.setTextSize(TypedValue.COMPLEX_UNIT_PX, 28);
         dv.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams dvp = k.lp(-1, -2);
-        dvp.setMargins(0, hiRes ? 30 : Theme.dp(10), 0, 0);
+        dvp.setMargins(0, hiRes ? 22 : Theme.dp(10), 0, 0);
         c.addView(dv, dvp);
         return c;
     }

@@ -173,7 +173,6 @@ public final class MoneyQueries {
     /** Day block anchored on latest dar.date for p: d,total,cash,pos,havaleh,cheque,count. */
     public static Queries.Q darDay(Meta m, int p) throws Queries.Missing {
         Dar d = darCols(m);
-        Set<String> cols = m.columns("dar");
         String day = "";
         try (java.sql.PreparedStatement ps = m.connection().prepareStatement(
                 "SELECT MAX(LEFT(TRY_CONVERT(nvarchar(30),[" + d.date + "]),10)) FROM dbo.dar WHERE [p]=?")) {
@@ -182,12 +181,35 @@ public final class MoneyQueries {
                 if (r.next() && r.getString(1) != null) day = r.getString(1).trim();
             }
         } catch (Exception ignored) { Diag.ignored("MoneyQueries:184", ignored); }
+        return darDayAt(m, p, day, false);
+    }
+
+    /** Home variant: the requested day is explicit, so all dashboard KPIs share one date. */
+    public static Queries.Q darDay(Meta m, int p, String requestedDay) throws Queries.Missing {
+        String day = Jalali.disp(requestedDay);
+        if (day.isEmpty()) throw new Queries.Missing("تاریخ دریافت یا پرداخت معتبر نیست");
+        return darDayAt(m, p, day, true);
+    }
+
+    private static Queries.Q darDayAt(Meta m, int p, String day, boolean matchGregorian) throws Queries.Missing {
+        Dar d = darCols(m);
+        Set<String> cols = m.columns("dar");
         DarParts parts = darParts(m, d, "h", p);
         List<Object> binds = new ArrayList<>();
         binds.add(p);
-        binds.add(day);
+        String date = Sql.date10("h", d.date);
+        String dateWhere;
+        if (matchGregorian) {
+            String gregorian = Jalali.toGregorian(day);
+            binds.add(day);
+            binds.add(gregorian);
+            dateWhere = "(" + Sql.dateKey(date) + "=? OR " + date + "=?)";
+        } else {
+            binds.add(day);
+            dateWhere = Sql.dateKey(date) + "=?";
+        }
         String rows = darRows(d, m, parts, cols,
-                "h.[p]=? AND " + Sql.dateKey(Sql.date10("h", d.date)) + "=?");
+                "h.[p]=? AND " + dateWhere);
         String sql = "SELECT " + Sql.lit(day) + " AS d, ISNULL(SUM(x.tot),0) AS total"
                 + ", ISNULL(SUM(x.cash),0) AS cash"
                 + ", ISNULL(SUM(x.pos),0) AS pos"
@@ -348,6 +370,12 @@ public final class MoneyQueries {
                 + ", COUNT_BIG(1) AS count FROM (" + rows + ") x", binds);
     }
 
+    /** Display-only receipt date with Atiran's separately stored clock, when available. */
+    private static String darDateTimeDisplay(Meta m, String alias, String dateColumn) {
+        String clock = m.col("dar", "ClockTime", "clocktime", "clock_time");
+        return Sql.dateTimeDisplay(alias, dateColumn, clock);
+    }
+
     /** Voucher list: ghno,date,code,customer,total,cash,pos,havaleh,cheque,chkCount,desc,kind,linkNo,multiCount. */
     public static Queries.Q darList(Meta m, Filter f, int p) throws Queries.Missing {
         Dar d = darCols(m);
@@ -373,7 +401,7 @@ public final class MoneyQueries {
         String where = " WHERE " + Sql.join(conds, " AND ");
         DarParts parts = darParts(m, d, "h", p);
         String sql = "SELECT " + Sql.txt("h", d.ghno, 60) + " AS ghno"
-                + ", " + Sql.date10("h", d.date) + " AS date"
+                + ", " + darDateTimeDisplay(m, "h", d.date) + " AS date"
                 + ", " + (d.shmo == null ? "CAST(NULL AS nvarchar(100))" : Sql.txt("h", d.shmo, 100)) + " AS code"
                 + ", " + Queries.custNameExpr(m, "h", d.shmo, "cu") + " AS customer"
                 + ", " + darTotal("h", d, m) + " AS total"
@@ -434,7 +462,7 @@ public final class MoneyQueries {
         binds.add(p);
         binds.add(ghno);
         String sql = "SELECT TOP (1) " + Sql.txt("h", d.ghno, 60) + " AS ghno"
-                + ", " + Sql.date10("h", d.date) + " AS date"
+                + ", " + darDateTimeDisplay(m, "h", d.date) + " AS date"
                 + ", " + (d.done == null ? "CAST(NULL AS nvarchar(10))" : Sql.date10("h", d.done)) + " AS doneDate"
                 + ", " + (d.shmo == null ? "CAST(NULL AS nvarchar(100))" : Sql.txt("h", d.shmo, 100)) + " AS code"
                 + ", " + Queries.custNameExpr(m, "h", d.shmo, "cu") + " AS customer"
@@ -515,6 +543,8 @@ public final class MoneyQueries {
         String headNo = incoming ? m.must(head, "شماره فاکتور", "shfacfo")
                 : m.must(head, "شماره فاکتور", "shfackh", "shfac");
         String headDate = incoming ? m.col(head, "date") : m.col(head, "DATE", "date");
+        String headTime = incoming ? m.col(head, "time_", "TimeServer", "time")
+                : m.col(head, "Hour", "hour");
         String headAmount = m.col(head, "all");
         String headShmo = m.col(head, "shmo", "SHMO");
         String multiGh = m.col(multi, "GhnoDar", "ghnoDar", "ghno");
@@ -524,7 +554,7 @@ public final class MoneyQueries {
         List<String> parts = new ArrayList<>();
         if (multiGh != null && multiNo != null && m.table(multi)) {
             parts.add("SELECT " + Sql.txt("h", headNo, 80) + " AS no"
-                    + ", " + Sql.date10("h", headDate) + " AS date"
+                    + ", " + Sql.dateTimeDisplay("h", headDate, headTime) + " AS date"
                     + ", " + Queries.custNameExpr(m, "h", headShmo, "cu") + " AS customer"
                     + ", " + Sql.num("h", headAmount) + " AS total"
                     + ", " + Sql.num("mf", multiPrice) + " AS paidSettled"
@@ -538,7 +568,7 @@ public final class MoneyQueries {
         Dar d = darCols(m);
         if (d.shfac != null) {
             parts.add("SELECT " + Sql.txt("h", headNo, 80) + " AS no"
-                    + ", " + Sql.date10("h", headDate) + " AS date"
+                    + ", " + Sql.dateTimeDisplay("h", headDate, headTime) + " AS date"
                     + ", " + Queries.custNameExpr(m, "h", headShmo, "cu") + " AS customer"
                     + ", " + Sql.num("h", headAmount) + " AS total"
                     + ", CAST(0 AS decimal(19,2)) AS paidSettled"
@@ -564,7 +594,7 @@ public final class MoneyQueries {
         List<Object> binds = new ArrayList<>();
         List<String> parts = new ArrayList<>();
         if (d.shfac != null) {
-            parts.add("SELECT " + Sql.txt("dr", d.ghno, 60) + " AS ghno, " + Sql.date10("dr", d.date) + " AS date"
+            parts.add("SELECT " + Sql.txt("dr", d.ghno, 60) + " AS ghno, " + darDateTimeDisplay(m, "dr", d.date) + " AS date"
                     + ", " + darTotal("dr", d, m) + " AS total, CAST(0 AS decimal(19,2)) AS settled"
                     + " FROM dbo.dar dr WHERE dr.[p]=? AND TRY_CONVERT(nvarchar(80),dr.[" + d.shfac + "])=?"
                     + " AND NULLIF(TRY_CONVERT(nvarchar(80),dr.[" + d.shfac + "]),N'0') IS NOT NULL");
@@ -572,7 +602,7 @@ public final class MoneyQueries {
             binds.add(no);
         }
         if (multiGh != null && multiNo != null && m.table(multi)) {
-            parts.add("SELECT " + Sql.txt("dr", d.ghno, 60) + " AS ghno, " + Sql.date10("dr", d.date) + " AS date"
+            parts.add("SELECT " + Sql.txt("dr", d.ghno, 60) + " AS ghno, " + darDateTimeDisplay(m, "dr", d.date) + " AS date"
                     + ", " + darTotal("dr", d, m) + " AS total, " + Sql.num("mf", multiPrice) + " AS settled"
                     + " FROM dbo.[" + multi + "] mf JOIN dbo.dar dr"
                     + " ON TRY_CONVERT(nvarchar(60),dr.[" + d.ghno + "])=TRY_CONVERT(nvarchar(60),mf.[" + multiGh + "]) AND dr.[p]=?"

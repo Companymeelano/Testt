@@ -158,7 +158,8 @@ public final class AtiranSpecialReports {
             String audit = isVoided ? (editor.isEmpty() ? "باطل‌شده" : "باطل‌شده توسط " + editor)
                     : (editor.isEmpty() ? "ثبت اولیه" : "اصلاح: " + editor);
             if (!note.isEmpty()) audit += " • " + note;
-            if (!row.s("editedAt").isEmpty()) audit += " • " + Jalali.faDate(row.s("editedAt"));
+            if (!row.s("editedAt").isEmpty())
+                audit += " • " + HomeNumberFormatter.dateTimeTable(row.s("editedAt"));
             row.put("audit", audit);
         }
         return rows;

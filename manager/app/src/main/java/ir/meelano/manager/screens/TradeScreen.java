@@ -11,6 +11,7 @@ import android.widget.TextView;
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.core.AtiranSchema;
 import ir.meelano.manager.core.Filter;
+import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.MoneyQueries;
@@ -35,6 +36,8 @@ public class TradeScreen extends Screen {
     private final boolean sales;
     private final Filter filter = Filter.daily();
     private int tab;
+    /** Temporary Home drill-down into explicitly marked voided sales invoices. */
+    private boolean voidedOnly;
 
     public TradeScreen(MainActivity a, boolean sales) {
         super(a);
@@ -46,7 +49,7 @@ public class TradeScreen extends Screen {
     public String id() { return sales ? "sales" : "buy"; }
 
     @Override
-    public String title() { return sales ? "فروش" : "خرید"; }
+    public String title() { return voidedOnly ? "ابطالی‌های فاکتور فروش" : (sales ? "فروش" : "خرید"); }
 
     @Override
     public String glyph() { return Theme.isLight() ? (sales ? "🧾" : "🧺") : (sales ? "🛍" : "🛒"); }
@@ -60,8 +63,17 @@ public class TradeScreen extends Screen {
     @Override
     public FilterSheet.Config filterConfig() {
         FilterSheet.Config c = new FilterSheet.Config();
-        c.searchHint = sales ? "فاکتور، مشتری…" : "فاکتور، طرف‌حساب…";
+        c.searchHint = voidedOnly ? "شماره یا توضیح فاکتور ابطالی…"
+                : sales ? "فاکتور، مشتری…" : "فاکتور، طرف‌حساب…";
         c.range = true;
+        if (voidedOnly) {
+            c.sortTitle = "مرتب‌سازی فهرست";
+            c.sort = new FilterSheet.Opt[]{
+                    new FilterSheet.Opt("", "جدیدترین"),
+                    new FilterSheet.Opt("total_desc", "مبلغ بیشتر"),
+            };
+            return c;
+        }
         if (sales) {
             c.visitors = true;
             c.routes = true;
@@ -106,12 +118,20 @@ public class TradeScreen extends Screen {
         content.addView(a.kit.gap(12));
         content.addView(a.kit.loading(sales ? "در حال دریافت فروش…" : "در حال دریافت خرید…"), a.kit.lp(-1, -2));
         final int myTab = tab;
+        final boolean myVoidedOnly = voidedOnly;
+        final int requestToken = a.renderGen();
         final Filter f = filter.copy();
+        final String requestCacheKey = tradeCacheKey(f, myVoidedOnly);
 
         a.repo.run(c -> {
             Meta m = new Meta(c);
             Data d = new Data();
             d.snapTab = myTab;
+            if (myVoidedOnly) {
+                d.list = soft(d.notes, "فهرست ابطالی‌ها",
+                        () -> Repo.exec(c, Queries.voidedFactorList(m, sales, f)));
+                return d;
+            }
             d.summary = soft(d.notes, "خلاصه", () -> Repo.one(c, Queries.factorSummary(m, sales, f)));
             final String from = f.hasRange() ? f.from : Jalali.addDays(Jalali.todayStr(), -29);
             final String to = f.hasRange() ? f.to : Jalali.todayStr();
@@ -139,14 +159,16 @@ public class TradeScreen extends Screen {
         }, new Repo.Cb<Data>() {
             @Override
             public void ok(Data d) {
-                saveCache(d);
+                if (a.renderGen() != requestToken) return;
+                saveCache(d, requestCacheKey);
                 build(content, d);
             }
 
             @Override
             public void fail(String faError) {
+                if (a.renderGen() != requestToken) return;
                 String[] lab = {""};
-                Data cached = loadCache(lab);
+                Data cached = loadCache(lab, requestCacheKey);
                 if (cached != null) {
                     build(content, cached);
                     offlineBanner(content, lab[0], faError);
@@ -165,7 +187,7 @@ public class TradeScreen extends Screen {
         return "داده‌ای دریافت نشد";
     }
 
-    private void saveCache(Data d) {
+    private void saveCache(Data d, String key) {
         java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
         m.put("sum", d.summary);
         m.put("daily", d.daily);
@@ -175,11 +197,19 @@ public class TradeScreen extends Screen {
         m.put("od", d.overdue);
         m.put("fc", d.forecast);
         m.put("tab", d.snapTab);
-        CacheStore.saveData(a, "cx_trade_" + id(), cacheNow(), m);
+        CacheStore.saveData(a, key, cacheNow(), m);
     }
 
-    private Data loadCache(String[] lab) {
-        java.util.Map<String, Object> m = CacheStore.loadData(a, "cx_trade_" + id(), lab);
+    private String tradeCacheKey(Filter f, boolean onlyVoided) {
+        String fingerprint = id() + "|" + onlyVoided + "|" + f.preset + "|" + f.from + "|" + f.to
+                + "|" + f.search + "|" + f.status + "|" + f.sort + "|" + f.page + "|" + f.top
+                + "|" + f.visitor + "|" + f.route + "|" + f.custGroup;
+        return "cx_trade_" + id() + (onlyVoided ? "_voided" : "")
+                + "_r" + Integer.toHexString(fingerprint.hashCode());
+    }
+
+    private Data loadCache(String[] lab, String key) {
+        java.util.Map<String, Object> m = CacheStore.loadData(a, key, lab);
         if (m == null) return null;
         Data d = new Data();
         d.summary = CacheStore.row(m, "sum");
@@ -198,6 +228,15 @@ public class TradeScreen extends Screen {
         content.addView(a.kit.gap(12));
         addSearchRow(content);
 
+        if (voidedOnly) {
+            content.addView(a.kit.hint("فقط فاکتورهایی نمایش داده می‌شوند که در منبع فروش نشانگر صریح ابطال دارند؛ اسناد حذف‌شده یا تأییدنشده با آن یکی نیستند."),
+                    a.kit.lp(-1, -2));
+            content.addView(a.kit.gap(8));
+            buildList(content, d);
+            renderNotes(content, d.notes);
+            return;
+        }
+
         Row s = d.summary == null ? new Row() : d.summary;
         List<Kit.Kpi> kpis = new ArrayList<>();
         kpis.add(new Kit.Kpi("جمع", Money.compactRial(s.d("total")), Money.fa(String.valueOf(s.l("docs"))) + " سند", accent()));
@@ -212,10 +251,12 @@ public class TradeScreen extends Screen {
             c.addView(a.kit.text("روند روزانه", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
             Charts.Area ch = new Charts.Area(a);
             List<Charts.Point> pts = new ArrayList<>();
-            for (Row r : d.daily) pts.add(new Charts.Point(Jalali.shortLabel(r.s("day")), r.d("total")));
+            for (Row r : d.daily) pts.add(new Charts.Point(
+                    HomeNumberFormatter.dateShortLabel(r.s("day")), r.d("total")));
             final TextView cap = a.kit.text("", 11f, Theme.MUTED, false);
             ch.setData(pts, accent(), Charts.COMPACT);
-            ch.setListener((idx, p) -> cap.setText(Money.fa(p.label) + " • " + Money.rial(p.value)));
+            ch.setListener((idx, p) -> cap.setText(HomeNumberFormatter.rtlText(
+                    p.label + " • " + Money.compactRial(p.value))));
             c.addView(ch, new LinearLayout.LayoutParams(-1, Theme.dp(175)));
             c.addView(cap, a.kit.lp(-1, -2));
             a.kit.addCard(content, c);
@@ -284,7 +325,8 @@ public class TradeScreen extends Screen {
         List<Kit.Kpi> kpis = new ArrayList<>();
         kpis.add(new Kit.Kpi("پیش‌بینی ۷ روز", Money.compactRial(p7), "مدل رفتار روز هفته", Theme.GOLD));
         kpis.add(new Kit.Kpi("پیش‌بینی ۳۰ روز", Money.compactRial(avg * 30.0), "میانگین روزانه " + Money.compactRial(avg), Theme.INFO));
-        kpis.add(new Kit.Kpi("روند هفته", (trend >= 0 ? "+" : "") + Money.pct(trend), "نسبت به هفته قبل", trend >= 0 ? Theme.SUCCESS : Theme.DANGER));
+        kpis.add(new Kit.Kpi("روند هفته", ir.meelano.manager.core.HomeNumberFormatter.signedPercent(trend),
+                "نسبت به هفته قبل", trend >= 0 ? Theme.SUCCESS : Theme.DANGER));
         kpis.add(new Kit.Kpi("فروش ۳۰ روز", Money.compactRial(sum), "مبنای مدل", accent()));
         content.addView(a.kit.kpiGrid(kpis, 2), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(12));
@@ -294,7 +336,8 @@ public class TradeScreen extends Screen {
         Charts.Bars bars = new Charts.Bars(a);
         List<Charts.Point> pts = new ArrayList<>();
         for (int i = 1; i <= 7; i++)
-            pts.add(new Charts.Point(Jalali.shortLabel(Jalali.addDays(today, i)), proj[i - 1]));
+            pts.add(new Charts.Point(HomeNumberFormatter.dateShortLabel(
+                    Jalali.addDays(today, i)), proj[i - 1]));
         bars.setData(pts, Charts.COMPACT);
         c.addView(bars, new LinearLayout.LayoutParams(-1, Theme.dp(200)));
         a.kit.addCard(content, c);
@@ -321,18 +364,32 @@ public class TradeScreen extends Screen {
     }
 
     private void buildList(LinearLayout content, Data d) {
-        if (d.list == null || d.list.isEmpty()) {
-            content.addView(a.kit.empty("فاکتوری در این بازه یافت نشد", "فیلتر را تغییر دهید"), a.kit.lp(-1, -2));
+        if (d.list == null) {
+            content.addView(a.kit.unavailable(voidedOnly
+                    ? "فهرست ابطالی‌های فاکتور در دسترس نیست"
+                    : "فهرست فاکتورها در دسترس نیست"), a.kit.lp(-1, -2));
+            return;
+        }
+        if (d.list.isEmpty()) {
+            content.addView(a.kit.empty(voidedOnly ? "فاکتور ابطالی در این بازه پیدا نشد"
+                    : "فاکتوری در این بازه یافت نشد", "فیلتر را تغییر دهید"), a.kit.lp(-1, -2));
             return;
         }
         for (Row r : d.list) {
             final String no = r.s("no");
-            boolean settled = Math.abs(r.d("remain")) <= AtiranSchema.SETTLE_TOLERANCE
+            boolean amountValid = r.has("total") && r.l("amountInvalid") == 0;
+            boolean paidValid = r.has("paid") && r.l("paidInvalid") == 0;
+            boolean remainValid = amountValid && paidValid && r.has("remain");
+            boolean settled = (remainValid && Math.abs(r.d("remain")) <= AtiranSchema.SETTLE_TOLERANCE)
                     || "t".equalsIgnoreCase(r.s("tasvieh").trim());
-            String status = settled ? "settled" : "unsettled";
+            String status = voidedOnly ? "ابطالی" : settled ? "settled" : "unsettled";
+            String fullAmount = amountValid ? Money.rial(r.d("total")) : "مبلغ نامعتبر";
+            String cardAmount = amountValid ? Money.compactRial(r.d("total")) : "مبلغ نامعتبر";
+            r.put("totalLabel", fullAmount);
+            r.put("remainLabel", remainValid ? Money.rial(r.d("remain")) : "نامشخص");
             View v = a.kit.invoiceRow("فاکتور " + Money.fa(no), r.s("customer"),
-                    Jalali.shortLabel(r.s("date")), Money.rial(r.d("total")),
-                    status, v2 -> openDetailByNo(no));
+                    HomeNumberFormatter.dateTime(r.s("date")), cardAmount,
+                    status, v2 -> openDetailByNo(no, voidedOnly));
             LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
             p.setMargins(0, 0, 0, Theme.dp(10));
             content.addView(v, p);
@@ -346,10 +403,11 @@ public class TradeScreen extends Screen {
                 new ReportCatalog.Col("no", "فاکتور", ReportCatalog.T_TEXT),
                 new ReportCatalog.Col("date", "تاریخ", ReportCatalog.T_DATE),
                 new ReportCatalog.Col("customer", "طرف‌حساب", ReportCatalog.T_TEXT),
-                new ReportCatalog.Col("total", "جمع", ReportCatalog.T_MONEY),
-                new ReportCatalog.Col("remain", "مانده", ReportCatalog.T_MONEY),
+                new ReportCatalog.Col("totalLabel", "جمع", ReportCatalog.T_TEXT),
+                new ReportCatalog.Col("remainLabel", "مانده", ReportCatalog.T_TEXT),
         };
-        content.addView(a.exportBar(sales ? "فهرست فاکتورهای فروش" : "فهرست فاکتورهای خرید",
+        content.addView(a.exportBar(voidedOnly ? "فهرست فاکتورهای ابطالی فروش"
+                        : sales ? "فهرست فاکتورهای فروش" : "فهرست فاکتورهای خرید",
                 filter.rangeFa(), expCols, d.list), a.kit.lp(-1, -2));
     }
 
@@ -361,7 +419,7 @@ public class TradeScreen extends Screen {
         double sum = 0;
         for (Row r : d.overdue) sum += r.d("amount");
         LinearLayout c = a.kit.card(Theme.DANGER);
-        c.addView(a.kit.kv("جمع معوق", Money.rial(sum), Theme.DANGER), a.kit.lp(-1, -2));
+        c.addView(a.kit.kv("جمع معوق", Money.compactRial(sum), Theme.DANGER), a.kit.lp(-1, -2));
         c.addView(a.kit.kv("تعداد", Money.fa(String.valueOf(d.overdue.size())) + " فاکتور", Theme.DANGER), a.kit.lp(-1, -2));
         a.kit.addCard(content, c);
         for (Row r : d.overdue) {
@@ -370,7 +428,9 @@ public class TradeScreen extends Screen {
             // Without dif_date_alan the server sends −1: derive the delay from the due date.
             if (dd < 0) dd = Jalali.diffDays(r.s("dueDate"), Jalali.todayStr());
             String days = dd >= 0 ? "تأخیر " + Money.fa(String.valueOf(dd)) + " روز • " : "";
-            View v = a.kit.alertRow("فاکتور " + Money.fa(no), days + r.s("party") + " • " + Money.rial(r.d("amount")),
+            View v = a.kit.alertRow("فاکتور " + Money.fa(no),
+                    days + r.s("party") + " • " + Money.compactRial(r.d("amount")),
+
                     Theme.DANGER, v2 -> openDetailByNo(no));
             LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
             p.setMargins(0, 0, 0, Theme.dp(10));
@@ -423,23 +483,54 @@ public class TradeScreen extends Screen {
     }
 
     private String pct(double part, double whole) {
-        if (whole <= 0) return "٪۰";
+        if (whole <= 0) return Money.pct(0d);
         return Money.pct(part * 100.0 / whole);
+    }
+
+    /** Open the actual invoice list for the calendar day selected on Home. */
+    public void openHomeRange(String from, String to) {
+        openHomeRange(from, to, false);
+    }
+
+    /** Open only invoices carrying an explicit cancellation marker. */
+    public void openHomeVoidedRange(String from, String to) {
+        if (!sales) return;
+        openHomeRange(from, to, true);
+    }
+
+    private void openHomeRange(String from, String to, boolean onlyVoided) {
+        voidedOnly = onlyVoided;
+        filter.copyFrom(Filter.daily());
+        filter.defaultPreset = Filter.P_TODAY;
+        filter.preset = Filter.P_CUSTOM;
+        String start = Jalali.disp(from);
+        String end = Jalali.disp(to);
+        filter.from = start.isEmpty() ? Jalali.todayStr() : start;
+        filter.to = end.isEmpty() ? filter.from : end;
+        filter.top = 50;
+        filter.page = 0;
+        tab = 0;
+        a.nav(id());
     }
 
     /** Opens one invoice by its number (used by product movements and reports). */
     public void openInvoice(final String no) {
         if (no == null || no.trim().isEmpty()) return;
-        openDetailByNo(no.trim());
+        openDetailByNo(no.trim(), false);
     }
 
     // ---------------- invoice detail ----------------
     private void openDetailByNo(final String no) {
+        openDetailByNo(no, voidedOnly);
+    }
+
+    private void openDetailByNo(final String no, final boolean includeVoided) {
         a.kit.toast("در حال دریافت فاکتور…");
         a.repo.run(c -> {
             Meta m = new Meta(c);
-            Row head = Repo.one(c, Queries.factorHeader(m, sales, no));
-            List<Row> lines = Queries.distinctLines(Repo.exec(c, Queries.factorLines(m, sales, no)));
+            Row head = Repo.one(c, Queries.factorHeader(m, sales, no, includeVoided));
+            List<Row> lines = Queries.distinctLines(Repo.exec(c,
+                    Queries.factorLines(m, sales, no, includeVoided)));
             List<Row> dars = new ArrayList<>();
             try {
                 dars = Repo.exec(c, MoneyQueries.invoiceDars(m, sales ? 0 : 1, no));
@@ -478,7 +569,7 @@ public class TradeScreen extends Screen {
         Row head = dt.head;
         LinearLayout body = a.kit.v();
         body.addView(a.kit.kv("شماره", Money.fa(head.s("no")), Theme.TEXT), a.kit.lp(-1, -2));
-        body.addView(a.kit.kv("تاریخ", Jalali.dispFa(head.s("date")), Theme.TEXT), a.kit.lp(-1, -2));
+        body.addView(a.kit.kv("تاریخ", HomeNumberFormatter.dateTime(head.s("date")), Theme.TEXT), a.kit.lp(-1, -2));
         body.addView(a.kit.kv(sales ? "مشتری" : "طرف‌حساب", head.s("customer"), Theme.TEXT), a.kit.lp(-1, -2));
         if (sales && !head.s("visitor").isEmpty() && !"بدون ویزیتور".equals(head.s("visitor")))
             body.addView(a.kit.kv("ویزیتور", head.s("visitor"), Theme.TEXT), a.kit.lp(-1, -2));
@@ -488,29 +579,45 @@ public class TradeScreen extends Screen {
             body.addView(a.kit.kv("تخفیف", Money.rial(head.d("tafif")), Theme.TEXT), a.kit.lp(-1, -2));
         if (head.has("tax") && head.d("tax") > 0)
             body.addView(a.kit.kv("مالیات", Money.rial(head.d("tax")), Theme.TEXT), a.kit.lp(-1, -2));
-        body.addView(a.kit.kv("جمع", Money.rial(head.d("total")), Theme.GOLD_SOFT), a.kit.lp(-1, -2));
-        body.addView(a.kit.kv(sales ? "دریافتی" : "پرداختی", Money.rial(head.d("paid")), Theme.SUCCESS), a.kit.lp(-1, -2));
+        boolean totalValid = head.has("total") && head.l("amountInvalid") == 0;
+        boolean paidValid = head.has("paid") && head.l("paidInvalid") == 0;
+        body.addView(a.kit.kv("جمع", totalValid ? Money.rial(head.d("total")) : "مبلغ نامعتبر",
+                Theme.GOLD_SOFT), a.kit.lp(-1, -2));
+        body.addView(a.kit.kv(sales ? "دریافتی" : "پرداختی",
+                paidValid ? Money.rial(head.d("paid")) : "مبلغ نامعتبر", Theme.SUCCESS), a.kit.lp(-1, -2));
         String tasvieh = head.has("tasvieh") ? AtiranSchema.tasviehFa(head.s("tasvieh")) : "نامشخص";
         if (!"نامشخص".equals(tasvieh))
             body.addView(a.kit.kv("وضعیت تسویه", tasvieh,
                     "تسویه‌شده".equals(tasvieh) ? Theme.SUCCESS : Theme.WARNING), a.kit.lp(-1, -2));
-        double remain = head.d("total") - head.d("paid");
-        if (Math.abs(remain) > AtiranSchema.SETTLE_TOLERANCE)
-            body.addView(a.kit.kv("مانده", Money.rial(remain), remain > 0 ? Theme.DANGER : Theme.INFO), a.kit.lp(-1, -2));
-        body.addView(a.kit.text("مبلغ به حروف: " + Money.words(head.d("total")), 11f, Theme.MUTED, false), a.kit.lp(-1, -2));
+        if (totalValid && paidValid) {
+            double remain = head.d("total") - head.d("paid");
+            if (Math.abs(remain) > AtiranSchema.SETTLE_TOLERANCE)
+                body.addView(a.kit.kv("مانده", Money.rial(remain), remain > 0 ? Theme.DANGER : Theme.INFO), a.kit.lp(-1, -2));
+        }
+        if (totalValid)
+            body.addView(a.kit.text("مبلغ به حروف: " + Money.words(head.d("total")), 11f, Theme.MUTED, false), a.kit.lp(-1, -2));
         if (!dt.lines.isEmpty()) {
             body.addView(a.kit.text("اقلام فاکتور", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
             for (Row r : dt.lines) {
-                if (Math.abs(r.d("qtyVah")) < 0.0005 && Math.abs(r.d("qtyJoz")) > 0.0005)
-                    r.put("qtyVah", r.d("qtyJoz"));
-                if (Math.abs(r.d("vahPrice")) < 0.005 && Math.abs(r.d("jozPrice")) > 0.005)
-                    r.put("vahPrice", r.d("jozPrice"));
+                String quantity = r.has("qtyVah")
+                        ? ir.meelano.manager.core.HomeNumberFormatter.decimal(r.d("qtyVah")) : "نامعتبر";
+                if (r.has("qtyJoz") && Math.abs(r.d("qtyJoz")) > 0.0005)
+                    quantity += " + " + ir.meelano.manager.core.HomeNumberFormatter.decimal(r.d("qtyJoz"));
+                String unitPrice = r.has("vahPrice") ? Money.rial(r.d("vahPrice"))
+                        : r.has("jozPrice") ? Money.rial(r.d("jozPrice")) : "نامعتبر";
+                if (r.has("vahPrice") && Math.abs(r.d("vahPrice")) < 0.005
+                        && r.has("jozPrice") && Math.abs(r.d("jozPrice")) > 0.005)
+                    unitPrice = Money.rial(r.d("jozPrice"));
+                r.put("qtyLabel", quantity);
+                r.put("unitPriceLabel", unitPrice);
+                r.put("lineSumLabel", r.has("lineSum") && r.l("lineSumInvalid") == 0
+                        ? Money.rial(r.d("lineSum")) : "مبلغ نامعتبر");
             }
             ReportCatalog.Col[] cols = new ReportCatalog.Col[]{
                     new ReportCatalog.Col("naka", "کالا", ReportCatalog.T_TEXT),
-                    new ReportCatalog.Col("qtyVah", "مقدار", ReportCatalog.T_NUM),
-                    new ReportCatalog.Col("vahPrice", "فی", ReportCatalog.T_MONEY),
-                    new ReportCatalog.Col("lineSum", "مبلغ", ReportCatalog.T_MONEY),
+                    new ReportCatalog.Col("qtyLabel", "مقدار", ReportCatalog.T_TEXT),
+                    new ReportCatalog.Col("unitPriceLabel", "فی", ReportCatalog.T_TEXT),
+                    new ReportCatalog.Col("lineSumLabel", "مبلغ", ReportCatalog.T_TEXT),
             };
             body.addView(a.kit.dataTable(cols, dt.lines, null), a.kit.lp(-1, -2));
         }
@@ -534,12 +641,12 @@ public class TradeScreen extends Screen {
         final List<Row> fLines = dt.lines;
         final String fNo = head.s("no");
         final String fParty = head.s("customer");
-        final String fDate = Jalali.dispFa(head.s("date"));
+        final String fDate = HomeNumberFormatter.dateTime(head.s("date"));
         ReportCatalog.Col[] expCols = new ReportCatalog.Col[]{
                 new ReportCatalog.Col("naka", "کالا", ReportCatalog.T_TEXT),
-                new ReportCatalog.Col("qtyVah", "مقدار", ReportCatalog.T_NUM),
-                new ReportCatalog.Col("vahPrice", "فی", ReportCatalog.T_MONEY),
-                new ReportCatalog.Col("lineSum", "مبلغ", ReportCatalog.T_MONEY),
+                new ReportCatalog.Col("qtyLabel", "مقدار", ReportCatalog.T_TEXT),
+                new ReportCatalog.Col("unitPriceLabel", "فی", ReportCatalog.T_TEXT),
+                new ReportCatalog.Col("lineSumLabel", "مبلغ", ReportCatalog.T_TEXT),
         };
         if (!fLines.isEmpty()) {
             body.addView(a.kit.gap(8));

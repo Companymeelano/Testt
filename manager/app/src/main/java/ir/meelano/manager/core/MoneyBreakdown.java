@@ -1,12 +1,14 @@
 package ir.meelano.manager.core;
 
+import java.math.BigDecimal;
+
 /**
  * A conservative check that compares a booked receipt/payment total with its four
  * classified components. It never invents missing components: callers must pass
  * {@code available=false} unless the live Atiran schema can provide a complete split.
  */
 public final class MoneyBreakdown {
-    /** Half a Rial accommodates binary/SQL decimal conversion noise without hiding real gaps. */
+    /** Legacy tolerance retained for the double-only compatibility overload. */
     public static final double TOLERANCE = 0.5d;
 
     public final boolean available;
@@ -36,6 +38,52 @@ public final class MoneyBreakdown {
 
     public boolean matches() {
         return available && Math.abs(unexplained) <= TOLERANCE;
+    }
+
+    /** Exact half-Rial threshold for the dashboard's read-only financial controls. */
+    public static final BigDecimal TOLERANCE_EXACT = new BigDecimal("0.5");
+
+    /** Exact decimal result used by money controls; null values never become zero. */
+    public static final class Exact {
+        public final boolean available;
+        public final BigDecimal bookedTotal;
+        public final BigDecimal componentTotal;
+        /** Positive means the booked total exceeds the classified components. */
+        public final BigDecimal unexplained;
+
+        private Exact(boolean available, BigDecimal bookedTotal,
+                      BigDecimal componentTotal, BigDecimal unexplained) {
+            this.available = available;
+            this.bookedTotal = bookedTotal;
+            this.componentTotal = componentTotal;
+            this.unexplained = unexplained;
+        }
+
+        public boolean matches() {
+            return available && unexplained.abs().compareTo(TOLERANCE_EXACT) <= 0;
+        }
+
+        public boolean exactlyEqual() {
+            return available && unexplained.signum() == 0;
+        }
+    }
+
+    /**
+     * Exact counterpart for financial paths. A missing, malformed, or negative source amount is
+     * unavailable; it cannot be treated as a zero component or a successful reconciliation.
+     */
+    public static Exact calculateExact(boolean available, BigDecimal bookedTotal,
+            BigDecimal cash, BigDecimal card, BigDecimal transfer, BigDecimal cheque) {
+        if (!available || !validExact(bookedTotal) || !validExact(cash) || !validExact(card)
+                || !validExact(transfer) || !validExact(cheque))
+            return new Exact(false, bookedTotal, null, null);
+        BigDecimal components = cash.add(card).add(transfer).add(cheque);
+        return new Exact(true, bookedTotal, components, bookedTotal.subtract(components));
+    }
+
+    private static boolean validExact(BigDecimal value) {
+        return value != null && value.signum() >= 0 && value.precision() <= 38
+                && value.scale() <= 18;
     }
 
     private static boolean finite(double value) {

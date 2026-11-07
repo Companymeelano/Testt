@@ -279,8 +279,10 @@ public final class Queries {
         binds.add(d == null ? "" : d);
         inner += Sql.activeAnd(cols, "x") + Sql.softAnd(cols, "x");
         String src = Sql.dedupe(table, numberCol, "h", inner);
+        String amount = Sql.numNull("h", amountCol);
         String sql = "SELECT " + Sql.lit(d == null ? "" : d) + " AS d"
                 + ", ISNULL(SUM(" + Sql.num("h", amountCol) + "),0) AS total"
+                + ", COALESCE(SUM(CASE WHEN " + amount + " IS NULL THEN 1 ELSE 0 END),0) AS invalidRows"
                 + ", COUNT_BIG(1) AS docs"
                 + ", " + (partyCol == null ? "CAST(0 AS bigint)" : "COUNT(DISTINCT h.[" + partyCol + "])") + " AS parties"
                 + ", ISNULL(SUM(" + Sql.num("h", paidCol) + "),0) AS paid"
@@ -298,28 +300,144 @@ public final class Queries {
         String amountCol = m.must(table, "مبلغ", "all");
         String numberCol = Sql.pick(cols, sales ? "shfacfo" : "shfackh");
         List<Object> binds = new ArrayList<>();
-        // Some rows store Gregorian dates («2026-10-14…») beside Atiran Jalali («1405/07/22»).
-        // The Jalali range alone drops the Gregorian rows, so recent days looked empty.
-        // Match both spellings; Java folds them onto the same Jalali day.
-        String raw = Sql.date10("x", dateCol);
-        String dc;
-        boolean bothEnds = from != null && !from.trim().isEmpty() && to != null && !to.trim().isEmpty();
-        String gf = bothEnds ? Jalali.toGregorian(from.trim()) : "";
-        String gt = bothEnds ? Jalali.toGregorian(to.trim()) : "";
-        if (bothEnds && !gf.isEmpty() && !gt.isEmpty()) {
-            String f = from.trim(), t = to.trim();
-            if (f.compareTo(t) > 0) { String x = f; f = t; t = x; String y = gf; gf = gt; gt = y; }
-            String dk = Sql.dateKey(raw);
-            dc = "((" + dk + ">=? AND " + dk + "<=?) OR (" + raw + ">=? AND " + raw + "<=?))";
-            binds.add(f); binds.add(t); binds.add(gf); binds.add(gt);
-        } else {
-            dc = Sql.dateCond(raw, from, to, binds);
-        }
+        // Some rows store Gregorian dates beside Atiran Jalali dates. Match each spelling
+        // only against its own range so an open-ended lower bound cannot admit older Gregorian rows.
+        String dc = factorDateRange("x", dateCol, from, to, binds);
         String inner = "WHERE " + (dc.isEmpty() ? "1=1" : dc) + Sql.activeAnd(cols, "x") + Sql.softAnd(cols, "x");
         String src = Sql.dedupe(table, numberCol, "h", inner);
         String day = Sql.date10("h", dateCol);
+        String amount = Sql.numNull("h", amountCol);
         return new Q("SELECT " + day + " AS day, ISNULL(SUM(" + Sql.num("h", amountCol) + "),0) AS total"
-                + ", COUNT_BIG(1) AS docs FROM " + src + " GROUP BY " + day + " ORDER BY " + day, binds);
+                + ", COUNT_BIG(1) AS docs"
+                + ", SUM(CASE WHEN " + amount + " IS NULL THEN 1 ELSE 0 END) AS invalidRows"
+                + " FROM " + src + " GROUP BY " + day + " ORDER BY " + day, binds);
+    }
+
+    /** Explicit cancellation/void marker, never inferred from deletion or unconfirmed status. */
+    public static String cancellationMarker(Meta m, boolean sales) {
+        String table = sales ? "sailfact" : "buyfact";
+        return Sql.pickFlex(m.columns(table), "cancel", "canceled", "cancelled", "is_cancel", "void");
+    }
+
+    /** Daily explicitly voided invoices. Missing markers remain unavailable, not a zero series. */
+    public static Q voidedFactorDaily(Meta m, boolean sales, String from, String to) throws Missing {
+        String table = sales ? "sailfact" : "buyfact";
+        Set<String> cols = m.columns(table);
+        String marker = cancellationMarker(m, sales);
+        if (marker == null)
+            throw new Missing("در «" + AtiranSchema.faTitle(table)
+                    + "» ستون صریحِ ابطال/لغو فاکتور پیدا نشد؛ وضعیت حذف یا تأییدنشده جای آن نیست");
+        String dateCol = sales ? m.must(table, "تاریخ", "date") : m.must(table, "تاریخ", "DATE", "date");
+        String amountCol = m.must(table, "مبلغ", "all");
+        String numberCol = sales ? m.must(table, "شماره فاکتور", "shfacfo")
+                : m.must(table, "شماره فاکتور", "shfackh", "shfac");
+        List<Object> binds = new ArrayList<>();
+        String dc = factorDateRange("x", dateCol, from, to, binds);
+        String flag = Sql.trueLike("x." + Sql.q(marker));
+        String inner = "WHERE " + flag + (dc.isEmpty() ? "" : " AND " + dc);
+        String src = Sql.dedupe(table, numberCol, "h", inner);
+        String day = Sql.date10("h", dateCol);
+        String amount = Sql.numNull("h", amountCol);
+        return new Q("SELECT " + day + " AS day, COUNT_BIG(1) AS docs"
+                + ", SUM(" + amount + ") AS total"
+                + ", SUM(CASE WHEN " + amount + " IS NULL THEN 1 ELSE 0 END) AS invalidRows"
+                + " FROM " + src + " GROUP BY " + day + " ORDER BY " + day, binds);
+    }
+
+    /** Read-only list behind the cancellation chart, paged and date-scoped. */
+    public static Q voidedFactorList(Meta m, boolean sales, Filter f) throws Missing {
+        String table = sales ? "sailfact" : "buyfact";
+        Set<String> cols = m.columns(table);
+        String marker = cancellationMarker(m, sales);
+        if (marker == null)
+            throw new Missing("در «" + AtiranSchema.faTitle(table)
+                    + "» ستون صریحِ ابطال/لغو فاکتور پیدا نشد؛ وضعیت حذف یا تأییدنشده جای آن نیست");
+        String dateCol = sales ? m.must(table, "تاریخ", "date") : m.must(table, "تاریخ", "DATE", "date");
+        String timeCol = sales ? Sql.pick(cols, "time_") : Sql.pick(cols, "Hour", "hour");
+        String amountCol = m.must(table, "مبلغ", "all");
+        String numberCol = sales ? m.must(table, "شماره فاکتور", "shfacfo")
+                : m.must(table, "شماره فاکتور", "shfackh", "shfac");
+        String partyCol = Sql.pick(cols, "shmo", "SHMO");
+        String paidCol = sales ? Sql.pick(cols, "MabDaryaftFactor", "Daryaft")
+                : Sql.pick(cols, "MablaghPardakht", "Pardakht");
+        String descCol = Sql.pick(cols, "description", "Explain", "Descrip", "sharh");
+        String dueCol = Sql.pick(cols, "t_date", "DateModatPardakht", "due_date");
+        String tasviehCol = Sql.pick(cols, "tasvieh", "Tasviyeh");
+        List<Object> binds = new ArrayList<>();
+        List<String> inner = new ArrayList<>();
+        inner.add(Sql.trueLike("x." + Sql.q(marker)));
+        String dc = factorDateRange("x", dateCol, f.from, f.to, binds);
+        if (!dc.isEmpty()) inner.add(dc);
+        String src = Sql.dedupe(table, numberCol, "h", "WHERE " + Sql.join(inner, " AND "));
+        String join = custJoin(m, "h", partyCol, "cu");
+        String custName = m.col("CUSTOMERS", "MONAME", "Name", "CusName");
+        String outerWhere = "";
+        if (f.search != null && !f.search.trim().isEmpty()) {
+            List<String> expressions = new ArrayList<>();
+            expressions.add(Sql.txt("h", numberCol, 80));
+            if (descCol != null) expressions.add(Sql.txt("h", descCol, 500));
+            if (custName != null && partyCol != null) expressions.add(Sql.txt("cu", custName, 250));
+            String search = searchCond(binds, f.search, expressions.toArray(new String[0]));
+            if (!search.isEmpty()) outerWhere = " WHERE " + search;
+        }
+        String total = Sql.numNull("h", amountCol);
+        String paid = Sql.numNull("h", paidCol);
+        String remain = "CASE WHEN " + total + " IS NULL OR " + paid + " IS NULL THEN NULL ELSE ("
+                + total + ")-(" + paid + ") END";
+        String orderBy = "h.[" + dateCol + "] DESC, h.[" + numberCol + "] DESC";
+        if ("total_desc".equals(f.sort)) orderBy = total + " DESC";
+        if ("remain_desc".equals(f.sort)) orderBy = "((" + total + ")-(" + paid + ")) DESC";
+        if ("total_desc".equals(f.sort) || "remain_desc".equals(f.sort))
+            orderBy += ", h.[" + dateCol + "] DESC";
+        String sql = "SELECT " + Sql.txt("h", numberCol, 80) + " AS no"
+                + ", " + Sql.dateTimeDisplay("h", dateCol, timeCol) + " AS date"
+                + ", " + (partyCol == null ? "CAST(NULL AS nvarchar(100))" : Sql.txt("h", partyCol, 100)) + " AS code"
+                + ", " + custNameExpr(m, "h", partyCol, "cu") + " AS customer"
+                + ", " + (sales ? "N'بدون ویزیتور'" : "N'—'") + " AS visitor"
+                + ", " + total + " AS total, " + paid + " AS paid"
+                + ", " + remain + " AS remain"
+                + ", CASE WHEN " + paid + " IS NULL THEN 1 ELSE 0 END AS paidInvalid"
+                + ", " + (tasviehCol == null ? "N''" : Sql.txt("h", tasviehCol, 10)) + " AS tasvieh"
+                + ", " + (dueCol == null ? "CAST(NULL AS nvarchar(10))" : Sql.date10("h", dueCol)) + " AS dueDate"
+                + ", " + (descCol == null ? "CAST(NULL AS nvarchar(500))" : Sql.txt("h", descCol, 500)) + " AS descrip"
+                + ", CASE WHEN " + total + " IS NULL THEN 1 ELSE 0 END AS amountInvalid"
+                + " FROM " + src + join + outerWhere + " ORDER BY " + orderBy
+                + pageClause(binds, f.page, f.top);
+        return new Q(sql, binds);
+    }
+
+    /** Jalali bounds also cover Gregorian date strings used by a few Atiran installations. */
+    private static String factorDateRange(String alias, String dateCol, String from, String to,
+                                          List<Object> binds) {
+        boolean hasFrom = from != null && !from.trim().isEmpty();
+        boolean hasTo = to != null && !to.trim().isEmpty();
+        boolean both = hasFrom && hasTo;
+        String gregorianFrom = hasFrom ? Jalali.toGregorian(from.trim()) : "";
+        String gregorianTo = hasTo ? Jalali.toGregorian(to.trim()) : "";
+        String raw = Sql.date10(alias, dateCol);
+        String dateKey = Sql.dateKey(raw);
+        String jalaliText = "CHARINDEX(N'/'," + raw + ")>0";
+        String gregorianText = "CHARINDEX(N'/'," + raw + ")=0";
+        if (!both && hasFrom && !gregorianFrom.isEmpty()) {
+            binds.add(from.trim()); binds.add(gregorianFrom);
+            return "((" + jalaliText + " AND " + dateKey + ">=?) OR (" + gregorianText + " AND " + raw + ">=?))";
+        }
+        if (!both && hasTo && !gregorianTo.isEmpty()) {
+            binds.add(to.trim()); binds.add(gregorianTo);
+            return "((" + jalaliText + " AND " + dateKey + "<=?) OR (" + gregorianText + " AND " + raw + "<=?))";
+        }
+        if (both && !gregorianFrom.isEmpty() && !gregorianTo.isEmpty()) {
+            String first = from.trim();
+            String last = to.trim();
+            if (first.compareTo(last) > 0) {
+                String swap = first; first = last; last = swap;
+                String gregorianSwap = gregorianFrom; gregorianFrom = gregorianTo; gregorianTo = gregorianSwap;
+            }
+            binds.add(first); binds.add(last); binds.add(gregorianFrom); binds.add(gregorianTo);
+            return "((" + jalaliText + " AND " + dateKey + ">=? AND " + dateKey + "<=?) OR ("
+                    + gregorianText + " AND " + raw + ">=? AND " + raw + "<=?))";
+        }
+        return Sql.dateCond(raw, from, to, binds);
     }
 
     /** Top debtors: code,party,amount. */
@@ -365,6 +483,7 @@ public final class Queries {
         }
         String sql = "SELECT TOP (" + clampTop(top) + ") " + codeExpr + " AS code, " + nameExpr + " AS party"
                 + ", COALESCE(TRY_CONVERT(decimal(19,2),s.[all_fel]),TRY_CONVERT(decimal(19,2),s.[all])) AS amount"
+                + ", COUNT_BIG(1) OVER() AS totalCount"
                 + ", LEFT(TRY_CONVERT(nvarchar(30),s.[t_date]),10) AS dueDate, " + daysExpr + " AS days"
                 + ", " + visitorExpr + " AS visitor, " + numExpr + " AS invoice"
                 + " FROM dbo.sailfact s" + joinSql + " WHERE " + Sql.join(where, " AND ")
@@ -441,6 +560,7 @@ public final class Queries {
         String table = sales ? "sailfact" : "buyfact";
         Set<String> cols = m.columns(table);
         String dateCol = sales ? m.must(table, "تاریخ", "date") : m.must(table, "تاریخ", "DATE", "date");
+        String timeCol = sales ? Sql.pick(cols, "time_") : Sql.pick(cols, "Hour", "hour");
         String amountCol = m.must(table, "مبلغ", "all");
         String numberCol = sales ? m.must(table, "شماره فاکتور", "shfacfo") : m.must(table, "شماره فاکتور", "shfackh", "shfac");
         String partyCol = Sql.pick(cols, "shmo", "SHMO");
@@ -454,7 +574,7 @@ public final class Queries {
         String custGroup = m.col("CUSTOMERS", "group_rdf");
         List<Object> binds = new ArrayList<>();
         List<String> conds = new ArrayList<>();
-        String dc = Sql.dateCond(Sql.date10("h", dateCol), f.from, f.to, binds);
+        String dc = factorDateRange("h", dateCol, f.from, f.to, binds);
         if (!dc.isEmpty()) conds.add(dc);
         if (sales && f.visitor >= 0 && visCol != null) { conds.add("TRY_CONVERT(int,h.[" + visCol + "])=?"); binds.add(f.visitor); }
         boolean needCust = f.route >= 0 || f.custGroup >= 0 || (f.search != null && !f.search.trim().isEmpty());
@@ -500,13 +620,18 @@ public final class Queries {
         String regApply = MoneyQueries.registrantApplyFor(m, userCol);
         String regSel = regApply == null ? "N''" : "COALESCE(ru.regName,N'')";
         if (regApply != null) join = join + regApply;
+        String totalNullable = Sql.numNull("h", amountCol);
+        String paidNullable = Sql.numNull("h", paidCol);
         String sql = "SELECT " + Sql.txt("h", numberCol, 80) + " AS no"
-                + ", " + Sql.date10("h", dateCol) + " AS date"
+                + ", " + Sql.dateTimeDisplay("h", dateCol, timeCol) + " AS date"
                 + ", " + (partyCol == null ? "CAST(NULL AS nvarchar(100))" : Sql.txt("h", partyCol, 100)) + " AS code"
                 + ", " + custNameExpr(m, "h", partyCol, "cu") + " AS customer"
                 + ", " + (sales ? (visCol == null ? "N'بدون ویزیتور'" : visNameExpr(m, "h", visCol, "v")) : "N'—'") + " AS visitor"
-                + ", " + totalExpr + " AS total, " + paidExpr + " AS paid"
-                + ", ((" + totalExpr + ")-(" + paidExpr + ")) AS remain"
+                + ", " + totalNullable + " AS total, " + paidNullable + " AS paid"
+                + ", CASE WHEN " + totalNullable + " IS NULL OR " + paidNullable + " IS NULL THEN NULL ELSE ("
+                + totalNullable + ")-(" + paidNullable + ") END AS remain"
+                + ", CASE WHEN " + totalNullable + " IS NULL THEN 1 ELSE 0 END AS amountInvalid"
+                + ", CASE WHEN " + paidNullable + " IS NULL THEN 1 ELSE 0 END AS paidInvalid"
                 + ", " + (tasviehCol == null ? "N''" : Sql.txt("h", tasviehCol, 10)) + " AS tasvieh"
                 + ", " + (dueCol == null ? "CAST(NULL AS nvarchar(10))" : Sql.date10("h", dueCol)) + " AS dueDate"
                 + ", " + (descCol == null ? "CAST(NULL AS nvarchar(500))" : Sql.txt("h", descCol, 500)) + " AS descrip"
@@ -564,30 +689,40 @@ public final class Queries {
     }
 
 
-    /** Invoice header (all key fields + joined names). */
+    /** Invoice header (all key fields + joined names), excluding inactive documents. */
     public static Q factorHeader(Meta m, boolean sales, String no) throws Missing {
+        return factorHeader(m, sales, no, false);
+    }
+
+    /** Void-detail lookup may include an inactive header after its explicit void marker matched. */
+    public static Q factorHeader(Meta m, boolean sales, String no, boolean includeVoided) throws Missing {
         String table = sales ? "sailfact" : "buyfact";
         Set<String> cols = m.columns(table);
         String dateCol = sales ? m.must(table, "تاریخ", "date") : m.must(table, "تاریخ", "DATE", "date");
+        String timeCol = sales ? Sql.pick(cols, "time_") : Sql.pick(cols, "Hour", "hour");
         String amountCol = m.must(table, "مبلغ", "all");
         String numberCol = sales ? m.must(table, "شماره فاکتور", "shfacfo") : m.must(table, "شماره فاکتور", "shfackh", "shfac");
         String partyCol = Sql.pick(cols, "shmo", "SHMO");
         String paidCol = sales ? Sql.pick(cols, "MabDaryaftFactor", "Daryaft") : Sql.pick(cols, "MablaghPardakht", "Pardakht");
         String visCol = sales ? Sql.pick(cols, "vis_rdf", "VisitorID") : null;
         String[] extra = {"tafif", "tax", "avarez", "barbari", "sumlineall", "tasvieh", "t_date", "done_date",
-                "description", "Status", "TaeedUser", "TaeedDate", "tdf", "moname", "shpish", "time_"};
+                "description", "Status", "TaeedUser", "TaeedDate", "tdf", "moname", "shpish", "time_", "Hour"};
         StringBuilder sb = new StringBuilder("SELECT TOP (1) ");
-        sb.append(Sql.txt("h", numberCol, 80)).append(" AS no, ").append(Sql.date10("h", dateCol)).append(" AS date, ");
+        sb.append(Sql.txt("h", numberCol, 80)).append(" AS no, ").append(Sql.dateTimeDisplay("h", dateCol, timeCol)).append(" AS date, ");
         sb.append(partyCol == null ? "CAST(NULL AS nvarchar(100))" : Sql.txt("h", partyCol, 100)).append(" AS code, ");
         sb.append(custNameExpr(m, "h", partyCol, "cu")).append(" AS customer, ");
         sb.append(sales ? (visCol == null ? "N'بدون ویزیتور'" : visNameExpr(m, "h", visCol, "v")) : "N'—'").append(" AS visitor, ");
-        sb.append(Sql.num("h", amountCol)).append(" AS total, ").append(Sql.num("h", paidCol)).append(" AS paid");
+        String totalNullable = Sql.numNull("h", amountCol);
+        String paidNullable = Sql.numNull("h", paidCol);
+        sb.append(totalNullable).append(" AS total, ").append(paidNullable).append(" AS paid")
+                .append(", CASE WHEN ").append(totalNullable).append(" IS NULL THEN 1 ELSE 0 END AS amountInvalid")
+                .append(", CASE WHEN ").append(paidNullable).append(" IS NULL THEN 1 ELSE 0 END AS paidInvalid");
         for (String e : extra) {
             String c = Sql.pick(cols, e);
             sb.append(", ");
             if (c == null) sb.append("CAST(NULL AS nvarchar(400))");
             else if (e.equals("description") || e.equals("TaeedUser") || e.equals("TaeedDate") || e.equals("moname")
-                    || e.equals("shpish") || e.equals("time_") || e.equals("tasvieh")) sb.append(Sql.txt("h", c, 400));
+                    || e.equals("shpish") || e.equals("time_") || e.equals("Hour") || e.equals("tasvieh")) sb.append(Sql.txt("h", c, 400));
             else if (e.equals("t_date") || e.equals("done_date")) sb.append(Sql.date10("h", c));
             else if (e.equals("Status")) sb.append("TRY_CONVERT(int,h.[").append(c).append("])");
             else sb.append(Sql.num("h", c));
@@ -598,7 +733,7 @@ public final class Queries {
         sb.append(" FROM dbo.[").append(table).append("] h").append(custJoin(m, "h", partyCol, "cu"));
         if (sales) sb.append(visJoin(m, "h", visCol, "v"));
         sb.append(" WHERE TRY_CONVERT(nvarchar(80),h.[").append(numberCol).append("])=?");
-        sb.append(Sql.activeAnd(cols, "h"));
+        if (!includeVoided) sb.append(Sql.activeAnd(cols, "h"));
         // Atiran keeps every saved version of an invoice (rdf__); the current one is the highest (mili.sql).
         String verHead = Sql.pick(cols, "rdf__", "RDF__");
         if (verHead != null) sb.append(" ORDER BY h.[").append(verHead).append("] DESC");
@@ -607,6 +742,11 @@ public final class Queries {
 
     /** Invoice lines: shka,naka,qtyVah,qtyJoz,vahPrice,jozPrice,lineSum,discount,tax. */
     public static Q factorLines(Meta m, boolean sales, String no) throws Missing {
+        return factorLines(m, sales, no, false);
+    }
+
+    /** Include inactive lines only for an invoice already selected by the explicit void marker. */
+    public static Q factorLines(Meta m, boolean sales, String no, boolean includeVoided) throws Missing {
         String line = sales ? "subsailfact" : "subbuyfact";
         String head = sales ? "sailfact" : "buyfact";
         if (!m.table(line)) {
@@ -618,7 +758,9 @@ public final class Queries {
             return new Q("SELECT TOP (1) CAST(NULL AS nvarchar(60)) AS shka, N'اقلام تفکیک‌نشده' AS naka"
                     + ", CAST(NULL AS decimal(19,3)) AS qtyVah, CAST(NULL AS decimal(19,3)) AS qtyJoz"
                     + ", CAST(NULL AS decimal(19,2)) AS vahPrice, CAST(NULL AS decimal(19,2)) AS jozPrice"
-                    + ", " + Sql.num("h", amountCol) + " AS lineSum, CAST(0 AS decimal(19,2)) AS discount"
+                    + ", " + Sql.numNull("h", amountCol) + " AS lineSum"
+                    + ", CASE WHEN " + Sql.numNull("h", amountCol) + " IS NULL THEN 1 ELSE 0 END AS lineSumInvalid"
+                    + ", CAST(0 AS decimal(19,2)) AS discount"
                     + ", CAST(0 AS decimal(19,2)) AS tax FROM dbo.[" + head + "] h"
                     + " WHERE TRY_CONVERT(nvarchar(80),h.[" + numberCol + "])=?", binds);
         }
@@ -649,7 +791,8 @@ public final class Queries {
                 + ", " + numNull("d", qtyJ, "decimal(19,3)") + " AS qtyJoz"
                 + ", " + numNull("d", vp, "decimal(19,2)") + " AS vahPrice"
                 + ", " + numNull("d", jp, "decimal(19,2)") + " AS jozPrice"
-                + ", " + Sql.num("d", sum) + " AS lineSum"
+                + ", " + numNull("d", sum, "decimal(19,2)") + " AS lineSum"
+                + ", CASE WHEN " + numNull("d", sum, "decimal(19,2)") + " IS NULL THEN 1 ELSE 0 END AS lineSumInvalid"
                 + ", " + Sql.num("d", disc) + " AS discount"
                 + ", " + Sql.num("d", tax) + " AS tax"
                 + (lineNo == null ? ", CAST(NULL AS int) AS [lineNo]" : ", " + numNull("d", lineNo, "int") + " AS [lineNo]")
@@ -661,7 +804,7 @@ public final class Queries {
                 + " WHERE TRY_CONVERT(nvarchar(80),d.[" + linkCol + "])=?"
                 + (verCol == null ? "" : " AND d.[" + verCol + "] = (SELECT MAX(x.[" + verCol + "]) FROM dbo.["
                 + line + "] x WHERE TRY_CONVERT(nvarchar(80),x.[" + linkCol + "])=?)")
-                + Sql.activeAnd(cols, "d")
+                + (includeVoided ? "" : Sql.activeAnd(cols, "d"))
                 + " ORDER BY d.[" + linkCol + "]";
         // Only the current version of the invoice (highest rdf__, as Atiran's own procedures use).
         if (verCol != null) binds.add(no);
@@ -671,7 +814,7 @@ public final class Queries {
     /**
      * One invoice line = one (line sequence, item) pair. The same pair returned twice is a copy of
      * the same stored line, so only the first is kept. Lines without a sequence number are kept as is.
-     * A missing line amount is filled with quantity × unit price.
+     * A missing/invalid amount stays missing; the detail UI must not invent a line total.
      */
     public static List<Row> distinctLines(List<Row> rows) {
         List<Row> out = new ArrayList<>();
@@ -682,7 +825,6 @@ public final class Queries {
                 String key = r.s("lineNo") + "|" + r.s("shka");
                 if (!seen.add(key)) continue;
             }
-            if (Math.abs(r.d("lineSum")) < 0.005) r.put("lineSum", r.d("qtyVah") * r.d("vahPrice"));
             out.add(r);
         }
         return out;
@@ -835,10 +977,10 @@ public final class Queries {
     }
 
     /**
-     * Purchase price drift per product. For each item bought in the range, the unit price
-     * (LINESUM / TEDVAH) of its latest purchase is compared with the purchase before it.
+     * Purchase price drift per product. Compare the two latest current, active purchase lines.
+     * Ordering uses the invoice date, a valid stored invoice time when available, then stable
+     * invoice/line keys so same-day rows cannot be selected nondeterministically.
      * Only products bought at least twice are listed; the largest moves come first.
-     * Columns are the same ones factorTopProducts already reads from buyfact/subbuyfact.
      */
     public static Q buyPriceTrend(Meta m, Filter f, int top) throws Missing {
         String head = "buyfact";
@@ -861,23 +1003,54 @@ public final class Queries {
         List<String> conds = new ArrayList<>();
         String dc = Sql.dateCond(Sql.date10("x", dateCol), f.from, f.to, binds);
         if (!dc.isEmpty()) conds.add(dc);
+        String headerVersionCol = Sql.pick(cols, "rdf__", "RDF__");
+        String timeCol = Sql.pick(cols, "Hour", "hour");
+        String lineVersionCol = Sql.pick(sub, "rdf__", "RDF__");
+        String lineSequenceCol = Sql.pick(sub, "rdf", "RDF");
+        String latestHeader = "";
+        if (headerVersionCol != null) {
+            latestHeader = " AND TRY_CONVERT(bigint,x.[" + headerVersionCol + "])=(SELECT MAX(TRY_CONVERT(bigint,v.["
+                    + headerVersionCol + "])) FROM dbo.[" + head + "] v"
+                    + " WHERE TRY_CONVERT(nvarchar(100),v.[" + numberCol + "])=TRY_CONVERT(nvarchar(100),x.["
+                    + numberCol + "]))";
+        }
         String inner = "WHERE " + (conds.isEmpty() ? "1=1" : Sql.join(conds, " AND "))
-                + Sql.activeAnd(cols, "x") + Sql.softAnd(cols, "x");
+                + Sql.activeAnd(cols, "x") + Sql.softAnd(cols, "x") + latestHeader;
         String src = Sql.dedupe(head, numberCol, "h", inner);
         boolean useInv = invName != null && invShka != null;
         String label = "COALESCE(" + (useInv ? Sql.txt("i", invName, 250) + "," : "") + Sql.txt("d", shka, 120) + ",N'—')";
         // Unit price per piece: the line amount covers vah and joz, so the denominator must too.
         String unit = "CAST(" + Sql.num("d", unitCol) + " AS decimal(19,4))";
+        String purchaseTime = timeCol == null ? "CAST(NULL AS time(0))"
+                : "TRY_CONVERT(time(0),h.[" + timeCol + "])";
+        String invoiceNo = "TRY_CONVERT(nvarchar(100),h.[" + numberCol + "])";
+        String invoiceSort = "TRY_CONVERT(decimal(19,0),h.[" + numberCol + "])";
+        String headerRevision = headerVersionCol == null ? "CAST(0 AS bigint)"
+                : "TRY_CONVERT(bigint,h.[" + headerVersionCol + "])";
+        String lineSequence = lineSequenceCol == null ? "CAST(0 AS bigint)"
+                : "TRY_CONVERT(bigint,d.[" + lineSequenceCol + "])";
+        String lineRevision = lineVersionCol == null ? "CAST(0 AS bigint)"
+                : "TRY_CONVERT(bigint,d.[" + lineVersionCol + "])";
+        String latestLine = "";
+        if (lineVersionCol != null) {
+            latestLine = " AND TRY_CONVERT(bigint,d.[" + lineVersionCol + "])=(SELECT MAX(TRY_CONVERT(bigint,x.["
+                    + lineVersionCol + "])) FROM dbo.[" + line + "] x"
+                    + " WHERE TRY_CONVERT(nvarchar(100),x.[" + linkCol + "])=TRY_CONVERT(nvarchar(100),d.["
+                    + linkCol + "]))";
+        }
         String sql = "WITH ln AS ("
                 + " SELECT TRY_CONVERT(nvarchar(100),d.[" + shka + "]) AS k, " + label + " AS label"
                 + ", " + Sql.dateKey(Sql.date10("h", dateCol)) + " AS dk"
-                + ", (" + unit + ") AS unit"
+                + ", " + purchaseTime + " AS purchaseTime, " + invoiceSort + " AS invoiceSort, " + invoiceNo + " AS invoiceNo"
+                + ", " + headerRevision + " AS headRevision, " + lineSequence + " AS lineSequence"
+                + ", " + lineRevision + " AS lineRevision, (" + unit + ") AS unit"
                 + " FROM " + src
                 + " JOIN dbo.[" + line + "] d ON TRY_CONVERT(nvarchar(100),d.[" + linkCol + "])=TRY_CONVERT(nvarchar(100),h.[" + numberCol + "])"
                 + (useInv ? " LEFT JOIN dbo.inventory i ON TRY_CONVERT(nvarchar(100),i.[" + invShka + "])=TRY_CONVERT(nvarchar(100),d.[" + shka + "])" : "")
-                + " WHERE d.[" + qty + "] IS NOT NULL"
+                + " WHERE d.[" + qty + "] IS NOT NULL" + latestLine
+                + Sql.activeAnd(sub, "d") + Sql.softAnd(sub, "d")
                 + "), r AS ("
-                + " SELECT k, label, unit, dk, ROW_NUMBER() OVER (PARTITION BY k ORDER BY dk DESC) AS rn"
+                + " SELECT k, label, unit, dk, ROW_NUMBER() OVER (PARTITION BY k ORDER BY dk DESC, purchaseTime DESC, invoiceSort DESC, invoiceNo DESC, headRevision DESC, lineSequence DESC, lineRevision DESC) AS rn"
                 + ", COUNT(*) OVER (PARTITION BY k) AS n"
                 + " FROM ln WHERE unit IS NOT NULL AND unit > 0"
                 + ") SELECT TOP (" + clampTop(top) + ") MAX(r1.label) AS label"

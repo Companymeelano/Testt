@@ -1,8 +1,6 @@
 package ir.meelano.manager.core;
 
 import android.content.Intent;
-import android.media.AudioAttributes;
-import android.media.MediaPlayer;
 import android.content.pm.ResolveInfo;
 import android.net.Uri;
 import android.os.Handler;
@@ -14,8 +12,6 @@ import android.widget.LinearLayout;
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.ui.Theme;
 
-import java.io.File;
-import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -103,11 +99,7 @@ public final class Speaker {
             speaking = false;
             if (onDone != null) onDone.run();
         };
-        // Natural Gemini voice first (clearest Persian); the built-in Persian voice when it is off or fails.
-        if (cloudOn(a)) {
-            speakCloud(a, clean, finished);
-            return;
-        }
+        // Speech stays on-device; assistant replies are never forwarded to a cloud TTS provider.
         speakLocal(a, clean, finished);
     }
 
@@ -142,114 +134,19 @@ public final class Speaker {
             } else {
                 post(onDone);
                 if (!setupShown) showSetup(a);
-                else a.kit.toast("صدای فارسی روی گوشی نیست؛ صدای طبیعی را در تنظیمات هوش مصنوعی فعال کنید");
+                else a.kit.toast("صدای فارسی محلی آماده نیست؛ در تنظیمات مدل آفلاین را نصب کنید");
             }
         });
     }
 
-    // ================= natural (cloud) voice =================
-
-    /** Cloud voice is used when the user enabled it and the AI key + consent are in place. */
-    public static boolean cloudOn(MainActivity a) {
-        android.content.SharedPreferences p = a.getSharedPreferences("meelano_ai", android.content.Context.MODE_PRIVATE);
-        String provider = p.getString("provider", "gemini");
-        if (!p.getBoolean("tts_cloud", false) || !p.getBoolean("consent", false)) return false;
-        // Natural speech needs a speech-capable service with a key (active or not).
-        for (String s : new String[]{provider, AiClient.GEMINI, AiClient.OPENAI}) {
-            if (AiClient.hasSpeech(s) && !ir.meelano.manager.screens.AiSettings.keyFor(a, s).isEmpty()) return true;
-        }
-        return false;
-    }
-
-    private static MediaPlayer player;
-    private static Runnable playerDone;
-
-    private static void speakCloud(final MainActivity a, final String clean, final Runnable onDone) {
-        final android.content.SharedPreferences p = a.getSharedPreferences("meelano_ai", android.content.Context.MODE_PRIVATE);
-        // The voice comes from a service that has natural speech: the active one if it has speech,
-        // otherwise the first speech-capable service with a saved key.
-        String active = p.getString("provider", AiClient.GEMINI);
-        String provider = null;
-        for (String s : new String[]{active, AiClient.GEMINI, AiClient.OPENAI}) {
-            if (AiClient.hasSpeech(s) && !ir.meelano.manager.screens.AiSettings.keyFor(a, s).isEmpty()) {
-                provider = s;
-                break;
-            }
-        }
-        final String chosen = provider;
-        if (chosen == null) {
-            speakLocal(a, clean, onDone);
-            return;
-        }
-        final String base = chosen.equals(active) ? p.getString("baseUrl", "") : "";
-        // A saved model is used only when it is a speech model (a chat model would fail on every reply).
-        String savedTts = p.getString("tts_model", "").trim();
-        final String model = chosen.equals(active) && savedTts.toLowerCase(java.util.Locale.ROOT).contains("tts")
-                ? savedTts : "";
-        // A saved voice name belongs to the active service only; other services use their default voice.
-        final String voice = chosen.equals(active) ? p.getString("tts_voice", "") : "";
-        final String key = ir.meelano.manager.screens.AiSettings.keyFor(a, chosen);
-        stopPlayer();
-        new Thread(() -> {
-            try {
-                AiClient.Audio au = AiClient.speech(chosen, base, model, voice, key, clean);
-                File f = new File(a.getCacheDir(), "assistant_reply." + au.ext);
-                try (FileOutputStream fo = new FileOutputStream(f)) {
-                    fo.write(au.data);
-                }
-                a.runOnUiThread(() -> play(a, f, onDone));
-            } catch (Exception e) {
-                Diag.ignored("Speaker:cloud", e);
-                a.runOnUiThread(() -> {
-                    a.kit.toast("صدای طبیعی در دسترس نبود؛ صدای گوشی استفاده شد");
-                    speakLocal(a, clean, onDone);
-                });
-            }
-        }).start();
-    }
-
-    private static void play(final MainActivity a, File f, Runnable onDone) {
-        stopPlayer();
-        try {
-            MediaPlayer mp = new MediaPlayer();
-            player = mp;
-            playerDone = onDone;
-            mp.setAudioAttributes(new AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_ASSISTANT)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                    .build());
-            mp.setDataSource(f.getAbsolutePath());
-            mp.setOnCompletionListener(m -> stopPlayer());
-            mp.setOnErrorListener((m, w, e) -> {
-                Diag.warn("Speaker:play", new IllegalStateException("MediaPlayer " + w + "/" + e));
-                stopPlayer();
-                a.kit.toast("پخش صدای طبیعی ناموفق بود");
-                if (onDone != null) onDone.run();
-                return true;
-            });
-            mp.prepare();
-            mp.start();
-        } catch (Exception e) {
-            Diag.ignored("Speaker:play", e);
-            stopPlayer();
-        }
-    }
-
-    /** Stops the natural voice and releases the player; the pending callback still runs. */
+    /** Stops both supported on-device Persian speech engines immediately. */
     public static void stopPlayer() {
         OfflineVoice.stop();
-        Runnable done = playerDone;
-        playerDone = null;
         try {
-            if (player != null) {
-                player.stop();
-                player.release();
-            }
+            if (tts != null) tts.stop();
         } catch (Exception e) {
             Diag.ignored("Speaker:stop", e);
         }
-        player = null;
-        post(done);
     }
 
     // ================= setup step =================
@@ -269,7 +166,7 @@ public final class Speaker {
         body.addView(a.kit.btnGhost("صفحهٔ F-Droid (جایگزین)", Theme.GOLD, v -> openUrl(a, ESPEAK_FDROID)),
                 a.kit.lp(-1, -2));
         body.addView(a.kit.gap(6));
-        body.addView(a.kit.btnGhost("⟳ بررسی مجدد", Theme.GOLD, v -> probe(a, () -> {
+        body.addView(a.kit.btnGhost("⇅ بررسی مجدد", Theme.GOLD, v -> probe(a, () -> {
             if (state == READY) {
                 closeSetup();
                 a.kit.toast("صدای فارسی آماده است (" + engineName + ")");

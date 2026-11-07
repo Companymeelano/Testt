@@ -9,9 +9,7 @@ import android.widget.LinearLayout;
 import android.view.View;
 
 import ir.meelano.manager.MainActivity;
-import ir.meelano.manager.core.AiClient;
 import ir.meelano.manager.core.AiBackendClient;
-import ir.meelano.manager.core.BuiltinKeys;
 import ir.meelano.manager.core.OfflineAsr;
 import ir.meelano.manager.core.OfflineVoice;
 import ir.meelano.manager.core.SecretBox;
@@ -19,149 +17,78 @@ import ir.meelano.manager.core.Speaker;
 import ir.meelano.manager.ui.Theme;
 
 /**
- * «هوش مصنوعی» block of Settings: optional managed HTTPS proxy, user-owned direct provider keys,
- * consent, and Persian voice. No provider key is bundled; direct keys use Android Keystore encryption.
- * Preferences live in {@code meelano_ai}; keys are stored encrypted by {@link SecretBox}.
+ * Settings for the AvalAI-only HTTPS proxy and on-device Persian speech.
+ * Provider credentials are never stored in Android; legacy personal keys are purged on upgrade.
  */
 public final class AiSettings {
     private AiSettings() { }
 
     static final String PREFS = "meelano_ai";
-    /** Consent text/scope version; changing it requires the user to opt in again. */
-    private static final int CONSENT_VERSION = 6;
-    /** Legacy single-key slot (migrated once into the per-provider slot). */
-    static final String KEY_NAME = "ai_key";
-
-    /** Each service keeps its own encrypted key, so switching provider never sends the wrong key. */
-    public static String keyName(String provider) {
-        return "ai_key_" + provider;
-    }
-
-    /** Moves the legacy key to the provider that was active when it was saved (runs once). */
-    private static void migrate(Context c) {
-        SharedPreferences p = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        if (p.getBoolean("keys_migrated", false)) return;
-        String legacy = SecretBox.get(c, KEY_NAME);
-        if (!legacy.isEmpty()) {
-            // A legacy key with no provider preference was saved by older builds under Gemini.
-            String selected = p.getString("provider", null);
-            String targetProvider = selected == null ? AiClient.GEMINI
-                    : (isKnown(selected) ? selected : AiClient.DEFAULT_PROVIDER);
-            String target = keyName(targetProvider);
-            if (SecretBox.get(c, target).isEmpty() && !SecretBox.put(c, target, legacy)) return;
-            if (!SecretBox.put(c, KEY_NAME, "")) return;
-            if (selected == null) p.edit().putString("provider", targetProvider).apply();
-        }
-        p.edit().putBoolean("keys_migrated", true).apply();
-    }
-
-    /** Only a key explicitly saved by the user is available; no provider keys are bundled. */
-    public static String keyFor(Context c, String provider) {
-        migrate(c);
-        String saved = SecretBox.get(c, keyName(provider));
-        return saved.isEmpty() ? BuiltinKeys.get(provider) : saved;
-    }
+    /** Consent scope now explicitly covers the secure AvalAI-only proxy. */
+    private static final int CONSENT_VERSION = 7;
+    private static final String DIRECT_KEYS_PURGED = "direct_provider_keys_purged_v1";
+    private static final String[] LEGACY_PROVIDER_IDS = {
+            "openai", "gemini", "deepseek", "groq", "grok", "openrouter", "gapgpt",
+            "cerebras", "huggingface", "custom"
+    };
 
     static SharedPreferences prefs(Context a) {
         SharedPreferences p = a.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         if (p.getInt("consent_version", 0) != CONSENT_VERSION) {
-            // Previous consent described a narrower payload; never silently broaden it.
+            // The provider and voice-processing scope changed; require fresh consent.
             p.edit().putBoolean("consent", false)
                     .putInt("consent_version", CONSENT_VERSION).apply();
         }
+        purgeLegacyDirectSettings(a, p);
         return p;
     }
 
-    /** New installs default to OpenAI; existing saved provider keys keep their previous selection. */
-    private static String selectedProvider(Context context, SharedPreferences p) {
-        String saved = p.getString("provider", "");
-        if (isKnown(saved)) return saved;
-        for (String[] option : AiClient.NAMES) {
-            if (!keyFor(context, option[0]).isEmpty()) {
-                p.edit().putString("provider", option[0]).apply();
-                return option[0];
-            }
+    /** Clears device-held provider credentials and old cloud-TTS options from earlier builds. */
+    private static void purgeLegacyDirectSettings(Context c, SharedPreferences p) {
+        if (p.getBoolean(DIRECT_KEYS_PURGED, false)) return;
+        boolean cleared = SecretBox.put(c, "ai_key", "");
+        for (String provider : LEGACY_PROVIDER_IDS) {
+            if (!SecretBox.put(c, "ai_key_" + provider, "")) cleared = false;
         }
-        return AiClient.DEFAULT_PROVIDER;
+        if (cleared) {
+            SharedPreferences.Editor edit = p.edit().putBoolean(DIRECT_KEYS_PURGED, true)
+                    .putBoolean("tts_cloud", false)
+                    .remove("provider").remove("baseUrl").remove("tts_model").remove("tts_voice")
+                    .remove("ai_backend_enabled").remove("ai_advanced_connection_open");
+            for (String provider : LEGACY_PROVIDER_IDS) edit.remove("ai_api_tested_" + provider);
+            edit.apply();
+        }
     }
 
-    /** True when explicit consent and a tested, selected connection are both ready. */
+    /** Consent and an active server session are both required for any online AI request. */
     static boolean ready(MainActivity a) {
         SharedPreferences p = prefs(a);
-        if (!p.getBoolean("consent", false)) return false;
-        if (AiBackendClient.selected(a)) return AiBackendClient.hasSession(a);
-        String provider = selectedProvider(a, p);
-        return !keyFor(a, provider).isEmpty() && p.getBoolean(testFlag(provider), false);
-    }
-
-    private static String testFlag(String provider) {
-        return "ai_api_tested_" + provider;
-    }
-
-    private static boolean isKnown(String provider) {
-        for (String[] n : AiClient.NAMES) if (n[0].equals(provider)) return true;
-        return false;
+        return p.getBoolean("consent", false) && AiBackendClient.hasSession(a);
     }
 
     static void build(final MainActivity a, final LinearLayout content, final Runnable rerender) {
         final SharedPreferences p = prefs(a);
-        final String provider = selectedProvider(a, p);
-        final boolean hasKey = !keyFor(a, provider).isEmpty();
-        final boolean testedKey = hasKey && p.getBoolean(testFlag(provider), false);
-        final boolean proxySelected = AiBackendClient.selected(a);
-        final boolean advancedOpen = p.getBoolean("ai_advanced_connection_open", false) || proxySelected;
+        final boolean hasSession = AiBackendClient.hasSession(a);
 
         LinearLayout card = a.kit.card(Theme.GOLD);
-        card.addView(a.kit.text(proxySelected ? "✦ اتصال سروری امن هوش مصنوعی" : "✦ اتصال هوش مصنوعی",
-                15f, Theme.TEXT, true), a.kit.lp(-1, -2));
-        String connectionHint;
-        if (proxySelected) {
-            connectionHint = AiBackendClient.hasSession(a)
-                    ? "پروکسی امن انتخاب شده است؛ کلیدهای ارائه‌دهنده فقط روی سرور می‌مانند."
-                    : "پروکسی امن انتخاب شده، اما ورود به سرور کامل نیست. تا استقرار endpoint HTTPS سرویس در دسترس نخواهد بود.";
-        } else if (testedKey) {
-            connectionHint = p.getBoolean("consent", false)
-                    ? "اتصال شخصی این دستگاه آماده است؛ برای استفادهٔ مشترک سازمانی، مدیر باید پروکسی امن را مستقر کند."
-                    : "اتصال شخصی آزمایش شده است؛ برای ارسال هرگونه داده ابتدا رضایت را ثبت کنید.";
-        } else {
-            connectionHint = "کلیدهای ارائه‌دهنده در بخش عادی نمایش داده نمی‌شوند. برای استفادهٔ سازمانی، مدیر باید سرویس امن HTTPS را مستقر و پیکربندی کند؛ تنظیم شخصیِ اختیاری فقط در بخش پیشرفته است.";
-        }
-        card.addView(a.kit.hint(connectionHint), a.kit.lp(-1, -2));
+        card.addView(a.kit.text("✦ دستیار هوشمند AvalAI", 15f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        card.addView(a.kit.hint(hasSession
+                ? "نشست HTTPS آماده است. کلید AvalAI فقط روی سرور نگه‌داری می‌شود و برنامه آن را دریافت نمی‌کند."
+                : "برای استفاده از AvalAI، ابتدا سرور امن را تنظیم و وارد شوید. کلید API را در برنامه وارد نکنید؛ فقط روی secret manager سرور قرار دهید."),
+                a.kit.lp(-1, -2));
         card.addView(a.kit.gap(8));
 
         boolean ready = ready(a);
         card.addView(a.kit.pill(ready ? "روشن" : "خاموش", ready ? Theme.SUCCESS : Theme.MUTED), a.kit.lp(-2, -2));
         card.addView(a.kit.gap(8));
 
-        LinearLayout chips = a.kit.h();
-        for (final String[] o : AiClient.NAMES) {
-            android.widget.TextView pc = a.kit.chip(o[1], o[0].equals(provider), Theme.GOLD, v -> {
-                p.edit().putString("provider", o[0]).apply();
-                rerender.run();
-            });
-            pc.setTextSize(11f * Theme.fontScale());
-            chips.addView(pc, a.kit.wlp(1f));
-        }
-        android.widget.TextView keyHint = a.kit.hint(hasKey
-                ? (testedKey
-                ? "کلید شخصی ذخیره و آزمایش شده است؛ مقدار آن نمایش داده نمی‌شود."
-                : "کلید شخصی ذخیره شده اما هنوز آزمایش نشده است.")
-                : "کلید شخصی این ارائه‌دهنده را فقط در صورت نیاز وارد کنید.");
-        final EditText key = a.kit.edit("کلید شخصی " + AiClient.nameOf(provider) + " (مخفی و رمزنگاری‌شده)", "", true);
-        key.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-
         final CheckBox consent = new CheckBox(a);
-        consent.setText("با رضایت من، متن پرسش، حداکثر ۲۰ پیام اخیر همین گفتگو و فقط زمینه/نتیجهٔ گزارش یا ابزارِ ازپیش‌تعریف‌شده و فقط‌خواندنی آتیران برای پردازش به سرویس AI فرستاده می‌شود. نتیجه ممکن است شامل نام مشتری/تأمین‌کننده/ویزیتور، مانده، فاکتور یا شاخص کارکنان باشد؛ اطلاعات تماس، نشانی و احراز هویت حذف می‌شوند. کل جدول یا پایگاه‌داده ارسال نمی‌شود. در پروکسی، اگر سرویس اصلی پاسخ ندهد ممکن است همان محتوا به سرویس پشتیبانِ پیکربندی‌شده (AvalAI، OpenAI، Gemini یا Groq) هم ارسال شود. اگر صدای طبیعی ابری را روشن کنم، متن پاسخ هم به سرویس گفتار می‌رود؛ صدای فارسی پیش‌فرض محلی است. نگهداری و استفادهٔ ارائه‌دهندگان تابع سیاست خودشان است.");
+        consent.setText("با رضایت من، متن پرسش، حداکثر ۲۰ پیام اخیر همین گفتگو و فقط زمینه/نتیجهٔ گزارش یا ابزارِ ازپیش‌تعریف‌شده و فقط‌خواندنی آتیران به پروکسی امن فرستاده می‌شود. در پیکربندی این برنامه، پروکسی فقط AvalAI را صدا می‌زند و در صورت خطا درخواست را متوقف می‌کند؛ اطلاعات به provider دیگری منتقل نمی‌شود. اطلاعات تماس، نشانی و احراز هویت حذف می‌شوند و کل جدول یا پایگاه‌داده ارسال نمی‌شود. پاسخ صوتی با صدای فارسی محلی پخش می‌شود و به سرویس گفتار ابری فرستاده نمی‌شود. نگهداری داده در AvalAI تابع سیاست همان سرویس است.");
         consent.setTextColor(Theme.TEXT);
         consent.setTextSize(12.5f * Theme.fontScale());
         consent.setChecked(p.getBoolean("consent", false));
         card.addView(consent, a.kit.lp(-1, -2));
         card.addView(a.kit.gap(8));
-
-        View directTest = a.kit.btnGhost("⇅ آزمایش کلید شخصی (بدون دادهٔ فروشگاه)", Theme.GOLD, v ->
-                testConnection(a, provider, key.getText().toString().trim(), rerender));
-        View directConnect = a.kit.btnGold("⚡ آزمایش و فعال‌سازی اتصال شخصی", v -> connectAndActivate(a, provider,
-                key.getText().toString().trim(), p, consent.isChecked(), rerender));
 
         // ---- Offline speech recognition (listening) ----
         card.addView(a.kit.text("🎙 شنیدن فارسی آفلاین", 13.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
@@ -233,19 +160,9 @@ public final class AiSettings {
         }
         card.addView(a.kit.gap(8));
 
-        android.widget.TextView cloudVoiceTitle = a.kit.text("🔊 صدای طبیعی Gemini (اختیاری)", 13.5f, Theme.TEXT, true);
-        android.widget.TextView cloudVoiceHint = a.kit.hint("به اینترنت و کلید شخصی Gemini نیاز دارد و متن پاسخ‌ها را به سرویس می‌فرستد. "
-                + "اگر خاموش باشد، همیشه صدای داخلی فارسی خوانده می‌شود.");
-        final CheckBox cloudTts = new CheckBox(a);
-        cloudTts.setText("استفاده از صدای طبیعی Gemini");
-        cloudTts.setTextColor(Theme.TEXT);
-        cloudTts.setTextSize(12.5f * Theme.fontScale());
-        cloudTts.setChecked(p.getBoolean("tts_cloud", false));
-
-        card.addView(a.kit.btnGold("✦ ذخیرهٔ رضایت و تنظیمات عمومی", v -> {
+        card.addView(a.kit.btnGold("✦ ذخیرهٔ رضایت و تنظیمات گفتار", v -> {
             p.edit().putBoolean("consent", consent.isChecked())
                     .putInt("consent_version", CONSENT_VERSION)
-                    .putBoolean("tts_cloud", cloudTts.isChecked())
                     .apply();
             a.kit.toast("رضایت و تنظیمات هوش مصنوعی ذخیره شد");
             rerender.run();
@@ -253,71 +170,16 @@ public final class AiSettings {
 
         content.addView(card, a.kit.lp(-1, -2));
 
-        LinearLayout advanced = a.kit.v();
-        advanced.setVisibility(advancedOpen ? View.VISIBLE : View.GONE);
-        LinearLayout providerCard = a.kit.card(Theme.GOLD);
-        providerCard.setVisibility(proxySelected ? View.GONE : View.VISIBLE);
-        providerCard.addView(a.kit.text("اتصال مستقیم شخصی (اختیاری)", 13.5f, Theme.TEXT, true),
-                a.kit.lp(-1, -2));
-        providerCard.addView(a.kit.hint("برای کاربران عادی، از پروکسی سازمانی استفاده کنید تا کلیدهای ارائه‌دهنده فقط روی سرور بمانند. این مسیر فقط کلید شخصی همین دستگاه را می‌گیرد؛ مقدار کلید نمایش داده یا در APK قرار نمی‌گیرد و با Android Keystore رمزنگاری می‌شود."),
-                a.kit.lp(-1, -2));
-        providerCard.addView(a.kit.gap(6));
-        providerCard.addView(a.kit.text("انتخاب ارائه‌دهندهٔ مستقیم", 12.5f, Theme.TEXT, true),
-                a.kit.lp(-1, -2));
-        providerCard.addView(chips, a.kit.lp(-1, -2));
-        providerCard.addView(a.kit.gap(6));
-        providerCard.addView(keyHint, a.kit.lp(-1, -2));
-        providerCard.addView(key, a.kit.lp(-1, -2));
-        providerCard.addView(a.kit.btnGold("ذخیرهٔ کلید شخصی روی این دستگاه", v -> {
-            String typedKey = key.getText().toString().trim();
-            if (typedKey.isEmpty()) {
-                a.kit.toast("برای ذخیره، کلید شخصی را وارد کنید");
-                return;
-            }
-            boolean changed = !typedKey.equals(keyFor(a, provider));
-            if (!SecretBox.put(a, keyName(provider), typedKey)) {
-                a.kit.toast("ذخیرهٔ امن کلید ممکن نشد");
-                return;
-            }
-            if (changed) p.edit().putBoolean(testFlag(provider), false).apply();
-            a.kit.toast("کلید شخصی به‌صورت رمزنگاری‌شده ذخیره شد");
-            rerender.run();
-        }), a.kit.lp(-1, -2));
-        providerCard.addView(a.kit.gap(6));
-        providerCard.addView(directTest, a.kit.lp(-1, -2));
-        providerCard.addView(directConnect, a.kit.lp(-1, -2));
-        providerCard.addView(a.kit.gap(8));
-        providerCard.addView(cloudVoiceTitle, a.kit.lp(-1, -2));
-        providerCard.addView(cloudVoiceHint, a.kit.lp(-1, -2));
-        providerCard.addView(cloudTts, a.kit.lp(-1, -2));
-        providerCard.addView(a.kit.btnGhost("🗑 حذف کلید شخصی این سرویس و خاموش‌کردن AI", Theme.DANGER, v -> {
-            SecretBox.put(a, keyName(provider), "");
-            p.edit().putBoolean(testFlag(provider), false).putBoolean("consent", false).apply();
-            a.kit.toast("کلید شخصی حذف شد و هوش مصنوعی خاموش شد");
-            rerender.run();
-        }), a.kit.lp(-1, -2));
-        advanced.addView(providerCard, a.kit.lp(-1, -2));
-        buildBackendCard(a, advanced, rerender);
-
-        if (proxySelected) {
-            content.addView(advanced, a.kit.lp(-1, -2));
-        } else {
-            View advancedToggle = a.kit.btnGhost("تنظیمات پیشرفته: سرویس‌های دیگر یا پروکسی (اختیاری)",
-                    Theme.VIOLET, v -> {
-                        boolean open = advanced.getVisibility() != View.VISIBLE;
-                        advanced.setVisibility(open ? View.VISIBLE : View.GONE);
-                        p.edit().putBoolean("ai_advanced_connection_open", open).apply();
-                    });
-            content.addView(advancedToggle, a.kit.lp(-1, -2));
-            content.addView(advanced, a.kit.lp(-1, -2));
-        }
+        buildBackendCard(a, content, rerender);
     }
 
     /** Configures the separately deployed PHP proxy without embedding its model key in the APK. */
     private static void buildBackendCard(final MainActivity a, LinearLayout content, final Runnable rerender) {
         LinearLayout card = a.kit.card(Theme.VIOLET);
         card.addView(a.kit.text("🔐 سرور AI امن (PHP)", 14.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
-        card.addView(a.kit.hint("این سرویس جدا از سرور آتیران است. کلیدهای AvalAI، OpenAI، Gemini و Groq فقط در secret manager هاست نگه‌داری می‌شوند؛ پروکسی می‌تواند بین سرویس‌های پیکربندی‌شده جابه‌جا شود. برنامه فقط از HTTPS استفاده می‌کند و نشست را رمزنگاری‌شده نگه می‌دارد. تا استقرار endpoint و تنظیم حساب، این نمونه آنلاین نیست."),
+        card.addView(a.kit.hint("این پروکسی از سرور آتیران جداست و فقط AvalAI را صدا می‌زند؛ اگر AvalAI آماده نباشد، درخواست متوقف می‌شود. کلید AvalAI فقط در secret manager هاست می‌ماند و برنامه آن را دریافت نمی‌کند. برنامه فقط با HTTPS وصل می‌شود و نشست را رمزنگاری‌شده نگه می‌دارد."),
+                a.kit.lp(-1, -2));
+        card.addView(a.kit.hint("نشانی زیر، آدرس پروکسی PHP خودتان است؛ آدرس API و کلید AvalAI باید در محیط امن هاست تنظیم شوند، نه در برنامه."),
                 a.kit.lp(-1, -2));
         card.addView(a.kit.gap(8));
 
@@ -333,17 +195,9 @@ public final class AiSettings {
         password.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         card.addView(password, a.kit.lp(-1, -2));
 
-        final CheckBox useProxy = new CheckBox(a);
-        useProxy.setText("استفاده از پروکسی امن به‌جای اتصال شخصی دستگاه");
-        useProxy.setTextColor(Theme.TEXT);
-        useProxy.setTextSize(12.5f * Theme.fontScale());
-        useProxy.setChecked(AiBackendClient.selected(a));
-        card.addView(useProxy, a.kit.lp(-1, -2));
-
         final boolean hasSession = AiBackendClient.hasSession(a);
         String status = hasSession ? "✓ نشست امن فعال است؛ رمز ورود ذخیره نشده است."
-                : (AiBackendClient.selected(a) ? "پروکسی انتخاب شده؛ برای استفاده ابتدا وارد شوید."
-                : "پروکسی آمادهٔ تنظیم است؛ تا استقرار PHP اتصال آنلاین برقرار نمی‌شود.");
+                : "پروکسی AvalAI آمادهٔ تنظیم است؛ تا استقرار PHP و ورود امن اتصال آنلاین برقرار نمی‌شود.";
         card.addView(a.kit.hint(status), a.kit.lp(-1, -2));
         card.addView(a.kit.gap(6));
         card.addView(a.kit.btnGhost("ذخیره و اعتبارسنجی نشانی HTTPS", Theme.VIOLET, v -> {
@@ -368,9 +222,8 @@ public final class AiSettings {
                 boolean success = false;
                 try {
                     AiBackendClient.login(a, url, user, pass);
-                    AiBackendClient.select(a, true);
                     success = true;
-                    message = "ورود موفق شد و پروکسی انتخاب شد؛ برای ارسال داده رضایت را ثبت کنید.";
+                    message = "ورود امن AvalAI موفق شد؛ برای ارسال داده رضایت را ثبت کنید.";
                 } catch (Exception e) {
                     message = (e instanceof IllegalArgumentException || e instanceof java.io.IOException)
                             && e.getMessage() != null ? e.getMessage() : "ورود به سرور AI ناموفق بود";
@@ -416,93 +269,8 @@ public final class AiSettings {
         });
         logout.setVisibility(hasSession ? View.VISIBLE : View.GONE);
         card.addView(logout, a.kit.lp(-1, -2));
-        useProxy.setOnCheckedChangeListener((button, checked) -> {
-            AiBackendClient.select(a, checked);
-            if (rerender != null) rerender.run();
-        });
         content.addView(card, a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
     }
 
-    /**
-     * One-tap connection: stores the typed key (or keeps the saved one), checks it with a short
-     * request, and turns the assistant on only when the service answers.
-     */
-    private static void connectAndActivate(final MainActivity a, final String provider, final String typedKey,
-                                           final SharedPreferences p, final boolean consent,
-                                           final Runnable rerender) {
-        if (!consent) {
-            a.kit.toast("برای فعال‌سازی آنلاین، ابتدا رضایت ارسال داده را تأیید کنید");
-            return;
-        }
-        final String k = typedKey.isEmpty() ? keyFor(a, provider) : typedKey;
-        if (k.isEmpty()) {
-            a.kit.toast("ابتدا کلید API را وارد کنید");
-            return;
-        }
-        if (!typedKey.isEmpty()) {
-            if (!SecretBox.put(a, keyName(provider), typedKey)) {
-                a.kit.toast("ذخیرهٔ امن کلید ممکن نشد");
-                return;
-            }
-            p.edit().putBoolean(testFlag(provider), false).apply();
-        }
-        a.kit.toast("در حال اتصال به " + AiClient.nameOf(provider) + "…");
-        new Thread(() -> {
-            String msg;
-            boolean ok = false;
-            try {
-                AiClient.complete(provider, "", AiClient.modelFor(provider, "fast"), k,
-                        "پاسخ کوتاه بده.", "فقط بنویس: آمادهٔ کمک هستم.");
-                ok = true;
-                msg = "اتصال برقرار شد و هوش مصنوعی فعال است ✓";
-            } catch (Exception e) {
-                msg = "اتصال ناموفق: " + (e.getMessage() == null ? "خطا" : e.getMessage());
-            }
-            final boolean fok = ok;
-            final String fm = msg;
-            a.runOnUiThread(() -> {
-                if (fok) {
-                    p.edit().putString("provider", provider).putBoolean(testFlag(provider), true)
-                            .putBoolean("consent", true)
-                            .putInt("consent_version", CONSENT_VERSION).apply();
-                }
-                a.kit.toast(fm);
-                if (rerender != null) rerender.run();
-            });
-        }).start();
-    }
-
-    private static void testConnection(final MainActivity a, final String provider, final String typedKey,
-                                       final Runnable rerender) {
-        final String savedKey = keyFor(a, provider);
-        final String k = typedKey.isEmpty() ? savedKey : typedKey;
-        if (k.isEmpty()) {
-            a.kit.toast("ابتدا کلید API را وارد کنید");
-            return;
-        }
-        final boolean testsSavedKey = k.equals(savedKey);
-        a.kit.toast("در حال آزمایش اتصال…");
-        new Thread(() -> {
-            String msg;
-            boolean ok = false;
-            try {
-                AiClient.complete(provider, "", AiClient.modelFor(provider, "fast"), k,
-                        "پاسخ کوتاه بده.", "فقط بنویس: آمادهٔ کمک هستم.");
-                ok = true;
-                msg = "اتصال برقرار است ✓";
-            } catch (Exception e) {
-                msg = "اتصال ناموفق: " + (e.getMessage() == null ? "خطا" : e.getMessage());
-            }
-            final boolean tested = ok;
-            final String fm = msg;
-            a.runOnUiThread(() -> {
-                if (testsSavedKey) {
-                    prefs(a).edit().putBoolean(testFlag(provider), tested).apply();
-                }
-                a.kit.toast(fm);
-                if (testsSavedKey && rerender != null) rerender.run();
-            });
-        }).start();
-    }
 }

@@ -16,7 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Locale;
 
-/** HTTPS client for the optional, separately deployed PHP AI proxy. */
+/** HTTPS client for the separately deployed, AvalAI-only PHP proxy. */
 public final class AiBackendClient {
     private AiBackendClient() { }
 
@@ -25,7 +25,6 @@ public final class AiBackendClient {
     private static final String USER = "ai_backend_user";
     private static final String EXPIRES = "ai_backend_expires";
     private static final String TOKEN = "ai_backend_token";
-    private static final String ENABLED = "ai_backend_enabled";
     private static final int MAX_BODY_BYTES = 192 * 1024;
     private static final int CONNECT_TIMEOUT_MS = 10_000;
     private static final int READ_TIMEOUT_MS = 100_000;
@@ -40,14 +39,6 @@ public final class AiBackendClient {
 
     public static String savedUser(Context c) {
         return prefs(c).getString(USER, "");
-    }
-
-    public static boolean selected(Context c) {
-        return prefs(c).getBoolean(ENABLED, false);
-    }
-
-    public static void select(Context c, boolean enabled) {
-        prefs(c).edit().putBoolean(ENABLED, enabled).apply();
     }
 
     /** Saves only public connection metadata; changing the host invalidates the old bearer token. */
@@ -110,7 +101,7 @@ public final class AiBackendClient {
         return complete(c, "general", system, message);
     }
 
-    /** Sends one bounded chat request; the PHP service owns provider keys and failover. */
+    /** Sends one bounded chat request; the PHP service owns the AvalAI key and provider route. */
     public static String complete(Context c, String task, String system, String message) throws Exception {
         return completeRequest(c, task, system, message, null, null, null);
     }
@@ -203,7 +194,6 @@ public final class AiBackendClient {
     /** Removes the encrypted bearer token and expiry; no password was persisted. */
     public static void logout(Context c) {
         clearSession(c);
-        prefs(c).edit().putBoolean(ENABLED, false).apply();
     }
 
     private static void clearSession(Context c) {

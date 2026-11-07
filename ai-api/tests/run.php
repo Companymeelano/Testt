@@ -112,20 +112,26 @@ putenv('AI_MODEL=');
 putenv('AI_PROVIDER_ORDER=');
 putenv('AI_PROVIDER_ONLY=');
 $configured = ai_configured_providers('fast');
-check(array_column($configured, 'name') === ['groq', 'openai'],
-    'Server environment provider configuration or task routing failed');
-check($configured[0]['model'] === 'llama-3.3-70b-versatile', 'Default Groq model was not selected');
+check($configured === [],
+    'AvalAI-only default did not fail closed when only non-AvalAI providers were configured');
+putenv('AI_PROVIDER_ONLY=groq');
+check(ai_configured_providers('fast') === [],
+    'Non-AvalAI provider override did not fail closed');
+putenv('AI_PROVIDER_ONLY=');
 putenv('AVALAI_API_KEY=placeholder-avalai-key-123456789');
 putenv('AVALAI_BASE_URL=https://api.avalai.example/v1');
 putenv('AVALAI_MODEL=avalai-chat-model-v1');
 check(ai_avalai_endpoint() === 'https://api.avalai.example/v1/chat/completions',
     'AvalAI base URL was not normalized to the OpenAI-compatible chat endpoint');
 $withAvalai = ai_configured_providers('general');
-check(array_column($withAvalai, 'name') === ['avalai', 'openai', 'groq'],
-    'AvalAI did not become the preferred server-configured provider');
+check(array_column($withAvalai, 'name') === ['avalai'],
+    'AvalAI-only default did not exclude all configured backup providers');
 check($withAvalai[0]['model'] === 'avalai-chat-model-v1'
     && $withAvalai[0]['base_url'] === 'https://api.avalai.example/v1/chat/completions',
     'AvalAI model or endpoint was not kept in server-side provider configuration');
+putenv('AI_PROVIDER_ONLY=groq');
+check(ai_configured_providers('general') === [],
+    'Non-AvalAI override changed the provider used by this application');
 putenv('AI_PROVIDER_ONLY=avalai');
 $avalaiOnly = ai_configured_providers('general');
 check(array_column($avalaiOnly, 'name') === ['avalai'],

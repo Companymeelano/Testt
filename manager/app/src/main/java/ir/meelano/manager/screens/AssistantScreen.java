@@ -18,8 +18,7 @@ import android.widget.TextView;
 
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.core.AiBackendClient;
-import ir.meelano.manager.core.AiClient;
-import ir.meelano.manager.core.AiRouter;
+import ir.meelano.manager.core.AiTask;
 import ir.meelano.manager.core.Assistant;
 import ir.meelano.manager.core.AssistantEngine;
 import ir.meelano.manager.core.AssistantPrompt;
@@ -48,8 +47,8 @@ import java.util.List;
 
 /**
  * «دستیار میلانو»: a Persian manager chat over the live store data.
- * Uses the configured generative model (set in Settings → هوش مصنوعی) when it is
- * enabled; otherwise the built-in data engine answers. Supports typed questions,
+ * Online answers use only the secure AvalAI proxy after consent and server login;
+ * the built-in data engine remains available offline. Supports typed questions,
  * voice input, read-aloud replies, and a live voice conversation mode.
  */
 public final class AssistantScreen extends Screen {
@@ -389,8 +388,7 @@ public final class AssistantScreen extends Screen {
     }
 
     private String completeAi(String task, String system, String user) throws Exception {
-        if (AiBackendClient.selected(a)) return AiBackendClient.complete(a, task, system, user);
-        return AiRouter.complete(a, task, system, user).text;
+        return AiBackendClient.complete(a, task, system, user);
     }
 
     /** The answer currently being written, and the text view that shows it (updated in place). */
@@ -404,8 +402,7 @@ public final class AssistantScreen extends Screen {
         final String userPrompt = AssistantPrompt.build(facts, currentMessages, q);
         final AssistantPrompt.Conversation proxyConversation =
                 AssistantPrompt.buildConversation(facts, currentMessages, q);
-        final String aiTask = AiRouter.taskFor(q);
-        final boolean useProxy = AiBackendClient.selected(a);
+        final String aiTask = AiTask.forQuestion(q);
         aiBusy = true;
         final String[] slot = {"ai", "…"};
         liveSlot = slot;
@@ -418,42 +415,20 @@ public final class AssistantScreen extends Screen {
         final SpeechQueue[] speech = {speakIt ? new SpeechQueue(a, liveOn ? this::listenOnce : null) : null};
         currentSpeech = speech[0];
         new Thread(() -> {
-            final StringBuilder acc = new StringBuilder();
-            final long[] lastShown = {0};
             String reply = null;
             try {
-                if (useProxy) {
-                    // The PHP proxy owns the provider key. Its response is complete, not streamed.
-                    reply = AiPromptRedactor.redact(AiBackendClient.complete(a, aiTask, SYSTEM_PROMPT,
-                            proxyConversation.context, proxyConversation.messages, userPrompt));
-                    acc.append(reply);
-                    final String shown = reply;
-                    a.runOnUiThread(() -> {
-                        if (liveBody != null && liveSlot == slot) {
-                            slot[1] = shown;
-                            liveBody.setText(shown);
-                        }
-                    });
-                } else {
-                    AiRouter.Result result = AiRouter.completeStream(a, aiTask, SYSTEM_PROMPT,
-                            userPrompt, piece -> {
-                                acc.append(piece);
-                                long now = System.currentTimeMillis();
-                                if (now - lastShown[0] < 70) return;
-                                lastShown[0] = now;
-                                    final String shown = AiPromptRedactor.redact(acc.toString());
-                                a.runOnUiThread(() -> {
-                                    if (liveBody != null && liveSlot == slot) {
-                                        slot[1] = shown;
-                                        liveBody.setText(shown);
-                                    }
-                                    if (speech[0] != null) speech[0].feed(shown, false);
-                                });
-                            });
-                    reply = AiPromptRedactor.redact(result.text);
-                }
+                // All online assistant traffic uses the HTTPS proxy; the provider key never enters the app.
+                reply = AiPromptRedactor.redact(AiBackendClient.complete(a, aiTask, SYSTEM_PROMPT,
+                        proxyConversation.context, proxyConversation.messages, userPrompt));
+                final String shown = reply;
+                a.runOnUiThread(() -> {
+                    if (liveBody != null && liveSlot == slot) {
+                        slot[1] = shown;
+                        liveBody.setText(shown);
+                    }
+                });
             } catch (Exception ignored) {
-                // Provider/server messages can contain diagnostics; never surface raw responses or secrets.
+                // Server messages can contain diagnostics; never surface raw responses or secrets.
             }
             final String fr = reply;
             a.runOnUiThread(() -> {
@@ -470,7 +445,7 @@ public final class AssistantScreen extends Screen {
                 redraw();
                 String spoken = slot[1];
                 if (speech[0] != null && fr != null) {
-                    // Streamed sentences were already read; finish the queue with the last part.
+                    // AvalAI proxy replies are non-streamed; queue the complete answer at once.
                     speech[0].feed(spoken, true);
                 } else {
                     if (speech[0] != null) speech[0].cancel();

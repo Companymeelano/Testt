@@ -12,7 +12,6 @@ import android.widget.TextView;
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.R;
 import ir.meelano.manager.core.AiBackendClient;
-import ir.meelano.manager.core.AiRouter;
 import ir.meelano.manager.core.AtiranAuth;
 import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Jalali;
@@ -603,11 +602,11 @@ public final class VisitorDeskScreen extends Screen {
     }
 
     private void showAiInput(){
-        if(!AiSettings.ready(a)){a.kit.toast("دستیار آنلاین هنوز با تأیید مدیر و کلید سرویس فعال نشده است؛ از ورود صوتی آفلاین یا جستجوی کالا استفاده کنید.");return;}
+        if(!AiSettings.ready(a)){a.kit.toast("پروکسی امن AvalAI هنوز آماده نیست یا رضایت ثبت نشده است؛ از ورود صوتی آفلاین یا جستجوی کالا استفاده کنید.");return;}
         android.content.SharedPreferences privacy=a.getSharedPreferences("meelano_visitor_ai",0);
-        String consentKey="order_phrase_consent_v2_"+AtiranAuth.sessionUid(a);
+        String consentKey="order_phrase_consent_v3_"+AtiranAuth.sessionUid(a);
         if(!privacy.getBoolean(consentKey,false)){
-            new AlertDialog.Builder(a).setTitle("اجازهٔ پردازش گفتار سفارش").setMessage("فقط جملهٔ نام کالا و تعداد برای پیشنهاد نام/مقدار به سرویس هوش مصنوعی پیکربندی‌شده ارسال می‌شود. در پروکسی سازمانی، درخواست ممکن است به ارائه‌دهندهٔ اصلی یا پشتیبانِ تنظیم‌شده (AvalAI، OpenAI، Gemini یا Groq) برسد. نام مشتری، قیمت و اطلاعات حساب ارسال نمی‌شوند. هیچ قلمی بدون انتخاب کالا و تأیید شما به سبد افزوده نمی‌شود.").setNegativeButton("فعلاً نه",null).setPositiveButton("می‌پذیرم",(d,w)->{privacy.edit().putBoolean(consentKey,true).apply();showAiInput();}).show();return;
+            new AlertDialog.Builder(a).setTitle("اجازهٔ پردازش گفتار سفارش").setMessage("فقط جملهٔ نام کالا و تعداد برای استخراج پیشنهاد به پروکسی امن AvalAI ارسال می‌شود. در صورت خطای AvalAI درخواست متوقف می‌شود و به سرویس دیگری نمی‌رود. نام مشتری، قیمت و اطلاعات حساب ارسال نمی‌شوند؛ تطبیق کالا و قیمت از آتیران خوانده می‌شود. هیچ قلمی بدون انتخاب کالا و تأیید شما به سبد افزوده نمی‌شود.").setNegativeButton("فعلاً نه",null).setPositiveButton("می‌پذیرم",(d,w)->{privacy.edit().putBoolean(consentKey,true).apply();showAiInput();}).show();return;
         }
         EditText phrase=a.kit.edit("مثلاً: دو بسته پسته اکبری و یک کیلو بادام"," ");
         phrase.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
@@ -621,9 +620,7 @@ public final class VisitorDeskScreen extends Screen {
         aiExecutor.execute(()->{
             try{
                 String system="فقط یک JSON معتبر برگردان: {\"items\":[{\"product\":\"نام کالا\",\"quantity\":1,\"unit\":\"واحد\"}]}. هیچ قیمت یا شناسه‌ای نساز. اگر نام کالا مشخص نیست items را خالی کن.";
-                String aiText = AiBackendClient.selected(a)
-                        ? AiBackendClient.complete(a, "fast", system, input)
-                        : AiRouter.complete(a,"fast",system,input).text;
+                String aiText = AiBackendClient.complete(a, "fast", system, input);
                 org.json.JSONObject root=new org.json.JSONObject(aiText);org.json.JSONArray items=root.optJSONArray("items");
                 if(items==null||items.length()==0)throw new Exception("نام/تعداد کالا به شکل قابل‌تأیید تشخیص داده نشد.");
                 if(items.length()!=1)throw new Exception("برای جلوگیری از حذف یا اشتباه در اقلام، هر بار فقط یک کالا را بگویید.");

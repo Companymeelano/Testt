@@ -21,7 +21,7 @@ function ai_normalize_task(string $task): ?string
     return in_array($task, ['analysis', 'fast', 'writing', 'general'], true) ? $task : null;
 }
 
-/** The normal failover order is task-aware; a private host setting can change its preference. */
+/** Legacy task-aware ordering helper; the application runtime pins requests to AvalAI below. */
 function ai_provider_order(string $task, string $configuredOrder = ''): array
 {
     $task = ai_normalize_task($task) ?? 'general';
@@ -193,12 +193,12 @@ function ai_configured_providers(string $task): array
             $available[] = $provider;
         }
     }
-    $plan = ai_provider_plan(
-        $task,
-        ai_provider_env('AI_PROVIDER_ORDER'),
-        $available,
-        ai_provider_env('AI_PROVIDER_ONLY')
-    );
+    $onlyProvider = strtolower(ai_provider_env('AI_PROVIDER_ONLY'));
+    if ($onlyProvider !== '' && $onlyProvider !== 'avalai') {
+        // This application is AvalAI-only; a mistaken override fails closed.
+        return [];
+    }
+    $plan = ai_provider_plan($task, '', $available, 'avalai');
     $configured = [];
     foreach ($plan as $provider) {
         $configured[] = [
@@ -438,13 +438,13 @@ function ai_provider_complete(array $provider, string $system, string $message,
     return $text;
 }
 
-/** Divides the 90-second upstream budget across all configured fallback attempts. */
+/** Divides the 90-second upstream budget across configured attempts (one in AvalAI-only mode). */
 function ai_provider_timeout_seconds(int $providerCount): int
 {
     return max(1, intdiv(90, max(1, $providerCount)));
 }
 
-/** Uses the next configured provider when a provider is unavailable; never exposes its diagnostics. */
+/** Executes the strict server-side provider plan; AvalAI-only mode returns at most one provider. */
 function ai_complete_with_fallback(array $providers, string $system, string $message,
                                    string $context = '', array $messages = []): string
 {

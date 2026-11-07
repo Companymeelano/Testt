@@ -44,11 +44,19 @@ function ai_provider_order(string $task, string $configuredOrder = ''): array
 }
 
 /** Pure planner kept separate so routing and fallback order can be tested without credentials. */
-function ai_provider_plan(string $task, string $configuredOrder, array $available): array
+function ai_provider_plan(string $task, string $configuredOrder, array $available,
+                          string $onlyProvider = ''): array
 {
-    $available = array_values(array_unique(array_filter($available, static function ($name) {
-        return is_string($name) && in_array($name, ['avalai', 'openai', 'gemini', 'groq'], true);
+    $allowed = ['avalai', 'openai', 'gemini', 'groq'];
+    $available = array_values(array_unique(array_filter($available, static function ($name) use ($allowed) {
+        return is_string($name) && in_array($name, $allowed, true);
     })));
+    $onlyProvider = strtolower(trim($onlyProvider));
+    if ($onlyProvider !== '') {
+        // An invalid or unavailable strict pin fails closed rather than silently using another API.
+        return in_array($onlyProvider, $allowed, true) && in_array($onlyProvider, $available, true)
+            ? [$onlyProvider] : [];
+    }
     return array_values(array_filter(ai_provider_order($task, $configuredOrder), static function ($name) use ($available) {
         return in_array($name, $available, true);
     }));
@@ -185,7 +193,12 @@ function ai_configured_providers(string $task): array
             $available[] = $provider;
         }
     }
-    $plan = ai_provider_plan($task, ai_provider_env('AI_PROVIDER_ORDER'), $available);
+    $plan = ai_provider_plan(
+        $task,
+        ai_provider_env('AI_PROVIDER_ORDER'),
+        $available,
+        ai_provider_env('AI_PROVIDER_ONLY')
+    );
     $configured = [];
     foreach ($plan as $provider) {
         $configured[] = [

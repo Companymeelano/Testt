@@ -62,6 +62,12 @@ check(ai_provider_plan('analysis', '', ['openai', 'groq']) === ['openai', 'groq'
     'Provider planner did not skip an unconfigured service');
 check(ai_provider_plan('writing', 'openai, groq, invalid', ['gemini', 'groq', 'openai'])
     === ['openai', 'groq', 'gemini'], 'Private provider order override was not safely normalized');
+check(ai_provider_plan('general', '', ['avalai', 'openai', 'groq'], 'avalai') === ['avalai'],
+    'Strict provider pin did not exclude fallback providers');
+check(ai_provider_plan('general', '', ['openai', 'groq'], 'avalai') === [],
+    'Unavailable strict provider pin did not fail closed');
+check(ai_provider_plan('general', '', ['avalai', 'openai'], 'unknown') === [],
+    'Invalid strict provider pin did not fail closed');
 check(ai_provider_timeout_seconds(1) === 90 && ai_provider_timeout_seconds(4) === 22,
     'Upstream timeout did not preserve the 90-second overall budget');
 check(ai_valid_model('gemini-2.5-flash') && ai_valid_model('meta/model-v1'), 'Valid model was rejected');
@@ -104,6 +110,7 @@ putenv('AI_MODEL_GEMINI=');
 putenv('AI_MODEL_GROQ=');
 putenv('AI_MODEL=');
 putenv('AI_PROVIDER_ORDER=');
+putenv('AI_PROVIDER_ONLY=');
 $configured = ai_configured_providers('fast');
 check(array_column($configured, 'name') === ['groq', 'openai'],
     'Server environment provider configuration or task routing failed');
@@ -119,7 +126,17 @@ check(array_column($withAvalai, 'name') === ['avalai', 'openai', 'groq'],
 check($withAvalai[0]['model'] === 'avalai-chat-model-v1'
     && $withAvalai[0]['base_url'] === 'https://api.avalai.example/v1/chat/completions',
     'AvalAI model or endpoint was not kept in server-side provider configuration');
+putenv('AI_PROVIDER_ONLY=avalai');
+$avalaiOnly = ai_configured_providers('general');
+check(array_column($avalaiOnly, 'name') === ['avalai'],
+    'AI_PROVIDER_ONLY=avalai did not suppress configured fallback providers');
+putenv('AI_PROVIDER_ONLY=gemini');
+check(ai_configured_providers('general') === [],
+    'Unavailable strict provider pin silently fell back to another provider');
+putenv('AI_PROVIDER_ONLY=avalai');
 putenv('AVALAI_BASE_URL=http://api.avalai.example/v1');
+check(ai_configured_providers('general') === [],
+    'Strict AvalAI pin silently fell back when its endpoint was invalid');
 check(ai_avalai_endpoint() === '', 'Insecure AvalAI HTTP endpoint was accepted');
 putenv('AVALAI_BASE_URL=https://127.0.0.1/v1');
 check(ai_avalai_endpoint() === '', 'Loopback AvalAI endpoint was accepted');

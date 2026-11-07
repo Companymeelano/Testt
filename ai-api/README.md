@@ -39,12 +39,13 @@ Optional environment:
 | `AI_MODEL_GEMINI` | `gemini-2.5-flash` | Gemini model |
 | `AI_MODEL_GROQ` | `llama-3.3-70b-versatile` | Groq model |
 | `AI_PROVIDER_ORDER` | task-specific order below | Private comma-separated preference containing any of `avalai,openai,gemini,groq`; unavailable providers are skipped |
+| `AI_PROVIDER_ONLY` | unset | Optional strict provider pin (`avalai`, `openai`, `gemini`, or `groq`); only that configured provider may be called, with no fallback. An invalid or unavailable pin fails closed. For AvalAI-only operation, set this to `avalai`. |
 | `AI_TOKEN_TTL` | 43200 seconds | JWT lifetime; accepted range is 600–86400 seconds |
 | `AI_JWT_ISSUER` | `meelano-ai-api` | JWT issuer |
 | `AI_RATE_LIMIT_FILE` | private system temp directory | Lock-protected rate-limit data file |
 | `AI_TRUST_PROXY_TLS` | `0` | Set to `1` only when a trusted reverse proxy terminates TLS and controls `X-Forwarded-Proto` |
 
-Without `AI_PROVIDER_ORDER`, routing prefers AvalAI first when configured; subsequent defaults are Gemini/OpenAI/Groq for `analysis` and `writing`, Groq/Gemini/OpenAI for `fast`, and OpenAI/Gemini/Groq for `general`. The order is filtered to server-configured providers; if a provider call fails, the next configured provider is tried. AvalAI uses the configured model, OpenAI-compatible `/chat/completions`, temperature `0.2`, and a bounded response size. Because failover may send the same prompt/report facts to a backup provider, the app names the possible providers in its consent text. No client request can select a provider or send a provider key.
+Without `AI_PROVIDER_ORDER`, routing prefers AvalAI first when configured; subsequent defaults are Gemini/OpenAI/Groq for `analysis` and `writing`, Groq/Gemini/OpenAI for `fast`, and OpenAI/Gemini/Groq for `general`. The order is filtered to server-configured providers; if a provider call fails, the next configured provider is tried. Set `AI_PROVIDER_ONLY=avalai` to disable all fallback and ensure every proxy request uses only AvalAI; if AvalAI is not configured or fails, the request fails rather than being sent elsewhere. `AI_PROVIDER_ORDER=avalai` alone is only a preference and still permits fallback. AvalAI uses the configured model, OpenAI-compatible `/chat/completions`, temperature `0.2`, and a bounded response size. Without strict pinning, failover may send the same prompt/report facts to a backup provider; the app names the possible providers in its consent text. No client request can select a provider or send a provider key.
 
 Generate the password hash and JWT secret directly on a trusted host or administrator machine, then transfer their results only through the host's secret-management channel. Never paste their values into this repository or the conversation. Configure TLS before enabling the endpoint. If the application server terminates TLS, leave `AI_TRUST_PROXY_TLS` unset; do not trust arbitrary forwarded headers.
 

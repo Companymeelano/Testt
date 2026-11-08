@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>صلوات برای امام زمان (عج)</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>صلوات برای امام زمان (عج)</h1>
+    <p class="sub">برای سلامت و ظهور آقا امام زمان (عج) صلوات بفرستیم</p>
+  </header>
+
+  <main>
+    <section class="card dua">
+      <p>اللَّهُمَّ صَلِّ عَلَى مُحَمَّدٍ وَ آلِ مُحَمَّدٍ وَ عَجِّلْ فَرَجَهُمْ</p>
+    </section>
+
+    <section class="card">
+      <label for="intention">نیت شما</label>
+      <select id="intention"></select>
+      <p class="hint" id="intentionDesc"></p>
+    </section>
+
+    <section class="card counter">
+      <div class="big" id="sessionTotal">۰</div>
+      <p class="hint">امروز شما: <span id="myToday">۰</span> — مجموع: <span id="myTotal">۰</span></p>
+      <div class="buttons">
+        <button data-add="1">+۱</button>
+        <button data-add="10">+۱۰</button>
+        <button data-add="100">+۱۰۰</button>
+      </div>
+      <div class="custom">
+        <input id="customAmount" type="number" min="1" max="1000" placeholder="تعداد دلخواه (۱ تا ۱۰۰۰)">
+        <button id="addCustom">ثبت</button>
+      </div>
+      <p class="error" id="error" role="alert"></p>
+    </section>
+
+    <section class="card">
+      <h2>آمار جمعی امروز</h2>
+      <p>مجموع امروز: <strong id="gToday">۰</strong> از هدف <span id="gGoal">۰</span></p>
+      <div class="bar"><div id="gBar"></div></div>
+      <p class="hint">شرکت‌کنندگان امروز: <span id="gParticipants">۰</span> — مجموع کل: <span id="gTotal">۰</span></p>
+      <h3>به تفکیک نیت (امروز)</h3>
+      <ul id="gIntentions" class="list"></ul>
+    </section>
+
+    <section class="card">
+      <h2>کارنامه من</h2>
+      <ul id="myIntentions" class="list"></ul>
+      <h3>هفت روز اخیر</h3>
+      <ul id="myDays" class="days"></ul>
+    </section>
+  </main>
+
+  <footer>
+    <p>ربات روبیکا: همین آمار را در پیام خصوصی هم ببینید.</p>
+  </footer>
+  <script src="app.js"></script>
+</body>
+</html>

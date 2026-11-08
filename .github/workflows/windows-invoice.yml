@@ -45,12 +45,15 @@ jobs:
             Tee-Object -FilePath 'windows-invoice-build.log'
           $buildExitCode = $LASTEXITCODE
           if ($buildExitCode -ne 0) {
-            $tail = @(Get-Content 'windows-invoice-build.log' -Tail 120)
-            $diagnosticText = $tail -join "`n"
-            if ($diagnosticText.Length -gt 20000) { $diagnosticText = $diagnosticText.Substring($diagnosticText.Length - 20000) }
+            $allLines = @(Get-Content 'windows-invoice-build.log')
+            $relevant = @(Select-String -Path 'windows-invoice-build.log' -Pattern 'FAILURE:|What went wrong:|Execution failed for task|error:|Could not resolve|Could not find|No matching variant|cannot find symbol|^> Task .*FAILED|Caused by:|timed out' -Context 1,2 |
+              ForEach-Object { $_.Context.PreContext; $_.Line; $_.Context.PostContext } | Select-Object -Unique -First 35)
+            if ($relevant.Count -eq 0) { $relevant = @($allLines | Select-Object -Last 25) }
+            $diagnosticText = $relevant -join "`n"
+            if ($diagnosticText.Length -gt 3000) { $diagnosticText = $diagnosticText.Substring(0, 3000) }
             $escaped = $diagnosticText.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
             Write-Output "::error title=Gradle test/package failure::$escaped"
-            $summary = @('### Gradle test/package failed', '', '```text') + $tail + @('```')
+            $summary = @('### Gradle test/package failed', '', '```text') + $relevant + @('```')
             $summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
             exit $buildExitCode
           }

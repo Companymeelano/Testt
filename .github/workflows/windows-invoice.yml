@@ -1,0 +1,83 @@
+name: Windows invoice client
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'windows-invoice/**'
+      - 'app/src/main/res/raw/atiran_sale_invoice.sql'
+      - 'app/src/main/assets/fonts/Vazirmatn-*.ttf'
+      - '.github/workflows/windows-invoice.yml'
+  push:
+    paths:
+      - 'windows-invoice/**'
+      - 'app/src/main/res/raw/atiran_sale_invoice.sql'
+      - 'app/src/main/assets/fonts/Vazirmatn-*.ttf'
+      - '.github/workflows/windows-invoice.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-package:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6.1.0
+
+      - name: Install JDK 17
+        uses: actions/setup-java@v6.1.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Gradle
+        uses: gradle/actions/setup-gradle@v6.4.0
+        with:
+          gradle-version: '8.14'
+
+      - name: Run unit tests and build Windows installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          & gradle -p windows-invoice clean test jpackage --stacktrace --console=plain 2>&1 |
+            Tee-Object -FilePath 'windows-invoice-build.log'
+          $buildExitCode = $LASTEXITCODE
+          if ($buildExitCode -ne 0) {
+            $allLines = @(Get-Content 'windows-invoice-build.log')
+            $relevant = @(Select-String -Path 'windows-invoice-build.log' -Pattern 'FAILURE:|What went wrong:|Execution failed for task|error:|Could not resolve|Could not find|No matching variant|cannot find symbol|^> Task .*FAILED|Caused by:|timed out' -Context 1,2 |
+              ForEach-Object { $_.Context.PreContext; $_.Line; $_.Context.PostContext } | Select-Object -Unique -First 35)
+            if ($relevant.Count -eq 0) { $relevant = @($allLines | Select-Object -Last 25) }
+            $diagnosticText = $relevant -join "`n"
+            if ($diagnosticText.Length -gt 3000) { $diagnosticText = $diagnosticText.Substring(0, 3000) }
+            $escaped = $diagnosticText.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+            Write-Output "::error title=Gradle test/package failure::$escaped"
+            $summary = @('### Gradle test/package failed', '', '```text') + $relevant + @('```')
+            $summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
+            exit $buildExitCode
+          }
+
+      - name: Upload Gradle build log
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: windows-invoice-build-log
+          path: windows-invoice-build.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Verify installer output
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem -Path 'windows-invoice/build/jpackage' -Filter 'MEELANO-Factor-1.0.0.exe' -File -Recurse | Select-Object -First 1
+          if ($null -eq $installer -or $installer.Length -le 0) { throw 'The Windows installer .exe was not created.' }
+          Get-FileHash -Path $installer.FullName -Algorithm SHA256 | Format-List
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: meelano-windows-invoice
+          path: windows-invoice/build/jpackage/**/MEELANO-Factor-1.0.0.exe
+          if-no-files-found: error
+          retention-days: 14

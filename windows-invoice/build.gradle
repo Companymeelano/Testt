@@ -1,0 +1,66 @@
+plugins {
+    id 'application'
+    id 'org.openjfx.javafxplugin' version '0.1.0'
+    id 'org.beryx.jlink' version '3.1.1'
+}
+
+group = 'ir.meelano'
+version = '1.0.0'
+
+java {
+    toolchain { languageVersion = JavaLanguageVersion.of(17) }
+}
+
+javafx {
+    version = '21.0.5'
+    modules = ['javafx.controls']
+}
+
+dependencies {
+    implementation 'com.microsoft.sqlserver:mssql-jdbc:12.8.1.jre11'
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+}
+
+application {
+    mainModule = 'ir.meelano.windowsinvoice'
+    mainClass = 'ir.meelano.windowsinvoice.MainApp'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.named('processResources') {
+    // Keep the Atiran write contract canonical in the existing app; do not maintain a second SQL copy.
+    from('../app/src/main/res/raw/atiran_sale_invoice.sql') {
+        into 'sql'
+        rename { 'atiran_sale_invoice.sql' }
+    }
+    from('../app/src/main/assets/fonts') {
+        include 'Vazirmatn-Regular.ttf', 'Vazirmatn-Bold.ttf', 'Vazirmatn-OFL-LICENSE.txt'
+        into 'fonts'
+    }
+}
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
+    modularity.inferModulePath = false
+}
+
+jlink {
+    options = ['--strip-debug', '--compress', '2', '--no-header-files', '--no-man-pages', '--bind-services']
+    launcher {
+        name = 'MEELANO-Factor'
+        jvmArgs = ['-Dfile.encoding=UTF-8']
+    }
+    jpackage {
+        imageName = 'MEELANO-Factor'
+        installerName = 'MEELANO-Factor-1.0.0'
+        installerType = 'exe'
+        appVersion = '1.0.0'
+        vendor = 'MEELANO'
+        icon = 'src/main/resources/icons/meelano-invoice.ico'
+        installerOptions = ['--win-per-user-install', '--win-menu', '--win-shortcut']
+    }
+}

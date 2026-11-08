@@ -17,6 +17,9 @@ import javafx.geometry.Insets;
 import javafx.geometry.NodeOrientation;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.scene.Scene;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBar;
@@ -67,6 +70,8 @@ public final class InvoiceDeskView extends BorderPane implements AutoCloseable {
     private final ListView<Product> productList = new ListView<>();
     private final TableView<Row> invoiceTable = new TableView<>(rows);
     private ScrollPane bodyScroll;
+    private long customerSearchVersion;
+    private long productSearchVersion;
     private final TextField dateField = new TextField(PersianDate.today());
     private final TextField noteField = new TextField();
     private final TextField invoiceDiscountField = new TextField("0");
@@ -132,8 +137,8 @@ public final class InvoiceDeskView extends BorderPane implements AutoCloseable {
         sidebar.getChildren().add(section);
         sidebar.getChildren().addAll(
                 navButton("invoice", "ثبت فاکتور", true, dateField::requestFocus),
-                navButton("users", "انتخاب مشتری", false, () -> focusInBody(customerSearch, 0.0)),
-                navButton("box", "جست‌وجوی کالا", false, () -> focusInBody(productSearch, 0.48)),
+                navButton("users", "انتخاب مشتری", false, this::focusCustomerSearch),
+                navButton("box", "جست‌وجوی کالا", false, this::focusProductSearch),
                 navButton("cart", "ردیف‌های فاکتور", false, () -> focusInBody(invoiceTable, 1.0))
         );
         Region spacer = new Region();
@@ -202,48 +207,92 @@ public final class InvoiceDeskView extends BorderPane implements AutoCloseable {
         Button fresh = secondaryButton("فاکتور جدید", "plus");
         fresh.disableProperty().bind(submitting);
         fresh.setOnAction(e -> requestNewDraft());
-        actions.getChildren().addAll(test, fresh);
+        Button keyboardHelp = secondaryButton("کلیدها · F1", "invoice");
+        keyboardHelp.getStyleClass().add("compact-button");
+        keyboardHelp.setTooltip(new Tooltip("راهنمای کامل کار با صفحه‌کلید"));
+        keyboardHelp.setOnAction(e -> showKeyboardHelp());
+        actions.getChildren().addAll(test, fresh, keyboardHelp);
         top.getChildren().addAll(titleBlock, actions);
 
         HBox meta = new HBox(10);
         meta.setAlignment(Pos.CENTER_RIGHT);
-        HBox invoiceId = pill("شماره را آتیران تولید می‌کند", "pill-neutral");
-        HBox currency = pill("مبالغ با واحد ثبت‌شده در آتیران", "pill-gold");
+        HBox invoiceId = pill("شماره با آتیران", "pill-neutral");
+        HBox currency = pill("واحد پول آتیران", "pill-gold");
         Label dateLabel = new Label("تاریخ فاکتور");
         dateLabel.getStyleClass().add("field-label");
         dateField.getStyleClass().add("field-date");
         dateField.setAlignment(Pos.CENTER_RIGHT);
-        dateField.setPrefWidth(150);
-        dateField.setTooltip(new Tooltip("تاریخ شمسی، مانند 1405/08/16"));
+        dateField.setPrefWidth(132);
+        dateField.setTooltip(new Tooltip("تاریخ شمسی، مانند 1405/08/16 · Enter برای رفتن به یادداشت"));
+        dateField.setOnAction(e -> noteField.requestFocus());
         dateField.textProperty().addListener((o, a, b) -> updateSubmitState());
-        noteField.setPromptText("توضیح کوتاه فاکتور (اختیاری)");
+        noteField.setPromptText("یادداشت (اختیاری)");
         noteField.setAlignment(Pos.CENTER_RIGHT);
-        noteField.setPrefWidth(245);
-        noteField.setTooltip(new Tooltip("یادداشتی که در فاکتور آتیران ثبت می‌شود"));
+        noteField.setPrefWidth(205);
+        noteField.setTooltip(new Tooltip("یادداشتی که در فاکتور آتیران ثبت می‌شود؛ Enter برای شروع انتخاب مشتری"));
+        noteField.setOnAction(e -> focusCustomerSearch());
         meta.getChildren().addAll(invoiceId, currency, dateLabel, dateField, noteField);
+        header.widthProperty().addListener((o, oldWidth, newWidth) -> {
+            boolean compactHeader = newWidth.doubleValue() < 900;
+            dateField.setPrefWidth(compactHeader ? 112 : 132);
+            noteField.setPrefWidth(compactHeader ? 138 : 205);
+        });
         header.getChildren().addAll(top, meta);
         return header;
     }
 
     private Node buildInvoiceBody() {
-        VBox workArea = new VBox(14);
+        VBox workArea = new VBox(12);
         workArea.getStyleClass().add("workspace");
-        workArea.setPadding(new Insets(8, 26, 15, 14));
-        workArea.setMinWidth(560);
-        workArea.getChildren().addAll(buildCustomerCard(), buildProductCard(), buildInvoiceTableCard());
-        VBox.setVgrow(workArea.getChildren().get(2), Priority.ALWAYS);
+        workArea.setPadding(new Insets(8, 20, 12, 12));
+        workArea.setMinWidth(0);
 
-        Node summary = buildSummaryCard();
+        VBox customerCard = (VBox) buildCustomerCard();
+        VBox productCard = (VBox) buildProductCard();
+        customerCard.setPrefWidth(300);
+        customerCard.setMinWidth(248);
+        customerCard.setMaxWidth(360);
+        productCard.setMinWidth(300);
+        HBox.setHgrow(productCard, Priority.ALWAYS);
+
+        HBox quickEntry = new HBox(12, customerCard, productCard);
+        quickEntry.setAlignment(Pos.TOP_RIGHT);
+        quickEntry.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(quickEntry, Priority.NEVER);
+
+        VBox tableCard = (VBox) buildInvoiceTableCard();
+        VBox.setVgrow(tableCard, Priority.ALWAYS);
+        workArea.getChildren().addAll(quickEntry, tableCard);
+
+        VBox summary = (VBox) buildSummaryCard();
+        summary.setPrefWidth(315);
+        summary.setMinWidth(270);
+        summary.setMaxWidth(360);
+
         HBox body = new HBox(16, workArea, summary);
         body.disableProperty().bind(submitting);
         body.setNodeOrientation(NodeOrientation.RIGHT_TO_LEFT);
         HBox.setHgrow(workArea, Priority.ALWAYS);
-        body.setPadding(new Insets(0, 0, 0, 0));
+        body.setPadding(Insets.EMPTY);
         bodyScroll = new ScrollPane(body);
         bodyScroll.setFitToWidth(true);
         bodyScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         bodyScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
         bodyScroll.getStyleClass().add("body-scroll");
+
+        body.widthProperty().addListener((o, oldWidth, newWidth) -> {
+            double available = newWidth.doubleValue();
+            boolean compact = available < 1280;
+            double summaryWidth = compact ? (available < 1080 ? 232 : 280) : 315;
+            summary.setPrefWidth(summaryWidth);
+            summary.setMinWidth(compact ? Math.min(230, summaryWidth) : 290);
+            workArea.setPadding(compact ? new Insets(8, 8, 10, 8) : new Insets(8, 20, 12, 12));
+            body.setSpacing(compact ? 8 : 16);
+            quickEntry.setSpacing(compact ? 8 : 12);
+            customerCard.setPrefWidth(compact ? Math.max(210, Math.min(255, available * 0.28)) : 300);
+            customerCard.setMinWidth(compact ? 210 : 248);
+            productCard.setMinWidth(compact ? 260 : 300);
+        });
         return bodyScroll;
     }
 
@@ -252,10 +301,13 @@ public final class InvoiceDeskView extends BorderPane implements AutoCloseable {
         HBox heading = sectionHeading("مشتری فاکتور", "users", "فقط مشتری فعال و مجاز انتخاب می‌شود");
         HBox search = new HBox(9);
         search.setAlignment(Pos.CENTER_RIGHT);
-        customerSearch.setPromptText("نام، کد یا شمارهٔ تماس مشتری");
+        customerSearch.setPromptText("نام یا کد مشتری · Ctrl+F");
         customerSearch.setAlignment(Pos.CENTER_RIGHT);
+        customerSearch.setTooltip(new Tooltip("Ctrl+F برای مشتری؛ عبارت را بنویس و Enter بزن."));
         customerSearch.setOnAction(e -> searchCustomers());
         Button searchButton = primaryButton("جست‌وجو", "search");
+        searchButton.getStyleClass().add("compact-button");
+        searchButton.setTooltip(new Tooltip("جست‌وجوی مشتری · Enter"));
         searchButton.setOnAction(e -> searchCustomers());
         HBox.setHgrow(customerSearch, Priority.ALWAYS);
         search.getChildren().addAll(customerSearch, searchButton);
@@ -265,21 +317,38 @@ public final class InvoiceDeskView extends BorderPane implements AutoCloseable {
         selected.getStyleClass().add("selected-customer");
         StackPane avatar = iconBubble("users", "green");
         VBox selectedText = new VBox(3);
+        selectedText.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(selectedText, Priority.ALWAYS);
         selectionLabel.getStyleClass().add("selected-customer-name");
         selectedBalanceLabel.getStyleClass().add("selected-customer-detail");
+        selectionLabel.setWrapText(true);
+        selectedBalanceLabel.setWrapText(true);
         selectedText.getChildren().addAll(selectionLabel, selectedBalanceLabel);
         Button clear = iconButton("×", "حذف انتخاب مشتری");
-        clear.setOnAction(e -> selectCustomer(null));
-        Region flex = new Region();
-        HBox.setHgrow(flex, Priority.ALWAYS);
-        selected.getChildren().addAll(avatar, selectedText, flex, clear);
+        clear.setAccessibleText("حذف مشتری انتخاب‌شده");
+        clear.setOnAction(e -> { selectCustomer(null); focusCustomerSearch(); });
+        selected.getChildren().addAll(avatar, selectedText, clear);
 
-        customerList.getSelectionModel().selectedItemProperty().addListener((o, oldCustomer, customer) -> {
-            if (customer != null) selectCustomer(customer);
+        customerList.setOnMouseClicked(e -> {
+            if (e.getClickCount() == 1) acceptCustomerSelection();
         });
         customerList.setPlaceholder(new Label("برای حفظ حریم خصوصی، مشتری را جست‌وجو کن"));
         customerList.setPrefHeight(112);
-        customerList.setMinHeight(90);
+        customerList.setMinHeight(52);
+        customerList.setMaxHeight(120);
+        customerList.setVisible(false);
+        customerList.setManaged(false);
+        customerList.setAccessibleText("نتایج مشتری؛ با کلیدهای جهت و Enter انتخاب کن");
+        customerList.setOnKeyPressed(e -> {
+            if (e.getCode() == KeyCode.ENTER) {
+                acceptCustomerSelection();
+                e.consume();
+            } else if (e.getCode() == KeyCode.ESCAPE) {
+                setCustomerResultsVisible(false);
+                customerSearch.requestFocus();
+                e.consume();
+            }
+        });
         customerList.setCellFactory(list -> new ListCell<>() {
             @Override protected void updateItem(Customer c, boolean empty) {
                 super.updateItem(c, empty);
@@ -306,17 +375,34 @@ public final class InvoiceDeskView extends BorderPane implements AutoCloseable {
         HBox heading = sectionHeading("افزودن کالا", "barcode", "نرخ فقط از گروه قیمت یکتای آتیران خوانده می‌شود");
         HBox search = new HBox(9);
         search.setAlignment(Pos.CENTER_RIGHT);
-        productSearch.setPromptText("نام کالا، کد یا بارکد را وارد کنید");
+        productSearch.setPromptText("نام، کد یا بارکد · Ctrl+K / اسکنر");
         productSearch.setAlignment(Pos.CENTER_RIGHT);
+        productSearch.setTooltip(new Tooltip("Ctrl+K؛ بارکدخوان را مثل صفحه‌کلید وصل کن و بارکد را اسکن کن."));
         productSearch.setOnAction(e -> searchProducts());
-        Button searchButton = primaryButton("جست‌وجوی کالا", "search");
+        Button searchButton = primaryButton("جست‌وجو", "search");
+        searchButton.getStyleClass().add("compact-button");
+        searchButton.setTooltip(new Tooltip("جست‌وجو؛ بارکد یکتا با Enter خودکار افزوده می‌شود."));
         searchButton.setOnAction(e -> searchProducts());
         HBox.setHgrow(productSearch, Priority.ALWAYS);
         search.getChildren().addAll(productSearch, searchButton);
 
         productList.setPlaceholder(new Label("نام، کد یا بارکد کالا را جست‌وجو کن"));
-        productList.setPrefHeight(162);
-        productList.setMinHeight(120);
+        productList.setPrefHeight(120);
+        productList.setMinHeight(52);
+        productList.setMaxHeight(160);
+        productList.setVisible(false);
+        productList.setManaged(false);
+        productList.setAccessibleText("نتایج کالا؛ با کلیدهای جهت و Enter افزودن");
+        productList.setOnKeyPressed(e -> {
+            if (e.getCode() == KeyCode.ENTER) {
+                addSelectedProductFromKeyboard();
+                e.consume();
+            } else if (e.getCode() == KeyCode.ESCAPE) {
+                setProductResultsVisible(false);
+                productSearch.requestFocus();
+                e.consume();
+            }
+        });
         productList.setCellFactory(list -> new ListCell<>() {
             @Override protected void updateItem(Product p, boolean empty) {
                 super.updateItem(p, empty);
@@ -352,20 +438,17 @@ public final class InvoiceDeskView extends BorderPane implements AutoCloseable {
 
     private Node buildInvoiceTableCard() {
         VBox card = card();
-        HBox heading = sectionHeading("ردیف‌های فاکتور", "invoice", "برای تغییر تعداد یا تخفیف، روی سلول بزنید");
+        HBox heading = sectionHeading("ردیف‌های فاکتور", "invoice", "F2 مقدار · Shift+F2 تخفیف · Ctrl+Backspace حذف");
         configureTable();
         HBox controls = new HBox(8);
         controls.setAlignment(Pos.CENTER_RIGHT);
         Button remove = secondaryButton("حذف ردیف", "trash");
-        remove.setOnAction(e -> {
-            Row selected = invoiceTable.getSelectionModel().getSelectedItem();
-            if (selected != null) rows.remove(selected);
-            refreshTotals();
-        });
+        remove.setTooltip(new Tooltip("ردیف انتخاب‌شده · Ctrl+Backspace"));
+        remove.setOnAction(e -> removeSelectedRow());
         Button clear = secondaryButton("پاک‌کردن ردیف‌ها", "refresh");
-        clear.setOnAction(e -> { rows.clear(); refreshTotals(); });
+        clear.setOnAction(e -> { rows.clear(); refreshTotals(); productSearch.requestFocus(); });
         Region grow = new Region(); HBox.setHgrow(grow, Priority.ALWAYS);
-        Label hint = new Label("مقادیر آزمایشی فقط در حالت پیش‌نمایش‌اند");
+        Label hint = new Label("↑ ↓ جابه‌جایی · Enter تأیید مقدار · F2 ویرایش");
         hint.getStyleClass().add("table-hint");
         controls.getChildren().addAll(hint, grow, remove, clear);
         VBox.setVgrow(invoiceTable, Priority.ALWAYS);
@@ -427,7 +510,10 @@ public final class InvoiceDeskView extends BorderPane implements AutoCloseable {
         total.setCellValueFactory(v -> new ReadOnlyStringWrapper(rowTotal(v.getValue())));
         total.setPrefWidth(140);
         invoiceTable.getColumns().setAll(item, quantity, unit, price, discount, total);
-        invoiceTable.setPrefHeight(270);
+        invoiceTable.setPrefHeight(220);
+        invoiceTable.setMinHeight(132);
+        invoiceTable.setAccessibleText("ردیف‌های فاکتور؛ F2 ویرایش تعداد، Shift+F2 تخفیف، Ctrl+Backspace حذف");
+        invoiceTable.setTooltip(new Tooltip("با جهت‌ها حرکت کن؛ F2 تعداد و Shift+F2 تخفیف را ویرایش می‌کند."));
     }
 
     private Node buildSummaryCard() {
@@ -446,14 +532,16 @@ public final class InvoiceDeskView extends BorderPane implements AutoCloseable {
                 summaryRow("مالیات", taxTotalLabel)
         );
         Separator separator = new Separator();
-        VBox extra = new VBox(8);
-        extra.getChildren().addAll(
-                inputRow("تخفیف کل", invoiceDiscountField, "۰"),
-                inputRow("باربری", freightField, "۰"),
-                inputRow("مالیات ٪", taxField, "۰"),
-                inputRow("مدت تسویه (روز)", settlementField, "۰ تا ۷۲۰"),
-                inputRow("کد انبار (اختیاری)", warehouseField, "پیش‌فرض آتیران")
-        );
+        VBox discountInput = inputRow("تخفیف کل", invoiceDiscountField, "۰");
+        VBox freightInput = inputRow("باربری", freightField, "۰");
+        VBox taxInput = inputRow("مالیات ٪", taxField, "۰");
+        VBox settlementInput = inputRow("تسویه (روز)", settlementField, "۰ تا ۷۲۰");
+        HBox discountAndFreight = inputPair(discountInput, freightInput);
+        HBox taxAndSettlement = inputPair(taxInput, settlementInput);
+        VBox extra = new VBox(7,
+                discountAndFreight,
+                taxAndSettlement,
+                inputRow("انبار (اختیاری)", warehouseField, "پیش‌فرض آتیران"));
         HBox payable = new HBox(6);
         payable.setAlignment(Pos.CENTER_RIGHT);
         VBox payableText = new VBox(3);
@@ -467,9 +555,11 @@ public final class InvoiceDeskView extends BorderPane implements AutoCloseable {
         submitButton.getStyleClass().add("submit-button");
         submitButton.setGraphic(IconFactory.icon("check", 20, Color.WHITE));
         submitButton.setMaxWidth(Double.MAX_VALUE);
+        submitButton.setTooltip(new Tooltip("Ctrl+Enter · ثبت واقعی فقط با اتصال و مجوز فعال می‌شود."));
         submitButton.setOnAction(e -> confirmSubmit());
         Button preview = secondaryButton("پیش‌نمایش چاپ", "print");
         preview.setMaxWidth(Double.MAX_VALUE);
+        preview.setTooltip(new Tooltip("Ctrl+P · پیش‌نمایش محلی؛ چاپ یا ذخیره نمی‌کند."));
         preview.setOnAction(e -> showPrintPreview());
         safetyLabel.setWrapText(true);
         submitArea.getChildren().addAll(submitButton, preview, safetyLabel);
@@ -480,6 +570,11 @@ public final class InvoiceDeskView extends BorderPane implements AutoCloseable {
         taxField.textProperty().addListener((o, a, b) -> refreshTotals());
         settlementField.textProperty().addListener((o, a, b) -> updateSubmitState());
         warehouseField.textProperty().addListener((o, a, b) -> updateSubmitState());
+        invoiceDiscountField.setOnAction(e -> freightField.requestFocus());
+        freightField.setOnAction(e -> taxField.requestFocus());
+        taxField.setOnAction(e -> settlementField.requestFocus());
+        settlementField.setOnAction(e -> warehouseField.requestFocus());
+        warehouseField.setOnAction(e -> focusProductSearch());
         return summary;
     }
 
@@ -491,36 +586,282 @@ public final class InvoiceDeskView extends BorderPane implements AutoCloseable {
         connectionDot.getStyleClass().add(gateway.connected() ? "status-dot-live" : "status-dot-demo");
         connectionLabel.setText(gateway.connectionStatus());
         connectionLabel.getStyleClass().add("connection-label");
+        connectionLabel.setTextOverrun(javafx.scene.control.OverrunStyle.ELLIPSIS);
+        connectionLabel.setMaxWidth(250);
         messageLabel.getStyleClass().add("status-message");
+        messageLabel.setTextOverrun(javafx.scene.control.OverrunStyle.ELLIPSIS);
+        messageLabel.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(messageLabel, Priority.SOMETIMES);
         Region grow = new Region(); HBox.setHgrow(grow, Priority.ALWAYS);
-        Label privacy = new Label(gateway.live() ? "اطلاعات فقط به SQL Server پیکربندی‌شده فرستاده می‌شود." : "پیش‌نمایش محلی · بدون ذخیره‌سازی یا ارسال");
+        Label privacy = new Label(gateway.live() ? "فقط به SQL Server پیکربندی‌شده ارسال می‌شود." : "پیش‌نمایش محلی · بدون ذخیره‌سازی یا ارسال");
         privacy.getStyleClass().add("status-privacy");
+        privacy.setTextOverrun(javafx.scene.control.OverrunStyle.ELLIPSIS);
+        privacy.setMaxWidth(260);
         bar.getChildren().addAll(connectionDot, connectionLabel, new Separator(), messageLabel, grow, privacy);
         return bar;
     }
 
     private void searchCustomers() {
-        String query = customerSearch.getText();
+        long requestVersion = ++customerSearchVersion;
+        String query = customerSearch.getText() == null ? "" : customerSearch.getText().trim();
+        if (normalizeDigits(query).length() < 2) {
+            customerList.getItems().clear();
+            setCustomerResultsVisible(false);
+            setMessage("برای جست‌وجوی سریع مشتری دست‌کم دو نویسه وارد کن.", true);
+            return;
+        }
+        customerList.getItems().clear();
+        customerList.getSelectionModel().clearSelection();
+        setCustomerResultsVisible(false);
         runAsync("در حال جست‌وجوی مشتری…", () -> gateway.searchCustomers(query), results -> {
+            if (requestVersion != customerSearchVersion || !query.equals(customerSearch.getText().trim())) return;
             customerList.getItems().setAll(results);
-            if (results.isEmpty()) setMessage("مشتری فعالی با این عبارت پیدا نشد.", true);
-            else setMessage(results.size() + " مشتری یافت شد.", false);
+            if (results.isEmpty()) {
+                setCustomerResultsVisible(false);
+                setMessage("مشتری فعالی با این عبارت پیدا نشد.", true);
+                customerSearch.requestFocus();
+                return;
+            }
+            customerList.setPrefHeight(Math.min(126, Math.max(56, results.size() * 48 + 8)));
+            setCustomerResultsVisible(true);
+            boolean exactCode = results.size() == 1
+                    && FastEntryPolicy.isExactCustomerCode(query, results.get(0));
+            if (exactCode) {
+                customerList.getSelectionModel().selectFirst();
+                acceptCustomerSelection();
+                setMessage("کد دقیق مشتری تأیید شد؛ حالا کالا را جست‌وجو یا اسکن کن.", false);
+            } else {
+                customerList.getSelectionModel().selectFirst();
+                customerList.requestFocus();
+                setMessage(digits(results.size()) + " مشتری یافت شد؛ با کلیدهای ↑ و ↓ و سپس Enter انتخاب کن.", false);
+            }
         });
     }
 
     private void searchProducts() {
-        String query = productSearch.getText();
+        long requestVersion = ++productSearchVersion;
+        String query = productSearch.getText() == null ? "" : productSearch.getText().trim();
+        if (normalizeDigits(query).length() < 2) {
+            productList.getItems().clear();
+            setProductResultsVisible(false);
+            setMessage("برای جست‌وجوی کالا دست‌کم دو نویسه یا یک بارکد اسکن کن.", true);
+            return;
+        }
+        productList.getItems().clear();
+        productList.getSelectionModel().clearSelection();
+        setProductResultsVisible(false);
         runAsync("در حال جست‌وجوی کالا و نرخ آتیران…", () -> gateway.searchProducts(query), results -> {
+            if (requestVersion != productSearchVersion || !query.equals(productSearch.getText().trim())) return;
             productList.getItems().setAll(results);
-            if (results.isEmpty()) setMessage("کالایی با نرخ قابل‌تأیید پیدا نشد.", true);
-            else setMessage(results.size() + " کالا بررسی شد؛ نرخ مبهم برای افزودن مسدود است.", false);
+            if (results.isEmpty()) {
+                setProductResultsVisible(false);
+                setMessage("کالایی با نرخ قابل‌تأیید پیدا نشد.", true);
+                productSearch.requestFocus();
+                return;
+            }
+            productList.setPrefHeight(Math.min(156, Math.max(56, results.size() * 48 + 8)));
+            setProductResultsVisible(true);
+            if (results.size() == 1 && FastEntryPolicy.canAutoAddProduct(query, results.get(0))) {
+                Product exact = results.get(0);
+                addProduct(exact);
+                clearProductSearchForNextScan();
+                setMessage("شناسهٔ یکتای کالا تأیید شد؛ افزوده شد. بارکد بعدی را اسکن کن.", false);
+                return;
+            }
+            productList.getSelectionModel().selectFirst();
+            productList.requestFocus();
+            setMessage(digits(results.size()) + " کالا یافت شد؛ با ↑ و ↓ انتخاب کن و Enter بزن تا افزوده شود.", false);
         });
+    }
+
+    public void installKeyboardShortcuts(Scene scene) {
+        scene.addEventFilter(KeyEvent.KEY_PRESSED, this::handleKeyboardShortcut);
+    }
+
+    public void focusInitialField() {
+        focusCustomerSearch();
+    }
+
+    private void handleKeyboardShortcut(KeyEvent event) {
+        if (submitting.get()) return;
+        if (event.isControlDown() && !event.isAltDown()) {
+            switch (event.getCode()) {
+                case F -> { focusCustomerSearch(); event.consume(); }
+                case K -> { focusProductSearch(); event.consume(); }
+                case N -> { requestNewDraft(); event.consume(); }
+                case P -> { showPrintPreview(); event.consume(); }
+                case ENTER -> { submitFromKeyboard(); event.consume(); }
+                case DIGIT1 -> { focusCustomerSearch(); event.consume(); }
+                case DIGIT2 -> { focusProductSearch(); event.consume(); }
+                case DIGIT3 -> { focusInBody(invoiceTable, 1.0); event.consume(); }
+                case DIGIT4 -> { focusHeaderField(dateField); event.consume(); }
+                case DIGIT5 -> { focusHeaderField(noteField); event.consume(); }
+                case BACK_SPACE, DELETE -> {
+                    if (isTableFocused()) { removeSelectedRow(); event.consume(); }
+                }
+                default -> { }
+            }
+            if (event.isConsumed()) return;
+        }
+        if (event.getCode() == KeyCode.F1) {
+            showKeyboardHelp();
+            event.consume();
+        } else if (event.getCode() == KeyCode.F2) {
+            editSelectedTableCell(event.isShiftDown());
+            event.consume();
+        } else if (event.getCode() == KeyCode.ESCAPE) {
+            if (productList.isVisible()) {
+                setProductResultsVisible(false);
+                focusProductSearch();
+            } else if (customerList.isVisible()) {
+                setCustomerResultsVisible(false);
+                focusCustomerSearch();
+            }
+            event.consume();
+        }
+    }
+
+    private void focusHeaderField(TextField field) {
+        Platform.runLater(() -> {
+            field.requestFocus();
+            field.selectAll();
+        });
+    }
+
+    private void focusCustomerSearch() {
+        setCustomerResultsVisible(false);
+        focusInBody(customerSearch, 0.0);
+        Platform.runLater(customerSearch::selectAll);
+    }
+
+    private void focusProductSearch() {
+        setProductResultsVisible(false);
+        focusInBody(productSearch, 0.0);
+        Platform.runLater(productSearch::selectAll);
+    }
+
+    private void submitFromKeyboard() {
+        if (!gateway.writeEnabled()) {
+            setMessage("ثبت واقعی خاموش است؛ Ctrl+Enter هیچ داده‌ای را در آتیران نمی‌نویسد.", true);
+            return;
+        }
+        if (submitButton.isDisabled()) {
+            setMessage(currentValidationMessage.isBlank()
+                    ? "برای ثبت، مشتری و دست‌کم یک کالای معتبر انتخاب کن."
+                    : currentValidationMessage, true);
+            return;
+        }
+        submitButton.fire();
+    }
+
+    private boolean isTableFocused() {
+        if (getScene() == null) return false;
+        Node node = getScene().getFocusOwner();
+        while (node != null) {
+            if (node == invoiceTable) return true;
+            node = node.getParent();
+        }
+        return false;
+    }
+
+    private void editSelectedTableCell(boolean discount) {
+        if (rows.isEmpty()) {
+            setMessage("برای ویرایش، ابتدا یک ردیف کالا اضافه کن.", true);
+            focusProductSearch();
+            return;
+        }
+        int row = invoiceTable.getSelectionModel().getSelectedIndex();
+        if (row < 0) row = 0;
+        int columnIndex = discount ? 4 : 1;
+        TableColumn<Row, ?> column = invoiceTable.getColumns().get(columnIndex);
+        invoiceTable.getSelectionModel().select(row);
+        invoiceTable.getFocusModel().focus(row, column);
+        invoiceTable.requestFocus();
+        invoiceTable.edit(row, column);
+    }
+
+    private void removeSelectedRow() {
+        Row selected = invoiceTable.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            setMessage("برای حذف، ابتدا ردیف را با کلیدهای جهت انتخاب کن.", true);
+            return;
+        }
+        rows.remove(selected);
+        refreshTotals();
+        focusProductSearch();
+    }
+
+    private void addSelectedProductFromKeyboard() {
+        Product product = productList.getSelectionModel().getSelectedItem();
+        if (product == null && !productList.getItems().isEmpty()) {
+            productList.getSelectionModel().selectFirst();
+            product = productList.getSelectionModel().getSelectedItem();
+        }
+        if (product == null) {
+            setMessage("ابتدا کالا را جست‌وجو کن.", true);
+            focusProductSearch();
+            return;
+        }
+        addProduct(product);
+        if (product.hasUnambiguousPrice()) clearProductSearchForNextScan();
+    }
+
+    private void clearProductSearchForNextScan() {
+        productSearch.clear();
+        productList.getItems().clear();
+        setProductResultsVisible(false);
+        focusProductSearch();
+    }
+
+    private void acceptCustomerSelection() {
+        Customer customer = customerList.getSelectionModel().getSelectedItem();
+        if (customer == null && !customerList.getItems().isEmpty()) {
+            customerList.getSelectionModel().selectFirst();
+            customer = customerList.getSelectionModel().getSelectedItem();
+        }
+        if (customer == null) return;
+        selectCustomer(customer);
+        setCustomerResultsVisible(false);
+        focusProductSearch();
+    }
+
+    private void setCustomerResultsVisible(boolean visible) {
+        customerList.setVisible(visible);
+        customerList.setManaged(visible);
+        if (!visible) customerList.getSelectionModel().clearSelection();
+    }
+
+    private void setProductResultsVisible(boolean visible) {
+        productList.setVisible(visible);
+        productList.setManaged(visible);
+        if (!visible) productList.getSelectionModel().clearSelection();
+    }
+
+    private void showKeyboardHelp() {
+        Alert help = new Alert(Alert.AlertType.INFORMATION);
+        help.setTitle("کار با صفحه‌کلید");
+        help.setHeaderText("ثبت سریع فاکتور، بدون نیاز به ماوس");
+        help.setContentText("Ctrl+F  جست‌وجوی مشتری\n"
+                + "Enter  جست‌وجو؛ سپس ↑ و ↓ و Enter برای انتخاب\n"
+                + "Ctrl+K  رفتن به جست‌وجو/بارکد کالا\n"
+                + "بارکد یکتا + Enter  افزودن خودکار و آماده‌شدن برای اسکن بعدی\n"
+                + "اسکن دوبارهٔ همان کالا  افزایش مقدار همان ردیف\n"
+                + "Enter روی نتیجهٔ کالا  افزودن کالای انتخاب‌شده\n"
+                + "F2  ویرایش مقدار ردیف انتخابی\n"
+                + "Shift+F2  ویرایش تخفیف ردیف\n"
+                + "Ctrl+Backspace  حذف ردیف انتخابی (وقتی جدول فوکوس دارد)\n"
+                + "Ctrl+P  پیش‌نمایش محلی\n"
+                + "Ctrl+1/2/3/4/5  مشتری / کالا / جدول / تاریخ / یادداشت\n"
+                + "Ctrl+Enter  بررسی و درخواست تأیید ثبت\n"
+                + "Ctrl+N  فاکتور جدید   ·   Esc بستن نتایج");
+        help.showAndWait();
+        focusProductSearch();
     }
 
     private void selectCustomer(Customer customer) {
         selectedCustomer = customer;
         if (customer == null) {
-            customerList.getSelectionModel().clearSelection();
+            setCustomerResultsVisible(false);
             selectionLabel.setText("هنوز مشتری انتخاب نشده است");
             selectedBalanceLabel.setText("مانده: —");
         } else {
@@ -755,6 +1096,10 @@ public final class InvoiceDeskView extends BorderPane implements AutoCloseable {
         selectCustomer(null);
         customerSearch.clear();
         productSearch.clear();
+        customerList.getItems().clear();
+        productList.getItems().clear();
+        setCustomerResultsVisible(false);
+        setProductResultsVisible(false);
         noteField.clear();
         invoiceDiscountField.setText("0");
         freightField.setText("0");
@@ -765,6 +1110,7 @@ public final class InvoiceDeskView extends BorderPane implements AutoCloseable {
         draftUniqueId = newInvoiceId();
         refreshTotals();
         setMessage("فرم فاکتور تازه آماده است.", false);
+        focusCustomerSearch();
     }
 
     private void updateConnectionBadge() {
@@ -831,8 +1177,12 @@ public final class InvoiceDeskView extends BorderPane implements AutoCloseable {
         row.setAlignment(Pos.CENTER_RIGHT);
         StackPane badge = iconBubble(icon, "green");
         VBox text = new VBox(2);
+        text.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(text, Priority.ALWAYS);
         Label name = new Label(title); name.getStyleClass().add("section-title");
         Label sub = new Label(subtitle); sub.getStyleClass().add("section-caption");
+        sub.setWrapText(true);
+        sub.setMaxWidth(Double.MAX_VALUE);
         text.getChildren().addAll(name, sub);
         row.getChildren().addAll(badge, text);
         return row;
@@ -850,11 +1200,29 @@ public final class InvoiceDeskView extends BorderPane implements AutoCloseable {
 
     private static VBox inputRow(String labelText, TextField input, String prompt) {
         VBox row = new VBox(4);
+        row.setMinWidth(0);
         Label label = new Label(labelText); label.getStyleClass().add("field-label");
         input.setPromptText(prompt);
         input.getStyleClass().add("summary-input");
         input.setAlignment(Pos.CENTER_RIGHT);
+        input.setPrefColumnCount(6);
+        input.setMinWidth(0);
+        input.setMaxWidth(Double.MAX_VALUE);
+        input.setAccessibleText(labelText);
         row.getChildren().addAll(label, input);
+        return row;
+    }
+
+    private static HBox inputPair(VBox first, VBox second) {
+        HBox row = new HBox(10, first, second);
+        row.setMinWidth(0);
+        row.setAlignment(Pos.CENTER_RIGHT);
+        first.setMinWidth(0);
+        second.setMinWidth(0);
+        first.setMaxWidth(Double.MAX_VALUE);
+        second.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(first, Priority.ALWAYS);
+        HBox.setHgrow(second, Priority.ALWAYS);
         return row;
     }
 

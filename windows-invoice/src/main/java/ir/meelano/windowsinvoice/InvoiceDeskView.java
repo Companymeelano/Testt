@@ -29,7 +29,7 @@ import javafx.scene.control.Separator;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
-import javafx.scene.control.TextFieldTableCell;
+import javafx.scene.control.cell.TextFieldTableCell;
 import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
@@ -207,8 +207,8 @@ public final class InvoiceDeskView extends BorderPane implements AutoCloseable {
 
         HBox meta = new HBox(10);
         meta.setAlignment(Pos.CENTER_RIGHT);
-        Label invoiceId = pill("شماره را آتیران تولید می‌کند", "pill-neutral");
-        Label currency = pill("مبالغ با واحد ثبت‌شده در آتیران", "pill-gold");
+        HBox invoiceId = pill("شماره را آتیران تولید می‌کند", "pill-neutral");
+        HBox currency = pill("مبالغ با واحد ثبت‌شده در آتیران", "pill-gold");
         Label dateLabel = new Label("تاریخ فاکتور");
         dateLabel.getStyleClass().add("field-label");
         dateField.getStyleClass().add("field-date");

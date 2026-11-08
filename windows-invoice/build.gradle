@@ -56,7 +56,7 @@ jlink {
     }
     jpackage {
         imageName = 'MEELANO-Factor'
-        installerName = 'MEELANO-Factor-1.0.0'
+        installerName = 'MEELANO-Factor'
         installerType = 'exe'
         appVersion = '1.0.0'
         vendor = 'MEELANO'

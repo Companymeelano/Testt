@@ -1078,7 +1078,8 @@ public final class InvoiceDeskView extends BorderPane implements AutoCloseable {
         confirm.showAndWait().filter(discard::equals).ifPresent(button -> resetDraft());
     }
 
-    private boolean hasInvoiceDraftChanges() {
+    /** True when closing the window would discard user-entered invoice fields or rows. */
+    public boolean hasInvoiceDraftChanges() {
         return selectedCustomer != null || !rows.isEmpty() || !noteField.getText().isBlank()
                 || !isZeroAmount(invoiceDiscountField.getText()) || !isZeroAmount(freightField.getText())
                 || !isZeroAmount(taxField.getText()) || !isZeroAmount(settlementField.getText())

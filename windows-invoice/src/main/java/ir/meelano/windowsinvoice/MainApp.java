@@ -6,6 +6,8 @@ import javafx.application.Platform;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonBar;
+import javafx.scene.control.ButtonType;
 import javafx.scene.text.Font;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
@@ -53,6 +55,20 @@ public final class MainApp extends Application {
                 pending.setHeaderText("تا دریافت نتیجه، پنجره را نبندید.");
                 pending.setContentText("بستن اجباری در این لحظه می‌تواند وضعیت ثبت در آتیران را نامشخص کند.");
                 pending.showAndWait();
+            } else if (view != null && view.hasInvoiceDraftChanges()) {
+                e.consume();
+                Alert discard = new Alert(Alert.AlertType.CONFIRMATION);
+                discard.setTitle("پیش‌نویس ثبت‌نشده");
+                discard.setHeaderText("این فاکتور هنوز در آتیران ثبت نشده است.");
+                discard.setContentText("تغییرات این فاکتور ذخیرهٔ محلی ندارند و با بستن پنجره از بین می‌روند.");
+                ButtonType stay = new ButtonType("ادامهٔ ثبت", ButtonBar.ButtonData.CANCEL_CLOSE);
+                ButtonType closeAnyway = new ButtonType("بستن و دورریختن پیش‌نویس", ButtonBar.ButtonData.OK_DONE);
+                discard.getButtonTypes().setAll(stay, closeAnyway);
+                discard.showAndWait().filter(closeAnyway::equals).ifPresent(button -> {
+                    closeView();
+                    stage.hide();
+                    Platform.exit();
+                });
             } else {
                 closeView();
             }

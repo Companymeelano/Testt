@@ -70,7 +70,7 @@ jobs:
       - name: Verify installer output
         shell: pwsh
         run: |
-          $installer = Get-ChildItem -Path 'windows-invoice/build/jpackage' -Filter 'MEELANO-Factor-1.0.0.exe' -File -Recurse | Select-Object -First 1
+          $installer = Get-ChildItem -Path 'windows-invoice/build/jpackage' -Filter 'MEELANO-Factor-1.0.1.exe' -File -Recurse | Select-Object -First 1
           if ($null -eq $installer -or $installer.Length -le 0) { throw 'The Windows installer .exe was not created.' }
           Get-FileHash -Path $installer.FullName -Algorithm SHA256 | Format-List
 
@@ -78,6 +78,6 @@ jobs:
         uses: actions/upload-artifact@v7.0.1
         with:
           name: meelano-windows-invoice
-          path: windows-invoice/build/jpackage/**/MEELANO-Factor-1.0.0.exe
+          path: windows-invoice/build/jpackage/**/MEELANO-Factor-1.0.1.exe
           if-no-files-found: error
           retention-days: 14

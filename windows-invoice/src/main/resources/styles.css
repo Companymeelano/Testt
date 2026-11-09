@@ -50,6 +50,7 @@
 .page-title { -fx-text-fill: #1b2c24; -fx-font-size: 29px; -fx-font-weight: 800; }
 .page-subtitle { -fx-text-fill: #63736a; -fx-font-size: 14px; }
 .field-label { -fx-text-fill: #596b60; -fx-font-size: 12px; -fx-font-weight: 700; }
+.field-shortcut { -fx-text-fill: #80652b; -fx-font-size: 10px; -fx-font-weight: 700; }
 .field-date, .summary-input, .text-field {
     -fx-background-color: #ffffff;
     -fx-border-color: #d5ded5;
@@ -89,9 +90,20 @@
 }
 .section-title { -fx-text-fill: #20352a; -fx-font-size: 16px; -fx-font-weight: 800; }
 .section-caption { -fx-text-fill: #66776c; -fx-font-size: 11px; }
-.icon-bubble { -fx-background-radius: 12; -fx-alignment: center; }
-.icon-bubble-green { -fx-background-color: #e9f0e6; }
-.icon-bubble-muted { -fx-background-color: #f0f2ef; }
+.icon-bubble {
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+    -fx-border-width: 1;
+    -fx-border-color: rgba(255,255,255,.95) rgba(37,79,56,.16) rgba(37,79,56,.22) rgba(255,255,255,.95);
+    -fx-alignment: center;
+    -fx-effect: dropshadow(gaussian, rgba(26,60,43,.14), 7, .16, 0, 2);
+}
+.icon-bubble-green { -fx-background-color: linear-gradient(to bottom right, #fbfff9, #d9e8d9); }
+.icon-bubble-blue { -fx-background-color: linear-gradient(to bottom right, #fbfdff, #dce9f5); }
+.icon-bubble-teal { -fx-background-color: linear-gradient(to bottom right, #f8fffc, #d6ebe5); }
+.icon-bubble-coral { -fx-background-color: linear-gradient(to bottom right, #fffaf7, #f0ddd4); }
+.icon-bubble-gold { -fx-background-color: linear-gradient(to bottom right, #fffdf5, #eee1bc); }
+.icon-bubble-muted { -fx-background-color: linear-gradient(to bottom right, #fcfdfb, #e8ece8); }
 .selected-customer {
     -fx-background-color: #f5f8f3;
     -fx-background-radius: 11;
@@ -206,3 +218,68 @@
 .scroll-bar:vertical .thumb { -fx-background-color: #cbd6cb; -fx-background-radius: 9; }
 .scroll-bar:vertical .thumb:hover { -fx-background-color: #afbeaf; }
 .scroll-bar:vertical .track { -fx-background-color: transparent; }
+
+/* Stand-alone, read-only customer center. */
+.customer-center-root { -fx-background-color: #f4f3ed; -fx-font-family: "Vazirmatn"; }
+.customer-eyebrow { -fx-text-fill: #7b8b7d; -fx-font-size: 10px; -fx-font-weight: 800; }
+.customer-title { -fx-text-fill: #183e31; -fx-font-size: 26px; -fx-font-weight: 900; }
+.customer-caption { -fx-text-fill: #68786d; -fx-font-size: 12px; }
+.customer-mode-live, .customer-mode-demo {
+    -fx-background-radius: 99; -fx-padding: 7 11 7 11; -fx-font-size: 10px; -fx-font-weight: 800;
+}
+.customer-mode-live { -fx-background-color: #e4f0e5; -fx-text-fill: #2e7046; }
+.customer-mode-demo { -fx-background-color: #fbf1d9; -fx-text-fill: #806026; }
+.customer-pane {
+    -fx-background-color: #ffffff; -fx-background-radius: 14; -fx-border-color: #dce4dc;
+    -fx-border-radius: 14; -fx-effect: dropshadow(gaussian, rgba(28,48,37,.055), 11, .12, 0, 2);
+}
+.customer-section-title { -fx-text-fill: #203b2d; -fx-font-size: 15px; -fx-font-weight: 800; }
+.customer-muted, .customer-hint { -fx-text-fill: #718077; -fx-font-size: 10px; }
+.customer-hint { -fx-wrap-text: true; }
+.customer-field-label { -fx-text-fill: #69796f; -fx-font-size: 10px; -fx-font-weight: 700; }
+.customer-summary-chip {
+    -fx-background-color: #f5f8f3; -fx-background-radius: 10; -fx-border-color: #e5ece3;
+    -fx-border-radius: 10; -fx-padding: 7 10 7 10; -fx-min-width: 128px;
+}
+.customer-summary-value { -fx-text-fill: #234b35; -fx-font-size: 13px; -fx-font-weight: 800; }
+.customer-table { -fx-background-color: #ffffff; -fx-background-radius: 9; -fx-border-color: #dfe7df; -fx-border-radius: 9; }
+.customer-table:focused { -fx-border-color: #c9a956; -fx-border-width: 2; }
+.customer-table .column-header-background { -fx-background-color: #edf3eb; -fx-background-radius: 9 9 0 0; }
+.customer-table .column-header, .customer-table .filler { -fx-background-color: transparent; -fx-size: 38px; -fx-border-color: transparent transparent #dce5dc transparent; }
+.customer-table .column-header .label { -fx-text-fill: #50665a; -fx-font-size: 10px; -fx-font-weight: 800; }
+.customer-table .table-row-cell { -fx-background-color: #ffffff; -fx-border-color: transparent transparent #edf0eb transparent; -fx-cell-size: 37px; }
+.customer-table .table-row-cell:odd { -fx-background-color: #fbfcf9; }
+.customer-table .table-row-cell:selected { -fx-background-color: #e5f0e4; }
+.customer-table .table-cell { -fx-text-fill: #2b4033; -fx-alignment: center-right; -fx-font-size: 10px; -fx-padding: 4 7 4 7; }
+.customer-details-card { -fx-background-color: #f7f9f5; -fx-background-radius: 10; -fx-border-color: #e3eae1; -fx-border-radius: 10; -fx-padding: 8 10 8 10; }
+.customer-detail-scroll { -fx-background-color: transparent; -fx-background: transparent; -fx-border-color: transparent; }
+.customer-detail-scroll > .viewport { -fx-background-color: transparent; }
+.customer-detail-field { -fx-background-color: #ffffff; -fx-background-radius: 8; -fx-border-color: #e8eee6; -fx-border-radius: 8; -fx-padding: 6 8 6 8; }
+.customer-detail-value { -fx-text-fill: #2e4235; -fx-font-size: 10px; }
+.customer-status-message { -fx-text-fill: #617166; -fx-font-size: 10px; }
+.customer-status-ok { -fx-text-fill: #476b51; }
+.customer-status-error { -fx-text-fill: #9b4037; -fx-font-weight: 700; }
+.customer-filter-pane { -fx-background-color: #f7f9f5; -fx-background-radius: 8; }
+.customer-filter-pane > .title { -fx-background-color: transparent; -fx-text-fill: #4f6656; -fx-font-size: 10px; -fx-font-weight: 700; }
+.customer-filter-pane > .content { -fx-background-color: transparent; -fx-padding: 8; }
+.customer-center-root .text-field, .customer-center-root .combo-box-base {
+    -fx-background-color: #ffffff; -fx-border-color: #d5ded5; -fx-border-radius: 8; -fx-background-radius: 8;
+    -fx-text-fill: #26372e; -fx-font-size: 11px; -fx-padding: 6 9 6 9; -fx-pref-height: 34px;
+}
+.customer-center-root .text-field:focused, .customer-center-root .combo-box-base:focused { -fx-border-color: #568f6e; -fx-border-width: 1.4; }
+
+/* ------------------------------------------------------------------ Manager section reports */
+/* Shared by cash, cheques, stock ledger, sales reports, profit, production, personnel and users. */
+.section-filter-bar {
+    -fx-background-color: #f7f9f5; -fx-background-radius: 10; -fx-border-color: #e3eae1;
+    -fx-border-radius: 10; -fx-padding: 10 10 8 10;
+}
+.section-kpi-chip {
+    -fx-background-color: #f5f8f3; -fx-background-radius: 10; -fx-border-color: #e5ece3;
+    -fx-border-radius: 10; -fx-padding: 7 12 7 12; -fx-min-width: 142px;
+}
+.section-kpi-label { -fx-text-fill: #718077; -fx-font-size: 10px; -fx-font-weight: 700; }
+.section-kpi-value { -fx-text-fill: #234b35; -fx-font-size: 14px; -fx-font-weight: 800; }
+.section-note { -fx-text-fill: #7b6a3d; -fx-font-size: 10px; }
+.customer-center-root .section-filter-bar .combo-box-base,
+.customer-center-root .section-filter-bar .text-field { -fx-pref-height: 32px; }

@@ -1,5 +1,9 @@
 package ir.meelano.windowsinvoice;
 
+import ir.meelano.windowsinvoice.data.AtiranLogin;
+import ir.meelano.windowsinvoice.data.AtiranRoles;
+import ir.meelano.windowsinvoice.data.WindowsSqlSettings;
+import ir.meelano.windowsinvoice.sections.SectionCatalog;
 import ir.meelano.windowsinvoice.InvoiceModels.Customer;
 import ir.meelano.windowsinvoice.InvoiceModels.InvoiceDraft;
 import ir.meelano.windowsinvoice.InvoiceModels.InvoiceLine;
@@ -43,11 +47,16 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
+import javafx.stage.Stage;
+import javafx.stage.WindowEvent;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.text.NumberFormat;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -58,6 +67,9 @@ import java.util.function.Consumer;
 public final class InvoiceDeskView extends BorderPane implements AutoCloseable {
     private static final String GREEN = "#174d3c";
     private final AtiranGateway gateway;
+    /** Signed-in Atiran identity; null means environment/demo mode with the full menu set. */
+    private final AtiranLogin.Session session;
+    private final String role;
     private final ExecutorService io = Executors.newFixedThreadPool(2, r -> {
         Thread t = new Thread(r, "meelano-atiran-io");
         t.setDaemon(true);
@@ -92,13 +104,22 @@ public final class InvoiceDeskView extends BorderPane implements AutoCloseable {
     private final Button submitButton = new Button("ثبت قطعی در آتیران");
     private final BooleanProperty submitting = new SimpleBooleanProperty(false);
     private Customer selectedCustomer;
+    private Stage customerCenterStage;
+    /** One section window per Manager section id, reused while it is open. */
+    private final Map<String, Stage> sectionStages = new LinkedHashMap<>();
     /** Stable across retries; a new token is minted only when the operator starts a new invoice. */
     private String draftUniqueId = newInvoiceId();
     private String startupWarning = "";
     private String currentValidationMessage = "";
 
     public InvoiceDeskView(AtiranGateway gateway, String startupWarning) {
+        this(gateway, startupWarning, null);
+    }
+
+    public InvoiceDeskView(AtiranGateway gateway, String startupWarning, AtiranLogin.Session session) {
         this.gateway = gateway;
+        this.session = session;
+        this.role = session == null ? AtiranRoles.ADMIN : session.appRole;
         this.startupWarning = startupWarning == null ? "" : startupWarning;
         setNodeOrientation(NodeOrientation.RIGHT_TO_LEFT);
         getStyleClass().add("app-root");
@@ -131,21 +152,28 @@ public final class InvoiceDeskView extends BorderPane implements AutoCloseable {
         brand.getChildren().addAll(mark, brandText);
         sidebar.getChildren().add(brand);
 
-        Label section = new Label("فروشگاه");
+        Label section = new Label(session == null ? "فروشگاه" : "منوهای نقش · " + roleLabel());
         section.getStyleClass().add("sidebar-section-label");
         VBox.setMargin(section, new Insets(27, 9, 7, 0));
         sidebar.getChildren().add(section);
-        sidebar.getChildren().addAll(
-                navButton("invoice", "ثبت فاکتور", true, dateField::requestFocus),
-                navButton("users", "انتخاب مشتری", false, this::focusCustomerSearch),
-                navButton("box", "جست‌وجوی کالا", false, this::focusProductSearch),
-                navButton("cart", "ردیف‌های فاکتور", false, () -> focusInBody(invoiceTable, 1.0))
-        );
+        // The Manager menu set is filtered by the signed-in Atiran role; the first entry stays active.
+        List<WindowsRoleMenus.Item> menus = WindowsRoleMenus.itemsFor(role);
+        boolean first = true;
+        for (WindowsRoleMenus.Item item : menus) {
+            sidebar.getChildren().add(navButton(iconOf(item.id), item.label, first,
+                    () -> openMenu(item.id), item.shortcut));
+            first = false;
+        }
         Region spacer = new Region();
         VBox.setVgrow(spacer, Priority.ALWAYS);
         sidebar.getChildren().add(spacer);
         sidebar.getChildren().add(new Separator());
-        sidebar.getChildren().add(navButton("settings", "اتصال و تنظیمات", false, this::showConnectionHelp));
+        sidebar.getChildren().add(navButton("settings", "اتصال و تنظیمات سرور", false,
+                this::openConnectionSetup, "تنظیم SQL Server و انتخاب دیتابیس"));
+        sidebar.getChildren().add(navButton("users", "تغییر کاربر آتیران", false,
+                this::switchAtiranUser, "ورود با حساب دیگر"));
+        sidebar.getChildren().add(navButton("settings", "راهنمای اتصال", false,
+                this::showConnectionHelp, "راهنمای اتصال و تنظیمات"));
         Label version = new Label("نسخهٔ دسکتاپ · ۱.۰");
         version.getStyleClass().add("sidebar-footnote");
         VBox.setMargin(version, new Insets(10, 9, 0, 0));
@@ -153,13 +181,138 @@ public final class InvoiceDeskView extends BorderPane implements AutoCloseable {
         return sidebar;
     }
 
-    private Button navButton(String iconName, String text, boolean active, Runnable action) {
+    /** Persian label of the signed-in role for the sidebar heading and the status bar. */
+    public String roleLabel() {
+        if (session == null) return "دسترسی کامل محلی";
+        String name = session.roleName == null ? "" : session.roleName.trim();
+        if (!name.isEmpty()) return name;
+        switch (role == null ? "" : role) {
+            case AtiranRoles.ADMIN: return "مدیر";
+            case AtiranRoles.SALES_MANAGER: return "مدیر فروش";
+            case AtiranRoles.ACCOUNTANT: return "حسابدار";
+            case AtiranRoles.WAREHOUSE: return "انباردار";
+            case AtiranRoles.VISITOR: return "ویزیتور";
+            case AtiranRoles.DISTRIBUTOR: return "نمایندهٔ پخش";
+            case AtiranRoles.MOADIAN: return "کاربر مودیان";
+            case AtiranRoles.SELLER: return "فروشنده";
+            default: return "کاربر";
+        }
+    }
+
+    private static String iconOf(String menuId) {
+        switch (menuId == null ? "" : menuId) {
+            case WindowsRoleMenus.INVOICE: return "invoice";
+            case WindowsRoleMenus.CUSTOMERS: return "users";
+            case WindowsRoleMenus.CUSTOMER_CENTER: return "users";
+            case WindowsRoleMenus.PRODUCTS: return "box";
+            case WindowsRoleMenus.STOCK_LEDGER: return "box";
+            case WindowsRoleMenus.CASH: return "cart";
+            case WindowsRoleMenus.CHEQUES: return "invoice";
+            case WindowsRoleMenus.REPORTS: return "invoice";
+            case WindowsRoleMenus.PROFIT: return "invoice";
+            case WindowsRoleMenus.PRODUCTION: return "box";
+            case WindowsRoleMenus.PERSONNEL: return "users";
+            case WindowsRoleMenus.USERS: return "settings";
+            case WindowsRoleMenus.MOADIAN: return "invoice";
+            case WindowsRoleMenus.HANDOFF: return "print";
+            case WindowsRoleMenus.CONNECTION: return "settings";
+            default: return "settings";
+        }
+    }
+
+    /** Runs the section this menu id stands for, or explains that it is not on the desktop build yet. */
+    private void openMenu(String menuId) {
+        if (!WindowsRoleMenus.allows(role, menuId)) {
+            setMessage("این بخش برای نقش «" + roleLabel() + "» فعال نیست.", true);
+            return;
+        }
+        switch (menuId == null ? "" : menuId) {
+            case WindowsRoleMenus.INVOICE: focusCustomerSearch(); break;
+            case WindowsRoleMenus.CUSTOMERS: focusCustomerSearch(); break;
+            case WindowsRoleMenus.CUSTOMER_CENTER: openCustomerCenter(); break;
+            case WindowsRoleMenus.PRODUCTS: focusProductSearch(); break;
+            case WindowsRoleMenus.HANDOFF: showPrintPreview(); break;
+            case WindowsRoleMenus.CONNECTION: openConnectionSetup(); break;
+            default: openSection(menuId); break;
+        }
+    }
+
+    private void pendingSection(String menuId) {
+        setMessage("بخش «" + WindowsRoleMenus.labelOf(menuId) + "» در نسخهٔ دسکتاپ هنوز فعال نیست؛"
+                + " همین بخش در برنامهٔ Manager اندروید در دسترس است.", true);
+    }
+
+    /**
+     * Opens the read-only Manager section window (cash, cheques, stock, reports, profit, production,
+     * personnel, users). One stage per section is kept and reused; the role check runs here and again
+     * inside the gateway, so a role can never reach a section it may not open.
+     */
+    private void openSection(String menuId) {
+        if (getScene() == null) return;
+        if (WindowsRoleMenus.MOADIAN.equals(menuId)) {
+            setMessage("سامانهٔ مودیان در نسخهٔ دسکتاپ فعال نیست؛ ارسال مالیاتی را از Manager اندروید انجام بده.", true);
+            return;
+        }
+        if (!SectionCatalog.isDesktopSection(menuId)) {
+            pendingSection(menuId);
+            return;
+        }
+        if (!WindowsRoleMenus.allows(role, menuId)) {
+            setMessage("بخش «" + WindowsRoleMenus.labelOf(menuId) + "» برای نقش «" + roleLabel() + "» فعال نیست.", true);
+            return;
+        }
+        Stage existing = sectionStages.get(menuId);
+        if (existing != null && existing.isShowing()) {
+            existing.toFront();
+            existing.requestFocus();
+            return;
+        }
+        try {
+            Stage opened = ManagerSectionView.open(getScene().getWindow(), gateway, menuId, role);
+            sectionStages.put(menuId, opened);
+            opened.addEventHandler(WindowEvent.WINDOW_HIDDEN, event -> {
+                if (sectionStages.get(menuId) == opened) sectionStages.remove(menuId);
+            });
+            setMessage("بخش «" + WindowsRoleMenus.labelOf(menuId) + "» باز شد؛ همهٔ گزارش‌ها فقط‌خواندنی‌اند.", false);
+        } catch (RuntimeException ex) {
+            setMessage("باز کردن بخش «" + WindowsRoleMenus.labelOf(menuId) + "» ممکن نشد؛ دوباره تلاش کن.", true);
+        }
+    }
+
+    /** Reopens the one-time SQL setup (server, port, database, SQL login) and applies the result. */
+    private void openConnectionSetup() {
+        if (getScene() == null) {
+            showConnectionHelp();
+            return;
+        }
+        ConnectionSetupDialog.show(getScene().getWindow()).ifPresent(endpoint -> {
+            WindowsSqlSettings.rememberSuccessfulRoute(endpoint.route);
+            setMessage("اتصال ذخیره شد: " + endpoint.host + ":" + endpoint.port + " / " + endpoint.database
+                    + " — برای اعمال کامل، برنامه را با ورود آتیران دوباره باز کن.", false);
+        });
+    }
+
+    /** Signs in as another Atiran account; menus follow the new role after a restart of the desk. */
+    private void switchAtiranUser() {
+        if (getScene() == null) return;
+        List<WindowsSqlSettings.Endpoint> endpoints = WindowsSqlSettings.candidates();
+        if (endpoints.isEmpty()) {
+            openConnectionSetup();
+            return;
+        }
+        AtiranLoginDialog.show(getScene().getWindow(), endpoints).ifPresent(signed ->
+                setMessage("ورود «" + signed.title() + "» تأیید شد؛ منوها پس از بازکردن دوبارهٔ برنامه به‌روز می‌شوند.", false));
+    }
+
+    private Button navButton(String iconName, String text, boolean active, Runnable action, String shortcutHint) {
         Button b = new Button(text);
         b.setGraphic(IconFactory.icon(iconName, 20, active ? Color.web("#f4d990") : Color.web("#c3d4c9")));
         b.setMaxWidth(Double.MAX_VALUE);
         b.setAlignment(Pos.CENTER_RIGHT);
         b.getStyleClass().add("nav-button");
         if (active) b.getStyleClass().add("nav-button-active");
+        b.setAccessibleText(text + " · " + shortcutHint);
+        b.setTooltip(new Tooltip(shortcutHint));
         b.disableProperty().bind(submitting);
         b.setOnAction(e -> action.run());
         return b;
@@ -187,7 +340,9 @@ public final class InvoiceDeskView extends BorderPane implements AutoCloseable {
         HBox top = new HBox(16);
         top.setAlignment(Pos.CENTER_RIGHT);
         VBox titleBlock = new VBox(4);
-        Label overline = new Label("MEELANO  /  فروش");
+        Label overline = new Label(session == null ? "MEELANO  /  فروش"
+                : "MEELANO  /  " + (session.displayName == null || session.displayName.isBlank()
+                        ? session.username : session.displayName) + "  ·  " + roleLabel());
         overline.getStyleClass().add("eyebrow");
         Label title = new Label("ثبت فاکتور فروش");
         title.getStyleClass().add("page-title");
@@ -200,38 +355,48 @@ public final class InvoiceDeskView extends BorderPane implements AutoCloseable {
         actions.setAlignment(Pos.CENTER_LEFT);
         Button test = secondaryButton("آزمون اتصال", "refresh");
         test.disableProperty().bind(submitting);
-        test.setOnAction(e -> runAsync("در حال آزمون اتصال…", () -> { gateway.testConnection(); return Boolean.TRUE; }, ok -> {
-            setMessage("اتصال به SQL Server برقرار است.", false);
-            updateConnectionBadge();
-        }));
+        test.setTooltip(new Tooltip("F5 · بررسی اتصال به SQL Server"));
+        test.setOnAction(e -> testConnection());
+        Button customers = secondaryButton("مرکز مشتریان · F11", "users");
+        customers.setTooltip(new Tooltip("F11 · فهرست، گردش حساب و جزئیات اسناد مشتری"));
+        customers.setOnAction(e -> openCustomerCenter());
         Button fresh = secondaryButton("فاکتور جدید", "plus");
         fresh.disableProperty().bind(submitting);
+        fresh.setTooltip(new Tooltip("Ctrl+N · شروع یک پیش‌نویس تازه"));
         fresh.setOnAction(e -> requestNewDraft());
         Button keyboardHelp = secondaryButton("کلیدها · F1", "invoice");
         keyboardHelp.getStyleClass().add("compact-button");
         keyboardHelp.setTooltip(new Tooltip("راهنمای کامل کار با صفحه‌کلید"));
         keyboardHelp.setOnAction(e -> showKeyboardHelp());
-        actions.getChildren().addAll(test, fresh, keyboardHelp);
+        actions.getChildren().addAll(test, customers, fresh, keyboardHelp);
         top.getChildren().addAll(titleBlock, actions);
 
         HBox meta = new HBox(10);
         meta.setAlignment(Pos.CENTER_RIGHT);
         HBox invoiceId = pill("شماره با آتیران", "pill-neutral");
         HBox currency = pill("واحد پول آتیران", "pill-gold");
-        Label dateLabel = new Label("تاریخ فاکتور");
+        Label dateLabel = new Label("تاریخ · Ctrl+4");
         dateLabel.getStyleClass().add("field-label");
+        HBox dateCaption = new HBox(5, IconFactory.icon("calendar", 14, Color.web("#738bd0")), dateLabel);
+        dateCaption.setAlignment(Pos.CENTER_RIGHT);
         dateField.getStyleClass().add("field-date");
         dateField.setAlignment(Pos.CENTER_RIGHT);
         dateField.setPrefWidth(132);
-        dateField.setTooltip(new Tooltip("تاریخ شمسی، مانند 1405/08/16 · Enter برای رفتن به یادداشت"));
+        dateField.setAccessibleText("تاریخ فاکتور · Ctrl+4");
+        dateField.setTooltip(new Tooltip("Ctrl+4 · تاریخ شمسی، مانند 1405/08/16 · Enter برای رفتن به یادداشت"));
         dateField.setOnAction(e -> noteField.requestFocus());
         dateField.textProperty().addListener((o, a, b) -> updateSubmitState());
         noteField.setPromptText("یادداشت (اختیاری)");
         noteField.setAlignment(Pos.CENTER_RIGHT);
         noteField.setPrefWidth(205);
-        noteField.setTooltip(new Tooltip("یادداشتی که در فاکتور آتیران ثبت می‌شود؛ Enter برای شروع انتخاب مشتری"));
+        noteField.setAccessibleText("یادداشت فاکتور · Ctrl+5");
+        noteField.setTooltip(new Tooltip("Ctrl+5 · یادداشت فاکتور؛ Enter برای شروع انتخاب مشتری"));
         noteField.setOnAction(e -> focusCustomerSearch());
-        meta.getChildren().addAll(invoiceId, currency, dateLabel, dateField, noteField);
+        Label noteIcon = new Label();
+        noteIcon.setGraphic(IconFactory.icon("note", 14, Color.web("#7d8eae")));
+        noteIcon.setAccessibleText("یادداشت فاکتور · Ctrl+5");
+        noteIcon.setTooltip(new Tooltip("Ctrl+5 · رفتن به یادداشت فاکتور"));
+        meta.getChildren().addAll(invoiceId, currency, dateCaption, dateField, noteIcon, noteField);
         header.widthProperty().addListener((o, oldWidth, newWidth) -> {
             boolean compactHeader = newWidth.doubleValue() < 900;
             dateField.setPrefWidth(compactHeader ? 112 : 132);
@@ -239,6 +404,13 @@ public final class InvoiceDeskView extends BorderPane implements AutoCloseable {
         });
         header.getChildren().addAll(top, meta);
         return header;
+    }
+
+    private void testConnection() {
+        runAsync("در حال آزمون اتصال…", () -> { gateway.testConnection(); return Boolean.TRUE; }, ok -> {
+            setMessage("اتصال به SQL Server برقرار است.", false);
+            updateConnectionBadge();
+        });
     }
 
     private Node buildInvoiceBody() {
@@ -443,7 +615,7 @@ public final class InvoiceDeskView extends BorderPane implements AutoCloseable {
         HBox controls = new HBox(8);
         controls.setAlignment(Pos.CENTER_RIGHT);
         Button remove = secondaryButton("حذف ردیف", "trash");
-        remove.setTooltip(new Tooltip("ردیف انتخاب‌شده · Ctrl+Backspace"));
+        remove.setTooltip(new Tooltip("ردیف انتخاب‌شده · Ctrl+Backspace یا Ctrl+Delete"));
         remove.setOnAction(e -> removeSelectedRow());
         Button clear = secondaryButton("پاک‌کردن ردیف‌ها", "refresh");
         clear.setOnAction(e -> { rows.clear(); refreshTotals(); productSearch.requestFocus(); });
@@ -512,8 +684,8 @@ public final class InvoiceDeskView extends BorderPane implements AutoCloseable {
         invoiceTable.getColumns().setAll(item, quantity, unit, price, discount, total);
         invoiceTable.setPrefHeight(220);
         invoiceTable.setMinHeight(132);
-        invoiceTable.setAccessibleText("ردیف‌های فاکتور؛ F2 ویرایش تعداد، Shift+F2 تخفیف، Ctrl+Backspace حذف");
-        invoiceTable.setTooltip(new Tooltip("با جهت‌ها حرکت کن؛ F2 تعداد و Shift+F2 تخفیف را ویرایش می‌کند."));
+        invoiceTable.setAccessibleText("ردیف‌های فاکتور؛ F2 ویرایش تعداد، Shift+F2 تخفیف، Ctrl+Backspace یا Ctrl+Delete حذف");
+        invoiceTable.setTooltip(new Tooltip("با جهت‌ها حرکت کن؛ F2 تعداد و Shift+F2 تخفیف را ویرایش می‌کند. Ctrl+Backspace/Delete ردیف را حذف می‌کند."));
     }
 
     private Node buildSummaryCard() {
@@ -524,7 +696,10 @@ public final class InvoiceDeskView extends BorderPane implements AutoCloseable {
         summary.setMaxWidth(360);
         Label title = new Label("خلاصهٔ فاکتور"); title.getStyleClass().add("summary-title");
         Label desc = new Label("مبالغ بر اساس واحد آتیران"); desc.getStyleClass().add("summary-caption");
-        VBox head = new VBox(4, title, desc);
+        VBox headText = new VBox(4, title, desc);
+        HBox head = new HBox(10, iconBubble("wallet", "gold"), headText);
+        head.setAlignment(Pos.CENTER_RIGHT);
+        HBox.setHgrow(headText, Priority.ALWAYS);
         VBox values = new VBox(10);
         values.getChildren().addAll(
                 summaryRow("جمع ردیف‌ها", subtotalLabel),
@@ -532,16 +707,16 @@ public final class InvoiceDeskView extends BorderPane implements AutoCloseable {
                 summaryRow("مالیات", taxTotalLabel)
         );
         Separator separator = new Separator();
-        VBox discountInput = inputRow("تخفیف کل", invoiceDiscountField, "۰");
-        VBox freightInput = inputRow("باربری", freightField, "۰");
-        VBox taxInput = inputRow("مالیات ٪", taxField, "۰");
-        VBox settlementInput = inputRow("تسویه (روز)", settlementField, "۰ تا ۷۲۰");
+        VBox discountInput = inputRow("تخفیف کل", invoiceDiscountField, "۰", "discount", "Ctrl+6");
+        VBox freightInput = inputRow("باربری", freightField, "۰", "truck", "Ctrl+7");
+        VBox taxInput = inputRow("مالیات ٪", taxField, "۰", "percent", "Ctrl+8");
+        VBox settlementInput = inputRow("تسویه (روز)", settlementField, "۰ تا ۷۲۰", "clock", "Ctrl+9");
         HBox discountAndFreight = inputPair(discountInput, freightInput);
         HBox taxAndSettlement = inputPair(taxInput, settlementInput);
         VBox extra = new VBox(7,
                 discountAndFreight,
                 taxAndSettlement,
-                inputRow("انبار (اختیاری)", warehouseField, "پیش‌فرض آتیران"));
+                inputRow("انبار (اختیاری)", warehouseField, "پیش‌فرض آتیران", "warehouse", "Ctrl+0"));
         HBox payable = new HBox(6);
         payable.setAlignment(Pos.CENTER_RIGHT);
         VBox payableText = new VBox(3);
@@ -682,20 +857,76 @@ public final class InvoiceDeskView extends BorderPane implements AutoCloseable {
         focusCustomerSearch();
     }
 
+    /** Ctrl+Shift+4..0 → Manager sections, Ctrl+Shift+U → users; "" when the key is not a section. */
+    private static String sectionShortcut(KeyCode code) {
+        switch (code) {
+            case DIGIT4, NUMPAD4: return WindowsRoleMenus.sectionForDigit(4);
+            case DIGIT5, NUMPAD5: return WindowsRoleMenus.sectionForDigit(5);
+            case DIGIT6, NUMPAD6: return WindowsRoleMenus.sectionForDigit(6);
+            case DIGIT7, NUMPAD7: return WindowsRoleMenus.sectionForDigit(7);
+            case DIGIT8, NUMPAD8: return WindowsRoleMenus.sectionForDigit(8);
+            case DIGIT9, NUMPAD9: return WindowsRoleMenus.sectionForDigit(9);
+            case DIGIT0, NUMPAD0: return WindowsRoleMenus.sectionForDigit(0);
+            case U: return WindowsRoleMenus.USERS;
+            default: return "";
+        }
+    }
+
+    private void openCustomerCenter() {
+        if (getScene() == null) return;
+        if (!WindowsRoleMenus.allows(role, WindowsRoleMenus.CUSTOMER_CENTER)) {
+            setMessage("مرکز مشتریان برای نقش «" + roleLabel() + "» فعال نیست.", true);
+            return;
+        }
+        if (customerCenterStage != null && customerCenterStage.isShowing()) {
+            customerCenterStage.toFront();
+            customerCenterStage.requestFocus();
+            return;
+        }
+        Stage opened = CustomerCenterView.open(getScene().getWindow(), gateway);
+        customerCenterStage = opened;
+        opened.addEventHandler(WindowEvent.WINDOW_HIDDEN, event -> {
+            if (customerCenterStage == opened) customerCenterStage = null;
+        });
+    }
+
     private void handleKeyboardShortcut(KeyEvent event) {
+        if (event.getCode() == KeyCode.F11) {
+            if (!submitting.get()) openCustomerCenter();
+            event.consume();
+            return;
+        }
         if (submitting.get()) return;
-        if (event.isControlDown() && !event.isAltDown()) {
+        if (event.getCode() == KeyCode.F5) {
+            testConnection();
+            event.consume();
+            return;
+        }
+        if (event.isControlDown() && !event.isAltDown() && event.isShiftDown()) {
+            String section = sectionShortcut(event.getCode());
+            if (!section.isEmpty()) {
+                openSection(section);
+                event.consume();
+                return;
+            }
+        }
+        if (event.isControlDown() && !event.isAltDown() && !event.isShiftDown()) {
             switch (event.getCode()) {
                 case F -> { focusCustomerSearch(); event.consume(); }
                 case K -> { focusProductSearch(); event.consume(); }
                 case N -> { requestNewDraft(); event.consume(); }
                 case P -> { showPrintPreview(); event.consume(); }
                 case ENTER -> { submitFromKeyboard(); event.consume(); }
-                case DIGIT1 -> { focusCustomerSearch(); event.consume(); }
-                case DIGIT2 -> { focusProductSearch(); event.consume(); }
-                case DIGIT3 -> { focusInBody(invoiceTable, 1.0); event.consume(); }
-                case DIGIT4 -> { focusHeaderField(dateField); event.consume(); }
-                case DIGIT5 -> { focusHeaderField(noteField); event.consume(); }
+                case DIGIT1, NUMPAD1 -> { focusCustomerSearch(); event.consume(); }
+                case DIGIT2, NUMPAD2 -> { focusProductSearch(); event.consume(); }
+                case DIGIT3, NUMPAD3 -> { focusInBody(invoiceTable, 1.0); event.consume(); }
+                case DIGIT4, NUMPAD4 -> { focusHeaderField(dateField); event.consume(); }
+                case DIGIT5, NUMPAD5 -> { focusHeaderField(noteField); event.consume(); }
+                case DIGIT6, NUMPAD6 -> { focusSummaryField(invoiceDiscountField); event.consume(); }
+                case DIGIT7, NUMPAD7 -> { focusSummaryField(freightField); event.consume(); }
+                case DIGIT8, NUMPAD8 -> { focusSummaryField(taxField); event.consume(); }
+                case DIGIT9, NUMPAD9 -> { focusSummaryField(settlementField); event.consume(); }
+                case DIGIT0, NUMPAD0 -> { focusSummaryField(warehouseField); event.consume(); }
                 case BACK_SPACE, DELETE -> {
                     if (isTableFocused()) { removeSelectedRow(); event.consume(); }
                 }
@@ -728,6 +959,14 @@ public final class InvoiceDeskView extends BorderPane implements AutoCloseable {
         });
     }
 
+    private void focusSummaryField(TextField field) {
+        if (bodyScroll != null) bodyScroll.setVvalue(1.0);
+        Platform.runLater(() -> {
+            field.requestFocus();
+            field.selectAll();
+        });
+    }
+
     private void focusCustomerSearch() {
         setCustomerResultsVisible(false);
         focusInBody(customerSearch, 0.0);
@@ -741,6 +980,10 @@ public final class InvoiceDeskView extends BorderPane implements AutoCloseable {
     }
 
     private void submitFromKeyboard() {
+        if (!WindowsRoleMenus.canSubmitInvoice(role)) {
+            setMessage("ثبت فاکتور برای نقش «" + roleLabel() + "» فعال نیست.", true);
+            return;
+        }
         if (!gateway.writeEnabled()) {
             setMessage("ثبت واقعی خاموش است؛ Ctrl+Enter هیچ داده‌ای را در آتیران نمی‌نویسد.", true);
             return;
@@ -841,19 +1084,21 @@ public final class InvoiceDeskView extends BorderPane implements AutoCloseable {
         Alert help = new Alert(Alert.AlertType.INFORMATION);
         help.setTitle("کار با صفحه‌کلید");
         help.setHeaderText("ثبت سریع فاکتور، بدون نیاز به ماوس");
-        help.setContentText("Ctrl+F  جست‌وجوی مشتری\n"
-                + "Enter  جست‌وجو؛ سپس ↑ و ↓ و Enter برای انتخاب\n"
-                + "Ctrl+K  رفتن به جست‌وجو/بارکد کالا\n"
-                + "بارکد یکتا + Enter  افزودن خودکار و آماده‌شدن برای اسکن بعدی\n"
-                + "اسکن دوبارهٔ همان کالا  افزایش مقدار همان ردیف\n"
-                + "Enter روی نتیجهٔ کالا  افزودن کالای انتخاب‌شده\n"
-                + "F2  ویرایش مقدار ردیف انتخابی\n"
-                + "Shift+F2  ویرایش تخفیف ردیف\n"
-                + "Ctrl+Backspace  حذف ردیف انتخابی (وقتی جدول فوکوس دارد)\n"
-                + "Ctrl+P  پیش‌نمایش محلی\n"
-                + "Ctrl+1/2/3/4/5  مشتری / کالا / جدول / تاریخ / یادداشت\n"
-                + "Ctrl+Enter  بررسی و درخواست تأیید ثبت\n"
-                + "Ctrl+N  فاکتور جدید   ·   Esc بستن نتایج");
+        help.setContentText("F11  باز کردن مرکز مشتریان؛ کلیک روی مشتری یا انتخاب و Enter برای گردش حساب\n"
+                + "Ctrl+F  رفتن به جست‌وجوی مشتری؛ Enter برای جست‌وجو\n"
+                + "Ctrl+K  رفتن به جست‌وجو یا اسکن بارکد کالا\n"
+                + "نتایج: ↑ و ↓ برای انتخاب · Enter برای تأیید یا افزودن · Esc برای بستن\n"
+                + "بارکد یکتای کالا + Enter  افزودن خودکار؛ اسکن دوباره مقدار را یکی زیاد می‌کند\n"
+                + "Ctrl+1…Ctrl+0  مشتری / کالا / جدول / تاریخ / یادداشت / تخفیف / باربری / مالیات / تسویه / انبار\n"
+                + "Ctrl+Shift+4…Ctrl+Shift+0  بخش‌های مدیریتی: انبار / صندوق / چک‌ها / گزارش / سود / تولید / پرسنل\n"
+                + "Ctrl+Shift+U  مدیریت کاربران و دسترسی (فقط نقش مدیر) — همهٔ گزارش‌ها فقط‌خواندنی\n"
+                + "در خلاصه: Enter  تخفیف ← باربری ← مالیات ← تسویه ← انبار ← جست‌وجوی کالا\n"
+                + "در بالای فرم: Enter  تاریخ ← یادداشت ← مشتری\n"
+                + "Tab / Shift+Tab  کنترل بعدی / قبلی\n"
+                + "F2  ویرایش مقدار ردیف · Shift+F2  ویرایش تخفیف ردیف\n"
+                + "Ctrl+Backspace یا Ctrl+Delete  حذف ردیف انتخابی (با فوکوس جدول)\n"
+                + "Ctrl+P  پیش‌نمایش محلی · Ctrl+Enter  بررسی و درخواست تأیید ثبت\n"
+                + "Ctrl+N  فاکتور جدید · F5  آزمون اتصال · F1  راهنما · Esc  بستن نتایج");
         help.showAndWait();
         focusProductSearch();
     }
@@ -955,7 +1200,8 @@ public final class InvoiceDeskView extends BorderPane implements AutoCloseable {
                 validationMessage = ex.getMessage() == null ? "مقادیر فاکتور معتبر نیستند." : ex.getMessage();
             }
         }
-        submitButton.setDisable(!gateway.writeEnabled() || selectedCustomer == null || rows.isEmpty() || !validInputs);
+        submitButton.setDisable(!gateway.writeEnabled() || !WindowsRoleMenus.canSubmitInvoice(role)
+                || selectedCustomer == null || rows.isEmpty() || !validInputs);
         if (!validationMessage.isEmpty()) {
             currentValidationMessage = validationMessage;
             setMessage(validationMessage, true);
@@ -1176,7 +1422,7 @@ public final class InvoiceDeskView extends BorderPane implements AutoCloseable {
     private HBox sectionHeading(String title, String icon, String subtitle) {
         HBox row = new HBox(9);
         row.setAlignment(Pos.CENTER_RIGHT);
-        StackPane badge = iconBubble(icon, "green");
+        StackPane badge = iconBubble(icon, iconBubbleStyle(icon));
         VBox text = new VBox(2);
         text.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(text, Priority.ALWAYS);
@@ -1199,18 +1445,33 @@ public final class InvoiceDeskView extends BorderPane implements AutoCloseable {
         return row;
     }
 
-    private static VBox inputRow(String labelText, TextField input, String prompt) {
+    private static VBox inputRow(String labelText, TextField input, String prompt,
+                                 String iconName, String shortcut) {
         VBox row = new VBox(4);
         row.setMinWidth(0);
-        Label label = new Label(labelText); label.getStyleClass().add("field-label");
+        HBox labelLine = new HBox(4);
+        labelLine.setAlignment(Pos.CENTER_RIGHT);
+        Label label = new Label(labelText);
+        label.getStyleClass().add("field-label");
+        label.setMinWidth(0);
+        label.setMaxWidth(Double.MAX_VALUE);
+        label.setTextOverrun(javafx.scene.control.OverrunStyle.ELLIPSIS);
+        HBox.setHgrow(label, Priority.SOMETIMES);
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        Label shortcutHint = new Label(shortcut);
+        shortcutHint.getStyleClass().add("field-shortcut");
+        labelLine.getChildren().addAll(
+                IconFactory.icon(iconName, 13, Color.web(GREEN)), label, spacer, shortcutHint);
         input.setPromptText(prompt);
         input.getStyleClass().add("summary-input");
         input.setAlignment(Pos.CENTER_RIGHT);
         input.setPrefColumnCount(6);
         input.setMinWidth(0);
         input.setMaxWidth(Double.MAX_VALUE);
-        input.setAccessibleText(labelText);
-        row.getChildren().addAll(label, input);
+        input.setAccessibleText(labelText + " · " + shortcut);
+        input.setTooltip(new Tooltip(labelText + " · میانبر صفحه‌کلید: " + shortcut));
+        row.getChildren().addAll(labelLine, input);
         return row;
     }
 
@@ -1262,10 +1523,28 @@ public final class InvoiceDeskView extends BorderPane implements AutoCloseable {
     }
 
     private static StackPane iconBubble(String icon, String style) {
-        StackPane box = new StackPane(IconFactory.icon(icon, 19, Color.web(style.equals("green") ? GREEN : "#87958d")));
+        Color tint = switch (style) {
+            case "blue" -> Color.web("#477fae");
+            case "teal" -> Color.web("#357f72");
+            case "coral" -> Color.web("#a65f43");
+            case "gold" -> Color.web("#997525");
+            case "green" -> Color.web(GREEN);
+            default -> Color.web("#87958d");
+        };
+        StackPane box = new StackPane(IconFactory.icon(icon, 19, tint));
         box.getStyleClass().addAll("icon-bubble", "icon-bubble-" + style);
         box.setMinSize(40, 40); box.setPrefSize(40, 40); box.setMaxSize(40, 40);
         return box;
+    }
+
+    private static String iconBubbleStyle(String icon) {
+        return switch (icon) {
+            case "users" -> "blue";
+            case "barcode", "box" -> "teal";
+            case "cart" -> "coral";
+            case "wallet", "money", "invoice" -> "gold";
+            default -> "green";
+        };
     }
 
     private static Image loadIcon() {
@@ -1338,6 +1617,12 @@ public final class InvoiceDeskView extends BorderPane implements AutoCloseable {
     public boolean isSubmitting() { return submitting.get(); }
 
     @Override public void close() {
+        if (customerCenterStage != null && customerCenterStage.isShowing()) customerCenterStage.close();
+        customerCenterStage = null;
+        for (Stage section : new ArrayList<>(sectionStages.values())) {
+            if (section != null && section.isShowing()) section.close();
+        }
+        sectionStages.clear();
         io.shutdownNow();
         gateway.close();
     }

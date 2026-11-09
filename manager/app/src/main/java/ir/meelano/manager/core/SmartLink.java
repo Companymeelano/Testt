@@ -131,15 +131,11 @@ public final class SmartLink {
         }
         String t = Net.transport(c);
         final boolean lanFirst = !"cell".equals(t);
+        // Current transport decides the order (cellular → WAN first, Wi-Fi/Ethernet → LAN first);
+        // the last successful route no longer overrides the network the device is on right now.
         out.sort((a, b) -> {
-            String last = s.linkLast();
-            if (!last.isEmpty() && !a.kind.equals(b.kind)) {
-                if (a.kind.equals(last)) return -1;
-                if (b.kind.equals(last)) return 1;
-            }
-            if (!a.kind.equals(b.kind))
-                return (LAN.equals(a.kind) == lanFirst) ? -1 : 1;
-            return 0;
+            if (a.kind.equals(b.kind)) return 0;
+            return (LAN.equals(a.kind) == lanFirst) ? -1 : 1;
         });
         return out;
     }
@@ -158,7 +154,7 @@ public final class SmartLink {
             out.add(new Cand(WAN, s.wan()));
         }
         if (out.isEmpty()) {
-            String fb = s.host().isEmpty() ? Atiran.defaultHost() : s.host();
+            String fb = s.host();
             if (fb != null && !fb.trim().isEmpty()) {
                 Boolean priv = isPrivate(fb);
                 out.add(new Cand(priv != null && !priv ? WAN : LAN, fb.trim()));

@@ -79,10 +79,8 @@ public final class LanDiscover {
         return !a.isEmpty() && a.equalsIgnoreCase(b) && portA == portB;
     }
 
-    private static final int TCP_MS = 600;
-    private static final String[] COMMON = {
-            "1", "2", "3", "5", "7", "10", "11", "20", "21",
-            "100", "101", "110", "200", "201", "254"};
+    private static final int TCP_MS = 450;
+    private static final int MAX_RESULTS = 16;
 
     /** Strip scheme / port / path / spaces from a typed server address. */
     public static String clean(String in) {
@@ -151,27 +149,29 @@ public final class LanDiscover {
             String hostOct = lastOctet(t);
             for (String sub : localSubnets()) {
                 if (hostOct != null && !(sub + hostOct).equals(t)) cands.add(sub + hostOct);
-                for (String o : COMMON) {
-                    String h = sub + o;
+                // Scan only the local /24 block (never a public range or the whole LAN /16).
+                // This finds servers on non-conventional addresses, not just .1/.10/.100.
+                for (int octet = 1; octet <= 254; octet++) {
+                    String h = sub + octet;
                     if (!h.equals(t)) cands.add(h);
                 }
             }
             List<String> all = new ArrayList<>(cands);
             if (all.isEmpty()) return ordered;
-            ExecutorService pool = Executors.newFixedThreadPool(Math.min(24, all.size()));
+            ExecutorService pool = Executors.newFixedThreadPool(Math.min(32, all.size()));
             try {
                 List<Callable<Boolean>> tasks = new ArrayList<>();
                 for (final String h : all) {
                     tasks.add(() -> SmartLink.probeTcp(h, port, TCP_MS) == null);
                 }
-                List<Future<Boolean>> fs = pool.invokeAll(tasks, 4, TimeUnit.SECONDS);
+                List<Future<Boolean>> fs = pool.invokeAll(tasks, 7, TimeUnit.SECONDS);
                 for (int i = 0; i < all.size() && i < fs.size(); i++) {
                     try {
                         Future<Boolean> f = fs.get(i);
                         if (f.isDone() && !f.isCancelled() && Boolean.TRUE.equals(f.get()))
                             ordered.add(all.get(i));
                     } catch (Exception ignored) { Diag.ignored("LanDiscover:124", ignored); }
-                    if (ordered.size() >= 8) break;
+                    if (ordered.size() >= MAX_RESULTS) break;
                 }
             } finally {
                 pool.shutdownNow();

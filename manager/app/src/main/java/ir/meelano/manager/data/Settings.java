@@ -66,7 +66,7 @@ public final class Settings {
     /** True only after both a server address and an explicitly selected DB are saved. */
     public boolean connConfigured() {
         boolean hostSet = !lan().isEmpty() || !wan().isEmpty() || !host().isEmpty();
-        return hostSet && !db().isEmpty();
+        return hostSet && !db().isEmpty() && !effUser().isEmpty() && !effPass().isEmpty();
     }
     public String port() { return p.getString("db_port", "").trim(); }
 
@@ -124,19 +124,23 @@ public final class Settings {
      * Stores the SQL password only in the Keystore-encrypted store. If the Keystore cannot
      * encrypt, the password is NOT written in plain text; the user simply re-enters it.
      */
-    private void savePass(String pass) {
+    private boolean savePass(String pass) {
         String v = pass == null ? "" : pass;
         p.edit().remove("db_pass").apply();
-        if (!SecretBox.put(app, PASS_SECRET, v) && !v.isEmpty()) {
+        boolean stored = SecretBox.put(app, PASS_SECRET, v);
+        if (!stored && !v.isEmpty()) {
             ir.meelano.manager.core.Diag.ignored("Settings:savePass", new IllegalStateException("keystore unavailable"));
         }
+        return stored;
     }
 
-    public String effHost() { String h = host(); return h.isEmpty() ? Atiran.defaultHost() : h; }
-    public String effDb() { String d = db(); return d.isEmpty() ? Atiran.defaultDb() : d; }
-    // The SQL login is fixed (AdminAn) for every database, so a stale stored login cannot block the connection.
-    public String effUser() { return Atiran.defaultUser(); }
-    public String effPass() { return Atiran.defaultPass(); }
+    /** No server or database defaults are compiled into the app; setup must select and save them. */
+    public String effHost() { return savedHost(); }
+    public String effDb() { return db(); }
+    /** SQL login is provisioned once on this device, never embedded in the APK. */
+    public String effUser() { return user(); }
+    /** Password is available only from the Keystore-backed store. */
+    public String effPass() { return pass(); }
     public int effPort() {
         return parsePort(port());
     }
@@ -165,8 +169,8 @@ public final class Settings {
     }
 
     /** Save both smart-link profiles at once (either address may be empty). */
-    public void saveSmart(String lan, String wan, String port, String db, String user, String pass) {
-        saveSmart(lan, wan, port, port, db, user, pass);
+    public boolean saveSmart(String lan, String wan, String port, String db, String user, String pass) {
+        return saveSmart(lan, wan, port, port, db, user, pass);
     }
 
     /**
@@ -175,8 +179,8 @@ public final class Settings {
      * The dedicated/public address often answers on a forwarded port
      * (e.g. 5050 → 1433) while the shop LAN keeps 1433.
      */
-    public void saveSmart(String lan, String wan, String lanPort, String wanPort,
-                          String db, String user, String pass) {
+    public boolean saveSmart(String lan, String wan, String lanPort, String wanPort,
+                             String db, String user, String pass) {
         p.edit().putString("db_lan", lan == null ? "" : lan.trim())
                 .putString("db_wan", wan == null ? "" : wan.trim())
                 .putString("db_port_lan", lanPort == null ? "" : lanPort.trim())
@@ -188,7 +192,7 @@ public final class Settings {
                 .putString("link_mode", "auto")
                 .putString("link_last", "")
                 .apply();
-        savePass(pass);
+        return savePass(pass);
     }
 
     /**

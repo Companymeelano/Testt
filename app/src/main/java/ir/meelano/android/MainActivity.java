@@ -216,12 +216,6 @@ public class MainActivity extends Activity {
     private static final int REQ_PRODUCT_IMAGE = 9406;
     private static final String NATIVE_PREF_STATUS_TEXT = "ثبت شده";
 
-    private static final int[] S_HOST = {122, 126, 103, 120, 125, 122, 103, 120, 125, 126, 103, 120, 112};
-    private static final int[] S_USER = {8, 45, 36, 32, 39, 8, 39};
-    private static final int[] S_PASS = {26, 61, 9, 27, 123, 121, 123, 123, 109};
-    private static final int[] S_DB = {8, 61, 32, 59, 40, 39, 123};
-    private static final int S_KEY = 73;
-    private static final int SQL_PORT = 1433;
     private static final String LOCAL_KEY_ALIAS = "meelano_local_secret_v325";
 
     private int NAVY = Color.rgb(7, 9, 16);
@@ -1099,15 +1093,9 @@ public class MainActivity extends Activity {
         catch (Exception ignored) { return ""; }
     }
 
-    /** Default Atiran server {host, port, database, user, password} for the Moadian app (MeelanoTaxActivity). */
-    static String[] defaultDbConfig() {
-        return new String[]{hidden(S_HOST), String.valueOf(SQL_PORT), hidden(S_DB), hidden(S_USER), hidden(S_PASS)};
-    }
-
-    private static String hidden(int[] data) {
-        char[] out = new char[data.length];
-        for (int i = 0; i < data.length; i++) out[i] = (char) (data[i] ^ S_KEY);
-        return new String(out);
+    /** Device-local SQL profile for Moadian; an empty profile requires setup, never a compiled fallback. */
+    static String[] defaultDbConfig(Context context) {
+        return SqlConnectionConfig.legacyArray(context);
     }
 
     /**
@@ -3151,6 +3139,12 @@ public class MainActivity extends Activity {
 
         Button login = primaryButton("ورود");
         loginCard.addView(login, new LinearLayout.LayoutParams(-1, dp(54)));
+        Button sqlSetup = secondaryButton("تنظیم اتصال SQL Server / انتخاب دیتابیس");
+        LinearLayout.LayoutParams sqlSetupParams = new LinearLayout.LayoutParams(-1, dp(48));
+        sqlSetupParams.setMargins(0, dp(8), 0, 0);
+        sqlSetup.setOnClickListener(v -> SqlConnectionSetupDialog.show(this,
+                () -> showLogin("اتصال سرور ذخیره شد؛ اکنون با حساب آتیران وارد شوید.")));
+        loginCard.addView(sqlSetup, sqlSetupParams);
         Button bioLogin = null;
         if (VISITOR_EDITION && visitorBiometricEnabled() && biometricAvailable()) {
             bioLogin = secondaryButton("ورود با اثر انگشت");
@@ -4729,84 +4723,62 @@ public class MainActivity extends Activity {
     private Connection openConnection() throws Exception {
         if (designPreview) throw new DbException("حالت پیش‌نمایش طراحی: اتصال به پایگاه داده غیرفعال است.");
         bindSqlNetworkForVpnIfNeeded();
-        Class.forName("net.sourceforge.jtds.jdbc.Driver");
-        String host = (debugDbHost != null && isDebuggableBuild()) ? debugDbHost : hidden(S_HOST);
-        String hostOv = prefs == null ? "" : prefs.getString("db_host_override", "").trim();
-        String portOv = prefs == null ? "" : prefs.getString("db_port_override", "").trim();
-        if (!hostOv.isEmpty()) host = hostOv;
-        int port = SQL_PORT; try { if (!portOv.isEmpty()) port = Integer.parseInt(portOv); } catch (Exception ignored) { }
-        String url = "jdbc:jtds:sqlserver://" + host + ":" + port + "/" + hidden(S_DB)
-                + ";loginTimeout=8;socketTimeout=30;appName=MEELANOAndroid;";
-        Properties props = new Properties();
-        props.setProperty("user", hidden(S_USER));
-        props.setProperty("password", hidden(S_PASS));
-        props.setProperty("charset", "UTF-8");
-        props.setProperty("sendStringParametersAsUnicode", "true");
-        preflightTcp(host, port);
-        try {
-            return validatedConnection(DriverManager.getConnection(url, props));
-        } catch (Exception first) {
-            Thread.sleep(700); // one automatic retry — mobile networks drop first attempts often
-            try { return validatedConnection(DriverManager.getConnection(url, props)); } catch (Exception second) { throw new DbException(diagnoseDbError(second)); }
+        java.util.List<SqlConnectionConfig.Profile> routes = SqlConnectionConfig.candidates(this);
+        if (routes.isEmpty()) throw new DbException("تنظیم سرور، پورت، دیتابیس و ورود SQL کامل نیست؛ از صفحه ورود اتصال را تنظیم کنید.");
+        String debugHost = (debugDbHost != null && isDebuggableBuild()) ? debugDbHost : "";
+        Exception last = null;
+        for (SqlConnectionConfig.Profile route : routes) {
+            try {
+                Connection connection = SqlConnectionConfig.connect(route, debugHost);
+                SqlConnectionConfig.rememberSuccessfulRoute(this, route.kind);
+                return connection;
+            } catch (Exception failure) {
+                last = failure;
+            }
         }
-    }
-
-    /** Fail in ~3s instead of hanging for the full JDBC timeout when the server is unreachable. */
-    private void preflightTcp(String host, int port) throws Exception {
-        try (java.net.Socket s = new java.net.Socket()) {
-            s.connect(new java.net.InetSocketAddress(host, port), 3000);
-        } catch (Exception e) {
-            throw new DbException(diagnoseDbError(e));
-        }
-    }
-
-    /** Refuse a half-dead connection: prove it can execute before handing it to the app. */
-    private static Connection validatedConnection(Connection cc) throws Exception {
-        try (java.sql.Statement st = cc.createStatement()) { st.setQueryTimeout(5); st.execute("SELECT 1"); }
-        catch (Exception ve) { try { cc.close(); } catch (Exception ignored) { } throw ve; }
-        return cc;
+        throw new DbException(diagnoseDbError(last));
     }
 
     /** Persian, actionable diagnosis instead of a raw driver string. */
     private String diagnoseDbError(Exception e) {
-        String m = String.valueOf(e == null ? "" : e.getMessage());
-        if (m.contains("reset") || m.contains("Reset")) return "خطای شبکه: اتصال در لحظهٔ شروع پروتکل قطع شد (Connection Reset). سرویس SQL Server روی سرور متوقف است یا فایروال/آنتی‌ویروس سمت سرور آن را مسدود می‌کند — سرویس SQL Server و پورت سرور بررسی شود.";
-        if (m.contains("timed out") || m.contains("timeout") || m.contains("Timeout")) return "سرور پاسخ نداد (timeout). وضعیت شبکه/اینترنت و روشن‌بودن سرور و سرویس SQL Server بررسی شود.";
-        if (m.contains("refused")) return "سرور در این پورت سرویسی ندارد (Connection Refused). پورت/آدرس سرور تغییر کرده است.";
-        return "خطای اتصال: " + m;
+        String message = String.valueOf(e == null ? "" : e.getMessage());
+        String lower = message.toLowerCase(Locale.US);
+        if (lower.contains("login failed") || lower.contains("logon failed"))
+            return "ورود SQL تأیید نشد؛ نام کاربری و رمز ذخیره‌شده را در تنظیم اتصال بررسی کنید.";
+        if (lower.contains("cannot open database") || lower.contains("database does not exist"))
+            return "دیتابیس انتخاب‌شده در دسترس نیست؛ دوباره فهرست دیتابیس‌ها را دریافت و انتخاب کنید.";
+        if (lower.contains("timed out") || lower.contains("timeout"))
+            return "سرور در زمان مقرر پاسخ نداد؛ شبکه، سرویس SQL و پورت انتخاب‌شده را بررسی کنید.";
+        if (lower.contains("refused") || lower.contains("unreachable") || lower.contains("no route"))
+            return "پورت انتخاب‌شده پاسخ نمی‌دهد؛ برای اتصال پیش‌فرض ۱۴۳۳ و در صورت فوروارد، پورت جایگزین را بررسی کنید.";
+        return "اتصال به SQL Server برقرار نشد؛ تنظیمات سرور، پورت، دیتابیس و دسترسی را بررسی کنید.";
     }
 
     private void showDbOverrideDialog(final Runnable retry) {
-        LinearLayout box = new LinearLayout(this); box.setOrientation(LinearLayout.VERTICAL);
-        int pad = dp(18); box.setPadding(pad, pad, pad, 0);
-        final EditText eh = new EditText(this); eh.setHint("آدرس سرور (خالی = آدرس فعلی)"); eh.setText(prefs.getString("db_host_override", ""));
-        final EditText ep = new EditText(this); ep.setHint("پورت (خالی = 1433)"); ep.setText(prefs.getString("db_port_override", "")); ep.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
-        box.addView(eh, new LinearLayout.LayoutParams(-1, -2));
-        box.addView(ep, new LinearLayout.LayoutParams(-1, -2));
-        new android.app.AlertDialog.Builder(this).setView(box).setTitle("تنظیم اتصال سرور")
-            .setPositiveButton("ذخیره و تلاش مجدد", (d, w) -> {
-                prefs.edit().putString("db_host_override", eh.getText().toString().trim()).putString("db_port_override", ep.getText().toString().trim()).apply();
-                ManagerAnalytics.clearMetadataCache();   // سرور دیگری ⇒ متادیتای کش‌شده بی‌اعتبار است
-                retry.run();
-            }).setNegativeButton("انصراف", null).show();
+        SqlConnectionSetupDialog.show(this, retry);
     }
 
     /** Same server and credentials as {@link #openConnection()}, for the staff app's background delivery job (no Activity). */
     static Connection backgroundConnection(Context ctx) throws Exception {
-        Class.forName("net.sourceforge.jtds.jdbc.Driver");
-        String host = hidden(S_HOST);
+        java.util.List<SqlConnectionConfig.Profile> routes = SqlConnectionConfig.candidates(ctx);
+        if (routes.isEmpty()) throw new DbException("تنظیم محلی اتصال SQL کامل نیست.");
+        String debugHost = "";
         try {
             boolean debuggable = (ctx.getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0;
             String test = ctx.getSharedPreferences(PREFS, MODE_PRIVATE).getString("bg_db_host", "");
-            if (debuggable && test != null && !test.trim().isEmpty()) host = test.trim();
+            if (debuggable && test != null && !test.trim().isEmpty()) debugHost = test.trim();
         } catch (Exception ignored) { }
-        String url = "jdbc:jtds:sqlserver://" + host + ":" + SQL_PORT + "/" + hidden(S_DB) + ";loginTimeout=15;socketTimeout=45;appName=MEELANOStaffJob;";
-        Properties props = new Properties();
-        props.setProperty("user", hidden(S_USER));
-        props.setProperty("password", hidden(S_PASS));
-        props.setProperty("charset", "UTF-8");
-        props.setProperty("sendStringParametersAsUnicode", "true");
-        return validatedConnection(DriverManager.getConnection(url, props));
+        Exception last = null;
+        for (SqlConnectionConfig.Profile route : routes) {
+            try {
+                Connection connection = SqlConnectionConfig.connect(route, debugHost);
+                SqlConnectionConfig.rememberSuccessfulRoute(ctx, route.kind);
+                return connection;
+            } catch (Exception failure) {
+                last = failure;
+            }
+        }
+        throw new DbException(last == null ? "اتصال SQL برقرار نشد." : String.valueOf(last.getMessage()));
     }
 
     private void bindSqlNetworkForVpnIfNeeded() {
@@ -12010,62 +11982,72 @@ public class MainActivity extends Activity {
     // =============================== on-device connection diagnostics (round 13) ===============================
     private void loadDiagnosticsPage() {
         content.removeAllViews();
-        addHero("\u062a\u0634\u062e\u06cc\u0635 \u0627\u062a\u0635\u0627\u0644", "\u0622\u0632\u0645\u0648\u0646 \u0645\u0631\u062d\u0644\u0647\u200c\u0628\u0647\u200c\u0645\u0631\u062d\u0644\u0647 \u0627\u062a\u0635\u0627\u0644 \u0628\u0647 \u0633\u0631\u0648\u0631 \u0622\u062a\u06cc\u0631\u0627\u0646 \u2014 \u0646\u062a\u06cc\u062c\u0647 \u0647\u0631 \u0645\u0631\u062d\u0644\u0647 \u0632\u0646\u062f\u0647 \u0646\u0645\u0627\u06cc\u0634 \u062f\u0627\u062f\u0647 \u0645\u06cc\u200c\u0634\u0648\u062f.");
-        LinearLayout card = card();
-        LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(-1, -2); clp.setMargins(0, 0, 0, dp(12));
-        content.addView(card, clp);
-        TextView ver = text("\u0646\u0633\u062e\u0647 \u0646\u0635\u0628\u200c\u0634\u062f\u0647: " + BuildConfigSafe.versionName(this) + "  \u2022  \u0633\u0631\u0648\u0631: " + hidden(S_HOST) + ":" + SQL_PORT + "  \u2022  \u062f\u06cc\u062a\u0627\u0628\u06cc\u0633: " + hidden(S_DB), 10.4f, MUTED, Typeface.BOLD);
-        card.addView(ver, new LinearLayout.LayoutParams(-1, -2));
-        final String host = hidden(S_HOST);
+        addHero("تشخیص اتصال", "آزمون مرحله‌ای endpoint ذخیره‌شده؛ هیچ داده‌ای تغییر نمی‌کند.");
+        LinearLayout panel = card();
+        LinearLayout.LayoutParams panelParams = new LinearLayout.LayoutParams(-1, -2);
+        panelParams.setMargins(0, 0, 0, dp(12));
+        content.addView(panel, panelParams);
+        SqlConnectionConfig.Profile profile = SqlConnectionConfig.selected(this);
+        String endpoint = profile == null ? "تنظیم نشده" : profile.host + ":" + profile.port + " / " + profile.database;
+        panel.addView(text("نسخهٔ " + BuildConfigSafe.versionName(this) + " · " + endpoint,
+                10.4f, MUTED, Typeface.BOLD), new LinearLayout.LayoutParams(-1, -2));
+        Button configure = secondaryButton("تنظیم سرور، پورت و دیتابیس");
+        configure.setOnClickListener(v -> SqlConnectionSetupDialog.show(this, () -> loadDiagnosticsPage()));
+        panel.addView(configure, new LinearLayout.LayoutParams(-1, dp(46)));
+        if (profile == null) {
+            panel.addView(text("ابتدا سرور و دیتابیس را در تنظیمات اتصال انتخاب و ذخیره کنید.",
+                    11, DANGER, Typeface.BOLD), new LinearLayout.LayoutParams(-1, -2));
+            return;
+        }
         new Thread(() -> {
             java.util.List<String[]> steps = new java.util.ArrayList<>();
-            long t0 = System.currentTimeMillis();
-            try (Socket sock = new Socket()) {
-                sock.connect(new java.net.InetSocketAddress(host, SQL_PORT), 6000);
-                steps.add(new String[]{"1. \u0628\u0627\u0632 \u0628\u0648\u062f\u0646 \u067e\u0648\u0631\u062a " + SQL_PORT, "OK", (System.currentTimeMillis() - t0) + "ms"});
+            long start = System.currentTimeMillis();
+            try {
+                SqlConnectionConfig.probe(profile.host, profile.port, 6000);
+                steps.add(new String[]{"پورت TCP " + profile.port, "OK",
+                        (System.currentTimeMillis() - start) + "ms"});
             } catch (Exception e) {
-                steps.add(new String[]{"1. \u0628\u0627\u0632 \u0628\u0648\u062f\u064f \u067e\u0648\u0631\u062a " + SQL_PORT, "ERR", String.valueOf(e.getMessage())});
+                steps.add(new String[]{"پورت TCP " + profile.port, "ERR", diagnoseDbError(e)});
             }
-            Connection c = null;
+            Connection connection = null;
             if ("OK".equals(steps.get(0)[1])) {
-                long t1 = System.currentTimeMillis();
+                long authStart = System.currentTimeMillis();
                 try {
-                    Class.forName("net.sourceforge.jtds.jdbc.Driver");
-                    String url = "jdbc:jtds:sqlserver://" + host + ":" + SQL_PORT + "/" + hidden(S_DB) + ";loginTimeout=12;socketTimeout=45;appName=MEELANODiag;";
-                    java.util.Properties props = new java.util.Properties();
-                    props.setProperty("user", hidden(S_USER));
-                    props.setProperty("password", hidden(S_PASS));
-                    props.setProperty("charset", "UTF-8");
-                    c = java.sql.DriverManager.getConnection(url, props);
-                    steps.add(new String[]{"2. \u0648\u0631\u0648\u062f \u0628\u0647 \u062f\u06cc\u062a\u0627\u0628\u06cc\u0633", "OK", (System.currentTimeMillis() - t1) + "ms"});
+                    connection = SqlConnectionConfig.connect(profile, null);
+                    steps.add(new String[]{"ورود و آزمون دیتابیس", "OK",
+                            (System.currentTimeMillis() - authStart) + "ms"});
                 } catch (Exception e) {
-                    steps.add(new String[]{"2. \u0648\u0631\u0648\u062f \u0628\u0647 \u062f\u06cc\u062a\u0627\u0628\u06cc\u0633", "ERR", String.valueOf(e.getMessage())});
+                    steps.add(new String[]{"ورود و آزمون دیتابیس", "ERR", diagnoseDbError(e)});
                 }
             }
-            if (c != null) {
-                long t2 = System.currentTimeMillis();
-                try (java.sql.Statement st = c.createStatement()) { st.setQueryTimeout(8); st.execute("SELECT 1"); steps.add(new String[]{"3. \u0627\u062c\u0631\u0627\u06cc \u062f\u0633\u062a\u0648\u0631 SQL", "OK", (System.currentTimeMillis() - t2) + "ms"}); }
-                catch (Exception e) { steps.add(new String[]{"3. \u0627\u062c\u0631\u0627\u06cc \u062f\u0633\u062a\u0648\u0631 SQL", "ERR", String.valueOf(e.getMessage())}); }
-                long t3 = System.currentTimeMillis();
-                try (java.sql.Statement st = c.createStatement()) { st.setQueryTimeout(20); try (java.sql.ResultSet r = st.executeQuery("SELECT COUNT_BIG(1) FROM dbo.sailfact")) { r.next(); steps.add(new String[]{"4. \u062e\u0648\u0627\u0646\u062f\u0646 \u062f\u0627\u062f\u0647 \u0641\u0631\u0648\u0634", "OK", formatNumber(r.getLong(1)) + " \u0633\u0646\u062f \u2022 " + (System.currentTimeMillis() - t3) + "ms"}); } }
-                catch (Exception e) { steps.add(new String[]{"4. \u062e\u0648\u0627\u0646\u062f\u0646 \u062f\u0627\u062f\u0647 \u0641\u0631\u0648\u0634", "ERR", String.valueOf(e.getMessage())}); }
-                long t4 = System.currentTimeMillis();
-                try (java.sql.Statement st = c.createStatement()) { st.setQueryTimeout(25); try (java.sql.ResultSet r = st.executeQuery("SELECT COUNT(*) FROM (SELECT DISTINCT x.* FROM dbo.sailfact x) h")) { r.next(); steps.add(new String[]{"5. \u06a9\u0648\u0626\u0631\u06cc \u0648\u0627\u0642\u0639\u06cc \u06af\u0632\u0627\u0631\u0634\u0627\u062a", "OK", formatNumber(r.getLong(1)) + " \u0631\u062f\u06cc\u0641 \u2022 " + (System.currentTimeMillis() - t4) + "ms"}); } }
-                catch (Exception e) { steps.add(new String[]{"5. \u06a9\u0648\u0626\u0631\u06cc \u0648\u0627\u0642\u0639\u06cc \u06af\u0632\u0627\u0631\u0634\u0627\u062a", "ERR", String.valueOf(e.getMessage())}); }
-                try { c.close(); } catch (Exception ignored) { }
+            if (connection != null) {
+                long countStart = System.currentTimeMillis();
+                try (java.sql.Statement st = connection.createStatement()) {
+                    st.setQueryTimeout(20);
+                    try (java.sql.ResultSet rs = st.executeQuery("SELECT COUNT_BIG(1) FROM dbo.sailfact")) {
+                        rs.next();
+                        steps.add(new String[]{"خواندن شمار فاکتورها", "OK",
+                                formatNumber(rs.getLong(1)) + " رکورد · " + (System.currentTimeMillis() - countStart) + "ms"});
+                    }
+                } catch (Exception e) {
+                    steps.add(new String[]{"خواندن شمار فاکتورها", "ERR", diagnoseDbError(e)});
+                }
+                try { connection.close(); } catch (Exception ignored) { }
             }
             runOnUiThread(() -> {
-                for (String[] st : steps) {
-                    boolean ok = "OK".equals(st[1]);
-                    LinearLayout row = new LinearLayout(this); row.setOrientation(LinearLayout.VERTICAL);
+                for (String[] step : steps) {
+                    boolean ok = "OK".equals(step[1]);
+                    LinearLayout row = new LinearLayout(this);
+                    row.setOrientation(LinearLayout.VERTICAL);
                     row.setPadding(dp(4), dp(8), dp(4), dp(8));
-                    TextView t = text((ok ? "\u2705 " : "\u274c ") + st[0] + "  \u2014  " + (ok ? st[2] : ""), 11.6f, ok ? tc(SUCCESS) : tc(DANGER), Typeface.BOLD);
-                    row.addView(t, new LinearLayout.LayoutParams(-1, -2));
-                    if (!ok) { TextView d = text(st[2], 9.8f, MUTED, Typeface.NORMAL); row.addView(d, new LinearLayout.LayoutParams(-1, -2)); }
-                    card.addView(row, new LinearLayout.LayoutParams(-1, -2));
+                    TextView title = text((ok ? "✓ " : "× ") + step[0] + " · "
+                                    + (ok ? step[2] : "ناموفق"),
+                            11.6f, ok ? tc(SUCCESS) : tc(DANGER), Typeface.BOLD);
+                    row.addView(title, new LinearLayout.LayoutParams(-1, -2));
+                    if (!ok) row.addView(text(step[2], 10, MUTED, Typeface.NORMAL),
+                            new LinearLayout.LayoutParams(-1, -2));
+                    panel.addView(row, new LinearLayout.LayoutParams(-1, -2));
                 }
-                TextView hint = text(steps.size() > 0 && "OK".equals(steps.get(steps.size() - 1)[1]) ? "\u0627\u062a\u0635\u0627\u0644 \u06a9\u0627\u0645\u0644 \u0628\u0631\u0642\u0631\u0627\u0631 \u0627\u0633\u062a \u2014 \u0627\u06af\u0631 \u0628\u062e\u0634\u06cc \u062e\u0627\u0644\u06cc \u0627\u0633\u062a\u060c \u062f\u0631 \u062f\u06cc\u062a\u0627\u0628\u06cc\u0633 \u062f\u0627\u062f\u0647\u200c\u0627\u06cc \u0628\u0631\u0627\u06cc \u0622\u0646 \u0628\u0627\u0632\u0647 \u0646\u06cc\u0633\u062a." : "\u0645\u0631\u062d\u0644\u0647 \u0634\u06a9\u0633\u062a\u200c\u062e\u0648\u0631\u062f\u0647 \u0631\u0627 \u0627\u0633\u06a9\u0631\u06cc\u0646\u200c\u0634\u0627\u062a \u0628\u06af\u06cc\u0631\u06cc\u062f \u062a\u0627 \u062f\u0642\u06cc\u0642 \u0631\u0641\u0639 \u0634\u0648\u062f.", 10.6f, MUTED, Typeface.BOLD);
-                card.addView(hint, new LinearLayout.LayoutParams(-1, -2));
             });
         }).start();
     }

@@ -86,6 +86,8 @@ public class LicenseActivity extends Activity {
     private boolean editingConnection;
     private EditText connectionIp;
     private EditText connectionPort;
+    private EditText connectionUser;
+    private EditText connectionPass;
     private String restoredConnectionIp;
     private String restoredConnectionPort;
 
@@ -1190,6 +1192,18 @@ public class LicenseActivity extends Activity {
             fPort.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
         } catch (Exception e) { Diag.ignored("LicenseActivity:portField", e); }
         c.addView(iconField(fPort, R.drawable.mi_my_location), kit.lp(-1, -2));
+        c.addView(kit.gap(4));
+        connectionUser = kit.edit("نام کاربری SQL", settings.user());
+        connectionUser.setSingleLine(true);
+        c.addView(iconField(connectionUser, R.drawable.mi_my_location), kit.lp(-1, -2));
+        c.addView(kit.gap(4));
+        connectionPass = kit.edit("رمز SQL (یک‌بار روی این دستگاه)", settings.pass());
+        connectionPass.setSingleLine(true);
+        connectionPass.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        c.addView(iconField(connectionPass, R.drawable.mi_my_location), kit.lp(-1, -2));
+        c.addView(kit.hint("نام کاربری و رمز فقط پس از اتصال موفق، روی همین دستگاه ذخیره می‌شوند."),
+                kit.lp(-1, -2));
         if (editingConnection) {
             c.addView(kit.hint("برای اتصال به سرور دیگر، آدرس بالا را کامل جایگزین کنید؛ دیتابیس قبلی به‌صورت خودکار انتخاب نمی‌شود. پورت خالی = ۱۴۳۳؛ اگر روی آی‌پی اختصاصی پورت دیگری (مثل ۵۰۵۰) به ۱۴۳۳ فوروارد شده، همان را وارد کنید."), 
                     kit.lp(-1, -2));
@@ -1201,7 +1215,7 @@ public class LicenseActivity extends Activity {
         c.addView(btn[0], kit.lp(-1, -2));
         c.addView(kit.gap(6));
         final android.widget.Button[] wbtn = new android.widget.Button[1];
-        wbtn[0] = kit.btnGhost("اتصال با وای‌فای", Theme.GOLD, v -> wifiConnect(wbtn[0]));
+        wbtn[0] = kit.btnGhost("یافتن سرور در شبکهٔ داخلی", Theme.GOLD, v -> wifiConnect(wbtn[0]));
         try {
             android.graphics.drawable.Drawable icd = getDrawable(R.drawable.mi_wifi);
             if (icd != null) {
@@ -1263,6 +1277,26 @@ public class LicenseActivity extends Activity {
     }
 
     /** Port typed into the address wins, then the separate field, then the default 1433. */
+    private String sqlUserValue() {
+        try {
+            String value = connectionUser == null ? settings.effUser()
+                    : connectionUser.getText().toString().trim();
+            return value == null ? "" : value.trim();
+        } catch (Exception ignored) {
+            return settings == null ? "" : settings.effUser();
+        }
+    }
+
+    private String sqlPassValue() {
+        try {
+            String value = connectionPass == null ? settings.effPass()
+                    : connectionPass.getText().toString();
+            return value == null ? "" : value;
+        } catch (Exception ignored) {
+            return settings == null ? "" : settings.effPass();
+        }
+    }
+
     private static int resolvePort(String portText, String typedHost) {
         String t = portText == null ? "" : portText.trim();
         if (!t.isEmpty()) {
@@ -1287,6 +1321,12 @@ public class LicenseActivity extends Activity {
             return;
         }
         final int fPort = resolvePort(portText, ip);
+        final String fUser = sqlUserValue();
+        final String fPass = sqlPassValue();
+        if (fUser.isEmpty() || fPass.isEmpty()) {
+            kit.toast("نام کاربری و رمز SQL را وارد کنید؛ پس از اتصال موفق روی دستگاه ذخیره می‌شوند");
+            return;
+        }
         if (!Net.online(this)) {
             kit.toast("شبکه قطع است — به وای‌فای یا دیتای موبایل وصل شوید");
             return;
@@ -1298,8 +1338,7 @@ public class LicenseActivity extends Activity {
         showRadar("در حال اتصال مستقیم به سرور…");
         new Thread(() -> {
           try {
-            List<String> databases = LanDiscover.listDatabases(fIp, fPort,
-                    License.SQL_USER, License.SQL_PASS);
+            List<String> databases = LanDiscover.listDatabases(fIp, fPort, fUser, fPass);
             if (databases == null || databases.isEmpty()) {
                 runOnUiThread(() -> {
                     hideRadar();
@@ -1311,15 +1350,13 @@ public class LicenseActivity extends Activity {
                     final String wan = (priv != null && !priv) ? fIp : "";
                     boolean vpn = NetRoute.isVpnActive(LicenseActivity.this);
                     SmartLink.diagnoseExplicit(LicenseActivity.this, lan, wan,
-                            fPort, "master", License.SQL_USER,
-                            License.SQL_PASS, vpn, r -> {
+                            fPort, "master", fUser, fPass, vpn, r -> {
                                 if (isFinishing()) return;
                                 LinkPanel.showFixSheet(LicenseActivity.this, r,
                                         () -> connectManual(ip, portText, btn),
                                         () -> LinkPanel.showDiagnoseExplicit(
                                                 LicenseActivity.this, lan, wan,
-                                                fPort, "master",
-                                                License.SQL_USER, License.SQL_PASS));
+                                                fPort, "master", fUser, fPass));
                             });
                 });
                 return;
@@ -1349,7 +1386,7 @@ public class LicenseActivity extends Activity {
                     fs.add(pool.submit(() -> {
                         try {
                             return SmartLink.probeTables(pair[0], Integer.parseInt(pair[2]), pair[1],
-                                    License.SQL_USER, License.SQL_PASS);
+                                    fUser, fPass);
                         } catch (Exception e) {
                             return -1;
                         }
@@ -1383,7 +1420,7 @@ public class LicenseActivity extends Activity {
                 }
                 // Even a single result is shown for confirmation, so the user
                 // explicitly sees and selects the database before proceeding.
-                dbPickerDialog(found, counts);
+                dbPickerDialog(found, counts, fUser, fPass);
             });
           } catch (Throwable t) {
             Diag.ignored("LicenseActivity:connectThread", t);
@@ -1401,8 +1438,9 @@ public class LicenseActivity extends Activity {
 
     /** Wi-Fi connect (v33): find the server, list its databases, user picks one. */
     private void wifiConnect(final android.widget.Button btn) {
-        if (!Net.wifi(this)) {
-            kit.toast("به وای‌فای فروشگاه وصل شوید و دوباره بزنید");
+        String transport = Net.transport(this);
+        if (!"wifi".equals(transport) && !"eth".equals(transport)) {
+            kit.toast("به وای‌فای یا شبکهٔ کابلی فروشگاه وصل شوید و دوباره بزنید");
             return;
         }
         try {
@@ -1445,8 +1483,7 @@ public class LicenseActivity extends Activity {
                 for (int hi = 0; hi < hosts.size(); hi++) {
                     final String h = hosts.get(hi);
                     final int hp = hostPorts.get(hi);
-                    fs.add(pool.submit(() -> LanDiscover.listDatabases(h, hp,
-                            License.SQL_USER, License.SQL_PASS)));
+                    fs.add(pool.submit(() -> LanDiscover.listDatabases(h, hp, sqlUser, sqlPass)));
                 }
                 long deadline = System.currentTimeMillis() + 12000;
                 for (int i = 0; i < fs.size(); i++) {
@@ -1479,7 +1516,7 @@ public class LicenseActivity extends Activity {
                         try {
                             return new int[]{SmartLink.probeTables(pr[0],
                                     Integer.parseInt(pr[2]), pr[1],
-                                    License.SQL_USER, License.SQL_PASS)};
+                                    sqlUser, sqlPass)};
                         } catch (Exception e) {
                             return new int[]{-1};
                         }
@@ -1510,10 +1547,10 @@ public class LicenseActivity extends Activity {
                         return;
                     }
                     if (fw.size() == 1) {
-                        saveSite(fw.get(0)[0], fw.get(0)[1], fn.get(0), pairPort(fw.get(0)));
+                        saveSite(fw.get(0)[0], fw.get(0)[1], fn.get(0), pairPort(fw.get(0)), sqlUser, sqlPass);
                         return;
                     }
-                    dbPickerDialog(fw, fn);
+                    dbPickerDialog(fw, fn, sqlUser, sqlPass);
                 });
             } finally {
                 pool.shutdownNow();
@@ -1544,7 +1581,8 @@ public class LicenseActivity extends Activity {
     }
 
     /** Single-choice database picker. */
-    private void dbPickerDialog(List<String[]> pairs, List<Integer> counts) {
+    private void dbPickerDialog(List<String[]> pairs, List<Integer> counts,
+                                String sqlUser, String sqlPass) {
         LinearLayout b = kit.v();
         b.setPadding(Theme.dp(16), Theme.dp(8), Theme.dp(16), Theme.dp(8));
         b.addView(kit.text("دیتابیس فروشگاه را انتخاب کنید", 13f, Theme.TEXT, true),
@@ -1583,14 +1621,15 @@ public class LicenseActivity extends Activity {
                 box[0].dismiss();
             } catch (Exception ignored) { Diag.ignored("LicenseActivity:1239", ignored); }
             saveSite(pairs.get(sel[0])[0], pairs.get(sel[0])[1], counts.get(sel[0]),
-                    pairPort(pairs.get(sel[0])));
+                    pairPort(pairs.get(sel[0])), sqlUser, sqlPass);
         }), kit.lp(-1, -2));
         box[0] = kit.dialog("انتخاب دیتابیس", kit.scrollWrap(b, 420), true);
         box[0].show();
     }
 
     /** Save a verified (host, db) and roll into the app (v33). */
-    private void saveSite(String host, String db, int tables, int port) {
+    private void saveSite(String host, String db, int tables, int port,
+                          String sqlUser, String sqlPass) {
         try {
             Boolean priv = SmartLink.isPrivate(host);
             String lan = (priv == null || priv) ? host : "";
@@ -1598,14 +1637,20 @@ public class LicenseActivity extends Activity {
             String portStr = String.valueOf(port);
             String lanPort = (priv == null || priv) ? portStr : "";
             String wanPort = (priv != null && !priv) ? portStr : "";
-            settings.saveSmart(lan, wan, lanPort, wanPort, db,
-                    License.SQL_USER, License.SQL_PASS);
+            boolean stored = settings.saveSmart(lan, wan, lanPort, wanPort, db,
+                    sqlUser, sqlPass);
+            if (!stored || !settings.connConfigured()) {
+                kit.toast("تنظیم SQL ذخیره نشد؛ ورود امن دستگاه در دسترس نیست");
+                return;
+            }
             settings.setLinkLast(lan.isEmpty() ? SmartLink.WAN : SmartLink.LAN);
             saveConnSummary(host, tables);
         } catch (Exception ignored) { Diag.ignored("LicenseActivity:1256", ignored); }
         editingConnection = false;
         connectionIp = null;
         connectionPort = null;
+        connectionUser = null;
+        connectionPass = null;
         restoredConnectionIp = null;
         restoredConnectionPort = null;
         try {
@@ -2122,8 +2167,18 @@ public class LicenseActivity extends Activity {
         kit.toast("در حال ثبت و تست اتصال…");
         final String fh = prof.host;
         final String fd = prof.db;
-        final String fu = prof.user;
-        final String fp = prof.pass;
+        // Connection cards are endpoint-only. Never trust credentials carried by a legacy card.
+        final String fu = settings.effUser();
+        final String fp = settings.effPass();
+        if (fu.isEmpty() || fp.isEmpty()) {
+            settings.saveConnection(fh, String.valueOf(port), fd, fu, fp);
+            editingConnection = true;
+            restoredConnectionIp = fh;
+            restoredConnectionPort = String.valueOf(port);
+            kit.toast("برای اتصال، یک‌بار نام کاربری و رمز SQL را در همین دستگاه وارد کنید");
+            buildUi();
+            return;
+        }
         repo.runWith(fh, port, fd, fu, fp, conn -> {
             Meta m = new Meta(conn);
             int n = 0;

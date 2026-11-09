@@ -284,7 +284,7 @@ public class MeelanoTaxActivity extends Activity {
     }
 
     private String[] dbConfig() {
-        String[] d = MainActivity.defaultDbConfig();
+        String[] d = MainActivity.defaultDbConfig(this);
         String host = prefs.getString("db_host", "").trim();
         String port = prefs.getString("db_port", "").trim();
         String name = prefs.getString("db_name", "").trim();
@@ -2768,9 +2768,11 @@ public class MeelanoTaxActivity extends Activity {
 
     private View dbSettingsForm(Runnable afterSave) {
         LinearLayout page = ui.page();
-        String[] d = MainActivity.defaultDbConfig();
+        String[] d = MainActivity.defaultDbConfig(this);
         LinearLayout c = ui.card();
-        c.addView(ui.caption("خالی گذاشتن هر مورد = مقدار پیش‌فرض برنامه‌های پخش درخشان (" + d[0] + ":" + d[1] + " / " + d[2] + ")."));
+        String current = d[0].isEmpty() ? "هنوز تنظیم نشده" : d[0] + ":" + d[1] + " / " + d[2];
+        c.addView(ui.caption("اتصال فعال روی این دستگاه: " + current
+                + " — خالی گذاشتن هر مورد یعنی همان مقدار ذخیره‌شدهٔ محلی به کار می‌رود."));
         EditText host = ui.ltrInput(d[0], prefs.getString("db_host", ""), InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
         EditText port = ui.ltrInput(d[1], prefs.getString("db_port", ""), InputType.TYPE_CLASS_NUMBER);
         EditText name = ui.ltrInput(d[2], prefs.getString("db_name", ""), InputType.TYPE_CLASS_TEXT);
@@ -2780,8 +2782,11 @@ public class MeelanoTaxActivity extends Activity {
         c.addView(ui.field("آدرس سرور", host, null));
         c.addView(ui.field("پورت", port, null));
         c.addView(ui.field("نام پایگاه داده", name, null));
-        c.addView(ui.field("کاربر SQL", u, "اگر خالی باشد، کاربر و رمز پیش‌فرض برنامه استفاده می‌شود"));
+        c.addView(ui.field("کاربر SQL", u, "اگر خالی باشد، ورود SQL ذخیره‌شده روی همین دستگاه استفاده می‌شود"));
         c.addView(ui.field("رمز SQL", p, "رمز با کلید امن گوشی رمزگذاری و ذخیره می‌شود"));
+        android.widget.LinearLayout chooseServer = ui.button("یافتن سرور و انتخاب دیتابیس",
+                R.drawable.mi_database, MeelanoTaxUi.BTN_GHOST, v -> SqlConnectionSetupDialog.show(this, afterSave));
+        c.addView(chooseServer);
         CheckBox vpn = ui.check("در صورت روشن بودن VPN، اتصال از شبکه مستقیم گوشی برقرار شود", !"0".equals(prefs.getString("vpn_bypass", "1")));
         c.addView(vpn);
         page.addView(c);

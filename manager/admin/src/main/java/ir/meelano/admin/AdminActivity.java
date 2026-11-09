@@ -1280,7 +1280,7 @@ public class AdminActivity extends Activity {
         Button bSave = AdminKit.btn(this, "فقط ذخیره مشخصات", false);
         bSave.setOnClickListener(v -> {
             db.saveSite(cid, AdminKit.txt(fHost), AdminKit.txt(fWan), AdminKit.txt(fPort),
-                    AdminKit.txt(fDb), License.SQL_USER, License.SQL_PASS);
+                    AdminKit.txt(fDb));
             AdminKit.toast(this, "مشخصات ذخیره شد");
         });
         box.addView(bSave);
@@ -1313,8 +1313,7 @@ public class AdminActivity extends Activity {
                         : "آدرس سرور، پورت و نام دیتابیس لازم است");
                 return;
             }
-            db.saveSite(cid, AdminKit.txt(fHost), AdminKit.txt(fWan), p.port, dbn,
-                    License.SQL_USER, License.SQL_PASS);
+            db.saveSite(cid, AdminKit.txt(fHost), AdminKit.txt(fWan), p.port, dbn);
             out.removeAllViews();
             LinearLayout rc = (LinearLayout) AdminKit.card(this);
             AdminKit.cardMargin(rc, this);

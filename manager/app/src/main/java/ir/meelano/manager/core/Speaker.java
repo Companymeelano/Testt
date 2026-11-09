@@ -1,5 +1,6 @@
 package ir.meelano.manager.core;
 
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ResolveInfo;
 import android.net.Uri;
@@ -59,16 +60,31 @@ public final class Speaker {
         return engineName;
     }
 
+    /** One-line Persian status for the Settings voice row. */
+    public static String voiceStatusFa(Context c) {
+        try {
+            if (OfflineVoice.installed(c)) return "🔊 صدای فارسی: آماده (موتور آفلاین برنامه)";
+        } catch (Exception e) {
+            Diag.ignored("Speaker:status", e);
+        }
+        if (state == READY) return "🔊 صدای فارسی: آماده (" + engineName + ")";
+        if (state == NO_PERSIAN) return "🔇 صدای فارسی: راه‌اندازی نشده · راهنما";
+        return "🔊 صدای فارسی: در حال بررسی…";
+    }
+
     /**
      * Called on every resume. The first time the app opens without a Persian voice it shows the
      * setup step. When the user returns from the store, it probes the engines again and closes
      * the step by itself once Persian works.
      */
     public static void onResume(final MainActivity a) {
-        if (OfflineVoice.installed(a)) return; // built-in Persian voice is ready: no setup step
+        if (OfflineVoice.installed(a)) { // built-in Persian voice is ready: no setup step
+            clearSetupFlags(a);
+            return;
+        }
         if (state == UNINIT) {
             probe(a, () -> {
-                if (state == NO_PERSIAN) showSetup(a);
+                if (state == NO_PERSIAN) autoSetupOnce(a);
             });
             return;
         }
@@ -76,11 +92,83 @@ public final class Speaker {
             probe(a, () -> {
                 if (state == READY) {
                     closeSetup();
+                    clearSetupFlags(a);
                     a.kit.toast("صدای فارسی آماده است (" + engineName + ")");
-                } else if (setupDialog == null || !setupDialog.isShowing()) {
-                    showSetup(a);
+                } else if (setupDialog != null && setupDialog.isShowing()) {
+                    return; // the user is already looking at the setup step
+                } else {
+                    autoSetupOnce(a);
                 }
             });
+        }
+    }
+
+    /**
+     * The setup step pops up by itself at most once per install. A user who chose «continue
+     * without sound» is never nagged again on resumes; the step stays reachable from Settings.
+     */
+    private static void autoSetupOnce(MainActivity a) {
+        if (skipped(a) || prompted(a)) return;
+        setPrompted(a, true);
+        showSetup(a);
+    }
+
+    /** Opens the setup step from Settings (explicit user action, ignores the skip flag). */
+    public static void openSetup(MainActivity a) {
+        if (OfflineVoice.installed(a)) {
+            a.kit.toast("صدای فارسی آماده است (موتور آفلاین برنامه)");
+            return;
+        }
+        if (state == READY) {
+            a.kit.toast("صدای فارسی آماده است (" + engineName + ")");
+            return;
+        }
+        showSetup(a);
+    }
+
+    private static android.content.SharedPreferences speakerPrefs(Context c) {
+        return c.getSharedPreferences("meelano_speaker", Context.MODE_PRIVATE);
+    }
+
+    private static boolean skipped(Context c) {
+        try {
+            return speakerPrefs(c).getBoolean("setup_skipped", false);
+        } catch (Exception e) {
+            Diag.ignored("Speaker:skipped", e);
+            return false;
+        }
+    }
+
+    private static void setSkipped(Context c, boolean value) {
+        try {
+            speakerPrefs(c).edit().putBoolean("setup_skipped", value).apply();
+        } catch (Exception e) {
+            Diag.ignored("Speaker:setSkipped", e);
+        }
+    }
+
+    private static boolean prompted(Context c) {
+        try {
+            return speakerPrefs(c).getBoolean("setup_prompted", false);
+        } catch (Exception e) {
+            Diag.ignored("Speaker:prompted", e);
+            return false;
+        }
+    }
+
+    private static void setPrompted(Context c, boolean value) {
+        try {
+            speakerPrefs(c).edit().putBoolean("setup_prompted", value).apply();
+        } catch (Exception e) {
+            Diag.ignored("Speaker:setPrompted", e);
+        }
+    }
+
+    private static void clearSetupFlags(Context c) {
+        try {
+            speakerPrefs(c).edit().remove("setup_skipped").remove("setup_prompted").apply();
+        } catch (Exception e) {
+            Diag.ignored("Speaker:clearFlags", e);
         }
     }
 
@@ -133,8 +221,7 @@ public final class Speaker {
                 tts.speak(clean, TextToSpeech.QUEUE_FLUSH, null, id);
             } else {
                 post(onDone);
-                if (!setupShown) showSetup(a);
-                else a.kit.toast("صدای فارسی محلی آماده نیست؛ در تنظیمات مدل آفلاین را نصب کنید");
+                a.kit.toast("صدای فارسی آماده نیست؛ از تنظیمات → صدای فارسی می‌توانید موتور را نصب کنید");
             }
         });
     }
@@ -158,7 +245,8 @@ public final class Speaker {
         LinearLayout body = a.kit.v();
         body.setPadding(Theme.dp(18), Theme.dp(6), Theme.dp(18), Theme.dp(12));
         body.addView(a.kit.text("موتور صدای این گوشی زبان فارسی ندارد. برای خواندن متن فارسی و گفتگوی زنده، "
-                + "موتور رایگان eSpeak NG را نصب کنید. بعد از نصب و برگشت به برنامه، خودکار بررسی می‌شود.",
+                + "موتور رایگان eSpeak NG را نصب کنید. بعد از نصب و برگشت به برنامه، خودکار بررسی می‌شود. "
+                + "اگر «بدون صدا» را انتخاب کنید این راهنما دیگر خودکار باز نمی‌شود و از تنظیمات → صدای فارسی در دسترس است.",
                 13f, Theme.TEXT, false), a.kit.lp(-1, -2));
         body.addView(a.kit.gap(12));
         body.addView(a.kit.btnGold("۱. نصب eSpeak NG از فروشگاه", v -> openStore(a)), a.kit.lp(-1, -2));
@@ -175,7 +263,11 @@ public final class Speaker {
             }
         })), a.kit.lp(-1, -2));
         body.addView(a.kit.gap(6));
-        body.addView(a.kit.btnGhost("فعلاً بدون صدا ادامه بده", Theme.MUTED, v -> closeSetup()), a.kit.lp(-1, -2));
+        body.addView(a.kit.btnGhost("فعلاً بدون صدا ادامه بده", Theme.MUTED, v -> {
+            setSkipped(a, true);
+            closeSetup();
+            a.kit.toast("باشه؛ این راهنما دیگر خودکار باز نمی‌شود (تنظیمات → صدای فارسی)");
+        }), a.kit.lp(-1, -2));
 
         setupDialog = a.kit.dialog("راه‌اندازی صدای فارسی", body, false);
         setupDialog.setCancelable(false);

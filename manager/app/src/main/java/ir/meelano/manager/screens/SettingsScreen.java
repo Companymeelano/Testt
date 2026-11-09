@@ -311,6 +311,20 @@ public class SettingsScreen extends Screen {
         th.addView(a.kit.hint("قالب انتخاب‌شده فوراً روی همهٔ بخش‌ها، جدول‌ها، نمودارها و آیکن‌ها اعمال می‌شود."),
                 a.kit.lp(-1, -2));
         a.kit.addCard(content, th);
+
+        // Persian voice: the setup step never pops up by itself after the first run; this row
+        // is the permanent home for installing/checking the on-device engine.
+        final LinearLayout vo = a.kit.v();
+        vo.addView(a.kit.text("صدا", 12f, Theme.MUTED, true), a.kit.lp(-1, -2));
+        vo.addView(a.kit.btnGhost(ir.meelano.manager.core.Speaker.voiceStatusFa(a), Theme.INFO,
+                v -> {
+                    ir.meelano.manager.core.Speaker.openSetup(a);
+                    render(content);
+                }), a.kit.lp(-1, -2));
+        vo.addView(a.kit.gap(6));
+        vo.addView(a.kit.hint("خواندن متن فارسی و گفتگوی زندهٔ دستیار روی همین گوشی انجام می‌شود؛ بدون سرویس ابری."),
+                a.kit.lp(-1, -2));
+        a.kit.addCard(content, vo);
     }
 
     private void buildPreview(final LinearLayout content) {

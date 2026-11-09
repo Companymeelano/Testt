@@ -1,6 +1,7 @@
 package ir.meelano.manager.data;
 
 import ir.meelano.manager.core.Diag;
+import ir.meelano.manager.core.LegacySql;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.sql.Connection;
@@ -49,7 +50,7 @@ public final class Atiran {
             throw new Exception(diagnose(e));
         }
         try {
-            return validated(DriverManager.getConnection(url, p));
+            return compat(DriverManager.getConnection(url, p), host, port);
         } catch (Exception first) {
             // A wrong password will not succeed on retry; do not hammer the login.
             String fm = String.valueOf(first.getMessage()).toLowerCase(java.util.Locale.US);
@@ -58,11 +59,27 @@ public final class Atiran {
             }
             Thread.sleep(700);
             try {
-                return validated(DriverManager.getConnection(url, p));
+                return compat(DriverManager.getConnection(url, p), host, port);
             } catch (Exception second) {
                 throw new Exception(diagnose(second));
             }
         }
+    }
+
+    /**
+     * Validates the raw connection and then selects the SQL dialect of the server.
+     * Field servers on SQL Server 2008 R2 cannot parse TRY_CONVERT/TRY_CAST; the wrapper
+     * rewrites every statement so reports keep working there (see {@link LegacySql}).
+     */
+    private static Connection compat(Connection raw, String host, int port) throws Exception {
+        Connection checked = validated(raw);
+        boolean legacy = false;
+        try {
+            legacy = LegacySql.probe(checked, host + ":" + port);
+        } catch (Exception e) {
+            Diag.ignored("Atiran:compat", e);
+        }
+        return LegacySql.wrap(checked, legacy);
     }
 
     private static Connection validated(Connection c) throws Exception {
@@ -107,6 +124,12 @@ public final class Atiran {
         }
         if (l.contains("incorrect syntax")) {
             return "ساختار این گزارش با دیتابیس سازگار نیست؛ به پشتیبانی اطلاع دهید";
+        }
+        if (l.contains("is not a recognized built-in function name")) {
+            // Pre-2012 SQL Server parses TRY_CONVERT's type argument as a call, so the message
+            // names «nvarchar»/«decimal» instead of the function. The compatibility wrapper
+            // normally prevents reaching here; if it does, say what to check in plain Persian.
+            return "نسخهٔ SQL Server سرور قدیمی‌تر از پشتیبانی این گزارش است؛ به پشتیبانی اطلاع دهید تا حالت سازگاری بررسی شود";
         }
         if (l.contains("aggregate function") || l.contains("group by") || l.contains("subquery")) {
             // SQL Server rejects this report's calculation shape. Keep the raw text out of the UI.

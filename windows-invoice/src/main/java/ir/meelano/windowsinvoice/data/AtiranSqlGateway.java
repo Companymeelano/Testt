@@ -1133,7 +1133,9 @@ public final class AtiranSqlGateway implements AtiranGateway {
         try {
             Connection connection = DriverManager.getConnection(jdbcUrl, sqlUser, sqlPassword);
             connectionAvailable = true;
-            return connection;
+            // SQL Server 2008 R2 field servers cannot parse TRY_CONVERT/TRY_CAST; the wrapper
+            // rewrites every statement of this connection into the guarded 2008 dialect.
+            return LegacySql.wrap(connection, LegacySql.probe(connection, jdbcUrl));
         } catch (SQLException ex) {
             connectionAvailable = false;
             throw ex;

@@ -310,7 +310,8 @@ public class MeelanoTaxActivity extends Activity {
             MeelanoTaxDb.ensureSchema(c);
             schemaReady = true;
         }
-        return c;
+        // Keep the tax queries runnable on SQL Server 2008 R2 field servers as well.
+        return LegacySql.wrap(c, LegacySql.probe(c, d[0] + ":" + d[1]));
     }
 
     // ------------------------------------------------------------------ configuration

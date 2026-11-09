@@ -153,8 +153,9 @@ public final class ConnectionSetupDialog {
             int typedPort = WindowsServerDiscovery.resolvePort(port.getText(), host.getText());
             String typedUser = user.getText().trim();
             String typedPass = password.getText();
-            String database = databaseList.getSelectionModel().getSelectedItem();
-            if (database == null || database.isBlank()) database = draft.database;
+            String picked = databaseList.getSelectionModel().getSelectedItem();
+            // Effectively final, so the worker and the UI callback can both capture it.
+            final String database = picked == null || picked.isBlank() ? draft.database : picked;
             String chosenRoute = route.getSelectionModel().getSelectedIndex() == 1 ? "lan"
                     : route.getSelectionModel().getSelectedIndex() == 2 ? "wan" : "auto";
             if (!WindowsSqlSettings.validHost(typedHost) || !WindowsSqlSettings.validDatabase(database)

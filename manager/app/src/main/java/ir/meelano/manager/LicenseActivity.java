@@ -1443,6 +1443,14 @@ public class LicenseActivity extends Activity {
             kit.toast("به وای‌فای یا شبکهٔ کابلی فروشگاه وصل شوید و دوباره بزنید");
             return;
         }
+        // Discovery reads master on every found server, so it needs the SQL login the operator
+        // entered on this device. Nothing is embedded in the build; a missing login stops here.
+        final String sqlUser = sqlUserValue();
+        final String sqlPass = sqlPassValue();
+        if (sqlUser.isEmpty() || sqlPass.isEmpty()) {
+            kit.toast("نام کاربری و رمز SQL را وارد کنید؛ پس از اتصال موفق روی دستگاه ذخیره می‌شوند");
+            return;
+        }
         try {
             btn.setEnabled(false);
             btn.setText("در حال جستجو…");

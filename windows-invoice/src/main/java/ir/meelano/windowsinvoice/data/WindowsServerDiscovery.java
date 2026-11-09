@@ -62,14 +62,33 @@ public final class WindowsServerDiscovery {
                     while (addresses.hasMoreElements()) {
                         InetAddress address = addresses.nextElement();
                         if (!(address instanceof Inet4Address) || !address.isSiteLocalAddress()) continue;
-                        String ip = address.getHostAddress();
-                        int dot = ip == null ? -1 : ip.lastIndexOf('.');
-                        if (dot > 0) out.add(ip.substring(0, dot + 1));
+                        String prefix = subnetPrefix(address.getHostAddress());
+                        if (!prefix.isEmpty()) out.add(prefix);
                     }
                 } catch (Exception ignored) { }
             }
         } catch (Exception ignored) { }
         return new ArrayList<>(out);
+    }
+
+    /**
+     * The /24 scan prefix of a dotted IPv4 address ("192.168.1.42" → "192.168.1."), or "" when the
+     * text is not a plain IPv4 address. Pure, so a unit test can pin the derivation without depending
+     * on the network interfaces of the machine that runs it.
+     */
+    public static String subnetPrefix(String ip) {
+        String value = ip == null ? "" : ip.trim();
+        if (value.isEmpty()) return "";
+        String[] parts = value.split("\\.", -1);
+        if (parts.length != 4) return "";
+        for (String part : parts) {
+            if (part.isEmpty() || part.length() > 3) return "";
+            for (int at = 0; at < part.length(); at++) {
+                if (part.charAt(at) < '0' || part.charAt(at) > '9') return "";
+            }
+            if (Integer.parseInt(part) > 255) return "";
+        }
+        return parts[0] + "." + parts[1] + "." + parts[2] + ".";
     }
 
     /** True when host:port accepts a TCP connection. */

@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -26,15 +27,39 @@ class WindowsServerDiscoveryTest {
     }
 
     @Test void localSubnetScanStaysInsideSiteLocalIpv4Blocks() {
+        // Depends on the machine's interfaces, so it validates whatever the runner actually has:
+        // a /24 prefix is three numeric octets plus a trailing dot, and only inside a private range.
         List<String> subnets = WindowsServerDiscovery.localSubnets();
         assertNotNull(subnets);
         for (String subnet : subnets) {
             assertTrue(subnet.endsWith("."), "subnet prefix must end with a dot: " + subnet);
             String[] parts = subnet.split("\\.");
-            assertTrue(parts.length == 4);
+            assertEquals(3, parts.length, "a /24 scan prefix is three octets: " + subnet);
+            for (String part : parts) {
+                int octet = Integer.parseInt(part);
+                assertTrue(octet >= 0 && octet <= 255, "octet out of range: " + subnet);
+            }
             assertTrue(WindowsSqlSettings.isPrivateAddress(subnet + "1"),
                     "only private ranges may be scanned: " + subnet);
+            assertTrue(WindowsSqlSettings.isPrivateAddress(subnet + "254"),
+                    "only private ranges may be scanned: " + subnet);
         }
+    }
+
+    @Test void scanPrefixesAreDerivedFromTheAddressTextAlone() {
+        assertEquals("192.168.1.", WindowsServerDiscovery.subnetPrefix("192.168.1.42"));
+        assertEquals("10.0.7.", WindowsServerDiscovery.subnetPrefix("10.0.7.254"));
+        assertEquals("172.16.30.", WindowsServerDiscovery.subnetPrefix(" 172.16.30.9 "));
+        assertEquals("", WindowsServerDiscovery.subnetPrefix(""));
+        assertEquals("", WindowsServerDiscovery.subnetPrefix(null));
+        assertEquals("", WindowsServerDiscovery.subnetPrefix("192.168.1"));
+        assertEquals("", WindowsServerDiscovery.subnetPrefix("192.168.1.42.7"));
+        assertEquals("", WindowsServerDiscovery.subnetPrefix("192.168.1."));
+        assertEquals("", WindowsServerDiscovery.subnetPrefix("999.1.1.1"));
+        assertEquals("", WindowsServerDiscovery.subnetPrefix("192.168.01x.1.1"));
+        assertEquals("", WindowsServerDiscovery.subnetPrefix("host;drop table x"));
+        assertEquals("", WindowsServerDiscovery.subnetPrefix("fe80::1"));
+        assertEquals("", WindowsServerDiscovery.subnetPrefix("srv01.local"));
     }
 
     @Test void candidatesCarryAValidHostAndPort() {

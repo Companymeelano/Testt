@@ -354,7 +354,7 @@ public final class Kit {
             }
         });
         animator.addListener(new android.animation.AnimatorListenerAdapter() {
-            @Override public void onAnimationEnd(android.animation.Animation animation) {
+            @Override public void onAnimationEnd(android.animation.Animator animation) {
                 figure.setText(finalText);
             }
         });

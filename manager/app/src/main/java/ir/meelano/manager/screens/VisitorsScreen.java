@@ -55,9 +55,98 @@ public class VisitorsScreen extends Screen {
     @Override
     public FilterSheet.Config filterConfig() {
         FilterSheet.Config c = new FilterSheet.Config();
-        c.search = false;
+        c.search = true;
+        c.searchHint = "نام ویزیتور…";
         c.range = true;
+        // Smart segments: derived from the fetched performance rows, never from new SQL.
+        c.statusTitle = "بخش هوشمند";
+        c.status = new FilterSheet.Opt[]{
+                new FilterSheet.Opt("", "همه"),
+                new FilterSheet.Opt("active", "فعال در بازه"),
+                new FilterSheet.Opt("off", "غیرفعال"),
+                new FilterSheet.Opt("no_cust", "بدون مشتری منتسب"),
+                new FilterSheet.Opt("goal", "تحقق‌کنندهٔ هدف"),
+        };
+        c.sortTitle = "مرتب‌سازی";
+        c.sort = new FilterSheet.Opt[]{
+                new FilterSheet.Opt("", "فروش"),
+                new FilterSheet.Opt("invoices", "فاکتور"),
+                new FilterSheet.Opt("customers", "مشتری منتسب"),
+                new FilterSheet.Opt("achieve", "تحقق هدف"),
+        };
         return c;
+    }
+
+    private static final String[][] SEGMENTS = {
+            {"", "همه"}, {"active", "فعال در بازه"}, {"off", "غیرفعال"},
+            {"no_cust", "بدون مشتری منتسب"}, {"goal", "تحقق‌کنندهٔ هدف"},
+    };
+
+    private static final ReportCatalog.Col[] VISITOR_COLS = new ReportCatalog.Col[]{
+            new ReportCatalog.Col("name", "ویزیتور", ReportCatalog.T_TEXT),
+            new ReportCatalog.Col("customers", "منتسب", ReportCatalog.T_NUM),
+            new ReportCatalog.Col("invoices", "فاکتور", ReportCatalog.T_NUM),
+            new ReportCatalog.Col("sales", "فروش", ReportCatalog.T_MONEY),
+            new ReportCatalog.Col("collected", "وصول‌شده", ReportCatalog.T_MONEY),
+            new ReportCatalog.Col("goals", "هدف", ReportCatalog.T_MONEY),
+    };
+
+    /** Client-side smart filter: segment + search over the fetched rows (no new queries). */
+    private List<Row> smartPerf(List<Row> src, Filter f) {
+        List<Row> out = new ArrayList<>();
+        if (src == null) return out;
+        String seg = f == null || f.status == null ? "" : f.status;
+        String q = f == null || f.search == null ? "" : f.search.trim();
+        for (Row r : src) {
+            if (!matchesSegment(r, seg)) continue;
+            if (!q.isEmpty() && !r.s("name", "").contains(q)) continue;
+            out.add(r);
+        }
+        String sort = f == null || f.sort == null ? "" : f.sort;
+        Collections.sort(out, (x, y) -> {
+            switch (sort) {
+                case "invoices": return Long.compare(y.l("invoices"), x.l("invoices"));
+                case "customers": return Long.compare(y.l("customers"), x.l("customers"));
+                case "achieve": return Double.compare(achieve(y), achieve(x));
+                default: return Double.compare(y.d("sales"), x.d("sales"));
+            }
+        });
+        return out;
+    }
+
+    private static boolean matchesSegment(Row r, String seg) {
+        if (seg == null || seg.isEmpty()) return true;
+        boolean off = isOff(r.s("active"));
+        if ("active".equals(seg)) return !off;
+        if ("off".equals(seg)) return off;
+        if ("no_cust".equals(seg)) return r.l("customers") <= 0;
+        if ("goal".equals(seg)) return r.d("goals") > 0 && r.d("sales") >= r.d("goals");
+        return true;
+    }
+
+    private static double achieve(Row r) {
+        return r.d("goals") > 0 ? r.d("sales") / r.d("goals") : -1d;
+    }
+
+    private String segmentLabel() {
+        String st = filter == null || filter.status == null ? "" : filter.status;
+        for (String[] s : SEGMENTS) if (s[0].equals(st)) return s[1];
+        return SEGMENTS[0][1];
+    }
+
+    private String sortLabel() {
+        String so = filter == null || filter.sort == null ? "" : filter.sort;
+        if ("invoices".equals(so)) return "فاکتور";
+        if ("customers".equals(so)) return "مشتری منتسب";
+        if ("achieve".equals(so)) return "تحقق هدف";
+        return "فروش";
+    }
+
+    private String shareSubtitle() {
+        String sub = "بخش: " + segmentLabel() + " • مرتب: " + sortLabel();
+        if (filter != null && filter.search != null && !filter.search.trim().isEmpty())
+            sub += " • جستجو: " + filter.search.trim();
+        return sub;
     }
 
     private static final class Data {
@@ -130,25 +219,58 @@ public class VisitorsScreen extends Screen {
         content.addView(a.kit.gap(10));
         addSearchRow(content);
 
+        final List<Row> perf = smartPerf(d.perf, filter);
+
         double sales = 0, collected = 0;
         long invoices = 0;
-        if (d.perf != null) {
-            for (Row r : d.perf) {
-                sales += r.d("sales");
-                collected += r.d("collected");
-                invoices += r.l("invoices");
-            }
+        for (Row r : perf) {
+            sales += r.d("sales");
+            collected += r.d("collected");
+            invoices += r.l("invoices");
         }
         List<Kit.Kpi> kpis = new ArrayList<>();
         kpis.add(new Kit.Kpi("فروش بازه", Money.compactRial(sales), "", accent()));
         kpis.add(new Kit.Kpi("وصول فاکتور", Money.compactRial(collected), "", Theme.SUCCESS));
         kpis.add(new Kit.Kpi("فاکتورها", Money.fa(String.valueOf(invoices)), "", Theme.INFO));
-        kpis.add(new Kit.Kpi("ویزیتورها", Money.fa(String.valueOf(d.perf == null ? 0 : d.perf.size())), "نفر", Theme.VIOLET));
+        kpis.add(new Kit.Kpi("ویزیتورها", Money.fa(String.valueOf(perf.size())), "نفر", Theme.VIOLET));
         content.addView(a.kit.kpiGrid(kpis, 2), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(12));
 
-        if (d.perf == null || d.perf.isEmpty()) {
-            content.addView(a.kit.empty("ویزیتوری یافت نشد", null), a.kit.lp(-1, -2));
+        // One-tap smart segments with live counts, mirroring the filter sheet choices.
+        String[] segNames = new String[SEGMENTS.length];
+        int segSel = 0;
+        String current = filter.status == null ? "" : filter.status;
+        for (int i = 0; i < SEGMENTS.length; i++) {
+            int n = 0;
+            if (d.perf != null) for (Row r : d.perf) if (matchesSegment(r, SEGMENTS[i][0])) n++;
+            segNames[i] = SEGMENTS[i][1] + " (" + Money.fa(String.valueOf(n)) + ")";
+            if (SEGMENTS[i][0].equals(current)) segSel = i;
+        }
+        content.addView(a.kit.chips(segNames, segSel, idx -> {
+            filter.status = SEGMENTS[idx][0];
+            render(content);
+        }), a.kit.lp(-1, -2));
+        content.addView(a.kit.gap(10));
+
+        // Sharing follows the chosen smart filters: PDF, image and Excel of the same rows.
+        if (!perf.isEmpty()) {
+            final List<Row> shared = perf;
+            LinearLayout shareRow = a.kit.h();
+            shareRow.addView(a.kit.btnGhost("اشتراک PDF", accent(),
+                    v -> a.sharePdf("بازده ویزیتور", shareSubtitle(), VISITOR_COLS, shared)), a.kit.wlp(1f));
+            shareRow.addView(a.kit.space(8));
+            shareRow.addView(a.kit.btnGhost("تصویر", accent(),
+                    v -> a.sharePng("بازده ویزیتور", shareSubtitle(), VISITOR_COLS, shared)), a.kit.wlp(1f));
+            shareRow.addView(a.kit.space(8));
+            shareRow.addView(a.kit.btnGhost("اکسل", accent(),
+                    v -> a.shareXlsx("بازده ویزیتور", shareSubtitle(), VISITOR_COLS, shared)), a.kit.wlp(1f));
+            content.addView(shareRow, a.kit.lp(-1, -2));
+            content.addView(a.kit.gap(12));
+        }
+
+        if (perf.isEmpty()) {
+            content.addView(a.kit.empty("ویزیتوری یافت نشد",
+                    "بخش هوشمند یا جستجو را تغییر دهید"), a.kit.lp(-1, -2));
             return;
         }
 
@@ -174,14 +296,14 @@ public class VisitorsScreen extends Screen {
         c.addView(a.kit.text("رتبه‌بندی فروش", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
         Charts.HBars hb = new Charts.HBars(a);
         List<Charts.Point> pts = new ArrayList<>();
-        for (int i = 0; i < Math.min(8, d.perf.size()); i++)
-            pts.add(new Charts.Point(d.perf.get(i).s("name"), d.perf.get(i).d("sales")));
+        for (int i = 0; i < Math.min(8, perf.size()); i++)
+            pts.add(new Charts.Point(perf.get(i).s("name"), perf.get(i).d("sales")));
         hb.setData(pts, Charts.COMPACT);
         c.addView(hb, a.kit.lp(-1, -2));
         a.kit.addCard(content, c);
 
         // ---- leaderboard: goal achievement first, then sales ----
-        List<Row> rank = new ArrayList<>(d.perf);
+        List<Row> rank = new ArrayList<>(perf);
         Collections.sort(rank, (x, y) -> {
             double ax = x.d("goals") > 0 ? x.d("sales") / x.d("goals") : -1;
             double ay = y.d("goals") > 0 ? y.d("sales") / y.d("goals") : -1;
@@ -206,7 +328,7 @@ public class VisitorsScreen extends Screen {
         }
         a.kit.addCard(content, lb);
 
-        for (Row r : d.perf) {
+        for (Row r : perf) {
             final Row row = r;
             double goals = r.d("goals");
             String side = goals > 0 ? Money.pct(r.d("sales") * 100.0 / goals) : Money.compactRial(r.d("sales"));
@@ -225,7 +347,7 @@ public class VisitorsScreen extends Screen {
         renderNotes(content, d.notes);
     }
 
-    private boolean isOff(String active) {
+    private static boolean isOff(String active) {
         if (active == null) return false;
         String t = active.trim().toUpperCase(java.util.Locale.US);
         return "F".equals(t) || "0".equals(t) || "FALSE".equals(t) || "N".equals(t);

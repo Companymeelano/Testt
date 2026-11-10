@@ -88,6 +88,36 @@ public class CustomersScreen extends Screen {
         return c;
     }
 
+    /** Columns of the shared customer list; mirrors the cards on screen. */
+    private static final ReportCatalog.Col[] CUSTOMER_COLS = new ReportCatalog.Col[]{
+            new ReportCatalog.Col("code", "کد", ReportCatalog.T_TEXT),
+            new ReportCatalog.Col("name", "مشتری", ReportCatalog.T_TEXT),
+            new ReportCatalog.Col("cell", "همراه", ReportCatalog.T_TEXT),
+            new ReportCatalog.Col("visitor", "ویزیتور", ReportCatalog.T_TEXT),
+            new ReportCatalog.Col("balance", "مانده", ReportCatalog.T_MONEY),
+    };
+
+    private String bucketLabel() {
+        String st = filter == null || filter.status == null ? "" : filter.status;
+        for (String[] b : BUCKETS) if (b[0].equals(st)) return b[1];
+        return BUCKETS[0][1];
+    }
+
+    private String sortLabel() {
+        String so = filter == null || filter.sort == null ? "" : filter.sort;
+        if ("top".equals(so)) return "بیشترین خرید";
+        if ("debt".equals(so)) return "بیشترین بدهی";
+        if ("balance_asc".equals(so)) return "کمترین مانده";
+        return "نام";
+    }
+
+    private String shareSubtitle() {
+        String sub = "بخش: " + bucketLabel() + " • مرتب: " + sortLabel();
+        if (filter != null && filter.search != null && !filter.search.trim().isEmpty())
+            sub += " • جستجو: " + filter.search.trim();
+        return sub;
+    }
+
     private static final ReportCatalog.Col[] LEDGER_COLS = new ReportCatalog.Col[]{
             new ReportCatalog.Col("date", "تاریخ", ReportCatalog.T_DATE),
             new ReportCatalog.Col("opLabel", "عملیات", ReportCatalog.T_TEXT),
@@ -288,6 +318,24 @@ public class CustomersScreen extends Screen {
             render(content);
         }), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
+
+        // Sharing follows exactly what the manager sees right now: active bucket chip,
+        // search text and sort from the filter sheet all land in the exported rows.
+        if (d.list != null && !d.list.isEmpty()) {
+            final List<Row> shared = d.list;
+            final String sub = shareSubtitle();
+            LinearLayout shareRow = a.kit.h();
+            shareRow.addView(a.kit.btnGhost("اشتراک PDF", accent(),
+                    v -> a.sharePdf("مشتریان", sub, CUSTOMER_COLS, shared)), a.kit.wlp(1f));
+            shareRow.addView(a.kit.space(8));
+            shareRow.addView(a.kit.btnGhost("تصویر", accent(),
+                    v -> a.sharePng("مشتریان", sub, CUSTOMER_COLS, shared)), a.kit.wlp(1f));
+            shareRow.addView(a.kit.space(8));
+            shareRow.addView(a.kit.btnGhost("اکسل", accent(),
+                    v -> a.shareXlsx("مشتریان", sub, CUSTOMER_COLS, shared)), a.kit.wlp(1f));
+            content.addView(shareRow, a.kit.lp(-1, -2));
+            content.addView(a.kit.gap(10));
+        }
 
         // While a search is active the query ignores paging and returns every
         // match, so a pager here would promise pages that cannot exist.

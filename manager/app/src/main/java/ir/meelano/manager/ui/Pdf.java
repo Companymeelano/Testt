@@ -73,8 +73,19 @@ public final class Pdf {
             android.graphics.Canvas g = page.getCanvas();
             g.drawColor(DesignTokens.IVORY);
             // accent top bar (follows the user's theme color)
-            paint.setColor(DesignTokens.GOLD);
+            // Premium band: molten gold sweeping across the page head, closed by a
+            // dark-gold thread underneath.
+            android.graphics.LinearGradient goldBand = new android.graphics.LinearGradient(
+                    0, 0, W, 0,
+                    new int[]{DesignTokens.GOLD_DARK, DesignTokens.GOLD,
+                            DesignTokens.GOLD_LIGHT, DesignTokens.GOLD},
+                    new float[]{0f, 0.42f, 0.72f, 1f},
+                    android.graphics.Shader.TileMode.CLAMP);
+            paint.setShader(goldBand);
             g.drawRect(0, 0, W, 10, paint);
+            paint.setShader(null);
+            paint.setColor(DesignTokens.GOLD_DARK);
+            g.drawRect(0, 10, W, 11.5f, paint);
             // title (right aligned)
             head.setColor(DesignTokens.INK);
             head.setTextSize(21);
@@ -87,8 +98,17 @@ public final class Pdf {
                     + HomeNumberFormatter.dateText(Jalali.todayStr())), W - margin, 106, muted);
             // header row
             int y = 130;
-            paint.setColor(DesignTokens.EMERALD);
+            // Deep-emerald header with a metallic sweep and a gold thread below it.
+            android.graphics.LinearGradient headBand = new android.graphics.LinearGradient(
+                    margin, y, W - margin, y,
+                    new int[]{DesignTokens.EMERALD_DEEP, DesignTokens.EMERALD,
+                            DesignTokens.EMERALD_DEEP},
+                    null, android.graphics.Shader.TileMode.CLAMP);
+            paint.setShader(headBand);
             g.drawRect(margin, y, W - margin, y + headH, paint);
+            paint.setShader(null);
+            paint.setColor(DesignTokens.GOLD);
+            g.drawRect(margin, y + headH, W - margin, y + headH + 1.5f, paint);
             bold.setColor(DesignTokens.GOLD_LIGHT);
             bold.setTextSize(12.5f);
             bold.setTextAlign(Paint.Align.CENTER);
@@ -120,6 +140,9 @@ public final class Pdf {
                 y += rowH;
             }
             // footer
+            // A champagne hairline crowns the footer block before the page mark.
+            paint.setColor(DesignTokens.GOLD_LIGHT);
+            g.drawRect(margin, H - 62, W - margin, H - 61, paint);
             muted.setTextSize(11);
             muted.setTextAlign(Paint.Align.CENTER);
             g.drawText(HomeNumberFormatter.rtlText("صفحه "
@@ -137,8 +160,17 @@ public final class Pdf {
                 PdfDocument.Page page = doc.startPage(info);
                 android.graphics.Canvas g = page.getCanvas();
                 g.drawColor(DesignTokens.IVORY);
-                paint.setColor(DesignTokens.GOLD);
+                android.graphics.LinearGradient appendixBand = new android.graphics.LinearGradient(
+                        0, 0, W, 0,
+                        new int[]{DesignTokens.GOLD_DARK, DesignTokens.GOLD,
+                                DesignTokens.GOLD_LIGHT, DesignTokens.GOLD},
+                        new float[]{0f, 0.42f, 0.72f, 1f},
+                        android.graphics.Shader.TileMode.CLAMP);
+                paint.setShader(appendixBand);
                 g.drawRect(0, 0, W, 10, paint);
+                paint.setShader(null);
+                paint.setColor(DesignTokens.GOLD_DARK);
+                g.drawRect(0, 10, W, 11.5f, paint);
                 head.setColor(DesignTokens.INK);
                 head.setTextSize(19);
                 head.setTextAlign(Paint.Align.RIGHT);

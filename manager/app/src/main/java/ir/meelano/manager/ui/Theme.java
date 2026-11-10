@@ -490,9 +490,24 @@ public final class Theme {
 
     /** One-pixel neutral divider; semantic color remains in the icon or label. */
     public static GradientDrawable accentHairline(int accent) {
+        // Royal divider: a gold-threaded rule that fades out at both ends instead of a
+        // hard border line.
         GradientDrawable rule = new GradientDrawable();
-        rule.setColor(BORDER);
+        int hue = DesignTokens.mix(accent == 0 ? PRIMARY : accent, GOLD_METAL, 0.42f);
+        rule.setOrientation(GradientDrawable.Orientation.LEFT_RIGHT);
+        rule.setColors(new int[]{alpha(hue, 0), alpha(hue, light ? 125 : 95), alpha(hue, 0)});
         return rule;
+    }
+
+    /** Gold-ringed medallion that carries a section icon; circular at 34dp. */
+    public static GradientDrawable medallion(int accent) {
+        int hue = accent == 0 ? PRIMARY : accent;
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{DesignTokens.mix(hue, GOLD_LIGHT, light ? 0.42f : 0.22f), hue,
+                        DesignTokens.mix(hue, GOLD_DARK, light ? 0.20f : 0.32f)});
+        d.setCornerRadius(dp(17));
+        d.setStroke(dp(1), alpha(DesignTokens.mix(GOLD_LIGHT, hue, 0.25f), light ? 155 : 105));
+        return d;
     }
 
     /** Shared, flat hero surface with a quiet section tint and a fine matching edge. */
@@ -504,7 +519,13 @@ public final class Theme {
 
     /** Welcome header uses the same calm surface and border as the rest of the shell. */
     public static android.graphics.drawable.Drawable executiveHero() {
-        return base(SURFACE, 16, dp(1), BORDER);
+        // The shell's welcome header wears the royal surface too: champagne wash from the
+        // top edge and a gold-threaded hairline, tuned separately for light and dark.
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{DesignTokens.mix(SURFACE, GOLD_LIGHT, light ? 0.26f : 0.08f), SURFACE});
+        d.setCornerRadius(dp(16));
+        d.setStroke(dp(1), DesignTokens.mix(BORDER, GOLD_METAL, light ? 0.42f : 0.28f));
+        return d;
     }
 
     /** Accent shared by the dock; the preserved Nuts skin keeps its gold identity. */
@@ -616,8 +637,21 @@ public final class Theme {
     }
 
     public static GradientDrawable chip(boolean selected, int accent) {
-        if (selected) return base(accent, 9, 0, 0);
-        return base(SURFACE, 9, dp(1), BORDER);
+        if (selected) {
+            // Metallic state: the accent wears a brushed highlight and settles into shade,
+            // closed by a champagne thread; onAccent() text keeps its exact contrast.
+            GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                    new int[]{DesignTokens.mix(accent, 0xFFFFFFFF, light ? 0.22f : 0.14f), accent,
+                            DesignTokens.mix(accent, 0xFF000000, 0.13f)});
+            d.setCornerRadius(dp(11));
+            d.setStroke(dp(1), alpha(DesignTokens.mix(GOLD_LIGHT, accent, 0.30f), light ? 150 : 100));
+            return d;
+        }
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{DesignTokens.mix(SURFACE, GOLD_LIGHT, light ? 0.18f : 0.06f), SURFACE});
+        d.setCornerRadius(dp(11));
+        d.setStroke(dp(1), DesignTokens.mix(BORDER, GOLD_METAL, light ? 0.34f : 0.22f));
+        return d;
     }
 
     public static GradientDrawable pill(int color) {
@@ -635,7 +669,14 @@ public final class Theme {
 
     /** Opaque, flat accent tile for a selected mark or compact status. */
     public static GradientDrawable accentAvatar(int accent) {
-        return base(accent, 10, 0, 0);
+        // The header medallion gets the same brushed-metal treatment as the primary
+        // buttons: highlight on top, shade at the bottom, a champagne thread around.
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{DesignTokens.mix(accent, GOLD_LIGHT, light ? 0.36f : 0.18f), accent,
+                        DesignTokens.mix(accent, GOLD_DARK, 0.22f)});
+        d.setCornerRadius(dp(10));
+        d.setStroke(dp(1), alpha(GOLD_LIGHT, light ? 140 : 90));
+        return d;
     }
 
     /** Header and page share one full-width surface so the top chrome does not look inset. */

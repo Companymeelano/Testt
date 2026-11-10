@@ -2989,7 +2989,9 @@ public class HomeScreen extends Screen {
             l.setSingleLine(true);
             l.setEllipsize(TextUtils.TruncateAt.END);
             tile.addView(l, a.kit.lp(-1, -2));
-            tile.addView(a.kit.amountLine(m.value, 15f, Gravity.CENTER), a.kit.lp(-1, -2));
+            View miniAmount = a.kit.amountLine(m.value, 15f, Gravity.CENTER);
+            tile.addView(miniAmount, a.kit.lp(-1, -2));
+            if (!quietTile) a.kit.countAmount(miniAmount);
             if (m.note != null && !m.note.isEmpty()) {
                 int noteColor = m.note.contains("ناقص") ? Theme.dashboardMutedInk(tileAccent)
                         : Theme.dashboardSemanticInk(tileAccent, Theme.SUCCESS);
@@ -3062,6 +3064,7 @@ public class HomeScreen extends Screen {
                             android.util.TypedValue.COMPLEX_UNIT_SP);
                 }
                 tile.addView(amount, a.kit.lp(-1, -2));
+                if (!quietMetric) a.kit.countAmount(amount);
                 if (metric.note != null && !metric.note.trim().isEmpty()) {
                     TextView note = a.kit.text(metric.note, 9.5f,
                             Theme.dashboardMutedInk(metricAccent), false);

@@ -332,6 +332,10 @@ public final class HomeSalesChart {
                 if (textPaint.measureText(scale) > plotWidth) scale = unitScale;
             }
             textPaint.setTextAlign(Paint.Align.CENTER);
+            // The unit legend wears the royal seal: champagne ink and a bold face, so the
+            // axis unit (هزار/میلیون/میلیارد تومان) reads as a deliberate caption.
+            textPaint.setColor(Theme.GOLD_SOFT);
+            textPaint.setTypeface(Theme.face(true));
             canvas.drawText(scale, (plotLeft + plotRight) / 2f,
                     Theme.dp(11) + textPaint.getTextSize(), textPaint);
         }

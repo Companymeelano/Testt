@@ -165,8 +165,15 @@ public final class Kit {
         row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         row.setMinimumHeight(Theme.dp(48));
         if (iconRes != 0) {
-            row.addView(icon(iconRes, sectionHue, 19), lp(Theme.dp(22), Theme.dp(22)));
-            row.addView(space(8));
+            // Royal medallion: the section icon rests inside a gradient ring closed by a
+            // champagne thread; the heading and the fading gold rule complete the crest.
+            LinearLayout medallion = v();
+            medallion.setGravity(Gravity.CENTER);
+            medallion.setBackground(Theme.medallion(sectionHue));
+            medallion.addView(icon(iconRes, Theme.onAccent(sectionHue), 17),
+                    lp(Theme.dp(18), Theme.dp(18)));
+            row.addView(medallion, lp(Theme.dp(34), Theme.dp(34)));
+            row.addView(space(9));
         }
         TextView heading = text(title, 14f, Theme.TEXT, true);
         heading.setMaxLines(2);
@@ -327,6 +334,44 @@ public final class Kit {
         amount.setContentDescription(spoken);
         figure.setContentDescription(spoken);
         return amount;
+    }
+
+    /**
+     * Luxury count-up: a formatted figure rises from zero and lands on the exact final
+     * text, keeping Persian digits, grouping and units. Reduced motion skips it.
+     */
+    public void countText(final TextView figure, final String finalText) {
+        if (figure == null || !Ui.motionOk(a)) return;
+        if (!ir.meelano.manager.core.CountUp.countable(finalText)) return;
+        figure.setText(ir.meelano.manager.core.CountUp.sweep(finalText, 0d));
+        android.animation.ValueAnimator animator = android.animation.ValueAnimator.ofFloat(0f, 1f);
+        animator.setDuration(720);
+        animator.setInterpolator(new android.view.animation.DecelerateInterpolator(1.5f));
+        animator.addUpdateListener(new android.animation.ValueAnimator.AnimatorUpdateListener() {
+            @Override public void onAnimationUpdate(android.animation.ValueAnimator animation) {
+                figure.setText(ir.meelano.manager.core.CountUp.sweep(
+                        finalText, (float) animation.getAnimatedValue()));
+            }
+        });
+        animator.addListener(new android.animation.AnimatorListenerAdapter() {
+            @Override public void onAnimationEnd(android.animation.Animation animation) {
+                figure.setText(finalText);
+            }
+        });
+        animator.start();
+    }
+
+    /** Count-up for an amountLine composite; the numeric TextView is located inside it. */
+    public void countAmount(View amountView) {
+        TextView figure = amountView instanceof TextView ? (TextView) amountView : null;
+        if (figure == null && amountView instanceof LinearLayout) {
+            LinearLayout composite = (LinearLayout) amountView;
+            if (composite.getChildCount() > 0 && composite.getChildAt(0) instanceof TextView) {
+                figure = (TextView) composite.getChildAt(0);
+            }
+        }
+        if (figure == null || figure.getText() == null) return;
+        countText(figure, figure.getText().toString());
     }
 
     /** A visual-only directional badge; callers supply direction and semantic tone. */
@@ -528,6 +573,8 @@ public final class Kit {
             if (Ui.motionOk(a)) {
                 value.setAlpha(0f);
                 value.animate().alpha(1f).setDuration(350).start();
+                // The home board counts its money up from zero; other screens keep the fade.
+                if (dashboardStyle) countText(value, HomeNumberFormatter.rtlText(stableNumberValue));
             } else value.setAlpha(1f);
         }
 
@@ -623,7 +670,10 @@ public final class Kit {
             }
             View tile = kpiTile(kpis.get(i));
             LinearLayout.LayoutParams params = wlp(1f);
-            if (i % span != span - 1) params.setMarginEnd(Theme.dp(8));
+            // A lone tile on the last row spans the full width instead of leaving a
+            // ragged half-empty cell beside it.
+            boolean lastAlone = i == kpis.size() - 1 && span > 1 && i % span == 0;
+            if (i % span != span - 1 && !lastAlone) params.setMarginEnd(Theme.dp(8));
             row.addView(tile, params);
             if (Ui.motionOk(a)) {
                 tile.setAlpha(0f);

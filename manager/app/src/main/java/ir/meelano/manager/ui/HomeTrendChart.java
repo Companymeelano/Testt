@@ -366,6 +366,9 @@ public final class HomeTrendChart {
                 if (textPaint.measureText(scale) > plotWidth) scale = unitScale;
             }
             textPaint.setTextAlign(Paint.Align.CENTER);
+            // The unit legend wears the royal seal: champagne ink and a bold face.
+            textPaint.setColor(Theme.GOLD_SOFT);
+            textPaint.setTypeface(Theme.face(true));
             canvas.drawText(scale, (float) ((plotLeft + plotRight) / 2d),
                     Theme.dp(13) + textPaint.getTextSize(), textPaint);
         }

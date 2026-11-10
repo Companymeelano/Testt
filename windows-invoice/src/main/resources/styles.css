@@ -8,12 +8,15 @@
     -fx-faint-focus-color: rgba(201,169,86,0.18);
     -fx-font-smoothing-type: gray;
 }
-.app-root { -fx-background-color: #f4f3ed; }
+.app-root {
+    /* Ivory with the faintest champagne wash from the top — the royal sheen, desktop. */
+    -fx-background-color: linear-gradient(to bottom, #f8f7f1, #f4f3ed 38%, #f1efe6);
+}
 
 /* Deep-green navigation, with a visible keyboard focus ring. */
 .sidebar {
     -fx-background-color: linear-gradient(to bottom, #123f33, #0d332a);
-    -fx-border-color: transparent #d9dfd7 transparent transparent;
+    -fx-border-color: transparent rgba(201,169,86,.38) transparent transparent;
     -fx-border-width: 0 1 0 0;
 }
 .brand-wordmark { -fx-text-fill: #f3e6be; -fx-font-size: 17px; -fx-font-weight: 800; }
@@ -38,14 +41,16 @@
     -fx-border-radius: 12;
 }
 .nav-button-active {
-    -fx-background-color: rgba(212,184,111,.20);
+    -fx-background-color: linear-gradient(to right, rgba(212,184,111,.30), rgba(212,184,111,.14));
     -fx-border-color: #c9a956;
     -fx-border-width: 0 3 0 0;
     -fx-text-fill: #fff1ce;
     -fx-font-weight: 700;
 }
 
-.main-panel, .page-header { -fx-background-color: #f4f3ed; }
+.main-panel, .page-header {
+    -fx-background-color: linear-gradient(to bottom, #f8f7f1, #f4f3ed 38%, #f1efe6);
+}
 .eyebrow { -fx-text-fill: #718077; -fx-font-size: 12px; -fx-font-weight: 700; }
 .page-title { -fx-text-fill: #1b2c24; -fx-font-size: 29px; -fx-font-weight: 800; }
 .page-subtitle { -fx-text-fill: #63736a; -fx-font-size: 14px; }
@@ -76,17 +81,23 @@
     -fx-font-weight: 700;
 }
 .pill-neutral { -fx-background-color: #e9ede7; -fx-text-fill: #50665a; }
-.pill-gold { -fx-background-color: #f6efdd; -fx-text-fill: #806026; }
+.pill-gold {
+    -fx-background-color: linear-gradient(to bottom, #fbf5e4, #f3e9cd);
+    -fx-border-color: rgba(201,169,86,.55);
+    -fx-border-radius: 99;
+    -fx-text-fill: #7a5a22;
+}
 
 .workspace { -fx-background-color: transparent; }
 .body-scroll { -fx-background-color: transparent; -fx-background: transparent; -fx-border-color: transparent; -fx-padding: 0; }
 .body-scroll > .viewport { -fx-background-color: transparent; }
 .surface-card {
-    -fx-background-color: #ffffff;
+    /* Champagne wash melting into the card face, closed by a gold-threaded hairline. */
+    -fx-background-color: linear-gradient(to bottom, #fffdf7, #ffffff 45%, #fdfbf4);
     -fx-background-radius: 15;
-    -fx-border-color: #dce4dc;
+    -fx-border-color: #e1dac3;
     -fx-border-radius: 15;
-    -fx-effect: dropshadow(gaussian, rgba(28,48,37,.07), 14, .15, 0, 3);
+    -fx-effect: dropshadow(gaussian, rgba(28,48,37,.09), 16, .16, 0, 3);
 }
 .section-title { -fx-text-fill: #20352a; -fx-font-size: 16px; -fx-font-weight: 800; }
 .section-caption { -fx-text-fill: #66776c; -fx-font-size: 11px; }
@@ -102,7 +113,10 @@
 .icon-bubble-blue { -fx-background-color: linear-gradient(to bottom right, #fbfdff, #dce9f5); }
 .icon-bubble-teal { -fx-background-color: linear-gradient(to bottom right, #f8fffc, #d6ebe5); }
 .icon-bubble-coral { -fx-background-color: linear-gradient(to bottom right, #fffaf7, #f0ddd4); }
-.icon-bubble-gold { -fx-background-color: linear-gradient(to bottom right, #fffdf5, #eee1bc); }
+.icon-bubble-gold {
+    -fx-background-color: linear-gradient(to bottom right, #fffdf5, #f3e7c2);
+    -fx-border-color: rgba(201,169,86,.65) rgba(201,169,86,.30) rgba(201,169,86,.30) rgba(201,169,86,.65);
+}
 .icon-bubble-muted { -fx-background-color: linear-gradient(to bottom right, #fcfdfb, #e8ece8); }
 .selected-customer {
     -fx-background-color: #f5f8f3;
@@ -143,15 +157,28 @@
     -fx-font-weight: 700;
     -fx-cursor: hand;
 }
-.primary-button { -fx-background-color: #174d3c; -fx-text-fill: #ffffff; }
-.primary-button:hover { -fx-background-color: #21654d; }
+.primary-button {
+    /* Brushed emerald: highlight across the top, deep shade at the base. */
+    -fx-background-color: linear-gradient(to bottom, #1e5c47, #174d3c 55%, #123f31);
+    -fx-text-fill: #ffffff;
+}
+.primary-button:hover {
+    -fx-background-color: linear-gradient(to bottom, #277157, #21654d 55%, #1a5541);
+}
 .primary-button:focused, .submit-button:focused {
     -fx-border-color: #d5b859;
     -fx-border-width: 2;
 }
 .primary-button:disabled, .submit-button:disabled { -fx-opacity: .48; -fx-cursor: default; }
-.secondary-button { -fx-background-color: #ffffff; -fx-border-color: #d4ded5; -fx-text-fill: #28533d; }
-.secondary-button:hover { -fx-background-color: #f1f6ef; -fx-border-color: #a9c0aa; }
+.secondary-button {
+    -fx-background-color: linear-gradient(to bottom, #ffffff, #f7f9f4);
+    -fx-border-color: #d9d6c3;
+    -fx-text-fill: #28533d;
+}
+.secondary-button:hover {
+    -fx-background-color: linear-gradient(to bottom, #f6faf3, #eef4ea);
+    -fx-border-color: #c9a956;
+}
 .secondary-button:focused, .icon-button:focused {
     -fx-border-color: #c9a956;
     -fx-border-width: 2;
@@ -161,7 +188,10 @@
 
 .invoice-table { -fx-background-color: #ffffff; -fx-background-radius: 10; -fx-border-color: #dfe7df; -fx-border-radius: 10; }
 .invoice-table:focused { -fx-border-color: #c9a956; -fx-border-width: 2; }
-.invoice-table .column-header-background { -fx-background-color: #edf3eb; -fx-background-radius: 10 10 0 0; }
+.invoice-table .column-header-background {
+    -fx-background-color: linear-gradient(to bottom, #f3f7ef, #e9f0e6);
+    -fx-background-radius: 10 10 0 0;
+}
 .invoice-table .column-header, .invoice-table .filler {
     -fx-background-color: transparent;
     -fx-size: 42px;
@@ -176,12 +206,12 @@
 .table-hint { -fx-text-fill: #6f7d73; -fx-font-size: 10px; }
 
 .summary-card {
-    -fx-background-color: #ffffff;
+    -fx-background-color: linear-gradient(to bottom, #fffdf7, #ffffff 45%, #fdfbf4);
     -fx-background-radius: 16;
-    -fx-border-color: #dce4dc;
+    -fx-border-color: #e1dac3;
     -fx-border-radius: 16;
     -fx-padding: 16 16 15 16;
-    -fx-effect: dropshadow(gaussian, rgba(28,48,37,.075), 16, .15, 0, 4);
+    -fx-effect: dropshadow(gaussian, rgba(28,48,37,.09), 18, .16, 0, 4);
 }
 .summary-title { -fx-text-fill: #20352a; -fx-font-size: 19px; -fx-font-weight: 800; }
 .summary-caption { -fx-text-fill: #68796e; -fx-font-size: 11px; }
@@ -189,8 +219,15 @@
 .summary-row-value { -fx-text-fill: #2b4435; -fx-font-size: 13px; -fx-font-weight: 700; }
 .payable-label { -fx-text-fill: #274536; -fx-font-size: 15px; -fx-font-weight: 800; }
 .grand-total { -fx-text-fill: #164b39; -fx-font-size: 22px; -fx-font-weight: 900; }
-.submit-button { -fx-background-color: #174d3c; -fx-text-fill: #ffffff; -fx-font-size: 14px; -fx-padding: 12 14 12 14; }
-.submit-button:hover { -fx-background-color: #21654d; }
+.submit-button {
+    -fx-background-color: linear-gradient(to bottom, #1e5c47, #174d3c 55%, #123f31);
+    -fx-text-fill: #ffffff;
+    -fx-font-size: 14px;
+    -fx-padding: 12 14 12 14;
+}
+.submit-button:hover {
+    -fx-background-color: linear-gradient(to bottom, #277157, #21654d 55%, #1a5541);
+}
 .safety-note { -fx-text-fill: #426d4d; -fx-font-size: 11px; -fx-wrap-text: true; }
 .safety-note-warning {
     -fx-text-fill: #775b27;
@@ -201,7 +238,11 @@
     -fx-wrap-text: true;
 }
 
-.status-bar { -fx-background-color: #f4f3ed; -fx-border-color: #dfe5dd transparent transparent transparent; -fx-border-width: 1 0 0 0; }
+.status-bar {
+    -fx-background-color: linear-gradient(to bottom, #f6f5ef, #f2f1e9);
+    -fx-border-color: rgba(201,169,86,.40) transparent transparent transparent;
+    -fx-border-width: 1 0 0 0;
+}
 .status-dot-live { -fx-min-width: 9; -fx-min-height: 9; -fx-max-width: 9; -fx-max-height: 9; -fx-background-color: #40875b; -fx-background-radius: 99; }
 .status-dot-demo { -fx-min-width: 9; -fx-min-height: 9; -fx-max-width: 9; -fx-max-height: 9; -fx-background-color: #bb8c30; -fx-background-radius: 99; }
 .connection-label { -fx-font-size: 11px; -fx-text-fill: #586b5e; }
@@ -230,16 +271,23 @@
 .customer-mode-live { -fx-background-color: #e4f0e5; -fx-text-fill: #2e7046; }
 .customer-mode-demo { -fx-background-color: #fbf1d9; -fx-text-fill: #806026; }
 .customer-pane {
-    -fx-background-color: #ffffff; -fx-background-radius: 14; -fx-border-color: #dce4dc;
-    -fx-border-radius: 14; -fx-effect: dropshadow(gaussian, rgba(28,48,37,.055), 11, .12, 0, 2);
+    -fx-background-color: linear-gradient(to bottom, #fffdf7, #ffffff 45%, #fdfbf4);
+    -fx-background-radius: 14;
+    -fx-border-color: #e1dac3;
+    -fx-border-radius: 14;
+    -fx-effect: dropshadow(gaussian, rgba(28,48,37,.075), 13, .14, 0, 2);
 }
 .customer-section-title { -fx-text-fill: #203b2d; -fx-font-size: 15px; -fx-font-weight: 800; }
 .customer-muted, .customer-hint { -fx-text-fill: #718077; -fx-font-size: 10px; }
 .customer-hint { -fx-wrap-text: true; }
 .customer-field-label { -fx-text-fill: #69796f; -fx-font-size: 10px; -fx-font-weight: 700; }
 .customer-summary-chip {
-    -fx-background-color: #f5f8f3; -fx-background-radius: 10; -fx-border-color: #e5ece3;
-    -fx-border-radius: 10; -fx-padding: 7 10 7 10; -fx-min-width: 128px;
+    -fx-background-color: linear-gradient(to bottom, #fdfcf6, #f5f8f3);
+    -fx-background-radius: 10;
+    -fx-border-color: #e2dbc6;
+    -fx-border-radius: 10;
+    -fx-padding: 7 10 7 10;
+    -fx-min-width: 128px;
 }
 .customer-summary-value { -fx-text-fill: #234b35; -fx-font-size: 13px; -fx-font-weight: 800; }
 .customer-table { -fx-background-color: #ffffff; -fx-background-radius: 9; -fx-border-color: #dfe7df; -fx-border-radius: 9; }
@@ -275,8 +323,12 @@
     -fx-border-radius: 10; -fx-padding: 10 10 8 10;
 }
 .section-kpi-chip {
-    -fx-background-color: #f5f8f3; -fx-background-radius: 10; -fx-border-color: #e5ece3;
-    -fx-border-radius: 10; -fx-padding: 7 12 7 12; -fx-min-width: 142px;
+    -fx-background-color: linear-gradient(to bottom, #fdfcf6, #f5f8f3);
+    -fx-background-radius: 10;
+    -fx-border-color: #e2dbc6;
+    -fx-border-radius: 10;
+    -fx-padding: 7 12 7 12;
+    -fx-min-width: 142px;
 }
 .section-kpi-label { -fx-text-fill: #718077; -fx-font-size: 10px; -fx-font-weight: 700; }
 .section-kpi-value { -fx-text-fill: #234b35; -fx-font-size: 14px; -fx-font-weight: 800; }

@@ -1,6 +1,7 @@
 package ir.meelano.manager.screens;
 
 import android.widget.LinearLayout;
+import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.CacheStore;
 import android.widget.TextView;
 

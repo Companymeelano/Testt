@@ -895,14 +895,6 @@ public final class Theme {
     public static int ACCENT_SOFT = DesignTokens.APP_DARK_ACCENT_SOFT;
     public static int SUCCESS = DesignTokens.textSafeColor(
             DesignTokens.POSITIVE, DesignTokens.APP_DARK_SURFACE, true);
-    public static int DANGER = DesignTokens.textSafeColor(
-            DesignTokens.NEGATIVE, DesignTokens.APP_DARK_SURFACE, true);
-    public static int WARNING = DesignTokens.textSafeColor(
-            DesignTokens.WARNING, DesignTokens.APP_DARK_SURFACE, true);
-    public static int INFO = DesignTokens.textSafeColor(
-            DesignTokens.INFO, DesignTokens.APP_DARK_SURFACE, true);
-    public static int VIOLET = DesignTokens.textSafeColor(
-            DesignTokens.RETURNS, DesignTokens.APP_DARK_SURFACE, true);
     public static final int NEUTRAL = DesignTokens.NEUTRAL;
     /** Use the bundled face when it covers the name; otherwise let Android's sans fallback draw it. */
     public static Typeface faceForText(String text, boolean isBold) {

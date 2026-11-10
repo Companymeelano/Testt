@@ -7,7 +7,7 @@ name: MEELANO v7 — unified licensed app + edition APKs
 
 on:
   push:
-    branches: ["arena/29e01a09-testt"]
+    branches: ["arena/29e01a09-testt", "arena/e7d9f96e-testt"]
     paths:
       - "app/**"
       - "gradle/**"
@@ -130,7 +130,10 @@ jobs:
             dist/latest-unified.json
 
       - name: Commit APKs + build info to dist/ (delivery into the session branch)
-        if: success()
+        # Only the branch this delivery pipeline was written for mirrors binaries into git;
+        # every other branch (incl. the current PR branch) delivers via artifact + release,
+        # so a build can never push binaries into a branch it does not own.
+        if: success() && github.ref_name == 'arena/29e01a09-testt'
         run: |
           git config user.name "arena-ci"
           git config user.email "arena-ci@local"
@@ -162,8 +165,17 @@ jobs:
           echo "Could not publish verified APKs to the session branch after five attempts." >&2
           exit 1
 
-      - name: Save diagnostics on failure (so the agent can read the real error)
+      - name: Upload the full build log on failure (any branch)
         if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: main-app-build-log
+          path: build-full.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Save diagnostics on failure (so the agent can read the real error)
+        if: failure() && github.ref_name == 'arena/29e01a09-testt'
         run: |
           { echo "=== commit: $(git rev-parse --short HEAD) ==="; tail -c 300000 build-full.log; } > build-error-tail.txt || echo "no log" > build-error-tail.txt
           git config user.name "arena-ci"

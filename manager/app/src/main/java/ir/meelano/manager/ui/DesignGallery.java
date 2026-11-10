@@ -18,6 +18,181 @@ public final class DesignGallery {
     public static void addPreviews(MainActivity activity, LinearLayout content) {
         addPanel(activity, content, new Palette(false));
         addPanel(activity, content, new Palette(true));
+        addDerakhshan(activity, content, DerakhshanTokens.theme(false), "درخشان ۲.۰ — مخمل کرم");
+        addDerakhshan(activity, content, DerakhshanTokens.theme(true), "درخشان ۲.۰ — شب زمرد");
+    }
+
+    /**
+     * Component gallery for the Derakhshan 2.0 kit (C1–C13): every component is rendered
+     * once per theme surface with neutral demo values, so the six button states
+     * (default/hover/pressed/loading/disabled/focus-visible), the dock, segmented control,
+     * gauge, balance card, empty state, LuxChart outlier handling and alert strip are all
+     * visible in-app without touching business screens.
+     */
+    private static void addDerakhshan(MainActivity a, LinearLayout parent,
+                                      DerakhshanTokens.Surface s, String title) {
+        LinearLayout panel = vertical(a);
+        panel.setPadding(Theme.dp(14), Theme.dp(14), Theme.dp(14), Theme.dp(14));
+        panel.setBackground(rounded(s.bg, s.hairline, 16));
+
+        panel.addView(text(a, title, 14f, s.ink, true), match());
+        panel.addView(gap(a, 6));
+        panel.addView(text(a, "کامپوننت‌های C1–C13 · مقادیر نمایشی · شش حالت دکمه: پیش‌فرض / لمسی / فشار / بارگذاری / غیرفعال / فوکوس",
+                10.5f, s.inkSecondary, false), match());
+        panel.addView(gap(a, 12));
+
+        // C1 hero data card (+ C3 medal, C4 chip, C5 actions, LuxSpark inline)
+        panel.addView(LuxKit.heroDataCard(a, s, R.drawable.mi_sell, DerakhshanTokens.EMERALD_500,
+                        "فروش دیروز", "فعال", LuxKit.CHIP_SOFT,
+                        "۴۰ فاکتور • میانگین هم‌نام ۳۳۸٬۰۶۸٬۱۹۸",
+                        "۴۹۴٬۰۰۰٬۰۰", "تومان", "+۴۶٫۱٪", DerakhshanTokens.SUCCESS,
+                        new double[]{2d, 4d, 3d, 6d, 5d, 8d, 7d, 10d},
+                        "ثبت فاکتور", null, "جزئیات", null),
+                match());
+        panel.addView(gap(a, 10));
+
+        // C2 stat row (three KPIs)
+        panel.addView(LuxKit.statRow(a, s,
+                        new String[]{"دریافت نقد", "پرداخت", "خالص روز"},
+                        new String[]{"۳۲۰٬۰۰۰٬۰۰", "۱۸۰٬۰۰۰٬۰۰", "۱۴۰٬۰۰۰٬۰۰"},
+                        new String[]{"+۱۲٪", "−۴٪", null},
+                        new int[]{DerakhshanTokens.SUCCESS, DerakhshanTokens.DANGER, 0}),
+                match());
+        panel.addView(gap(a, 10));
+
+        // C3 medal set + C4 chip families
+        LinearLayout row = horizontal(a);
+        int[] families = {DerakhshanTokens.EMERALD_500, DerakhshanTokens.GOLD_500,
+                DerakhshanTokens.SUCCESS, DerakhshanTokens.WARNING,
+                DerakhshanTokens.DANGER, DerakhshanTokens.INFO};
+        int[] glyph = {R.drawable.mi_home, R.drawable.mi_star_shine, R.drawable.mi_group,
+                R.drawable.mi_widgets, R.drawable.mi_inventory_2, R.drawable.mi_diamond};
+        for (int i = 0; i < families.length; i++) {
+            row.addView(LuxKit.medalIcon(a, s, glyph[i], families[i], 40));
+            if (i < families.length - 1) row.addView(gapW(a, 8));
+        }
+        panel.addView(row, match());
+        panel.addView(gap(a, 10));
+        LinearLayout chipRow = horizontal(a);
+        String[] chipNames = {"نرم", "توپر", "طلایی", "خطی"};
+        int[] chipKinds = {LuxKit.CHIP_SOFT, LuxKit.CHIP_SOLID, LuxKit.CHIP_GOLD, LuxKit.CHIP_GHOST};
+        for (int i = 0; i < chipKinds.length; i++) {
+            chipRow.addView(LuxKit.statusChip(a, s, chipNames[i], chipKinds[i],
+                    i == 2 ? DerakhshanTokens.GOLD_500 : DerakhshanTokens.EMERALD_500, false));
+            if (i < chipKinds.length - 1) chipRow.addView(gapW(a, 8));
+        }
+        panel.addView(chipRow, match());
+        panel.addView(gap(a, 12));
+
+        // C5 buttons: all six states, both variants
+        panel.addView(text(a, "C5 · شش حالت دکمه", 11.5f, s.inkSecondary, true), match());
+        panel.addView(gap(a, 6));
+        LinearLayout b1 = horizontal(a);
+        b1.addView(LuxKit.luxButton(a, s, "پیش‌فرض", LuxKit.PRIMARY, null), wrapM());
+        b1.addView(gapW(a, 8));
+        android.widget.Button loading = LuxKit.luxButton(a, s, "در حال ارسال", LuxKit.PRIMARY, null);
+        LuxKit.setLoading(loading, true);
+        b1.addView(loading, wrapM());
+        b1.addView(gapW(a, 8));
+        android.widget.Button disabled = LuxKit.luxButton(a, s, "غیرفعال", LuxKit.PRIMARY, null);
+        disabled.setEnabled(false);
+        disabled.setAlpha(DerakhshanTokens.DISABLED_OPACITY);
+        b1.addView(disabled, wrapM());
+        b1.addView(gapW(a, 8));
+        android.widget.Button focused = LuxKit.luxButton(a, s, "فوکوس", LuxKit.PRIMARY, null);
+        b1.addView(focused, wrapM());
+        focused.requestFocus();
+        panel.addView(b1, wrapM());
+        panel.addView(gap(a, 8));
+        LinearLayout b2 = horizontal(a);
+        b2.addView(LuxKit.luxButton(a, s, "طلایی", LuxKit.GOLD, null), wrapM());
+        b2.addView(gapW(a, 8));
+        b2.addView(LuxKit.luxButton(a, s, "خط طلایی", LuxKit.GHOST_GOLD, null), wrapM());
+        b2.addView(gapW(a, 8));
+        b2.addView(LuxKit.luxButton(a, s, "آرام", LuxKit.QUIET, null), wrapM());
+        panel.addView(b2, wrapM());
+        panel.addView(gap(a, 12));
+
+        // C7 segmented control
+        final String[] segOptions = {"همه", "فعال", "بدون منتسب"};
+        final TextView segValue = text(a, "انتخاب: همه", 10.5f, s.inkSecondary, false);
+        panel.addView(LuxKit.segmented(a, s, segOptions, 0,
+                index -> segValue.setText("انتخاب: " + segOptions[index])), match());
+        panel.addView(gap(a, 4));
+        panel.addView(segValue, match());
+        panel.addView(gap(a, 12));
+
+        // C8 quick tile hero + two tiles
+        panel.addView(LuxKit.quickTile(a, s, R.drawable.mi_star_shine,
+                DerakhshanTokens.EMERALD_500, "صدور سریع", "میان‌بر روز", true, null), match());
+        panel.addView(gap(a, 8));
+        LinearLayout tiles = horizontal(a);
+        tiles.addView(LuxKit.quickTile(a, s, R.drawable.mi_group, DerakhshanTokens.GOLD_500,
+                "مشتری", "", false, null), tileLp(1f));
+        tiles.addView(gapW(a, 8));
+        tiles.addView(LuxKit.quickTile(a, s, R.drawable.mi_inventory_2,
+                DerakhshanTokens.EMERALD_500, "انبار", "", false, null), tileLp(1f));
+        panel.addView(tiles, match());
+        panel.addView(gap(a, 12));
+
+        // C9 gauge (count-up inside the ring)
+        panel.addView(LuxKit.gauge(a, s, 78d, 100d, "تحقق هدف ماه"), match());
+        panel.addView(gap(a, 12));
+
+        // C10 balance card
+        panel.addView(LuxKit.balanceCard(a, s, "دریافت امروز", "۳۲۰٬۰۰۰٬۰۰",
+                "پرداخت امروز", "۱۸۰٬۰۰۰٬۰۰", "ثبت دریافت", null, "ثبت پرداخت", null), match());
+        panel.addView(gap(a, 12));
+
+        // C11 empty state (single line + action)
+        panel.addView(LuxKit.emptyState(a, s, R.drawable.mi_widgets,
+                DerakhshanTokens.INFO, "موردی برای نمایش نیست",
+                "با تغییر فیلترها نتیجهٔ بیشتری ببینید.", "پاک‌سازی فیلترها", null), match());
+        panel.addView(gap(a, 12));
+
+        // C12 LuxChart with an outlier day (broken axis + peak badge + MA + tooltip on touch)
+        LuxChartView chart = new LuxChartView(a, s);
+        chart.setData(new double[]{494d, 520d, 480d, 610d, 540d, 4295d, 500d, 530d, 470d, 590d},
+                new String[]{"۱", "۲", "۳", "۴", "۵", "۶", "۷", "۸", "۹", "۱۰"});
+        LinearLayout chartFrame = vertical(a);
+        chartFrame.setPadding(Theme.dp(10), Theme.dp(10), Theme.dp(10), Theme.dp(10));
+        chartFrame.setBackground(rounded(s.stone[0], s.hairline, 12));
+        chartFrame.addView(text(a, "روند ۱۰ روز · لمس برای جزئیات", 11f, s.inkSecondary, true), match());
+        chartFrame.addView(gap(a, 6));
+        chartFrame.addView(chart, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, Theme.dp(190)));
+        panel.addView(chartFrame, match());
+        panel.addView(gap(a, 12));
+
+        // C13 alert strip
+        panel.addView(LuxKit.alertStrip(a, s, "بیش از ۳۰۰ قلم با هشدار موجودی",
+                "بررسی پیشنهادی روزانه", "مشاهده", null), match());
+        panel.addView(gap(a, 10));
+
+        // C6 command dock
+        panel.addView(LuxKit.commandDock(a, s, new int[]{R.drawable.mi_home, R.drawable.mi_group,
+                        R.drawable.mi_receipt_long, R.drawable.mi_settings},
+                new String[]{"داشبورد", "مشتریان", "اسناد", "تنظیم"}, 0, null),
+                match());
+
+        LinearLayout.LayoutParams params = match();
+        params.bottomMargin = Theme.dp(14);
+        parent.addView(panel, params);
+    }
+
+    private static View gapW(MainActivity a, int dp) {
+        View v = new View(a);
+        v.setLayoutParams(new LinearLayout.LayoutParams(Theme.dp(dp), 1));
+        return v;
+    }
+
+    private static LinearLayout.LayoutParams tileLp(float weight) {
+        return new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, weight);
+    }
+
+    private static LinearLayout.LayoutParams wrapM() {
+        return new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
     }
 
     private static void addPanel(MainActivity a, LinearLayout parent, Palette palette) {

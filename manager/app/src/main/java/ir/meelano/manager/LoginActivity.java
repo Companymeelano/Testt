@@ -515,7 +515,8 @@ public class LoginActivity extends Activity {
     private String appVer() {
         try {
             String v = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
-            return "نسخه " + ir.meelano.manager.core.Money.fa(v == null || v.isEmpty() ? "—" : v);
+            // LRM marks keep the version digits in reading order inside the RTL caption.
+            return "نسخه \u200E" + ir.meelano.manager.core.Money.fa(v == null || v.isEmpty() ? "—" : v) + "\u200E";
         } catch (Exception e) {
             return "";
         }

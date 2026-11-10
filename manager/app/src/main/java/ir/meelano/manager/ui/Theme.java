@@ -327,12 +327,35 @@ public final class Theme {
     }
 
     public static android.graphics.drawable.Drawable card() {
-        return base(SURFACE, CARD_RADIUS_DP, dp(1), BORDER);
+        return royalSurface();
     }
 
     /** Flat neutral section card; the icon and heading carry section identity. */
     public static GradientDrawable cardAccent(int accent) {
-        return base(SURFACE, CARD_RADIUS_DP, dp(1), BORDER);
+        return royalSurface();
+    }
+
+    /**
+     * The signature royal surface: a whisper of champagne melting into the card face from the
+     * top edge, closed by a gold-threaded hairline. Cards stay in the same plane; the sheen,
+     * not a shadow, carries the luxury.
+     */
+    private static GradientDrawable royalSurface() {
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{DesignTokens.mix(SURFACE, GOLD_LIGHT, light ? 0.22f : 0.07f), SURFACE});
+        d.setCornerRadius(dp(CARD_RADIUS_DP));
+        d.setStroke(dp(1), DesignTokens.mix(BORDER, GOLD_METAL, light ? 0.40f : 0.26f));
+        return d;
+    }
+
+    /** Quiet champagne wash for tiles that have nothing to show yet (empty states). */
+    public static GradientDrawable emptyState(int accent) {
+        int hue = accent == 0 ? GOLD_METAL : accent;
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{DesignTokens.mix(SURFACE, hue, light ? 0.05f : 0.09f), SURFACE});
+        d.setCornerRadius(dp(14));
+        d.setStroke(dp(1), alpha(hue, light ? 96 : 72));
+        return d;
     }
 
     /** Dashboard surface tint levels are shared with contrast checks and muted-ink resolution. */
@@ -509,13 +532,25 @@ public final class Theme {
 
     /** Flat neutral KPI surface with a one-pixel border. */
     public static GradientDrawable kpi(int accent) {
-        return base(SURFACE, CARD_RADIUS_DP, dp(1), BORDER);
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{DesignTokens.mix(SURFACE, GOLD_LIGHT, light ? 0.28f : 0.09f), SURFACE});
+        d.setCornerRadius(dp(CARD_RADIUS_DP));
+        int hue = accent == 0 ? GOLD_METAL : accent;
+        d.setStroke(dp(1), DesignTokens.mix(BORDER, hue, 0.45f));
+        return d;
     }
 
 
     /** Legacy primary-button factory; resolves to a solid accent fill. */
     public static GradientDrawable goldButton() {
-        return base(GOLD, 10, 0, 0);
+        // Brushed-metal sheen: a soft highlight across the top of the approved accent fill.
+        // The body tone stays the accent itself so onAccent() contrast remains exact.
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{DesignTokens.mix(GOLD, 0xFFFFFFFF, light ? 0.20f : 0.13f), GOLD,
+                        DesignTokens.mix(GOLD, GOLD_DARK, 0.16f)});
+        d.setCornerRadius(dp(12));
+        d.setStroke(dp(1), alpha(GOLD_DARK, 130));
+        return d;
     }
 
     /** Existing expense-category accent; primary CTAs use the approved emerald/champagne palette. */
@@ -523,7 +558,13 @@ public final class Theme {
 
     /** Solid primary action; the foreground is chosen separately for sufficient contrast. */
     public static GradientDrawable startButton() {
-        return base(nuts ? DesignTokens.EMERALD : PRIMARY, 10, 0, 0);
+        int hue = nuts ? DesignTokens.EMERALD : PRIMARY;
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{DesignTokens.mix(hue, 0xFFFFFFFF, light ? 0.18f : 0.12f), hue,
+                        DesignTokens.mix(hue, 0xFF000000, 0.14f)});
+        d.setCornerRadius(dp(12));
+        d.setStroke(dp(1), alpha(DesignTokens.mix(hue, 0xFF000000, 0.35f), 130));
+        return d;
     }
 
     /** Flat field surface with a visible focus border. */
@@ -565,7 +606,13 @@ public final class Theme {
     }
 
     public static GradientDrawable ghostButton(int accent) {
-        return base(SURFACE, 10, dp(1), BORDER);
+        // Ghost actions keep their quiet surface but gain the royal finish: a faint accent
+        // wash from the top and a gold-threaded hairline instead of the plain border.
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{DesignTokens.mix(SURFACE, accent, light ? 0.07f : 0.13f), SURFACE});
+        d.setCornerRadius(dp(12));
+        d.setStroke(dp(1), DesignTokens.mix(BORDER, GOLD_METAL, light ? 0.38f : 0.24f));
+        return d;
     }
 
     public static GradientDrawable chip(boolean selected, int accent) {

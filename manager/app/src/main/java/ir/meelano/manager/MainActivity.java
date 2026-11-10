@@ -137,6 +137,7 @@ public class MainActivity extends Activity {
     private Runnable linkPending = null;
     private TextView licChip;
     private TextView companyName;
+    private TextView companyCodeLine;
     private android.widget.FrameLayout logoBox;
     private android.widget.ImageView logoImg;
     private TextView logoGlyph;
@@ -395,7 +396,9 @@ public class MainActivity extends Activity {
     private String splashVersion() {
         try {
             String v = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
-            return "نسخه " + Money.fa(v == null || v.isEmpty() ? "—" : v);
+            // LRM marks keep the version digits in reading order inside the RTL caption
+            // (without them "0.43.36" renders reversed as "36.43.0").
+            return "نسخه \u200E" + Money.fa(v == null || v.isEmpty() ? "—" : v) + "\u200E";
         } catch (Exception e) {
             return "";
         }
@@ -635,6 +638,13 @@ public class MainActivity extends Activity {
         companyName.setEllipsize(android.text.TextUtils.TruncateAt.END);
         companyName.setMaxWidth(Theme.dp(titleExpandedWidthDp));
         titleCol.addView(companyName, kit.lp(-1, -2));
+        // Registry code caption under the brand name (added before the header is measured,
+        // so the expanded height always includes this line).
+        companyCodeLine = kit.text("", 9.5f, Theme.MUTED, true);
+        companyCodeLine.setTag("header-company-code");
+        companyCodeLine.setSingleLine(true);
+        companyCodeLine.setVisibility(View.GONE);
+        titleCol.addView(companyCodeLine, kit.lp(-1, -2));
         // Expanded status line: the reusable SyncPill and a 48dp licence shortcut.
         // Account actions live in the toolbar/menu, avoiding a crowded brand row.
         headerStatusRow = kit.h();
@@ -1374,13 +1384,35 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             nm = "میلانو";
         }
+        // The registry code must not glue itself to the brand name; it earns its own
+        // caption line under the title, in Persian digits, with the name kept clean.
+        if (nm != null) nm = nm.replaceAll("[0-9\u06F0-\u06F9]+$", "").trim();
+        if (nm == null || nm.isEmpty()) nm = "میلانو";
         String g = Theme.seasonGlyph(this);
         return g.isEmpty() ? nm : nm + " " + g;
+    }
+
+    /** Trailing registry/national code of the shop, normalized to Persian digits. */
+    private String companyCode() {
+        try {
+            String nm = Company.get(this).displayName(this);
+            if (nm == null) return "";
+            java.util.regex.Matcher m = java.util.regex.Pattern
+                    .compile("([0-9\u06F0-\u06F9]{4,})\\s*$").matcher(nm);
+            return m.find() ? Money.fa(m.group(1)) : "";
+        } catch (Exception e) {
+            return "";
+        }
     }
 
     private void paintCompany() {
         try {
             if (companyName != null) ir.meelano.manager.ui.MeelanoIcons.set(companyName, companyTitle());
+            if (companyCodeLine != null) {
+                String code = companyCode();
+                companyCodeLine.setVisibility(code.isEmpty() ? View.GONE : View.VISIBLE);
+                companyCodeLine.setText(code.isEmpty() ? "" : "کد کسب\u200Cوکار " + code);
+            }
             if (logoImg != null) logoImg.setVisibility(View.GONE);
             if (logoGlyph != null) {
                 logoGlyph.setVisibility(View.VISIBLE);

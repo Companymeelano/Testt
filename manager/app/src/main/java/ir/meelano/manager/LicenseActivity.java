@@ -2391,7 +2391,9 @@ public class LicenseActivity extends Activity {
     private String appVer() {
         try {
             String v = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
-            return "نسخه " + Money.fa(v == null || v.isEmpty() ? "—" : v);
+            // LRM marks keep the version digits in reading order inside the RTL caption
+            // (without them "0.43.36" renders reversed as "36.43.0").
+            return "نسخه \u200E" + Money.fa(v == null || v.isEmpty() ? "—" : v) + "\u200E";
         } catch (Exception e) {
             return "نسخه —";
         }

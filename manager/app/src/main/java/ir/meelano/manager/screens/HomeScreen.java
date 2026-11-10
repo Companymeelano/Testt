@@ -2970,7 +2970,11 @@ public class HomeScreen extends Screen {
             Mini m = tiles.get(i);
             int tileAccent = dashboardAccent(m.icon);
             LinearLayout tile = a.kit.v();
-            tile.setBackground(Theme.dashboardMetric(tileAccent));
+            // A tile with nothing recorded yet gets the quiet champagne wash instead of the
+            // live metric surface, so "no data" reads as calm, not as an error.
+            boolean quietTile = m.note != null && m.note.contains("ثبت نشده");
+            tile.setBackground(quietTile ? Theme.emptyState(tileAccent)
+                    : Theme.dashboardMetric(tileAccent));
             tile.setElevation(0f);
             tile.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
             tile.setPadding(Theme.dp(12), Theme.dp(12), Theme.dp(12), Theme.dp(12));
@@ -3023,7 +3027,10 @@ public class HomeScreen extends Screen {
                 tile.setTag(accent == Theme.SECTION_CASH_POSITION
                         ? "home-cash-position-metric" : "home-closeout-metric");
                 int metricAccent = dashboardAccent(metric.icon);
-                tile.setBackground(Theme.dashboardMetric(metricAccent));
+                // Empty metrics rest on the quiet champagne wash; live numbers keep the tint.
+                boolean quietMetric = metric.note != null && metric.note.contains("ثبت نشده");
+                tile.setBackground(quietMetric ? Theme.emptyState(metricAccent)
+                        : Theme.dashboardMetric(metricAccent));
                 tile.setElevation(0f);
                 tile.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
                 tile.setPadding(Theme.dp(12), Theme.dp(8), Theme.dp(12), Theme.dp(8));

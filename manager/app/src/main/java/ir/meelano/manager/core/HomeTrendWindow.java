@@ -54,7 +54,17 @@ public final class HomeTrendWindow {
         List<Integer> indexes = new ArrayList<>();
         for (int index = 0; index < count; index += interval) indexes.add(index);
         int last = count - 1;
-        if (indexes.get(indexes.size() - 1) != last) indexes.add(last);
+        int tail = indexes.get(indexes.size() - 1);
+        if (tail != last) {
+            // A final label squeezed beside the previous one renders as one unreadable blob
+            // (two dates touching at the chart edge). When the tail gap is shorter than a full
+            // interval, move the last label to the end instead of crowding the pair together.
+            if (indexes.size() >= 2 && last - tail < interval) {
+                indexes.set(indexes.size() - 1, last);
+            } else {
+                indexes.add(last);
+            }
+        }
         return Collections.unmodifiableList(indexes);
     }
 

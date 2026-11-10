@@ -30,9 +30,21 @@ public class HomeTrendWindowTest {
     @Test public void dateLabelsStayEvenAndWithinTheReadableWidthBudget() {
         assertEquals(Arrays.asList(0, 3, 6, 9),
                 HomeTrendWindow.dateLabelIndexes(10, 180d, 60d));
-        assertEquals(Arrays.asList(0, 8, 16, 24, 29),
+        // The final label moves to the last point instead of crowding index 24 (gap 5 < interval 8),
+        // because two touching date labels at the edge render as one unreadable blob.
+        assertEquals(Arrays.asList(0, 8, 16, 29),
                 HomeTrendWindow.dateLabelIndexes(30, 240d, 60d));
         assertEquals(Arrays.asList(0, 1), HomeTrendWindow.dateLabelIndexes(2, 40d, 60d));
         assertTrue(HomeTrendWindow.dateLabelIndexes(1, 0d, 0d).contains(0));
+    }
+
+    @Test public void dateLabelsNeverCrowdTheLastTwoPointsTogether() {
+        // The live two-week dashboard window: 12 and 13 used to sit side by side and collide.
+        java.util.List<Integer> picked = HomeTrendWindow.dateLabelIndexes(14, 320d, 52d);
+        assertEquals(Integer.valueOf(13), picked.get(picked.size() - 1));
+        for (int i = 1; i < picked.size(); i++) {
+            assertTrue("labels " + picked + " crowd at index " + i,
+                    picked.get(i) - picked.get(i - 1) >= 3);
+        }
     }
 }

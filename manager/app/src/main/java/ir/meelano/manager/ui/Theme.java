@@ -848,4 +848,255 @@ public final class Theme {
             v.setBackground(new android.graphics.drawable.RippleDrawable(csl, bg, mask));
         } catch (Exception ignored) { Diag.ignored("Theme:491", ignored); }
     }
+
+    // ===== royal dashboard design tokens (branch world; additive) =====
+
+    // Shared 4dp layout rhythm and nested card radii for the Java/View design system.
+    public static final int SPACE_UNIT_DP = 4;
+    public static final int CARD_PADDING_HORIZONTAL_DP = 16;
+    public static final int CARD_PADDING_VERTICAL_DP = 12;
+    public static final int CARD_RADIUS_DP = 16;
+    public static final int DASHBOARD_CARD_RADIUS_DP = 20;
+    public static final int DASHBOARD_METRIC_RADIUS_DP = 16;
+    public static final int DASHBOARD_BADGE_RADIUS_DP = 12;
+    /** Clamp a requested gap to the nearest 4dp step; zero remains zero for optional spaces. */
+    public static int snapSpacingDp(int requestedDp) {
+        if (requestedDp <= 0) return 0;
+        return Math.max(SPACE_UNIT_DP,
+                Math.round(requestedDp / (float) SPACE_UNIT_DP) * SPACE_UNIT_DP);
+    }
+    // ---------------- dynamic palette (set by apply) ----------------
+    public static final int EMERALD_DEEP = DesignTokens.EMERALD_DEEP;
+    public static final int EMERALD = DesignTokens.EMERALD;
+    public static final int GOLD_METAL = DesignTokens.GOLD;
+    public static final int GOLD_LIGHT = DesignTokens.GOLD_LIGHT;
+    public static final int GOLD_DARK = DesignTokens.GOLD_DARK;
+    public static final int IVORY = DesignTokens.IVORY;
+    public static final int PAPER = DesignTokens.PAPER;
+    public static final int INK = DesignTokens.INK;
+    public static final int SECTION_SALES = DesignTokens.SALES;
+    public static final int SECTION_PURCHASE = DesignTokens.PURCHASE;
+    public static final int SECTION_RECEIVE = DesignTokens.RECEIVE;
+    public static final int SECTION_PAY = DesignTokens.PAY;
+    public static final int SECTION_RETURNS = DesignTokens.RETURNS;
+    public static final int SECTION_ALERT = DesignTokens.ALERT;
+    public static final int SECTION_MARKET = DesignTokens.MARKET;
+    public static final int SECTION_WAREHOUSE = DesignTokens.WAREHOUSE;
+    public static final int SECTION_CLOSEOUT = DesignTokens.CLOSEOUT;
+    public static final int SECTION_CASH_POSITION = DesignTokens.CASH_POSITION;
+    public static final int SECTION_TOP_PERFORMERS = DesignTokens.TOP_PERFORMERS;
+    public static final int SECTION_SALES_GOAL = DesignTokens.SALES_GOAL;
+    public static final int SECTION_GROSS_PROFIT = DesignTokens.GROSS_PROFIT;
+    public static final int SECTION_SEASONAL_CALENDAR = DesignTokens.SEASONAL_CALENDAR;
+    public static final int SECTION_QUICK_ACTIONS = DesignTokens.QUICK_ACTIONS;
+    public static final int SECTION_SALES_FORECAST = DesignTokens.SALES_FORECAST;
+    public static int PRIMARY = DesignTokens.APP_DARK_ACCENT;
+    public static int BORDER = DesignTokens.APP_DARK_BORDER;
+    public static int ACCENT_SOFT = DesignTokens.APP_DARK_ACCENT_SOFT;
+    public static int SUCCESS = DesignTokens.textSafeColor(
+            DesignTokens.POSITIVE, DesignTokens.APP_DARK_SURFACE, true);
+    public static int DANGER = DesignTokens.textSafeColor(
+            DesignTokens.NEGATIVE, DesignTokens.APP_DARK_SURFACE, true);
+    public static int WARNING = DesignTokens.textSafeColor(
+            DesignTokens.WARNING, DesignTokens.APP_DARK_SURFACE, true);
+    public static int INFO = DesignTokens.textSafeColor(
+            DesignTokens.INFO, DesignTokens.APP_DARK_SURFACE, true);
+    public static int VIOLET = DesignTokens.textSafeColor(
+            DesignTokens.RETURNS, DesignTokens.APP_DARK_SURFACE, true);
+    public static final int NEUTRAL = DesignTokens.NEUTRAL;
+    /** Use the bundled face when it covers the name; otherwise let Android's sans fallback draw it. */
+    public static Typeface faceForText(String text, boolean isBold) {
+        Typeface preferred = face(isBold);
+        if (text == null || text.isEmpty()) return preferred;
+        try {
+            Paint probe = new Paint();
+            probe.setTypeface(preferred);
+            // Check code points separately: a Persian word is several glyphs shaped as
+            // a run, so Paint.hasGlyph("علی") is not a valid whole-name coverage test.
+            for (int i = 0; i < text.length();) {
+                int cp = text.codePointAt(i);
+                i += Character.charCount(cp);
+                if (Character.isWhitespace(cp) || Character.isSpaceChar(cp)
+                        || Character.getType(cp) == Character.FORMAT) continue;
+                if (!probe.hasGlyph(new String(Character.toChars(cp)))) return systemTypeface(isBold);
+            }
+        } catch (Exception ignored) {
+            return systemTypeface(isBold);
+        }
+        return preferred;
+    }
+    private static Typeface systemTypeface(boolean isBold) {
+        try {
+            Typeface system = Typeface.create("sans-serif", isBold ? Typeface.BOLD : Typeface.NORMAL);
+            if (system != null) return system;
+        } catch (Exception ignored) { Diag.ignored("Theme:face", ignored); }
+        return isBold ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT;
+    }
+    /** Dashboard surface tint levels are shared with contrast checks and muted-ink resolution. */
+    public static float dashboardCardTopTint() { return light ? 0.03f : 0.12f; }
+    public static float dashboardCardBottomTint() { return light ? 0.01f : 0.06f; }
+    public static float dashboardMetricTopTint() { return light ? 0.045f : 0.12f; }
+    public static float dashboardMetricBottomTint() { return light ? 0.018f : 0.055f; }
+    /**
+     * Quiet, softly tinted card used only by the home dashboard. Other screens keep the shared
+     * neutral card so the home refresh does not leak into the rest of the application.
+     */
+    public static GradientDrawable dashboardCard(int accent) {
+        int hue = accent == 0 ? PRIMARY : accent;
+        GradientDrawable card = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{DesignTokens.mix(SURFACE, hue, dashboardCardTopTint()),
+                        DesignTokens.mix(SURFACE, hue, dashboardCardBottomTint())});
+        card.setCornerRadius(dp(DASHBOARD_CARD_RADIUS_DP));
+        card.setStroke(dp(1), DesignTokens.mix(BORDER, hue, light ? 0.20f : 0.28f));
+        return card;
+    }
+    /** Restrained inset tile: accent stays in the icon and label instead of filling each card. */
+    public static GradientDrawable dashboardMetric(int accent) {
+        int hue = accent == 0 ? PRIMARY : accent;
+        GradientDrawable tile = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{DesignTokens.mix(SURFACE, hue, dashboardMetricTopTint()),
+                        DesignTokens.mix(SURFACE, hue, dashboardMetricBottomTint())});
+        tile.setCornerRadius(dp(DASHBOARD_METRIC_RADIUS_DP));
+        tile.setStroke(dp(1), DesignTokens.mix(BORDER, hue, light ? 0.32f : 0.40f));
+        return tile;
+    }
+    /** Small raised jewel plate for dashboard icons; foreground color is resolved separately. */
+    public static GradientDrawable dashboardBadge(int accent) {
+        int hue = accent == 0 ? PRIMARY : accent;
+        float topTint = light ? 0.23f : 0.42f;
+        float bottomTint = light ? 0.12f : 0.27f;
+        GradientDrawable badge = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{DesignTokens.mix(SURFACE, hue, topTint),
+                        DesignTokens.mix(SURFACE, hue, bottomTint)});
+        badge.setCornerRadius(dp(DASHBOARD_BADGE_RADIUS_DP));
+        badge.setStroke(dp(1), DesignTokens.mix(BORDER, hue, light ? 0.42f : 0.52f));
+        return badge;
+    }
+    /** Accent ink that remains legible on the dashboard's tinted icon plates and card surfaces. */
+    public static int dashboardAccentInk(int accent) {
+        int hue = accent == 0 ? PRIMARY : accent;
+        int referenceSurface = DesignTokens.mix(SURFACE, hue, light ? 0.23f : 0.42f);
+        return DesignTokens.textSafeColor(hue, referenceSurface, !light);
+    }
+    /** Secondary copy ink adjusted for the strongest part of an inset dashboard tile. */
+    public static int dashboardMutedInk(int accent) {
+        int hue = accent == 0 ? PRIMARY : accent;
+        int referenceSurface = DesignTokens.mix(SURFACE, hue, dashboardMetricTopTint());
+        return DesignTokens.textSafeColor(MUTED, referenceSurface, !light);
+    }
+    /** Semantic success/warning ink adjusted for the inset surface without changing its meaning. */
+    public static int dashboardSemanticInk(int accent, int preferred) {
+        int hue = accent == 0 ? PRIMARY : accent;
+        int referenceSurface = DesignTokens.mix(SURFACE, hue, dashboardMetricTopTint());
+        return DesignTokens.textSafeColor(preferred, referenceSurface, !light);
+    }
+    /** Secondary copy ink for labels placed directly on a home-card surface. */
+    public static int dashboardCardMutedInk(int accent) {
+        int hue = accent == 0 ? PRIMARY : accent;
+        int referenceSurface = DesignTokens.mix(SURFACE, hue, dashboardCardTopTint());
+        return DesignTokens.textSafeColor(MUTED, referenceSurface, !light);
+    }
+    /** Contrast-safe foreground for a compact, filled dashboard action. */
+    public static int dashboardActionInk(int accent) {
+        int hue = accent == 0 ? PRIMARY : accent;
+        double blackContrast = DesignTokens.contrastRatio(Color.BLACK, hue);
+        double whiteContrast = DesignTokens.contrastRatio(Color.WHITE, hue);
+        return blackContrast >= whiteContrast ? Color.BLACK : Color.WHITE;
+    }
+    /** Filled, lightly shaded action used by dashboard section headings only. */
+    public static GradientDrawable dashboardAction(int accent) {
+        int hue = accent == 0 ? PRIMARY : accent;
+        int ink = dashboardActionInk(hue);
+        int safeShade = ink == Color.BLACK ? Color.WHITE : Color.BLACK;
+        GradientDrawable action = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{hue, DesignTokens.mix(hue, safeShade, 0.035f)});
+        action.setCornerRadius(dp(12));
+        action.setStroke(dp(1), alpha(ink, 30));
+        return action;
+    }
+    /** Deep emerald welcome panel with a restrained champagne edge; home-only by design. */
+    public static GradientDrawable dashboardWelcome() {
+        int deep = DesignTokens.EMERALD_DEEP;
+        int royal = DesignTokens.mix(DesignTokens.EMERALD, PRIMARY, nuts ? 0.12f : 0.08f);
+        GradientDrawable welcome = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{royal, DesignTokens.EMERALD, deep});
+        welcome.setCornerRadius(dp(20));
+        welcome.setStroke(dp(1), alpha(DesignTokens.GOLD, nuts ? 188 : 112));
+        return welcome;
+    }
+    /** Readable text and secondary ink for the deep emerald dashboard welcome panel. */
+    public static int dashboardWelcomeText() {
+        return DesignTokens.accentTextColor(DesignTokens.EMERALD_DEEP);
+    }
+    public static int dashboardWelcomeMuted() {
+        return DesignTokens.mix(dashboardWelcomeText(), DesignTokens.GOLD_LIGHT, 0.17f);
+    }
+    /** Stable section hue derived from its title; semantic outcomes use separate tokens. */
+    public static int sectionAccent(String title) {
+        return DesignTokens.sectionAccent(title);
+    }
+    /** Text-safe companion for a section accent. */
+    public static int sectionText(int accent) {
+        if (accent == SUCCESS || accent == DANGER || accent == WARNING || accent == INFO)
+            return DesignTokens.textSafeColor(accent, SURFACE, !light);
+        int foreground = nuts ? (accent == DesignTokens.GOLD ? DesignTokens.GOLD_DARK : PRIMARY) : PRIMARY;
+        return DesignTokens.textSafeColor(foreground, SURFACE, !light);
+    }
+    /** Theme-aligned accent surface for small icons and chips. */
+    public static int sectionTint(int accent) {
+        return ACCENT_SOFT;
+    }
+    /** One-pixel neutral divider; semantic color remains in the icon or label. */
+    public static GradientDrawable accentHairline(int accent) {
+        GradientDrawable rule = new GradientDrawable();
+        rule.setColor(BORDER);
+        return rule;
+    }
+    /** Accent shared by the dock; the preserved Nuts skin keeps its gold identity. */
+    public static int bottomNavAccent() { return nuts ? GOLD_DARK : PRIMARY; }
+    /** Listener returns false so framework click/keyboard/TalkBack actions remain untouched. */
+    @android.annotation.SuppressLint("ClickableViewAccessibility")
+    public static void pressable(View v) {
+        v.setClickable(true);
+        v.setFocusable(true);
+        // Micro-interaction: a soft press-in, a spring back, and a light haptic tick on release.
+        // Read the system animation scale once per gesture (ACTION_DOWN), not on every MOVE.
+        // Returns false so clicks and scrolling behave exactly as before.
+        try {
+            final boolean[] gestureMotion = {true};
+            v.setOnTouchListener((view, ev) -> {
+                switch (ev.getActionMasked()) {
+                    case android.view.MotionEvent.ACTION_DOWN:
+                        gestureMotion[0] = Ui.motionOk(view.getContext());
+                        if (gestureMotion[0])
+                            view.animate().scaleX(0.975f).scaleY(0.975f).setDuration(110).start();
+                        break;
+                    case android.view.MotionEvent.ACTION_UP:
+                        if (gestureMotion[0])
+                            view.animate().scaleX(1f).scaleY(1f).setDuration(180)
+                                    .setInterpolator(new android.view.animation.DecelerateInterpolator()).start();
+                        view.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP);
+                        break;
+                    case android.view.MotionEvent.ACTION_CANCEL:
+                        if (gestureMotion[0])
+                            view.animate().scaleX(1f).scaleY(1f).setDuration(120).start();
+                        break;
+                    default:
+                        break;
+                }
+                return false;
+            });
+        } catch (Exception ignored) { Diag.ignored("Theme:press", ignored); }
+        try {
+            // Never nest ripples: repaint passes (e.g. the bottom bar) call this repeatedly.
+            if (v.getBackground() instanceof android.graphics.drawable.RippleDrawable) return;
+            // Touch feedback: wrap the current background in a ripple (minSdk 26, always available).
+            android.graphics.drawable.Drawable bg = v.getBackground();
+            android.content.res.ColorStateList csl =
+                    android.content.res.ColorStateList.valueOf(alpha(TEXT, 64));
+            android.graphics.drawable.Drawable mask =
+                    bg == null ? new android.graphics.drawable.ColorDrawable(0xFFFFFFFF) : null;
+            v.setBackground(new android.graphics.drawable.RippleDrawable(csl, bg, mask));
+        } catch (Exception ignored) { Diag.ignored("Theme:491", ignored); }
+    }
 }

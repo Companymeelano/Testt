@@ -2107,4 +2107,27 @@ public class HomeScreen extends Screen {
         if (s instanceof CustomersScreen) ((CustomersScreen) s).openDossier(code);
         a.nav("customers");
     }
+
+    // ===== branch-world members kept for the dashboard tests (additive) =====
+
+    static String latestSalesChartDate(List<SalesSnapshot.Day> series) {
+        if (series == null) return "";
+        for (int i = series.size() - 1; i >= 0; i--) {
+            SalesSnapshot.Day day = series.get(i);
+            if (day != null && day.date != null && !day.date.isEmpty()) return day.date;
+        }
+        return "";
+    }
+    static boolean salesSeriesHasActivity(List<SalesSnapshot.Day> series) {
+        if (series == null) return false;
+        for (SalesSnapshot.Day day : series)
+            if (day != null && (Math.abs(day.salesRials) >= 0.005d || day.documents > 0)) return true;
+        return false;
+    }
+    static String salesChartEmptyState(List<SalesSnapshot.Day> series, String window) {
+        if (series == null || series.isEmpty()) return "تاریخچهٔ فروش برای این بازه در دسترس نیست";
+        if (salesSeriesHasActivity(series)) return "";
+        String label = window == null || window.trim().isEmpty() ? "" : " · " + window.trim();
+        return "در این بازه فاکتوری ثبت نشده است" + label;
+    }
 }

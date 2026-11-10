@@ -230,4 +230,57 @@ public class ProfitScreen extends Screen {
 
         renderNotes(content, d.notes);
     }
+
+    // ===== branch-world members kept for the dashboard tests (additive) =====
+
+    static boolean grossProfitCoverageComplete(List<Row> daily, boolean summaryAvailable) {
+        if (!summaryAvailable || daily == null) return false;
+        for (Row row : daily) {
+            Long issues = row == null ? null : row.exactLong("qualityIssues");
+            if (issues == null || issues != 0L || row.bd("sales") == null
+                    || row.bd("cogs") == null || row.bd("profit") == null) return false;
+        }
+        return true;
+    }
+    static String grossProfitCoverageWarningTitle(boolean queryIncomplete) {
+        return queryIncomplete ? "سود و زیان نمایش داده نمی‌شود" : "بهای کالا ناقص است";
+    }
+    static String grossProfitCoverageDetails(List<Row> daily) {
+        StringBuilder message = new StringBuilder("برای نمایش معتبر سود و حاشیهٔ سود، هر ردیف فروش باید به کالایی با بهای خرید معتبر و غیرمنفی وصل باشد؛ ردیف ناقص با مبلغ صفر جایگزین نمی‌شود.");
+        if (daily == null) return message.append("\nریز روزانه در دسترس نیست.").toString();
+
+        long totalIssues = 0L;
+        int affectedDays = 0;
+        boolean metadataMissing = false;
+        List<String> examples = new ArrayList<>();
+        for (Row row : daily) {
+            Long count = row == null ? null : row.exactLong("qualityIssues");
+            if (count == null || count < 0L) {
+                metadataMissing = true;
+                continue;
+            }
+            if (count == 0L) continue;
+            totalIssues = count > Long.MAX_VALUE - totalIssues ? Long.MAX_VALUE : totalIssues + count;
+            affectedDays++;
+            if (examples.size() < 5) {
+                String date = row.s("day").isEmpty() ? "تاریخ نامشخص" : Jalali.dispFa(row.s("day"));
+                examples.add(date + " · " + HomeNumberFormatter.integer(count) + " ردیف");
+            }
+        }
+        if (totalIssues > 0L) {
+            message.append("\nردیف‌های نیازمند بررسی: ")
+                    .append(HomeNumberFormatter.integer(totalIssues)).append('.');
+            if (!examples.isEmpty()) {
+                message.append("\nنمونهٔ روزها: ");
+                for (int i = 0; i < examples.size(); i++) {
+                    if (i > 0) message.append("؛ ");
+                    message.append(examples.get(i));
+                }
+                if (affectedDays > examples.size()) message.append("؛ و روزهای دیگر");
+            }
+        }
+        if (metadataMissing)
+            message.append("\nجزئیات برخی روزها در دادهٔ موجود نیست؛ مقدار ناقص صفر فرض نشده است.");
+        return message.toString();
+    }
 }

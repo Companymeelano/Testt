@@ -1619,4 +1619,15 @@ public final class Kit {
         c.addView(p, lp(-2, Theme.dp(110)));
         return c;
     }
+
+    // ===== branch-world members kept for the dashboard tests (additive) =====
+
+    /** Keep comparison badges concise; the full period remains in the accessible description. */
+    static String compactDashboardDelta(String detail) {
+        if (detail == null) return "";
+        String compact = detail.trim();
+        int basis = compact.indexOf('·');
+        if (basis >= 0) compact = compact.substring(0, basis).trim();
+        return compact;
+    }
 }

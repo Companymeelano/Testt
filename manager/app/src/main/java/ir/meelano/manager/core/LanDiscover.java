@@ -1,5 +1,6 @@
 package ir.meelano.manager.core;
 
+import ir.meelano.manager.data.Settings;
 import java.net.Inet4Address;
 import java.sql.Connection;
 import java.sql.PreparedStatement;

@@ -313,4 +313,12 @@ public final class Jalali {
         Calendar c = Calendar.getInstance();
         return String.format(Locale.US, "%04d-%02d-%02d", c.get(Calendar.YEAR), c.get(Calendar.MONTH) + 1, c.get(Calendar.DAY_OF_MONTH));
     }
+
+    // ===== branch-world members kept for the dashboard tests (additive) =====
+
+    /** Compact date for dense table cells: «۱۴۰۵/۰۸/۱۳», or «—» when unavailable. */
+    public static String dispTableFa(String raw) {
+        String d = disp(raw);
+        return d.isEmpty() ? "—" : HomeNumberFormatter.dateTable(d);
+    }
 }

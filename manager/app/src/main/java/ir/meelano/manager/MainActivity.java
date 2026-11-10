@@ -2150,4 +2150,21 @@ public class MainActivity extends Activity {
             }
         }).start();
     }
+
+    // ===== branch-world members kept for the dashboard tests (additive) =====
+
+    public static final String EXTRA_HOME_SCREENSHOT_PREVIEW =
+            "ir.meelano.manager.HOME_SCREENSHOT_PREVIEW";
+    /**
+     * Available brand-title width after accounting for every visible header control. The 4dp
+     * spacer before the menu is included in both compact states; omitting it let the licence chip
+     * and long company names get clipped on narrow displays.
+     */
+    public static int headerTitleWidthDp(int widthDp, int sideInsetDp,
+                                         boolean compact, boolean collapsed) {
+        int fixed = 24 + (2 * sideInsetDp) + (collapsed ? 40 : 36) + 8;
+        if (collapsed) fixed += 48 + 4 + 48; // sync, menu gap, menu
+        else if (compact) fixed += 4 + 48;   // expanded compact menu gap and menu
+        return Math.max(collapsed ? 72 : 96, widthDp - fixed);
+    }
 }

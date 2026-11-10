@@ -1,0 +1,128 @@
+{
+  "$comment": "درخشان ۲.۰ — stage-1 design tokens. Source of truth: manager/app/src/main/java/ir/meelano/manager/ui/DerakhshanTokens.java (Android) and windows-invoice/src/main/resources/styles.css looked-up colors (desktop). Identity: jewel in velvet. One light source at 150deg, four shadow levels, four semantic hues, no purple, no brown CTAs.",
+  "palette": {
+    "obsidian-emerald": "#04120D",
+    "emerald-800": "#062A20",
+    "emerald-700": "#0E4C39",
+    "emerald-500": "#1B7A50",
+    "emerald-300": "#2E9C68",
+    "gold-500": "#C9A227",
+    "gold-300": "#E8CE7A",
+    "gold-100": "#F7EFC8",
+    "cream": "#F7F3EA",
+    "cream-2": "#EFE6D6",
+    "bronze": "#B08968"
+  },
+  "semantic": {
+    "success": "#2E7D5B",
+    "warning": "#C98A2E",
+    "danger": "#B4434B",
+    "info": "#4C6E8A"
+  },
+  "themes": {
+    "light": {
+      "name": "مخمل کرم",
+      "bg": "#F7F3EA",
+      "bgDeep": "#EFE6D6",
+      "stone": ["#FFFFFF", "#F0EBE0"],
+      "stoneAngleDeg": 165,
+      "ink": "#1F180C",
+      "inkSecondary": "#4E422C",
+      "inkMeta": "#5F5138",
+      "hairline": "rgba(31,24,12,0.10)",
+      "glassFill": "rgba(255,255,255,0.60)",
+      "glassBorder": "rgba(255,255,255,0.20)",
+      "goldText": "#856310",
+      "goldTextNote": "spec suggested #8E6C14 but it measures 4.40:1 on cream; deepened one step to clear the mandated 4.5:1 floor (#C9A227 would be 2.6:1)",
+      "heroGold": ["#A97F16", "#856310", "#6E5210"],
+      "successText": "#2E7D5B",
+      "warningText": "#8A5A12",
+      "dangerText": "#B4434B",
+      "infoText": "#4C6E8A"
+    },
+    "dark": {
+      "name": "شب زمرد",
+      "bg": "#04120D",
+      "bgDeep": "#062A20",
+      "stone": ["#0C2A20", "#071C15"],
+      "stoneAngleDeg": 165,
+      "ink": "#F4EFDF",
+      "inkSecondary": "#CFC6AE",
+      "inkMeta": "#A99F87",
+      "hairline": "rgba(244,239,223,0.12)",
+      "glassFill": "rgba(255,255,255,0.06)",
+      "glassBorder": "rgba(255,255,255,0.12)",
+      "goldText": "#E8CE7A",
+      "heroGold": ["#F7EFC8", "#D9B45A", "#A8821E"],
+      "heroGoldStops": [0, 0.55, 1],
+      "successText": "#57B389",
+      "warningText": "#E0A94E",
+      "dangerText": "#E08A90",
+      "infoText": "#8FB0C9"
+    }
+  },
+  "materials": {
+    "gold": { "angleDeg": 150, "darkStops": ["#F7EFC8", "#D9B45A", "#A8821E"], "stops": [0, 0.55, 1] },
+    "emeraldCta": { "angleDeg": 160, "stops": ["#1B7A50", "#0A3A2C"], "onColor": "#FFFFFF" },
+    "glass": { "blurDp": 18, "saturate": 1.4 },
+    "goldEdge": { "heightDp": 2, "widthFraction": 0.34, "color": "#C9A227", "glow": "rgba(201,162,39,0.55)", "glowDp": 12, "anchor": "inset-inline-end" },
+    "grainFraction": 0.04
+  },
+  "elevation": {
+    "e1": { "css": "0 1px 2px rgba(0,0,0,.28), 0 2px 8px rgba(0,0,0,.18)", "nativeDp": 2 },
+    "e2": { "css": "0 2px 6px rgba(0,0,0,.30), 0 12px 28px rgba(0,0,0,.26)", "nativeDp": 6 },
+    "e3": { "css": "0 4px 12px rgba(0,0,0,.34), 0 24px 60px rgba(0,0,0,.34)", "nativeDp": 10 },
+    "e4": { "css": "e3 + inset 0 1px 0 rgba(255,255,255,.16)", "nativeDp": 12 },
+    "innerTopHighlight": "rgba(255,255,255,0.20)",
+    "innerBottomShade": "rgba(0,0,0,0.18)",
+    "floatingCard": { "liftDp": 4, "level": "e3", "hairline": "rgba(201,162,39,0.25)", "maxPerScreen": 1 }
+  },
+  "typography": {
+    "heroNumber": { "sp": 42, "weight": 800, "letterSpacingEm": -0.0286, "tabular": true, "fill": "heroGold gradient" },
+    "kpi": { "sp": 30, "weight": 800, "tabular": true },
+    "h2Section": { "sp": 17.5, "weight": 800 },
+    "body": { "sp": 14, "weight": 400, "lineHeight": 1.9 },
+    "label": { "sp": 12, "weight": 600 },
+    "meta": { "sp": 11.5, "weight": 500, "inkFraction": 0.6 },
+    "unit": { "sp": 12, "inkFraction": 0.55, "rule": "always smaller and dimmer than the figure" }
+  },
+  "motion": {
+    "easingCubicBezier": [0.22, 1, 0.36, 1],
+    "fastMs": 220, "midMs": 420, "slowMs": 700,
+    "cardEntry": { "ms": 420, "staggerMs": 60, "riseDp": 12 },
+    "countUp": { "ms": 560, "easing": "easeOutCubic", "tabular": true },
+    "chart": { "drawMs": 700, "pointStaggerMs": 30 },
+    "press": { "downMs": 90, "scale": 0.975, "releaseMs": 220 },
+    "urgentPulse": { "ms": 2400, "opacity": [0.3, 0.5], "maxPerScreen": 1, "infinite": true },
+    "shimmer": { "ms": 900, "oncePerSession": true },
+    "heroTilt": { "maxDeg": 3, "ema": 0.08, "returnMs": 600 },
+    "dockTab": { "liftDp": 6, "springMs": 320 },
+    "reducedMotion": "every motion collapses to a simple fade"
+  },
+  "components": {
+    "medalIcon": { "radiusDp": 14, "innerHighlight": "#FFFBEA 0 1px 0", "innerShade": "rgba(122,92,20,0.35) 0 -3px 6px", "frame": "semantic family of the card" },
+    "statusChip": { "heightDp": 24, "radiusDp": 8, "softFillFraction": 0.14, "dotDp": 6, "kinds": ["soft", "solid-urgent-only", "gold-role-pin", "ghost-inactive-filter"] },
+    "button": {
+      "kinds": ["primary-emerald", "gold-single-per-screen", "ghost-gold", "quiet"],
+      "states": ["default", "hover", "pressed", "loading", "disabled", "focus-visible"],
+      "primaryHeightDp": 48, "ghostHeightDp": 40, "touchMinDp": 44,
+      "ghostGoldBorder": "rgba(232,206,122,0.45) 1px",
+      "disabledOpacity": 0.4,
+      "focusRing": { "color": "#C9A227", "widthDp": 2, "offsetDp": 2 }
+    },
+    "quickTile": { "firstScale": 1.25, "hoverLiftDp": 4, "activeSinkDp": 2, "microStat": true },
+    "sparkline": { "heightDp": 54 },
+    "luxChart": { "lineDp": 2.5, "pointDp": 4, "hoverPointDp": 8, "hoverRingDp": 12, "peakPointDp": 9, "gridLines": 3, "gridOpacity": 0.03, "movingAverageWindowDays": 7, "brokenAxis": true },
+    "alertStrip": { "edgeDp": 3, "edge": "border-inline-start amber" },
+    "emptyState": { "artDp": 120, "titleSp": 15, "maxDescriptionLines": 1 }
+  },
+  "contrast": {
+    "mainTextMin": 7, "secondaryTextMin": 4.5, "largeTextMin": 3,
+    "provenBy": "manager/app/src/test/java/ir/meelano/manager/ui/DerakhshanTokensTest.java (12 tests)"
+  },
+  "rules": {
+    "colorShare": "60% base surface / 30% stone-glass / 10% gold",
+    "perScreen": "one dominant gold element, one primary button, one floating card, one urgent pulse",
+    "forbidden": ["purple", "brown #7A5C42 CTAs", "blue-grays outside the palette", "external fonts/icons at runtime", "permanent animations", "tilt > 3deg", "chained full-width CTAs", "multi-line gray empty states"]
+  }
+}

@@ -7,6 +7,33 @@
     -fx-focus-color: #c9a956;
     -fx-faint-focus-color: rgba(201,169,86,0.18);
     -fx-font-smoothing-type: gray;
+
+    /* «درخشان ۲.۰» stage-1 tokens — looked-up colors.
+       Source of truth: manager/.../ui/DerakhshanTokens.java and design/derakhshan-tokens.json.
+       Later stages consume these; nothing repaints by defining them. */
+    -drk-obsidian-emerald: #04120D;
+    -drk-emerald-800: #062A20;
+    -drk-emerald-700: #0E4C39;
+    -drk-emerald-500: #1B7A50;
+    -drk-emerald-300: #2E9C68;
+    -drk-gold-500: #C9A227;
+    -drk-gold-300: #E8CE7A;
+    -drk-gold-100: #F7EFC8;
+    -drk-cream: #F7F3EA;
+    -drk-cream-2: #EFE6D6;
+    -drk-bronze: #B08968;
+    -drk-success: #2E7D5B;
+    -drk-warning: #C98A2E;
+    -drk-danger: #B4434B;
+    -drk-info: #4C6E8A;
+    -drk-ink-light: #1F180C;
+    -drk-ink-secondary-light: #4E422C;
+    -drk-gold-ink-light: #856310;
+    -drk-stone-top: #FFFFFF;
+    -drk-stone-bottom: #F0EBE0;
+    -drk-ink-dark: #F4EFDF;
+    -drk-ink-secondary-dark: #CFC6AE;
+    -drk-gold-ink-dark: #E8CE7A;
 }
 .app-root {
     /* Ivory with the faintest champagne wash from the top — the royal sheen, desktop. */

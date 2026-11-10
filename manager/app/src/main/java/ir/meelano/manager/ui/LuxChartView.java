@@ -51,8 +51,9 @@ public class LuxChartView extends View {
         line.setStrokeCap(Paint.Cap.ROUND);
         line.setStrokeJoin(Paint.Join.ROUND);
         line.setColor(s.dark ? DerakhshanTokens.EMERALD_300 : DerakhshanTokens.EMERALD_500);
+        // colored drop shadow: the line's own hue at 35% alpha (blend() only returns opaque colors)
         line.setShadowLayer(Theme.dp(6), 0, Theme.dp(2),
-                DerakhshanTokens.blend(line.getColor(), 0x00000000, 0.45f));
+                (0x59 << 24) | (line.getColor() & 0x00FFFFFF));
         grid.setStyle(Paint.Style.STROKE);
         grid.setStrokeWidth(1);
         grid.setColor(DerakhshanTokens.blend(s.ink, s.stone[0], 1f - DerakhshanTokens.CHART_GRID_OPACITY));

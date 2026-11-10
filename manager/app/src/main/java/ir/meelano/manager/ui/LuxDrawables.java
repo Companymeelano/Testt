@@ -40,8 +40,9 @@ public final class LuxDrawables {
 
     /** C3 medal frame: metallic gradient of the semantic family with a lit top edge. */
     public static GradientDrawable medal(DerakhshanTokens.Surface s, int family) {
+        // Sheen stops stay saturated enough for the black/white glyph to clear 3:1 (WCAG 1.4.11).
         GradientDrawable d = new GradientDrawable(DOWN, new int[]{
-                DerakhshanTokens.blend(family, 0xFFFFFFFF, s.dark ? 0.28f : 0.45f),
+                DerakhshanTokens.blend(family, 0xFFFFFFFF, s.dark ? 0.18f : 0.25f),
                 family,
                 DerakhshanTokens.blend(family, 0xFF000000, s.dark ? 0.34f : 0.22f)});
         d.setCornerRadius(dp(DerakhshanTokens.MEDAL_RADIUS_DP));
@@ -67,9 +68,10 @@ public final class LuxDrawables {
         if (kind == 1) {
             d.setColor(family);
         } else if (kind == 2) {
+            // Gold chip: champagne gradient with near-black ink — light gold ink measured 3.25:1.
             d.setOrientation(SHEEN);
-            d.setColors(s.dark ? DerakhshanTokens.GOLD_MATERIAL_DARK : DerakhshanTokens.GOLD_MATERIAL_LIGHT);
-            d.setStroke(dp(1), alpha(DerakhshanTokens.GOLD_300, 120));
+            d.setColors(new int[]{DerakhshanTokens.GOLD_300, DerakhshanTokens.GOLD_500});
+            d.setStroke(dp(1), alpha(DerakhshanTokens.GOLD_500, 120));
         } else if (kind == 3) {
             d.setColor(0x00000000);
             d.setStroke(dp(1), s.hairline);

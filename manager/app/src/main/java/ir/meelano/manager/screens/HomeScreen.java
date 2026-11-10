@@ -64,7 +64,10 @@ import ir.meelano.manager.data.Company;
 import ir.meelano.manager.data.Repo;
 import ir.meelano.manager.data.Row;
 import ir.meelano.manager.ui.Charts;
+import ir.meelano.manager.ui.DerakhshanTokens;
 import ir.meelano.manager.ui.HomeCashWaterfall;
+import ir.meelano.manager.ui.LuxDrawables;
+import ir.meelano.manager.ui.LuxKit;
 import ir.meelano.manager.ui.HomeGoalGauge;
 import ir.meelano.manager.ui.HomeForecastChart;
 import ir.meelano.manager.ui.HomePaymentMixBar;
@@ -1289,6 +1292,9 @@ public class HomeScreen extends Screen {
                 Theme.dp(Theme.CARD_PADDING_VERTICAL_DP),
                 Theme.dp(Theme.CARD_PADDING_HORIZONTAL_DP),
                 Theme.dp(Theme.CARD_PADDING_VERTICAL_DP));
+        // C1 signature: the page's single dominant gold element — 2dp edge over 34% of the inline-end.
+        card.addView(new LuxKit.GoldEdge(a, Theme.luxSurface()), a.kit.lp(-1, Theme.dp(2)));
+        card.addView(a.kit.gap(6));
         final String[] selectedSalesDate = {data == null ? Jalali.todayStr() : snapshotDay(data)};
         final HomeTrendChart.Area chart = new HomeTrendChart.Area(a);
         View.OnClickListener salesAction = RoleStore.allowed(a, "sales")
@@ -1581,6 +1587,8 @@ public class HomeScreen extends Screen {
         amount.setSingleLine(true);
         amount.setEllipsize(TextUtils.TruncateAt.END);
         amount.setFontFeatureSettings("tnum");
+        // C1 hero figure: molten-gold gradient ink (tabular, contrast-checked per theme).
+        LuxKit.goldNumber(amount, Theme.luxSurface());
         amount.setContentDescription(HomeNumberFormatter.money(display.amountRials) + "؛ " + actualCaption);
         valueRow.addView(amount, a.kit.wlp(1f));
         TextView unit = a.kit.text(ir.meelano.manager.core.Money.unitName(), 10.5f,
@@ -1594,7 +1602,7 @@ public class HomeScreen extends Screen {
         if (animate && ir.meelano.manager.ui.Ui.motionOk(a)) {
             final double target = ir.meelano.manager.core.Money.toUnit(display.amountRials);
             animator[0] = android.animation.ValueAnimator.ofFloat(0f, 1f);
-            animator[0].setDuration(600);
+            animator[0].setDuration(DerakhshanTokens.COUNT_UP_MS);
             animator[0].setInterpolator(new android.view.animation.DecelerateInterpolator());
             animator[0].addUpdateListener(animation -> amount.setText(HomeNumberFormatter.compactUnit(
                     target * (float) animation.getAnimatedValue())));
@@ -2812,7 +2820,9 @@ public class HomeScreen extends Screen {
     }
 
     private ImageView dashboardArt(int iconVector, int accent) {
-        ImageView image = a.kit.icon(iconVector, Theme.dashboardAccentInk(accent), 21);
+        // C3 medal: the glyph is black/white picked by measured contrast on the saturated plate.
+        ImageView image = a.kit.icon(iconVector,
+                LuxKit.glyphInk(Theme.luxFamily(accent)), 21);
         image.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         image.setBackground(Theme.dashboardBadge(accent));
         int inset = Theme.dp(4);
@@ -2885,12 +2895,14 @@ public class HomeScreen extends Screen {
 
     /** The compact «‹» chip at the far end of a section head. */
     private View chevronChip(String label, View.OnClickListener onClick) {
-        TextView chip = a.kit.text("‹", 20f, Theme.GOLD, true);
+        // Gold as *text* must wear the surface's contrast-checked gold ink, never the raw hue.
+        int goldInk = Theme.luxSurface().goldText;
+        TextView chip = a.kit.text("‹", 20f, goldInk, true);
         chip.setGravity(Gravity.CENTER);
         chip.setPadding(Theme.dp(12), Theme.dp(4), Theme.dp(12), Theme.dp(4));
         chip.setMinWidth(Theme.dp(48));
         chip.setMinHeight(Theme.dp(48));
-        chip.setBackground(Theme.ghostButton(Theme.GOLD));
+        chip.setBackground(Theme.ghostButton(goldInk));
         chip.setContentDescription(label == null ? "باز کردن" : label + "؛ باز کردن");
         Theme.pressable(chip);
         if (onClick != null) chip.setOnClickListener(onClick);
@@ -2916,11 +2928,14 @@ public class HomeScreen extends Screen {
 
     /** A small status chip: how many alerts are open, or that there are none. */
     private View statusChip(String label, int color) {
-        TextView chip = a.kit.text(label, 10.5f, color, true);
+        // C4: soft 14% wash, radius 8 — never a pill; ink is the deepened family, never the raw hue.
+        TextView chip = a.kit.text(label, 10.5f, Theme.dashboardAccentInk(color), true);
         chip.setGravity(Gravity.CENTER);
         chip.setSingleLine(true);
-        chip.setPadding(Theme.dp(12), Theme.dp(8), Theme.dp(12), Theme.dp(8));
-        chip.setBackground(Theme.pill(color));
+        chip.setMinHeight(Theme.dp(DerakhshanTokens.CHIP_HEIGHT_DP));
+        chip.setPadding(Theme.dp(12), Theme.dp(4), Theme.dp(12), Theme.dp(4));
+        chip.setBackground(LuxDrawables.chipBg(Theme.luxSurface(), LuxKit.CHIP_SOFT,
+                Theme.luxFamily(color)));
         return chip;
     }
 
@@ -3172,6 +3187,19 @@ public class HomeScreen extends Screen {
             title.setMaxLines(2);
             title.setEllipsize(TextUtils.TruncateAt.END);
             heading.addView(title, a.kit.wlp(1f));
+            if (primary.priority == 0) {
+                // The page's single «فوری» pulse: a decorative dot breathes; text never pulses.
+                View urgentDot = new View(a);
+                android.graphics.drawable.GradientDrawable dot =
+                        new android.graphics.drawable.GradientDrawable();
+                dot.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+                dot.setColor(Theme.luxFamily(primary.accent));
+                urgentDot.setBackground(dot);
+                urgentDot.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+                heading.addView(urgentDot, a.kit.lp(Theme.dp(8), Theme.dp(8)));
+                heading.addView(a.kit.space(6));
+                LuxKit.pulseUrgent(urgentDot);
+            }
             heading.addView(statusChip(attentionLabel(primary.priority), primary.accent),
                     a.kit.lp(-2, -2));
             focus.addView(heading, a.kit.lp(-1, -2));

@@ -41,7 +41,9 @@ import ir.meelano.manager.core.LicenseStore;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.RoleStore;
 import ir.meelano.manager.data.Settings;
+import ir.meelano.manager.ui.DerakhshanTokens;
 import ir.meelano.manager.ui.DesignTokens;
+import ir.meelano.manager.ui.LuxKit;
 import ir.meelano.manager.ui.Theme;
 
 import java.io.File;
@@ -664,66 +666,62 @@ public final class HomeDashboardScreenshotTest {
     }
 
     private static void verifyDashboardColorContrast() {
-        int[] accents = {DesignTokens.SALES, DesignTokens.PURCHASE, DesignTokens.RECEIVE,
-                DesignTokens.PAY, DesignTokens.RETURNS, DesignTokens.ALERT,
-                DesignTokens.MARKET, DesignTokens.WAREHOUSE, DesignTokens.CLOSEOUT,
-                DesignTokens.CASH_POSITION, DesignTokens.TOP_PERFORMERS,
-                DesignTokens.SALES_GOAL, DesignTokens.GROSS_PROFIT,
-                DesignTokens.SEASONAL_CALENDAR, DesignTokens.QUICK_ACTIONS,
-                DesignTokens.SALES_FORECAST, Theme.SUCCESS, Theme.DANGER, Theme.WARNING};
-        boolean light = Theme.isLight();
-        float badgeTopTint = light ? 0.23f : 0.42f;
-        float badgeBottomTint = light ? 0.12f : 0.27f;
-        float metricTopTint = Theme.dashboardMetricTopTint();
-        float metricBottomTint = Theme.dashboardMetricBottomTint();
-        float cardTopTint = Theme.dashboardCardTopTint();
-        float cardBottomTint = Theme.dashboardCardBottomTint();
-        int welcomeRoyal = DesignTokens.mix(DesignTokens.EMERALD, Theme.PRIMARY,
-                Theme.isNuts() ? 0.12f : 0.08f);
-        int[] welcomeSurfaces = {welcomeRoyal, DesignTokens.EMERALD, DesignTokens.EMERALD_DEEP};
+        // Derakhshan 2.0 folds every legacy section hue into emerald/gold + four semantic colors.
+        // The home materials are now stone cards, saturated medals and 14% soft-chip washes, so the
+        // contrast checks verify those real surfaces instead of the retired tinted gradients.
+        DerakhshanTokens.Surface s = Theme.luxSurface();
+        int stoneTop = s.stone[0];
+        int stoneBottom = s.stone[s.stone.length - 1];
+        boolean dark = s.dark;
+
+        // Body / secondary / gold ink on the stone card — the spec's core contrast floors.
+        assertTrue("Primary ink on stone card", DesignTokens.contrastRatio(s.ink, stoneTop) >= 7.0);
+        assertTrue("Primary ink across stone gradient",
+                DesignTokens.contrastRatio(s.ink, stoneBottom) >= 7.0);
+        assertTrue("Secondary ink on stone card",
+                DesignTokens.contrastRatio(s.inkSecondary, stoneTop) >= 4.5);
+        assertTrue("Gold ink on stone card", DesignTokens.contrastRatio(s.goldText, stoneTop) >= 4.5);
+
+        // Welcome panel rides the emerald CTA material; white/champagne copy stays legible.
+        int[] welcomeSurfaces = DerakhshanTokens.EMERALD_MATERIAL;
         for (int surface : welcomeSurfaces) {
             assertTrue("Welcome title contrast on emerald hero",
                     DesignTokens.contrastRatio(Theme.dashboardWelcomeText(), surface) >= 4.8);
             assertTrue("Welcome secondary-text contrast on emerald hero",
                     DesignTokens.contrastRatio(Theme.dashboardWelcomeMuted(), surface) >= 4.8);
         }
-        for (int accent : accents) {
-            int badgeTop = DesignTokens.mix(Theme.SURFACE, accent, badgeTopTint);
-            int badgeBottom = DesignTokens.mix(Theme.SURFACE, accent, badgeBottomTint);
-            int iconInk = Theme.dashboardAccentInk(accent);
-            assertTrue("Dashboard icon contrast on top badge for " + Integer.toHexString(accent),
-                    DesignTokens.contrastRatio(iconInk, badgeTop) >= 4.8);
-            assertTrue("Dashboard icon contrast on lower badge for " + Integer.toHexString(accent),
-                    DesignTokens.contrastRatio(iconInk, badgeBottom) >= 4.8);
 
-            int metricTop = DesignTokens.mix(Theme.SURFACE, accent, metricTopTint);
-            int metricBottom = DesignTokens.mix(Theme.SURFACE, accent, metricBottomTint);
-            int mutedInk = Theme.dashboardMutedInk(accent);
-            assertTrue("Dashboard metric label contrast for " + Integer.toHexString(accent),
-                    DesignTokens.contrastRatio(mutedInk, metricTop) >= 4.8);
-            assertTrue("Dashboard metric label contrast across gradient for " + Integer.toHexString(accent),
-                    DesignTokens.contrastRatio(mutedInk, metricBottom) >= 4.8);
-            int categoryInk = Theme.dashboardAccentInk(accent);
-            assertTrue("Dashboard category shortcut contrast for " + Integer.toHexString(accent),
-                    DesignTokens.contrastRatio(categoryInk, metricTop) >= 4.8);
-            assertTrue("Dashboard category shortcut contrast across gradient for " + Integer.toHexString(accent),
-                    DesignTokens.contrastRatio(categoryInk, metricBottom) >= 4.8);
+        int[] families = {DerakhshanTokens.EMERALD_500, DerakhshanTokens.EMERALD_700,
+                DerakhshanTokens.GOLD_500, DerakhshanTokens.SUCCESS, DerakhshanTokens.WARNING,
+                DerakhshanTokens.DANGER, DerakhshanTokens.INFO};
+        float medalTopTint = dark ? 0.18f : 0.25f;
+        float medalBottomTint = dark ? 0.34f : 0.22f;
+        for (int family : families) {
+            String hex = Integer.toHexString(family);
 
-            int cardTop = DesignTokens.mix(Theme.SURFACE, accent, cardTopTint);
-            int cardBottom = DesignTokens.mix(Theme.SURFACE, accent, cardBottomTint);
-            int cardMuted = Theme.dashboardCardMutedInk(accent);
-            assertTrue("Dashboard card subtitle contrast for " + Integer.toHexString(accent),
-                    DesignTokens.contrastRatio(cardMuted, cardTop) >= 4.8);
-            assertTrue("Dashboard card subtitle contrast across gradient for " + Integer.toHexString(accent),
-                    DesignTokens.contrastRatio(cardMuted, cardBottom) >= 4.8);
+            // C3 medal: the black/white glyph must clear the WCAG 1.4.11 non-text 3:1 on every stop.
+            int glyph = LuxKit.glyphInk(family);
+            int medalTop = DerakhshanTokens.blend(family, 0xFFFFFFFF, medalTopTint);
+            int medalBottom = DerakhshanTokens.blend(family, 0xFF000000, medalBottomTint);
+            assertTrue("Medal glyph contrast (center) for " + hex,
+                    DesignTokens.contrastRatio(glyph, family) >= 3.0);
+            assertTrue("Medal glyph contrast (lit top) for " + hex,
+                    DesignTokens.contrastRatio(glyph, medalTop) >= 3.0);
+            assertTrue("Medal glyph contrast (shaded bottom) for " + hex,
+                    DesignTokens.contrastRatio(glyph, medalBottom) >= 3.0);
 
-            int actionInk = Theme.dashboardActionInk(accent);
-            int safeShade = actionInk == 0xFF000000 ? 0xFFFFFFFF : 0xFF000000;
-            int actionEnd = DesignTokens.mix(accent, safeShade, 0.035f);
-            assertTrue("Dashboard action text contrast for " + Integer.toHexString(accent),
-                    DesignTokens.contrastRatio(actionInk, accent) >= 4.8);
-            assertTrue("Dashboard action text contrast across gradient for " + Integer.toHexString(accent),
-                    DesignTokens.contrastRatio(actionInk, actionEnd) >= 4.8);
+            // Inset tile / soft chip: the deepened family ink stays >= 4.5:1 on its own 14% wash.
+            int wash = DerakhshanTokens.softChip(family, stoneTop);
+            int familyInk = Theme.dashboardAccentInk(family);
+            assertTrue("Family ink on soft wash for " + hex,
+                    DesignTokens.contrastRatio(familyInk, wash) >= 4.5);
+            assertTrue("Metric label ink on soft wash for " + hex,
+                    DesignTokens.contrastRatio(Theme.dashboardMutedInk(family), wash) >= 4.5);
+
+            // Filled heading action keeps its contrast-safe black/white ink on the folded family.
+            int actionInk = Theme.dashboardActionInk(family);
+            assertTrue("Action text contrast for " + hex,
+                    DesignTokens.contrastRatio(actionInk, family) >= 4.8);
         }
     }
 

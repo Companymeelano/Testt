@@ -364,70 +364,89 @@ public final class Theme {
     public static float dashboardMetricTopTint() { return light ? 0.045f : 0.12f; }
     public static float dashboardMetricBottomTint() { return light ? 0.018f : 0.055f; }
 
+    /** The resolved Derakhshan surface for the active app theme; the home dashboard renders on it. */
+    public static DerakhshanTokens.Surface luxSurface() { return DerakhshanTokens.theme(!light); }
+
     /**
-     * Quiet, softly tinted card used only by the home dashboard. Other screens keep the shared
-     * neutral card so the home refresh does not leak into the rest of the application.
+     * Folds every legacy section hue into the Derakhshan families: emerald/gold for the brand
+     * plus exactly four semantic colors. Purple and brown accents do not survive this map, so
+     * the home dashboard cannot render them no matter which section asks.
      */
-    public static GradientDrawable dashboardCard(int accent) {
-        int hue = accent == 0 ? PRIMARY : accent;
-        GradientDrawable card = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{DesignTokens.mix(SURFACE, hue, dashboardCardTopTint()),
-                        DesignTokens.mix(SURFACE, hue, dashboardCardBottomTint())});
-        card.setCornerRadius(dp(DASHBOARD_CARD_RADIUS_DP));
-        card.setStroke(dp(1), DesignTokens.mix(BORDER, hue, light ? 0.20f : 0.28f));
-        return card;
+    public static int luxFamily(int accent) {
+        if (accent == SUCCESS || accent == DesignTokens.POSITIVE || accent == DesignTokens.RECEIVE)
+            return DerakhshanTokens.SUCCESS;
+        if (accent == DANGER || accent == DesignTokens.NEGATIVE || accent == DesignTokens.PAY
+                || accent == DesignTokens.RETURNS || accent == DesignTokens.ROSE)
+            return DerakhshanTokens.DANGER;
+        if (accent == WARNING || accent == DesignTokens.WARNING || accent == DesignTokens.ALERT)
+            return DerakhshanTokens.WARNING;
+        if (accent == INFO || accent == DesignTokens.INFO || accent == DesignTokens.PURCHASE
+                || accent == DesignTokens.WAREHOUSE || accent == DesignTokens.CASH_POSITION
+                || accent == DesignTokens.SALES_GOAL || accent == DesignTokens.SALES_FORECAST
+                || accent == DesignTokens.SEASONAL_CALENDAR)
+            return DerakhshanTokens.INFO;
+        if (accent == DesignTokens.MARKET || accent == DesignTokens.GOLD)
+            return DerakhshanTokens.GOLD_500;
+        if (accent == DesignTokens.CLOSEOUT) return DerakhshanTokens.EMERALD_700;
+        return DerakhshanTokens.EMERALD_500;
     }
 
-    /** Restrained inset tile: accent stays in the icon and label instead of filling each card. */
+    /** The active surface's semantic ink for a legacy outcome color — text never wears a raw hue. */
+    public static int luxSemanticInk(int color) {
+        DerakhshanTokens.Surface s = luxSurface();
+        if (color == SUCCESS || color == DesignTokens.POSITIVE) return s.successText;
+        if (color == DANGER || color == DesignTokens.NEGATIVE) return s.dangerText;
+        if (color == WARNING || color == DesignTokens.WARNING || color == DesignTokens.ALERT)
+            return s.warningText;
+        if (color == INFO || color == DesignTokens.INFO) return s.infoText;
+        return s.ink;
+    }
+
+    /**
+     * Quiet stone card used only by the home dashboard — one calm material for every section;
+     * hue lives in the medals and inks. Other screens keep the shared neutral card.
+     */
+    public static GradientDrawable dashboardCard(int accent) {
+        return LuxDrawables.stone(luxSurface());
+    }
+
+    /** Restrained inset tile: the folded family at a 14% soft wash over the stone. */
     public static GradientDrawable dashboardMetric(int accent) {
-        int hue = accent == 0 ? PRIMARY : accent;
-        GradientDrawable tile = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{DesignTokens.mix(SURFACE, hue, dashboardMetricTopTint()),
-                        DesignTokens.mix(SURFACE, hue, dashboardMetricBottomTint())});
+        DerakhshanTokens.Surface s = luxSurface();
+        GradientDrawable tile = new GradientDrawable();
+        tile.setColor(DerakhshanTokens.softChip(luxFamily(accent), s.stone[0]));
         tile.setCornerRadius(dp(DASHBOARD_METRIC_RADIUS_DP));
-        tile.setStroke(dp(1), DesignTokens.mix(BORDER, hue, light ? 0.32f : 0.40f));
+        tile.setStroke(dp(1), s.hairline);
         return tile;
     }
 
-    /** Small raised jewel plate for dashboard icons; foreground color is resolved separately. */
+    /** C3 metallic medal plate for dashboard icons; the glyph rides in white/gold-100. */
     public static GradientDrawable dashboardBadge(int accent) {
-        int hue = accent == 0 ? PRIMARY : accent;
-        float topTint = light ? 0.23f : 0.42f;
-        float bottomTint = light ? 0.12f : 0.27f;
-        GradientDrawable badge = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{DesignTokens.mix(SURFACE, hue, topTint),
-                        DesignTokens.mix(SURFACE, hue, bottomTint)});
-        badge.setCornerRadius(dp(DASHBOARD_BADGE_RADIUS_DP));
-        badge.setStroke(dp(1), DesignTokens.mix(BORDER, hue, light ? 0.42f : 0.52f));
-        return badge;
+        return LuxDrawables.medal(luxSurface(), luxFamily(accent));
     }
 
-    /** Accent ink that remains legible on the dashboard's tinted icon plates and card surfaces. */
+    /** Family ink that stays legible on the soft dashboard washes (light: deepened, dark: lifted). */
     public static int dashboardAccentInk(int accent) {
-        int hue = accent == 0 ? PRIMARY : accent;
-        int referenceSurface = DesignTokens.mix(SURFACE, hue, light ? 0.23f : 0.42f);
-        return DesignTokens.textSafeColor(hue, referenceSurface, !light);
+        DerakhshanTokens.Surface s = luxSurface();
+        int family = luxFamily(accent);
+        // 40%/50% shifts keep every family — gold and deep emerald included — above 4.5:1 on washes.
+        return s.dark ? DerakhshanTokens.blend(family, 0xFFFFFFFF, 0.50f)
+                : DerakhshanTokens.blend(family, 0xFF000000, 0.40f);
     }
 
-    /** Secondary copy ink adjusted for the strongest part of an inset dashboard tile. */
+    /** Secondary copy ink on an inset dashboard tile: the surface's own secondary ink. */
     public static int dashboardMutedInk(int accent) {
-        int hue = accent == 0 ? PRIMARY : accent;
-        int referenceSurface = DesignTokens.mix(SURFACE, hue, dashboardMetricTopTint());
-        return DesignTokens.textSafeColor(MUTED, referenceSurface, !light);
+        return luxSurface().inkSecondary;
     }
 
-    /** Semantic success/warning ink adjusted for the inset surface without changing its meaning. */
+    /** Semantic success/warning ink without changing its meaning — deepened to stay ≥4.8:1 on washes. */
     public static int dashboardSemanticInk(int accent, int preferred) {
-        int hue = accent == 0 ? PRIMARY : accent;
-        int referenceSurface = DesignTokens.mix(SURFACE, hue, dashboardMetricTopTint());
-        return DesignTokens.textSafeColor(preferred, referenceSurface, !light);
+        return dashboardAccentInk(preferred);
     }
 
-    /** Secondary copy ink for labels placed directly on a home-card surface. */
+    /** Secondary copy ink for labels placed directly on a home-card stone surface. */
     public static int dashboardCardMutedInk(int accent) {
-        int hue = accent == 0 ? PRIMARY : accent;
-        int referenceSurface = DesignTokens.mix(SURFACE, hue, dashboardCardTopTint());
-        return DesignTokens.textSafeColor(MUTED, referenceSurface, !light);
+        return luxSurface().inkSecondary;
     }
 
     /** Contrast-safe foreground for a compact, filled dashboard action. */
@@ -440,7 +459,7 @@ public final class Theme {
 
     /** Filled, lightly shaded action used by dashboard section headings only. */
     public static GradientDrawable dashboardAction(int accent) {
-        int hue = accent == 0 ? PRIMARY : accent;
+        int hue = luxFamily(accent);
         int ink = dashboardActionInk(hue);
         int safeShade = ink == Color.BLACK ? Color.WHITE : Color.BLACK;
         GradientDrawable action = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
@@ -450,14 +469,12 @@ public final class Theme {
         return action;
     }
 
-    /** Deep emerald welcome panel with a restrained champagne edge; home-only by design. */
+    /** Derakhshan CTA-material welcome panel (160° emerald) with a restrained gold hairline. */
     public static GradientDrawable dashboardWelcome() {
-        int deep = DesignTokens.EMERALD_DEEP;
-        int royal = DesignTokens.mix(DesignTokens.EMERALD, PRIMARY, nuts ? 0.12f : 0.08f);
         GradientDrawable welcome = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{royal, DesignTokens.EMERALD, deep});
+                DerakhshanTokens.EMERALD_MATERIAL);
         welcome.setCornerRadius(dp(20));
-        welcome.setStroke(dp(1), alpha(DesignTokens.GOLD, nuts ? 188 : 112));
+        welcome.setStroke(dp(1), alpha(DerakhshanTokens.GOLD_300, nuts ? 188 : 112));
         return welcome;
     }
 

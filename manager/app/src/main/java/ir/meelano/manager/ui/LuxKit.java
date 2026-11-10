@@ -61,7 +61,7 @@ public final class LuxKit {
         medal.addView(wash, wp);
         ImageView icon = new ImageView(c);
         icon.setImageResource(iconRes);
-        icon.setColorFilter(s.dark ? DerakhshanTokens.GOLD_100 : 0xFFFFFFFF);
+        icon.setColorFilter(glyphInk(family));
         FrameLayout.LayoutParams ip = new FrameLayout.LayoutParams(
                 Theme.dp(sizeDp * 0.5f), Theme.dp(sizeDp * 0.5f));
         ip.gravity = Gravity.CENTER;
@@ -90,11 +90,19 @@ public final class LuxKit {
     }
 
     private static int chipInk(DerakhshanTokens.Surface s, int kind, int family) {
-        if (kind == CHIP_SOLID) return 0xFFFFFFFF;
-        if (kind == CHIP_GOLD) return s.dark ? 0xFF2A2005 : 0xFFF7EFC8;
+        // Filled chips pick black/white by measured contrast (white on amber measured 2.7:1).
+        if (kind == CHIP_SOLID) return glyphInk(family);
+        if (kind == CHIP_GOLD) return 0xFF2A2005;
         if (kind == CHIP_GHOST) return s.inkSecondary;
-        return s.dark ? DerakhshanTokens.blend(family, 0xFFFFFFFF, 0.35f)
-                : DerakhshanTokens.blend(family, 0xFF000000, 0.25f);
+        // same shifts as Theme.dashboardAccentInk: every family clears 4.5:1 on its own wash
+        return s.dark ? DerakhshanTokens.blend(family, 0xFFFFFFFF, 0.50f)
+                : DerakhshanTokens.blend(family, 0xFF000000, 0.40f);
+    }
+
+    /** Contrast-picked black/white foreground for a saturated family plate (icons, solid chips). */
+    public static int glyphInk(int family) {
+        return DerakhshanTokens.contrastRatio(0xFF000000, family)
+                >= DerakhshanTokens.contrastRatio(0xFFFFFFFF, family) ? 0xFF000000 : 0xFFFFFFFF;
     }
 
     // ---------------------------------------------------------------- C5 Button
@@ -268,6 +276,8 @@ public final class LuxKit {
             this.s = s;
             paint.setShadowLayer(Theme.dp(DerakhshanTokens.GOLD_EDGE_GLOW_DP), 0, 0,
                     DerakhshanTokens.GOLD_EDGE_GLOW);
+            // shadowLayer on shapes needs the software renderer; the view is 2dp tall so it is cheap.
+            setLayerType(LAYER_TYPE_SOFTWARE, null);
         }
 
         @Override protected void onDraw(Canvas canvas) {
@@ -276,12 +286,10 @@ public final class LuxKit {
             if (w <= 0 || h <= 0) return;
             float edgeW = w * DerakhshanTokens.GOLD_EDGE_WIDTH_FRACTION;
             // RTL: inline-end sits on the left.
-            float left = w - edgeW;
-            paint.setShader(new LinearGradient(left, 0, w, 0,
-                    new int[]{DerakhshanTokens.GOLD_500, DerakhshanTokens.GOLD_300},
+            paint.setShader(new LinearGradient(0, 0, edgeW, 0,
+                    new int[]{DerakhshanTokens.GOLD_300, DerakhshanTokens.GOLD_500},
                     null, Shader.TileMode.CLAMP));
-            canvas.drawRoundRect(new RectF(left, 0, w, h), h / 2f, h / 2f, paint);
-            if (s == null) return;
+            canvas.drawRoundRect(new RectF(0, 0, edgeW, h), h / 2f, h / 2f, paint);
         }
     }
 
@@ -667,13 +675,13 @@ public final class LuxKit {
             ImageView ic = new ImageView(c);
             ic.setImageResource(icons[i]);
             ic.setColorFilter(active ? DerakhshanTokens.GOLD_100
-                    : DerakhshanTokens.blend(s.ink, s.stone[0], 0.40f));
+                    : DerakhshanTokens.blend(s.ink, s.stone[0], 0.32f));
             FrameLayout.LayoutParams ip = new FrameLayout.LayoutParams(Theme.dp(20), Theme.dp(20));
             ip.gravity = Gravity.CENTER;
             frame.addView(ic, ip);
             tab.addView(frame, lp(Theme.dp(36), Theme.dp(32)));
             TextView l = txt(c, s, labels[i], 10.5f,
-                    active ? s.goldText : DerakhshanTokens.blend(s.ink, s.stone[0], 0.40f), true);
+                    active ? s.goldText : DerakhshanTokens.blend(s.ink, s.stone[0], 0.32f), true);
             l.setGravity(Gravity.CENTER);
             tab.addView(l, match(c));
             if (active) {
@@ -742,6 +750,21 @@ public final class LuxKit {
 
     private static LinearLayout.LayoutParams wlp(Context c, float weight) {
         return new LinearLayout.LayoutParams(0, -2, weight);
+    }
+
+    /**
+     * The page's single «فوری» pulse: a decorative marker breathes between 30% and 50%
+     * opacity over 2400ms. Reduce-motion keeps it static at full opacity.
+     */
+    public static void pulseUrgent(final View marker) {
+        if (marker == null) return;
+        if (!Ui.motionOk(marker.getContext())) return;
+        android.animation.ObjectAnimator an = android.animation.ObjectAnimator.ofFloat(
+                marker, "alpha", DerakhshanTokens.URGENT_PULSE_FROM, DerakhshanTokens.URGENT_PULSE_TO);
+        an.setDuration(DerakhshanTokens.URGENT_PULSE_MS / 2L);
+        an.setRepeatMode(android.animation.ValueAnimator.REVERSE);
+        an.setRepeatCount(android.animation.ValueAnimator.INFINITE);
+        an.start();
     }
 
     /** Count-up for any Derakhshan figure, honoring reduce-motion. */

@@ -46,6 +46,36 @@ public final class MasterQueries {
                 + " FROM dbo.inventory");
     }
 
+    /**
+     * Compact, read-only list of active products that are out of stock or at/below a known
+     * reorder point. If the schema has no reorder-point column, only confirmed stock-outs
+     * are returned; unknown reorder data is never treated as a zero threshold.
+     */
+    public static Queries.Q stockAlerts(Meta m, int top) throws Queries.Missing {
+        String shka = m.must("inventory", "کد کالا", "shka");
+        String name = m.must("inventory", "نام کالا", "naka", "NAKA");
+        String active = m.col("inventory", "active", "Active");
+        String reorder = m.col("inventory", "reopoint", "reorder_point");
+        String pieces = stockPieces(m, "i.");
+        String reorderExpr = reorder == null ? "CAST(NULL AS decimal(19,3))"
+                : "TRY_CONVERT(decimal(19,3),i.[" + reorder + "])";
+        String stockCondition = pieces + "<=0";
+        if (reorder != null)
+            stockCondition = "(" + stockCondition + " OR (" + reorderExpr + ">0 AND "
+                    + pieces + "<=" + reorderExpr + "))";
+        String where = " WHERE " + (active == null ? "" : boolTrue("i.[" + active + "]") + " AND ")
+                + stockCondition;
+        String sql = "SELECT TOP (" + Queries.clampTop(top) + ") "
+                + Sql.txt("i", shka, 100) + " AS shka, "
+                + Sql.txt("i", name, 250) + " AS name, "
+                + pieces + " AS stockPieces, " + reorderExpr + " AS reorderPoint, "
+                + "CAST(" + (reorder == null ? "0" : "1") + " AS int) AS reorderKnown, "
+                + "CAST(CASE WHEN " + pieces + "<=0 THEN 1 ELSE 0 END AS int) AS isOut "
+                + "FROM dbo.inventory i" + where
+                + " ORDER BY CASE WHEN " + pieces + "<=0 THEN 0 ELSE 1 END, " + pieces + " ASC, i.[" + name + "] ASC";
+        return new Queries.Q(sql);
+    }
+
     public static Queries.Q stockValueByGroup(Meta m) throws Queries.Missing {
         String cost = m.col("inventory", "inventory_price", "buy_price", "pure_buy_price", "ImPureBuyPrice");
         String active = m.col("inventory", "active", "Active");
@@ -502,6 +532,7 @@ public final class MasterQueries {
         if (!m.table("cust_act")) throw new Queries.Missing("«گردش حساب مشتری» در دیتابیس پیدا نشد");
         String shmo = m.must("cust_act", "کد مشتری", "shmo");
         String date = m.must("cust_act", "تاریخ", "date", "DATE");
+        String time = m.col("cust_act", "t_time", "TimeServer", "time");
         String bed = m.must("cust_act", "بدهکار", "act_bed", "bed");
         String bes = m.must("cust_act", "بستانکار", "act_bes", "bes");
         String op = m.col("cust_act", "act_id", "ActID");
@@ -514,7 +545,7 @@ public final class MasterQueries {
         conds.add("TRY_CONVERT(nvarchar(100),h.[" + shmo + "])=?");
         String dc = Sql.dateCond(Sql.date10("h", date), f.from, f.to, binds);
         if (!dc.isEmpty()) conds.add(dc);
-        return new Queries.Q("SELECT " + Sql.date10("h", date) + " AS date"
+        return new Queries.Q("SELECT " + Sql.dateTimeDisplay("h", date, time) + " AS date"
                 + ", " + (op == null ? "N''" : "COALESCE(" + Sql.txt("h", op, 40) + ",N'')") + " AS op"
                 + ", " + Queries.actLabelExpr(m, "h", op, "an") + " AS opLabel"
                 + ", " + Sql.num("h", bed) + " AS bed, " + Sql.num("h", bes) + " AS bes"
@@ -532,6 +563,7 @@ public final class MasterQueries {
         String ghno = m.must("dar", "شماره قبض", "ghno", "GHNO");
         String shmo = m.must("dar", "کد مشتری", "shmo", "SHMO");
         String date = m.must("dar", "تاریخ", "date", "DATE");
+        String clock = m.col("dar", "ClockTime", "clocktime", "clock_time");
         String cash = m.col("dar", "naghd", "cash");
         // POS/transfer amounts are not dar columns (they live in PosDetails); no dar equivalent for them.
         String pos = null;
@@ -547,7 +579,7 @@ public final class MasterQueries {
         String dc = Sql.dateCond(Sql.date10("h", date), f.from, f.to, binds);
         if (!dc.isEmpty()) conds.add(dc);
         return new Queries.Q("SELECT " + Sql.txt("h", ghno, 60) + " AS ghno"
-                + ", " + Sql.date10("h", date) + " AS date"
+                + ", " + Sql.dateTimeDisplay("h", date, clock) + " AS date"
                 + ", (" + Sql.num("h", cash) + "+" + Sql.num("h", pos) + "+" + Sql.num("h", hav) + "+" + Sql.num("h", chq) + ") AS total"
                 + ", " + (desc == null ? "N''" : "COALESCE(" + Sql.txt("h", desc, 500) + ",N'')") + " AS descrip"
                 + " FROM dbo.dar h WHERE " + Sql.join(conds, " AND ")
@@ -584,7 +616,7 @@ public final class MasterQueries {
         String where = conds.isEmpty() ? "" : " WHERE " + Sql.join(conds, " AND ");
         return new Queries.Q("SELECT " + Sql.txt("c", shmo, 100) + " AS code"
                 + ", " + (name == null ? Sql.txt("c", shmo, 120) : "COALESCE(" + Sql.txt("c", name, 250) + "," + Sql.txt("c", shmo, 120) + ")") + " AS name"
-                + ", " + Sql.date10("c", date) + " AS date"
+                + ", " + Sql.dateTimeDisplay("c", date) + " AS date"
                 + ", " + (vis == null ? "N''" : Queries.visNameExpr(m, "c", vis)) + " AS visitor"
                 + " FROM dbo.CUSTOMERS c" + (vis == null ? "" : Queries.visJoin(m, "c", vis))
                 + where + " ORDER BY c.[" + date + "] DESC" + Queries.pageClause(binds, f.page, f.top), binds);
@@ -729,10 +761,10 @@ public final class MasterQueries {
         String loginDate = m.colFlex("LoginDetails", "DateServer", "DateClient", "login_date", "logindate", "date", "event_time", "time");
         String loginTable = m.table("LoginDetails") && m.canSelect("LoginDetails") ? m.qTable("LoginDetails") : null;
         String loginApply = loginUser != null && loginDate != null && loginTable != null
-                ? "OUTER APPLY (SELECT MAX(" + Sql.date10("lg", loginDate) + ") lastDay FROM " + loginTable + " lg"
+                ? "OUTER APPLY (SELECT MAX(" + Sql.dateTimeDisplay("lg", loginDate) + ") lastDay FROM " + loginTable + " lg"
                 + " WHERE TRY_CONVERT(nvarchar(100),lg.[" + loginUser + "]) IN (TRY_CONVERT(nvarchar(100),u.[" + id + "])"
                 + (uname == null ? "" : ",TRY_CONVERT(nvarchar(100),u.[" + uname + "])") + ")) ll"
-                : "OUTER APPLY (SELECT CAST(NULL AS nvarchar(10)) lastDay) ll";
+                : "OUTER APPLY (SELECT CAST(NULL AS nvarchar(30)) lastDay) ll";
         // Today's actions (best-effort); the sample keeps these in security.Log.
         String logUser = m.colFlex("Log", "user_id", "userid", "username", "user_name");
         String logDate = m.colFlex("Log", "date", "event_time", "time", "logdate");
@@ -763,7 +795,7 @@ public final class MasterQueries {
         if (date == null && desc == null) throw new Queries.Missing("ساختار «ورودهای کاربران» قابل تشخیص نیست");
         List<Object> binds = new ArrayList<>();
         binds.add(userId);
-        return new Queries.Q("SELECT TOP (100) " + (date == null ? "CAST(NULL AS nvarchar(16))" : "LEFT(TRY_CONVERT(nvarchar(30),[" + date + "]),16)") + " AS at"
+        return new Queries.Q("SELECT TOP (100) " + Sql.dateTimeDisplay(null, date) + " AS at"
                 + ", " + (ip == null ? "N''" : "COALESCE(" + Sql.txt(null, ip, 120) + ",N'')") + " AS ip"
                 + ", " + (desc == null ? "N''" : "COALESCE(" + Sql.txt(null, desc, 400) + ",N'')") + " AS descrip"
                 + " FROM " + m.qTable("LoginDetails") + " WHERE TRY_CONVERT(nvarchar(100),[" + user + "])=?"
@@ -895,18 +927,33 @@ public final class MasterQueries {
         if (!dc.isEmpty()) conds.add(dc);
         String inner = "WHERE " + (conds.isEmpty() ? "1=1" : Sql.join(conds, " AND ")) + Sql.activeAnd(cols, "x") + Sql.softAnd(cols, "x");
         String day = monthly ? Sql.month7("h", dateCol) : Sql.date10("h", dateCol);
-        // Sales per day from the header; COGS per day from the lines (avoid fan-out by aggregating separately).
+        String quantity = "TRY_CONVERT(decimal(19,3),d.[" + qty + "])";
+        String unitCost = "TRY_CONVERT(decimal(19,2),i.[" + buy + "])";
+        String qualityIssue = "CASE WHEN d.[" + linkCol + "] IS NULL OR " + quantity
+                + " IS NULL OR i.[" + invShka + "] IS NULL OR " + unitCost
+                + " IS NULL OR " + unitCost + "<0 THEN CONVERT(bigint,1) ELSE CONVERT(bigint,0) END";
+        // Sales, COGS and data-quality checks are aggregated separately to avoid fan-out. A
+        // missing line or unmatched/invalid item cost marks the day incomplete, not as zero COGS.
         String sql = "SELECT day AS day, ISNULL(SUM(sales),0) AS sales, ISNULL(SUM(cogs),0) AS cogs"
-                + ", ISNULL(SUM(sales),0)-ISNULL(SUM(cogs),0) AS profit FROM ("
-                + "SELECT " + day + " AS day, " + Sql.num("h", amountCol) + " AS sales, CAST(0 AS decimal(19,2)) AS cogs"
+                + ", ISNULL(SUM(sales),0)-ISNULL(SUM(cogs),0) AS profit"
+                + ", ISNULL(SUM(qualityIssues),0) AS qualityIssues FROM ("
+                + "SELECT " + day + " AS day, " + Sql.num("h", amountCol)
+                + " AS sales, CAST(0 AS decimal(19,2)) AS cogs, CAST(0 AS bigint) AS qualityIssues"
                 + " FROM " + Sql.dedupe("sailfact", numberCol, "h", inner)
                 + " UNION ALL SELECT " + day + " AS day, CAST(0 AS decimal(19,2)) AS sales"
-                + ", " + cogsLine(m, qty, "d", "i") + " AS cogs"
+                + ", " + cogsLine(m, qty, "d", "i") + " AS cogs, CAST(0 AS bigint) AS qualityIssues"
                 + " FROM " + Sql.dedupe("sailfact", numberCol, "h", inner)
                 + " JOIN dbo.subsailfact d ON TRY_CONVERT(nvarchar(100),d.[" + linkCol + "])=TRY_CONVERT(nvarchar(100),h.[" + numberCol + "])"
                 + " LEFT JOIN dbo.inventory i ON TRY_CONVERT(nvarchar(100),i.[" + invShka + "])=TRY_CONVERT(nvarchar(100),d.[" + shka + "])"
+                + " UNION ALL SELECT " + day + " AS day, CAST(0 AS decimal(19,2)) AS sales"
+                + ", CAST(0 AS decimal(19,2)) AS cogs, SUM(" + qualityIssue + ") AS qualityIssues"
+                + " FROM " + Sql.dedupe("sailfact", numberCol, "h", inner)
+                + " LEFT JOIN dbo.subsailfact d ON TRY_CONVERT(nvarchar(100),d.[" + linkCol + "])=TRY_CONVERT(nvarchar(100),h.[" + numberCol + "])"
+                + " LEFT JOIN dbo.inventory i ON TRY_CONVERT(nvarchar(100),i.[" + invShka + "])=TRY_CONVERT(nvarchar(100),d.[" + shka + "])"
+                + " GROUP BY " + day
                 + ") u GROUP BY day ORDER BY day";
         List<Object> binds2 = new ArrayList<>(binds);
+        binds2.addAll(binds);
         binds2.addAll(binds);
         return new Queries.Q(sql, binds2);
     }
@@ -1231,10 +1278,92 @@ public final class MasterQueries {
             String dc = Sql.dateCond(Sql.date10("h", date), f.from, f.to, binds);
             if (!dc.isEmpty()) conds.add(dc);
         }
+        String bankIsActive = m.col("ban_act", "isActive", "IsActive");
+        if (bankIsActive != null) conds.add(boolTrue("h.[" + bankIsActive + "]"));
+        String active = Sql.activeAnd(m.columns("ban_act"), "h");
+        String soft = Sql.softAnd(m.columns("ban_act"), "h");
+        if (!active.isEmpty()) conds.add(active.substring(5));
+        if (!soft.isEmpty()) conds.add(soft.substring(5));
         String where = conds.isEmpty() ? "" : " WHERE " + Sql.join(conds, " AND ");
+        // Keep the account key alongside its display label: two accounts at the same bank
+        // must not be collapsed when the manager reconciles each statement independently.
+        String bankId = Sql.txt("h", bank, 60);
         return new Queries.Q("SELECT " + label + " AS bank, " + inExpr + " AS [in], " + outExpr + " AS [out]"
-                + ", COUNT_BIG(1) AS count FROM dbo.ban_act h" + join + where
-                + " GROUP BY " + label + " ORDER BY 2 DESC", binds);
+                + ", COUNT_BIG(1) AS count, " + bankId + " AS bankId FROM dbo.ban_act h" + join + where
+                + " GROUP BY " + label + ", " + bankId + " ORDER BY 2 DESC", binds);
+    }
+
+    /** Exact daily, direction-separated movements for one Atiran bank account (read-only). */
+    public static Queries.Q bankTurnoverDaily(Meta m, String bankId, String from, String to)
+            throws Queries.Missing {
+        if (!m.table("ban_act")) throw new Queries.Missing("«گردش بانک» در دیتابیس پیدا نشد");
+        if (bankId == null || bankId.trim().isEmpty())
+            throw new Queries.Missing("شناسهٔ حساب بانکی برای فیلتر گردش در دسترس نیست");
+        String bank = m.must("ban_act", "بانک", "bank_rdf", "BankRdf", "bankrdf");
+        String date = m.colFlex("ban_act", "act_date", "done_act");
+        if (date == null) throw new Queries.Missing("تاریخ عملیات بانکی در دیتابیس پیدا نشد");
+        String bed = m.colFlex("ban_act", "act_bed", "bed", "bedehkar");
+        String bes = m.colFlex("ban_act", "act_bes", "bes", "bestankar");
+        if (bed == null || bes == null)
+            throw new Queries.Missing("ستون واریز یا برداشت در دفتر بانک پیدا نشد؛ مقایسهٔ دوطرفه ممکن نیست");
+
+        String day = Sql.dateKey(Sql.date10("h", date));
+        String rawIn = "TRY_CONVERT(decimal(38,18),h.[" + bes + "])";
+        String rawOut = "TRY_CONVERT(decimal(38,18),h.[" + bed + "])";
+        String roundedIn = "TRY_CONVERT(decimal(38,4),h.[" + bes + "])";
+        String roundedOut = "TRY_CONVERT(decimal(38,4),h.[" + bed + "])";
+        String in = "COALESCE(" + roundedIn + ",CAST(0 AS decimal(38,4)))";
+        String out = "COALESCE(" + roundedOut + ",CAST(0 AS decimal(38,4)))";
+        String presentIn = "h.[" + bes + "] IS NOT NULL AND NULLIF(LTRIM(RTRIM(TRY_CONVERT(nvarchar(60),h.["
+                + bes + "]))),N'') IS NOT NULL";
+        String presentOut = "h.[" + bed + "] IS NOT NULL AND NULLIF(LTRIM(RTRIM(TRY_CONVERT(nvarchar(60),h.["
+                + bed + "]))),N'') IS NOT NULL";
+        String invalidIn = "CASE WHEN " + presentIn + " AND (" + rawIn + " IS NULL OR " + roundedIn
+                + " IS NULL OR " + rawIn + "<>" + roundedIn + ") THEN CONVERT(bigint,1) ELSE CONVERT(bigint,0) END";
+        String invalidOut = "CASE WHEN " + presentOut + " AND (" + rawOut + " IS NULL OR " + roundedOut
+                + " IS NULL OR " + rawOut + "<>" + roundedOut + ") THEN CONVERT(bigint,1) ELSE CONVERT(bigint,0) END";
+        String missingAmounts = "CASE WHEN NOT(" + presentIn + ") AND NOT(" + presentOut
+                + ") THEN CONVERT(bigint,1) ELSE CONVERT(bigint,0) END";
+        String negative = "CASE WHEN " + rawIn + "<0 OR " + rawOut
+                + "<0 THEN CONVERT(bigint,1) ELSE CONVERT(bigint,0) END";
+        String bankKey = "TRY_CONVERT(nvarchar(60),h.[" + bank + "])";
+        List<Object> binds = new ArrayList<>();
+        List<String> conds = new ArrayList<>();
+        conds.add("LTRIM(RTRIM(" + bankKey + "))=?");
+        binds.add(bankId.trim());
+        String bankIsActive = m.col("ban_act", "isActive", "IsActive");
+        if (bankIsActive != null) conds.add(boolTrue("h.[" + bankIsActive + "]"));
+        String active = Sql.activeAnd(m.columns("ban_act"), "h");
+        String soft = Sql.softAnd(m.columns("ban_act"), "h");
+        if (!active.isEmpty()) conds.add(active.substring(5));
+        if (!soft.isEmpty()) conds.add(soft.substring(5));
+        String sourceWhere = Sql.join(conds, " AND ");
+        String dateCondition = Sql.dateCond("b.day", from, to, binds);
+        String dailyWhere = dateCondition.isEmpty() ? "" : " WHERE " + dateCondition;
+        int maxJalaliYear = Jalali.fromDay(Jalali.today())[0] + 8;
+        String validJalaliDay = "b.day LIKE N'[0-9][0-9][0-9][0-9]/[0-9][0-9]/[0-9][0-9]'"
+                + " AND TRY_CONVERT(int,LEFT(b.day,4)) BETWEEN 1300 AND " + maxJalaliYear
+                + " AND TRY_CONVERT(int,SUBSTRING(b.day,6,2)) BETWEEN 1 AND 12"
+                + " AND TRY_CONVERT(int,RIGHT(b.day,2)) BETWEEN 1 AND 31";
+        return new Queries.Q("WITH bank_rows AS ("
+                + " SELECT " + day + " AS day, " + in + " AS [in], " + out + " AS [out]"
+                + ", " + invalidIn + " AS invalidIn, " + invalidOut + " AS invalidOut"
+                + ", " + missingAmounts + " AS missingRows, " + negative + " AS negativeRows"
+                + " FROM dbo.ban_act h WHERE " + sourceWhere + ")"
+                + ", daily AS (SELECT b.day, SUM(b.[in]) AS [in], SUM(b.[out]) AS [out]"
+                + ", COUNT_BIG(1) AS count, SUM(b.invalidIn) AS invalidIn, SUM(b.invalidOut) AS invalidOut"
+                + ", SUM(b.missingRows) AS missingRows, SUM(b.negativeRows) AS negativeRows"
+                + " FROM bank_rows b" + dailyWhere + " GROUP BY b.day)"
+                + ", quality AS (SELECT COALESCE(SUM(CASE WHEN " + validJalaliDay
+                + " THEN CONVERT(bigint,0) ELSE CONVERT(bigint,1) END),CONVERT(bigint,0)) AS invalidDateRows"
+                + " FROM bank_rows b)"
+                + " SELECT d.day,d.[in],d.[out],d.count,d.invalidIn,d.invalidOut,d.missingRows,d.negativeRows,q.invalidDateRows"
+                + " FROM daily d CROSS JOIN quality q"
+                + " UNION ALL SELECT CAST(NULL AS nvarchar(30)) AS day,CAST(0 AS decimal(38,4)) AS [in]"
+                + ",CAST(0 AS decimal(38,4)) AS [out],CONVERT(bigint,0) AS count"
+                + ",CONVERT(bigint,0) AS invalidIn,CONVERT(bigint,0) AS invalidOut"
+                + ",CONVERT(bigint,0) AS missingRows,CONVERT(bigint,0) AS negativeRows,q.invalidDateRows"
+                + " FROM quality q WHERE NOT EXISTS (SELECT 1 FROM daily) ORDER BY 1", binds);
     }
 
     /** Bank operations per account and month (banking only): bank,month,in,out,net,count. */
@@ -1284,6 +1413,7 @@ public final class MasterQueries {
         // Schema: TableChanges(DateServer, TimeServer, UserID, KindID, DescriptionOfChanges, Comment)
         // and TableChangesKinds(KindID, KindName) via FK_TableChanges_TableChangesKinds.
         String date = m.col("TableChanges", "DateServer");
+        String time = m.col("TableChanges", "TimeServer");
         String kind = m.col("TableChanges", "KindID");
         String kindName = m.col("TableChangesKinds", "KindName");
         String user = m.col("TableChanges", "UserID");
@@ -1304,7 +1434,7 @@ public final class MasterQueries {
         String where = conds.isEmpty() ? "" : " WHERE " + Sql.join(conds, " AND ");
         String order = date == null ? "1" : "t.[" + date + "] DESC";
         String join = joinKind ? " LEFT JOIN dbo.TableChangesKinds k ON TRY_CONVERT(nvarchar(60),k.[KindID])=TRY_CONVERT(nvarchar(60),t.[" + kind + "])" : "";
-        return new Queries.Q("SELECT " + (date == null ? "CAST(NULL AS nvarchar(16))" : "LEFT(TRY_CONVERT(nvarchar(30),t.[" + date + "]),16)") + " AS at"
+        return new Queries.Q("SELECT " + Sql.dateTimeDisplay("t", date, time) + " AS at"
                 + ", " + (joinKind ? "COALESCE(" + Sql.txt("k", kindName, 150) + ",N'')" : "N''") + " AS tableName"
                 + ", " + (user == null ? "N''" : "COALESCE(" + Sql.txt("t", user, 120) + ",N'')") + " AS username"
                 + ", " + (desc == null ? "N''" : "COALESCE(" + Sql.txt("t", desc, 400) + ",N'')") + " AS descrip"
@@ -1321,6 +1451,7 @@ public final class MasterQueries {
         String table = sales ? "sailfact" : "buyfact";
         Set<String> cols = m.columns(table);
         String dateCol = sales ? m.must(table, "تاریخ", "date") : m.must(table, "تاریخ", "DATE", "date");
+        String timeCol = sales ? Sql.pick(cols, "time_") : Sql.pick(cols, "Hour", "hour");
         String amountCol = m.must(table, "مبلغ", "all");
         String numberCol = sales ? m.must(table, "شماره فاکتور", "shfacfo") : m.must(table, "شماره فاکتور", "shfackh", "shfac");
         String partyCol = m.must(table, "طرف‌حساب", "shmo", "SHMO");
@@ -1338,7 +1469,7 @@ public final class MasterQueries {
         String total = Sql.num("h", amountCol);
         String paid = Sql.num("h", paidCol);
         return new Queries.Q("SELECT " + Sql.txt("h", numberCol, 80) + " AS no"
-                + ", " + Sql.date10("h", dateCol) + " AS date"
+                + ", " + Sql.dateTimeDisplay("h", dateCol, timeCol) + " AS date"
                 + ", " + total + " AS total, " + paid + " AS paid, ((" + total + ")-(" + paid + ")) AS remain"
                 + ", " + (tasviehCol == null ? "N''" : "COALESCE(" + Sql.txt("h", tasviehCol, 10) + ",N'')") + " AS tasvieh"
                 + ", " + (dueCol == null ? "CAST(NULL AS nvarchar(10))" : Sql.date10("h", dueCol)) + " AS dueDate"
@@ -1678,6 +1809,7 @@ public final class MasterQueries {
     public static Queries.Q invoiceProfit(Meta m, Filter f) throws Queries.Missing {
         Set<String> cols = m.columns("sailfact");
         String dateCol = m.must("sailfact", "تاریخ", "date");
+        String timeCol = m.col("sailfact", "time_", "TimeServer", "time");
         String amountCol = m.must("sailfact", "مبلغ", "all_fel", "all");
         String numberCol = m.must("sailfact", "شماره فاکتور", "shfacfo");
         String partyCol = Sql.pick(cols, "shmo", "SHMO");
@@ -1712,7 +1844,7 @@ public final class MasterQueries {
         String where = conds.isEmpty() ? "" : " WHERE " + Sql.join(conds, " AND ");
         return new Queries.Q("SELECT TOP (" + Queries.clampTop(f.top) + ") " + no + " AS no"
                 + ", " + Queries.custNameExpr(m, "h", partyCol, "cu") + " AS customer"
-                + ", " + Sql.date10("h", dateCol) + " AS date, " + amt + " AS amount"
+                + ", " + Sql.dateTimeDisplay("h", dateCol, timeCol) + " AS date, " + amt + " AS amount"
                 + ", " + disc + " AS discount, " + cogs + " AS cogs"
                 + ", " + profit + " AS profit, " + margin + " AS margin"
                 + " FROM " + Sql.dedupe("sailfact", numberCol, "h", inner)
@@ -1910,6 +2042,7 @@ public final class MasterQueries {
     private static Queries.Q whDeliveries(Meta m, String day, int limit) throws Queries.Missing {
         String no = m.must("sailfact", "شماره فاکتور", "shfacfo", "shFacFo");
         String dt = m.must("sailfact", "تاریخ فاکتور", "date");
+        String time = m.col("sailfact", "time_", "time");
         String shmo = m.col("sailfact", "shmo", "SHMO");
         String vis = m.col("sailfact", "vis_rdf", "visrdf");
         String all = m.col("sailfact", "all_fel", "all", "All", "sumall");
@@ -1966,7 +2099,7 @@ public final class MasterQueries {
                 + Sql.activeAnd(cols, "f") + Sql.softAnd(cols, "f");
         return new Queries.Q("SELECT TOP " + Math.max(1, Math.min(500, limit))
                 + " TRY_CONVERT(bigint,f.[" + no + "]) AS id, "
-                + Sql.date10("f", dt) + " AS dt, " + custExpr + " AS cust, " + phoneExpr + " AS phone, "
+                + Sql.dateTimeDisplay("f", dt, time) + " AS dt, " + custExpr + " AS cust, " + phoneExpr + " AS phone, "
                 + visExpr + " AS visitor, " + routeIdExpr + " AS routeId, " + routeNameExpr + " AS route, "
                 + (all == null ? "0" : "TRY_CONVERT(money,f.[" + all + "])") + " AS amount, "
                 + (tas == null ? "N''" : "COALESCE(" + Sql.txt("f", tas, 10) + ",N'')") + " AS settled"
@@ -2343,16 +2476,54 @@ public final class MasterQueries {
         return new String[]{label, join};
     }
 
+    /** Jalali report bounds also match Gregorian datetimes stored by some Atiran installs. */
+    private static String returnDateRange(String alias, String dateCol, String from, String to,
+                                          List<Object> binds) {
+        boolean hasFrom = from != null && !from.trim().isEmpty();
+        boolean hasTo = to != null && !to.trim().isEmpty();
+        boolean both = hasFrom && hasTo;
+        String gregorianFrom = hasFrom ? Jalali.toGregorian(from.trim()) : "";
+        String gregorianTo = hasTo ? Jalali.toGregorian(to.trim()) : "";
+        String raw = Sql.date10(alias, dateCol);
+        String dateKey = Sql.dateKey(raw);
+        String jalaliText = "CHARINDEX(N'/'," + raw + ")>0";
+        String gregorianText = "CHARINDEX(N'/'," + raw + ")=0";
+        if (!both && hasFrom && !gregorianFrom.isEmpty()) {
+            binds.add(from.trim()); binds.add(gregorianFrom);
+            return "((" + jalaliText + " AND " + dateKey + ">=?) OR (" + gregorianText + " AND " + raw + ">=?))";
+        }
+        if (!both && hasTo && !gregorianTo.isEmpty()) {
+            binds.add(to.trim()); binds.add(gregorianTo);
+            return "((" + jalaliText + " AND " + dateKey + "<=?) OR (" + gregorianText + " AND " + raw + "<=?))";
+        }
+        if (both && !gregorianFrom.isEmpty() && !gregorianTo.isEmpty()) {
+            String first = from.trim();
+            String last = to.trim();
+            if (first.compareTo(last) > 0) {
+                String swap = first; first = last; last = swap;
+                String gregorianSwap = gregorianFrom; gregorianFrom = gregorianTo; gregorianTo = gregorianSwap;
+            }
+            binds.add(first); binds.add(last); binds.add(gregorianFrom); binds.add(gregorianTo);
+            return "((" + jalaliText + " AND " + dateKey + ">=? AND " + dateKey + "<=?) OR ("
+                    + gregorianText + " AND " + raw + ">=? AND " + raw + "<=?))";
+        }
+        return Sql.dateCond(raw, from, to, binds);
+    }
+
     /** Returns grouped by document type: document count + total amount, best for a donut. */
     public static Queries.Q returnsByKind(Meta m, Filter f) throws Queries.Missing {
         RetCols r = retCols(m);
+        if (r.date == null && f != null && f.hasRange())
+            throw new Queries.Missing("ستون تاریخ در «اسناد برگشتی» موجود نیست؛ جمع بازه‌ای قابل گزارش نیست");
         String[] kj = retKindJoin(m, r);
         List<Object> binds = new ArrayList<>();
-        String dc = r.date == null ? "" : Sql.dateCond(Sql.date10("h", r.date), f.from, f.to, binds);
+        String dc = r.date == null ? "" : returnDateRange("h", r.date, f.from, f.to, binds);
         // back_sanad.Active = 1 is the live-document flag Atiran's own views use (deleted/revoked returns are 0).
         String where = " WHERE " + (dc.isEmpty() ? "1=1" : dc) + Sql.activeAnd(m.columns("back_sanad"), "h");
+        String amount = Sql.numNull("h", r.amount);
         return new Queries.Q("SELECT " + kj[0] + " AS label, COUNT_BIG(1) AS docs"
-                + ", ISNULL(SUM(" + Sql.num("h", r.amount) + "),0) AS total"
+                + ", SUM(" + amount + ") AS total"
+                + ", SUM(CASE WHEN " + amount + " IS NULL THEN 1 ELSE 0 END) AS invalidRows"
                 + " FROM dbo.[back_sanad] h" + kj[1] + where
                 + " GROUP BY " + kj[0]
                 + " ORDER BY 3 DESC", binds);
@@ -2369,11 +2540,15 @@ public final class MasterQueries {
     /** The return documents themselves, newest first. */
     public static Queries.Q returnsList(Meta m, Filter f) throws Queries.Missing {
         RetCols r = retCols(m);
+        if (r.date == null)
+            throw new Queries.Missing("ستون تاریخ در «اسناد برگشتی» موجود نیست؛ فهرستِ تاریخ‌فیلترشده قابل تهیه نیست");
+        if (r.no == null)
+            throw new Queries.Missing("ستون شماره سند برگشتی موجود نیست؛ باز کردن اقلام هر سند ممکن نیست");
         String[] kj = retKindJoin(m, r);
         List<Object> binds = new ArrayList<>();
         List<String> conds = new ArrayList<>();
         if (r.date != null) {
-            String dc = Sql.dateCond(Sql.date10("h", r.date), f.from, f.to, binds);
+            String dc = returnDateRange("h", r.date, f.from, f.to, binds);
             if (!dc.isEmpty()) conds.add(dc);
         }
         if (f.search != null && !f.search.trim().isEmpty()) {
@@ -2382,24 +2557,120 @@ public final class MasterQueries {
             if (r.customer != null) exprs.add(Sql.txt("h", r.customer, 250));
             if (r.desc != null) exprs.add(Sql.txt("h", r.desc, 500));
             if (!exprs.isEmpty()) {
-                binds.add("%" + f.search.trim() + "%");
                 List<String> likes = new ArrayList<>();
-                for (String e : exprs) likes.add(e + " LIKE ?");
+                for (String e : exprs) {
+                    likes.add(e + " LIKE ?");
+                    binds.add("%" + f.search.trim() + "%");
+                }
                 conds.add("(" + Sql.join(likes, " OR ") + ")");
             }
         }
         String where = " WHERE " + (conds.isEmpty() ? "1=1" : Sql.join(conds, " AND "))
                 + Sql.activeAnd(m.columns("back_sanad"), "h");
         String no = r.no == null ? "CAST(NULL AS nvarchar(80))" : Sql.txt("h", r.no, 80);
-        String dt = r.date == null ? "CAST(NULL AS nvarchar(20))" : Sql.date10("h", r.date);
+        String time = m.col("back_sanad", "Hour", "hour");
+        String dt = r.date == null ? "CAST(NULL AS nvarchar(30))" : Sql.dateTimeDisplay("h", r.date, time);
         String cu = r.customer == null ? "CAST(NULL AS nvarchar(150))" : Sql.txt("h", r.customer, 150);
         String dz = r.desc == null ? "CAST(NULL AS nvarchar(300))" : Sql.txt("h", r.desc, 300);
+        String amount = Sql.numNull("h", r.amount);
         String orderBy = r.date == null ? kj[0] : Sql.date10("h", r.date) + " DESC, " + kj[0];
         return new Queries.Q("SELECT " + no + " AS no, " + dt + " AS date, " + kj[0] + " AS kind"
-                + ", " + cu + " AS customer, " + Sql.num("h", r.amount) + " AS total, " + dz + " AS descr"
+                + ", " + Sql.txt("h", r.kind, 60) + " AS kindCode"
+                + ", " + cu + " AS customer, " + amount + " AS total"
+                + ", CASE WHEN " + amount + " IS NULL THEN 1 ELSE 0 END AS amountInvalid, " + dz + " AS descr"
                 + " FROM dbo.[back_sanad] h" + kj[1] + where
                 + " ORDER BY " + orderBy
                 + Queries.pageClause(binds, f.page, f.top), binds);
+    }
+
+    /** Dated daily return totals, with invalid amount rows kept visible to the caller. */
+    public static Queries.Q returnsDaily(Meta m, Filter f) throws Queries.Missing {
+        RetCols r = retCols(m);
+        if (r.date == null)
+            throw new Queries.Missing("ستون تاریخ در «اسناد برگشتی» پیدا نشد؛ روند روزانه قابل گزارش نیست");
+        List<Object> binds = new ArrayList<>();
+        String day = Sql.date10("h", r.date);
+        String dc = returnDateRange("h", r.date, f == null ? "" : f.from,
+                f == null ? "" : f.to, binds);
+        String amount = Sql.numNull("h", r.amount);
+        return new Queries.Q("SELECT " + day + " AS day, COUNT_BIG(1) AS docs"
+                + ", SUM(" + amount + ") AS total"
+                + ", SUM(CASE WHEN " + amount + " IS NULL THEN 1 ELSE 0 END) AS invalidRows"
+                + " FROM dbo.[back_sanad] h WHERE " + (dc.isEmpty() ? "1=1" : dc)
+                + Sql.activeAnd(m.columns("back_sanad"), "h")
+                + " GROUP BY " + day + " ORDER BY " + day, binds);
+    }
+
+    private static String decimal3Null(String alias, String column) {
+        return column == null ? "CAST(NULL AS decimal(19,3))"
+                : "TRY_CONVERT(decimal(19,3)," + alias + "." + Sql.q(column) + ")";
+    }
+
+    /** Actual return line items from Atiran's line-level return view; no synthetic item rows. */
+    public static Queries.Q returnLines(Meta m, String documentNo) throws Queries.Missing {
+        return returnLines(m, documentNo, "", "");
+    }
+
+    /** Filter by the return kind wherever the line view exposes its code, label, or both. */
+    public static Queries.Q returnLines(Meta m, String documentNo, String kindCode, String kindLabel) throws Queries.Missing {
+        String view = m.table("VW_AllRizAghlamBargashti") ? "VW_AllRizAghlamBargashti"
+                : m.table("VWRizAghlamBargashti") ? "VWRizAghlamBargashti"
+                : m.table("VW_AllBargashti") ? "VW_AllBargashti" : null;
+        if (view == null)
+            throw new Queries.Missing("نمای اقلام اسناد برگشتی در این پایگاه داده موجود نیست");
+        Set<String> cols = m.columns(view);
+        String link = Sql.pickFlex(cols, "sh_back_sanad", "shback_sanad");
+        String kindCodeCol = Sql.pickFlex(cols, "kind", "kind_rdf");
+        String kindLabelCol = Sql.pickFlex(cols, "type_bargashti");
+        String code = Sql.pickFlex(cols, "shka", "coka");
+        String name = Sql.pickFlex(cols, "naka", "name");
+        String qtyVah = Sql.pickFlex(cols, "tedvah", "qtyvah", "quantity");
+        String qtyJoz = Sql.pickFlex(cols, "tedjoz", "qtyjoz");
+        String vahPrice = Sql.pickFlex(cols, "vahprice");
+        String jozPrice = Sql.pickFlex(cols, "jozprice");
+        String total = Sql.pickFlex(cols, "kol_price", "kol_price_tafif", "linesum", "total");
+        String lineNo = Sql.pickFlex(cols, "rdf", "rdf__", "lineid", "rowid");
+        if (link == null || (name == null && code == null) || qtyVah == null || total == null)
+            throw new Queries.Missing("ستون ارتباط سند، کالا، تعداد یا مبلغ در نمای اقلام برگشتی پیدا نشد");
+        String kindKey = kindCode == null ? "" : kindCode.trim();
+        String kindName = kindLabel == null ? "" : kindLabel.trim();
+        if (!kindKey.isEmpty() && kindCodeCol == null && (kindLabelCol == null || kindName.isEmpty()))
+            throw new Queries.Missing("نوع سند در نمای اقلام برگشتی قابل تشخیص نیست؛ برای جلوگیری از ترکیب اسناد هم‌شماره جزئیات نمایش داده نمی‌شود");
+        String tableSql = m.qTable(view);
+        if (tableSql == null) throw new Queries.Missing("نمای اقلام اسناد برگشتی در دسترس نیست");
+        List<Object> binds = new ArrayList<>();
+        binds.add(documentNo == null ? "" : documentNo.trim());
+        List<String> kindFilters = new ArrayList<>();
+        if (!kindKey.isEmpty() && kindCodeCol != null) {
+            kindFilters.add("LTRIM(RTRIM(TRY_CONVERT(nvarchar(100),x." + Sql.q(kindCodeCol) + "))) = ?");
+            binds.add(kindKey);
+        }
+        if (!kindName.isEmpty() && kindLabelCol != null) {
+            String labelExpr = "LTRIM(RTRIM(TRY_CONVERT(nvarchar(100),x." + Sql.q(kindLabelCol) + ")))";
+            if (!kindKey.isEmpty()) {
+                kindFilters.add("(" + labelExpr + " = ? OR " + labelExpr + " = ?)");
+                binds.add(kindName);
+                binds.add(kindKey);
+            } else {
+                kindFilters.add(labelExpr + " = ?");
+                binds.add(kindName);
+            }
+        }
+        String displayName = "COALESCE(NULLIF(" + (name == null ? "CAST(NULL AS nvarchar(250))" : Sql.txt("x", name, 250))
+                + ",N'')," + (code == null ? "N'—'" : Sql.txt("x", code, 120)) + ")";
+        return new Queries.Q("SELECT TOP (300) "
+                + (code == null ? "CAST(NULL AS nvarchar(60))" : Sql.txt("x", code, 60)) + " AS shka"
+                + ", " + displayName + " AS naka"
+                + ", " + decimal3Null("x", qtyVah) + " AS qtyVah"
+                + ", " + decimal3Null("x", qtyJoz) + " AS qtyJoz"
+                + ", " + Sql.numNull("x", vahPrice) + " AS vahPrice"
+                + ", " + Sql.numNull("x", jozPrice) + " AS jozPrice"
+                + ", " + Sql.numNull("x", total) + " AS lineSum"
+                + (lineNo == null ? "" : ", " + Sql.txt("x", lineNo, 60) + " AS lineNo")
+                + " FROM " + tableSql + " x WHERE TRY_CONVERT(nvarchar(100),x." + Sql.q(link) + ")=?"
+                + (kindFilters.isEmpty() ? "" : " AND " + Sql.join(kindFilters, " AND "))
+                + Sql.activeAnd(cols, "x")
+                + " ORDER BY " + (lineNo == null ? Sql.txt("x", name == null ? code : name, 250) : "x." + Sql.q(lineNo)), binds);
     }
 
 }

@@ -23,8 +23,7 @@ public final class Atiran {
     }
 
     /**
-     * Same, with tunable speed: the smart link uses a fast profile
-     * (no retry — failover to the other profile IS the retry).
+     * Same, with tunable network timeouts and retry policy selected by the smart-link caller.
      */
     public static Connection open(String host, int port, String db, String user, String pass,
                                   int tcpMs, int loginSec, boolean retry) throws Exception {
@@ -80,7 +79,8 @@ public final class Atiran {
         } catch (Exception e) {
             Diag.ignored("Atiran:compat", e);
         }
-        return LegacySql.wrap(checked, legacy);
+        boolean trimLegacy = LegacySql.probeTrim(checked, host + ":" + port);
+        return LegacySql.wrap(checked, legacy, trimLegacy);
     }
 
     private static Connection validated(Connection c) throws Exception {

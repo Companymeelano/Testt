@@ -103,7 +103,7 @@ public final class CommandRoom {
                             e("anbar", "میزکار و هشدارهای انبار", "mi_inventory_2"),
                             e("tahvil", "تحویل فاکتور و ثبت گیرنده", "mi_local_shipping"),
                             e("pick_wave", "برداشت چند فاکتور، جمع کالا و اسکن بارگیری", "mi_add_shopping_cart"),
-                            e("sync_queue", "تحویل و شمارش‌های منتظر همگام‌سازی", "mi_refresh"),
+                            e("sync_queue", "تحویل و شمارش‌های منتظر همگام‌سازی", "mi_sync"),
                             e("resid", "رسید کالا و پیش‌نویس‌های انبار", "mi_widgets"),
                             e("takmil", "تکمیل پیش‌فاکتور", "mi_request_quote"),
                             e("shomarsh", "شمارش انبار و مغایرت‌گیری", "mi_zoom"),

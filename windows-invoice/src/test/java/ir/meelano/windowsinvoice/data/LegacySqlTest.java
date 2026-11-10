@@ -68,4 +68,26 @@ class LegacySqlTest {
         String sql = "SELECT CONVERT(int,x) , CAST(y AS nvarchar(10)) FROM t WHERE z=N'ok'";
         assertEquals(sql, LegacySql.rewrite(sql));
     }
+
+    @Test
+    void trimBecomesLtrimRtrimForMidServers() {
+        String sql = "SELECT TRIM(h.[name]) AS n, RTRIM(h.[c]) AS c FROM t";
+        String out = LegacySql.rewrite(sql, false, true);
+        assertTrue(out.contains("LTRIM(RTRIM(h.[name]))"), "trim not rewritten");
+        assertTrue(out.contains("RTRIM(h.[c])"), "rtrim damaged");
+        assertFalse(java.util.regex.Pattern.compile("(?i)(^|[^A-Za-z0-9_\\]])TRIM\\s*\\(").matcher(out).find(),
+                "bare trim left");
+    }
+
+    @Test
+    void nestedTrimIsRewrittenInsideOut() {
+        String out = LegacySql.rewrite("SELECT TRIM(TRIM(h.[a])) FROM t", false, true);
+        assertEquals("SELECT LTRIM(RTRIM(LTRIM(RTRIM(h.[a])))) FROM t", out, "nesting");
+    }
+
+    @Test
+    void trimStaysWhenTheServerSupportsIt() {
+        String sql = "SELECT TRIM(h.[name]) FROM t";
+        assertEquals(sql, LegacySql.rewrite(sql, false, false), "modern server must keep trim");
+    }
 }

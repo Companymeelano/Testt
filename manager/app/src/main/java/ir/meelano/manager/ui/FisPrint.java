@@ -15,6 +15,7 @@ import android.text.TextPaint;
 import android.widget.LinearLayout;
 
 import ir.meelano.manager.MainActivity;
+import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.data.Company;
@@ -118,13 +119,18 @@ public final class FisPrint {
 
     private static void send(final MainActivity a, final BluetoothDevice dev,
                              final Row head, final List<Row> lines, final boolean sales) {
+        if (Build.VERSION.SDK_INT >= 31 && a.checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            a.kit.toast("برای اتصال به چاپگر، دسترسی بلوتوث لازم است");
+            return;
+        }
         a.kit.toast("در حال اتصال به چاپگر…");
         new Thread(() -> {
             android.bluetooth.BluetoothSocket sock = null;
             try {
-                try {
-                    BluetoothAdapter.getDefaultAdapter().cancelDiscovery();
-                } catch (Exception ignored) { Diag.ignored("FisPrint:126", ignored); }
+                if (Build.VERSION.SDK_INT >= 31 && a.checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
+                        != android.content.pm.PackageManager.PERMISSION_GRANTED)
+                    throw new SecurityException("BLUETOOTH_CONNECT permission revoked");
                 sock = dev.createRfcommSocketToServiceRecord(SPP);
                 sock.connect();
                 OutputStream out = sock.getOutputStream();
@@ -186,7 +192,7 @@ public final class FisPrint {
         blocks.add(new Block(lay(dash(), 24, false, Layout.Alignment.ALIGN_CENTER), 6));
         String kind = sales ? "فاکتور فروش" : "فاکتور خرید";
         blocks.add(new Block(lay(kind + "  " + Money.fa(head.s("no")), 32, true, Layout.Alignment.ALIGN_CENTER), 4));
-        blocks.add(new Block(lay("تاریخ: " + Jalali.dispFa(head.s("date")), 26, false, Layout.Alignment.ALIGN_NORMAL), 2));
+        blocks.add(new Block(lay("تاریخ: " + HomeNumberFormatter.dateTime(head.s("date")), 26, false, Layout.Alignment.ALIGN_NORMAL), 2));
         blocks.add(new Block(lay((sales ? "مشتری: " : "طرف‌حساب: ") + head.s("customer"), 28, true, Layout.Alignment.ALIGN_NORMAL), 2));
         String vis = head.s("visitor");
         if (sales && !vis.isEmpty() && !"بدون ویزیتور".equals(vis))
@@ -199,7 +205,8 @@ public final class FisPrint {
                         ? r.d("qtyJoz") : r.d("qtyVah");
                 double pr = Math.abs(r.d("vahPrice")) < 0.005 && Math.abs(r.d("jozPrice")) > 0.005
                         ? r.d("jozPrice") : r.d("vahPrice");
-                String l2 = Money.fa(trimNum(q)) + " × " + Money.rial(pr) + " = " + Money.rial(r.d("lineSum"));
+                String l2 = HomeNumberFormatter.quantity(q) + " × " + Money.rial(pr)
+                        + " = " + Money.rial(r.d("lineSum"));
                 blocks.add(new Block(lay(l2, 26, false, Layout.Alignment.ALIGN_NORMAL), 6));
             }
         }
@@ -214,7 +221,8 @@ public final class FisPrint {
         if (Math.abs(remain) > 0.5)
             blocks.add(new Block(lay("مانده: " + Money.rial(remain), 28, true, Layout.Alignment.ALIGN_NORMAL), 2));
         blocks.add(new Block(lay("سپاس از خرید شما", 28, true, Layout.Alignment.ALIGN_CENTER), 2));
-        blocks.add(new Block(lay(Jalali.todayStr() + " • میلانو", 22, false, Layout.Alignment.ALIGN_CENTER), 0));
+        blocks.add(new Block(lay(HomeNumberFormatter.dateText(Jalali.todayStr())
+                + " • میلانو", 22, false, Layout.Alignment.ALIGN_CENTER), 0));
 
         int h = 16;
         for (Block b : blocks) h += b.lay.getHeight() + b.gapAfter;
@@ -230,11 +238,6 @@ public final class FisPrint {
             y += b.lay.getHeight() + b.gapAfter;
         }
         return raster(bmp);
-    }
-
-    private static String trimNum(double v) {
-        if (Math.abs(v - Math.round(v)) < 0.0005) return String.valueOf(Math.round(v));
-        return String.valueOf(Math.round(v * 100) / 100.0);
     }
 
     /** Bitmap → ESC/POS raster (GS v 0) + init + feed + cut. */

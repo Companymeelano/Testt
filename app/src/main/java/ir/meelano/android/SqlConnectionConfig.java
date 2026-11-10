@@ -278,7 +278,8 @@ final class SqlConnectionConfig {
         }
         // SQL Server 2008 R2 field servers cannot parse TRY_CONVERT/TRY_CAST; the wrapper
         // rewrites every statement of this connection into the guarded 2008 dialect.
-        return LegacySql.wrap(connection, LegacySql.probe(connection, host + ":" + profile.port));
+        return LegacySql.wrap(connection, LegacySql.probe(connection, host + ":" + profile.port),
+                LegacySql.probeTrim(connection, host + ":" + profile.port));
     }
 
     private static String jdbcUrl(String host, int port, String database, String appName) {

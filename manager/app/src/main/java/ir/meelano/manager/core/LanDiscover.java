@@ -1,6 +1,5 @@
 package ir.meelano.manager.core;
 
-import ir.meelano.manager.data.Settings;
 import java.net.Inet4Address;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -17,6 +16,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+
+import ir.meelano.manager.data.Settings;
 
 /**
  * Smart LAN discovery (v31): the customer types ONE server address and the
@@ -78,8 +79,7 @@ public final class LanDiscover {
         return !a.isEmpty() && a.equalsIgnoreCase(b) && portA == portB;
     }
 
-    // WAN/forwarded endpoints answer slower than a LAN socket: keep the probe patient.
-    private static final int TCP_MS = 600;
+    private static final int TCP_MS = 450;
     private static final int MAX_RESULTS = 16;
 
     /** Strip scheme / port / path / spaces from a typed server address. */

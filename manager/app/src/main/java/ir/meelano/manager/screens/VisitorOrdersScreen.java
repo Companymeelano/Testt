@@ -6,6 +6,7 @@ import android.widget.LinearLayout;
 
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.core.AtiranAuth;
+import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.VisitorPrefactorWriter;
 import ir.meelano.manager.data.Repo;
@@ -40,7 +41,7 @@ public final class VisitorOrdersScreen extends Screen {
             try(java.sql.PreparedStatement ps=db.prepareStatement(sql);java.sql.ResultSet rs=ps.executeQuery()){while(rs.next()){Row r=new Row();r.put("id",rs.getLong(1));r.put("username",rs.getString(2));r.put("visitor",rs.getString(3));r.put("customer",rs.getString(4));r.put("customerCode",rs.getString(5));r.put("total",rs.getDouble(6));r.put("status",rs.getString(7));r.put("created",rs.getString(8));r.put("reason",rs.getString(9));r.put("lines",rs.getInt(10));out.add(r);}}
             return out;
         },new Repo.Cb<List<Row>>(){
-            @Override public void ok(List<Row> rows){c.removeAllViews();if(rows.isEmpty()){c.addView(a.kit.empty("سفارشی برای نمایش نیست",null),a.kit.lp(-1,-2));return;}for(Row r:rows)c.addView(a.kit.personRow("شماره "+r.s("id")+" • "+r.s("customer"),"ویزیتور "+r.s("username")+" • "+r.s("created"),Money.rial(r.d("total")),statusFa(r.s("status")),statusColor(r.s("status")),v->details(r)),a.kit.lp(-1,-2));}
+            @Override public void ok(List<Row> rows){c.removeAllViews();if(rows.isEmpty()){c.addView(a.kit.empty("سفارشی برای نمایش نیست",null),a.kit.lp(-1,-2));return;}for(Row r:rows)c.addView(a.kit.personRow("شماره "+r.s("id")+" • "+r.s("customer"),"ویزیتور "+r.s("username")+" • "+HomeNumberFormatter.dateTime(r.s("created")),Money.compactRial(r.d("total")),statusFa(r.s("status")),statusColor(r.s("status")),v->details(r)),a.kit.lp(-1,-2));}
             @Override public void fail(String e){c.removeAllViews();c.addView(a.kit.error(e,()->load(c)),a.kit.lp(-1,-2));}
         });
     }
@@ -49,7 +50,9 @@ public final class VisitorOrdersScreen extends Screen {
         a.repo.run(db->{List<String> items=new ArrayList<>();try(java.sql.PreparedStatement ps=db.prepareStatement("SELECT product_name,qty,unit,price,amount FROM dbo.meelano_prefactor_items WHERE prefactor_id=? ORDER BY id")){ps.setLong(1,header.l("id"));try(java.sql.ResultSet rs=ps.executeQuery()){while(rs.next())items.add(rs.getString(1)+" • "+Money.qty(rs.getDouble(2))+" "+rs.getString(3)+" • "+Money.rial(rs.getDouble(4))+" • جمع "+Money.rial(rs.getDouble(5)));}}return items;},new Repo.Cb<List<String>>(){
             @Override public void ok(List<String> items){StringBuilder text=new StringBuilder("ویزیتور: ").append(header.s("username")).append(" (").append(header.s("visitor")).append(")\nمشتری: ").append(header.s("customer")).append(" • ").append(header.s("customerCode")).append("\nوضعیت: ").append(statusFa(header.s("status"))).append("\nجمع: ").append(Money.rial(header.d("total")));for(String x:items)text.append("\n\n").append(x);if(!header.s("reason").isEmpty())text.append("\n\nیادداشت: ").append(header.s("reason"));
                 boolean pending="pending_approval".equals(header.s("status"))||"needs_revision".equals(header.s("status"));
-                AlertDialog.Builder b=new AlertDialog.Builder(a).setTitle("پیش‌فاکتور "+header.s("id")).setMessage(text.toString());
+                AlertDialog.Builder b=new AlertDialog.Builder(a)
+                        .setTitle(HomeNumberFormatter.rtlText("پیش‌فاکتور "+header.s("id")))
+                        .setMessage(HomeNumberFormatter.rtlText(text.toString()));
                 if(pending){b.setNegativeButton("رد سفارش",(d,w)->decide(header,"rejected"));b.setNeutralButton("درخواست اصلاح",(d,w)->decide(header,"needs_revision"));b.setPositiveButton("تأیید",(d,w)->decide(header,"approved"));}
                 else b.setPositiveButton("بستن",null);
                 b.show();

@@ -6,6 +6,7 @@ import android.graphics.Paint;
 import android.graphics.pdf.PdfDocument;
 
 import ir.meelano.manager.ShareProvider;
+import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.LicenseStore;
 import ir.meelano.manager.core.Money;
@@ -50,7 +51,7 @@ public final class Pdf {
         Paint bold = new Paint(Paint.ANTI_ALIAS_FLAG);
         bold.setTypeface(Theme.face(true));
         Paint muted = new Paint(Paint.ANTI_ALIAS_FLAG);
-        muted.setColor(0xFF5A6478);
+        muted.setColor(DesignTokens.LIGHT_MUTED);
         // Column widths by type.
         int[] widths = new int[cols.length];
         int totalW = 0;
@@ -70,30 +71,32 @@ public final class Pdf {
             PdfDocument.PageInfo info = new PdfDocument.PageInfo.Builder(W, H, pg + 1).create();
             PdfDocument.Page page = doc.startPage(info);
             android.graphics.Canvas g = page.getCanvas();
-            g.drawColor(0xFFFFFFFF);
+            g.drawColor(DesignTokens.IVORY);
             // accent top bar (follows the user's theme color)
-            paint.setColor(Theme.GOLD);
+            paint.setColor(DesignTokens.GOLD);
             g.drawRect(0, 0, W, 10, paint);
             // title (right aligned)
-            head.setColor(0xFF101828);
+            head.setColor(DesignTokens.INK);
             head.setTextSize(21);
             head.setTextAlign(Paint.Align.RIGHT);
-            g.drawText(safe(title), W - margin, 62, head);
+            g.drawText(HomeNumberFormatter.rtlText(safe(title)), W - margin, 62, head);
             muted.setTextSize(12);
             muted.setTextAlign(Paint.Align.RIGHT);
             if (subtitle != null && !subtitle.isEmpty()) g.drawText(safe(subtitle), W - margin, 86, muted);
-            g.drawText(LicenseStore.brandName(c) + " • " + Money.fa(Jalali.todayStr()), W - margin, 106, muted);
+            g.drawText(HomeNumberFormatter.rtlText(LicenseStore.brandName(c) + " • "
+                    + HomeNumberFormatter.dateText(Jalali.todayStr())), W - margin, 106, muted);
             // header row
             int y = 130;
-            paint.setColor(0xFF101828);
+            paint.setColor(DesignTokens.EMERALD);
             g.drawRect(margin, y, W - margin, y + headH, paint);
-            bold.setColor(0xFFF1D493);
+            bold.setColor(DesignTokens.GOLD_LIGHT);
             bold.setTextSize(12.5f);
             bold.setTextAlign(Paint.Align.CENTER);
             int x = W - margin;
             for (int i = 0; i < cols.length; i++) {
                 x -= widths[i];
-                g.drawText(fit(cols[i].title, widths[i] - 10, bold), x + widths[i] / 2f, y + 26, bold);
+                g.drawText(HomeNumberFormatter.rtlText(
+                        fit(cols[i].title, widths[i] - 10, bold)), x + widths[i] / 2f, y + 26, bold);
             }
             y += headH;
             // rows
@@ -101,7 +104,7 @@ public final class Pdf {
             cell.setTextSize(11.5f);
             cell.setTextAlign(Paint.Align.CENTER);
             Paint zebra = new Paint();
-            zebra.setColor(0xFFF4F1E8);
+            zebra.setColor(DesignTokens.PAPER);
             int from = pg * rowsPerPage;
             int to = Math.min(n, from + rowsPerPage);
             for (int i = from; i < to; i++) {
@@ -110,7 +113,7 @@ public final class Pdf {
                 x = W - margin;
                 for (int j = 0; j < cols.length; j++) {
                     x -= widths[j];
-                    cell.setColor(cols[j].type == ReportCatalog.T_MONEY ? 0xFF101828 : 0xFF333C4E);
+                    cell.setColor(DesignTokens.INK);
                     cell.setTypeface(cols[j].type == ReportCatalog.T_MONEY ? Theme.face(true) : Theme.face(false));
                     g.drawText(fit(fmt(cols[j], r), widths[j] - 10, cell), x + widths[j] / 2f, y + 20, cell);
                 }
@@ -119,7 +122,9 @@ public final class Pdf {
             // footer
             muted.setTextSize(11);
             muted.setTextAlign(Paint.Align.CENTER);
-            g.drawText("صفحه " + Money.fa(String.valueOf(pg + 1)) + " از " + Money.fa(String.valueOf(pages)), W / 2f, H - 30, muted);
+            g.drawText(HomeNumberFormatter.rtlText("صفحه "
+                    + HomeNumberFormatter.integer(pg + 1) + " از "
+                    + HomeNumberFormatter.integer(pages)), W / 2f, H - 30, muted);
             muted.setTextSize(10);
             g.drawText("Milad Yaghoobi • طراح و توسعه‌دهنده", W / 2f, H - 48, muted);
             doc.finishPage(page);
@@ -131,13 +136,13 @@ public final class Pdf {
                 PdfDocument.PageInfo info = new PdfDocument.PageInfo.Builder(W, H, 999).create();
                 PdfDocument.Page page = doc.startPage(info);
                 android.graphics.Canvas g = page.getCanvas();
-                g.drawColor(0xFFFFFFFF);
-                paint.setColor(Theme.GOLD);
+                g.drawColor(DesignTokens.IVORY);
+                paint.setColor(DesignTokens.GOLD);
                 g.drawRect(0, 0, W, 10, paint);
-                head.setColor(0xFF101828);
+                head.setColor(DesignTokens.INK);
                 head.setTextSize(19);
                 head.setTextAlign(Paint.Align.RIGHT);
-                g.drawText(safe(im.cap), W - margin, 62, head);
+                g.drawText(HomeNumberFormatter.rtlText(safe(im.cap)), W - margin, 62, head);
                 int iw = im.bmp.getWidth(), ih = im.bmp.getHeight();
                 float maxW = W - margin * 2f, maxH = H - 220f;
                 float sc = Math.min(maxW / Math.max(1, iw), maxH / Math.max(1, ih));
@@ -150,7 +155,8 @@ public final class Pdf {
                 g.drawBitmap(im.bmp, null, dst, imgP);
                 muted.setTextSize(11);
                 muted.setTextAlign(Paint.Align.CENTER);
-                g.drawText("پیوست • " + Money.fa(Jalali.todayStr()), W / 2f, H - 30, muted);
+                g.drawText(HomeNumberFormatter.rtlText("پیوست • "
+                        + HomeNumberFormatter.dateText(Jalali.todayStr())), W / 2f, H - 30, muted);
                 doc.finishPage(page);
             }
         }
@@ -170,14 +176,16 @@ public final class Pdf {
         if (col.type == ReportCatalog.T_MONEY) return Money.rial(r.d(col.key));
         if (col.type == ReportCatalog.T_NUM) {
             double v = r.d(col.key);
-            if (Math.abs(v - Math.round(v)) < 0.001) return Money.num(Math.round(v));
-            return Money.fa(String.format(java.util.Locale.US, "%.1f", v).replace('.', '٫').replace('-', '−'));
+            if (Math.abs(v - Math.round(v)) < 0.001) return HomeNumberFormatter.rounded(v);
+            return HomeNumberFormatter.decimal(v);
         }
         if (col.type == ReportCatalog.T_DATE) {
-            return Jalali.dispFa(r.s(col.key));
+            return HomeNumberFormatter.dateTimeTable(r.s(col.key));
         }
         String t = r.s(col.key, "—");
-        return "—".equals(t) ? t : Money.fa(Jalali.faDate(t));
+        if ("—".equals(t)) return t;
+        return Jalali.disp(t).isEmpty() ? HomeNumberFormatter.localizeText(t)
+                : HomeNumberFormatter.dateTimeTable(t);
     }
 
     private static String safe(String s) {

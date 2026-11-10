@@ -91,23 +91,15 @@ public final class ProductionScreen extends Screen {
     @Override public String glyph() { return Theme.isLight() ? "⚙" : "🏭"; }
     @Override public int accent() { return Theme.GOLD; }
 
-    /** The approved 3D production emblem is exclusive to the dark gold skin. */
+    /** Calm section hero with the shared warehouse duotone mark. */
     private View productionHero(String subtitle) {
         LinearLayout card = a.kit.v();
         card.setBackground(Theme.hero(accent()));
         card.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(15));
         LinearLayout head = a.kit.h();
         head.setGravity(Gravity.CENTER_VERTICAL);
-        if (!Theme.isLight() && !Theme.isNuts()) {
-            android.widget.ImageView emblem = new android.widget.ImageView(a);
-            emblem.setImageResource(R.drawable.icon3d_production);
-            emblem.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
-            emblem.setContentDescription(null);
-            head.addView(emblem, new LinearLayout.LayoutParams(Theme.dp(58), Theme.dp(58)));
-        } else {
-            head.addView(a.kit.icon(R.drawable.mi_warehouse, accent(), 30),
-                    new LinearLayout.LayoutParams(Theme.dp(58), Theme.dp(58)));
-        }
+        head.addView(a.kit.iconBadge(R.drawable.mi_warehouse, accent(), 44),
+                new LinearLayout.LayoutParams(Theme.dp(44), Theme.dp(44)));
         head.addView(a.kit.space(10));
         LinearLayout copy = a.kit.v();
         copy.addView(a.kit.title(title()), a.kit.lp(-1, -2));
@@ -337,7 +329,7 @@ public final class ProductionScreen extends Screen {
             @Override public String searchText(ProductionWriter.Warehouse w){return w.name+" "+w.id;}
             @Override public View row(ProductionWriter.Warehouse w,View.OnClickListener click){
                 View row=a.kit.personRow(bidi(w.name),"انبار فعال آتیران",isolateLtr(Money.fa(String.valueOf(w.id))),"انتخاب",Theme.INFO,click);
-                row.setContentDescription("انبار "+w.name+"، شناسه "+Money.fa(String.valueOf(w.id)));
+                row.setContentDescription(ir.meelano.manager.core.HomeNumberFormatter.localizeText("انبار "+w.name+"، شناسه "+Money.fa(String.valueOf(w.id))));
                 return row;
             }
         },w->{warehouse=w;catalog=null;render(content);});
@@ -358,7 +350,7 @@ public final class ProductionScreen extends Screen {
                         ? "بازده پایه: "+qty(r.baseOutputQty)+" واحد"
                         : "محصول نهایی: "+r.productName+" • بازده پایه: "+qty(r.baseOutputQty);
                 View row=a.kit.personRow(bidi(r.name),bidi(detail),isolateLtr(Money.fa(String.valueOf(r.id))),"انتخاب",Theme.GOLD,click);
-                row.setContentDescription("فرمول "+r.name+"، محصول نهایی "+r.productName+"، شناسه "+Money.fa(String.valueOf(r.id)));
+                row.setContentDescription(ir.meelano.manager.core.HomeNumberFormatter.localizeText("فرمول "+r.name+"، محصول نهایی "+r.productName+"، شناسه "+Money.fa(String.valueOf(r.id))));
                 return row;
             }
         },this::selectRecipe);
@@ -429,8 +421,10 @@ public final class ProductionScreen extends Screen {
                     }
                     if(resultCount==0)rows.addView(a.kit.empty(key.isEmpty()?"فهرست کالا خالی است":"موردی با این عبارت پیدا نشد",null),a.kit.lp(-1,-2));
                     if(resultCount>matches.size())
-                        count.setText("نمایش "+Money.fa(String.valueOf(matches.size()))+" مورد از "+Money.fa(String.valueOf(resultCount))+" نتیجه؛ برای محدودکردن فهرست جست‌وجو کنید.");
-                    else count.setText(Money.fa(String.valueOf(resultCount))+" مورد");
+                        count.setText(ir.meelano.manager.core.HomeNumberFormatter.rtlText(
+                                "نمایش "+Money.fa(String.valueOf(matches.size()))+" مورد از "+Money.fa(String.valueOf(resultCount))+" نتیجه؛ برای محدودکردن فهرست جست‌وجو کنید."));
+                    else count.setText(ir.meelano.manager.core.HomeNumberFormatter.rtlText(
+                            Money.fa(String.valueOf(resultCount))+" مورد"));
                 });
             });
         };
@@ -468,7 +462,8 @@ public final class ProductionScreen extends Screen {
         try{
             if(dialog.getWindow()!=null)dialog.getWindow().setBackgroundDrawable(Theme.dialogBg());
             if(dialog.getButton(AlertDialog.BUTTON_POSITIVE)!=null)
-                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(Theme.GOLD);
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(
+                        Theme.isLight() ? Theme.GOLD_DARK : Theme.GOLD);
             if(dialog.getButton(AlertDialog.BUTTON_NEGATIVE)!=null)
                 dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(Theme.MUTED);
         }catch(Exception ignored){Diag.ignored("ProductionScreen:dialogTheme",ignored);}
@@ -608,8 +603,8 @@ public final class ProductionScreen extends Screen {
             @Override public View row(ProductionWriter.Product p,View.OnClickListener click){
                 String subtitle="موجودی انبار «"+(warehouse==null?"—":warehouse.name)+"»: "+qty(p.stockPieces)+" قطعهٔ پایه • "+p.unit;
                 View row=a.kit.personRow(bidi(p.name),bidi(subtitle),isolateLtr(Money.fa(String.valueOf(p.id))),"انتخاب",Theme.INFO,click);
-                row.setContentDescription(p.name+"، شناسه "+Money.fa(String.valueOf(p.id))
-                        +"، موجودی انبار "+(warehouse==null?"نامشخص":warehouse.name)+" "+qty(p.stockPieces)+" قطعهٔ پایه، واحد "+p.unit);
+                row.setContentDescription(ir.meelano.manager.core.HomeNumberFormatter.localizeText(p.name+"، شناسه "+Money.fa(String.valueOf(p.id))
+                        +"، موجودی انبار "+(warehouse==null?"نامشخص":warehouse.name)+" "+qty(p.stockPieces)+" قطعهٔ پایه، واحد "+p.unit));
                 return row;
             }
         },"مواد سری‌دار یا کالاهایی که دقیقاً یک تنوع ثبت‌شده ندارند، تا انتخاب قطعی قابل ثبت نیستند.",chosen);
@@ -624,7 +619,7 @@ public final class ProductionScreen extends Screen {
             @Override public View row(ProductionWriter.CostType type,View.OnClickListener click){
                 View row=a.kit.personRow(bidi(type.name),"نوع فعال هزینه در آتیران",
                         isolateLtr(Money.fa(String.valueOf(type.id))),"انتخاب",Theme.WARNING,click);
-                row.setContentDescription(type.name+"، شناسه "+Money.fa(String.valueOf(type.id)));
+                row.setContentDescription(ir.meelano.manager.core.HomeNumberFormatter.localizeText(type.name+"، شناسه "+Money.fa(String.valueOf(type.id))));
                 return row;
             }
         },chosen);
@@ -726,12 +721,12 @@ public final class ProductionScreen extends Screen {
     private <T> void runWriter(String wait,String failurePrefix,SqlRun<T> work,Done<T> done){
         a.kit.toast(wait);
         writer.execute(()->{
-            T result=null;String error=null;boolean direct=false;
+            T result=null;String error=null;boolean bound=false;
             try{
-                direct=a.settings.directConn();if(direct)ir.meelano.manager.data.NetRoute.bindDirect(a);
+                bound=a.settings.directConn()&&ir.meelano.manager.data.NetRoute.bindDirect(a);
                 try(Connection c=SmartLink.open(a,a.settings)){result=work.run(c);}
             }catch(Exception e){error=ir.meelano.manager.data.Atiran.diagnose(e);}
-            finally{if(direct)try{ir.meelano.manager.data.NetRoute.unbind(a);}catch(Exception ignored){Diag.ignored("ProductionScreen:writer",ignored);}}
+            finally{if(bound)try{ir.meelano.manager.data.NetRoute.unbind(a);}catch(Exception ignored){Diag.ignored("ProductionScreen:writer",ignored);}}
             T val=result;String err=error;
             a.runOnUiThread(()->{
                 if(err!=null){busy=false;render(content);a.kit.toast(failurePrefix+": "+err);}
@@ -749,7 +744,7 @@ public final class ProductionScreen extends Screen {
             @Override public View row(ProductionWriter.Product p,View.OnClickListener click){
                 View row=a.kit.personRow(bidi(p.name),bidi("واحد: "+p.unit),
                         isolateLtr(Money.fa(String.valueOf(p.id))),"انتخاب",Theme.GOLD,click);
-                row.setContentDescription("کالای نهایی "+p.name+"، شناسه "+Money.fa(String.valueOf(p.id))+"، واحد "+p.unit);
+                row.setContentDescription(ir.meelano.manager.core.HomeNumberFormatter.localizeText("کالای نهایی "+p.name+"، شناسه "+Money.fa(String.valueOf(p.id))+"، واحد "+p.unit));
                 return row;
             }
         },"کالاهای دارای چند تنوع قابل انتخاب نیستند. کالای نهاییِ دارای سری پس از ثبت، مطابق تنظیم تولید بدون الزام سری خواهد شد.",p->{ed.output=p;loadRecipeEditor(ed);});

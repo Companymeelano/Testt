@@ -109,4 +109,33 @@ public class LegacySqlTest {
         assertTrue(out.contains("COALESCE((CASE WHEN ISNUMERIC(h.[mab])=1 THEN CONVERT(decimal(19,2),h.[mab]) ELSE NULL END),0)"));
         assertTrue(out.contains("LEFT(CONVERT(nvarchar(30),h.[d]),10)"));
     }
+
+    @Test
+    public void trimBecomesLtrimRtrimForMidServers() {
+        String sql = "SELECT TRIM(h.[name]) AS n, RTRIM(h.[c]) AS c, LTRIM(h.[d]) AS d FROM t";
+        String out = LegacySql.rewrite(sql, false, true);
+        assertTrue(out.contains("LTRIM(RTRIM(h.[name]))"));
+        assertTrue(out.contains("RTRIM(h.[c])"));
+        assertTrue(out.contains("LTRIM(h.[d])"));
+        assertFalse(java.util.regex.Pattern.compile("(?i)(^|[^A-Za-z0-9_\\]])TRIM\\s*\\(").matcher(out).find());
+    }
+
+    @Test
+    public void nestedTrimIsRewrittenInsideOut() {
+        String out = LegacySql.rewrite("SELECT TRIM(TRIM(h.[a])) FROM t", false, true);
+        assertEquals("SELECT LTRIM(RTRIM(LTRIM(RTRIM(h.[a])))) FROM t", out);
+    }
+
+    @Test
+    public void trimStaysWhenTheServerSupportsIt() {
+        String sql = "SELECT TRIM(h.[name]) FROM t";
+        assertEquals(sql, LegacySql.rewrite(sql, false, false));
+    }
+
+    @Test
+    public void trimAndTryRewritesCombineOnOldServers() {
+        String out = LegacySql.rewrite("SELECT TRIM(TRY_CONVERT(nvarchar(40),h.[n])) FROM t", true, true);
+        assertFalse(out.contains("TRY_"));
+        assertTrue(out.startsWith("SELECT LTRIM(RTRIM("));
+    }
 }

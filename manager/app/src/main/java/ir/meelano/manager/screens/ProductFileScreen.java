@@ -6,6 +6,7 @@ import android.widget.LinearLayout;
 
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.core.AtiranSchema;
+import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.Money;
@@ -188,7 +189,7 @@ public class ProductFileScreen extends Screen {
         for (Row r : asc) {
             double q = Math.abs(r.d("qty"));
             acc += r.l("outFlag") == 1 ? -q : q;
-            run.add(new Charts.Point(Jalali.shortLabel(r.s("date")), acc));
+            run.add(new Charts.Point(HomeNumberFormatter.dateShortLabel(r.s("date")), acc));
         }
         LinearLayout ch = a.kit.card(Theme.VIOLET);
         ch.addView(a.kit.text("خالص گردش در حرکت‌های اخیر", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
@@ -239,7 +240,7 @@ public class ProductFileScreen extends Screen {
             String opLabel = r.s("opLabel").isEmpty() ? AtiranSchema.actNameFallback(r.s("act")) : r.s("opLabel");
             String mid = (r.s("doc").isEmpty() ? "بدون شماره سند" : "سند " + Money.fa(r.s("doc")))
                     + (r.s("warehouse").isEmpty() ? "" : "  •  انبار " + Money.fa(r.s("warehouse")));
-            View row = a.kit.docRow(opLabel, mid, Jalali.shortLabel(r.s("date")),
+            View row = a.kit.docRow(opLabel, mid, HomeNumberFormatter.dateTime(r.s("date")),
                     Money.signedQty(outFlag ? -Math.abs(r.d("qty")) : Math.abs(r.d("qty"))),
                     outFlag ? "خروج" : "ورود", outFlag ? Theme.DANGER : Theme.SUCCESS,
                     v -> openMovement(r));
@@ -322,7 +323,7 @@ public class ProductFileScreen extends Screen {
         head.addView(a.kit.space(8));
         head.addView(a.kit.text(opLabel, 15f, Theme.TEXT, true), a.kit.wlp(1f));
         body.addView(head, a.kit.lp(-1, -2));
-        body.addView(a.kit.text(Jalali.dispFa(r.s("date")), 11.5f, Theme.MUTED, false), a.kit.lp(-1, -2));
+        body.addView(a.kit.text(HomeNumberFormatter.dateTime(r.s("date")), 11.5f, Theme.MUTED, false), a.kit.lp(-1, -2));
         body.addView(a.kit.gap(6));
 
         // facts — quantity first, then price and the line value it adds up to

@@ -62,15 +62,23 @@ public class AssistantTest {
     }
 
     @Test
-    public void averageUsesSevenDaysBeforeToday() {
+    public void averageUsesSevenCalendarDaysBeforeToday() {
         Assistant.Snap s = new Assistant.Snap();
         s.day = "1405/07/23";
-        for (int i = 1; i <= 10; i++) {
-            s.salesDaily.add(row("day", "1405/07/" + (10 + i), "total", (double) (i * 100)));
+        for (int i = 1; i <= 7; i++) {
+            s.salesDaily.add(row("day", "1405/07/" + (15 + i), "total", (double) (i * 100), "invalidRows", 0L));
         }
-        s.salesDaily.add(row("day", "1405/07/23", "total", 99999.0));
-        // Days 4..10 (the last 7 before today): 400..1000 → average 700.
-        assertEquals(700.0, Assistant.averageLastWeek(s), 0.0001);
+        s.salesDaily.add(row("day", "1405/07/23", "total", 99999.0, "invalidRows", 0L));
+        // Days 16..22: 100..700 → average 400; today's value is excluded.
+        assertEquals(400.0, Assistant.averageLastWeek(s), 0.0001);
+    }
+
+    @Test
+    public void invalidTrendRowsDoNotBecomeZeroSales() {
+        Assistant.Snap s = new Assistant.Snap();
+        s.day = "1405/07/23";
+        s.salesDaily.add(row("day", "1405/07/22", "total", 9000.0, "invalidRows", 1L));
+        assertEquals(0.0, Assistant.averageLastWeek(s), 0.0001);
     }
 
     @Test
@@ -78,5 +86,48 @@ public class AssistantTest {
         String t = Assistant.dailySummary(snap());
         assertTrue(t, t.contains("خلاصه امروز"));
         assertTrue(t, t.contains("پیشنهاد مدیر"));
+    }
+
+    @Test
+    public void failedSectionsAreNotReportedAsConfirmedZero() {
+        Assistant.Snap s = snap();
+        s.notes.put("فروش امروز", "connection unavailable");
+        String answer = Assistant.answer(s, "فروش امروز");
+        assertTrue(answer, answer.contains("داده در دسترس نیست"));
+        assertFalse(answer, answer.contains(Money.compactRial(0)));
+        String summary = Assistant.dailySummary(s);
+        assertTrue(summary, summary.contains("فروش امروز: داده در دسترس نیست"));
+    }
+
+    @Test
+    public void missingListAmountsAndInventoryCountsAreNotPresentedAsZero() {
+        Assistant.Snap s = snap();
+        s.overdue = java.util.Collections.singletonList(row("party", "مشتری نمونه", "days", 3L));
+        String overdue = Assistant.answer(s, "معوق‌ها");
+        assertTrue(overdue, overdue.contains("داده در دسترس نیست"));
+        assertFalse(overdue, overdue.contains(Money.compactRial(0)));
+
+        s.prod = row("out", 2L);
+        String stock = Assistant.answer(s, "موجودی کالا");
+        assertTrue(stock, stock.contains("کم‌موجود: داده در دسترس نیست"));
+    }
+
+    @Test
+    public void malformedNumericFieldIsNotPresentedAsZero() {
+        Assistant.Snap s = snap();
+        s.salesToday = row("total", "not-a-number");
+        String answer = Assistant.answer(s, "فروش امروز");
+        assertTrue(answer, answer.contains("فروش امروز: داده در دسترس نیست"));
+        assertFalse(answer, answer.contains(Money.compactRial(0)));
+    }
+
+    @Test
+    public void failedEmptyListIsNotPresentedAsNoRecords() {
+        Assistant.Snap s = snap();
+        s.overdue = java.util.Collections.emptyList();
+        s.notes.put("معوق‌ها", "query failed");
+        String answer = Assistant.answer(s, "معوق‌ها");
+        assertTrue(answer, answer.contains("معوق‌ها: داده در دسترس نیست"));
+        assertFalse(answer, answer.contains("ردیفی برنگشت"));
     }
 }

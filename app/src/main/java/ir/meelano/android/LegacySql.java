@@ -21,6 +21,11 @@ import java.util.concurrent.ConcurrentHashMap;
  * equivalents guarded by ISNUMERIC/ISDATE, which keep the same «bad value → NULL» behaviour
  * that the screens rely on. On 2012+ servers nothing changes: the probe detects the capability
  * once per server and the rewrite becomes a pass-through.
+ *
+ * <p>SQL Server 2014/2016 sit in between: they parse TRY_CONVERT just fine but still reject
+ * TRIM (a 2017+ function) with the same «not a recognized built-in function name» message.
+ * A second probe therefore detects TRIM support and, where it is missing, every bare TRIM(x)
+ * is rewritten to LTRIM(RTRIM(x)) - identical result for the trimmed strings the reports use.
  */
 public final class LegacySql {
 
@@ -54,6 +59,33 @@ public final class LegacySql {
         return legacy;
     }
 
+    /** Probe string: parses (and runs) only where TRIM exists (SQL Server 2017+). */
+    private static final String PROBE_TRIM = "SELECT TRIM(N' x ')";
+
+    /**
+     * True when the server cannot parse TRIM (SQL Server 2016 or older, or a database whose
+     * compatibility level keeps the older parser). Cached per cache key like {@link #probe}.
+     */
+    public static boolean probeTrim(Connection c, String cacheKey) {
+        String key = cacheKey == null ? null : cacheKey + "|trim";
+        if (key != null) {
+            Boolean known = SERVER_CACHE.get(key);
+            if (known != null) return known;
+        }
+        boolean missing;
+        try (Statement st = c.createStatement()) {
+            st.setQueryTimeout(5);
+            st.execute(PROBE_TRIM);
+            missing = false;
+        } catch (SQLException e) {
+            missing = isParseError(e);
+        } catch (Exception e) {
+            missing = false; // network/permission trouble: keep the modern dialect
+        }
+        if (key != null) SERVER_CACHE.put(key, missing);
+        return missing;
+    }
+
     /** Msg 195 («not a recognized built-in function name») / Msg 102 (syntax). */
     private static boolean isParseError(SQLException e) {
         String m = String.valueOf(e.getMessage()).toLowerCase(Locale.US);
@@ -65,7 +97,16 @@ public final class LegacySql {
 
     /** Wraps a connection so every statement it prepares is dialect-rewritten when needed. */
     public static Connection wrap(final Connection real, final boolean legacy) {
-        if (!legacy) return real;
+        return wrap(real, legacy, false);
+    }
+
+    /**
+     * Wraps a connection for the two capability gaps: {@code legacy} rewrites TRY_* and the
+     * paginated tail (pre-2012 parsers), {@code trimLegacy} rewrites bare TRIM calls
+     * (pre-2017 parsers, which includes SQL Server 2014/2016).
+     */
+    public static Connection wrap(final Connection real, final boolean legacy, final boolean trimLegacy) {
+        if (!legacy && !trimLegacy) return real;
         return (Connection) java.lang.reflect.Proxy.newProxyInstance(
                 LegacySql.class.getClassLoader(), new Class[]{Connection.class},
                 (proxy, method, args) -> {
@@ -73,18 +114,18 @@ public final class LegacySql {
                     if (("prepareStatement".equals(name) || "prepareCall".equals(name))
                             && args != null && args.length > 0 && args[0] instanceof String) {
                         Object[] copy = args.clone();
-                        copy[0] = rewrite((String) copy[0]);
-                        return wrapStatement(invoke(method, real, copy));
+                        copy[0] = rewrite((String) copy[0], legacy, trimLegacy);
+                        return wrapStatement(invoke(method, real, copy), legacy, trimLegacy);
                     }
                     if ("createStatement".equals(name)) {
-                        return wrapStatement(invoke(method, real, args));
+                        return wrapStatement(invoke(method, real, args), legacy, trimLegacy);
                     }
                     return invoke(method, real, args);
                 });
     }
 
     /** Rewrites the SQL text argument of execute / executeQuery / executeUpdate / addBatch. */
-    private static Object wrapStatement(final Object real) {
+    private static Object wrapStatement(final Object real, final boolean legacy, final boolean trimLegacy) {
         if (real == null) return null;
         return java.lang.reflect.Proxy.newProxyInstance(LegacySql.class.getClassLoader(),
                 real.getClass().getInterfaces(), (proxy, method, args) -> {
@@ -94,7 +135,7 @@ public final class LegacySql {
                             || "executeUpdate".equals(name) || "executeLargeUpdate".equals(name)
                             || "addBatch".equals(name))) {
                         Object[] copy = args.clone();
-                        copy[0] = rewrite((String) copy[0]);
+                        copy[0] = rewrite((String) copy[0], legacy, trimLegacy);
                         return invoke(method, real, copy);
                     }
                     return invoke(method, real, args);
@@ -113,30 +154,73 @@ public final class LegacySql {
 
     // ============================== rewrite ==============================
 
-    /** Rewrites TRY_CONVERT / TRY_CAST into 2008-compatible guarded CONVERT / CAST. */
+    /** Rewrites with every compatibility rule on (the offline corpus and tests use this). */
     public static String rewrite(String sql) {
+        return rewrite(sql, true, true);
+    }
+
+    /**
+     * Rewrites TRY_CONVERT / TRY_CAST into 2008-compatible guarded CONVERT / CAST when
+     * {@code legacyFns}, and bare TRIM into LTRIM(RTRIM) when {@code trimFns}.
+     */
+    public static String rewrite(String sql, boolean legacyFns, boolean trimFns) {
         if (sql == null || sql.isEmpty()) return sql;
-        String lower = sql.toLowerCase(Locale.US);
+        String work = trimFns ? rewriteTrim(sql) : sql;
+        if (!legacyFns) return work;
+        String lower = work.toLowerCase(Locale.US);
         int hit = indexOfFn(lower, 0);
-        if (hit < 0) return rewritePagination(sql);
-        StringBuilder out = new StringBuilder(sql.length() + 64);
+        if (hit < 0) return rewritePagination(work);
+        StringBuilder out = new StringBuilder(work.length() + 64);
         int cursor = 0;
         while (hit >= 0) {
-            out.append(sql, cursor, hit);
+            out.append(work, cursor, hit);
             boolean convert = lower.startsWith("try_convert(", hit);
             int open = hit + (convert ? "TRY_CONVERT".length() : "TRY_CAST".length());
-            int close = matchParen(sql, open);
+            int close = matchParen(work, open);
             if (close < 0) { // unbalanced: give up gracefully and keep the original text
-                out.append(sql.substring(hit));
+                out.append(work.substring(hit));
                 return out.toString();
             }
-            String inner = sql.substring(open + 1, close);
-            out.append(convert ? rewriteConvert(inner) : rewriteCast(inner));
+            String inner = work.substring(open + 1, close);
+            out.append(convert ? rewriteConvert(inner, legacyFns, trimFns)
+                    : rewriteCast(inner, legacyFns, trimFns));
             cursor = close + 1;
             hit = indexOfFn(lower, cursor);
         }
-        out.append(sql, cursor, sql.length());
+        out.append(work, cursor, work.length());
         return rewritePagination(out.toString());
+    }
+
+    /**
+     * Rewrites every bare TRIM(x) into LTRIM(RTRIM(x)): TRIM arrived in SQL Server 2017, so
+     * 2014/2016 field servers reject it while parsing. LTRIM/RTRIM exist since 2008 and give
+     * the same string for the whitespace-trimmed columns the reports use. RTRIM/LTRIM and
+     * identifiers that merely end in «trim» are left alone.
+     */
+    static String rewriteTrim(String sql) {
+        String lower = sql.toLowerCase(Locale.US);
+        StringBuilder out = new StringBuilder(sql.length() + 32);
+        int cursor = 0;
+        int at = lower.indexOf("trim(", cursor);
+        while (at >= 0) {
+            char prev = at > 0 ? sql.charAt(at - 1) : ' ';
+            boolean bare = !Character.isLetterOrDigit(prev) && prev != '_' && prev != ']';
+            if (!bare) {
+                at = lower.indexOf("trim(", at + 1);
+                continue;
+            }
+            int open = at + "trim".length();
+            int close = matchParen(sql, open);
+            if (close < 0) {
+                out.append(sql.substring(cursor));
+                return out.toString();
+            }
+            out.append(sql, cursor, at).append("LTRIM(RTRIM(").append(rewriteTrim(sql.substring(open + 1, close))).append("))");
+            cursor = close + 1;
+            at = lower.indexOf("trim(", cursor);
+        }
+        out.append(sql, cursor, sql.length());
+        return out.toString();
     }
 
     /**
@@ -242,19 +326,19 @@ public final class LegacySql {
         return -1;
     }
 
-    private static String rewriteConvert(String inner) {
+    private static String rewriteConvert(String inner, boolean legacyFns, boolean trimFns) {
         String[] parts = splitTop(inner, ',');
         if (parts.length < 2) return "CONVERT(" + inner + ")";
         String type = parts[0].trim();
-        String expr = rewrite(parts[1].trim());
+        String expr = rewrite(parts[1].trim(), legacyFns, trimFns);
         String style = parts.length > 2 ? "," + parts[2].trim() : "";
         return guarded(type, expr, style);
     }
 
-    private static String rewriteCast(String inner) {
+    private static String rewriteCast(String inner, boolean legacyFns, boolean trimFns) {
         int as = indexOfTopAs(inner);
         if (as < 0) return "CAST(" + inner + ")";
-        String expr = rewrite(inner.substring(0, as).trim());
+        String expr = rewrite(inner.substring(0, as).trim(), legacyFns, trimFns);
         String type = inner.substring(as + 3).trim();
         return guarded(type, expr, "");
     }

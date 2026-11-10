@@ -6,6 +6,4 @@
     <include domain="sharedpref" path="meelano_manager7.xml" />
     <include domain="sharedpref" path="meelano_company.xml" />
     <include domain="file" path="company_logo.png" />
-    <exclude domain="sharedpref" path="meelano_secrets.xml" />
-    <exclude domain="sharedpref" path="meelano_login.xml" />
 </full-backup-content>

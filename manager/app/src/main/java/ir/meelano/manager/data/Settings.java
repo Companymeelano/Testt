@@ -4,8 +4,6 @@ import ir.meelano.manager.core.Diag;
 import android.content.Context;
 import android.content.SharedPreferences;
 
-import java.util.Map;
-
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.SecretBox;
 
@@ -92,23 +90,8 @@ public final class Settings {
     /** Effective port for one smart-link profile (see {@link #effPort}). */
     public int effPortFor(String kind) {
         String per = ir.meelano.manager.core.SmartLink.WAN.equals(kind) ? portWan() : portLan();
-        return resolveProfilePort(per, port());
-    }
-
-    /** Per-profile port wins; a legacy shared value is used only when that profile is unset. */
-    public static int resolveProfilePort(String profilePort, String sharedPort) {
-        if (profilePort != null && !profilePort.trim().isEmpty()) return parsePort(profilePort);
-        return parsePort(sharedPort);
-    }
-
-    /**
-     * A forced route cannot work when its profile is absent. Fall back to auto in that
-     * case rather than leaving the app with an empty candidate list after an endpoint change.
-     */
-    public static String normalizeLinkMode(String mode, boolean hasLan, boolean hasWan) {
-        if ("lan".equals(mode)) return hasLan ? "lan" : "auto";
-        if ("wan".equals(mode)) return hasWan ? "wan" : "auto";
-        return "auto";
+        if (!per.isEmpty()) return parsePort(per);
+        return effPort();
     }
     public String db() { return p.getString("db_name", "").trim(); }
     public String user() { return p.getString("db_user", "").trim(); }
@@ -153,7 +136,7 @@ public final class Settings {
     public void clearSavedServer() {
         p.edit().remove("db_host").remove("db_lan").remove("db_wan")
                 .remove("db_name").remove("link_last")
-                .remove("db_port").remove("db_port_lan").remove("db_port_wan")
+                .remove("db_port_lan").remove("db_port_wan")
                 .putString("link_mode", "auto").apply();
     }
 
@@ -162,8 +145,6 @@ public final class Settings {
                 .putString("db_port", port == null ? "" : port.trim())
                 .putString("db_name", db == null ? "" : db.trim())
                 .putString("db_user", user == null ? "" : user.trim())
-                .putString("link_mode", "auto")
-                .putString("link_last", "")
                 .apply();
         savePass(pass);
     }
@@ -175,7 +156,7 @@ public final class Settings {
 
     /**
      * Save both smart-link profiles with their own ports (either may be empty;
-     * empty uses the default 1433).
+     * empty = the default 1433, or the shared port when one was saved before).
      * The dedicated/public address often answers on a forwarded port
      * (e.g. 5050 → 1433) while the shop LAN keeps 1433.
      */
@@ -188,9 +169,6 @@ public final class Settings {
                 .putString("db_port", "")
                 .putString("db_name", db == null ? "" : db.trim())
                 .putString("db_user", user == null ? "" : user.trim())
-                // Changing the endpoint invalidates a manually pinned old route.
-                .putString("link_mode", "auto")
-                .putString("link_last", "")
                 .apply();
         return savePass(pass);
     }
@@ -204,35 +182,19 @@ public final class Settings {
     public void placeHost(String host, String port, String db, String user, String pass) {
         String h = host == null ? "" : host.trim();
         SharedPreferences.Editor e = p.edit();
-        String kind = "";
         if (!h.isEmpty()) {
-            String sharedPort = port();
             Boolean priv = ir.meelano.manager.core.SmartLink.isPrivate(h);
-            kind = priv != null && !priv
-                    ? ir.meelano.manager.core.SmartLink.WAN
-                    : ir.meelano.manager.core.SmartLink.LAN;
-            if (ir.meelano.manager.core.SmartLink.WAN.equals(kind)) {
-                // Preserve the other saved endpoint's legacy shared-port behavior before
-                // replacing it with this newly verified endpoint's (possibly forwarded) port.
-                if (!lan().isEmpty() && portLan().isEmpty())
-                    e.putString("db_port_lan", String.valueOf(resolveProfilePort("", sharedPort)));
+            if (priv != null && !priv) {
                 e.putString("db_wan", h);
                 e.putString("db_port_wan", port == null ? "" : port.trim());
             } else {
-                if (!wan().isEmpty() && portWan().isEmpty())
-                    e.putString("db_port_wan", String.valueOf(resolveProfilePort("", sharedPort)));
                 e.putString("db_lan", h);
                 e.putString("db_port_lan", port == null ? "" : port.trim());
             }
-            // Keep the new endpoint's port for older single-route builds; the other saved
-            // endpoint has been materialized above so it will not inherit this forwarded port.
-            e.putString("db_port", port == null ? "" : port.trim());
         }
-        e.putString("db_name", db == null ? "" : db.trim())
+        e.putString("db_port", port == null ? "" : port.trim())
+                .putString("db_name", db == null ? "" : db.trim())
                 .putString("db_user", user == null ? "" : user.trim())
-                // A freshly verified endpoint becomes the active route; never keep a stale pin.
-                .putString("link_mode", "auto")
-                .putString("link_last", kind)
                 .apply();
         savePass(pass);
     }
@@ -249,22 +211,13 @@ public final class Settings {
 
     /** Smart-link mode: "auto" (default), "lan" or "wan". */
     public String linkMode() {
-        String stored = p.getString("link_mode", "auto");
-        String normalized = normalizeLinkMode(stored, !lan().isEmpty(), !wan().isEmpty());
-        if (!normalized.equals(stored)) p.edit().putString("link_mode", normalized).apply();
-        return normalized;
+        String m = p.getString("link_mode", "auto");
+        if ("lan".equals(m) || "wan".equals(m)) return m;
+        return "auto";
     }
 
-    /**
-     * Select a route only when its endpoint exists. A missing profile is not a useful
-     * manual choice; keep the app in auto mode and tell the caller to explain that.
-     */
-    public boolean setLinkMode(String mode) {
-        if (lan().isEmpty() && wan().isEmpty() && !host().isEmpty()) migrateLegacyHost();
-        String requested = "lan".equals(mode) || "wan".equals(mode) ? mode : "auto";
-        String normalized = normalizeLinkMode(requested, !lan().isEmpty(), !wan().isEmpty());
-        p.edit().putString("link_mode", normalized).apply();
-        return requested.equals(normalized);
+    public void setLinkMode(String mode) {
+        p.edit().putString("link_mode", "lan".equals(mode) || "wan".equals(mode) ? mode : "auto").apply();
     }
 
     /** Profile that worked last ("lan" / "wan" / ""). */
@@ -353,28 +306,6 @@ public final class Settings {
 
     public void setNotifOn(boolean on) { p.edit().putBoolean("notif_on", on).apply(); }
 
-    /** Per-category Home due notification switch; enabled by default under the master switch. */
-    public boolean homeDueAlertsOn() { return p.getBoolean("home_due_alerts_on", true); }
-
-    public void setHomeDueAlertsOn(boolean on) {
-        p.edit().putBoolean("home_due_alerts_on", on).apply();
-    }
-
-    /** Optional local quiet window for Home AlertEngine notifications; disabled until chosen. */
-    public boolean homeQuietHoursOn() { return p.getBoolean("home_quiet_on", false); }
-    public int homeQuietStartMinute() { return clampMinute(p.getInt("home_quiet_start", 22 * 60)); }
-    public int homeQuietEndMinute() { return clampMinute(p.getInt("home_quiet_end", 8 * 60)); }
-
-    public void setHomeQuietHours(boolean enabled, int startMinute, int endMinute) {
-        p.edit().putBoolean("home_quiet_on", enabled)
-                .putInt("home_quiet_start", clampMinute(startMinute))
-                .putInt("home_quiet_end", clampMinute(endMinute)).apply();
-    }
-
-    private static int clampMinute(int minute) {
-        return Math.max(0, Math.min(23 * 60 + 59, minute));
-    }
-
     // ---------------- shop card ----------------
     public String shopName() { return p.getString("shop_name", "").trim(); }
 
@@ -449,13 +380,8 @@ public final class Settings {
     public void setWhDirect(boolean on) { p.edit().putBoolean("wh_direct", on).apply(); }
 
     // ---------------- home dashboard order ----------------
-    /** Orderable lower Home modules; the default keeps finance, insight and operation groups adjacent. */
-    public static final String HOME_ORDER_DEFAULT = "smart_report,closeout,cash_position,cash_mix,due,eod,top_performers,sales_goal,gross_profit,forecast_7d,seasonal_calendar,quick_actions,alerts,market,returns";
-    /** First three new modules are enabled by default; existing compact modules remain available. */
-    public static final String HOME_SECTIONS_DEFAULT = "smart_report,closeout,cash_position";
-    private static final String[] HOME_SECTION_KEYS = {"smart_report", "closeout", "cash_position",
-            "top_performers", "sales_goal", "gross_profit", "seasonal_calendar", "quick_actions",
-            "forecast_7d", "alerts", "cash_mix", "market", "due", "returns", "eod"};
+    /** Manager-first order: daily flow and actions, then trends and product analysis. */
+    public static final String HOME_ORDER_DEFAULT = "kpis,alerts,due,returns,sales_insight,cash_mix,eod";
 
     public String homeOrder() {
         String stored = p.getString("home_order", null);
@@ -491,250 +417,6 @@ public final class Settings {
 
     public void setHomeOrder(String csv) {
         p.edit().putString("home_order", csv == null ? HOME_ORDER_DEFAULT : csv).apply();
-    }
-
-    /** Selected lower Home modules; an empty stored value intentionally hides them all. */
-    public String homeSections() {
-        String stored = p.getString("home_sections", null);
-        return normalizeHomeSections(stored == null ? HOME_SECTIONS_DEFAULT : stored);
-    }
-
-    public void setHomeSections(String csv) {
-        p.edit().putString("home_sections", normalizeHomeSections(csv == null ? "" : csv)).apply();
-    }
-
-    private static String normalizeHomeSections(String csv) {
-        StringBuilder normalized = new StringBuilder();
-        java.util.HashSet<String> seen = new java.util.HashSet<>();
-        if (csv != null) for (String key : csv.split(",")) {
-            String candidate = key == null ? "" : key.trim();
-            boolean known = false;
-            for (String valid : HOME_SECTION_KEYS) if (valid.equals(candidate)) { known = true; break; }
-            if (known && seen.add(candidate)) {
-                if (normalized.length() > 0) normalized.append(',');
-                normalized.append(candidate);
-            }
-        }
-        return normalized.toString();
-    }
-
-    /** Simple mode shows the first three selected modules; full mode shows every selected module. */
-    public boolean homeSimpleMode() { return p.getBoolean("home_simple", true); }
-
-    public void setHomeSimpleMode(boolean simple) {
-        p.edit().putBoolean("home_simple", simple).apply();
-    }
-
-    /** User-entered monthly sales targets keyed by Jalali month; local preferences only. */
-    public String homeSalesGoalRials(String jalaliMonth) {
-        String key = homeSalesGoalKey(jalaliMonth);
-        return key == null ? "" : p.getString(key, "");
-    }
-
-    public void setHomeSalesGoalRials(String jalaliMonth, String rawRials) {
-        String key = homeSalesGoalKey(jalaliMonth);
-        if (key == null) return;
-        String raw = rawRials == null ? "" : Money.en(rawRials).replace(",", "")
-                .replace("٬", "").replace('٫', '.').trim();
-        if (raw.isEmpty()) {
-            p.edit().remove(key).apply();
-            return;
-        }
-        try {
-            java.math.BigDecimal amount = new java.math.BigDecimal(raw);
-            if (amount.signum() < 0) return;
-            p.edit().putString(key, amount.stripTrailingZeros().toPlainString()).apply();
-        } catch (Exception invalid) {
-            Diag.ignored("Settings:homeSalesGoal", invalid);
-        }
-    }
-
-    private String homeSalesGoalKey(String jalaliMonth) {
-        String month = jalaliMonth == null ? "" : jalaliMonth.trim();
-        if (!month.matches("\\d{4}/\\d{2}")) return null;
-        String normalized = ir.meelano.manager.core.Jalali.disp(month + "/01");
-        if (normalized.isEmpty()) return null;
-        return "home_sales_goal_" + normalized.substring(0, 7).replace('/', '_');
-    }
-
-    /** Seasonal buying/stock planning notes keyed by Jalali month; they remain on this device. */
-    public String homeSeasonalPlan(String jalaliMonth) {
-        String key = homeSeasonalPlanKey(jalaliMonth);
-        return key == null ? "" : p.getString(key, "");
-    }
-
-    public void setHomeSeasonalPlan(String jalaliMonth, String note) {
-        String key = homeSeasonalPlanKey(jalaliMonth);
-        if (key == null) return;
-        String value = note == null ? "" : note.trim();
-        if (value.isEmpty()) {
-            p.edit().remove(key).apply();
-            return;
-        }
-        if (value.length() > 600) {
-            int end = 600;
-            if (Character.isHighSurrogate(value.charAt(end - 1))) end--;
-            value = value.substring(0, end);
-        }
-        p.edit().putString(key, value).apply();
-    }
-
-    private String homeSeasonalPlanKey(String jalaliMonth) {
-        String month = jalaliMonth == null ? "" : jalaliMonth.trim();
-        if (!month.matches("\\d{4}/\\d{2}")) return null;
-        String normalized = ir.meelano.manager.core.Jalali.disp(month + "/01");
-        if (normalized.isEmpty()) return null;
-        return "home_seasonal_plan_" + normalized.substring(0, 7).replace('/', '_');
-    }
-
-    /** Local till observations keyed by Jalali day; they never leave this device or alter Atiran. */
-    public String closeoutCashOpening(String day) { return p.getString(closeoutCashKey("open", day), ""); }
-    public String closeoutCashCounted(String day) { return p.getString(closeoutCashKey("counted", day), ""); }
-    public void setCloseoutCashOpening(String day, String rials) {
-        saveCloseoutCash("open", day, rials);
-    }
-    public void setCloseoutCashCounted(String day, String rials) {
-        saveCloseoutCash("counted", day, rials);
-    }
-
-    private String closeoutCashKey(String kind, String day) {
-        String normalized = ir.meelano.manager.core.Jalali.disp(day);
-        if (normalized.isEmpty()) return "home_cash_" + kind + "_unknown";
-        return "home_cash_" + kind + "_" + normalized.replace('/', '_');
-    }
-
-    private void saveCloseoutCash(String kind, String day, String raw) {
-        String normalized = ir.meelano.manager.core.Jalali.disp(day);
-        if (normalized.isEmpty()) return;
-        String value = Money.en(raw == null ? "" : raw.trim()).replace(",", "")
-                .replace("٬", "").replace('٫', '.').trim();
-        try {
-            java.math.BigDecimal amount = new java.math.BigDecimal(value);
-            if (amount.signum() < 0) return;
-            value = amount.stripTrailingZeros().toPlainString();
-        } catch (Exception invalid) {
-            if (!value.isEmpty()) return;
-        }
-        p.edit().putString(closeoutCashKey(kind, normalized), value).apply();
-    }
-
-    /** Actual bank-statement movement totals entered by a manager; local to this device. */
-    public String homeBankStatementInRials(String day, String bankId) {
-        String key = homeBankStatementKey("in", day, bankId);
-        return key == null ? "" : p.getString(key, "");
-    }
-
-    public String homeBankStatementOutRials(String day, String bankId) {
-        String key = homeBankStatementKey("out", day, bankId);
-        return key == null ? "" : p.getString(key, "");
-    }
-
-    public String homeBankStatementSource(String day, String bankId) {
-        String key = homeBankStatementKey("source", day, bankId);
-        if (key == null) return "";
-        String source = p.getString(key, "");
-        if (!source.isEmpty()) return source;
-        return !homeBankStatementInRials(day, bankId).isEmpty()
-                && !homeBankStatementOutRials(day, bankId).isEmpty() ? "ثبت دستی" : "";
-    }
-
-    public long homeBankStatementUpdatedAt(String day, String bankId) {
-        String key = homeBankStatementKey("updated", day, bankId);
-        return key == null ? 0L : p.getLong(key, 0L);
-    }
-
-    /** Both directions are required: a blank is never interpreted as a zero bank movement. */
-    public boolean setHomeBankStatementRials(String day, String bankId, String inflow, String outflow) {
-        String inKey = homeBankStatementKey("in", day, bankId);
-        String outKey = homeBankStatementKey("out", day, bankId);
-        String sourceKey = homeBankStatementKey("source", day, bankId);
-        String updatedKey = homeBankStatementKey("updated", day, bankId);
-        String in = normalizeLocalRials(inflow);
-        String out = normalizeLocalRials(outflow);
-        if (inKey == null || outKey == null || sourceKey == null || updatedKey == null
-                || in == null || out == null) return false;
-        p.edit().putString(inKey, in).putString(outKey, out)
-                .putString(sourceKey, "ثبت دستی")
-                .putLong(updatedKey, System.currentTimeMillis()).apply();
-        return true;
-    }
-
-    /**
-     * Atomically replaces only daily aggregate values inside a manager-confirmed complete range.
-     * The raw file and transaction rows are never copied to preferences or another store.
-     */
-    public boolean setHomeBankStatementRialsBatch(String bankId, String fromDay, String toDay,
-                                                   Map<String, String[]> dailyRials) {
-        String id = bankId == null ? "" : bankId.trim();
-        String from = ir.meelano.manager.core.Jalali.disp(fromDay);
-        String to = ir.meelano.manager.core.Jalali.disp(toDay);
-        int first = ir.meelano.manager.core.Jalali.parse(from);
-        int last = ir.meelano.manager.core.Jalali.parse(to);
-        if (id.isEmpty() || id.length() > 200 || first < 0 || last < first
-                || last - first + 1 > ir.meelano.manager.core.BankStatementFile.MAX_PERIOD_DAYS
-                || dailyRials == null || dailyRials.size() != last - first + 1) return false;
-
-        SharedPreferences.Editor edit = p.edit();
-        String source = "فایل بانکی • " + ir.meelano.manager.core.HomeNumberFormatter.dateText(
-                ir.meelano.manager.core.Jalali.todayStr());
-        long updated = System.currentTimeMillis();
-        for (int offset = 0; offset <= last - first; offset++) {
-            String day = ir.meelano.manager.core.Jalali.format(first + offset);
-            String[] amounts = dailyRials.get(day);
-            if (amounts == null || amounts.length < 2) return false;
-            String in = normalizeLocalRials(amounts[0]);
-            String out = normalizeLocalRials(amounts[1]);
-            String inKey = homeBankStatementKey("in", day, id);
-            String outKey = homeBankStatementKey("out", day, id);
-            String sourceKey = homeBankStatementKey("source", day, id);
-            String updatedKey = homeBankStatementKey("updated", day, id);
-            if (in == null || out == null || inKey == null || outKey == null
-                    || sourceKey == null || updatedKey == null) return false;
-            edit.putString(inKey, in).putString(outKey, out)
-                    .putString(sourceKey, source).putLong(updatedKey, updated);
-        }
-        // Extra keys cannot satisfy the exact day count without a missing date; reject any stray date.
-        for (String key : dailyRials.keySet()) {
-            String day = ir.meelano.manager.core.Jalali.disp(key);
-            int dayNo = ir.meelano.manager.core.Jalali.parse(day);
-            if (dayNo < first || dayNo > last) return false;
-        }
-        return edit.commit();
-    }
-
-    public void clearHomeBankStatement(String day, String bankId) {
-        String inKey = homeBankStatementKey("in", day, bankId);
-        String outKey = homeBankStatementKey("out", day, bankId);
-        String sourceKey = homeBankStatementKey("source", day, bankId);
-        String updatedKey = homeBankStatementKey("updated", day, bankId);
-        if (inKey == null || outKey == null) return;
-        p.edit().remove(inKey).remove(outKey).remove(sourceKey).remove(updatedKey).apply();
-    }
-
-    private String homeBankStatementKey(String direction, String day, String bankId) {
-        String normalizedDay = ir.meelano.manager.core.Jalali.disp(day);
-        String id = bankId == null ? "" : bankId.trim();
-        if (normalizedDay.isEmpty() || id.isEmpty() || id.length() > 200) return null;
-        try {
-            String token = android.util.Base64.encodeToString(id.getBytes("UTF-8"),
-                    android.util.Base64.URL_SAFE | android.util.Base64.NO_WRAP
-                            | android.util.Base64.NO_PADDING);
-            return "home_bank_statement_" + direction + "_"
-                    + normalizedDay.replace('/', '_') + "_" + token;
-        } catch (Exception invalid) {
-            return null;
-        }
-    }
-
-    private String normalizeLocalRials(String raw) {
-        if (raw == null || raw.trim().isEmpty()) return null;
-        String lower = Money.en(raw).toLowerCase(java.util.Locale.US);
-        if (lower.contains("تومان") || lower.contains("irt") || lower.contains("toman")) return null;
-        java.math.BigDecimal amount = ir.meelano.manager.core.BankStatementFile.parseAmountExact(
-                raw, ir.meelano.manager.core.BankStatementFile.AMOUNT_AUTO);
-        if (amount == null || amount.signum() < 0 || amount.precision() > 24 || amount.scale() > 4
-                || amount.compareTo(ir.meelano.manager.core.BankStatementFile.MAX_AMOUNT_RIALS) > 0) return null;
-        return amount.stripTrailingZeros().toPlainString();
     }
 
     // ---------------- stock alerts + auto backup (v18) ----------------

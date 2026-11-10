@@ -38,100 +38,12 @@ public class AtiranSampleSchemaTest {
         assertEquals(12, report.totalSections);
     }
 
-    @Test public void homeOverduePreviewCarriesAnExactTotalWithoutLoadingEveryInvoice() throws Exception {
-        Meta meta = new Meta(connection(loadManifest()));
-        Queries.Q query = Queries.overdueInvoices(meta, 5);
-        String sql = query.sql.toLowerCase(Locale.ROOT);
-        assertTrue(sql, sql.contains("count_big(1) over() as totalcount"));
-        assertTrue(sql, sql.contains("select top (20)"));
-        assertTrue(sql, sql.contains("s.[tasvieh]='f'"));
-        assertFalse(sql, sql.contains("insert into "));
-        assertFalse(sql, sql.contains("update dbo."));
-        assertFalse(sql, sql.contains("delete from "));
-    }
-
-    @Test public void bankStatementQueryIsAccountScopedDailyAndReadOnly() throws Exception {
-        Meta meta = new Meta(connection(loadManifest()));
-        Queries.Q q = MasterQueries.bankTurnoverDaily(meta, "17", "1405/01/01", "1405/01/31");
-        String sql = q.sql.toLowerCase(Locale.ROOT);
-        assertTrue(sql, sql.startsWith("with bank_rows as ("));
-        assertTrue(sql, sql.contains("h.[bank_rdf]"));
-        assertTrue(sql, sql.contains("as day"));
-        assertTrue(sql, sql.contains("as [in]"));
-        assertTrue(sql, sql.contains("as [out]"));
-        assertTrue(sql, sql.contains("as invalidin"));
-        assertTrue(sql, sql.contains("as invalidout"));
-        assertTrue(sql, sql.contains("as missingrows"));
-        assertTrue(sql, sql.contains("as invaliddaterows"));
-        assertTrue(sql, sql.contains("decimal(38,18)"));
-        assertTrue(sql, sql.contains("decimal(38,4)"));
-        assertTrue(sql, sql.contains("group by"));
-        assertTrue(sql, sql.contains("h.[act_date]"));
-        assertEquals("17", q.binds.get(0));
-        assertEquals("1405/01/01", q.binds.get(1));
-        assertEquals("1405/01/31", q.binds.get(2));
-        assertFalse(sql, sql.contains("insert into "));
-        assertFalse(sql, sql.contains("update dbo."));
-        assertFalse(sql, sql.contains("delete from "));
-    }
-
-    @Test public void grossProfitQueryReportsMissingCostCoverageInsteadOfTreatingItAsZero() throws Exception {
-        Meta meta = new Meta(connection(loadManifest()));
-        Queries.Q query = MasterQueries.profitDaily(meta, new Filter());
-        String sql = query.sql.toLowerCase(Locale.ROOT);
-        assertTrue(sql, sql.contains("as qualityissues"));
-        assertTrue(sql, sql.contains("sum(qualityissues)"));
-        assertTrue(sql, sql.contains("left join dbo.subsailfact"));
-        assertTrue(sql, sql.contains("left join dbo.inventory"));
-        assertTrue(sql, sql.contains("try_convert(decimal(19,2)"));
-        assertFalse(sql, sql.contains("insert into "));
-        assertFalse(sql, sql.contains("update dbo."));
-        assertFalse(sql, sql.contains("delete from "));
-    }
-
     /** Purchase unit price comes from JOZPRICE: subbuyfact has no LINESUM in the sample schema. */
     @Test public void purchasePriceUsesJozPriceNotLineSum() throws Exception {
         Meta meta = new Meta(connection(loadManifest()));
         String sql = Queries.buyPriceTrend(meta, new Filter(), 50).sql.toLowerCase(Locale.ROOT);
         assertTrue(sql, sql.contains("jozprice"));
         assertFalse(sql, sql.contains("linesum"));
-    }
-
-    @Test public void homePriceDriftUsesCurrentPurchaseLinesAndDeterministicSameDayOrdering() throws Exception {
-        Meta meta = new Meta(connection(loadManifest()));
-        Filter allHistory = new Filter();
-        allHistory.from = "";
-        allHistory.to = "";
-        Queries.Q q = Queries.buyPriceTrend(meta, allHistory, 20);
-        String sql = q.sql.toLowerCase(Locale.ROOT);
-        assertTrue(sql, sql.contains("row_number() over (partition by k order by dk desc, purchasetime desc"));
-        assertTrue(sql, sql.contains("try_convert(time(0),h.[hour])"));
-        assertTrue(sql, sql.contains("max(try_convert(bigint,v.[rdf__]))"));
-        assertTrue(sql, sql.contains("max(try_convert(bigint,x.[rdf__]))"));
-        assertTrue(sql, sql.contains("active"));
-        assertTrue(sql, sql.contains("r1.rn=1"));
-        assertTrue(sql, sql.contains("r1.rn=2"));
-        assertTrue(q.binds.isEmpty());
-        assertFalse(sql, sql.contains("insert into "));
-        assertFalse(sql, sql.contains("update dbo."));
-        assertFalse(sql, sql.contains("delete from "));
-    }
-
-    @Test public void homeStockAlertsAreReadOnlyAndRequireARealReorderPoint() throws Exception {
-        Meta meta = new Meta(connection(loadManifest()));
-        String sql = MasterQueries.stockAlerts(meta, 20).sql.toLowerCase(Locale.ROOT);
-        assertTrue(sql, sql.contains("as stockpieces"));
-        assertTrue(sql, sql.contains("as reorderpoint"));
-        assertTrue(sql, sql.contains("as reorderknown"));
-        assertTrue(sql, sql.contains("mojkavah"));
-        assertTrue(sql, sql.contains("mojkajoz"));
-        assertTrue(sql, sql.contains("reopoint"));
-        assertTrue(sql, sql.contains("active"));
-        assertTrue(sql, sql.contains("<=0"));
-        assertTrue(sql, sql.contains("where "));
-        assertFalse(sql, sql.contains("insert into "));
-        assertFalse(sql, sql.contains("update dbo."));
-        assertFalse(sql, sql.contains("delete from "));
     }
 
     /** Stock value counts loose pieces (mojkajoz) at inventory_price for active items only. */
@@ -202,100 +114,6 @@ public class AtiranSampleSchemaTest {
         assertTrue(sql, sql.contains("reopoint"));
     }
 
-    @Test public void homeDailyKpisUseOneExplicitJalaliDayForPurchasesReceiptsAndPayments() throws Exception {
-        Meta meta = new Meta(connection(loadManifest()));
-        String day = "1405/07/22";
-
-        Queries.Q purchases = Queries.factorDaily(meta, false, day, day);
-        Queries.Q receipts = MoneyQueries.darDay(meta, 0, day);
-        Queries.Q payments = MoneyQueries.darDay(meta, 1, day);
-
-        assertTrue(purchases.binds.contains(day));
-        assertTrue(purchases.binds.contains(Jalali.toGregorian(day)));
-        Queries.Q oneSidedPurchase = Queries.factorDaily(meta, false, day, "");
-        assertTrue(oneSidedPurchase.sql.toLowerCase(Locale.ROOT).contains("charindex(n'/',"));
-        assertEquals(day, oneSidedPurchase.binds.get(0));
-        assertEquals(Jalali.toGregorian(day), oneSidedPurchase.binds.get(1));
-        assertEquals(Integer.valueOf(0), receipts.binds.get(0));
-        assertEquals(day, receipts.binds.get(1));
-        assertEquals(Jalali.toGregorian(day), receipts.binds.get(2));
-        assertEquals(Integer.valueOf(1), payments.binds.get(0));
-        assertEquals(day, payments.binds.get(1));
-        assertEquals(Jalali.toGregorian(day), payments.binds.get(2));
-        assertTrue(receipts.sql.toLowerCase(Locale.ROOT).startsWith("select "));
-        // POS detail revisions use MAX(Rdf_), but the explicit Home day must not select
-        // its date by querying a different latest day from dbo.dar.
-        assertFalse(receipts.sql.toLowerCase(Locale.ROOT).contains("select max(left(try_convert"));
-        assertFalse(payments.sql.toLowerCase(Locale.ROOT).contains("select max(left(try_convert"));
-    }
-
-    @Test public void returnTrendAndRegisterAreDateScopedAndExposeInvalidAmounts() throws Exception {
-        Meta meta = new Meta(connection(loadManifest()));
-        Filter filter = new Filter();
-        filter.from = "1405/07/22";
-        filter.to = "1405/07/22";
-        filter.search = "برگشت ۱۲۳";
-        filter.top = 50;
-
-        Queries.Q daily = MasterQueries.returnsDaily(meta, filter);
-        String dailySql = daily.sql.toLowerCase(Locale.ROOT);
-        assertTrue(dailySql, dailySql.contains("as invalidrows"));
-        assertTrue(dailySql, dailySql.contains("sum(try_convert(decimal(19,2)"));
-        assertTrue(daily.binds.contains(filter.from));
-        assertTrue(daily.binds.contains(Jalali.toGregorian(filter.from)));
-        Filter fromOnly = new Filter();
-        fromOnly.from = filter.from;
-        fromOnly.to = "";
-        Queries.Q oneSidedReturns = MasterQueries.returnsDaily(meta, fromOnly);
-        assertTrue(oneSidedReturns.sql.toLowerCase(Locale.ROOT).contains("charindex(n'/',"));
-        assertEquals(filter.from, oneSidedReturns.binds.get(0));
-        assertEquals(Jalali.toGregorian(filter.from), oneSidedReturns.binds.get(1));
-        assertFalse(dailySql, dailySql.contains("insert into "));
-        assertFalse(dailySql, dailySql.contains("update dbo."));
-        assertFalse(dailySql, dailySql.contains("delete from "));
-
-        Queries.Q list = MasterQueries.returnsList(meta, filter);
-        String listSql = list.sql.toLowerCase(Locale.ROOT);
-        assertTrue(listSql, listSql.contains("as amountinvalid"));
-        assertTrue(listSql, listSql.contains("as kindcode"));
-        assertTrue(listSql, listSql.contains("offset ? rows fetch next ? rows only"));
-        assertEquals(3, list.binds.stream().filter(v -> "%برگشت ۱۲۳%".equals(v)).count());
-        assertTrue(list.binds.contains(filter.from));
-        assertTrue(list.binds.contains(Jalali.toGregorian(filter.from)));
-        assertFalse(listSql, listSql.contains("insert into "));
-        assertFalse(listSql, listSql.contains("update dbo."));
-        assertFalse(listSql, listSql.contains("delete from "));
-
-        Queries.Q lines = MasterQueries.returnLines(meta, "123");
-        String lineSql = lines.sql.toLowerCase(Locale.ROOT);
-        assertTrue(lineSql, lineSql.contains("vw_allrizaghlambargashti"));
-        assertTrue(lineSql, lineSql.contains("x.[sh_back_sanad]"));
-        assertTrue(lineSql, lineSql.contains("as linesum"));
-        assertTrue(lineSql, lineSql.contains("try_convert(decimal(19,3),x.[tedvah])"));
-        assertEquals("123", lines.binds.get(0));
-        assertFalse(lineSql, lineSql.contains("insert into "));
-        assertFalse(lineSql, lineSql.contains("update dbo."));
-        assertFalse(lineSql, lineSql.contains("delete from "));
-
-        Queries.Q exactLines = MasterQueries.returnLines(meta, "123", "2", "برگشت از فروش");
-        String exactLineSql = exactLines.sql.toLowerCase(Locale.ROOT);
-        assertTrue(exactLineSql, exactLineSql.contains("try_convert(nvarchar(100),x.[type_bargashti])"));
-        assertTrue(exactLineSql, exactLineSql.contains(" or "));
-        assertEquals("123", exactLines.binds.get(0));
-        assertEquals("برگشت از فروش", exactLines.binds.get(1));
-        assertEquals("2", exactLines.binds.get(2));
-    }
-
-    @Test public void missingExplicitVoidMarkerDoesNotBecomeAnEmptyZeroTrend() throws Exception {
-        Meta meta = new Meta(connection(loadManifest()));
-        try {
-            Queries.voidedFactorDaily(meta, true, "1405/07/22", "1405/07/22");
-            throw new AssertionError("the sample has no explicit cancellation marker");
-        } catch (Queries.Missing expected) {
-            assertTrue(expected.getMessage(), expected.getMessage().contains("صریح"));
-        }
-    }
-
     @Test public void productListAndCountShareNormalizedReadOnlyFiltersAndExactPaging() throws Exception {
         Meta meta = new Meta(connection(loadManifest()));
         Filter filter = new Filter();
@@ -334,54 +152,11 @@ public class AtiranSampleSchemaTest {
         assertTrue(users.sql.contains("LEFT JOIN [dbo].[Roles] r"));
         assertTrue(users.sql.contains("FROM [security].[LoginDetails] lg"));
         assertTrue(users.sql.contains("FROM [security].[Log] lo"));
-        assertTrue("User list should retain the login clock for display",
-                users.sql.contains("MAX(LEFT(LTRIM(RTRIM(TRY_CONVERT(nvarchar(30),lg.[DateServer],121))),19)) lastDay"));
 
         Queries.Q logins = MasterQueries.userLogins(meta, "7");
         assertTrue(logins.sql.contains("FROM [security].[LoginDetails]"));
-        assertTrue("Login history should return an ISO timestamp for the shared formatter",
-                logins.sql.contains("LEFT(LTRIM(RTRIM(TRY_CONVERT(nvarchar(30),[DateServer],121))),19) AS at"));
         Queries.Q lookup = MasterQueries.lookupUsers(meta);
         assertTrue(lookup.sql.contains("FROM [dbo].[sys_users] t"));
-
-        Queries.Q handover = MasterQueries.whDeliveries(meta, "1405/08/13");
-        assertTrue("Handover rows should combine sailfact.date with its separate clock",
-                handover.sql.contains("f.[time_]") && handover.sql.contains("CHARINDEX(N' ',"));
-
-        Queries.Q changes = MasterQueries.tableChanges(meta, new Filter());
-        assertTrue("TableChanges should combine DateServer and TimeServer for the shared formatter",
-                changes.sql.contains("t.[TimeServer]") && changes.sql.contains(" AS at"));
-
-        Queries.Q receipts = MoneyQueries.darList(meta, new Filter(), 0);
-        assertTrue("Receipt lists should retain the separate ClockTime",
-                receipts.sql.contains("h.[ClockTime]"));
-        Queries.Q sales = Queries.factorList(meta, true, new Filter());
-        assertTrue("Sales invoices should retain the separate time_ clock",
-                sales.sql.contains("h.[time_]"));
-        Queries.Q purchases = Queries.factorList(meta, false, new Filter());
-        assertTrue("Purchase invoices should retain the separate Hour value",
-                purchases.sql.contains("h.[Hour]"));
-        Queries.Q overpaid = FinanceReports.overpaidVouchers(meta, new Filter(), 10);
-        assertTrue("Home finance audit should retain receipt ClockTime",
-                overpaid.sql.contains("h.[ClockTime]"));
-        Queries.Q journals = FinanceReports.unbalancedJournals(meta, new Filter(), 10);
-        assertTrue("Journal summaries should retain their separate TimeServer field",
-                journals.sql.contains("a.[TimeServer]"));
-        Queries.Q biggestJournals = FinanceReports.biggestJournals(meta, new Filter(), 10);
-        assertTrue("Largest journal documents should retain their separate TimeServer field",
-                biggestJournals.sql.contains("a.[TimeServer]"));
-        Queries.Q customerLedger = MasterQueries.customerTurnover(meta, "7", new Filter());
-        assertTrue("Customer ledger should retain its t_time timestamp",
-                customerLedger.sql.contains("h.[t_time]"));
-        Queries.Q customerReceipts = MasterQueries.customerDars(meta, "7", 0, new Filter());
-        assertTrue("Customer receipt rows should retain ClockTime",
-                customerReceipts.sql.contains("h.[ClockTime]"));
-        Queries.Q customerInvoices = MasterQueries.partyInvoices(meta, true, "7", new Filter());
-        assertTrue("Customer invoice rows should retain the separate time_ clock",
-                customerInvoices.sql.contains("h.[time_]"));
-        Queries.Q returns = MasterQueries.returnsList(meta, new Filter());
-        assertTrue("Return documents should retain their separate Hour value",
-                returns.sql.contains("h.[Hour]"));
     }
 
     private static JSONObject loadManifest() throws Exception {

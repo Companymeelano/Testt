@@ -17,7 +17,7 @@ import java.util.List;
 public class AdminDb extends SQLiteOpenHelper {
 
     private static final String NAME = "meelano_admin.db";
-    private static final int VERSION = 7;
+    private static final int VERSION = 6;
 
     public static final class Customer {
         public long id;
@@ -37,7 +37,7 @@ public class AdminDb extends SQLiteOpenHelper {
 
         public boolean hasSite() {
             return (!dbHost.isEmpty() || !dbWan.isEmpty()) && !dbPort.isEmpty()
-                    && !dbName.isEmpty();
+                    && !dbName.isEmpty() && !dbUser.isEmpty();
         }
     }
 
@@ -101,11 +101,10 @@ public class AdminDb extends SQLiteOpenHelper {
             }
         }
         if (oldV < 6) {
-            try { db.execSQL("UPDATE customers SET db_pass = ''"); } catch (Exception ignored) { }
-        }
-        if (oldV < 7) {
-            // Endpoint cards no longer carry a database login; require local provisioning on each client.
-            try { db.execSQL("UPDATE customers SET db_user = '', db_pass = ''"); } catch (Exception ignored) { }
+            // The SQL password is a shared constant and nothing reads this column: erase old copies.
+            try {
+                db.execSQL("UPDATE customers SET db_pass = ''");
+            } catch (Exception ignored) { }
         }
         if (oldV < 3) {
             try {
@@ -313,27 +312,22 @@ public class AdminDb extends SQLiteOpenHelper {
         }
     }
 
-    public boolean saveSite(long id, String lan, String wan, String port, String db) {
+    public boolean saveSite(long id, String lan, String wan, String port, String db,
+                             String user, String pass) {
         try {
             ContentValues v = new ContentValues();
             v.put("db_host", s(lan));
             v.put("db_wan", s(wan));
             v.put("db_port", s(port));
             v.put("db_name", s(db));
-            // Endpoint-only connection cards never contain SQL credentials.
-            v.put("db_user", "");
+            v.put("db_user", s(user));
+            // The SQL password is never written to this database (it is a shared constant in the app).
             v.put("db_pass", "");
             return getWritableDatabase().update("customers", v, "_id=?",
                     new String[]{String.valueOf(id)}) > 0;
         } catch (Exception e) {
             return false;
         }
-    }
-
-    /** Legacy signature retained for callers during migration; supplied SQL credentials are discarded. */
-    public boolean saveSite(long id, String lan, String wan, String port, String db,
-                            String ignoredUser, String ignoredPass) {
-        return saveSite(id, lan, wan, port, db);
     }
 
     /** Move a customer record to a new device code (phone change). False on clash. */

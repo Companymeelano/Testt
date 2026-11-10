@@ -7,51 +7,84 @@ import android.graphics.RectF;
 import android.util.AttributeSet;
 import android.view.View;
 
-/** Static flat server glyph used beside the live connection status text. */
+/**
+ * Server-hunt radar (v33): rings + a rotating sweep + blips.
+ * Animates only while attached AND visible.
+ */
 public class RadarView extends View {
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final RectF rect = new RectF();
+    private float angle;
+    private boolean live;
 
-    public RadarView(Context context) {
-        super(context);
-        setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+    public RadarView(Context c) {
+        super(c);
     }
 
-    public RadarView(Context context, AttributeSet attrs) {
-        super(context, attrs);
-        setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+    public RadarView(Context c, AttributeSet a) {
+        super(c, a);
     }
 
     @Override
-    protected void onDraw(Canvas canvas) {
-        super.onDraw(canvas);
-        float width = getWidth(), height = getHeight();
-        if (width <= 0 || height <= 0) return;
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        live = true;
+        post(step);
+    }
 
-        float left = width * 0.20f;
-        float right = width * 0.80f;
-        float top = height * 0.20f;
-        float rowHeight = height * 0.18f;
-        float gap = height * 0.06f;
+    @Override
+    protected void onDetachedFromWindow() {
+        live = false;
+        removeCallbacks(step);
+        super.onDetachedFromWindow();
+    }
+
+    private final Runnable step = new Runnable() {
+        @Override
+        public void run() {
+            if (!live) return;
+            if (getVisibility() == VISIBLE && getWidth() > 0 && Ui.motionOk(getContext())) {
+                angle = (angle + 9) % 360;
+                invalidate();
+            }
+            postDelayed(step, 50);
+        }
+    };
+
+    @Override
+    protected void onDraw(Canvas c) {
+        int w = getWidth(), h = getHeight();
+        if (w <= 0 || h <= 0) return;
+        float cx = w / 2f, cy = h / 2f;
+        float r = Math.min(w, h) / 2f - 4;
         paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(Theme.dp(1.5f));
-        paint.setColor(Theme.BORDER);
-        for (int i = 0; i < 3; i++) {
-            float y = top + i * (rowHeight + gap);
-            rect.set(left, y, right, y + rowHeight);
-            canvas.drawRoundRect(rect, Theme.dp(5), Theme.dp(5), paint);
-        }
-
+        paint.setStrokeWidth(2.5f);
+        paint.setColor(Theme.GOLD);
+        paint.setAlpha(220);
+        c.drawCircle(cx, cy, r, paint);
+        paint.setAlpha(120);
+        c.drawCircle(cx, cy, r * 0.66f, paint);
+        paint.setAlpha(70);
+        c.drawCircle(cx, cy, r * 0.33f, paint);
+        // sweep
         paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Theme.PRIMARY);
-        float dotRadius = Math.max(Theme.dp(2), width * 0.025f);
-        for (int i = 0; i < 3; i++) {
-            float y = top + i * (rowHeight + gap) + rowHeight / 2f;
-            canvas.drawCircle(left + width * 0.10f, y, dotRadius, paint);
-            paint.setAlpha(160);
-            canvas.drawRoundRect(left + width * 0.20f, y - Theme.dp(1),
-                    right - width * 0.10f, y + Theme.dp(1), Theme.dp(1), Theme.dp(1), paint);
-            paint.setAlpha(255);
+        RectF o = new RectF(cx - r, cy - r, cx + r, cy + r);
+        for (int i = 0; i < 5; i++) {
+            paint.setColor(0xFF2ED3A3);
+            paint.setAlpha(46 - i * 8);
+            c.drawArc(o, angle - 12 - i * 9, 9, true, paint);
         }
+        // blips
+        paint.setColor(Theme.GOLD_SOFT);
+        paint.setAlpha(255);
+        float b1 = (angle * 3.1f) % 360;
+        c.drawCircle(cx + (float) Math.cos(Math.toRadians(b1)) * r * 0.55f,
+                cy + (float) Math.sin(Math.toRadians(b1)) * r * 0.55f, 5, paint);
+        float b2 = (angle * 1.7f + 140) % 360;
+        paint.setAlpha(170);
+        c.drawCircle(cx + (float) Math.cos(Math.toRadians(b2)) * r * 0.8f,
+                cy + (float) Math.sin(Math.toRadians(b2)) * r * 0.8f, 4, paint);
+        // hub
+        paint.setAlpha(255);
+        c.drawCircle(cx, cy, 5, paint);
     }
 }

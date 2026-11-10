@@ -196,7 +196,7 @@ public class VoiceScreen extends Screen {
             String today = Jalali.todayStr();
             if (day.equals(today)) return "امروز";
             if (day.equals(Jalali.addDays(today, -1))) return "دیروز";
-            return Jalali.dispFa(day);
+            return Jalali.shortLabel(day);
         } catch (Exception e) {
             return "امروز";
         }

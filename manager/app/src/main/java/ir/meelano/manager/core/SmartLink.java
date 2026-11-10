@@ -5,7 +5,6 @@ import android.os.Handler;
 import android.os.Looper;
 
 import ir.meelano.manager.data.Atiran;
-import ir.meelano.manager.data.NetRoute;
 import ir.meelano.manager.data.Settings;
 
 import java.net.InetSocketAddress;
@@ -147,12 +146,7 @@ public final class SmartLink {
         } catch (Exception ignored) { Diag.ignored("SmartLink:150", ignored); }
         List<Cand> out = new ArrayList<>();
         if (!s.lan().isEmpty()) out.add(new Cand(LAN, s.lan()));
-        int lanPort = s.effPortFor(LAN);
-        int wanPort = s.effPortFor(WAN);
-        if (!s.wan().isEmpty()
-                && !LanDiscover.sameEndpoint(s.wan(), wanPort, s.lan(), lanPort)) {
-            out.add(new Cand(WAN, s.wan()));
-        }
+        if (!s.wan().isEmpty() && !sameHost(s.wan(), s.lan())) out.add(new Cand(WAN, s.wan()));
         if (out.isEmpty()) {
             String fb = s.host();
             if (fb != null && !fb.trim().isEmpty()) {
@@ -174,41 +168,34 @@ public final class SmartLink {
      * winning profile. Throws a short Persian verdict when all fail.
      */
     public static Connection open(Context c, Settings s) throws Exception {
-        boolean directBound = s != null && s.directConn() && NetRoute.bindDirect(c);
-        try {
-            List<Cand> cands = order(c, s);
-            if (cands.isEmpty()) {
-                String mode = s.linkMode();
-                if (!LAN.equals(mode) && !WAN.equals(mode))
-                    throw new Exception("آدرس سرور ثبت نشده؛ از فروشنده کارت اتصال بگیرید");
-                throw new Exception("آدرس «" + kindShort(mode)
-                        + "» ثبت نشده؛ حالت را روی «خودکار» بگذارید یا آدرس را کامل کنید");
-            }
-            List<String> fails = new ArrayList<>();
-            for (Cand k : cands) {
-                try {
-                    // Give the public/forwarded path room for a slower TDS login after TCP succeeds.
-                    int tcpMs = LAN.equals(k.kind) ? 2000 : 8000;
-                    int loginSec = LAN.equals(k.kind) ? 8 : 12;
-                    Connection conn = Atiran.open(k.host, s.effPortFor(k.kind), s.effDb(),
-                            s.effUser(), s.effPass(), tcpMs, loginSec, cands.size() == 1);
-                    try {
-                        s.setLinkLast(k.kind);
-                    } catch (Exception ignored) { Diag.ignored("SmartLink:189", ignored); }
-                    return conn;
-                } catch (Exception e) {
-                    fails.add(kindShort(k.kind) + ": " + Atiran.diagnose(e));
-                }
-            }
-            StringBuilder v = new StringBuilder();
-            for (int i = 0; i < fails.size(); i++) {
-                if (i > 0) v.append(" • ");
-                v.append(fails.get(i));
-            }
-            throw new Exception(v.toString());
-        } finally {
-            if (directBound) NetRoute.unbind(c);
+        List<Cand> cands = order(c, s);
+        if (cands.isEmpty()) {
+            if (!LAN.equals(s.linkMode()) && !WAN.equals(s.linkMode()))
+                throw new Exception("آدرس سرور ثبت نشده؛ از فروشنده کارت اتصال بگیرید");
+            throw new Exception("آدرس «" + kindShort(s.linkMode())
+                    + "» ثبت نشده؛ حالت را روی «خودکار» بگذارید یا آدرس را کامل کنید");
         }
+        List<String> fails = new ArrayList<>();
+        for (Cand k : cands) {
+            try {
+                // LAN answers in milliseconds; a public (WAN) address over mobile data needs longer.
+                int tcpMs = LAN.equals(k.kind) ? 1500 : 6000;
+                Connection conn = Atiran.open(k.host, s.effPortFor(k.kind), s.effDb(),
+                        s.effUser(), s.effPass(), tcpMs, 5, false);
+                try {
+                    s.setLinkLast(k.kind);
+                } catch (Exception ignored) { Diag.ignored("SmartLink:189", ignored); }
+                return conn;
+            } catch (Exception e) {
+                fails.add(kindShort(k.kind) + ": " + Atiran.diagnose(e));
+            }
+        }
+        StringBuilder v = new StringBuilder();
+        for (int i = 0; i < fails.size(); i++) {
+            if (i > 0) v.append(" • ");
+            v.append(fails.get(i));
+        }
+        throw new Exception(v.toString());
     }
 
     /** Raw TCP probe: null = port is open, else the failure. Never throws. */
@@ -281,13 +268,7 @@ public final class SmartLink {
     public static void diagnose(Context ctx, Settings s, boolean vpnOn, Cb cb) {
         final Context app = ctx.getApplicationContext();
         new Thread(() -> {
-            boolean directBound = s != null && s.directConn() && NetRoute.bindDirect(app);
-            Report r;
-            try {
-                r = build(app, s, vpnOn, null);
-            } finally {
-                if (directBound) NetRoute.unbind(app);
-            }
+            Report r = build(app, s, vpnOn, null);
             MAIN.post(() -> {
                 try {
                     cb.done(r);
@@ -299,29 +280,16 @@ public final class SmartLink {
     /** Explicit values (activation screen): lan/wan may each be empty. */
     public static void diagnoseExplicit(Context ctx, String lan, String wan, int port, String db,
                                         String user, String pass, boolean vpnOn, Cb cb) {
-        diagnoseExplicit(ctx, lan, wan, port, db, user, pass, vpnOn, false, cb);
-    }
-
-    /** Explicit diagnostics with the user's optional direct-network route applied for every probe. */
-    public static void diagnoseExplicit(Context ctx, String lan, String wan, int port, String db,
-                                        String user, String pass, boolean vpnOn,
-                                        boolean directRoute, Cb cb) {
         final Context app = ctx.getApplicationContext();
         new Thread(() -> {
-            boolean directBound = directRoute && NetRoute.bindDirect(app);
-            Report r;
-            try {
-                Exp e = new Exp();
-                e.lan = lan == null ? "" : lan.trim();
-                e.wan = wan == null ? "" : wan.trim();
-                e.port = port;
-                e.db = db == null ? "" : db.trim();
-                e.user = user;
-                e.pass = pass;
-                r = build(app, null, vpnOn, e);
-            } finally {
-                if (directBound) NetRoute.unbind(app);
-            }
+            Exp e = new Exp();
+            e.lan = lan == null ? "" : lan.trim();
+            e.wan = wan == null ? "" : wan.trim();
+            e.port = port;
+            e.db = db == null ? "" : db.trim();
+            e.user = user;
+            e.pass = pass;
+            Report r = build(app, null, vpnOn, e);
             MAIN.post(() -> {
                 try {
                     cb.done(r);
@@ -342,7 +310,6 @@ public final class SmartLink {
         r.vpnOn = vpnOn;
         List<Cand> cands = new ArrayList<>();
         String db, user, pass, mode = "auto";
-        boolean forcedProfileMissing = false;
         // Per-profile ports: the shop LAN usually keeps 1433 while the
         // dedicated/public address may answer on a forwarded port (5050 → 1433).
         final int portLan, portWan;
@@ -355,20 +322,13 @@ public final class SmartLink {
             user = e.user;
             pass = e.pass;
         } else {
-            List<Cand> saved = allSaved(s);
+            cands = allSaved(s);
             portLan = s.effPortFor(LAN);
             portWan = s.effPortFor(WAN);
             db = s.effDb();
             user = s.effUser();
             pass = s.effPass();
             mode = s.linkMode();
-            if (LAN.equals(mode) || WAN.equals(mode)) {
-                for (Cand candidate : saved)
-                    if (mode.equals(candidate.kind)) cands.add(candidate);
-                forcedProfileMissing = cands.isEmpty() && !saved.isEmpty();
-            } else {
-                cands = saved;
-            }
         }
         r.portDb = (portLan == portWan
                         ? "پورت " + Money.fa(String.valueOf(portLan))
@@ -388,9 +348,6 @@ public final class SmartLink {
                     break;
                 }
             r.verdict = "✓ مسیر فعال: " + kindShort(r.activeKind) + " — همه‌چیز سالم است";
-        } else if (forcedProfileMissing) {
-            r.verdict = "مسیر «" + kindShort(mode)
-                    + "» انتخاب شده، اما آدرس این مسیر ثبت نیست؛ حالت خودکار را فعال کنید";
         } else if (cands.isEmpty()) {
             r.verdict = "هیچ آدرسی ثبت نشده؛ از فروشنده کارت اتصال بگیرید یا در فعال‌سازی » مرحله ۲ وارد کنید";
         } else if (!online) {

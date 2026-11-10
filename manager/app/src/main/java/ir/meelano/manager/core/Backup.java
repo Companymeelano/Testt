@@ -39,7 +39,10 @@ import java.util.zip.ZipOutputStream;
 public final class Backup {
     private Backup() { }
 
-    /** Backup uses the same verified host/database/port route as normal app reads. */
+    /** Database account used by the smart backup and the offline report copy. */
+    static final String BACKUP_USER = ir.meelano.manager.data.Atiran.defaultUser();
+    static final String BACKUP_PASS = ir.meelano.manager.data.Atiran.defaultPass();
+
     public interface Progress {
         void onTable(String faName, int done, int total);
     }
@@ -75,7 +78,7 @@ public final class Backup {
         new Thread(() -> {
             boolean bound = s.directConn() && NetRoute.bindDirect(app);
             try {
-                try (Connection c = SmartLink.open(app, s)) {
+                try (Connection c = Atiran.open(s.effHost(), s.effPort(), s.effDb(), BACKUP_USER, BACKUP_PASS)) {
                     Meta m = new Meta(c);
                     String stamp = new SimpleDateFormat("yyyyMMdd_HHmm", Locale.US).format(new Date());
                     File dir = new File(app.getCacheDir(), "backup");

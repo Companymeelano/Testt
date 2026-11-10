@@ -12,7 +12,6 @@ import ir.meelano.manager.core.AtiranAuth;
 import ir.meelano.manager.core.AtiranSchema;
 import ir.meelano.manager.core.CloseoutDb;
 import ir.meelano.manager.core.HandoverDb;
-import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.Money;
@@ -73,11 +72,11 @@ public class CloseoutScreen extends Screen {
         if (content == null) return;
         content.removeAllViews();
         content.addView(a.kit.hero(glyph(), title(),
-                "تطبیق برای " + Jalali.dispFa(day) + " • مبالغ با واحد انتخاب‌شده", accent()), a.kit.lp(-1, -2));
+                "تطبیق برای " + Money.fa(day) + " • مبالغ با واحد انتخاب‌شده", accent()), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(8));
         LinearLayout top = a.kit.card(Theme.STEEL);
         LinearLayout row = a.kit.h();
-        row.addView(a.kit.text("تاریخ: " + Jalali.dispFa(day), 13f, Theme.TEXT, true), a.kit.wlp(1f));
+        row.addView(a.kit.text("تاریخ: " + Money.fa(day), 13f, Theme.TEXT, true), a.kit.wlp(1f));
         row.addView(a.kit.btnGhost("انتخاب", Theme.GOLD, v -> a.kit.dateDialog(
                 "تاریخ بستن روز", day, picked -> { day = Jalali.normalizeDate(picked); load(); })), a.kit.lp(-2, -2));
         top.addView(row, a.kit.lp(-1, -2));
@@ -96,7 +95,7 @@ public class CloseoutScreen extends Screen {
             @Override public void fail(String faError) {
                 if (content == null || !selected.equals(day)) return;
                 content.removeAllViews();
-                content.addView(a.kit.hero(glyph(), title(), "تطبیق برای " + Jalali.dispFa(day), accent()),
+                content.addView(a.kit.hero(glyph(), title(), "تطبیق برای " + Money.fa(day), accent()),
                         a.kit.lp(-1, -2));
                 content.addView(a.kit.gap(8));
                 content.addView(a.kit.error(faError, () -> load()), a.kit.lp(-1, -2));
@@ -160,7 +159,7 @@ public class CloseoutScreen extends Screen {
         content.removeAllViews();
         LinearLayout top = a.kit.card(Theme.STEEL);
         LinearLayout row = a.kit.h();
-        row.addView(a.kit.text("تطبیق روز " + Jalali.dispFa(day), 13f, Theme.TEXT, true), a.kit.wlp(1f));
+        row.addView(a.kit.text("تطبیق روز " + Money.fa(day), 13f, Theme.TEXT, true), a.kit.wlp(1f));
         row.addView(a.kit.btnGhost("تغییر تاریخ", Theme.GOLD, v -> a.kit.dateDialog(
                 "تاریخ بستن روز", day, picked -> { day = Jalali.normalizeDate(picked); load(); })), a.kit.lp(-2, -2));
         top.addView(row, a.kit.lp(-1, -2));
@@ -249,10 +248,10 @@ public class CloseoutScreen extends Screen {
                 if (status.isEmpty()) status = incoming
                         ? AtiranSchema.chequeInStatusFa(r.s("st"), r.s("back"))
                         : AtiranSchema.chequeOutStatusFa(r.s("st"));
-                String eventDate = r.s("getdate").isEmpty() ? ""
-                        : HomeNumberFormatter.dateTime(r.s("getdate"));
-                String dueDate = Jalali.dispFa(r.s("sardate"));
-                if ("—".equals(dueDate)) dueDate = "";
+                String eventDate = Jalali.disp(r.s("getdate"));
+                String dueDate = Jalali.disp(r.s("sardate"));
+                if (!eventDate.isEmpty()) eventDate = Money.fa(eventDate);
+                if (!dueDate.isEmpty()) dueDate = Money.fa(dueDate);
                 String extra = Money.compactRial(r.d("amount"));
                 if (!eventDate.isEmpty()) extra += " • " + (incoming ? "دریافت " : "صدور ") + eventDate;
                 if (!dueDate.isEmpty()) extra += " • سررسید " + dueDate;
@@ -319,8 +318,8 @@ public class CloseoutScreen extends Screen {
             long ts = d.closed.optLong("closedAt", 0);
             card.addView(a.kit.text("روز ثبت شده است", 14f, Theme.SUCCESS, true), a.kit.lp(-1, -2));
             card.addView(a.kit.kv("ثبت‌کننده", d.closed.optString("username", "—"), Theme.TEXT), a.kit.lp(-1, -2));
-            card.addView(a.kit.kv("زمان ثبت", ts > 0 ? "ساعت " + HomeNumberFormatter.time(ts)
-                    : "—", Theme.TEXT),
+            card.addView(a.kit.kv("زمان ثبت", ts > 0 ? "ساعت " + Money.fa(new java.text.SimpleDateFormat(
+                    "HH:mm", java.util.Locale.US).format(new java.util.Date(ts))) : "—", Theme.TEXT),
                     a.kit.lp(-1, -2));
             String note = d.closed.optString("note", "");
             if (!note.isEmpty()) card.addView(a.kit.kv("یادداشت", note, Theme.MUTED), a.kit.lp(-1, -2));
@@ -334,7 +333,7 @@ public class CloseoutScreen extends Screen {
         boolean canClose = d.closeTable && (d.closed == null || d.closeHistoryTable);
         String closeLabel = !d.closeTable ? "ثبت مرکزی در دسترس نیست"
                 : d.closed == null ? "☑ تأیید و بستن روز"
-                : d.closeHistoryTable ? "✎ ثبت اصلاحیهٔ بستن روز" : "اصلاحیه تا فعال‌شدن تاریخچه قفل است";
+                : d.closeHistoryTable ? "⟳ ثبت اصلاحیهٔ بستن روز" : "اصلاحیه تا فعال‌شدن تاریخچه قفل است";
         card.addView(a.kit.btn(closeLabel, v -> { if (canClose) confirmClose(d); }), a.kit.lp(-1, -2));
         if (!d.closeTable) {
             card.addView(a.kit.hint("جدول جانبی قابل نوشتن نیست؛ پس بدون تأیید سرور، روز بسته اعلام نمی‌شود."),
@@ -389,7 +388,15 @@ public class CloseoutScreen extends Screen {
     }
 
     private String historyTime(long millis) {
-        return millis <= 0 ? "زمان نامشخص" : HomeNumberFormatter.dateTime(millis);
+        if (millis <= 0) return "زمان نامشخص";
+        try {
+            java.util.Date d = new java.util.Date(millis);
+            java.text.SimpleDateFormat date = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US);
+            java.text.SimpleDateFormat time = new java.text.SimpleDateFormat("HH:mm", java.util.Locale.US);
+            return Money.fa(Jalali.disp(date.format(d)) + " • " + time.format(d));
+        } catch (Exception ignored) {
+            return "زمان نامشخص";
+        }
     }
 
     private JSONObject historySnapshot(JSONObject record) {
@@ -413,7 +420,7 @@ public class CloseoutScreen extends Screen {
         JSONObject snap = historySnapshot(record);
         LinearLayout body = a.kit.v();
         body.setPadding(Theme.dp(16), Theme.dp(12), Theme.dp(16), Theme.dp(12));
-        body.addView(a.kit.kv("روز", Jalali.dispFa(record.optString("day", day)), Theme.TEXT), a.kit.lp(-1, -2));
+        body.addView(a.kit.kv("روز", Money.fa(record.optString("day", day)), Theme.TEXT), a.kit.lp(-1, -2));
         body.addView(a.kit.kv("نوع ثبت", historyAction(record.optString("action", "")), Theme.INFO), a.kit.lp(-1, -2));
         body.addView(a.kit.kv("ثبت‌کننده / زمان", record.optString("username", "—")
                 + " • " + historyTime(record.optLong("closedAt", 0)), Theme.TEXT), a.kit.lp(-1, -2));
@@ -459,7 +466,7 @@ public class CloseoutScreen extends Screen {
     private void confirmClose(final Data d) {
         LinearLayout body = a.kit.v();
         body.setPadding(Theme.dp(16), Theme.dp(14), Theme.dp(16), Theme.dp(14));
-        body.addView(a.kit.text("ثبت جمع‌بندی " + Jalali.dispFa(day), 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        body.addView(a.kit.text("ثبت جمع‌بندی " + Money.fa(day), 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
         body.addView(a.kit.hint("فروش " + money(d, "فروش", d.sales.d("total"))
                 + " • دریافت " + money(d, "دریافت‌ها", d.receipts.d("total"))
                 + " • پرداخت " + money(d, "پرداخت‌ها", d.payments.d("total"))), a.kit.lp(-1, -2));

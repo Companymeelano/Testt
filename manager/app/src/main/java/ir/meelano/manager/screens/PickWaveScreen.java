@@ -8,7 +8,6 @@ import android.widget.LinearLayout;
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.core.AtiranAuth;
 import ir.meelano.manager.core.HandoverDb;
-import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.Money;
@@ -72,8 +71,7 @@ public class PickWaveScreen extends Screen {
 
         LinearLayout controls = a.kit.card(Theme.STEEL);
         LinearLayout dateRow = a.kit.h();
-        dateRow.addView(a.kit.text("تاریخ فاکتور: " + HomeNumberFormatter.dateText(day),
-                13f, Theme.TEXT, true), a.kit.wlp(1f));
+        dateRow.addView(a.kit.text("تاریخ فاکتور: " + Money.fa(day), 13f, Theme.TEXT, true), a.kit.wlp(1f));
         dateRow.addView(a.kit.btnGhost("انتخاب", Theme.GOLD, v -> a.kit.dateDialog(
                 "تاریخ موج بارگیری", day, picked -> {
                     day = Jalali.normalizeDate(picked);
@@ -138,7 +136,7 @@ public class PickWaveScreen extends Screen {
             LinearLayout previous = a.kit.card(Theme.INFO);
             previous.addView(a.kit.kv("آخرین موج ذخیره‌شده", last.optString("route", "—"), Theme.INFO),
                     a.kit.lp(-1, -2));
-            previous.addView(a.kit.hint(HomeNumberFormatter.dateText(last.optString("day", "")) + " • "
+            previous.addView(a.kit.hint(Money.fa(last.optString("day", "")) + " • "
                     + Money.fa(String.valueOf(savedInvoices == null ? 0 : savedInvoices.length()))
                     + " فاکتور • " + Money.fa(String.valueOf(savedItems == null ? 0 : savedItems.length()))
                     + " قلم • ذخیرهٔ محلی"), a.kit.lp(-1, -2));
@@ -204,10 +202,9 @@ public class PickWaveScreen extends Screen {
             final Row invoice = r;
             String id = invoice.s("id");
             CheckBox cb = new CheckBox(a);
-            cb.setText(ir.meelano.manager.core.HomeNumberFormatter.rtlText(
-                    "فاکتور " + Money.fa(id) + " • " + invoice.s("cust")
-                            + " • " + Money.compactMoney(invoice.d("amount"))
-                            + (invoice.s("visitor").isEmpty() ? "" : " • " + invoice.s("visitor"))));
+            cb.setText("فاکتور " + Money.fa(id) + " • " + invoice.s("cust")
+                    + " • " + Money.compactMoney(invoice.d("amount"))
+                    + (invoice.s("visitor").isEmpty() ? "" : " • " + invoice.s("visitor")));
             cb.setTextColor(Theme.TEXT);
             cb.setTypeface(Theme.face(false));
             cb.setTextSize(12f * Theme.fontScale() * Theme.typeScale());
@@ -227,9 +224,7 @@ public class PickWaveScreen extends Screen {
     }
 
     private void updateCount() {
-        if (selectedCount != null) selectedCount.setText(
-                ir.meelano.manager.core.HomeNumberFormatter.rtlText(
-                        Money.fa(String.valueOf(selected.size())) + " انتخاب"));
+        if (selectedCount != null) selectedCount.setText(Money.fa(String.valueOf(selected.size())) + " انتخاب");
     }
 
     private void selectAll(boolean on) {

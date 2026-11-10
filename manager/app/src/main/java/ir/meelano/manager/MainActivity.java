@@ -16,13 +16,12 @@ import ir.meelano.manager.core.AtiranPreflight;
 import ir.meelano.manager.core.Filter;
 import ir.meelano.manager.core.Finger;
 import ir.meelano.manager.core.LicenseStore;
-import ir.meelano.manager.core.MarketWeather;
 import ir.meelano.manager.core.UpdateCenter;
+import ir.meelano.manager.ui.WhatsNew;
 import ir.meelano.manager.core.RoleStore;
 import ir.meelano.manager.core.SmartLink;
 import ir.meelano.manager.ui.LinkPanel;
 import ir.meelano.manager.data.NetRoute;
-import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.PersianText;
 import ir.meelano.manager.core.Notify;
@@ -85,12 +84,9 @@ import java.util.Map;
 
 /**
  * MEELANO Manager v7 — management-only shell.
- * Bottom nav (5 hubs) + collapsible brand/sync header + content.
+ * Bottom nav (5 hubs) + header (filter / refresh / connection dot) + content.
  */
 public class MainActivity extends Activity {
-    public static final String EXTRA_HOME_SCREENSHOT_PREVIEW =
-            "ir.meelano.manager.HOME_SCREENSHOT_PREVIEW";
-
     public Kit kit;
     public Repo repo;
     public Settings settings;
@@ -100,42 +96,38 @@ public class MainActivity extends Activity {
     private LinearLayout contentWrap;
     /** Incremented on every render. Async work captures it and stops once it changes. */
     private int renderGen = 0;
-    private PullToRefreshScrollView scroll;
+    private ScrollView scroll;
     /** Product search/scanner stays visible above the scrolling catalogue. */
     private LinearLayout productStickyHost;
-    /** Sticky brand/sync header collapses as any screen's scroll content moves. */
+    /** Brand row collapses while browsing products; toolbar remains reachable. */
     private View brandHeaderBlock;
     private int brandHeaderExpandedHeight;
     private boolean brandHeaderCollapsed;
-    private LinearLayout headerRoot;
-    private LinearLayout headerTools;
-    private LinearLayout brandRow;
-    private LinearLayout brandTitleColumn;
-    private LinearLayout headerStatusRow;
-    private View headerToolbarGap;
-    private View compactMenuGap;
-    private android.widget.FrameLayout headerSyncHost;
-    private android.widget.FrameLayout compactSyncButton;
-    private android.widget.ImageView compactSyncIcon;
-    private android.view.View compactMenuButton;
-    private int headerWidthDp;
-    private int brandMarkExpandedDp;
-    private int brandHeaderSideInsetDp;
-    private int brandTitleExpandedSp;
-    private int titleExpandedWidthDp;
-    private boolean compactHeaderLayout;
-    private String linkKind = "probe";
+    private android.animation.ValueAnimator brandHeaderAnimator;
     private LinearLayout bottomBar;
     /** Host of the bottom bar: holds the sliding selection capsule behind the tabs. */
     private android.widget.FrameLayout bottomHost;
     private View navCapsule;
+    private android.widget.ImageView linkIcon;
 
+    /** Connection-state icon: emerald and gold in the nut theme, the navy set otherwise. */
+    private int linkRes(int base) {
+        if (!Theme.isNuts()) return base;
+        if (base == R.drawable.link_probe) return R.drawable.link_probe_nut;
+        if (base == R.drawable.link_wan) return R.drawable.link_wan_nut;
+        if (base == R.drawable.link_lan) return R.drawable.link_lan_nut;
+        if (base == R.drawable.link_off) return R.drawable.link_off_nut;
+        return base;
+    }
     private android.net.ConnectivityManager.NetworkCallback linkCb = null;
     private boolean linkCbReg = false;
     private final android.os.Handler linkHandler =
             new android.os.Handler(android.os.Looper.getMainLooper());
     private Runnable linkPending = null;
     private TextView licChip;
+    /** The back control of the tab bar (a gold disc), not a button floating over the content. */
+    private LinearLayout backCell;
+    private TextView backLabel;
     private TextView companyName;
     private android.widget.FrameLayout logoBox;
     private android.widget.ImageView logoImg;
@@ -149,8 +141,8 @@ public class MainActivity extends Activity {
     private boolean rolePicked;
     private boolean shellStarted;
     private boolean restoredScreen;
+    private TextView userChip;
     private android.widget.ImageView compactUserAction;
-    private android.view.View compactUserCell;
     private boolean unlocked = false;
     private boolean crashRecoveryMode;
 
@@ -197,32 +189,23 @@ public class MainActivity extends Activity {
         splash();
     }
 
-    /** Debug-only, seed-data dashboard preview used by the emulator screenshot tests. */
-    public boolean isHomeScreenshotPreview() {
-        return (getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
-                && getIntent() != null
-                && getIntent().getBooleanExtra(EXTRA_HOME_SCREENSHOT_PREVIEW, false);
-    }
-
     @Override
     protected void onResume() {
         super.onResume();
-        final boolean homeScreenshotPreview = isHomeScreenshotPreview();
         // Re-validate the license every time the app comes to the foreground
         // (expired / clock-tampered devices fall back to the activation screen).
         if (!isFinishing() && !LicenseStore.unlocked(this)) toLicense();
         if (!isFinishing() && LicenseStore.unlocked(this)
                 && !new Settings(this).connConfigured()) toLicense();
-        // Updater, voice, and sync are normal-launch side effects; recovery and screenshot previews stay quiet.
-        if (!homeScreenshotPreview && !crashRecoveryMode && !isFinishing()
-                && LicenseStore.unlocked(this)) UpdateCenter.autoCheck(this);
-        if (!homeScreenshotPreview && !crashRecoveryMode && !isFinishing()
-                && LicenseStore.unlocked(this) && new Settings(this).connConfigured()) {
+        // Secure updater / voice / sync run only after a normal launch; recovery stays quiet.
+        if (!crashRecoveryMode && !isFinishing() && LicenseStore.unlocked(this)) UpdateCenter.autoCheck(this);
+        if (!crashRecoveryMode && !isFinishing() && LicenseStore.unlocked(this)
+                && new Settings(this).connConfigured()) {
             ir.meelano.manager.core.Speaker.onResume(this);
         }
         if (!isFinishing() && AtiranAuth.gate(this)) toLogin();
         if (!crashRecoveryMode) Usage.touch(this);
-        if (!homeScreenshotPreview && !crashRecoveryMode && repo != null && !isFinishing()
+        if (!crashRecoveryMode && repo != null && !isFinishing()
                 && RoleStore.WAREHOUSE.equals(effRole())) WarehouseSync.retry(this, null);
         refreshLicChip();
         refreshUserChip();
@@ -328,68 +311,77 @@ public class MainActivity extends Activity {
         toLogin();
     }
 
-    /** Compact launch splash, then PIN gate or the main shell. */
+    /** Luxury launch splash with the developer signature, then PIN gate / shell. */
     private void splash() {
         styleBars();
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setGravity(Gravity.CENTER);
         root.setBackgroundColor(Theme.BG);
-        root.setPadding(Theme.dp(24), Theme.dp(24), Theme.dp(24), Theme.dp(24));
-
-        android.widget.ImageView logo = kit.logo(56);
-        root.addView(logo, new LinearLayout.LayoutParams(Theme.dp(56), Theme.dp(56)));
-        TextView title = kit.text("میلانو", 22f, Theme.TEXT, true);
-        title.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams titleParams = kit.lp(-1, -2);
-        titleParams.topMargin = Theme.dp(8);
-        root.addView(title, titleParams);
-
-        String subtitle = "داشبورد مدیریتی آتیران";
+        root.setPadding(Theme.dp(28), Theme.dp(28), Theme.dp(28), Theme.dp(28));
+        android.widget.ImageView logoV = kit.logo(110);
+        root.addView(logoV, new LinearLayout.LayoutParams(Theme.dp(110), Theme.dp(110)));
+        TextView t = kit.text("میلانو", 26, Theme.TEXT, true);
+        t.setGravity(Gravity.CENTER);
+        root.addView(t, kit.lp(-1, -2));
+        String splashSub = "داشبورد مدیریتی آتیران";
         try {
-            String role = AtiranAuth.sessionRole(this);
-            if (RoleStore.WAREHOUSE.equals(role)) subtitle = "نسخه انباردار • آتیران";
+            String sr = AtiranAuth.sessionRole(this);
+            if (RoleStore.WAREHOUSE.equals(sr)) splashSub = "نسخه انباردار • آتیران";
         } catch (Exception ignored) { Diag.ignored("MainActivity:227", ignored); }
-        TextView description = kit.text(subtitle, 12f, Theme.MUTED, false);
-        description.setGravity(Gravity.CENTER);
-        root.addView(description, kit.lp(-1, -2));
-
-        View rule = new View(this);
-        rule.setBackgroundColor(Theme.BORDER);
-        LinearLayout.LayoutParams ruleParams = new LinearLayout.LayoutParams(Theme.dp(72), Theme.dp(1));
-        ruleParams.gravity = Gravity.CENTER;
-        ruleParams.topMargin = Theme.dp(14);
-        root.addView(rule, ruleParams);
-        TextView developer = kit.text("Milad Yaghoobi", 13f, Theme.PRIMARY, true);
-        developer.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams developerParams = kit.lp(-1, -2);
-        developerParams.topMargin = Theme.dp(12);
-        root.addView(developer, developerParams);
-        TextView roleLabel = kit.text("طراح و توسعه‌دهنده", 11f, Theme.MUTED, false);
-        roleLabel.setGravity(Gravity.CENTER);
-        root.addView(roleLabel, kit.lp(-1, -2));
-        TextView version = kit.text(splashVersion(), 10f, Theme.MUTED, false);
-        version.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams versionParams = kit.lp(-1, -2);
-        versionParams.topMargin = Theme.dp(8);
-        root.addView(version, versionParams);
+        TextView s = kit.text(splashSub, 12.5f, Theme.MUTED, false);
+        s.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams sp = kit.lp(-1, -2);
+        sp.setMargins(0, Theme.dp(4), 0, Theme.dp(14));
+        root.addView(s, sp);
+        View line = new View(this);
+        line.setBackgroundColor(Theme.alpha(Theme.GOLD, 160));
+        LinearLayout.LayoutParams llp = new LinearLayout.LayoutParams(Theme.dp(120), Theme.dp(2));
+        llp.gravity = Gravity.CENTER;
+        root.addView(line, llp);
+        TextView dev = kit.text("Milad Yaghoobi", 21, Theme.GOLD, true);
+        dev.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams dp = kit.lp(-1, -2);
+        dp.setMargins(0, Theme.dp(12), 0, 0);
+        root.addView(dev, dp);
+        TextView role = kit.text("طراح و توسعه‌دهنده", 12f, Theme.MUTED, false);
+        role.setGravity(Gravity.CENTER);
+        root.addView(role, kit.lp(-1, -2));
+        TextView ver = kit.text(splashVersion(), 10.5f, Theme.MUTED, false);
+        ver.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams vp = kit.lp(-1, -2);
+        vp.setMargins(0, Theme.dp(10), 0, 0);
+        root.addView(ver, vp);
         setContentView(root);
-
-        if (ir.meelano.manager.ui.Ui.motionOk(this)) {
-            logo.setAlpha(0f);
-            title.setAlpha(0f);
-            description.setAlpha(0f);
-            logo.animate().alpha(1f).setDuration(220).start();
-            title.animate().alpha(1f).setDuration(220).setStartDelay(60).start();
-            description.animate().alpha(1f).setDuration(220).setStartDelay(100).start();
-        }
+        // Staged luxury intro: the logo pops, lines rise one by one, the gold rule sweeps.
+        logoV.setScaleX(0.55f);
+        logoV.setScaleY(0.55f);
+        logoV.setAlpha(0f);
+        logoV.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(650)
+                .setInterpolator(new android.view.animation.OvershootInterpolator(1.4f)).start();
+        t.setAlpha(0f);
+        t.setTranslationY(Theme.dp(14));
+        t.animate().alpha(1f).translationY(0f).setDuration(500).setStartDelay(250).start();
+        s.setAlpha(0f);
+        s.animate().alpha(1f).setDuration(500).setStartDelay(450).start();
+        line.setPivotX(0f);
+        line.setScaleX(0f);
+        line.animate().scaleX(1f).setDuration(600).setStartDelay(600).start();
+        dev.setAlpha(0f);
+        dev.setScaleX(0.92f);
+        dev.setScaleY(0.92f);
+        dev.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(700).setStartDelay(750).start();
+        role.setAlpha(0f);
+        ver.setAlpha(0f);
+        role.animate().alpha(1f).setDuration(500).setStartDelay(950).start();
+        ver.animate().alpha(1f).setDuration(500).setStartDelay(1100).start();
         root.postDelayed(() -> {
             if (settings.pinEnabled()) pinGate();
             else {
                 unlocked = true;
                 shell();
             }
-        }, 1100);
+        }, 1750);
     }
 
     private String splashVersion() {
@@ -404,8 +396,6 @@ public class MainActivity extends Activity {
     /** Paint status/navigation bars for the current skin. */
     private void styleBars() {
         try {
-            // Keep the app shell inside system-bar insets (including Android 15+ devices).
-            if (android.os.Build.VERSION.SDK_INT >= 30) getWindow().setDecorFitsSystemWindows(true);
             getWindow().setStatusBarColor(Theme.statusBar());
             getWindow().setNavigationBarColor(Theme.navBar());
             int vis = getWindow().getDecorView().getSystemUiVisibility();
@@ -417,7 +407,7 @@ public class MainActivity extends Activity {
         } catch (Exception ignored) { Diag.ignored("MainActivity:303", ignored); }
     }
 
-    /** Re-apply the selected palette and rebuild the current screen. */
+    /** Re-apply the luxury theme and rebuild the shell on the current screen. */
     public void refreshTheme() {
         Theme.apply(this);
         history.clear();
@@ -574,6 +564,10 @@ public class MainActivity extends Activity {
 
     // ================= shell =================
     private void shell() {
+        if (brandHeaderAnimator != null) {
+            brandHeaderAnimator.cancel();
+            brandHeaderAnimator = null;
+        }
         if (!shellStarted) {
             shellStarted = true;
             AtiranAuth.applySessionRole(this);
@@ -591,110 +585,118 @@ public class MainActivity extends Activity {
         root.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         root.setBackground(Theme.background());
 
-        // Expanded header: one brand row with a real SyncPill, then a compact labelled tool row.
-        // Scrolling replaces it with a one-line 56dp brand/sync/menu strip.
+        // header (two rows): row 1 = logo, company name (up to two lines, never squeezed
+        // to a stub) and the status line (link, licence, user); row 2 = a full-width
+        // toolbar with equal-width, labelled buttons. Nothing competes for the same width.
         android.util.DisplayMetrics dm = getResources().getDisplayMetrics();
         int widthDp = dm.widthPixels * 160 / dm.densityDpi;
         final boolean tiny = widthDp < 360;
         final boolean compact = widthDp < 520;
-        headerWidthDp = widthDp;
-        compactHeaderLayout = compact;
-        brandMarkExpandedDp = 36;
-        brandHeaderSideInsetDp = 4;
-        brandTitleExpandedSp = compact ? 17 : 18;
-        titleExpandedWidthDp = headerTitleWidthDp(widthDp, brandHeaderSideInsetDp, compact, false);
-        headerRoot = kit.v();
-        headerRoot.setPadding(Theme.dp(12), Theme.dp(8), Theme.dp(12), Theme.dp(8));
+        LinearLayout header = kit.v();
+        header.setPadding(Theme.dp(12), Theme.dp(compact ? 6 : 9), Theme.dp(12), Theme.dp(5));
 
-        // ---- compact, flat brand mark; the company name remains the data-backed identity ----
-        brandRow = kit.h();
-        brandRow.setGravity(Gravity.CENTER_VERTICAL);
-        brandRow.setMinimumHeight(Theme.dp(48));
-        brandRow.setClipChildren(false);
+        // ---- row 1: brand ----
+        LinearLayout brand = kit.h();
+        brand.setGravity(Gravity.CENTER_VERTICAL);
         logoBox = new android.widget.FrameLayout(this);
-        logoBox.setBackground(Theme.accentAvatar(Theme.PRIMARY));
-        logoGlyph = kit.text("م", 17, Theme.onAccent(Theme.PRIMARY), true);
+        logoBox.setBackground(Theme.accentAvatar(Theme.GOLD));
+        logoGlyph = kit.text("♛", 20, Theme.onAccent(), true);
         logoGlyph.setGravity(Gravity.CENTER);
-        logoGlyph.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-        logoBox.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         logoBox.addView(logoGlyph, new android.widget.FrameLayout.LayoutParams(-1, -1));
         logoImg = new android.widget.ImageView(this);
+        logoImg.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
+        try {
+            logoImg.setClipToOutline(true);
+            logoImg.setOutlineProvider(new android.view.ViewOutlineProvider() {
+                @Override
+                public void getOutline(android.view.View v, android.graphics.Outline o) {
+                    o.setOval(0, 0, v.getWidth(), v.getHeight());
+                }
+            });
+        } catch (Exception ignored) { Diag.ignored("MainActivity:508", ignored); }
+        int lpad = Theme.dp(2);
+        logoImg.setPadding(lpad, lpad, lpad, lpad);
         logoImg.setVisibility(View.GONE);
         logoBox.addView(logoImg, new android.widget.FrameLayout.LayoutParams(-1, -1));
-        LinearLayout.LayoutParams logoLp = new LinearLayout.LayoutParams(
-                Theme.dp(brandMarkExpandedDp), Theme.dp(brandMarkExpandedDp));
-        brandRow.addView(logoBox, logoLp);
-        brandRow.addView(kit.space(8));
+        int brandMarkSize = compact ? 66 : 76;
+        brand.addView(logoBox, new LinearLayout.LayoutParams(Theme.dp(brandMarkSize), Theme.dp(brandMarkSize)));
+        brand.addView(kit.space(10));
 
-        // Compute text room instead of letting long names slide underneath the logo.
+        // The name column gets exactly the room that is left of the brand mark. A weight is
+        // measured from the row, and a long shop name (or the status chips) then slid under
+        // the mark and lost its last letters; a computed width keeps both clear of it.
+        int nameRoomDp = widthDp - 24 - brandMarkSize - 10 - 6;
+        if (nameRoomDp < 150) nameRoomDp = 150;
         LinearLayout titleCol = kit.v();
-        brandTitleColumn = titleCol;
-        companyName = kit.text(companyTitle(), brandTitleExpandedSp, Theme.TEXT, true);
-        companyName.setTag("header-company-title");
+        companyName = kit.text(companyTitle(), 22, Theme.TEXT, true);
         companyName.setMaxLines(2);
         companyName.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        companyName.setMaxWidth(Theme.dp(titleExpandedWidthDp));
+        companyName.setMaxWidth(Theme.dp(nameRoomDp));
         titleCol.addView(companyName, kit.lp(-1, -2));
-        // Expanded status line: the reusable SyncPill and a 48dp licence shortcut.
-        // Account actions live in the toolbar/menu, avoiding a crowded brand row.
-        headerStatusRow = kit.h();
-        headerStatusRow.setGravity(Gravity.CENTER_VERTICAL);
-        headerStatusRow.setMinimumHeight(Theme.dp(48));
-        headerSyncHost = new android.widget.FrameLayout(this);
-        headerSyncHost.setMinimumWidth(Theme.dp(tiny ? 72 : compact ? 80 : 104));
-        headerStatusRow.addView(headerSyncHost, new LinearLayout.LayoutParams(0, -1, 1f));
-        headerStatusRow.addView(kit.space(6));
+        if (Theme.DARK) {
+            // Gold-to-champagne gradient across the company name, as in the reference header.
+            companyName.addOnLayoutChangeListener((title_v, x1, x2, x3, x4, x5, x6, x7, x8) -> {
+                android.graphics.Shader sh = new android.graphics.LinearGradient(0, 0, 0, title_v.getHeight(),
+                        Theme.GOLD_SOFT, Theme.GOLD, android.graphics.Shader.TileMode.CLAMP);
+                companyName.getPaint().setShader(sh);
+                title_v.invalidate();
+            });
+        }
+
+        // status line: link state, licence chip, Atiran user chip (small, always visible)
+        LinearLayout status = kit.h();
+        status.setGravity(Gravity.CENTER_VERTICAL);
+        linkIcon = new android.widget.ImageView(this);
+        try {
+            linkIcon.setImageResource(linkRes(R.drawable.link_probe));
+        } catch (Exception ignored) { Diag.ignored("MainActivity:528", ignored); }
+        linkIcon.setContentDescription("وضعیت اتصال — لمس برای جزئیات");
+        linkIcon.setPadding(Theme.dp(1), Theme.dp(1), Theme.dp(1), Theme.dp(1));
+        Theme.pressable(linkIcon);
+        linkIcon.setOnClickListener(v -> {
+            try {
+                LinkPanel.showStatus(this, settings, () -> checkConn());
+            } catch (Exception ignored) { Diag.ignored("MainActivity:535", ignored); }
+        });
+        status.addView(linkIcon, new LinearLayout.LayoutParams(Theme.dp(20), Theme.dp(20)));
+        status.addView(kit.space(6));
         licChip = kit.text("", 10.5f, Theme.GOLD_SOFT, true);
-        licChip.setTag("header-license-chip");
         licChip.setBackground(Theme.pill(Theme.GOLD));
-        licChip.setPadding(Theme.dp(8), Theme.dp(4), Theme.dp(8), Theme.dp(4));
+        licChip.setPadding(Theme.dp(8), Theme.dp(3), Theme.dp(8), Theme.dp(3));
         licChip.setSingleLine(true);
-        licChip.setMinWidth(Theme.dp(56));
-        licChip.setMinHeight(Theme.dp(48));
-        // A shield + remaining-time label is recognizable as a licence, not a clipped date.
-        licChip.setMaxWidth(Theme.dp(tiny ? 72 : 92));
+        licChip.setMaxWidth(Theme.dp(64));
         licChip.setEllipsize(android.text.TextUtils.TruncateAt.END);
         Theme.pressable(licChip);
         licChip.setOnClickListener(v -> openLicense());
-        headerStatusRow.addView(licChip, kit.lp(-2, -1));
-        titleCol.addView(headerStatusRow, kit.lp(-1, -2));
-        brandRow.addView(titleCol, new LinearLayout.LayoutParams(Theme.dp(titleExpandedWidthDp), -2));
-
-        compactSyncButton = new android.widget.FrameLayout(this);
-        compactSyncButton.setBackground(Theme.kpi(Theme.PRIMARY));
-        compactSyncButton.setContentDescription("وضعیت اتصال؛ لمس برای جزئیات");
-        compactSyncIcon = kit.icon(R.drawable.mi_sync, Theme.MUTED, 18);
-        compactSyncButton.addView(compactSyncIcon, new android.widget.FrameLayout.LayoutParams(
-                Theme.dp(20), Theme.dp(20), Gravity.CENTER));
-        compactSyncButton.setVisibility(View.GONE);
-        Theme.pressable(compactSyncButton);
-        compactSyncButton.setOnClickListener(v -> showLinkPanel());
-        brandRow.addView(compactSyncButton, new LinearLayout.LayoutParams(Theme.dp(48), Theme.dp(48)));
-        compactMenuGap = kit.space(4);
-        compactMenuGap.setVisibility(compact ? View.VISIBLE : View.GONE);
-        brandRow.addView(compactMenuGap);
-        android.widget.FrameLayout menuButton = new android.widget.FrameLayout(this);
-        menuButton.setTag("compact-header-menu");
-        menuButton.setBackground(Theme.ghostButton(Theme.bottomNavAccent()));
-        menuButton.setContentDescription("ابزارها، تنظیمات و حساب کاربری");
-        android.widget.ImageView menuIcon = kit.icon(R.drawable.mi_more_horiz,
-                Theme.sectionText(Theme.bottomNavAccent()), 20);
-        menuButton.addView(menuIcon, new android.widget.FrameLayout.LayoutParams(
-                Theme.dp(20), Theme.dp(20), Gravity.CENTER));
-        menuButton.setVisibility(compact ? View.VISIBLE : View.GONE);
-        Theme.pressable(menuButton);
-        menuButton.setOnClickListener(v -> showHeaderMenu());
-        compactMenuButton = menuButton;
-        brandRow.addView(menuButton, new LinearLayout.LayoutParams(Theme.dp(48), Theme.dp(48)));
-
+        status.addView(licChip, kit.lp(-2, -2));
+        status.addView(kit.space(6));
+        userChip = kit.text("", 10.5f, Theme.GOLD_SOFT, true);
+        userChip.setBackground(Theme.pill(Theme.GOLD));
+        userChip.setPadding(Theme.dp(8), Theme.dp(3), Theme.dp(8), Theme.dp(3));
+        userChip.setSingleLine(true);
+        // The name of the signed-in account is worth more room than the day counter, but the
+        // whole status line has to stay inside the room that is left of the brand mark.
+        userChip.setMaxWidth(Theme.dp(Math.max(96, Math.min(160, nameRoomDp - 134))));
+        userChip.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        Theme.pressable(userChip);
+        userChip.setOnClickListener(v -> userMenu());
+        status.addView(userChip, kit.lp(-2, -2));
+        // Gold tag badge at the end of the chips row, as in the reference header (decorative).
+        android.widget.ImageView tagBadge = new android.widget.ImageView(this);
+        try {
+            int tagRes = Theme.icon3d(R.drawable.mi_sell);
+            tagBadge.setImageResource(tagRes);
+            if (!Theme.isIcon3d(tagRes)) tagBadge.setColorFilter(Theme.GOLD);
+        } catch (Exception ignored) { Diag.ignored("MainActivity:tagBadge", ignored); }
+        tagBadge.setPadding(Theme.dp(5), Theme.dp(5), Theme.dp(5), Theme.dp(5));
+        tagBadge.setBackground(Theme.ghostButton(Theme.GOLD));
+        tagBadge.setClickable(false);
+        status.addView(kit.space(8));
+        status.addView(tagBadge, new LinearLayout.LayoutParams(Theme.dp(30), Theme.dp(30)));
+        titleCol.addView(status, kit.lp(-2, -2));
+        brand.addView(titleCol, new LinearLayout.LayoutParams(Theme.dp(nameRoomDp), -2));
         LinearLayout brandBlock = kit.v();
-        brandBlock.setTag("main-brand-header");
-        brandBlock.setBackground(Theme.toolbarPanel());
-        brandBlock.setPadding(Theme.dp(brandHeaderSideInsetDp), Theme.dp(4),
-                Theme.dp(brandHeaderSideInsetDp), Theme.dp(4));
-        brandBlock.setClipChildren(false);
-        brandBlock.setClipToPadding(false);
-        brandBlock.addView(brandRow, kit.lp(-1, -2));
+        brandBlock.addView(brand, kit.lp(-1, -2));
         brandHeaderBlock = brandBlock;
         brandHeaderExpandedHeight = 0;
         brandHeaderCollapsed = false;
@@ -702,17 +704,15 @@ public class MainActivity extends Activity {
             if (brandHeaderBlock == brandBlock && brandBlock.getHeight() > 0)
                 brandHeaderExpandedHeight = brandBlock.getHeight();
         });
-        headerRoot.addView(brandBlock, kit.lp(-1, -2));
+        header.addView(brandBlock, kit.lp(-1, -2));
         refreshUserChip();
-        updateHeaderSyncPill(linkKind);
-        headerToolbarGap = kit.space(4);
-        headerRoot.addView(headerToolbarGap);
+        header.addView(kit.space(compact ? 5 : 8));
 
-        // ---- row 2: compact, role-aware tools (the refresh action is intentionally absent) ----
+        // ---- row 2: toolbar (equal-width cells with Persian labels) ----
         LinearLayout tools = kit.h();
         tools.setGravity(Gravity.CENTER_VERTICAL);
         tools.setBackground(Theme.toolbarPanel());
-        tools.setPadding(Theme.dp(4), Theme.dp(4), Theme.dp(4), Theme.dp(4));
+        tools.setPadding(Theme.dp(3), Theme.dp(3), Theme.dp(3), Theme.dp(3));
 
         // Role-aware toolbar: each person only sees the tools their own role may open.
         if (!tiny && RoleStore.allowed(this, "search"))
@@ -720,9 +720,13 @@ public class MainActivity extends Activity {
 
         final android.widget.ImageView themeIcon = toolIcon(R.drawable.mi_contrast);
         if (!tiny) tools.addView(toolCell(themeIcon, "تم", "تغییر تم روشن / تیره", () -> {
-            if (ir.meelano.manager.ui.Ui.motionOk(this))
-                themeIcon.animate().rotationBy(180f).setDuration(320).start();
-            cycleTheme();
+            themeIcon.animate().rotationBy(180f).setDuration(420).start();
+            // Cycle: dark → light → nuts → dark.
+            String cur = settings.themeMode();
+            String next = "dark".equals(cur) ? "light" : "light".equals(cur) ? "nuts" : "dark";
+            settings.setThemeMode(next);
+            kit.toast("nuts".equals(next) ? "تم آجیل و خشکبار فعال شد" : "light".equals(next) ? "تم روشن فعال شد" : "تم تیره فعال شد");
+            refreshTheme();
         }), toolLp());
 
         if (!compact) {
@@ -730,23 +734,25 @@ public class MainActivity extends Activity {
             tools.addView(toolCell(zoom, "بزرگ‌نمایی", "بزرگ‌نمایی متن", () -> cycleZoom()), toolLp());
         }
 
+        final android.widget.ImageView refreshIcon = toolIcon(R.drawable.mi_refresh);
+        tools.addView(toolCell(refreshIcon, "تازه‌سازی", "تازه‌سازی", () -> {
+            refreshIcon.animate().rotationBy(360f).setDuration(600).start();
+            renderCurrent();
+        }), toolLp());
         if (RoleStore.allowed(this, "settings"))
             tools.addView(toolCell(toolIcon(R.drawable.mi_settings), "تنظیمات", "تنظیمات", () -> nav("settings")), toolLp());
 
-        // Keep the account action in the same flat duotone icon family as the toolbar.
+        // toolIcon() shows the 3D icon in both skins (and tints only flat vectors).
         android.widget.ImageView account = toolIcon(R.drawable.mi_person);
         compactUserAction = account;
-        LinearLayout accountCell = toolCell(account, "حساب", "حساب کاربری، خروج یا تغییر کاربر", () -> userMenu());
-        compactUserCell = accountCell;
-        tools.addView(accountCell, toolLp());
+        tools.addView(toolCell(account, "حساب", "حساب کاربری؛ خروج یا تغییر کاربر", () -> userMenu()), toolLp());
 
         for (int i = tools.getChildCount() - 1; i > 0; i--) {
-            tools.addView(vdiv(), i, new LinearLayout.LayoutParams(Theme.dp(1), Theme.dp(44)));
+            tools.addView(vdiv(), i, new LinearLayout.LayoutParams(Theme.dp(1), Theme.dp(40)));
         }
-        headerTools = tools;
-        headerRoot.addView(tools, kit.lp(-1, -2));
+        header.addView(tools, kit.lp(-1, -2));
         refreshUserChip();
-        root.addView(headerRoot, kit.lp(-1, -2));
+        root.addView(header, kit.lp(-1, -2));
         LinearLayout productStickyWrap = kit.h();
         productStickyWrap.setGravity(Gravity.CENTER_HORIZONTAL);
         productStickyHost = kit.v();
@@ -760,22 +766,13 @@ public class MainActivity extends Activity {
         root.addView(productStickyWrap, kit.lp(-1, -2));
         refreshLicChip();
 
-        // Center the content on wide screens. The sibling dock stays inside the system-safe
-        // app window; decor fitting supplies navigation-bar insets, so adding them here would double them.
-        scroll = new PullToRefreshScrollView(this);
-        scroll.setTag("main-scroll-viewport");
-        scroll.setFillViewport(true);
-        scroll.setOnRefreshListener(() -> {
-            if ("home".equals(currentId)) renderCurrent();
-        });
-        // Hysteresis avoids collapsing/expanding the fixed header repeatedly when a finger
-        // pauses near the threshold; one layout change happens only after a clear scroll.
+        // content (centered max-width column on tablets / wide screens)
+        scroll = new ScrollView(this);
+        // A small end inset keeps the final action fully scrollable above the fixed navigation dock.
+        scroll.setClipToPadding(false);
+        scroll.setPadding(0, 0, 0, Theme.dp(14));
         scroll.setOnScrollChangeListener((v, x, y, oldX, oldY) -> {
-            if (brandHeaderCollapsed) {
-                if (y < Theme.dp(24)) setBrandHeaderCollapsed(false);
-            } else if (y > Theme.dp(72)) {
-                setBrandHeaderCollapsed(true);
-            }
+            setBrandHeaderCollapsed("products".equals(currentId) && y > Theme.dp(48));
         });
         contentWrap = kit.h();
         contentWrap.setGravity(Gravity.CENTER_HORIZONTAL);
@@ -783,31 +780,24 @@ public class MainActivity extends Activity {
         content = newPage();
         root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1f));
 
-        // Bottom dock: it is a sibling of the scroll viewport, never an overlay on page content.
-        // Decor fitting has already applied the system navigation/gesture inset to this app window.
+        // bottom bar
         bottomBar = new LinearLayout(this);
         bottomBar.setOrientation(LinearLayout.HORIZONTAL);
         bottomBar.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        bottomBar.setGravity(Gravity.CENTER_VERTICAL);
-        bottomBar.setMinimumHeight(Theme.dp(64));
-        bottomBar.setClipChildren(false);
-        bottomBar.setClipToPadding(false);
-        bottomBar.setPadding(Theme.dp(4), Theme.dp(2), Theme.dp(4), Theme.dp(2));
+        // Keep the nut-theme dock tactile, but reclaim about 14dp of dashboard height on phones.
+        int dockVPad = Theme.isNuts() ? 4 : 8;
+        bottomBar.setPadding(Theme.dp(6), Theme.dp(dockVPad), Theme.dp(6),
+                Theme.dp(Theme.isNuts() ? 4 : 10));
         bottomHost = new android.widget.FrameLayout(this);
-        bottomHost.setBackground(Theme.bottomBar());
-        bottomHost.setClipChildren(false);
-        bottomHost.setClipToPadding(false);
-        Theme.lift(bottomHost, Theme.dp(1));
+        bottomHost.setBackground(Theme.isNuts() ? Theme.navDock() : Theme.bottomBar());
         navCapsule = new View(this);
         navCapsule.setVisibility(View.GONE);
-        navCapsule.setClickable(false);
-        navCapsule.setFocusable(false);
         navCapsule.setBackground(Theme.bottomNavSelected());
-        navCapsule.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         bottomHost.addView(navCapsule, new android.widget.FrameLayout.LayoutParams(Theme.dp(40), Theme.dp(40),
-                Gravity.TOP | Gravity.START));
+                Gravity.TOP | Gravity.LEFT));
         bottomHost.addView(bottomBar, new android.widget.FrameLayout.LayoutParams(-1, -2));
         LinearLayout.LayoutParams hostLp = kit.lp(-1, -2);
+        if (Theme.isNuts()) hostLp.setMargins(Theme.dp(12), 0, Theme.dp(12), Theme.dp(6));
         root.addView(bottomHost, hostLp);
 
         setContentView(root);
@@ -867,12 +857,21 @@ public class MainActivity extends Activity {
             ir.meelano.manager.core.LicenseStore.setTourPending(this, false);
         } catch (Exception ignored) { Diag.ignored("MainActivity:677", ignored); }
         Notify.boot(this);
+        syncBackFab();
         watchLink();
     }
 
-    /** Theme-aware flat toolbar icons. */
+    /** One toolbar cell: icon above a small Persian label, equal width via {@link #toolLp()}. */
+    /** Gold vector icon for the header toolbar (replaces text glyphs, which rendered unevenly). */
     private android.widget.ImageView toolIcon(int res) {
-        return kit.icon(res, Theme.MUTED, 20);
+        android.widget.ImageView iv = new android.widget.ImageView(this);
+        try {
+            // Tint only flat vectors: decide on the base icon, since emerald twins are not in isIcon3d().
+            int base3 = Theme.icon3d(res);
+            iv.setImageResource(Theme.chrome3d(res));
+            if (!Theme.isIcon3d(base3)) iv.setColorFilter(Theme.GOLD_SOFT);
+        } catch (Exception ignored) { Diag.ignored("MainActivity:694", ignored); }
+        return iv;
     }
 
     private LinearLayout toolCell(View icon, String label, String desc, Runnable onTap) {
@@ -880,99 +879,31 @@ public class MainActivity extends Activity {
         cell.setOrientation(LinearLayout.VERTICAL);
         cell.setGravity(Gravity.CENTER);
         cell.setContentDescription(desc);
-        cell.setMinimumHeight(Theme.dp(52));
-        cell.setMinimumWidth(Theme.dp(48));
-        cell.setPadding(Theme.dp(4), Theme.dp(4), Theme.dp(4), Theme.dp(4));
+        cell.setMinimumHeight(Theme.dp(Theme.isNuts() ? 64 : 54));
         Theme.pressable(cell);
         cell.setOnClickListener(v -> onTap.run());
         icon.setClickable(false);
-        cell.addView(icon, new LinearLayout.LayoutParams(Theme.dp(20), Theme.dp(20)));
-        TextView title = kit.text(label, 10.5f, Theme.MUTED, true);
-        title.setGravity(Gravity.CENTER);
-        title.setSingleLine(true);
-        title.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        cell.addView(title, new LinearLayout.LayoutParams(-1, -2));
+        int ic = Theme.isNuts() ? 38 : 24;
+        cell.addView(icon, new LinearLayout.LayoutParams(Theme.dp(ic), Theme.dp(ic)));
+        TextView t = new TextView(this);
+        t.setText(label);
+        t.setTextSize((Theme.isNuts() ? 10.5f : 10f) * Theme.fontScale());
+        t.setTextColor(Theme.DARK ? Theme.GOLD_SOFT : Theme.TEXT);
+        t.setGravity(Gravity.CENTER);
+        t.setSingleLine(true);
+        cell.addView(t, new LinearLayout.LayoutParams(-2, -2));
         return cell;
     }
 
-    /** Cycle through dark, light and the preserved Nuts skin. */
-    private void cycleTheme() {
-        String current = settings.themeMode();
-        String next = "dark".equals(current) ? "light" : "light".equals(current) ? "nuts" : "dark";
-        settings.setThemeMode(next);
-        kit.toast("nuts".equals(next) ? "تم آجیل و خشکبار فعال شد"
-                : "light".equals(next) ? "تم روشن فعال شد" : "تم تیره فعال شد");
-        refreshTheme();
-    }
-
-    /** Accessible overflow for header controls when the full tool row is collapsed or compact. */
-    private void showHeaderMenu() {
-        LinearLayout body = kit.v();
-        body.setPadding(Theme.dp(16), Theme.dp(12), Theme.dp(16), Theme.dp(16));
-        final AlertDialog[] dialog = new AlertDialog[1];
-        if (!history.isEmpty() || !"home".equals(currentId))
-            addHeaderMenuAction(body, "بازگشت به صفحهٔ قبلی", R.drawable.mi_arrow_forward,
-                    dialog, this::goBack);
-        if (RoleStore.allowed(this, "search"))
-            addHeaderMenuAction(body, "جستجو", R.drawable.mi_search, dialog, () -> nav("search"));
-        addHeaderMenuAction(body, "تغییر تم روشن، تیره یا آجیل و خشکبار",
-                R.drawable.mi_contrast, dialog, this::cycleTheme);
-        addHeaderMenuAction(body, "بزرگ‌نمایی متن · " + zoomLabel(settings.zoomIdx()),
-                R.drawable.mi_zoom, dialog, this::cycleZoom);
-        if (RoleStore.allowed(this, "settings"))
-            addHeaderMenuAction(body, "تنظیمات", R.drawable.mi_settings, dialog, () -> nav("settings"));
-        if (AtiranAuth.hasSession(this))
-            addHeaderMenuAction(body, "حساب کاربری · " + displayName(),
-                    R.drawable.mi_person, dialog, this::userMenu);
-        addHeaderMenuAction(body, "مجوز و فعال‌سازی", R.drawable.mi_verified_user,
-                dialog, this::openLicense);
-        addHeaderMenuAction(body, "وضعیت اتصال", R.drawable.mi_wifi,
-                dialog, this::showLinkPanel);
-        dialog[0] = kit.dialog("ابزارها", body, true);
-        dialog[0].show();
-    }
-
-    private void addHeaderMenuAction(LinearLayout body, String label, int icon,
-                                     AlertDialog[] dialog, Runnable action) {
-        LinearLayout item = kit.h();
-        item.setGravity(Gravity.CENTER_VERTICAL);
-        item.setPadding(Theme.dp(16), Theme.dp(8), Theme.dp(16), Theme.dp(8));
-        item.setMinimumHeight(Theme.dp(56));
-        item.setBackground(Theme.ghostButton(Theme.bottomNavAccent()));
-        item.addView(kit.icon(icon, Theme.sectionText(Theme.bottomNavAccent()), 28),
-                new LinearLayout.LayoutParams(Theme.dp(28), Theme.dp(28)));
-        item.addView(kit.space(12));
-        TextView text = kit.text(label, 13f, Theme.TEXT, true);
-        text.setMaxLines(2);
-        text.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        item.addView(text, kit.wlp(1f));
-        item.setContentDescription(label);
-        Theme.pressable(item);
-        item.setOnClickListener(v -> {
-            if (dialog[0] != null) dialog[0].dismiss();
-            action.run();
-        });
-        LinearLayout.LayoutParams p = kit.lp(-1, -2);
-        p.bottomMargin = Theme.dp(8);
-        body.addView(item, p);
-    }
-
-    private void showLinkPanel() {
-        try {
-            LinkPanel.showStatus(this, settings, this::checkConn);
-        } catch (Exception ignored) { Diag.ignored("MainActivity:linkPanel", ignored); }
-    }
-
     private LinearLayout.LayoutParams toolLp() {
-        return new LinearLayout.LayoutParams(0, Theme.dp(52), 1f);
+        return new LinearLayout.LayoutParams(0, Theme.dp(Theme.isNuts() ? 64 : 54), 1f);
     }
 
     /** Hairline divider between header tool buttons. */
     private View vdiv() {
-        View divider = new View(this);
-        divider.setBackgroundColor(Theme.BORDER);
-        divider.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-        return divider;
+        View d = new View(this);
+        d.setBackgroundColor(Theme.alpha(Theme.GOLD, 70));
+        return d;
     }
 
     private void reg(Screen s) {
@@ -1002,7 +933,6 @@ public class MainActivity extends Activity {
 
     private void buildBottom() {
         bottomBar.removeAllViews();
-        bottomBar.setTag("main-bottom-nav");
         java.util.List<String> ids = new java.util.ArrayList<>();
         for (String t : RoleStore.tabsFor(effRole())) {
             if (screens.containsKey(t)) ids.add(t);
@@ -1014,65 +944,103 @@ public class MainActivity extends Activity {
             if (s == null) continue;
             LinearLayout b = kit.v();
             b.setGravity(Gravity.CENTER);
-            b.setMinimumWidth(Theme.dp(48));
-            b.setMinimumHeight(Theme.dp(56));
-            b.setPadding(Theme.dp(2), Theme.dp(2), Theme.dp(2), Theme.dp(2));
-            b.setClipChildren(false);
-
+            b.setMinimumHeight(Theme.dp(64)); // Preserve a comfortable tap target in every skin.
+            b.setPadding(Theme.dp(2), Theme.dp(Theme.isNuts() ? 2 : 4),
+                    Theme.dp(2), Theme.dp(2));
             LinearLayout badge = new LinearLayout(this);
             badge.setGravity(Gravity.CENTER);
-            badge.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
             int iconRes = MeelanoIcons.iconFor(s.glyph());
-            int iconSize = 20;
+            // A 3D bitmap must not be tinted; remember that on the symbol.
+            boolean is3d = iconRes != 0 && Theme.isIcon3d(Theme.icon3d(iconRes));
             if (iconRes != 0) {
-                int artwork = Theme.icon3d(iconRes);
-                android.widget.ImageView symbol = kit.artworkIcon(iconRes, Theme.MUTED, iconSize);
-                symbol.setTag(Theme.isIcon3d(artwork) ? Boolean.TRUE : Boolean.FALSE);
-                badge.addView(symbol, new LinearLayout.LayoutParams(
-                        Theme.dp(iconSize), Theme.dp(iconSize)));
+                android.widget.ImageView symbol = kit.icon(iconRes, Theme.MUTED, Theme.isNuts() ? 46 : 22);
+                if (Theme.isNuts() && is3d) symbol.setImageResource(Theme.chrome3d(iconRes));
+                symbol.setTag(is3d ? Boolean.TRUE : Boolean.FALSE);
+                int sz = Theme.isNuts() ? 40 : 24;
+                badge.addView(symbol, new LinearLayout.LayoutParams(Theme.dp(sz), Theme.dp(sz)));
             } else {
-                TextView symbol = kit.text(s.glyph(), 22, Theme.MUTED, true);
+                TextView symbol = kit.text(s.glyph(), 20, Theme.MUTED, true);
                 symbol.setGravity(Gravity.CENTER);
                 badge.addView(symbol, kit.lp(-2, -2));
             }
-            b.addView(badge, new LinearLayout.LayoutParams(Theme.dp(24), Theme.dp(24)));
-
-            String label = RoleStore.tabLabel(id);
-            if ("more".equals(id) && RoleStore.VISITOR.equals(effRole())) label = "بیشتر";
-            if (label == null) label = s.title();
-            TextView title = kit.text(label, 10.5f, Theme.MUTED, true);
-            title.setGravity(Gravity.CENTER);
-            title.setMaxLines(2);
-            title.setEllipsize(android.text.TextUtils.TruncateAt.END);
-            title.setIncludeFontPadding(false);
-            LinearLayout.LayoutParams titleParams = kit.lp(-1, -2);
-            titleParams.topMargin = Theme.dp(1);
-            b.addView(title, titleParams);
-
+            b.addView(badge, new LinearLayout.LayoutParams(Theme.dp(46), Theme.dp(Theme.isNuts() ? 44 : 36)));
+            String tl = RoleStore.tabLabel(id);
+            if ("more".equals(id) && RoleStore.VISITOR.equals(effRole())) tl = "بیشتر";
+            TextView l = kit.text(tl != null ? tl : s.title(), Theme.isNuts() ? 11f : 10.5f, Theme.MUTED, true);
+            l.setGravity(Gravity.CENTER);
+            l.setSingleLine(true);
+            l.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            b.addView(l, kit.lp(-1, -2));
             View marker = new View(this);
             marker.setVisibility(View.INVISIBLE);
             marker.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-            LinearLayout.LayoutParams markerParams = new LinearLayout.LayoutParams(
-                    Theme.dp(20), Theme.dp(2));
-            markerParams.topMargin = Theme.dp(2);
-            b.addView(marker, markerParams);
-
+            LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(Theme.dp(18), Theme.dp(2));
+            mp.setMargins(0, Theme.dp(Theme.isNuts() ? 2 : 3), 0, 0);
+            b.addView(marker, mp);
             b.setTag(id);
-            b.setContentDescription("more".equals(id) ? "همهٔ بخش‌ها، رفتن به فهرست بخش‌ها"
-                    : label + "، رفتن به بخش");
+            b.setContentDescription((tl != null ? tl : s.title()) + "، رفتن به بخش");
             if (!RoleStore.allowed(this, id)) b.setAlpha(0.35f);
             Theme.pressable(b);
             b.setOnClickListener(v -> nav(id));
             bottomBar.addView(b, kit.wlp(1f));
         }
+        // The back control lives in the tab bar, so it never covers the rows it points at.
+        // It sits at the start of the row, where the back arrow belongs in a Persian layout.
+        LinearLayout back = kit.v();
+        back.setGravity(Gravity.CENTER);
+        back.setTag(BACK_CELL_TAG);
+        back.setContentDescription("بازگشت به صفحه قبلی");
+        final int backInk = Theme.onAccent(Theme.GOLD);
+        android.graphics.drawable.GradientDrawable backDisc = new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                new int[]{Theme.GOLD_SOFT, Theme.GOLD});
+        backDisc.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        backDisc.setStroke(Theme.dp(1), Theme.alpha(backInk, 60));
+        TextView backArrow = kit.text("\u2192", 19f, backInk, true);
+        backArrow.setGravity(Gravity.CENTER);
+        backArrow.setBackground(backDisc);
+        backArrow.setContentDescription("بازگشت به صفحه قبلی");
+        Theme.pressable(backArrow);
+        backArrow.setOnClickListener(v -> goBack());
+        back.addView(backArrow, kit.lp(Theme.dp(38), Theme.dp(38)));
+        bottomBar.addView(back, 0, kit.lp(Theme.dp(50), -2));
+        backCell = back;
         paintBottom();
+        updateBackControl();
     }
+
+    /** Tag of the back control inside the tab bar, so the tab painter skips it. */
+    private static final String BACK_CELL_TAG = "back-cell";
 
     private int selectedNavIndex = -1;
 
-    /** Compatibility hook; selection is shown by a small flat marker under the active tab. */
+    /** Slides the selection capsule to the selected tab (animated after the first layout). */
     private void moveCapsule(final boolean animate) {
-        if (navCapsule != null) navCapsule.setVisibility(View.GONE);
+        if (navCapsule == null || bottomBar == null) return;
+        if (selectedNavIndex < 0 || selectedNavIndex >= bottomBar.getChildCount()) {
+            navCapsule.setVisibility(View.GONE);
+            return;
+        }
+        final View tab = bottomBar.getChildAt(selectedNavIndex);
+        Runnable go = () -> {
+            if (tab.getWidth() <= 0 || tab.getHeight() <= 0) return;
+            android.widget.FrameLayout.LayoutParams lp =
+                    (android.widget.FrameLayout.LayoutParams) navCapsule.getLayoutParams();
+            lp.width = tab.getWidth() - Theme.dp(8);
+            lp.height = tab.getHeight() - Theme.dp(4);
+            lp.topMargin = tab.getTop() + Theme.dp(2);
+            lp.leftMargin = 0;
+            navCapsule.setLayoutParams(lp);
+            float x = tab.getLeft() + Theme.dp(4);
+            navCapsule.setVisibility(View.VISIBLE);
+            if (animate) {
+                navCapsule.animate().translationX(x).setDuration(280)
+                        .setInterpolator(new android.view.animation.DecelerateInterpolator()).start();
+            } else {
+                navCapsule.setTranslationX(x);
+            }
+        };
+        if (tab.getWidth() > 0) go.run(); else tab.post(go);
     }
 
     private void paintBottom() {
@@ -1081,10 +1049,23 @@ public class MainActivity extends Activity {
         for (int i = 0; i < bottomBar.getChildCount(); i++) {
             LinearLayout b = (LinearLayout) bottomBar.getChildAt(i);
             if (b == null) continue;
+            if (BACK_CELL_TAG.equals(b.getTag())) continue;   // the back control is not a tab
             boolean on = tabIndex < tabs.length && (tabs[tabIndex].equals(currentId)
                     || ("more".equals(tabs[tabIndex]) && !isTab(currentId)));
             LinearLayout badge = (LinearLayout) b.getChildAt(0);
-            badge.setBackground(null);
+            badge.setBackground(on ? Theme.bottomNavIconSelected() : null);
+            // Gold underline under the selected tab (the marker was never shown before).
+            View under = b.getChildCount() > 2 ? b.getChildAt(2) : null;
+            if (under != null) {
+                under.setVisibility(on ? View.VISIBLE : View.INVISIBLE);
+                under.setBackground(Theme.pill(Theme.GOLD));
+            }
+            // Gold halo under the selected capsule (API 28+ coloured shadow; older devices keep the rim).
+            if (android.os.Build.VERSION.SDK_INT >= 28) {
+                badge.setElevation(on ? Theme.dp(6) : 0f);
+                badge.setOutlineSpotShadowColor(Theme.GOLD);
+                badge.setOutlineAmbientShadowColor(Theme.GOLD);
+            }
             View symbol = badge.getChildAt(0);
             if (symbol instanceof android.widget.ImageView) {
                 if (!Boolean.TRUE.equals(symbol.getTag()))
@@ -1093,14 +1074,16 @@ public class MainActivity extends Activity {
                 ((TextView) symbol).setTextColor(on ? Theme.selectedNavInk() : Theme.MUTED);
             }
             TextView label = (TextView) b.getChildAt(1);
-            label.setTextColor(on ? Theme.selectedNavInk() : Theme.MUTED);
-            label.setTextSize(10.5f * Theme.fontScale() * Theme.typeScale());
-            View marker = b.getChildAt(2);
-            marker.setVisibility(on ? View.VISIBLE : View.INVISIBLE);
-            marker.setBackground(on ? Theme.bottomNavMarker() : null);
+            label.setTextColor(on ? Theme.GOLD_SOFT : Theme.MUTED);
+            label.setTextSize(on ? 11f : 10.5f);
+            b.getChildAt(2).setVisibility(on ? View.VISIBLE : View.INVISIBLE);
+            b.getChildAt(2).setBackground(on ? Theme.bottomNavMarker() : null);
+            b.setBackground(null); // the sliding capsule marks the selected tab instead
             if (on) selectedNavIndex = i;
             b.setSelected(on);
+            b.setElevation(on ? Theme.dp(2) : 0f);
             b.setContentDescription(label.getText() + (on ? "، بخش فعال" : "، رفتن به بخش"));
+            Theme.pressable(b); // Re-wrap the selected-state background with touch feedback.
             tabIndex++;
         }
         moveCapsule(true);
@@ -1154,73 +1137,33 @@ public class MainActivity extends Activity {
             brandHeaderExpandedHeight = block.getHeight();
         if (brandHeaderExpandedHeight <= 0) return;
 
-        // Keep scroll-driven collapse to one layout pass. Animating this sibling's height per
-        // frame repeatedly remeasures the ScrollView while it is dispatching finger movement.
-        applyHeaderDensity(collapsed);
-        android.view.ViewGroup.LayoutParams params = block.getLayoutParams();
+        if (brandHeaderAnimator != null) {
+            brandHeaderAnimator.cancel();
+            brandHeaderAnimator = null;
+        }
+        final android.view.ViewGroup.LayoutParams params = block.getLayoutParams();
         if (params == null) return;
-        params.height = collapsed ? Theme.dp(48) : brandHeaderExpandedHeight;
+        final int start = Math.max(0, block.getHeight());
+        final int target = collapsed ? 0 : brandHeaderExpandedHeight;
         brandHeaderCollapsed = collapsed;
-        block.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_AUTO);
-        block.setLayoutParams(params);
-    }
-
-    /**
-     * Available brand-title width after accounting for every visible header control. The 4dp
-     * spacer before the menu is included in both compact states; omitting it let the licence chip
-     * and long company names get clipped on narrow displays.
-     */
-    public static int headerTitleWidthDp(int widthDp, int sideInsetDp,
-                                         boolean compact, boolean collapsed) {
-        int fixed = 24 + (2 * sideInsetDp) + (collapsed ? 40 : 36) + 8;
-        if (collapsed) fixed += 48 + 4 + 48; // sync, menu gap, menu
-        else if (compact) fixed += 4 + 48;   // expanded compact menu gap and menu
-        return Math.max(collapsed ? 72 : 96, widthDp - fixed);
-    }
-
-    /** Set the compact header's controls and line count without duplicating the brand mark. */
-    private void applyHeaderDensity(boolean collapsed) {
-        if (headerRoot == null || brandRow == null) return;
-        int verticalPad = collapsed ? 4 : 8;
-        headerRoot.setPadding(Theme.dp(12), Theme.dp(verticalPad), Theme.dp(12),
-                Theme.dp(collapsed ? 4 : 8));
-        if (brandHeaderBlock != null) {
-            int blockVerticalInset = collapsed ? 0 : 4;
-            brandHeaderBlock.setPadding(Theme.dp(brandHeaderSideInsetDp),
-                    Theme.dp(blockVerticalInset), Theme.dp(brandHeaderSideInsetDp),
-                    Theme.dp(blockVerticalInset));
+        block.setImportantForAccessibility(collapsed
+                ? View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+                : View.IMPORTANT_FOR_ACCESSIBILITY_AUTO);
+        if (start == target || !ir.meelano.manager.ui.Ui.motionOk(this)) {
+            params.height = target;
+            block.setLayoutParams(params);
+            block.setAlpha(collapsed ? 0f : 1f);
+            return;
         }
-        if (headerTools != null) headerTools.setVisibility(collapsed ? View.GONE : View.VISIBLE);
-        if (headerToolbarGap != null) headerToolbarGap.setVisibility(collapsed ? View.GONE : View.VISIBLE);
-        if (headerStatusRow != null) headerStatusRow.setVisibility(collapsed ? View.GONE : View.VISIBLE);
-        if (compactSyncButton != null) compactSyncButton.setVisibility(collapsed ? View.VISIBLE : View.GONE);
-        boolean showMenu = collapsed || compactHeaderLayout;
-        if (compactMenuButton != null)
-            compactMenuButton.setVisibility(showMenu ? View.VISIBLE : View.GONE);
-        if (compactMenuGap != null) compactMenuGap.setVisibility(showMenu ? View.VISIBLE : View.GONE);
-
-        android.view.ViewGroup.LayoutParams logo = logoBox == null ? null : logoBox.getLayoutParams();
-        if (logo != null) {
-            int size = Theme.dp(collapsed ? 40 : brandMarkExpandedDp);
-            logo.width = size;
-            logo.height = size;
-            logoBox.setLayoutParams(logo);
-        }
-        if (companyName != null) {
-            companyName.setSingleLine(collapsed);
-            companyName.setMaxLines(collapsed ? 1 : 2);
-            companyName.setTextSize((collapsed ? 16f : brandTitleExpandedSp)
-                    * Theme.fontScale() * Theme.typeScale());
-        }
-        if (brandTitleColumn != null) {
-            int width = headerTitleWidthDp(headerWidthDp, brandHeaderSideInsetDp,
-                    compactHeaderLayout, collapsed);
-            android.view.ViewGroup.LayoutParams title = brandTitleColumn.getLayoutParams();
-            if (title != null) {
-                title.width = Theme.dp(Math.max(72, width));
-                brandTitleColumn.setLayoutParams(title);
-            }
-        }
+        brandHeaderAnimator = android.animation.ValueAnimator.ofInt(start, target);
+        brandHeaderAnimator.setDuration(180);
+        brandHeaderAnimator.addUpdateListener(anim -> {
+            params.height = (Integer) anim.getAnimatedValue();
+            block.setLayoutParams(params);
+            block.setAlpha(Math.min(1f, Math.max(0f,
+                    (float) params.height / (float) brandHeaderExpandedHeight)));
+        });
+        brandHeaderAnimator.start();
     }
 
     public void nav(String id) {
@@ -1381,13 +1324,13 @@ public class MainActivity extends Activity {
     private void paintCompany() {
         try {
             if (companyName != null) ir.meelano.manager.ui.MeelanoIcons.set(companyName, companyTitle());
-            if (logoImg != null) logoImg.setVisibility(View.GONE);
-            if (logoGlyph != null) {
-                logoGlyph.setVisibility(View.VISIBLE);
-                logoGlyph.setTextColor(Theme.onAccent(Theme.PRIMARY));
-                logoGlyph.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+            android.graphics.Bitmap b = Company.logo(this);
+            if (logoImg != null && logoGlyph != null) {
+                // Same crown-M medallion as the dashboard crest (b is intentionally not shown here).
+                logoImg.setImageResource(Theme.logoRes());
+                logoImg.setVisibility(View.VISIBLE);
+                logoGlyph.setVisibility(View.GONE);
             }
-            if (logoBox != null) logoBox.setBackground(Theme.accentAvatar(Theme.PRIMARY));
         } catch (Exception ignored) { Diag.ignored("MainActivity:997", ignored); }
     }
 
@@ -1409,8 +1352,10 @@ public class MainActivity extends Activity {
     private void renderCurrent() {
         Screen s = screens.get(currentId);
         if (s == null) return;
-        if (!"products".equals(currentId)) setProductStickyBar(null);
-        setBrandHeaderCollapsed(false);
+        if (!"products".equals(currentId)) {
+            setProductStickyBar(null);
+            setBrandHeaderCollapsed(false);
+        }
         renderGen++;
         // A new page for every render: a slow query that returns after the user has moved to
         // another section fills the old, detached page and can no longer repaint the screen on display.
@@ -1463,9 +1408,8 @@ public class MainActivity extends Activity {
     /** Builds an empty, centred page column and puts it on screen in place of the previous one. */
     private LinearLayout newPage() {
         LinearLayout page = kit.v();
-        // The dock is a separate sibling below the scroll viewport, not an overlay on page rows.
-        // Keep just a compact end gutter rather than the old 128dp spacer, which created a blank tail.
-        page.setPadding(Theme.dp(12), Theme.dp(4), Theme.dp(12), Theme.dp(20));
+        // Bottom room so the back capsule never covers the last row.
+        page.setPadding(Theme.dp(12), Theme.dp(4), Theme.dp(12), Theme.dp(128));
         int sw = getResources().getDisplayMetrics().widthPixels;
         if (contentWrap != null) {
             contentWrap.removeAllViews();
@@ -1486,11 +1430,21 @@ public class MainActivity extends Activity {
         setBrandHeaderCollapsed(false);
     }
 
-    /** Repaint bottom bar and back utility after a page or role-state change. */
+    /** Repaint bottom bar + back control (screens call this after internal state changes). */
     public void refreshChrome() {
         Screen s = screens.get(currentId);
         if (s == null) return;
         paintBottom();
+        updateBackControl();
+        updateBackLabel();
+    }
+
+    /** The back capsule names the screen it will actually return to. */
+    private void updateBackLabel() {
+        if (backLabel == null) return;
+        String target = history.isEmpty() ? "home" : history.get(history.size() - 1);
+        Screen t = screens.get(target);
+        backLabel.setText(t == null ? "بازگشت" : "بازگشت به «" + t.title() + "»");
     }
 
     public void openFilter() {
@@ -1511,7 +1465,7 @@ public class MainActivity extends Activity {
         }
     }
 
-    /** Shared back action for the Android system gesture/key and the header overflow menu. */
+    /** Shared back logic for the system back key and the golden back FAB. */
     public void goBack() {
         Screen s = screens.get(currentId);
         if (s != null && s.onBack()) return;
@@ -1520,6 +1474,34 @@ public class MainActivity extends Activity {
             renderCurrent();
             animateContent(false);
         } else nav("home");
+    }
+
+    /**
+     * The single back control for every screen: a gold disc with a round arrow, docked in the
+     * tab bar next to the sections. It used to float above the scrolling content, where it
+     * covered the very rows it points at - on the visitor grid that was the text of a section.
+     * In the bar it always sits in the same place and never hides anything.
+     */
+    private void syncBackFab() {
+        backLabel = null;
+        updateBackControl();
+        updateBackLabel();
+    }
+
+    /**
+     * The back control of the tab bar: bright when there is a page to return to, dimmed on the
+     * first page. The cell always keeps its place, so the sections never jump while navigating.
+     */
+    private void updateBackControl() {
+        if (backCell == null) return;
+        // On the home page there is nothing to go back to. The arrow is hidden there instead of
+        // dimmed: a half-faded disc reads as a broken button, and the cell keeps its place so
+        // the tabs never jump while the user walks through the sections.
+        boolean can = !"home".equals(currentId);
+        backCell.setAlpha(can ? 1f : 0f);
+        backCell.setContentDescription(can ? "بازگشت به صفحه قبلی" : "خانه");
+        android.view.View arrow = backCell.getChildCount() > 0 ? backCell.getChildAt(0) : null;
+        if (arrow != null) arrow.setContentDescription(backCell.getContentDescription());
     }
 
     // ================= Persian voice search =================
@@ -1592,19 +1574,6 @@ public class MainActivity extends Activity {
             }
             scanCb = null;
         }
-        if (requestCode == BANK_STATEMENT_REQ) {
-            java.util.function.Consumer<android.net.Uri> callback = bankStatementCb;
-            bankStatementCb = null;
-            if (callback == null) return;
-            try {
-                if (resultCode == Activity.RESULT_OK && data != null && data.getData() != null)
-                    callback.accept(data.getData());
-                else kit.toast("فایلی انتخاب نشد");
-            } catch (Exception e) {
-                kit.toast("دسترسی به فایل ممکن نشد؛ دوباره انتخاب کنید");
-            }
-            return;
-        }
         if (requestCode == DOC_REQ && docCb != null) {
             try {
                 if (resultCode == Activity.RESULT_OK && data != null && data.getData() != null) {
@@ -1642,10 +1611,7 @@ public class MainActivity extends Activity {
         boolean granted = grantResults != null && grantResults.length > 0
                 && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED;
         if (requestCode == LOC_PERM) {
-            // A grant records the user's opt-in; a denial removes any location-derived cache.
-            if (ir.meelano.manager.core.DeviceLocation.granted(this))
-                MarketWeather.setWeatherLocationEnabled(this, true);
-            else MarketWeather.setWeatherLocationEnabled(this, false);
+            // Location is optional: redraw the home card so weather follows the new permission at once.
             if ("home".equals(currentId)) renderCurrent();
             return;
         }
@@ -1704,9 +1670,7 @@ public class MainActivity extends Activity {
     // ================= document pick + photo =================
     private static final int DOC_REQ = 904;
     private static final int PHOTO_REQ = 905;
-    private static final int BANK_STATEMENT_REQ = 906;
     private java.util.function.Consumer<String> docCb;
-    private java.util.function.Consumer<android.net.Uri> bankStatementCb;
     private java.util.function.Consumer<android.net.Uri> photoCb;
     private android.net.Uri photoUri;
 
@@ -1724,25 +1688,6 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             kit.toast("انتخاب فایل ممکن نشد");
             docCb = null;
-        }
-    }
-
-    /** Choose a bank-export file through Android's document picker; the URI is read locally once. */
-    public void startBankStatementPick(java.util.function.Consumer<android.net.Uri> cb) {
-        bankStatementCb = cb;
-        try {
-            android.content.Intent i = new android.content.Intent(
-                    android.content.Intent.ACTION_OPEN_DOCUMENT);
-            i.addCategory(android.content.Intent.CATEGORY_OPENABLE);
-            i.setType("*/*");
-            i.putExtra(android.content.Intent.EXTRA_MIME_TYPES, new String[]{
-                    "text/csv", "text/tab-separated-values", "text/plain",
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    "application/octet-stream"});
-            startActivityForResult(i, BANK_STATEMENT_REQ);
-        } catch (Exception e) {
-            kit.toast("انتخاب فایل صورت‌حساب ممکن نشد");
-            bankStatementCb = null;
         }
     }
 
@@ -1785,7 +1730,7 @@ public class MainActivity extends Activity {
     }
 
     // ================= helpers for screens =================
-    /** Paint the themed header licence chip with a warning tone as expiry approaches. */
+    /** Paint the header license chip (remaining time; red when ≤ 7 days). */
     public void refreshLicChip() {
         if (licChip == null) return;
         try {
@@ -1795,26 +1740,19 @@ public class MainActivity extends Activity {
                 return;
             }
             licChip.setVisibility(View.VISIBLE);
-            int tone;
-            String spoken;
             if (s.plan == License.P_PERM) {
-                ir.meelano.manager.ui.MeelanoIcons.set(licChip, "🛡 دائمی");
-                tone = Theme.GOLD;
-                spoken = "مجوز دائمی";
+                ir.meelano.manager.ui.MeelanoIcons.set(licChip, "📅 دائمی");
+                licChip.setTextColor(Theme.GOLD_SOFT);
+            } else if (s.daysLeft <= 2) {
+                ir.meelano.manager.ui.MeelanoIcons.set(licChip, "📅 " + Money.fa(String.valueOf(s.daysLeft)) + " روز!");
+                licChip.setTextColor(Theme.DANGER);
+            } else if (s.daysLeft <= 7) {
+                ir.meelano.manager.ui.MeelanoIcons.set(licChip, "📅 " + Money.fa(String.valueOf(s.daysLeft)) + " روز");
+                licChip.setTextColor(Theme.WARNING);
             } else {
-                long daysLeft = Math.max(0L, s.daysLeft);
-                String days = Money.fa(String.valueOf(daysLeft));
-                ir.meelano.manager.ui.MeelanoIcons.set(licChip, "🛡 " + days + " روز");
-                tone = daysLeft <= 2 ? Theme.DANGER
-                        : daysLeft <= 7 ? Theme.WARNING : Theme.GOLD;
-                spoken = "مجوز؛ " + days + " روز باقی‌مانده";
+                ir.meelano.manager.ui.MeelanoIcons.set(licChip, "📅 " + Money.fa(String.valueOf(s.daysLeft)) + " روز");
+                licChip.setTextColor(Theme.GOLD_SOFT);
             }
-            licChip.setBackground(Theme.pill(tone));
-            Theme.pressable(licChip);
-            licChip.setTextColor(Theme.sectionText(tone));
-            licChip.setContentDescription(spoken + "؛ لمس برای مدیریت مجوز");
-            if (android.os.Build.VERSION.SDK_INT >= 26)
-                licChip.setTooltipText(spoken + "؛ لمس برای مدیریت مجوز");
         } catch (Exception e) {
             try {
                 licChip.setVisibility(View.GONE);
@@ -1866,14 +1804,11 @@ public class MainActivity extends Activity {
     }
 
     /**
-     * The header iconizer maps «◆» to a diamond vector, so a damaged name containing a valid
-     * letter plus «◆?» could pass the old any-letter check and appear as an icon/question mark.
-     * Reject the whole display value and fall back to the account/role label; never rewrite the
-     * persisted Atiran name or username.
+     * Reject empty placeholders and JDBC's Unicode replacement marker. A damaged display name
+     * falls back to the account name/role label; the persisted Atiran value is never rewritten.
      */
     private static String cleanName(String s) {
-        if (!PersianText.isUsablePersonName(s)) return "";
-        return PersianText.cleanDisplayLabel(s).trim();
+        return PersianText.isUsablePersonName(s) ? s.trim() : "";
     }
 
     private String displayName() {
@@ -1886,13 +1821,22 @@ public class MainActivity extends Activity {
     public void refreshUserChip() {
         try {
             boolean hasSession = AtiranAuth.hasSession(this);
-            if (compactUserAction != null)
+            if (userChip != null) {
+                if (!hasSession) {
+                    userChip.setVisibility(View.GONE);
+                } else {
+                    userChip.setVisibility(View.VISIBLE);
+                    String fullName = displayName();
+                    ir.meelano.manager.ui.MeelanoIcons.set(userChip, "\uD83D\uDC64 " + fullName);
+                    userChip.setTextDirection(View.TEXT_DIRECTION_RTL);
+                    userChip.setContentDescription("کاربر، " + fullName + "؛ لمس برای اطلاعات حساب");
+                    if (android.os.Build.VERSION.SDK_INT >= 26) userChip.setTooltipText(fullName);
+                }
+            }
+            if (compactUserAction != null) {
+                compactUserAction.setVisibility(hasSession ? View.VISIBLE : View.GONE);
                 compactUserAction.setContentDescription(hasSession
-                        ? "حساب کاربری؛ خروج یا تغییر کاربر" : "حساب کاربری");
-            if (compactUserCell != null) {
-                compactUserCell.setVisibility(hasSession ? View.VISIBLE : View.GONE);
-                compactUserCell.setContentDescription(hasSession
-                        ? "حساب کاربری؛ خروج یا تغییر کاربر" : "حساب کاربری");
+                        ? "حساب کاربری؛ خروج یا تغییر کاربر" : "ورود به حساب کاربری");
             }
         } catch (Exception ignored) { Diag.ignored("MainActivity:1399", ignored); }
     }
@@ -1932,7 +1876,7 @@ public class MainActivity extends Activity {
     }
 
     public void checkConn() {
-        setConnectionState("probe");
+        setLinkIcon("probe");
         repo.run(c -> Repo.one(c, new Queries.Q("SELECT 1 AS ok")), new Repo.Cb<Row>() {
             @Override
             public void ok(Row v) {
@@ -1940,68 +1884,41 @@ public class MainActivity extends Activity {
                 try {
                     last = settings.linkLast();
                 } catch (Exception ignored) { Diag.ignored("MainActivity:1444", ignored); }
-                setConnectionState(last.isEmpty() ? SmartLink.LAN : last);
+                setLinkIcon(last.isEmpty() ? SmartLink.LAN : last);
             }
 
             @Override
             public void fail(String faError) {
-                setConnectionState("off");
+                setLinkIcon("off");
             }
         });
     }
 
-    /** Persist and repaint the reusable SyncPill in both expanded and compact header states. */
-    private void setConnectionState(String kind) {
-        linkKind = kind == null ? "off" : kind;
-        updateHeaderSyncPill(linkKind);
-    }
-
-    private void updateHeaderSyncPill(String kind) {
-        int icon;
-        int accent;
-        String title;
-        String detail;
-        boolean busy = "probe".equals(kind);
-        if (busy) {
-            icon = R.drawable.mi_sync;
-            accent = Theme.PRIMARY;
-            title = "در حال بررسی اتصال";
-            detail = "شبکهٔ فروشگاه";
-        } else if (SmartLink.WAN.equals(kind)) {
-            icon = R.drawable.mi_check_circle;
-            accent = Theme.SUCCESS;
-            title = "اتصال برقرار";
-            detail = "از خارج شبکه";
-        } else if (SmartLink.LAN.equals(kind)) {
-            icon = R.drawable.mi_wifi;
-            accent = Theme.SUCCESS;
-            title = "اتصال برقرار";
-            detail = "در شبکهٔ داخلی";
-        } else {
-            icon = R.drawable.mi_wifi_off;
-            accent = Theme.WARNING;
-            title = "ارتباط قطع";
-            detail = "برای عیب‌یابی لمس کنید";
-        }
-        String spoken = title + "؛ " + detail + "؛ لمس برای جزئیات اتصال";
+    /** Header link icon: inside / outside / probing (spins) / offline. */
+    private void setLinkIcon(String kind) {
+        if (linkIcon == null) return;
         try {
-            if (headerSyncHost != null) {
-                headerSyncHost.removeAllViews();
-                View pill = kit.syncPill(icon, title, detail, accent, busy, null);
-                pill.setContentDescription(spoken);
-                Theme.pressable(pill);
-                pill.setOnClickListener(v -> showLinkPanel());
-                headerSyncHost.addView(pill, new android.widget.FrameLayout.LayoutParams(
-                        -1, -2, Gravity.CENTER_VERTICAL));
-            }
-            if (compactSyncButton != null) {
-                compactSyncButton.setBackground(Theme.kpi(accent));
-                compactSyncButton.setContentDescription(spoken);
-                Theme.pressable(compactSyncButton);
-            }
-            if (compactSyncIcon != null) {
-                compactSyncIcon.setImageResource(icon);
-                compactSyncIcon.setColorFilter(Theme.sectionText(accent));
+            linkIcon.clearAnimation();
+            if ("probe".equals(kind)) {
+                linkIcon.setImageResource(linkRes(R.drawable.link_probe));
+                android.view.animation.RotateAnimation spin =
+                        new android.view.animation.RotateAnimation(0, 360,
+                                android.view.animation.Animation.RELATIVE_TO_SELF, 0.5f,
+                                android.view.animation.Animation.RELATIVE_TO_SELF, 0.5f);
+                spin.setDuration(900);
+                spin.setRepeatCount(android.view.animation.Animation.INFINITE);
+                spin.setInterpolator(new android.view.animation.LinearInterpolator());
+                linkIcon.startAnimation(spin);
+                linkIcon.setContentDescription("در حال بررسی اتصال");
+            } else if (SmartLink.WAN.equals(kind)) {
+                linkIcon.setImageResource(linkRes(R.drawable.link_wan));
+                linkIcon.setContentDescription("متصل از خارج شبکه — لمس برای جزئیات");
+            } else if (SmartLink.LAN.equals(kind)) {
+                linkIcon.setImageResource(linkRes(R.drawable.link_lan));
+                linkIcon.setContentDescription("متصل از داخل شبکه — لمس برای جزئیات");
+            } else {
+                linkIcon.setImageResource(linkRes(R.drawable.link_off));
+                linkIcon.setContentDescription("قطع — لمس برای عیب‌یابی");
             }
         } catch (Exception ignored) { Diag.ignored("MainActivity:1481", ignored); }
     }
@@ -2175,15 +2092,14 @@ public class MainActivity extends Activity {
         b.setAllCaps(false);
         b.setSingleLine(true);
         b.setTextSize(12f * Theme.fontScale());
-        boolean outcome = accent == Theme.SUCCESS || accent == Theme.DANGER
-                || accent == Theme.WARNING || accent == Theme.INFO;
-        b.setTextColor(outcome ? Theme.TEXT : Theme.sectionText(accent));
+        b.setTextColor(accent);
         b.setTypeface(Theme.face(true));
         b.setBackground(Theme.ghostButton(accent));
         b.setGravity(android.view.Gravity.CENTER);
+        b.setElevation(Theme.dp(1));
         b.setPadding(Theme.dp(2), Theme.dp(8), Theme.dp(2), Theme.dp(8));
-        b.setMinHeight(Theme.dp(48));
-        b.setMinimumHeight(Theme.dp(48));
+        b.setMinHeight(Theme.dp(44));
+        b.setMinimumHeight(Theme.dp(44));
         b.setMinWidth(0);
         b.setMinimumWidth(0);
         b.setOnClickListener(click);
@@ -2200,10 +2116,10 @@ public class MainActivity extends Activity {
     }
 
     public static String zoomLabel(int idx) {
-        if (idx == 0) return HomeNumberFormatter.percent(90d);
-        if (idx == 2) return HomeNumberFormatter.percent(115d);
-        if (idx == 3) return HomeNumberFormatter.percent(130d);
-        return HomeNumberFormatter.percent(100d);
+        if (idx == 0) return "٪۹۰";
+        if (idx == 2) return "٪۱۱۵";
+        if (idx == 3) return "٪۱۳۰";
+        return "٪۱۰۰";
     }
 
     /** Share a bitmap (shop card) via the FileProvider. */
@@ -2234,54 +2150,4 @@ public class MainActivity extends Activity {
             }
         }).start();
     }
-
-    /** Detects a downward pull at the top without intercepting ordinary child gestures. */
-    private static final class PullToRefreshScrollView extends ScrollView {
-        private Runnable refreshListener;
-        private float startX;
-        private float startY;
-        private boolean startedAtTop;
-        private boolean pullReachedThreshold;
-        private final float triggerDistance;
-
-        PullToRefreshScrollView(android.content.Context context) {
-            super(context);
-            triggerDistance = 84f * getResources().getDisplayMetrics().density;
-        }
-
-        void setOnRefreshListener(Runnable listener) {
-            refreshListener = listener;
-        }
-
-        @Override
-        public boolean dispatchTouchEvent(android.view.MotionEvent event) {
-            int action = event.getActionMasked();
-            if (action == android.view.MotionEvent.ACTION_DOWN) {
-                startX = event.getX();
-                startY = event.getY();
-                startedAtTop = getScrollY() <= 0;
-                pullReachedThreshold = false;
-            } else if (action == android.view.MotionEvent.ACTION_MOVE
-                    && startedAtTop && getScrollY() <= 0) {
-                float dy = event.getY() - startY;
-                float dx = event.getX() - startX;
-                if (dy >= triggerDistance && dy > Math.abs(dx) * 1.2f) {
-                    pullReachedThreshold = true;
-                }
-            }
-
-            boolean shouldRefresh = action == android.view.MotionEvent.ACTION_UP
-                    && pullReachedThreshold && startedAtTop && refreshListener != null;
-            Runnable callback = shouldRefresh ? refreshListener : null;
-            boolean handled = super.dispatchTouchEvent(event);
-            if (action == android.view.MotionEvent.ACTION_UP
-                    || action == android.view.MotionEvent.ACTION_CANCEL) {
-                startedAtTop = false;
-                pullReachedThreshold = false;
-            }
-            if (callback != null) post(callback);
-            return handled;
-        }
-    }
-
 }

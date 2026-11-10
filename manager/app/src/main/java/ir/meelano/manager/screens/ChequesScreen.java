@@ -9,7 +9,6 @@ import android.widget.ScrollView;
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.core.AtiranSchema;
 import ir.meelano.manager.core.Filter;
-import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.MoneyQueries;
@@ -284,7 +283,7 @@ public class ChequesScreen extends Screen {
                 if (!myBucket.isEmpty())
                     c.addView(a.kit.kv("وضعیت", bucketLabel(myBucket), Theme.TEXT), a.kit.lp(-1, -2));
                 c.addView(a.kit.kv("تعداد", Money.fa(String.valueOf(g.count)) + " فقره", Theme.TEXT), a.kit.lp(-1, -2));
-                c.addView(a.kit.kv("جمع", Money.compactRial(g.total), Theme.GOLD_SOFT), a.kit.lp(-1, -2));
+                c.addView(a.kit.kv("جمع", Money.rial(g.total), Theme.GOLD_SOFT), a.kit.lp(-1, -2));
                 a.kit.addCard(content, c);
             }
         }
@@ -294,10 +293,10 @@ public class ChequesScreen extends Screen {
         } else {
             for (Row r : d.list) {
                 final Row row = r;
-                String eventDate = row.s("getdate").isEmpty() ? ""
-                        : HomeNumberFormatter.dateTime(row.s("getdate"));
-                String dueDate = Jalali.dispFa(row.s("sardate"));
-                if ("—".equals(dueDate)) dueDate = "";
+                String eventDate = Jalali.disp(row.s("getdate"));
+                String dueDate = Jalali.disp(row.s("sardate"));
+                if (!eventDate.isEmpty()) eventDate = Money.fa(eventDate);
+                if (!dueDate.isEmpty()) dueDate = Money.fa(dueDate);
                 String eventLabel = myIn ? "دریافت " : "صدور ";
                 String eventText = eventDate.isEmpty() ? "" : eventLabel + eventDate;
                 String dueText = dueDate.isEmpty() ? "" : "سررسید " + dueDate;
@@ -390,8 +389,7 @@ public class ChequesScreen extends Screen {
         LinearLayout side = a.kit.v();
         side.setGravity(android.view.Gravity.END);
         side.setPadding(Theme.dp(8), 0, 0, 0);
-        side.addView(a.kit.text(Money.compactRial(row.d("amount")), 13.5f, Theme.GOLD_SOFT, true),
-                a.kit.lp(-2, -2));
+        side.addView(a.kit.text(Money.rial(row.d("amount")), 13.5f, Theme.GOLD_SOFT, true), a.kit.lp(-2, -2));
         if (pill != null && !pill.isEmpty()) {
             android.widget.LinearLayout.LayoutParams pp = a.kit.lp(-2, -2);
             pp.setMargins(0, Theme.dp(6), 0, 0);
@@ -499,7 +497,7 @@ public class ChequesScreen extends Screen {
         }
         LinearLayout c = a.kit.card(accent());
         c.addView(a.kit.kv("سررسید " + title, Money.fa(String.valueOf(mN)) + " فقره", Theme.TEXT), a.kit.lp(-1, -2));
-        c.addView(a.kit.kv("جمع مبالغ", Money.compactRial(mSum), Theme.GOLD_SOFT), a.kit.lp(-1, -2));
+        c.addView(a.kit.kv("جمع مبالغ", Money.rial(mSum), Theme.GOLD_SOFT), a.kit.lp(-1, -2));
         a.kit.addCard(content, c);
         renderNotes(content, d.notes);
     }
@@ -515,10 +513,9 @@ public class ChequesScreen extends Screen {
         body.addView(a.kit.kv("روز", Jalali.dispFa(key) + " • " + Jalali.weekday(key), Theme.TEXT), a.kit.lp(-1, -2));
         body.addView(a.kit.kv("جمع", Money.rial(tot), Theme.GOLD_SOFT), a.kit.lp(-1, -2));
         for (final Row r : rows) {
-            String eventDate = r.s("getdate").isEmpty() ? ""
-                    : HomeNumberFormatter.dateTime(r.s("getdate"));
+            String eventDate = Jalali.disp(r.s("getdate"));
             String dates = "سررسید " + Jalali.dispFa(r.s("sardate"));
-            if (!eventDate.isEmpty()) dates += "\n" + (inc ? "دریافت " : "صدور ") + eventDate;
+            if (!eventDate.isEmpty()) dates += "\n" + (inc ? "دریافت " : "صدور ") + Money.fa(eventDate);
             View v = chequeCard(r, inc, dates, rowLabel(inc, r));
             LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
             p.setMargins(0, 0, 0, Theme.dp(8));
@@ -551,9 +548,8 @@ public class ChequesScreen extends Screen {
         if (!r.s("branch").isEmpty()) body.addView(a.kit.kv(inc ? "شعبه" : "گیرنده", r.s("branch"), Theme.TEXT), a.kit.lp(-1, -2));
         body.addView(a.kit.kv("وضعیت", rowLabel(inc, r), Theme.TEXT), a.kit.lp(-1, -2));
         if (!r.s("sayad").isEmpty()) body.addView(a.kit.kv("شناسه صیادی", Money.fa(r.s("sayad")), Theme.TEXT), a.kit.lp(-1, -2));
-        if (!r.s("getdate").isEmpty())
-            body.addView(a.kit.kv(incoming ? "تاریخ دریافت" : "تاریخ صدور",
-                    HomeNumberFormatter.dateTime(r.s("getdate")), Theme.TEXT), a.kit.lp(-1, -2));
+        if (!Jalali.disp(r.s("getdate")).isEmpty())
+            body.addView(a.kit.kv(incoming ? "تاریخ دریافت" : "تاریخ صدور", Jalali.dispFa(r.s("getdate")), Theme.TEXT), a.kit.lp(-1, -2));
         if (!r.s("descrip").isEmpty()) body.addView(a.kit.kv("شرح", r.s("descrip"), Theme.MUTED), a.kit.lp(-1, -2));
         body.addView(a.kit.text("مبلغ به حروف: " + Money.words(r.d("amount")), 11f, Theme.MUTED, false), a.kit.lp(-1, -2));
 

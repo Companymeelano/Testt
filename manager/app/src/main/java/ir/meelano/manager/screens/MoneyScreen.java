@@ -11,7 +11,6 @@ import android.widget.TextView;
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.core.AtiranSchema;
 import ir.meelano.manager.core.Filter;
-import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.MoneyQueries;
@@ -169,12 +168,10 @@ public class MoneyScreen extends Screen {
             c.addView(a.kit.text("روند روزانه", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
             Charts.Area ch = new Charts.Area(a);
             List<Charts.Point> pts = new ArrayList<>();
-            for (Row r : d.daily) pts.add(new Charts.Point(
-                    HomeNumberFormatter.dateShortLabel(r.s("day")), r.d("total")));
+            for (Row r : d.daily) pts.add(new Charts.Point(Jalali.shortLabel(r.s("day")), r.d("total")));
             final TextView cap = a.kit.text("", 11f, Theme.MUTED, false);
             ch.setData(pts, accent(), Charts.MONEY);
-            ch.setListener((idx, pt) -> cap.setText(ir.meelano.manager.core.HomeNumberFormatter.rtlText(
-                    Money.fa(pt.label) + " • " + Money.compactRial(pt.value))));
+            ch.setListener((idx, pt) -> cap.setText(Money.fa(pt.label) + " • " + Money.rial(pt.value)));
             c.addView(ch, new LinearLayout.LayoutParams(-1, Theme.dp(175)));
             c.addView(cap, a.kit.lp(-1, -2));
             a.kit.addCard(content, c);
@@ -267,7 +264,7 @@ public class MoneyScreen extends Screen {
             String pill = r.s("kind");
             if (pill.isEmpty()) pill = "—";
             View v = a.kit.docRow("قبض " + Money.fa(ghno), r.s("customer"),
-                    HomeNumberFormatter.dateTime(r.s("date")), Money.compactRial(r.d("total")),
+                    Jalali.shortLabel(r.s("date")), Money.rial(r.d("total")),
                     pill, methodColor(r), receiptFoot(r), v2 -> openDetail(ghno));
             LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
             p.setMargins(0, 0, 0, Theme.dp(10));
@@ -372,7 +369,7 @@ public class MoneyScreen extends Screen {
         final AlertDialog[] dlgHolder = new AlertDialog[1];
         LinearLayout body = a.kit.v();
         body.addView(a.kit.kv("شماره قبض", Money.fa(head.s("ghno")), Theme.TEXT), a.kit.lp(-1, -2));
-        body.addView(a.kit.kv("تاریخ", HomeNumberFormatter.dateTime(head.s("date")), Theme.TEXT), a.kit.lp(-1, -2));
+        body.addView(a.kit.kv("تاریخ", Jalali.dispFa(head.s("date")), Theme.TEXT), a.kit.lp(-1, -2));
         body.addView(a.kit.kv("طرف‌حساب", head.s("customer"), Theme.TEXT), a.kit.lp(-1, -2));
         if (!head.s("kind").isEmpty()) body.addView(a.kit.kv("نوع", head.s("kind"), Theme.TEXT), a.kit.lp(-1, -2));
         if (head.d("cash") > 0) body.addView(a.kit.kv("نقد", Money.rial(head.d("cash")), Theme.TEXT), a.kit.lp(-1, -2));
@@ -452,7 +449,7 @@ public class MoneyScreen extends Screen {
                     new ReportCatalog.Col("paidSettled", "تسویه‌شده", ReportCatalog.T_MONEY),
             };
             body.addView(a.kit.gap(8));
-            body.addView(a.exportBar("تسویه‌های قبض " + head.s("ghno"), HomeNumberFormatter.dateTime(head.s("date")), expCols, dt.invs), a.kit.lp(-1, -2));
+            body.addView(a.exportBar("تسویه‌های قبض " + head.s("ghno"), Jalali.dispFa(head.s("date")), expCols, dt.invs), a.kit.lp(-1, -2));
         }
         body.addView(a.kit.gap(8));
         body.addView(a.kit.btn("بستن", v -> dlg.dismiss()), a.kit.lp(-1, -2));

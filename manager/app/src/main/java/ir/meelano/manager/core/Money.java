@@ -1,7 +1,10 @@
 package ir.meelano.manager.core;
 
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /** Persian money / number formatting. Atiran stores Rials; the UI uses the selected display unit. */
 public final class Money {
@@ -27,9 +30,12 @@ public final class Money {
     /** «تومان» or «ریال». */
     public static String unitName() { return unit == UNIT_TOMAN ? "تومان" : "ریال"; }
 
-    /** Latin or Arabic-Indic digits → Persian digits through the shared display formatter. */
+    /** Latin digits → Persian digits. */
     public static String fa(String s) {
-        return HomeNumberFormatter.persianDigits(s);
+        if (s == null) return "";
+        StringBuilder b = new StringBuilder(s.length());
+        for (char ch : s.toCharArray()) b.append(ch >= '0' && ch <= '9' ? (char) ('۰' + (ch - '0')) : ch);
+        return b.toString();
     }
 
     /** Persian digits → Latin digits (for parsing user input). */
@@ -44,63 +50,104 @@ public final class Money {
         return b.toString();
     }
 
-    /** Full Rial amount in the selected display unit, RTL-safe and kept next to its unit. */
-    public static String rial(double v) {
-        return HomeNumberFormatter.money(v);
+    private static String group(long v) {
+        DecimalFormat f = new DecimalFormat("#,##0", DecimalFormatSymbols.getInstance(Locale.US));
+        return f.format(v).replace(',', '٬').replace('-', '−');
     }
 
-    /** Shared text-safe money display; retained as a compatibility alias for existing callers. */
+    /** «۱۲٬۴۵۰٬۰۰۰ ریال» — or the Toman equivalent when Toman is selected. */
+    public static String rial(double v) {
+        return fa(group(Math.round(toUnit(v)))) + " " + unitName();
+    }
+
+    /** TextView-safe money format: the signed number stays LTR-isolated inside an RTL label. */
     public static String rialText(double v) {
-        return HomeNumberFormatter.money(v);
+        return ltrIsolate(fa(group(Math.round(toUnit(v))))) + " " + unitName();
     }
 
     /** Isolate a numeric run for correct bidi ordering in RTL controls. */
     public static String ltrIsolate(String value) {
-        return HomeNumberFormatter.isolateLtr(value);
+        return "\u2066" + (value == null ? "" : value) + "\u2069";
     }
 
-    /** Text-safe quantity, including a visible zero and stable sign. */
+    /** TextView-safe quantity, including a visible zero and a stable negative sign. */
     public static String qtyText(double value) {
-        return HomeNumberFormatter.quantity(value);
+        return ltrIsolate(qty(value));
     }
 
-    /** Compact amount with the current unit for tiles/cards. */
+    /** Compact amount WITH the current unit for tiles/cards: «۱۲٫۴ میلیون تومان». */
     public static String compactMoney(double v) {
-        return HomeNumberFormatter.compactMoney(v);
+        return compact(toUnit(v)) + " " + unitName();
     }
 
-    /** Rounded, grouped whole number. */
+    /** «۱۲٬۴۵۰٬۰۰۰» */
     public static String num(double v) {
-        return HomeNumberFormatter.rounded(v);
+        return fa(group(Math.round(v)));
     }
 
     public static String num(long v) {
-        return HomeNumberFormatter.integer(v);
+        return fa(group(v));
     }
 
-    /** Quantity with an explicit sign inside one LTR isolate. */
+    /**
+     * Quantity with an explicit sign inside one LTR isolate, so the sign always hugs
+     * the digits («−۹٫۸») instead of drifting to the far side of an RTL line.
+     */
     public static String signedQty(double v) {
-        return HomeNumberFormatter.signedQuantity(v);
+        return "\u2066" + (v < 0 ? "\u2212" : "+") + qty(Math.abs(v)) + "\u2069";
     }
 
-    /** Quantity with up to three fractional digits. */
+    /** Quantity with up to 3 decimals, trimmed: «۱۲٫۵». */
     public static String qty(double v) {
-        return HomeNumberFormatter.quantity(v);
+        if (Math.abs(v - Math.round(v)) < 0.0005) return fa(group(Math.round(v)));
+        String s = String.format(java.util.Locale.US, "%.3f", v);
+        s = s.replaceAll("0+$", "").replaceAll("\\.$", "");
+        int dot = s.indexOf('.');
+        String ip = dot < 0 ? s : s.substring(0, dot);
+        String fp = dot < 0 ? "" : s.substring(dot);
+        return fa(groupStr(ip) + fp.replace('.', '٫'));
     }
 
-    /** Compact amount for chart axes and inline values. */
+    private static String groupStr(String ip) {
+        boolean neg = ip.startsWith("-");
+        if (neg) ip = ip.substring(1);
+        StringBuilder b = new StringBuilder();
+        int n = ip.length();
+        for (int i = 0; i < n; i++) {
+            if (i > 0 && (n - i) % 3 == 0) b.append('٬');
+            b.append(ip.charAt(i));
+        }
+        return neg ? "−" + b : b.toString();
+    }
+
+    /** Compact amount for chart axes: «۱۲٫۴ میلیون». */
     public static String compact(double v) {
-        return HomeNumberFormatter.compactUnit(v);
+        double a = Math.abs(v);
+        String s;
+        if (a >= 1e12) s = trim(v / 1e12) + " هزار میلیارد";
+        else if (a >= 1e9) s = trim(v / 1e9) + " میلیارد";
+        else if (a >= 1e6) s = trim(v / 1e6) + " میلیون";
+        else if (a >= 1e3) s = trim(v / 1e3) + " هزار";
+        else s = trim(v);
+        return fa(s);
     }
 
-    /** Compact amount with the current display unit. */
+    /** Compact amount WITH the current unit for tiles/cards: «۱۲٫۴ میلیون تومان». */
     public static String compactRial(double v) {
-        return HomeNumberFormatter.compactMoney(v);
+        return compactMoney(v);
     }
 
-    /** Percentage with Persian digits, decimal separator, and trailing percent mark. */
+    private static String trim(double v) {
+        String s = String.format(Locale.US, Math.abs(v) >= 100 ? "%.0f" : "%.1f", v);
+        if (s.endsWith(".0")) s = s.substring(0, s.length() - 2);
+        return s.replace('.', '٫').replace('-', '−');
+    }
+
+    /** «٪۱۲٫۵» */
     public static String pct(double v) {
-        return HomeNumberFormatter.percent(v);
+        String s = String.format(Locale.US, "%.1f", v);
+        if (s.endsWith(".0")) s = s.substring(0, s.length() - 2);
+        return "٪" + fa(s.replace('.', '٫').replace('-', '−'));
     }
 
     // ---------------- amount in words ----------------

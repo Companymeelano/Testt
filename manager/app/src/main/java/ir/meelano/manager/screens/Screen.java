@@ -5,7 +5,6 @@ import android.widget.LinearLayout;
 
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.core.Filter;
-import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Queries;
 import ir.meelano.manager.data.Atiran;
 import ir.meelano.manager.ui.FilterSheet;
@@ -132,8 +131,9 @@ public abstract class Screen {
     protected String cacheNow() {
         try {
             java.util.Calendar c = java.util.Calendar.getInstance();
-            return a.kit.todayLine() + " ساعت " + HomeNumberFormatter.time(
+            String hm = String.format(java.util.Locale.US, "%02d:%02d",
                     c.get(java.util.Calendar.HOUR_OF_DAY), c.get(java.util.Calendar.MINUTE));
+            return a.kit.todayLine() + " ساعت " + hm;
         } catch (Exception e) {
             return "";
         }

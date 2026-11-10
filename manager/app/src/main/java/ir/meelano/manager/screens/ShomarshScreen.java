@@ -9,7 +9,6 @@ import android.widget.LinearLayout;
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.core.AtiranAuth;
 import ir.meelano.manager.core.DeviceId;
-import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.Money;
@@ -169,16 +168,20 @@ public class ShomarshScreen extends Screen {
         LinearLayout session = a.kit.card(Theme.STEEL);
         LinearLayout dateRow = a.kit.h();
         dateRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        dateRow.addView(a.kit.text("تاریخ شمارش: " + HomeNumberFormatter.dateText(countDate),
-                13f, Theme.TEXT, true),
+        dateRow.addView(a.kit.text("تاریخ شمارش: " + Money.fa(countDate), 13f, Theme.TEXT, true),
                 a.kit.wlp(1f));
         dateRow.addView(a.kit.btnGhost("انتخاب تاریخ", Theme.GOLD, v -> chooseCountDate()), a.kit.lp(-2, -2));
         session.addView(dateRow, a.kit.lp(-1, -2));
         session.addView(a.kit.hint("تاریخ انتخاب‌شده برای همهٔ اقلام این نشست استفاده می‌شود."), a.kit.lp(-1, -2));
         if (restoredLocalDraft && lines.length() > 0) {
             String recovered = "نشست ناتمام از حافظهٔ خصوصی همین گوشی بازیابی شد؛ تغییرات جدید هم خودکار ذخیره می‌شوند.";
-            if (restoredAt > 0)
-                recovered += " آخرین ذخیره: " + HomeNumberFormatter.time(restoredAt) + ".";
+            if (restoredAt > 0) {
+                try {
+                    String time = new java.text.SimpleDateFormat("HH:mm", java.util.Locale.US)
+                            .format(new java.util.Date(restoredAt));
+                    recovered += " آخرین ذخیره: " + Money.fa(time) + ".";
+                } catch (Exception ignored) { Diag.ignored("ShomarshScreen:182", ignored); }
+            }
             session.addView(a.kit.hint(recovered), a.kit.lp(-1, -2));
         } else {
             session.addView(a.kit.hint("اقلام و تعدادهای واردشده تا زمان ثبت گزارش، روی همین گوشی نگه‌داری می‌شوند."),
@@ -199,11 +202,9 @@ public class ShomarshScreen extends Screen {
             double stock = ln.optDouble(WarehouseWriter.L_STOCK, 0);
             double diff = counted - stock;
             boolean blind = blindMode();
-            String detail = blind ? "شمرده " + HomeNumberFormatter.quantity(counted)
-                    : "سیستم " + HomeNumberFormatter.quantity(stock) + " • شمرده "
-                            + HomeNumberFormatter.quantity(counted);
-            String pill = blind ? "ثبت‌شده" : (Math.abs(diff) < 0.001 ? "✓"
-                    : HomeNumberFormatter.quantity(diff));
+            String detail = blind ? "شمرده " + Money.fa(fmtNum(counted))
+                    : "سیستم " + Money.fa(fmtNum(stock)) + " • شمرده " + Money.fa(fmtNum(counted));
+            String pill = blind ? "ثبت‌شده" : (Math.abs(diff) < 0.001 ? "✓" : Money.fa(fmtNum(diff)));
             View v = a.kit.personRow(ln.optString(WarehouseWriter.L_NAKA, "—"),
                     detail, blind ? "" : "مغایرت " + pill,
                     "✕", blind ? Theme.INFO : (Math.abs(diff) < 0.001 ? Theme.SUCCESS : Theme.DANGER),
@@ -276,7 +277,7 @@ public class ShomarshScreen extends Screen {
                             if (ln != null && Math.abs(ln.optDouble(WarehouseWriter.L_COUNTED, 0)
                                     - ln.optDouble(WarehouseWriter.L_STOCK, 0)) > 0.001) variance++;
                         }
-                        String sub = HomeNumberFormatter.dateText(doc.optString("day", "")) + " • "
+                        String sub = Money.fa(doc.optString("day", "")) + " • "
                                 + doc.optString("anbar", "سراسری") + " • "
                                 + doc.optString("keeper", "—");
                         card.addView(a.kit.personRow("شمارش " + Money.fa(String.valueOf(ls.length())) + " قلم",
@@ -319,7 +320,7 @@ public class ShomarshScreen extends Screen {
         LinearLayout body = a.kit.v();
         body.setPadding(Theme.dp(16), Theme.dp(12), Theme.dp(16), Theme.dp(12));
         body.addView(a.kit.kv("ثبت‌کننده / تاریخ", doc.optString("keeper", "—") + " • "
-                + HomeNumberFormatter.dateText(doc.optString("day", "")), Theme.TEXT), a.kit.lp(-1, -2));
+                + Money.fa(doc.optString("day", "")), Theme.TEXT), a.kit.lp(-1, -2));
         body.addView(a.kit.kv("انبار", doc.optString("anbar", "سراسری"), Theme.TEXT), a.kit.lp(-1, -2));
         JSONArray ls = parseLines(doc.optString("lines", "[]"));
         for (int i = 0; i < ls.length(); i++) {
@@ -329,9 +330,9 @@ public class ShomarshScreen extends Screen {
             double counted = ln.optDouble(WarehouseWriter.L_COUNTED, 0);
             double diff = counted - stock;
             String detail = "کد " + ln.optString(WarehouseWriter.L_SHKA, "")
-                    + " • سیستم " + HomeNumberFormatter.quantity(stock)
-                    + " • شمرده " + HomeNumberFormatter.quantity(counted)
-                    + " • اختلاف " + HomeNumberFormatter.quantity(diff);
+                    + " • سیستم " + Money.fa(fmtNum(stock))
+                    + " • شمرده " + Money.fa(fmtNum(counted))
+                    + " • اختلاف " + Money.fa(fmtNum(diff));
             String reason = ln.optString("reason", "").trim();
             if (!reason.isEmpty()) detail += " • علت/توضیح انباردار: " + reason;
             body.addView(a.kit.kv(ln.optString(WarehouseWriter.L_NAKA, "—"), detail,
@@ -446,8 +447,7 @@ public class ShomarshScreen extends Screen {
                     for (Row r : rows) {
                         final Row row = r;
                         String label = blindMode() ? row.s("name") + " • کد " + row.s("code")
-                                : row.s("name") + " • سیستم: "
-                                        + HomeNumberFormatter.quantity(row.d("stock"));
+                                : row.s("name") + " • سیستم: " + Money.fa(fmtNum(row.d("stock")));
                         results.addView(a.kit.btnGhost(label, Theme.GOLD, v -> {
                             try {
                                 box[0].dismiss();
@@ -476,7 +476,7 @@ public class ShomarshScreen extends Screen {
         b.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(16));
         b.addView(a.kit.kv("کالا", name.isEmpty() ? "—" : name, Theme.TEXT), a.kit.lp(-1, -2));
         if (!blindMode()) {
-            b.addView(a.kit.kv("موجودی سیستم", HomeNumberFormatter.quantity(stock) + " " + unit, Theme.TEXT),
+            b.addView(a.kit.kv("موجودی سیستم", Money.fa(fmtNum(stock)) + " " + unit, Theme.TEXT),
                     a.kit.lp(-1, -2));
         }
         final EditText e = a.kit.editNum("تعداد شمرده‌شده *", "");
@@ -542,7 +542,7 @@ public class ShomarshScreen extends Screen {
                 if (content != null) render(content);
                 double diff = c - stock;
                 if (!blindMode() && Math.abs(diff) > 0.001)
-                    a.kit.toast("⚠ مغایرت: " + HomeNumberFormatter.quantity(diff));
+                    a.kit.toast("⚠ مغایرت: " + Money.fa(fmtNum(diff)));
             } catch (Exception ex) {
                 a.kit.toast("ثبت ممکن نشد");
             }

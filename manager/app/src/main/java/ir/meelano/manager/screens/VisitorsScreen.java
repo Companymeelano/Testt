@@ -10,7 +10,6 @@ import android.widget.TextView;
 
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.core.Filter;
-import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.Money;
@@ -305,12 +304,10 @@ public class VisitorsScreen extends Screen {
             body.addView(a.kit.text("روند فروش روزانه", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
             Charts.Area ch = new Charts.Area(a);
             List<Charts.Point> pts = new ArrayList<>();
-            for (Row r : dt.trend) pts.add(new Charts.Point(
-                    HomeNumberFormatter.dateShortLabel(r.s("day")), r.d("total")));
+            for (Row r : dt.trend) pts.add(new Charts.Point(Jalali.shortLabel(r.s("day")), r.d("total")));
             final TextView cap = a.kit.text("", 11f, Theme.MUTED, false);
             ch.setData(pts, accent(), Charts.COMPACT);
-            ch.setListener((idx, p) -> cap.setText(ir.meelano.manager.core.HomeNumberFormatter.rtlText(
-                    Money.fa(p.label) + " • " + Money.compactRial(p.value))));
+            ch.setListener((idx, p) -> cap.setText(Money.fa(p.label) + " • " + Money.rial(p.value)));
             body.addView(ch, new LinearLayout.LayoutParams(-1, Theme.dp(160)));
             body.addView(cap, a.kit.lp(-1, -2));
         }

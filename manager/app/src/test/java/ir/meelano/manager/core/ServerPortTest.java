@@ -5,8 +5,6 @@ import ir.meelano.manager.data.Settings;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 
 /**
  * Server-port handling: the default is 1433, custom/forwarded ports
@@ -45,31 +43,6 @@ public class ServerPortTest {
         assertEquals(0, LanDiscover.typedPort("1.2.3.4:abc"));
         assertEquals(0, LanDiscover.typedPort(""));
         assertEquals(0, LanDiscover.typedPort(null));
-    }
-
-    @Test
-    public void addressPortOverridesAStalePrefilledPortField() {
-        assertEquals(5050, LanDiscover.resolvePort("1433", "198.51.100.8:5050"));
-        assertEquals(5050, LanDiscover.resolvePort("", "198.51.100.8:5050"));
-        assertEquals(5050, LanDiscover.resolvePort("۵۰۵۰", "198.51.100.8"));
-        assertEquals(1433, LanDiscover.resolvePort("invalid", "198.51.100.8"));
-    }
-
-    @Test
-    public void perProfilePortIsNotConfusedWithLegacySharedPort() {
-        assertEquals(5050, Settings.resolveProfilePort("5050", "1433"));
-        assertEquals(5050, Settings.resolveProfilePort("", "5050"));
-        assertEquals(1433, Settings.resolveProfilePort("", ""));
-    }
-
-    @Test
-    public void sameAddressWithDifferentPortsIsNotTheSameEndpoint() {
-        assertTrue(LanDiscover.sameEndpoint("198.51.100.8", 5050,
-                "198.51.100.8:5050", 5050));
-        assertFalse(LanDiscover.sameEndpoint("198.51.100.8", 1433,
-                "198.51.100.8", 5050));
-        assertFalse(LanDiscover.sameEndpoint("198.51.100.8", 5050,
-                "198.51.100.9", 5050));
     }
 
     @Test

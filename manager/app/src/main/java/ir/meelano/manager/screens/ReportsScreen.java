@@ -12,10 +12,8 @@ import ir.meelano.manager.core.AtiranSpecialReports;
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.R;
 import ir.meelano.manager.core.Filter;
-import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.Money;
-import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.Queries;
 import ir.meelano.manager.core.ReportCatalog;
 import ir.meelano.manager.core.VisitorScorecard;
@@ -26,7 +24,6 @@ import ir.meelano.manager.data.Repo;
 import ir.meelano.manager.data.Row;
 import ir.meelano.manager.ui.Charts;
 import ir.meelano.manager.ui.FilterSheet;
-import ir.meelano.manager.ui.Kit;
 import ir.meelano.manager.ui.Theme;
 
 import java.util.ArrayList;
@@ -93,18 +90,25 @@ public class ReportsScreen extends Screen {
     }
 
     private int sectionAccent(String section) {
-        if (section == null) return Theme.SECTION_SALES;
-        if (section.contains("فروش")) return Theme.SECTION_SALES;
-        if (section.contains("خرید")) return Theme.SECTION_PURCHASE;
-        if (section.contains("دریافت") || section.contains("چک")) return Theme.SECTION_RECEIVE;
-        if (section.contains("پرداخت") || section.contains("هزینه")) return Theme.SECTION_PAY;
-        if (section.contains("برگشت") || section.contains("ابطال")) return Theme.SECTION_RETURNS;
-        if (section.contains("کالا") || section.contains("انبار")) return Theme.SECTION_WAREHOUSE;
-        if (section.contains("بازار") || section.contains("سود") || section.contains("تحلیل")
-                || section.contains("خزانه") || section.contains("بانک")) return Theme.SECTION_MARKET;
-        if (section.contains("هشدار")) return Theme.SECTION_ALERT;
-        if (section.contains("مشتری")) return Theme.SECTION_PURCHASE;
-        return Theme.EMERALD_DEEP;
+        if ("ویژه مدیر".equals(section)) return Theme.GOLD;
+        if ("فروش".equals(section)) return Theme.SALES_HUE;
+        if ("خرید".equals(section)) return Theme.BUY_HUE;
+        if ("دریافتی‌ها و پرداخت".equals(section)) return Theme.SUCCESS;
+        if ("چک‌ها".equals(section)) return Theme.INFO;
+        if ("عملکرد صندوق".equals(section)) return Theme.GOLD;
+        if ("خزانه‌داری".equals(section)) return Theme.GOLD;
+        if ("کالا و انبار".equals(section)) return Theme.VIOLET;
+        if ("مشتریان".equals(section)) return Theme.SUCCESS;
+        if ("ویزیتورها".equals(section)) return Theme.WARNING;
+        if ("سود و زیان".equals(section)) return Theme.GOLD;
+        if ("بانک و صندوق".equals(section)) return Theme.INFO;
+        if ("پرسنل و نظارت".equals(section)) return Theme.STEEL;
+        if ("هوشمند".equals(section)) return Theme.VIOLET;
+        if ("هزینه‌ها".equals(section)) return Theme.ROSE;
+        if ("برگشتی و ابطالی".equals(section)) return Theme.DANGER;
+        if ("تحلیل ویزیتور و مسیر".equals(section)) return Theme.WARNING;
+        if ("سرفصل‌ها".equals(section)) return Theme.GOLD_SOFT;
+        return Theme.MUTED;
     }
 
     private int sectionIcon(String section) {
@@ -151,34 +155,6 @@ public class ReportsScreen extends Screen {
 
     private static final String STATE_PREFS = "reports_state";
     private boolean restored = false;
-
-    /** Open the authorized real returns register for the day selected in Home. */
-    public boolean openHomeReturnsRange(String from, String to) {
-        ReportCatalog.Spec returns = ReportCatalog.byId("returns_list");
-        if (returns == null || !ReportCatalog.availableToRole(returns, reportRole())) {
-            a.kit.toast("فهرست اسناد برگشتی برای نقش فعلی مجاز نیست");
-            return false;
-        }
-        if (!restored) {
-            restored = true;
-            restoreState();
-        }
-        sel = returns;
-        selCat = returns.section;
-        browseQuery = "";
-        filter.copyFrom(Filter.daily());
-        filter.defaultPreset = Filter.P_TODAY;
-        filter.preset = Filter.P_CUSTOM;
-        String start = Jalali.disp(from);
-        String end = Jalali.disp(to);
-        filter.from = start.isEmpty() ? Jalali.todayStr() : start;
-        filter.to = end.isEmpty() ? filter.from : end;
-        filter.top = 200;
-        filter.page = 0;
-        pendingCategory = null;
-        a.nav(id());
-        return true;
-    }
 
     private String reportRole() {
         String role = AtiranAuth.sessionRole(a);
@@ -425,8 +401,19 @@ public class ReportsScreen extends Screen {
         c.setPadding(Theme.dp(12), Theme.dp(11), Theme.dp(12), Theme.dp(11));
         Theme.lift(c, Theme.cardElevation());
 
-        View icon = a.kit.iconBadge(reportIcon(spec), color, 40);
-        c.addView(icon, new LinearLayout.LayoutParams(Theme.dp(40), Theme.dp(40)));
+        ImageView icon = new ImageView(a);
+        int reportVector = reportIcon(spec);
+        int reportArt = Theme.icon3d(reportVector);
+        if (!Theme.isIcon3d(reportArt)) {
+            int categoryArt = Theme.icon3d(sectionIcon(spec.section));
+            if (Theme.isIcon3d(categoryArt)) reportArt = categoryArt;
+        }
+        icon.setImageResource(reportArt);
+        if (Theme.isIcon3d(reportArt)) icon.clearColorFilter();
+        else icon.setColorFilter(color);
+        icon.setBackground(Theme.avatar(Theme.alpha(color, 48)));
+        icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        c.addView(icon, new LinearLayout.LayoutParams(Theme.dp(48), Theme.dp(48)));
         c.addView(a.kit.space(10));
 
         LinearLayout copy = a.kit.v();
@@ -524,8 +511,14 @@ public class ReportsScreen extends Screen {
         LinearLayout c = a.kit.card(sectionAccent(section));
         c.setGravity(Gravity.CENTER_HORIZONTAL);
         c.setMinimumHeight(Theme.dp(122));
-        View iv = a.kit.iconBadge(sectionIcon(section), sectionAccent(section), 40);
-        int sz = Theme.dp(40);
+        ImageView iv = new ImageView(a);
+        try {
+            int art = Theme.icon3d(sectionIcon(section));
+            iv.setImageResource(art);
+            if (Theme.isIcon3d(art)) iv.clearColorFilter();
+            else iv.setColorFilter(sectionAccent(section));
+        } catch (Exception ignored) { Diag.ignored("ReportsScreen:349", ignored); }
+        int sz = Theme.dp(44);
         c.addView(iv, new LinearLayout.LayoutParams(sz, sz));
         c.addView(a.kit.gap(6));
         android.widget.TextView t = a.kit.text(section, 14f, Theme.TEXT, true);
@@ -537,8 +530,7 @@ public class ReportsScreen extends Screen {
         u.setGravity(Gravity.CENTER);
         u.setSingleLine(true);
         c.addView(u, a.kit.lp(-1, -2));
-        c.setContentDescription(ir.meelano.manager.core.HomeNumberFormatter.localizeText(
-                section + "؛ " + Money.fa(String.valueOf(count)) + " گزارش"));
+        c.setContentDescription(section + "؛ " + Money.fa(String.valueOf(count)) + " گزارش");
         c.addView(a.kit.gap(2));
         Theme.pressable(c);
         c.setOnClickListener(v -> {
@@ -766,94 +758,6 @@ java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
         }
     }
 
-    private static final class ReturnLineData {
-        final List<Row> rows;
-        final String error;
-        ReturnLineData(List<Row> rows, String error) {
-            this.rows = rows == null ? new ArrayList<>() : rows;
-            this.error = error == null ? "" : error;
-        }
-    }
-
-    /** A return-register row opens only the line view for its exact number and return kind. */
-    private void returnDetailDialog(final Row invoice) {
-        final String no = invoice == null ? "" : invoice.s("no").trim();
-        final String kindCode = invoice == null ? "" : invoice.s("kindCode").trim();
-        if (no.isEmpty()) {
-            a.kit.toast("شمارهٔ سند برای دریافت اقلام موجود نیست");
-            return;
-        }
-        if (kindCode.isEmpty()) {
-            a.kit.toast("نوع سند برای تشخیص دقیق اقلام موجود نیست؛ نمایش جزئیات متوقف شد");
-            return;
-        }
-        a.kit.toast("در حال دریافت اقلام سند برگشتی…");
-        a.repo.run(c -> {
-            Meta m = new Meta(c);
-            try {
-                return new ReturnLineData(Repo.exec(c,
-                        MasterQueries.returnLines(m, no, kindCode, invoice.s("kind"))), "");
-            } catch (Queries.Missing missing) {
-                return new ReturnLineData(null, missing.getMessage());
-            }
-        }, new Repo.Cb<ReturnLineData>() {
-            @Override public void ok(ReturnLineData result) {
-                showReturnDetails(invoice, result);
-            }
-            @Override public void fail(String error) {
-                a.kit.toast(error == null || error.isEmpty()
-                        ? "اقلام این سند برگشتی در دسترس نیست" : error);
-            }
-        });
-    }
-
-    private void showReturnDetails(Row invoice, ReturnLineData result) {
-        String no = invoice == null ? "" : invoice.s("no");
-        LinearLayout body = a.kit.v();
-        body.setPadding(Theme.dp(14), Theme.dp(12), Theme.dp(14), Theme.dp(12));
-        body.addView(a.kit.kv("شماره سند", Money.fa(no), Theme.TEXT), a.kit.lp(-1, -2));
-        if (invoice != null && !invoice.s("date").isEmpty())
-            body.addView(a.kit.kv("تاریخ", HomeNumberFormatter.dateTime(invoice.s("date")), Theme.TEXT), a.kit.lp(-1, -2));
-        if (invoice != null && !invoice.s("kind").isEmpty())
-            body.addView(a.kit.kv("نوع برگشت", invoice.s("kind"), Theme.TEXT), a.kit.lp(-1, -2));
-        if (invoice != null && !invoice.s("customer").isEmpty())
-            body.addView(a.kit.kv("طرف‌حساب", invoice.s("customer"), Theme.TEXT), a.kit.lp(-1, -2));
-        String amount = invoice == null ? "" : invoice.s("amountLabel");
-        if (!amount.isEmpty()) body.addView(a.kit.kv("مبلغ سند", amount, Theme.GOLD_SOFT), a.kit.lp(-1, -2));
-        body.addView(a.kit.gap(8));
-        body.addView(a.kit.hint("اقلام از نمای واقعی برگشتی خوانده می‌شوند؛ مقادیر نامعتبر صفر فرض نمی‌شوند."),
-                a.kit.lp(-1, -2));
-        body.addView(a.kit.gap(6));
-        if (result != null && !result.error.isEmpty()) {
-            body.addView(a.kit.unavailable(result.error), a.kit.lp(-1, -2));
-        } else if (result == null || result.rows.isEmpty()) {
-            body.addView(a.kit.empty("قلمی برای این سند در نمای برگشتی پیدا نشد", null), a.kit.lp(-1, -2));
-        } else {
-            for (Row line : result.rows) {
-                String qty = line.has("qtyVah")
-                        ? ir.meelano.manager.core.HomeNumberFormatter.decimal(line.d("qtyVah")) : "نامعتبر";
-                if (line.has("qtyJoz") && Math.abs(line.d("qtyJoz")) > 0.0005)
-                    qty += " + " + ir.meelano.manager.core.HomeNumberFormatter.decimal(line.d("qtyJoz"));
-                line.put("qtyLabel", qty);
-                line.put("lineSumLabel", line.has("lineSum") ? Money.rial(line.d("lineSum")) : "مبلغ نامعتبر");
-            }
-            ReportCatalog.Col[] cols = {
-                    new ReportCatalog.Col("shka", "کد", ReportCatalog.T_TEXT),
-                    new ReportCatalog.Col("naka", "کالا", ReportCatalog.T_TEXT),
-                    new ReportCatalog.Col("qtyLabel", "تعداد", ReportCatalog.T_TEXT),
-                    new ReportCatalog.Col("lineSumLabel", "مبلغ", ReportCatalog.T_TEXT),
-            };
-            body.addView(a.kit.dataTable(cols, result.rows, null), a.kit.lp(-1, -2));
-        }
-        android.widget.ScrollView scroll = new android.widget.ScrollView(a);
-        scroll.setFillViewport(true);
-        scroll.addView(body);
-        android.app.AlertDialog dialog = a.kit.dialog("جزئیات سند برگشتی " + Money.fa(no), scroll, true);
-        dialog.show();
-        if (dialog.getWindow() != null)
-            dialog.getWindow().setLayout(-1, (int) (a.getResources().getDisplayMetrics().heightPixels * 0.82f));
-    }
-
     private void buildReport(LinearLayout content, final ReportCatalog.Spec spec, final List<Row> rows) {
         content.removeAllViews();
         content.addView(a.kit.btnGhost("‹ بازگشت به فهرست", Theme.GOLD, v -> onBack()), a.kit.lp(-1, -2));
@@ -868,27 +772,10 @@ java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
             return;
         }
 
-        boolean returnKindReport = "returns_by_kind".equals(spec.id);
-        boolean returnListReport = "returns_list".equals(spec.id);
-        boolean returnAmountsIncomplete = false;
-        if (returnKindReport || returnListReport) {
-            for (Row row : rows) {
-                String validityKey = returnKindReport ? "invalidRows" : "amountInvalid";
-                boolean invalid = !row.has(validityKey) || row.l(validityKey) > 0 || !row.has("total");
-                if (returnKindReport) {
-                    returnAmountsIncomplete |= invalid;
-                    row.put("totalLabel", invalid ? "مبلغ نامعتبر" : Money.rial(row.d("total")));
-                } else {
-                    row.put("amountLabel", invalid ? "مبلغ نامعتبر" : Money.rial(row.d("total")));
-                }
-            }
-        }
-
         content.addView(a.exportBar(spec.title, spec.needsRange ? filter.rangeFa() : spec.desc, spec.cols, rows), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(12));
 
-        if (spec.chart != ReportCatalog.C_NONE && !spec.chartX.isEmpty() && !spec.chartY.isEmpty()
-                && !(returnKindReport && returnAmountsIncomplete)) {
+        if (spec.chart != ReportCatalog.C_NONE && !spec.chartX.isEmpty() && !spec.chartY.isEmpty()) {
             LinearLayout c = a.kit.card(sectionAccent(spec.section));
             final List<Charts.Point> pts = new ArrayList<>();
             int cap = spec.chart == ReportCatalog.C_DONUT ? 8 : 31;
@@ -936,9 +823,6 @@ java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
                 c.addView(dn, new LinearLayout.LayoutParams(-1, Theme.dp(300)));
             }
             a.kit.addCard(content, c);
-        } else if (returnKindReport && returnAmountsIncomplete) {
-            content.addView(a.kit.unavailable("نمودار جمع مبلغ برگشتی‌ها نمایش داده نمی‌شود؛ دست‌کم یک مبلغ در دادهٔ منبع نامعتبر یا ناقص است."),
-                    a.kit.lp(-1, -2));
         }
 
         LinearLayout c = a.kit.card(Theme.GOLD);
@@ -947,14 +831,12 @@ java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
             if (col.type != ReportCatalog.T_MONEY) continue;
             double sum = 0;
             for (Row r : rows) sum += r.d(col.key);
-            c.addView(a.kit.kv("جمع " + col.title, Money.compactRial(sum), Theme.GOLD_SOFT), a.kit.lp(-1, -2));
+            c.addView(a.kit.kv("جمع " + col.title, Money.rial(sum), Theme.GOLD_SOFT), a.kit.lp(-1, -2));
         }
         int show = Math.min(rows.size(), 300);
         final boolean callable = "fleeing_customers".equals(spec.id) || "cheque_reliability".equals(spec.id);
-        Kit.RowClick rowClick = callable ? this::contactDialog
-                : returnListReport ? this::returnDetailDialog : null;
         c.addView(a.kit.dataTable(spec.cols, new ArrayList<>(rows.subList(0, show)),
-                rowClick), a.kit.lp(-1, -2));
+                callable ? this::contactDialog : null), a.kit.lp(-1, -2));
         if (rows.size() > show)
             c.addView(a.kit.hint("+" + Money.fa(String.valueOf(rows.size() - show)) + " ردیف دیگر در PDF…"), a.kit.lp(-1, -2));
         LinearLayout.LayoutParams fp = a.kit.lp(-1, -2);
@@ -1005,7 +887,7 @@ java.util.Map<String, Object> sm = new java.util.LinkedHashMap<>();
     private String chartLabel(ReportCatalog.Spec spec, String x) {
         if (x == null) return "";
         try {
-            if ("day".equals(spec.chartX)) return HomeNumberFormatter.dateShortLabel(x);
+            if ("day".equals(spec.chartX)) return Jalali.shortLabel(x);
             if ("month".equals(spec.chartX)) return Jalali.monthName(x + "/01") + " " + Money.fa(x.substring(0, 4));
         } catch (Exception ignored) { Diag.ignored("ReportsScreen:691", ignored); }
         String t = Money.fa(x);

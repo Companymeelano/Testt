@@ -4,7 +4,6 @@ import ir.meelano.manager.R;
 import ir.meelano.manager.core.Diag;
 import android.content.Context;
 import android.graphics.Color;
-import android.graphics.Paint;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.view.View;
@@ -13,89 +12,46 @@ import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.data.Settings;
 
 /**
- * Shared flat theme engine for the whole Java/View app. Light and dark modes use neutral surfaces
- * with an emerald action accent; Nuts remains a distinct selectable skin. Colors stay mutable so
- * each screen, chart and drawable can repaint after a theme change without changing business data.
+ * Luxury theme engine: two skins («Midnight Gold» dark, «Ivory Royal» light)
+ * × six accent colors, applied to the WHOLE app at runtime.
+ *
+ * Colors are plain static fields (not constants) on purpose: every screen,
+ * chart and drawable reads them fresh on each render, so switching theme +
+ * re-render is all it takes. GOLD / GOLD_SOFT always mean «the current
+ * accent», whatever the user picked.
  */
 public final class Theme {
     private Theme() { }
 
-    // Shared 4dp layout rhythm and nested card radii for the Java/View design system.
-    public static final int SPACE_UNIT_DP = 4;
-    public static final int CARD_PADDING_HORIZONTAL_DP = 16;
-    public static final int CARD_PADDING_VERTICAL_DP = 12;
-    public static final int CARD_RADIUS_DP = 16;
-    public static final int DASHBOARD_CARD_RADIUS_DP = 20;
-    public static final int DASHBOARD_METRIC_RADIUS_DP = 16;
-    public static final int DASHBOARD_BADGE_RADIUS_DP = 12;
-
-    /** Clamp a requested gap to the nearest 4dp step; zero remains zero for optional spaces. */
-    public static int snapSpacingDp(int requestedDp) {
-        if (requestedDp <= 0) return 0;
-        return Math.max(SPACE_UNIT_DP,
-                Math.round(requestedDp / (float) SPACE_UNIT_DP) * SPACE_UNIT_DP);
-    }
-
     // ---------------- dynamic palette (set by apply) ----------------
-    public static final int EMERALD_DEEP = DesignTokens.EMERALD_DEEP;
-    public static final int EMERALD = DesignTokens.EMERALD;
-    public static final int GOLD_METAL = DesignTokens.GOLD;
-    public static final int GOLD_LIGHT = DesignTokens.GOLD_LIGHT;
-    public static final int GOLD_DARK = DesignTokens.GOLD_DARK;
-    public static final int IVORY = DesignTokens.IVORY;
-    public static final int PAPER = DesignTokens.PAPER;
-    public static final int INK = DesignTokens.INK;
-    public static final int SECTION_SALES = DesignTokens.SALES;
-    public static final int SECTION_PURCHASE = DesignTokens.PURCHASE;
-    public static final int SECTION_RECEIVE = DesignTokens.RECEIVE;
-    public static final int SECTION_PAY = DesignTokens.PAY;
-    public static final int SECTION_RETURNS = DesignTokens.RETURNS;
-    public static final int SECTION_ALERT = DesignTokens.ALERT;
-    public static final int SECTION_MARKET = DesignTokens.MARKET;
-    public static final int SECTION_WAREHOUSE = DesignTokens.WAREHOUSE;
-    public static final int SECTION_CLOSEOUT = DesignTokens.CLOSEOUT;
-    public static final int SECTION_CASH_POSITION = DesignTokens.CASH_POSITION;
-    public static final int SECTION_TOP_PERFORMERS = DesignTokens.TOP_PERFORMERS;
-    public static final int SECTION_SALES_GOAL = DesignTokens.SALES_GOAL;
-    public static final int SECTION_GROSS_PROFIT = DesignTokens.GROSS_PROFIT;
-    public static final int SECTION_SEASONAL_CALENDAR = DesignTokens.SEASONAL_CALENDAR;
-    public static final int SECTION_QUICK_ACTIONS = DesignTokens.QUICK_ACTIONS;
-    public static final int SECTION_SALES_FORECAST = DesignTokens.SALES_FORECAST;
-
-    public static int BG = DesignTokens.APP_DARK_BG;
-    public static int SURFACE = DesignTokens.APP_DARK_SURFACE;
-    public static int SURFACE2 = DesignTokens.APP_DARK_SURFACE_2;
-    /** Compatibility alias used by existing screens; light/dark resolve to emerald, Nuts to gold. */
-    public static int GOLD = DesignTokens.APP_DARK_ACCENT;
-    public static int GOLD_SOFT = DesignTokens.APP_DARK_ACCENT;
-    public static int PRIMARY = DesignTokens.APP_DARK_ACCENT;
-    public static int TEXT = DesignTokens.APP_DARK_TEXT;
-    public static int MUTED = DesignTokens.APP_DARK_MUTED;
-    public static int BORDER = DesignTokens.APP_DARK_BORDER;
-    public static int ACCENT_SOFT = DesignTokens.APP_DARK_ACCENT_SOFT;
-    public static int SUCCESS = DesignTokens.textSafeColor(
-            DesignTokens.POSITIVE, DesignTokens.APP_DARK_SURFACE, true);
-    public static int DANGER = DesignTokens.textSafeColor(
-            DesignTokens.NEGATIVE, DesignTokens.APP_DARK_SURFACE, true);
-    public static int WARNING = DesignTokens.textSafeColor(
-            DesignTokens.WARNING, DesignTokens.APP_DARK_SURFACE, true);
-    public static int INFO = DesignTokens.textSafeColor(
-            DesignTokens.INFO, DesignTokens.APP_DARK_SURFACE, true);
-    public static int VIOLET = DesignTokens.textSafeColor(
-            DesignTokens.RETURNS, DesignTokens.APP_DARK_SURFACE, true);
-    public static int STEEL = DesignTokens.APP_DARK_STEEL;
-    public static final int NEUTRAL = DesignTokens.NEUTRAL;
-    /** Legacy aliases; semantic outcome colors are intentionally not section colors. */
-    public static final int SALES_HUE = DesignTokens.SALES;
-    public static final int BUY_HUE = DesignTokens.PURCHASE;
+    public static int BG = 0xFF0C1220;
+    public static int SURFACE = 0xFF151D31;
+    public static int SURFACE2 = 0xFF1D2742;
+    /** Current accent (gold by default). */
+    public static int GOLD = 0xFFD9AE5A;
+    /** Current accent, soft variant (readable on the background). */
+    public static int GOLD_SOFT = 0xFFF1D493;
+    public static int TEXT = 0xFFF4EFE4;
+    public static int MUTED = 0xFF9AA3B5;
+    public static int SUCCESS = 0xFF35C26E;
+    public static int DANGER = 0xFFE5484D;
+    public static int WARNING = 0xFFF5A524;
+    public static int INFO = 0xFF4FA3FF;
+    public static int VIOLET = 0xFF9A7BFF;
+    public static int STEEL = 0xFF7C8DA6;
+    /** Fixed hues for sales and purchases: they must stand out from the gold/theme accent. */
+    public static final int SALES_HUE = 0xFFFF8A3D;
+    public static final int BUY_HUE = 0xFFFF5FA2;
 
     private static boolean light = false;
     /** «آجیل و خشکبار»: the light skin plus nut artwork and nut icons. */
     private static boolean nuts = false;
     public static boolean isNuts() { return nuts; }
 
-    /** Shared flat brand mark; its tint is chosen by the surface using it. */
-    public static int logoRes() { return R.drawable.mi_diamond; }
+    /** MEELANO crest: gold on emerald in the nut theme, the classic black-and-gold badge otherwise. */
+    public static int logoRes() { return nuts ? R.drawable.meelano_nuts : R.drawable.meelano_3d; }
+    /** Application context, used only to load the light skin artwork. */
+    private static Context appCtx;
     /** Mirror of !light for call sites (charts, tables). */
     public static boolean DARK = true;
     private static float fontScale = 1f;
@@ -110,16 +66,209 @@ public final class Theme {
     private static Typeface regular;
     private static Typeface bold;
 
+    /** Deep ink and warm ivory chosen to keep accent controls legible in both skins. */
+    private static final int ACCENT_INK = 0xFF111827;
+    private static final int ACCENT_PAPER = 0xFFFFFCF5;
+
     public static boolean isLight() { return light; }
 
-    /** Compatibility flag retained for callers of the previous icon treatment. */
+    /**
+     * Rendered 3D gold icons replace the flat vector glyphs in both skins. Returns the drawable to
+     * show for a vector glyph id.
+     */
+    /**
+     * Nut theme icons: false = the gold 3D set from the approved reference (plain gold on the
+     * ivory and emerald surfaces). true = the emerald medallion set. One flag switches back.
+     */
     public static final boolean NUT_MEDALLIONS = false;
 
-    /** Legacy hook: return the flat vector unchanged so every theme can tint it. */
-    public static int icon3d(int vector) { return vector; }
+    /** Nut-theme medallion icons (emerald medallion, gold rim) for the main sections; 0 = none. */
+    private static int medal(int vector) {
+        if (vector == R.drawable.mi_home) return R.drawable.icon3d_medal_home;
+        if (vector == R.drawable.mi_group) return R.drawable.icon3d_medal_customers;
+        if (vector == R.drawable.mi_inventory_2) return R.drawable.icon3d_medal_inventory;
+        if (vector == R.drawable.mi_grid_view) return R.drawable.icon3d_medal_products;
+        if (vector == R.drawable.mi_bar_chart) return R.drawable.icon3d_medal_reports;
+        if (vector == R.drawable.mi_settings) return R.drawable.icon3d_medal_settings;
+        if (vector == R.drawable.mi_search) return R.drawable.icon3d_medal_search;
+        if (vector == R.drawable.mi_cheque) return R.drawable.icon3d_medal_cheque;
+        if (vector == R.drawable.mi_calendar_month) return R.drawable.icon3d_medal_dues;
+        if (vector == R.drawable.mi_person) return R.drawable.icon3d_medal_account;
+        if (vector == R.drawable.mi_refresh) return R.drawable.icon3d_medal_refresh;
+        if (vector == R.drawable.mi_contrast) return R.drawable.icon3d_medal_theme;
+        if (vector == R.drawable.mi_zoom) return R.drawable.icon3d_medal_zoom;
+        if (vector == R.drawable.mi_star_shine) return R.drawable.icon3d_medal_assistant;
+        if (vector == R.drawable.mi_widgets) return R.drawable.icon3d_medal_more;
+        if (vector == R.drawable.mi_diamond) return R.drawable.icon3d_medal_goldbar;
+        if (vector == R.drawable.mi_trending_up) return R.drawable.icon3d_medal_dollar;
+        return 0;
+    }
 
-    /** Flat vector glyphs are always tintable. */
-    public static boolean isIcon3d(int res) { return false; }
+    /**
+     * Header toolbar and bottom nav icons. In the nut theme they use the emerald set, pulled from
+     * the emerald of the MEELANO nut crest, so the chrome and the logo read as one colour family.
+     * Content icons keep the gold set. Falls back to the gold icon if no emerald twin exists.
+     */
+    public static int chrome3d(int vector) {
+        int base = icon3d(vector);
+        if (!nuts || NUT_MEDALLIONS || appCtx == null || !isIcon3d(base)) return base;
+        try {
+            String n = appCtx.getResources().getResourceEntryName(base);
+            // The medallions of the gold set have their own name; the emerald twin is the same
+            // subject in the emerald set (icon3d_medal_sales -> icon3d_emerald_sales).
+            String twin = ir.meelano.manager.core.IconArt.emeraldName(n);
+            if (twin.isEmpty()) return base;
+            int e = appCtx.getResources().getIdentifier(twin, "drawable", appCtx.getPackageName());
+            return e != 0 ? e : base;
+        } catch (Exception ignored) { return base; }
+    }
+
+    /**
+     * The 3D icon of the manager's board in the nut theme: the emerald twin of the
+     * section's icon, so the board, the header and the tab bar read as one family.
+     * The medallion names are folded to their plain twin (medal_sales -> sales).
+     * The other skins keep the gold set, and a section without a twin keeps its icon.
+     */
+    public static int emerald3d(int vector) {
+        int base = icon3d(vector);
+        if (!nuts || NUT_MEDALLIONS || appCtx == null || !isIcon3d(base)) return base;
+        try {
+            String n = appCtx.getResources().getResourceEntryName(base);
+            if (!n.startsWith("icon3d_")) return base;
+            String key = n.substring(7);
+            if (key.startsWith("medal_")) key = key.substring(6);
+            int e = appCtx.getResources().getIdentifier("icon3d_emerald_" + key, "drawable", appCtx.getPackageName());
+            return e != 0 ? e : base;
+        } catch (Exception ignored) { return base; }
+    }
+
+    public static int icon3d(int vector) {
+        if (NUT_MEDALLIONS && nuts) {
+            int m = medal(vector);
+            if (m != 0) return m;
+        }
+        // A coherent 3D set for the command room and financial sections, shared by all three themes.
+        // The source artwork is a transparent emerald/gold medallion, so it remains legible on ivory and obsidian.
+        if (vector == R.drawable.mi_warehouse) return R.drawable.icon3d_production;
+        if (vector == R.drawable.mi_task_alt) return R.drawable.icon3d_closeout;
+        if (vector == R.drawable.mi_military_tech) return R.drawable.icon3d_score;
+        if (vector == R.drawable.mi_profit) return R.drawable.icon3d_profit;
+        if (vector == R.drawable.mi_account_balance || vector == R.drawable.mi_account_balance_wallet) return R.drawable.icon3d_treasury;
+        if (vector == R.drawable.mi_directions_car || vector == R.drawable.mi_local_shipping) return R.drawable.icon3d_logistics;
+        if (vector == R.drawable.mi_mic) return R.drawable.icon3d_voice;
+        if (vector == R.drawable.mi_admin_panel_settings) return R.drawable.icon3d_dark_roles;
+        if (vector == R.drawable.mi_request_quote) return R.drawable.icon3d_medal_sales;
+        if (vector == R.drawable.mi_add_shopping_cart) return R.drawable.icon3d_medal_purchase;
+        if (vector == R.drawable.mi_warning) return R.drawable.icon3d_medal_alert;
+        if (!light) {
+            // Dark skin: icons rendered on black, with a brighter gold glow.
+            if (vector == R.drawable.mi_lightbulb) return R.drawable.icon3d_dark_assistant;
+            if (vector == R.drawable.mi_trending_down) return R.drawable.icon3d_dark_cash_out;
+            if (vector == R.drawable.mi_assignment_return) return R.drawable.icon3d_dark_refresh;
+            if (vector == R.drawable.mi_trending_up) return R.drawable.icon3d_dark_dollar;
+            if (vector == R.drawable.mi_diamond) return R.drawable.icon3d_dark_gold;
+            if (vector == R.drawable.mi_search) return R.drawable.icon3d_dark_search;
+            if (vector == R.drawable.mi_refresh) return R.drawable.icon3d_dark_refresh;
+            if (vector == R.drawable.mi_contrast) return R.drawable.icon3d_dark_theme;
+            if (vector == R.drawable.mi_zoom) return R.drawable.icon3d_dark_zoom;
+            if (vector == R.drawable.mi_point_of_sale) return R.drawable.icon3d_dark_sales;
+            if (vector == R.drawable.mi_shopping_cart) return R.drawable.icon3d_dark_purchase;
+            if (vector == R.drawable.mi_group) return R.drawable.icon3d_dark_customers;
+            if (vector == R.drawable.mi_home) return R.drawable.icon3d_dark_home;
+            if (vector == R.drawable.mi_settings) return R.drawable.icon3d_dark_settings;
+            if (vector == R.drawable.mi_star_shine) return R.drawable.icon3d_dark_assistant;
+            if (vector == R.drawable.mi_receipt_long) return R.drawable.icon3d_dark_cash_in;
+            if (vector == R.drawable.mi_payments) return R.drawable.icon3d_dark_cash_out;
+            if (vector == R.drawable.mi_cheque) return R.drawable.icon3d_dark_cheque;
+            if (vector == R.drawable.mi_inventory_2) return R.drawable.icon3d_dark_inventory;
+            if (vector == R.drawable.mi_bar_chart) return R.drawable.icon3d_dark_reports;
+            if (vector == R.drawable.mi_person) return R.drawable.icon3d_dark_account;
+            if (vector == R.drawable.mi_grid_view) return R.drawable.icon3d_dark_products;
+            if (vector == R.drawable.mi_widgets) return R.drawable.icon3d_dark_more;
+            if (vector == R.drawable.mi_calendar_month) return R.drawable.icon3d_dark_dues;
+        }
+        if (vector == R.drawable.mi_grid_view) return R.drawable.icon3d_products;
+        if (vector == R.drawable.mi_star_shine) return R.drawable.icon3d_assistant;
+        if (vector == R.drawable.mi_widgets) return R.drawable.icon3d_more;
+        if (vector == R.drawable.mi_calendar_month) return R.drawable.icon3d_dues;
+        if (vector == R.drawable.mi_zoom) return R.drawable.icon3d_zoom;
+        if (vector == R.drawable.mi_sell) return light ? R.drawable.icon3d_light_tag : R.drawable.icon3d_dark_tag;
+        if (vector == R.drawable.mi_point_of_sale) return nuts ? R.drawable.icon3d_medal_sales : R.drawable.icon3d_sales;
+        if (vector == R.drawable.mi_shopping_cart) return nuts ? R.drawable.icon3d_medal_purchase : R.drawable.icon3d_purchase;
+        if (vector == R.drawable.mi_receipt_long) return nuts ? R.drawable.icon3d_medal_cash_in : R.drawable.icon3d_cash_in;
+        if (vector == R.drawable.mi_payments) return nuts ? R.drawable.icon3d_medal_cash_out : R.drawable.icon3d_cash_out;
+        if (vector == R.drawable.mi_cheque) return R.drawable.icon3d_cheque;
+        if (vector == R.drawable.mi_inventory_2) return R.drawable.icon3d_inventory;
+        if (vector == R.drawable.mi_group) return R.drawable.icon3d_customers;
+        if (vector == R.drawable.mi_bar_chart) return R.drawable.icon3d_reports;
+        if (vector == R.drawable.mi_settings) return R.drawable.icon3d_settings;
+        if (vector == R.drawable.mi_trending_up) return R.drawable.icon3d_dollar;
+        if (vector == R.drawable.mi_diamond) return R.drawable.icon3d_gold;
+        if (vector == R.drawable.mi_home) return R.drawable.icon3d_home;
+        if (vector == R.drawable.mi_grid_view) return R.drawable.icon3d_inventory;
+        if (vector == R.drawable.mi_person) return R.drawable.icon3d_account;
+        if (vector == R.drawable.mi_search) return R.drawable.icon3d_search;
+        if (vector == R.drawable.mi_refresh) return R.drawable.icon3d_refresh;
+        if (vector == R.drawable.mi_contrast) return R.drawable.icon3d_theme;
+        return vector;
+    }
+
+    /** True for bitmap 3D icons, which must not be tinted. */
+    public static boolean isIcon3d(int res) {
+        if (res == R.drawable.visitor3d_assistant || res == R.drawable.visitor3d_customers
+                || res == R.drawable.visitor3d_prefactor || res == R.drawable.visitor3d_products
+                || res == R.drawable.visitor3d_receipt) return true;
+        // The emerald set is the nut theme's own 3D artwork. It is produced by chrome3d(),
+        // so it must be recognised as 3D as well - otherwise it would be tinted like a flat
+        // glyph and lose the colour of the skin it belongs to.
+        if (res == R.drawable.icon3d_emerald_account || res == R.drawable.icon3d_emerald_assistant
+                || res == R.drawable.icon3d_emerald_cash_in || res == R.drawable.icon3d_emerald_cash_out
+                || res == R.drawable.icon3d_emerald_cheque || res == R.drawable.icon3d_emerald_coin
+                || res == R.drawable.icon3d_emerald_customers || res == R.drawable.icon3d_emerald_dollar
+                || res == R.drawable.icon3d_emerald_dues || res == R.drawable.icon3d_emerald_gold
+                || res == R.drawable.icon3d_emerald_home || res == R.drawable.icon3d_emerald_inventory
+                || res == R.drawable.icon3d_emerald_light_tag || res == R.drawable.icon3d_emerald_more
+                || res == R.drawable.icon3d_emerald_products || res == R.drawable.icon3d_emerald_purchase
+                || res == R.drawable.icon3d_emerald_refresh || res == R.drawable.icon3d_emerald_reports
+                || res == R.drawable.icon3d_emerald_sales || res == R.drawable.icon3d_emerald_search
+                || res == R.drawable.icon3d_emerald_settings || res == R.drawable.icon3d_emerald_theme
+                || res == R.drawable.icon3d_emerald_zoom) return true;
+        if (res == R.drawable.icon3d_dark_bell || res == R.drawable.icon3d_medal_alert) return true;
+        if (res == R.drawable.icon3d_medal_account || res == R.drawable.icon3d_medal_refresh || res == R.drawable.icon3d_medal_theme || res == R.drawable.icon3d_medal_zoom || res == R.drawable.icon3d_medal_assistant || res == R.drawable.icon3d_medal_more || res == R.drawable.icon3d_medal_goldbar || res == R.drawable.icon3d_medal_dollar || res == R.drawable.icon3d_medal_coin) return true;
+        if (res == R.drawable.icon3d_medal_home || res == R.drawable.icon3d_medal_customers
+                || res == R.drawable.icon3d_medal_inventory || res == R.drawable.icon3d_medal_products
+                || res == R.drawable.icon3d_medal_reports || res == R.drawable.icon3d_medal_settings
+                || res == R.drawable.icon3d_medal_search || res == R.drawable.icon3d_medal_cheque
+                || res == R.drawable.icon3d_medal_dues) return true;
+        return res == R.drawable.icon3d_nut_theme || res == R.drawable.icon3d_production
+                || res == R.drawable.icon3d_closeout
+                || res == R.drawable.icon3d_treasury || res == R.drawable.icon3d_logistics
+                || res == R.drawable.icon3d_voice || res == R.drawable.icon3d_dark_roles
+                || res == R.drawable.icon3d_score || res == R.drawable.icon3d_profit
+                || res == R.drawable.icon3d_medal_sales || res == R.drawable.icon3d_medal_purchase
+                || res == R.drawable.icon3d_medal_cash_in || res == R.drawable.icon3d_medal_cash_out
+                || res == R.drawable.icon3d_sales || res == R.drawable.icon3d_purchase
+                || res == R.drawable.icon3d_cash_in || res == R.drawable.icon3d_cash_out
+                || res == R.drawable.icon3d_cheque || res == R.drawable.icon3d_inventory
+                || res == R.drawable.icon3d_customers || res == R.drawable.icon3d_reports
+                || res == R.drawable.icon3d_settings || res == R.drawable.icon3d_dollar
+                || res == R.drawable.icon3d_gold || res == R.drawable.icon3d_coin
+                || res == R.drawable.icon3d_home || res == R.drawable.icon3d_search
+                || res == R.drawable.icon3d_account || res == R.drawable.icon3d_refresh
+                || res == R.drawable.icon3d_theme || res == R.drawable.icon3d_products
+                || res == R.drawable.icon3d_assistant || res == R.drawable.icon3d_more
+                || res == R.drawable.icon3d_dues || res == R.drawable.icon3d_zoom
+                || res == R.drawable.icon3d_dark_dollar || res == R.drawable.icon3d_dark_gold
+                || res == R.drawable.icon3d_dark_search || res == R.drawable.icon3d_dark_refresh
+                || res == R.drawable.icon3d_dark_theme || res == R.drawable.icon3d_dark_zoom
+                || res == R.drawable.icon3d_dark_coin || res == R.drawable.icon3d_dark_sales
+                || res == R.drawable.icon3d_dark_purchase || res == R.drawable.icon3d_dark_customers
+                || res == R.drawable.icon3d_dark_home || res == R.drawable.icon3d_dark_settings
+                || res == R.drawable.icon3d_dark_assistant
+                || res == R.drawable.icon3d_dark_tag || res == R.drawable.icon3d_light_tag
+                || res == R.drawable.icon3d_dark_cash_in || res == R.drawable.icon3d_dark_cash_out || res == R.drawable.icon3d_dark_cheque || res == R.drawable.icon3d_dark_inventory || res == R.drawable.icon3d_dark_reports || res == R.drawable.icon3d_dark_account || res == R.drawable.icon3d_dark_products || res == R.drawable.icon3d_dark_more || res == R.drawable.icon3d_dark_dues
+                || res == R.drawable.icon3d_alert || res == R.drawable.icon3d_emerald_alert;
+    }
 
     /** 1.0 normal, 1.3 large-text mode (applied in Kit.text). */
     public static float fontScale() { return fontScale; }
@@ -139,16 +288,15 @@ public final class Theme {
             regular = Typeface.createFromAsset(c.getAssets(), "fonts/Vazirmatn-Regular.ttf");
             bold = Typeface.createFromAsset(c.getAssets(), "fonts/Vazirmatn-Bold.ttf");
         } catch (Exception ignored) {
-            // The platform sans family has a broader Arabic/Persian fallback chain than
-            // Typeface.DEFAULT on OEM builds where the bundled Vazirmatn asset is missing.
-            regular = systemTypeface(false);
-            bold = systemTypeface(true);
+            regular = Typeface.DEFAULT;
+            bold = Typeface.DEFAULT_BOLD;
         }
         apply(c);
     }
 
     /** Re-read theme settings and repaint the whole palette. Call before any render. */
     public static void apply(Context c) {
+        appCtx = c.getApplicationContext();
         Settings s = new Settings(c);
         String tm = s.themeMode();
         nuts = "nuts".equals(tm);
@@ -160,54 +308,62 @@ public final class Theme {
             if (s.bigFont()) zi = 3;
         } catch (Exception ignored) { Diag.ignored("Theme:154", ignored); }
         fontScale = zi == 0 ? 0.9f : zi == 2 ? 1.15f : zi == 3 ? 1.3f : 1f;
-
+        // Three fixed looks share two palette families: obsidian/gold and ivory/emerald;
+        // the nut-shop look adds its own surfaces and artwork to the ivory/emerald palette.
         if (light) {
-            BG = DesignTokens.APP_LIGHT_BG;
-            SURFACE = DesignTokens.APP_LIGHT_SURFACE;
-            SURFACE2 = DesignTokens.APP_LIGHT_SURFACE_2;
-            PRIMARY = nuts ? DesignTokens.EMERALD : DesignTokens.APP_LIGHT_ACCENT;
-            GOLD = nuts ? DesignTokens.GOLD : PRIMARY;
-            GOLD_SOFT = nuts ? DesignTokens.GOLD_DARK : PRIMARY;
-            TEXT = DesignTokens.APP_LIGHT_TEXT;
-            MUTED = DesignTokens.APP_LIGHT_MUTED;
-            BORDER = DesignTokens.APP_LIGHT_BORDER;
-            ACCENT_SOFT = nuts ? DesignTokens.PAPER : DesignTokens.APP_LIGHT_ACCENT_SOFT;
-            SUCCESS = DesignTokens.textSafeColor(DesignTokens.POSITIVE, SURFACE, false);
-            DANGER = DesignTokens.textSafeColor(DesignTokens.NEGATIVE, SURFACE, false);
-            WARNING = DesignTokens.textSafeColor(DesignTokens.WARNING, SURFACE, false);
-            INFO = DesignTokens.textSafeColor(DesignTokens.INFO, SURFACE, false);
-            VIOLET = DesignTokens.textSafeColor(DesignTokens.RETURNS, SURFACE, false);
-            STEEL = DesignTokens.APP_LIGHT_STEEL;
+            // «ایوری و زمرد»: ivory base, deep emerald accent, antique-gold ornaments.
+            // Both light and nut looks use this palette; nuts adds its separate visual treatment.
+            // Reference mockup: ivory silk, emerald panels, gold rims. Text pairs stay ≥4.5:1.
+            BG = 0xFFFBF6EA;
+            SURFACE = 0xFFFFFFFF;
+            SURFACE2 = 0xFFF4ECD6;
+            GOLD = 0xFF0F5B45;
+            GOLD_SOFT = 0xFF8A6418;
+            TEXT = 0xFF0E1F1A;
+            MUTED = 0xFF5B6B66;
+            SUCCESS = 0xFF15803D;
+            DANGER = 0xFFB3261E;
+            WARNING = 0xFF9A5B00;
+            INFO = 0xFF2D6A5A;
+            VIOLET = 0xFF8A6418;
+            STEEL = 0xFF546177;
         } else {
-            BG = DesignTokens.APP_DARK_BG;
-            SURFACE = DesignTokens.APP_DARK_SURFACE;
-            SURFACE2 = DesignTokens.APP_DARK_SURFACE_2;
-            PRIMARY = DesignTokens.APP_DARK_ACCENT;
-            GOLD = PRIMARY;
-            GOLD_SOFT = PRIMARY;
-            TEXT = DesignTokens.APP_DARK_TEXT;
-            MUTED = DesignTokens.APP_DARK_MUTED;
-            BORDER = DesignTokens.APP_DARK_BORDER;
-            ACCENT_SOFT = DesignTokens.APP_DARK_ACCENT_SOFT;
-            SUCCESS = DesignTokens.textSafeColor(DesignTokens.POSITIVE, SURFACE, true);
-            DANGER = DesignTokens.textSafeColor(DesignTokens.NEGATIVE, SURFACE, true);
-            WARNING = DesignTokens.textSafeColor(DesignTokens.WARNING, SURFACE, true);
-            INFO = DesignTokens.textSafeColor(DesignTokens.INFO, SURFACE, true);
-            VIOLET = DesignTokens.textSafeColor(DesignTokens.RETURNS, SURFACE, true);
-            STEEL = DesignTokens.APP_DARK_STEEL;
+            // «ابسیدین و طلا»: near-black obsidian surfaces, glass cards and a bright polished gold.
+            BG = 0xFF07090E;
+            SURFACE = 0xFF0E121A;
+            SURFACE2 = 0xFF161B26;
+            // Brighter, more luminous gold so every accent reads clearly on the obsidian surfaces.
+            GOLD = 0xFFFFD45C;
+            GOLD_SOFT = 0xFFFFEDB0;
+            TEXT = 0xFFFAF6EC;
+            MUTED = 0xFF9AA3B5;
+            SUCCESS = 0xFF34D399;
+            DANGER = 0xFFF87171;
+            WARNING = 0xFFFBBF24;
+            INFO = 0xFF60A5FA;
+            VIOLET = 0xFF9A7BFF;
+            STEEL = 0xFF7C8DA6;
         }
     }
 
-    /** Flat brand-paper / emerald-night backdrop; decoration stays in headers and empty states. */
+    /**
+     * Shared page backdrop for the licence and login screens. Dark: a cool platinum light
+     * falling onto graphite black. Light: a warm gold glow over the ivory pearl base.
+     */
     public static GradientDrawable backdrop() {
-        GradientDrawable d = new GradientDrawable();
-        d.setColor(BG);
-        return d;
+        if (nuts) {
+            // Nut theme: opaque ivory with a soft gold glow at the top (no dark window showing through).
+            return new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                    new int[]{0xFFF3E6BE, 0xFFF9F3E0, BG});
+        }
+        int glow = light ? (nuts ? alpha(0xFFC9A24A, 70) : alpha(GOLD, 52)) : alpha(GOLD, 40);
+        return new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{glow, BG});
     }
 
     /** Choose the foreground with the stronger contrast against an accent surface. */
     public static int onAccent(int background) {
-        return DesignTokens.accentTextColor(background);
+        return darkAccentInk(background) ? ACCENT_INK : ACCENT_PAPER;
     }
 
     /** Text color readable on the current accent. */
@@ -220,43 +376,18 @@ public final class Theme {
         return Color.luminance(background) >= 0.195f;
     }
 
+    /** Foreground for the selected navigation capsule (neutral in light mode). */
+    public static int selectedNavInk() {
+        return light ? GOLD : onAccent(GOLD);
+    }
+
     public static int dp(float v) {
         return Math.round(v * density);
     }
 
     public static Typeface face(boolean isBold) {
-        if (isBold) return bold == null ? systemTypeface(true) : bold;
-        return regular == null ? systemTypeface(false) : regular;
-    }
-
-    /** Use the bundled face when it covers the name; otherwise let Android's sans fallback draw it. */
-    public static Typeface faceForText(String text, boolean isBold) {
-        Typeface preferred = face(isBold);
-        if (text == null || text.isEmpty()) return preferred;
-        try {
-            Paint probe = new Paint();
-            probe.setTypeface(preferred);
-            // Check code points separately: a Persian word is several glyphs shaped as
-            // a run, so Paint.hasGlyph("علی") is not a valid whole-name coverage test.
-            for (int i = 0; i < text.length();) {
-                int cp = text.codePointAt(i);
-                i += Character.charCount(cp);
-                if (Character.isWhitespace(cp) || Character.isSpaceChar(cp)
-                        || Character.getType(cp) == Character.FORMAT) continue;
-                if (!probe.hasGlyph(new String(Character.toChars(cp)))) return systemTypeface(isBold);
-            }
-        } catch (Exception ignored) {
-            return systemTypeface(isBold);
-        }
-        return preferred;
-    }
-
-    private static Typeface systemTypeface(boolean isBold) {
-        try {
-            Typeface system = Typeface.create("sans-serif", isBold ? Typeface.BOLD : Typeface.NORMAL);
-            if (system != null) return system;
-        } catch (Exception ignored) { Diag.ignored("Theme:face", ignored); }
-        return isBold ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT;
+        if (isBold) return bold == null ? Typeface.DEFAULT_BOLD : bold;
+        return regular == null ? Typeface.DEFAULT : regular;
     }
 
     public static int alpha(int color, int a) {
@@ -291,12 +422,12 @@ public final class Theme {
     }
 
     public static int statusBar() {
-        return BG;
+        return light ? 0xFFFFFFFF : 0xFF0F172A;
     }
 
-    /** Match the system navigation area to the active flat palette surface. */
+    /** Navigation-bar color: champagne in light mode so the dark system keys stay visible. */
     public static int navBar() {
-        return BG;
+        return light ? 0xFFE4EEE9 : 0xFF07090E;
     }
 
     // ---------------- drawable factories ----------------
@@ -308,242 +439,243 @@ public final class Theme {
         return d;
     }
 
-    /** Cards stay in the same plane; borders and surfaces establish hierarchy. */
-    public static float cardElevation() { return 0f; }
+    /** Elevation for cards: deeper in dark mode, where the gold glow carries the depth. */
+    public static float cardElevation() {
+        return dp(light ? 4 : 10);
+    }
 
-    /** Compatibility hook for older builders; the approved visual system has no card shadows. */
+    /**
+     * Applies elevation and, on Android 9+, a tinted shadow: a soft black ambient shadow plus a
+     * faint gold spot-glow on dark, so raised cards read as lit objects rather than grey boxes.
+     */
     public static void lift(android.view.View v, float elevationPx) {
-        if (v != null) v.setElevation(0f);
+        v.setElevation(elevationPx);
+        if (android.os.Build.VERSION.SDK_INT >= 28) {
+            try {
+                v.setOutlineAmbientShadowColor(light ? 0x2A3A2A10 : 0xCC000000);
+                v.setOutlineSpotShadowColor(light ? 0x40103A30 : alpha(GOLD, 120));
+            } catch (Exception ignored) { Diag.ignored("Theme:lift", ignored); }
+        }
     }
 
-    /** Legacy glass API now returns a flat palette surface to avoid reintroducing gradients. */
+    /**
+     * Glass surface: a translucent body with a bright top sheen fading out and a fine gold
+     * edge. Used by every card, so the whole app shares one material.
+     */
     public static android.graphics.drawable.Drawable glass(int top, int bottom, float radiusDp, int edgeAlpha) {
-        return base(SURFACE, radiusDp, dp(1), BORDER);
+        GradientDrawable body = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{top, bottom});
+        body.setCornerRadius(dp(radiusDp));
+        body.setStroke(dp(1), alpha(GOLD, edgeAlpha));
+        GradientDrawable sheen = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{alpha(0xFFFFFFFF, light ? 150 : 22), 0x00FFFFFF});
+        sheen.setCornerRadius(dp(radiusDp));
+        return new android.graphics.drawable.LayerDrawable(
+                new android.graphics.drawable.Drawable[]{body, sheen});
     }
 
-    /** Flat screen surface. Nut mode keeps its crest but never tiles artwork behind content. */
+    /** Standard glass card: translucent navy (or ivory) body with a top sheen and gold edge. */
+    private static android.graphics.Bitmap paperGrain;
+
+    /**
+     * Screen background. Dark theme: the flat night colour. Light theme: ivory with a very
+     * faint, repeating linen grain (a few percent alpha), so large cream areas feel like
+     * paper instead of a flat digital fill. The grain tile is generated once and cached.
+     */
+    /** Screen background. Light skin adds soft gold light in the top-right and bottom-left corners. */
     public static android.graphics.drawable.Drawable background() {
-        return new android.graphics.drawable.ColorDrawable(BG);
+        android.graphics.drawable.Drawable base = backgroundBase();
+        if (!nuts || appCtx == null) return base;
+        try {
+            android.graphics.drawable.Drawable art = appCtx.getResources()
+                    .getDrawable(ir.meelano.manager.R.drawable.nut_bg);
+            return new android.graphics.drawable.LayerDrawable(
+                    new android.graphics.drawable.Drawable[]{base, art});
+        } catch (Exception e) {
+            return base;
+        }
+    }
+
+    private static android.graphics.drawable.Drawable backgroundBase() {
+        android.graphics.drawable.ColorDrawable base = new android.graphics.drawable.ColorDrawable(BG);
+        if (!light) {
+            // Obsidian screen with a soft gold light from the top-left corner, as in the reference.
+            try {
+                GradientDrawable glow = new GradientDrawable();
+                glow.setGradientType(GradientDrawable.RADIAL_GRADIENT);
+                glow.setColors(new int[]{alpha(GOLD, 34), alpha(GOLD, 0)});
+                glow.setGradientCenter(0.06f, 0.02f);
+                glow.setGradientRadius(dp(460));
+                return new android.graphics.drawable.LayerDrawable(
+                        new android.graphics.drawable.Drawable[]{base, glow});
+            } catch (Exception e) {
+                return base;
+            }
+        }
+        try {
+            if (paperGrain == null) {
+                int size = 96;
+                paperGrain = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888);
+                java.util.Random rnd = new java.util.Random(7);
+                for (int y = 0; y < size; y++)
+                    for (int x = 0; x < size; x++) {
+                        // Fine horizontal and vertical fibres, very low alpha.
+                        int fibre = ((x % 3 == 0) || (y % 4 == 0)) ? 5 : 0;
+                        int a = Math.min(9, fibre + rnd.nextInt(4));
+                        paperGrain.setPixel(x, y, (a << 24) | 0x5A4A2A);
+                    }
+            }
+            android.graphics.drawable.BitmapDrawable tile = new android.graphics.drawable.BitmapDrawable(
+                    null, paperGrain);
+            tile.setTileModeXY(android.graphics.Shader.TileMode.REPEAT, android.graphics.Shader.TileMode.REPEAT);
+            return new android.graphics.drawable.LayerDrawable(
+                    new android.graphics.drawable.Drawable[]{base, tile});
+        } catch (Exception e) {
+            return base;
+        }
     }
 
     public static android.graphics.drawable.Drawable card() {
-        return base(SURFACE, CARD_RADIUS_DP, dp(1), BORDER);
+        if (nuts) {
+            // Nut theme: near-solid cards so the nut artwork stays behind the content, not through it.
+            return glass(0xFFFFFFFF, 0xFFF9F3E0, 22, 230);
+        }
+        if (light) {
+            // Reference light cards: white panels with a clearer metallic gold edge.
+            return glass(0xFFFFFFFF, 0xFFFBF5E6, 22, 130);
+        }
+        return glass(alpha(SURFACE, 242), alpha(SURFACE, 214), 22, 92);
     }
 
-    /** Flat neutral section card; the icon and heading carry section identity. */
+    /** Card with an accent glow edge. */
     public static GradientDrawable cardAccent(int accent) {
-        return base(SURFACE, CARD_RADIUS_DP, dp(1), BORDER);
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{alpha(accent, light ? 30 : 46), alpha(accent, light ? 10 : 14), SURFACE});
+        d.setCornerRadius(dp(20));
+        d.setStroke(dp(1), alpha(accent, light ? 70 : 90));
+        return d;
     }
 
-    /** Dashboard surface tint levels are shared with contrast checks and muted-ink resolution. */
-    public static float dashboardCardTopTint() { return light ? 0.03f : 0.12f; }
-    public static float dashboardCardBottomTint() { return light ? 0.01f : 0.06f; }
-    public static float dashboardMetricTopTint() { return light ? 0.045f : 0.12f; }
-    public static float dashboardMetricBottomTint() { return light ? 0.018f : 0.055f; }
-
-    /**
-     * Quiet, softly tinted card used only by the home dashboard. Other screens keep the shared
-     * neutral card so the home refresh does not leak into the rest of the application.
-     */
-    public static GradientDrawable dashboardCard(int accent) {
-        int hue = accent == 0 ? PRIMARY : accent;
-        GradientDrawable card = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{DesignTokens.mix(SURFACE, hue, dashboardCardTopTint()),
-                        DesignTokens.mix(SURFACE, hue, dashboardCardBottomTint())});
-        card.setCornerRadius(dp(DASHBOARD_CARD_RADIUS_DP));
-        card.setStroke(dp(1), DesignTokens.mix(BORDER, hue, light ? 0.20f : 0.28f));
-        return card;
-    }
-
-    /** Restrained inset tile: accent stays in the icon and label instead of filling each card. */
-    public static GradientDrawable dashboardMetric(int accent) {
-        int hue = accent == 0 ? PRIMARY : accent;
-        GradientDrawable tile = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{DesignTokens.mix(SURFACE, hue, dashboardMetricTopTint()),
-                        DesignTokens.mix(SURFACE, hue, dashboardMetricBottomTint())});
-        tile.setCornerRadius(dp(DASHBOARD_METRIC_RADIUS_DP));
-        tile.setStroke(dp(1), DesignTokens.mix(BORDER, hue, light ? 0.32f : 0.40f));
-        return tile;
-    }
-
-    /** Small raised jewel plate for dashboard icons; foreground color is resolved separately. */
-    public static GradientDrawable dashboardBadge(int accent) {
-        int hue = accent == 0 ? PRIMARY : accent;
-        float topTint = light ? 0.23f : 0.42f;
-        float bottomTint = light ? 0.12f : 0.27f;
-        GradientDrawable badge = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{DesignTokens.mix(SURFACE, hue, topTint),
-                        DesignTokens.mix(SURFACE, hue, bottomTint)});
-        badge.setCornerRadius(dp(DASHBOARD_BADGE_RADIUS_DP));
-        badge.setStroke(dp(1), DesignTokens.mix(BORDER, hue, light ? 0.42f : 0.52f));
-        return badge;
-    }
-
-    /** Accent ink that remains legible on the dashboard's tinted icon plates and card surfaces. */
-    public static int dashboardAccentInk(int accent) {
-        int hue = accent == 0 ? PRIMARY : accent;
-        int referenceSurface = DesignTokens.mix(SURFACE, hue, light ? 0.23f : 0.42f);
-        return DesignTokens.textSafeColor(hue, referenceSurface, !light);
-    }
-
-    /** Secondary copy ink adjusted for the strongest part of an inset dashboard tile. */
-    public static int dashboardMutedInk(int accent) {
-        int hue = accent == 0 ? PRIMARY : accent;
-        int referenceSurface = DesignTokens.mix(SURFACE, hue, dashboardMetricTopTint());
-        return DesignTokens.textSafeColor(MUTED, referenceSurface, !light);
-    }
-
-    /** Semantic success/warning ink adjusted for the inset surface without changing its meaning. */
-    public static int dashboardSemanticInk(int accent, int preferred) {
-        int hue = accent == 0 ? PRIMARY : accent;
-        int referenceSurface = DesignTokens.mix(SURFACE, hue, dashboardMetricTopTint());
-        return DesignTokens.textSafeColor(preferred, referenceSurface, !light);
-    }
-
-    /** Secondary copy ink for labels placed directly on a home-card surface. */
-    public static int dashboardCardMutedInk(int accent) {
-        int hue = accent == 0 ? PRIMARY : accent;
-        int referenceSurface = DesignTokens.mix(SURFACE, hue, dashboardCardTopTint());
-        return DesignTokens.textSafeColor(MUTED, referenceSurface, !light);
-    }
-
-    /** Contrast-safe foreground for a compact, filled dashboard action. */
-    public static int dashboardActionInk(int accent) {
-        int hue = accent == 0 ? PRIMARY : accent;
-        double blackContrast = DesignTokens.contrastRatio(Color.BLACK, hue);
-        double whiteContrast = DesignTokens.contrastRatio(Color.WHITE, hue);
-        return blackContrast >= whiteContrast ? Color.BLACK : Color.WHITE;
-    }
-
-    /** Filled, lightly shaded action used by dashboard section headings only. */
-    public static GradientDrawable dashboardAction(int accent) {
-        int hue = accent == 0 ? PRIMARY : accent;
-        int ink = dashboardActionInk(hue);
-        int safeShade = ink == Color.BLACK ? Color.WHITE : Color.BLACK;
-        GradientDrawable action = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{hue, DesignTokens.mix(hue, safeShade, 0.035f)});
-        action.setCornerRadius(dp(12));
-        action.setStroke(dp(1), alpha(ink, 30));
-        return action;
-    }
-
-    /** Deep emerald welcome panel with a restrained champagne edge; home-only by design. */
-    public static GradientDrawable dashboardWelcome() {
-        int deep = DesignTokens.EMERALD_DEEP;
-        int royal = DesignTokens.mix(DesignTokens.EMERALD, PRIMARY, nuts ? 0.12f : 0.08f);
-        GradientDrawable welcome = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{royal, DesignTokens.EMERALD, deep});
-        welcome.setCornerRadius(dp(20));
-        welcome.setStroke(dp(1), alpha(DesignTokens.GOLD, nuts ? 188 : 112));
-        return welcome;
-    }
-
-    /** Readable text and secondary ink for the deep emerald dashboard welcome panel. */
-    public static int dashboardWelcomeText() {
-        return DesignTokens.accentTextColor(DesignTokens.EMERALD_DEEP);
-    }
-
-    public static int dashboardWelcomeMuted() {
-        return DesignTokens.mix(dashboardWelcomeText(), DesignTokens.GOLD_LIGHT, 0.17f);
-    }
-
-    /** Stable section hue derived from its title; semantic outcomes use separate tokens. */
-    public static int sectionAccent(String title) {
-        return DesignTokens.sectionAccent(title);
-    }
-
-    /** Text-safe companion for a section accent. */
-    public static int sectionText(int accent) {
-        if (accent == SUCCESS || accent == DANGER || accent == WARNING || accent == INFO)
-            return DesignTokens.textSafeColor(accent, SURFACE, !light);
-        int foreground = nuts ? (accent == DesignTokens.GOLD ? DesignTokens.GOLD_DARK : PRIMARY) : PRIMARY;
-        return DesignTokens.textSafeColor(foreground, SURFACE, !light);
-    }
-
-    /** Theme-aligned accent surface for small icons and chips. */
-    public static int sectionTint(int accent) {
-        return ACCENT_SOFT;
-    }
-
-    /** One-pixel neutral divider; semantic color remains in the icon or label. */
-    public static GradientDrawable accentHairline(int accent) {
-        GradientDrawable rule = new GradientDrawable();
-        rule.setColor(BORDER);
-        return rule;
-    }
-
-    /** Shared, flat hero surface with a quiet section tint and a fine matching edge. */
+    /** Hero header background. */
     public static GradientDrawable hero(int accent) {
-        int hue = accent == 0 ? PRIMARY : accent;
-        return base(DesignTokens.heroSurface(hue, !light), 18, dp(1),
-                DesignTokens.heroBorder(hue, !light));
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TR_BL,
+                new int[]{alpha(accent, light ? 44 : 70), alpha(accent, light ? 16 : 22), alpha(SURFACE, 255)});
+        d.setCornerRadius(dp(24));
+        d.setStroke(dp(1), alpha(accent, light ? 90 : 110));
+        return d;
     }
 
-    /** Welcome header uses the same calm surface and border as the rest of the shell. */
+    /** Executive dashboard hero: layered midnight/champagne glass with a quiet metallic edge. */
     public static android.graphics.drawable.Drawable executiveHero() {
-        return base(SURFACE, 16, dp(1), BORDER);
+        int accent = GOLD;
+        if (light) {
+            // Champagne-gold hero: a clearly golden sheen fading into ivory, with a brighter bronze rim.
+            // Reference header: ivory card with a bright gold frame, fading to champagne.
+            return glass(0xFFFFFFFF, 0xFFF4E7C8, 28, 220);
+        }
+        // Obsidian hero with a soft gold light falling from the top-left corner.
+        return glass(alpha(accent, 44), alpha(SURFACE, 250), 28, 150);
     }
 
-    /** Accent shared by the dock; the preserved Nuts skin keeps its gold identity. */
-    public static int bottomNavAccent() { return nuts ? GOLD_DARK : PRIMARY; }
-
-    /** Contrast-safe foreground for the active dock item on its exact tinted surface. */
-    public static int selectedNavInk() {
-        return DesignTokens.textSafeColor(bottomNavAccent(), ACCENT_SOFT, !light);
-    }
-
-    /** Selected destination: a quiet, flat surface behind the active item. */
+    /** Selected destination on the premium bottom navigation rail. */
     public static GradientDrawable bottomNavSelected() {
-        return base(ACCENT_SOFT, 10, 0, 0);
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{alpha(GOLD, light ? 70 : 28), alpha(GOLD, light ? 40 : 12)});
+        d.setCornerRadius(dp(20));
+        d.setStroke(dp(1), alpha(GOLD, light ? 170 : 90));
+        return d;
     }
 
-    /** Quiet active icon capsule; the icon itself uses the contrast-safe dock foreground. */
+    /** Active icon capsule in the bottom navigation. */
     public static GradientDrawable bottomNavIconSelected() {
-        return base(ACCENT_SOFT, 10, 0, 0);
+        // Ivory Royal uses a neutral champagne capsule with the accent itself as
+        // the foreground; Midnight Gold uses a luminous accent capsule and ink.
+        // Three-stop gold: champagne highlight → accent → deep shade, with a bright rim.
+        int[] colors = light
+                ? new int[]{shade(SURFACE2, 0.05f), SURFACE2, shade(SURFACE2, -0.03f)}
+                : new int[]{shade(GOLD, 0.22f), GOLD, shade(GOLD, -0.2f)};
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR, colors);
+        d.setCornerRadius(dp(22));
+        d.setStroke(dp(1), alpha(0xFFFFFFFF, light ? 110 : 120));
+        return d;
     }
 
-    /** Small, solid accent marker under the selected bottom-nav label. */
+    /** Small active marker under each bottom-nav label. */
     public static GradientDrawable bottomNavMarker() {
-        return base(bottomNavAccent(), 999, 0, 0);
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{shade(GOLD, -0.08f), GOLD, shade(GOLD, 0.20f)});
+        d.setCornerRadius(dp(99));
+        return d;
     }
 
-    /** Flat neutral KPI surface with a one-pixel border. */
+    /** KPI tile background. */
     public static GradientDrawable kpi(int accent) {
-        return base(SURFACE, CARD_RADIUS_DP, dp(1), BORDER);
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                light ? new int[]{alpha(accent, 34), alpha(SURFACE, 255)}
+                        : new int[]{alpha(accent, 44), alpha(SURFACE, 255), shade(SURFACE, -0.06f)});
+        d.setCornerRadius(dp(20));
+        d.setStroke(dp(1), alpha(accent, light ? 70 : 84));
+        return d;
     }
 
-
-    /** Legacy primary-button factory; resolves to a solid accent fill. */
+    /** Primary button gradient, toned toward a high-contrast ink/paper foreground. */
     public static GradientDrawable goldButton() {
-        return base(GOLD, 10, 0, 0);
+        boolean darkInk = darkAccentInk(GOLD);
+        float direction = darkInk ? 1f : -1f;
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{shade(GOLD, direction * 0.14f),
+                        shade(GOLD, direction * 0.02f),
+                        shade(GOLD, direction * -0.08f)});
+        d.setCornerRadius(dp(18));
+        d.setStroke(dp(1), alpha(ACCENT_PAPER, 110));
+        return d;
     }
 
-    /** Existing expense-category accent; primary CTAs use the approved emerald/champagne palette. */
-    public static final int ROSE = DesignTokens.ROSE;
+    /** Controlled rose-gold for the primary start CTA (v34). */
+    public static final int ROSE = 0xFFC2527E;
 
-    /** Solid primary action; the foreground is chosen separately for sufficient contrast. */
+    /** Primary start button: gold-to-rose sheen, both stops matched to the active ink. */
     public static GradientDrawable startButton() {
-        return base(nuts ? DesignTokens.EMERALD : PRIMARY, 10, 0, 0);
+        if (nuts) {
+            // Nut theme: emerald to antique gold, the same as the main action buttons (no rose).
+            GradientDrawable n = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                    new int[]{0xFF1F6F55, 0xFF0B5C44, 0xFF9C7A1A});
+            n.setCornerRadius(dp(18));
+            n.setStroke(dp(1), alpha(ACCENT_PAPER, 110));
+            return n;
+        }
+        boolean darkInk = darkAccentInk(GOLD);
+        int gold = shade(GOLD, darkInk ? 0.04f : -0.08f);
+        int rose = shade(ROSE, darkInk ? 0.22f : -0.18f);
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{shade(gold, 0.10f), gold, rose});
+        d.setCornerRadius(dp(18));
+        d.setStroke(dp(1), alpha(ACCENT_PAPER, 110));
+        return d;
     }
 
-    /** Flat field surface with a visible focus border. */
+    /** Luxury field background with a real focus ring (v34). */
     public static android.graphics.drawable.StateListDrawable fieldBg() {
-        GradientDrawable normal = base(SURFACE, 10, dp(1), BORDER);
-        GradientDrawable focused = base(SURFACE, 10, dp(2), PRIMARY);
-        android.graphics.drawable.StateListDrawable states = new android.graphics.drawable.StateListDrawable();
-        states.addState(new int[]{android.R.attr.state_focused}, focused);
-        states.addState(new int[]{}, normal);
-        return states;
+        GradientDrawable normal = base(SURFACE2, 16, dp(1), alpha(GOLD, light ? 70 : 46));
+        GradientDrawable focused = base(SURFACE2, 16, dp(2), GOLD);
+        android.graphics.drawable.StateListDrawable s = new android.graphics.drawable.StateListDrawable();
+        s.addState(new int[]{android.R.attr.state_focused}, focused);
+        s.addState(new int[]{}, normal);
+        return s;
     }
 
     /** Field background in the error state (v34). */
     public static GradientDrawable fieldBgError() {
-        return base(SURFACE, 10, dp(2), DANGER);
+        return base(SURFACE2, 16, dp(2), DANGER);
     }
 
-    /** Flat back button used across screens, with a neutral border. */
+    /** The one back button used on every screen: accent-gradient capsule with a light rim. */
     public static GradientDrawable backPill() {
-        return base(SURFACE, 10, dp(1), BORDER);
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{shade(GOLD, 0.08f), GOLD, shade(GOLD, -0.22f)});
+        d.setCornerRadius(dp(30));
+        d.setStroke(dp(1), alpha(0xFFFFFFFF, light ? 150 : 90));
+        return d;
     }
 
     /**
@@ -565,96 +697,138 @@ public final class Theme {
     }
 
     public static GradientDrawable ghostButton(int accent) {
-        return base(SURFACE, 10, dp(1), BORDER);
+        return base(alpha(accent, light ? 18 : 26), 16, dp(1), alpha(accent, light ? 130 : 110));
     }
 
     public static GradientDrawable chip(boolean selected, int accent) {
-        if (selected) return base(accent, 9, 0, 0);
-        return base(SURFACE, 9, dp(1), BORDER);
+        if (selected) {
+            float relief = darkAccentInk(accent) ? 0.08f : -0.08f;
+            GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
+                    new int[]{accent, shade(accent, relief)});
+            d.setCornerRadius(dp(999));
+            d.setStroke(dp(1), alpha(onAccent(accent), 86));
+            return d;
+        }
+        return base(alpha(SURFACE2, 255), 999, dp(1), alpha(accent, 70));
     }
 
     public static GradientDrawable pill(int color) {
-        return base(alpha(color, light ? 18 : 30), 8, 0, 0);
+        return base(alpha(color, light ? 22 : 30), 999, dp(1), alpha(color, 120));
     }
 
     public static GradientDrawable searchBar() {
-        return base(SURFACE, 12, dp(1), BORDER);
+        return base(SURFACE2, 16, dp(1), alpha(GOLD, light ? 70 : 46));
     }
 
     /** Semi-transparent glyph capsule for secondary icons. */
     public static GradientDrawable avatar(int color) {
-        return base(color, 12, 0, 0);
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{color, alpha(color, 140)});
+        d.setCornerRadius(dp(999));
+        d.setStroke(dp(1), alpha(color, light ? 110 : 90));
+        return d;
     }
 
-    /** Opaque, flat accent tile for a selected mark or compact status. */
+    /** Opaque accent capsule with both gradient stops matched to its foreground. */
     public static GradientDrawable accentAvatar(int accent) {
-        return base(accent, 10, 0, 0);
+        float relief = darkAccentInk(accent) ? 0.08f : -0.08f;
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{accent, shade(accent, relief)});
+        d.setCornerRadius(dp(999));
+        d.setStroke(dp(1), alpha(onAccent(accent), 86));
+        return d;
     }
 
-    /** Header and page share one full-width surface so the top chrome does not look inset. */
+    /** Header tool row: solid ivory panel in light mode so labels read over the artwork. */
     public static android.graphics.drawable.Drawable toolbarPanel() {
-        return new android.graphics.drawable.ColorDrawable(BG);
+        if (!light) return ghostButton(GOLD);
+        GradientDrawable d = new GradientDrawable();
+        d.setCornerRadius(dp(18));
+        d.setColor(0xF2FFFFFF);
+        d.setStroke(dp(1), alpha(GOLD, 110));
+        return d;
     }
 
-    /** Compatibility factory for the shared flat dock surface. */
+    /** Nut theme: a floating ivory dock with a gold hairline, like the reference bottom bar. */
     public static GradientDrawable navDock() {
-        return base(SURFACE, 0, 0, 0);
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{0xFFFFFFFF, 0xFFF4ECD6});
+        d.setCornerRadius(dp(28));
+        d.setStroke(dp(1), 0xFFC9A24A);
+        return d;
     }
 
-    /** Flat app dock surface, continuous with the screen background. */
     public static GradientDrawable bottomBar() {
-        return base(BG, 0, 0, 0);
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                light ? new int[]{0xFFFFFFFF, 0xFFF4ECD6} : new int[]{0xFF0E121A, 0xFF07090E});
+        // Rounded top edge with a gold hairline: the bar reads as a floating luxury dock.
+        float r = dp(22);
+        d.setCornerRadii(new float[]{r, r, r, r, 0, 0, 0, 0});
+        d.setStroke(dp(1), alpha(GOLD, light ? 140 : 120));
+        return d;
     }
 
     public static GradientDrawable dialogBg() {
-        return base(SURFACE, 18, dp(1), BORDER);
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{shade(SURFACE, light ? 0.02f : 0.08f), SURFACE});
+        d.setCornerRadius(dp(26));
+        d.setStroke(dp(1), alpha(GOLD, 90));
+        return d;
     }
 
-    /** Flat panel surface retained for the selectable Nuts theme. */
+    /** Nut theme: ivory panel framed in gold, the frame of every data table. */
     public static GradientDrawable nutPanel() {
-        return base(SURFACE, 14, dp(1), BORDER);
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{0xFFFFFFFF, 0xFFF7F0DC});
+        d.setCornerRadius(dp(20));
+        d.setStroke(dp(1), 0xFFC9A24A);
+        return d;
     }
 
-    /** Neutral table-header surface used by the Nuts theme. */
+    /** Nut theme: deep emerald header band with a gold hairline, like the dashboard banner. */
     public static GradientDrawable nutTableHeader() {
-        return base(SURFACE2, 8, dp(1), BORDER);
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{0xFF0A3B2E, 0xFF17684F, 0xFF0A3B2E});
+        d.setCornerRadius(dp(14));
+        d.setStroke(dp(1), alpha(0xFFC9A24A, 170));
+        return d;
     }
 
     public static GradientDrawable tableHeader() {
-        return base(SURFACE2, 8, dp(1), BORDER);
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{alpha(GOLD, light ? 90 : 60), alpha(GOLD, light ? 40 : 26)});
+        d.setCornerRadius(dp(12));
+        return d;
     }
 
     /** Color-dot swatch for the theme picker. */
     public static GradientDrawable swatch(int color, boolean selected) {
-        return base(color, 10, selected ? dp(2) : 0, selected ? TEXT : Color.TRANSPARENT);
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{color, shade(color, -0.22f)});
+        d.setCornerRadius(dp(999));
+        if (selected) d.setStroke(dp(3), TEXT);
+        return d;
     }
 
-    /** Listener returns false so framework click/keyboard/TalkBack actions remain untouched. */
-    @android.annotation.SuppressLint("ClickableViewAccessibility")
     public static void pressable(View v) {
         v.setClickable(true);
         v.setFocusable(true);
         // Micro-interaction: a soft press-in, a spring back, and a light haptic tick on release.
-        // Read the system animation scale once per gesture (ACTION_DOWN), not on every MOVE.
         // Returns false so clicks and scrolling behave exactly as before.
         try {
-            final boolean[] gestureMotion = {true};
             v.setOnTouchListener((view, ev) -> {
+                boolean motion = Ui.motionOk(view.getContext());
                 switch (ev.getActionMasked()) {
                     case android.view.MotionEvent.ACTION_DOWN:
-                        gestureMotion[0] = Ui.motionOk(view.getContext());
-                        if (gestureMotion[0])
-                            view.animate().scaleX(0.975f).scaleY(0.975f).setDuration(110).start();
+                        if (motion) view.animate().scaleX(0.975f).scaleY(0.975f).setDuration(110).start();
                         break;
                     case android.view.MotionEvent.ACTION_UP:
-                        if (gestureMotion[0])
-                            view.animate().scaleX(1f).scaleY(1f).setDuration(180)
-                                    .setInterpolator(new android.view.animation.DecelerateInterpolator()).start();
+                        if (motion) view.animate().scaleX(1f).scaleY(1f).setDuration(260)
+                                .setInterpolator(new android.view.animation.OvershootInterpolator(1.3f)).start();
                         view.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP);
                         break;
                     case android.view.MotionEvent.ACTION_CANCEL:
-                        if (gestureMotion[0])
-                            view.animate().scaleX(1f).scaleY(1f).setDuration(120).start();
+                        if (motion) view.animate().scaleX(1f).scaleY(1f).setDuration(160).start();
                         break;
                     default:
                         break;

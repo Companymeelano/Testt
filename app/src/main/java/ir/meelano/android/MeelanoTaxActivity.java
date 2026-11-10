@@ -284,7 +284,7 @@ public class MeelanoTaxActivity extends Activity {
     }
 
     private String[] dbConfig() {
-        String[] d = MainActivity.defaultDbConfig();
+        String[] d = MainActivity.defaultDbConfig(this);
         String host = prefs.getString("db_host", "").trim();
         String port = prefs.getString("db_port", "").trim();
         String name = prefs.getString("db_name", "").trim();
@@ -2768,7 +2768,7 @@ public class MeelanoTaxActivity extends Activity {
 
     private View dbSettingsForm(Runnable afterSave) {
         LinearLayout page = ui.page();
-        String[] d = MainActivity.defaultDbConfig();
+        String[] d = MainActivity.defaultDbConfig(this);
         LinearLayout c = ui.card();
         c.addView(ui.caption("خالی گذاشتن هر مورد = مقدار پیش‌فرض برنامه‌های پخش درخشان (" + d[0] + ":" + d[1] + " / " + d[2] + ")."));
         EditText host = ui.ltrInput(d[0], prefs.getString("db_host", ""), InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);

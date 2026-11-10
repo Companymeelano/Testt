@@ -282,8 +282,8 @@ public final class VisitorDeskScreen extends Screen {
     private View visitorErrorCard(String title,String error,Runnable retry){
         LinearLayout card=a.kit.card(Theme.SECTION_ALERT);
         LinearLayout head=a.kit.h();head.setGravity(Gravity.CENTER_VERTICAL);
-        head.addView(a.kit.iconBadge(R.drawable.mi_wifi_off,Theme.SECTION_ALERT,40),
-                new LinearLayout.LayoutParams(Theme.dp(40),Theme.dp(40)));
+        ImageView art=new ImageView(a);art.setImageResource(R.drawable.icon3d_dark_plug);art.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        head.addView(art,new LinearLayout.LayoutParams(Theme.dp(48),Theme.dp(48)));
         head.addView(a.kit.space(9));
         LinearLayout copy=a.kit.v();
         copy.addView(a.kit.text(title,14.5f,Theme.TEXT,true),a.kit.lp(-1,-2));

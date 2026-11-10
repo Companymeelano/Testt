@@ -165,6 +165,30 @@ jobs:
           echo "Could not publish verified APKs to the session branch after five attempts." >&2
           exit 1
 
+      - name: Surface the Gradle failure tail as a check annotation
+        if: failure()
+        run: |
+          [ -f build-full.log ] || exit 0
+          python3 - <<'PY' > "$RUNNER_TEMP/gradle-tail.txt"
+          from pathlib import Path
+          text = Path('build-full.log').read_text(errors='replace')
+          start = max(text.rfind('FAILURE:'), text.rfind('* What went wrong:'))
+          if start < 0:
+              start = max(0, len(text) - 6000)
+          print(text[start:start + 6000])
+          PY
+          summary=$(cat "$RUNNER_TEMP/gradle-tail.txt")
+          summary=${summary//'%'/'%25'}
+          summary=${summary//$'\r'/'%0D'}
+          summary=${summary//$'\n'/'%0A'}
+          echo "::error title=Gradle failure tail::$summary"
+          {
+            echo '### Gradle failure tail'
+            echo '```text'
+            cat "$RUNNER_TEMP/gradle-tail.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload the full build log on failure (any branch)
         if: failure()
         uses: actions/upload-artifact@v4

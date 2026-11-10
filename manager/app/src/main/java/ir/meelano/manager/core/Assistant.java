@@ -4,6 +4,7 @@ import ir.meelano.manager.data.Meta;
 import ir.meelano.manager.data.Repo;
 import ir.meelano.manager.data.Row;
 
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -14,11 +15,12 @@ import java.util.Map;
 /**
  * «دستیار میلانو»: a data-grounded manager assistant.
  *
- * It never sends shop data to a third party. Every answer is built from a live
+ * Rule-based answers are built on-device from a predefined, read-only live
  * snapshot of the store database (sales, purchases, receipts, payments, cheques,
- * debtors, overdue invoices, stock, visitors), using the same queries as the
- * home dashboard. Each part of the snapshot loads independently, so a missing
- * table only removes that part of the answer instead of failing the whole one.
+ * debtors, overdue invoices, stock, visitors). When online AI is explicitly enabled,
+ * AssistantScreen sends only the selected tool/report facts needed for that turn,
+ * not this entire snapshot. Each part loads independently, and failed sections are
+ * recorded rather than treated as confirmed zero values.
  */
 public final class Assistant {
     private Assistant() { }
@@ -81,7 +83,24 @@ public final class Assistant {
             vf.applyPreset();
             return Repo.exec(c, MasterQueries.visitorsPerf(m, vf));
         });
+        markInvalidAmounts(s.notes, "فروش امروز", s.salesToday);
+        markInvalidAmounts(s.notes, "فروش دیروز", s.salesYesterday);
+        markInvalidAmounts(s.notes, "خرید امروز", s.buyToday);
+        if (s.salesDaily != null) for (Row row : s.salesDaily) {
+            Long invalidRows = row == null ? null : row.exactLong("invalidRows");
+            if (row == null || invalidRows == null || invalidRows > 0) {
+                s.notes.put("روند فروش", "در یک یا چند ردیف مقدار فروش ناقص یا نامعتبر است");
+                break;
+            }
+        }
         return s;
+    }
+
+    private static void markInvalidAmounts(Map<String, String> notes, String label, Row row) {
+        Long invalidRows = row == null ? null : row.exactLong("invalidRows");
+        if (invalidRows == null || invalidRows > 0) {
+            notes.put(label, "مبلغ در یک یا چند ردیف ناقص یا قابل‌خواندن نیست");
+        }
     }
 
     private static <T> T soft(Map<String, String> notes, String label, T def, Get<T> g) {
@@ -105,6 +124,7 @@ public final class Assistant {
         if (has(q, "راهنما", "کمک", "چیکار", "چه کار", "چی بپرس", "چه سوالی", "راهنمایی")) {
             return help();
         }
+        if (s == null) return "دادهٔ کسب‌وکار اکنون در دسترس نیست؛ عددی را صفر فرض نمی‌کنم. اتصال را بررسی و دوباره تلاش کنید.";
         if (has(q, "پیشنهاد", "چه کنم", "اقدام", "مدیر")) {
             return joinSuggestions(suggestions(s), "پیشنهاد اقدام امروز");
         }
@@ -122,17 +142,21 @@ public final class Assistant {
         } else if (has(q, "ویزیتور", "ویزیت", "بازاریاب")) {
             b.append(visitorText(s));
         } else if (has(q, "خرید")) {
-            b.append("خرید امروز: ").append(money(s.buyToday.d("total")));
+            if (unavailable(s, "خرید امروز") || !hasMoney(s.buyToday, "total")) b.append(unavailableText("خرید امروز"));
+            else b.append("خرید امروز: ").append(moneyField(s.buyToday, "total"));
         } else if (has(q, "پرداخت")) {
-            b.append("پرداخت امروز: ").append(money(s.outToday.d("total")))
-                    .append("\nچک پرداختی تا ۳ روز آینده: ").append(count(s.dueOut.size()))
-                    .append(" مورد (").append(money(sumAmount(s.dueOut))).append(")");
+            if (unavailable(s, "پرداخت امروز") || !hasMoney(s.outToday, "total")) b.append(unavailableText("پرداخت امروز"));
+            else b.append("پرداخت امروز: ").append(moneyField(s.outToday, "total"));
+            if (unavailable(s, "چک پرداختی")) b.append("\nچک پرداختی تا ۳ روز آینده: داده در دسترس نیست");
+            else b.append("\nچک پرداختی تا ۳ روز آینده: ").append(count(s.dueOut.size()))
+                    .append(" مورد (").append(sumAmountOrUnavailable(s.dueOut)).append(")");
         } else if (has(q, "دریافت", "وصولی", "نقد")) {
-            b.append("دریافت امروز: ").append(money(s.inToday.d("total")))
-                    .append("\n• نقد: ").append(money(s.inToday.d("cash")))
-                    .append("\n• چک: ").append(money(s.inToday.d("cheque")))
-                    .append("\n• پوز: ").append(money(s.inToday.d("pos")))
-                    .append("\n• حواله: ").append(money(s.inToday.d("havaleh")));
+            if (unavailable(s, "دریافت امروز") || !hasMoney(s.inToday, "total")) b.append(unavailableText("دریافت امروز"));
+            else b.append("دریافت امروز: ").append(moneyField(s.inToday, "total"))
+                    .append("\n• نقد: ").append(valueOrUnavailable(s.inToday, "cash"))
+                    .append("\n• چک: ").append(valueOrUnavailable(s.inToday, "cheque"))
+                    .append("\n• پوز: ").append(valueOrUnavailable(s.inToday, "pos"))
+                    .append("\n• حواله: ").append(valueOrUnavailable(s.inToday, "havaleh"));
         } else if (has(q, "فروش", "فاکتور")) {
             b.append(salesText(s));
         } else if (has(q, "سود", "حاشیه")) {
@@ -140,118 +164,234 @@ public final class Assistant {
         } else {
             return "متوجه نشدم منظورتان چیست.\n\n" + help();
         }
-        if (!s.notes.isEmpty()) {
+        if (s.notes != null && !s.notes.isEmpty()) {
             b.append("\n\n⚠ بعضی اطلاعات در دسترس نبود: ").append(join(s.notes.keySet()));
+        } else if (hasMissingFields(s)) {
+            b.append("\n\n⚠ بعضی فیلدهای منبع موجود نیست؛ آن‌ها صفر یا نتیجهٔ قطعی فرض نشده‌اند.");
         }
         return b.toString();
     }
 
-    /** Short proactive list, most urgent first. */
+    /** True when a section failed to load; callers must not interpret its default row as zero. */
+    public static boolean unavailable(Snap s, String label) {
+        return s == null || s.notes != null && s.notes.containsKey(label);
+    }
+
+    private static String unavailableText(String label) {
+        return label + ": داده در دسترس نیست؛ مقدار صفر فرض نمی‌شود.";
+    }
+
+    static boolean hasMoney(Row row, String key) {
+        BigDecimal amount = row == null ? null : row.bd(key);
+        return amount != null && Double.isFinite(amount.doubleValue());
+    }
+
+    static boolean hasCount(Row row, String key) {
+        return row != null && row.exactLong(key) != null;
+    }
+
+    static String moneyField(Row row, String key) {
+        BigDecimal amount = row == null ? null : row.bd(key);
+        if (amount == null || !Double.isFinite(amount.doubleValue())) return "داده در دسترس نیست";
+        return money(amount.doubleValue());
+    }
+
+    static String countField(Row row, String key) {
+        Long value = row == null ? null : row.exactLong(key);
+        return value == null ? "داده در دسترس نیست" : count(value);
+    }
+
+    private static String valueOrUnavailable(Row row, String key) {
+        return moneyField(row, key);
+    }
+
+    private static String countOrUnavailable(Row row, String key) {
+        return countField(row, key);
+    }
+
+    private static String moneyOrUnavailable(Row row, String key) {
+        return moneyField(row, key);
+    }
+
+    /** Short proactive list, most urgent first; failed sections are never treated as empty. */
     public static List<String> suggestions(Snap s) {
         List<String> out = new ArrayList<>();
-        if (!s.overdue.isEmpty()) {
-            out.add("امروز با " + count(s.overdue.size()) + " فاکتور معوق (" + money(sumAmount(s.overdue))
-                    + ") تماس بگیرید؛ بیشترین مبلغ مربوط به «" + s.overdue.get(0).s("party") + "» است.");
+        if (s == null) {
+            out.add("دادهٔ کسب‌وکار در دسترس نیست؛ پیشنهاد عددی ارائه نمی‌شود.");
+            return out;
         }
-        if (!s.debtors.isEmpty()) {
+        if (!unavailable(s, "معوق‌ها") && !s.overdue.isEmpty()) {
+            String party = s.overdue.get(0).s("party");
+            if (party.isEmpty()) party = "نام در گزارش موجود نیست";
+            out.add("امروز با " + count(s.overdue.size()) + " فاکتور معوق (" + sumAmountOrUnavailable(s.overdue)
+                    + ") پیگیری کنید؛ اولویت نخست: «" + party + "».");
+        }
+        if (!unavailable(s, "بدهکاران") && !s.debtors.isEmpty()) {
             Row t = s.debtors.get(0);
-            out.add("بیشترین بدهکار «" + t.s("party") + "» با مانده " + money(t.d("amount"))
+            String party = t.s("party");
+            if (party.isEmpty()) party = "نام در گزارش موجود نیست";
+            out.add("بیشترین بدهکارِ گزارش «" + party + "» با مانده " + moneyOrUnavailable(t, "amount")
                     + " است؛ برای وصول، پیگیری یا قرار پرداخت اقدام کنید.");
         }
-        if (!s.dueIn.isEmpty()) {
-            out.add("تا ۳ روز آینده " + count(s.dueIn.size()) + " چک دریافتی سررسید دارد (" + money(sumAmount(s.dueIn))
+        if (!unavailable(s, "چک دریافتی") && !s.dueIn.isEmpty()) {
+            out.add("تا ۳ روز آینده " + count(s.dueIn.size()) + " چک دریافتی سررسید دارد (" + sumAmountOrUnavailable(s.dueIn)
                     + "). پیش از سررسید حساب بانکی را بررسی کنید.");
         }
-        if (!s.dueOut.isEmpty()) {
-            out.add("تا ۳ روز آینده " + count(s.dueOut.size()) + " چک پرداختی دارید (" + money(sumAmount(s.dueOut))
+        if (!unavailable(s, "چک پرداختی") && !s.dueOut.isEmpty()) {
+            out.add("تا ۳ روز آینده " + count(s.dueOut.size()) + " چک پرداختی دارید (" + sumAmountOrUnavailable(s.dueOut)
                     + "). موجودی کافی را تأیید کنید.");
         }
-        long out0 = s.prod.l("out"), low = s.prod.l("low");
-        if (out0 > 0 || low > 0) {
-            out.add("کالاهای ناموجود: " + count(out0) + "، کم‌موجود: " + count(low)
-                    + ". برای کالاهای پرفروش سفارش خرید ثبت کنید.");
+        if (!unavailable(s, "کالاها") && hasCount(s.prod, "out") && hasCount(s.prod, "low")) {
+            long out0 = s.prod.exactLong("out"), low = s.prod.exactLong("low");
+            if (out0 > 0 || low > 0) {
+                out.add("کالاهای ناموجود: " + count(out0) + "، کم‌موجود: " + count(low)
+                        + ". برای کالاهای پرفروش سفارش خرید ثبت کنید.");
+            }
         }
         if (s.pendingSync > 0) {
             out.add(count(s.pendingSync) + " سند انبار هنوز همگام‌سازی نشده است؛ اتصال به سرور را بررسی کنید.");
         }
-        double today = s.salesToday.d("total");
-        double avg = averageLastWeek(s);
-        if (avg > 0 && today < avg * 0.5 && java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) >= 14) {
-            out.add("فروش امروز کمتر از نصف میانگین ۷ روز گذشته است (" + money(avg)
-                    + "). کمپین تخفیف یا پیگیری مشتریان غیرفعال را در نظر بگیرید.");
+        if (!unavailable(s, "فروش امروز") && hasMoney(s.salesToday, "total") && !unavailable(s, "روند فروش")) {
+            double today = s.salesToday.bd("total").doubleValue();
+            double avg = averageLastWeek(s);
+            if (avg > 0 && today < avg * 0.5 && java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) >= 14) {
+                out.add("فروش امروز کمتر از نصف میانگین ۷ روز گذشته است (" + money(avg)
+                        + "). کمپین تخفیف یا پیگیری مشتریان غیرفعال را در نظر بگیرید.");
+            }
         }
         if (out.isEmpty()) {
-            out.add("امروز هشدار جدی‌ای نداریم. وقت خوبی برای بررسی ویزیتورها و مشتریان غیرفعال است.");
+            if (s.notes != null && !s.notes.isEmpty()) {
+                out.add("بعضی داده‌ها بارگذاری نشد؛ بنابراین نبودِ هشدار را نمی‌توان قطعی دانست: " + join(s.notes.keySet()));
+            } else if (hasMissingFields(s)) {
+                out.add("فیلدهای لازم در بعضی ردیف‌ها موجود نیست؛ نبودِ هشدار را نمی‌توان قطعی دانست.");
+            } else {
+                out.add("بر اساس داده‌های در دسترس هشدار مشخصی پیدا نشد؛ برای اطمینان گزارش‌های تکمیلی را بررسی کنید.");
+            }
         }
         return out;
     }
 
-    /** Full daily summary text (also used for the notification). */
+    private static boolean hasMissingFields(Snap s) {
+        if (!unavailable(s, "فروش امروز") && !hasMoney(s.salesToday, "total")) return true;
+        if (!unavailable(s, "فروش دیروز") && !hasMoney(s.salesYesterday, "total")) return true;
+        if (!unavailable(s, "خرید امروز") && !hasMoney(s.buyToday, "total")) return true;
+        if (!unavailable(s, "دریافت امروز") && !hasMoney(s.inToday, "total")) return true;
+        if (!unavailable(s, "پرداخت امروز") && !hasMoney(s.outToday, "total")) return true;
+        if (!unavailable(s, "کالاها") && (!hasCount(s.prod, "out") || !hasCount(s.prod, "low"))) return true;
+        if (!unavailable(s, "روند فروش")) {
+            if (s.salesDaily == null) return true;
+            for (Row row : s.salesDaily) {
+                Long invalidRows = row == null ? null : row.exactLong("invalidRows");
+                BigDecimal total = row == null ? null : row.bd("total");
+                if (row == null || !row.has("day") || total == null || !Double.isFinite(total.doubleValue())
+                        || Jalali.parse(row.s("day")) < 0 || invalidRows == null || invalidRows > 0) return true;
+            }
+        }
+        return false;
+    }
+
+    /** Full daily summary text (also used for the notification), with missing sections explicit. */
     public static String dailySummary(Snap s) {
+        if (s == null) return "دادهٔ فروشگاه در دسترس نیست؛ خلاصهٔ عددی ساخته نشد.";
         StringBuilder b = new StringBuilder();
-        b.append("📊 خلاصه امروز (").append(s.day).append(")\n");
-        b.append("• فروش: ").append(money(s.salesToday.d("total")))
-                .append(" (").append(count(s.salesToday.l("docs"))).append(" فاکتور)\n");
-        b.append("• دیروز: ").append(money(s.salesYesterday.d("total"))).append("\n");
-        b.append("• دریافت: ").append(money(s.inToday.d("total")))
-                .append(" • پرداخت: ").append(money(s.outToday.d("total"))).append("\n");
-        b.append("• خرید: ").append(money(s.buyToday.d("total"))).append("\n");
-        b.append("• معوق‌ها: ").append(count(s.overdue.size()))
-                .append(" فاکتور (").append(money(sumAmount(s.overdue))).append(")");
+        b.append("📊 خلاصه امروز (").append(s.day == null || s.day.isEmpty() ? "تاریخ نامشخص" : s.day).append(")\n");
+        if (unavailable(s, "فروش امروز") || !hasMoney(s.salesToday, "total")) b.append("• فروش امروز: داده در دسترس نیست\n");
+        else {
+            b.append("• فروش: ").append(moneyField(s.salesToday, "total"));
+            if (hasCount(s.salesToday, "docs")) b.append(" (").append(countField(s.salesToday, "docs")).append(" فاکتور)");
+            else b.append(" (تعداد فاکتور در منبع موجود نیست)");
+            b.append("\n");
+        }
+        if (unavailable(s, "فروش دیروز") || !hasMoney(s.salesYesterday, "total")) b.append("• فروش دیروز: داده در دسترس نیست\n");
+        else b.append("• دیروز: ").append(moneyField(s.salesYesterday, "total")).append("\n");
+        if (unavailable(s, "دریافت امروز") || !hasMoney(s.inToday, "total")) b.append("• دریافت: داده در دسترس نیست");
+        else b.append("• دریافت: ").append(moneyField(s.inToday, "total"));
+        if (unavailable(s, "پرداخت امروز") || !hasMoney(s.outToday, "total")) b.append(" • پرداخت: داده در دسترس نیست\n");
+        else b.append(" • پرداخت: ").append(moneyField(s.outToday, "total")).append("\n");
+        if (unavailable(s, "خرید امروز") || !hasMoney(s.buyToday, "total")) b.append("• خرید: داده در دسترس نیست\n");
+        else b.append("• خرید: ").append(moneyField(s.buyToday, "total")).append("\n");
+        if (unavailable(s, "معوق‌ها")) b.append("• معوق‌ها: داده در دسترس نیست");
+        else b.append("• معوق‌ها: ").append(count(s.overdue.size()))
+                .append(" فاکتور (").append(sumAmountOrUnavailable(s.overdue)).append(")");
         b.append("\n\n✦ پیشنهاد مدیر:\n");
         int i = 1;
         for (String p : suggestions(s)) {
             if (i > 3) break;
             b.append(i++).append(". ").append(p).append("\n");
         }
-        if (!s.notes.isEmpty()) {
+        if (s.notes != null && !s.notes.isEmpty()) {
             b.append("\n⚠ بعضی بخش‌ها در دسترس نبود: ").append(join(s.notes.keySet()));
+        } else if (hasMissingFields(s)) {
+            b.append("\n⚠ بعضی فیلدهای منبع موجود نیست؛ مقدار آن‌ها صفر فرض نمی‌شود.");
         }
         return b.toString().trim();
     }
 
-    /** Plain-text facts for a generative model: the same numbers the rule engine uses. */
+    /** Plain-text facts for a generative model; unavailable fields are never printed as zero. */
     public static String contextBlock(Snap s) {
+        if (s == null) return "دادهٔ فروشگاه در دسترس نیست.";
         StringBuilder b = new StringBuilder();
-        b.append("تاریخ امروز (شمسی): ").append(s.day).append("\n");
-        b.append("فروش امروز: ").append(money(s.salesToday.d("total")))
-                .append(" (").append(s.salesToday.l("docs")).append(" فاکتور)\n");
-        b.append("فروش دیروز: ").append(money(s.salesYesterday.d("total"))).append("\n");
-        double avg = averageLastWeek(s);
-        if (avg > 0) b.append("میانگین فروش روزانه ۷ روز گذشته: ").append(money(avg)).append("\n");
-        b.append("خرید امروز: ").append(money(s.buyToday.d("total"))).append("\n");
-        b.append("دریافت امروز: ").append(money(s.inToday.d("total"))).append(" (نقد ")
-                .append(money(s.inToday.d("cash"))).append("، چک ")
-                .append(money(s.inToday.d("cheque"))).append("، پوز ")
-                .append(money(s.inToday.d("pos"))).append("، حواله ")
-                .append(money(s.inToday.d("havaleh"))).append(")\n");
-        b.append("پرداخت امروز: ").append(money(s.outToday.d("total"))).append("\n");
-        b.append("فاکتورهای معوق: ").append(s.overdue.size()).append(" مورد، جمع ")
-                .append(money(sumAmount(s.overdue))).append("\n");
-        for (Row r : s.overdue) {
-            b.append("  - ").append(r.s("party")).append(": ").append(money(r.d("amount")))
-                    .append("، ").append(r.l("days")).append(" روز تأخیر\n");
+        b.append("تاریخ امروز (شمسی): ").append(s.day == null || s.day.isEmpty() ? "نامشخص" : s.day).append("\n");
+        if (s.loadedAt > 0) b.append("زمان خواندن داده: ").append(Money.fa(String.valueOf(s.loadedAt))).append("\n");
+        appendField(b, s, "فروش امروز", "فروش امروز", s.salesToday, "total", true);
+        appendField(b, s, "فروش دیروز", "فروش دیروز", s.salesYesterday, "total", true);
+        if (unavailable(s, "روند فروش")) b.append("روند فروش: داده در دسترس نیست\n");
+        else {
+            double avg = averageLastWeek(s);
+            if (avg > 0) b.append("میانگین فروش روزانه ۷ روز گذشته: ").append(money(avg)).append("\n");
+            else b.append("روند فروش: ردیف کافی برای میانگین در دسترس نیست\n");
         }
-        b.append("بدهکاران اولویت‌دار:\n");
-        for (Row r : s.debtors) {
-            b.append("  - ").append(r.s("party")).append(": ").append(money(r.d("amount"))).append("\n");
+        appendField(b, s, "خرید امروز", "خرید امروز", s.buyToday, "total", true);
+        appendField(b, s, "دریافت امروز", "دریافت امروز", s.inToday, "total", true);
+        appendField(b, s, "پرداخت امروز", "پرداخت امروز", s.outToday, "total", true);
+        appendList(b, s, "معوق‌ها", "فاکتورهای معوق", s.overdue, "party", "amount");
+        appendList(b, s, "بدهکاران", "بدهکاران اولویت‌دار", s.debtors, "party", "amount");
+        appendList(b, s, "چک دریافتی", "چک دریافتی تا سه روز آینده", s.dueIn, "party", "amount");
+        appendList(b, s, "چک پرداختی", "چک پرداختی تا سه روز آینده", s.dueOut, "party", "amount");
+        if (unavailable(s, "کالاها")) b.append("کالاها: داده در دسترس نیست\n");
+        else {
+            b.append("کالاها: کل ").append(countOrUnavailable(s.prod, "count"))
+                    .append("، فعال ").append(countOrUnavailable(s.prod, "active"))
+                    .append("، ناموجود ").append(countOrUnavailable(s.prod, "out"))
+                    .append("، کم‌موجود ").append(countOrUnavailable(s.prod, "low"))
+                    .append("، ارزش موجودی ").append(moneyOrUnavailable(s.prod, "value")).append("\n");
         }
-        b.append("چک دریافتی تا ۳ روز آینده: ").append(s.dueIn.size()).append(" مورد، ")
-                .append(money(sumAmount(s.dueIn))).append("\n");
-        b.append("چک پرداختی تا ۳ روز آینده: ").append(s.dueOut.size()).append(" مورد، ")
-                .append(money(sumAmount(s.dueOut))).append("\n");
-        b.append("کالاها: کل ").append(s.prod.l("count")).append("، فعال ").append(s.prod.l("active"))
-                .append("، ناموجود ").append(s.prod.l("out")).append("، کم‌موجود ").append(s.prod.l("low"))
-                .append("، نیازمند سفارش ").append(s.prod.l("reorderN"))
-                .append("، ارزش موجودی ").append(money(s.prod.d("value"))).append("\n");
-        b.append("سندهای انبار منتظر همگام‌سازی: ").append(s.pendingSync).append("\n");
-        b.append("عملکرد ویزیتورها (۳۰ روز):\n");
-        for (Row r : s.visitors) {
-            if (r.s("name").isEmpty()) continue;
-            b.append("  - ").append(r.s("name")).append(": ").append(money(r.d("sales"))).append("\n");
+        b.append("سندهای انبار منتظر همگام‌سازی (دستگاه): ").append(count(s.pendingSync)).append("\n");
+        if (unavailable(s, "ویزیتورها")) b.append("عملکرد ویزیتورها: داده در دسترس نیست\n");
+        else {
+            b.append("عملکرد ویزیتورها (۳۰ روز):\n");
+            for (Row r : s.visitors) {
+                if (r.s("name").isEmpty()) continue;
+                b.append("  - ").append(r.s("name")).append(": ").append(moneyOrUnavailable(r, "sales")).append("\n");
+            }
         }
-        if (!s.notes.isEmpty()) b.append("بخش‌های بدون داده: ").append(join(s.notes.keySet())).append("\n");
+        if (s.notes != null && !s.notes.isEmpty()) b.append("بخش‌های بارگذاری‌نشده: ").append(join(s.notes.keySet())).append("\n");
+        else if (hasMissingFields(s)) b.append("بعضی فیلدهای منبع ناموجود یا نامعتبرند و صفر فرض نشده‌اند.\n");
         return b.toString();
+    }
+
+    private static void appendField(StringBuilder out, Snap snap, String section, String label,
+                                    Row row, String key, boolean isMoney) {
+        if (unavailable(snap, section)) {
+            out.append(label).append(": داده در دسترس نیست\n");
+            return;
+        }
+        out.append(label).append(": ").append(isMoney ? moneyField(row, key) : countField(row, key)).append("\n");
+    }
+
+    private static void appendList(StringBuilder out, Snap snap, String section, String label,
+                                   List<Row> rows, String nameKey, String amountKey) {
+        if (unavailable(snap, section)) {
+            out.append(label).append(": داده در دسترس نیست\n");
+            return;
+        }
+        out.append(label).append(": ").append(count(rows.size())).append(" مورد\n");
+        for (Row row : rows) {
+            String name = row.s(nameKey);
+            String amount = moneyOrUnavailable(row, amountKey);
+            out.append("  - ").append(name.isEmpty() ? "نام در منبع موجود نیست" : name)
+                    .append(": ").append(amount).append("\n");
+        }
     }
 
     /** Human-readable help listing what can be asked. */
@@ -269,95 +409,129 @@ public final class Assistant {
     // ================= helpers =================
 
     private static String salesText(Snap s) {
-        double today = s.salesToday.d("total");
-        double yest = s.salesYesterday.d("total");
-        double avg = averageLastWeek(s);
         StringBuilder b = new StringBuilder();
-        b.append("فروش امروز: ").append(money(today)).append(" (")
-                .append(count(s.salesToday.l("docs"))).append(" فاکتور)");
-        b.append("\nدیروز: ").append(money(yest));
-        if (avg > 0) {
-            long pct = Math.round((today - avg) / avg * 100.0);
-            b.append("\nمیانگین ۷ روز گذشته: ").append(money(avg))
-                    .append(" • نسبت به میانگین: ").append(pct >= 0 ? "+" : "")
-                    .append(Money.fa(String.valueOf(pct))).append("٪");
+        boolean todayAvailable = !unavailable(s, "فروش امروز") && hasMoney(s.salesToday, "total");
+        if (!todayAvailable) {
+            b.append(unavailableText("فروش امروز"));
+        } else {
+            b.append("فروش امروز: ").append(moneyField(s.salesToday, "total"));
+            if (hasCount(s.salesToday, "docs")) b.append(" (").append(countField(s.salesToday, "docs")).append(" فاکتور)");
+            else b.append(" (تعداد فاکتور در منبع موجود نیست)");
         }
-        b.append("\nاگر امروز هنوز ساعات کمی گذشته، عدد کامل نیست.");
+        if (unavailable(s, "فروش دیروز") || !hasMoney(s.salesYesterday, "total")) {
+            b.append("\nفروش دیروز: داده در دسترس نیست");
+        } else {
+            b.append("\nدیروز: ").append(moneyField(s.salesYesterday, "total"));
+        }
+        if (unavailable(s, "روند فروش")) {
+            b.append("\nمیانگین ۷ روز گذشته: داده در دسترس نیست");
+        } else {
+            double avg = averageLastWeek(s);
+            if (avg > 0) {
+                b.append("\nمیانگین ۷ روز گذشته: ").append(money(avg));
+                if (todayAvailable) {
+                    long pct = Math.round((s.salesToday.bd("total").doubleValue() - avg) / avg * 100.0);
+                    b.append(" • نسبت به میانگین: ").append(pct >= 0 ? "+" : "")
+                            .append(Money.fa(String.valueOf(pct))).append("٪");
+                }
+            } else {
+                b.append("\nبرای محاسبهٔ میانگین ۷ روزه ردیف کافی در منبع نیست.");
+            }
+        }
+        if (todayAvailable) b.append("\nاگر امروز هنوز ساعات کمی گذشته، عدد کامل نیست.");
         return b.toString();
     }
 
     private static String overdueText(Snap s) {
-        if (s.overdue.isEmpty()) return "فاکتور معوقی ثبت نشده است.";
+        if (unavailable(s, "معوق‌ها")) return unavailableText("معوق‌ها");
+        if (s.overdue.isEmpty()) return "در گزارش معوق‌ها ردیفی برنگشت.";
         StringBuilder b = new StringBuilder("فاکتورهای معوق (")
-                .append(count(s.overdue.size())).append(" مورد، ").append(money(sumAmount(s.overdue))).append("):");
+                .append(count(s.overdue.size())).append(" مورد، ").append(sumAmountOrUnavailable(s.overdue)).append("):");
         for (int i = 0; i < s.overdue.size() && i < 5; i++) {
             Row r = s.overdue.get(i);
-            b.append("\n• ").append(r.s("party")).append(" — ").append(money(r.d("amount")))
-                    .append(" (").append(Money.fa(String.valueOf(r.l("days")))).append(" روز تأخیر)");
+            String party = r.s("party");
+            if (party.isEmpty()) party = "نام در منبع موجود نیست";
+            b.append("\n• ").append(party).append(" — ").append(moneyOrUnavailable(r, "amount"));
+            if (hasCount(r, "days")) b.append(" (").append(countField(r, "days")).append(" روز تأخیر)");
+            else b.append(" (میزان تأخیر در منبع موجود نیست)");
         }
         return b.toString();
     }
 
     private static String debtorText(Snap s) {
-        if (s.debtors.isEmpty()) return "بدهکار با مانده قابل توجهی ثبت نشده است.";
+        if (unavailable(s, "بدهکاران")) return unavailableText("بدهکاران");
+        if (s.debtors.isEmpty()) return "در گزارش بدهکاران ردیفی برنگشت.";
         StringBuilder b = new StringBuilder("بدهکاران اولویت‌دار:");
         for (Row r : s.debtors) {
-            b.append("\n• ").append(r.s("party")).append(" — ").append(money(r.d("amount")));
+            String party = r.s("party");
+            if (party.isEmpty()) party = "نام در منبع موجود نیست";
+            b.append("\n• ").append(party).append(" — ").append(moneyOrUnavailable(r, "amount"));
         }
         return b.toString();
     }
 
     private static String chequeText(Snap s) {
-        return "چک دریافتی تا ۳ روز آینده: " + count(s.dueIn.size()) + " مورد (" + money(sumAmount(s.dueIn)) + ")\n"
-                + "چک پرداختی تا ۳ روز آینده: " + count(s.dueOut.size()) + " مورد (" + money(sumAmount(s.dueOut)) + ")";
+        StringBuilder b = new StringBuilder();
+        if (unavailable(s, "چک دریافتی")) b.append("چک دریافتی تا ۳ روز آینده: داده در دسترس نیست");
+        else b.append("چک دریافتی تا ۳ روز آینده: ").append(count(s.dueIn.size()))
+                .append(" مورد (").append(sumAmountOrUnavailable(s.dueIn)).append(")");
+        if (unavailable(s, "چک پرداختی")) b.append("\nچک پرداختی تا ۳ روز آینده: داده در دسترس نیست");
+        else b.append("\nچک پرداختی تا ۳ روز آینده: ").append(count(s.dueOut.size()))
+                .append(" مورد (").append(sumAmountOrUnavailable(s.dueOut)).append(")");
+        return b.toString();
     }
 
     private static String stockText(Snap s) {
-        return "کل کالاها: " + count(s.prod.l("count")) + " • فعال: " + count(s.prod.l("active")) + "\n"
-                + "ناموجود: " + count(s.prod.l("out")) + " • کم‌موجود: " + count(s.prod.l("low"))
-                + " • نیازمند سفارش: " + count(s.prod.l("reorderN")) + "\n"
-                + "ارزش موجودی: " + money(s.prod.d("value"));
+        if (unavailable(s, "کالاها")) return unavailableText("کالاها");
+        return "کل کالاها: " + countOrUnavailable(s.prod, "count") + " • فعال: " + countOrUnavailable(s.prod, "active") + "\n"
+                + "ناموجود: " + countOrUnavailable(s.prod, "out") + " • کم‌موجود: " + countOrUnavailable(s.prod, "low")
+                + " • نیازمند سفارش: " + countOrUnavailable(s.prod, "reorderN") + "\n"
+                + "ارزش موجودی: " + moneyOrUnavailable(s.prod, "value");
     }
 
     private static String visitorText(Snap s) {
+        if (unavailable(s, "ویزیتورها")) return unavailableText("ویزیتورها");
         List<Row> rows = new ArrayList<>();
         for (Row r : s.visitors) {
             if (!r.s("name").isEmpty()) rows.add(r);
         }
-        if (rows.isEmpty()) return "اطلاعات ویزیتورها در ۳۰ روز گذشته ثبت نشده است.";
+        if (rows.isEmpty()) return s.visitors.isEmpty()
+                ? "در گزارش عملکرد ویزیتورها در ۳۰ روز گذشته ردیفی برنگشت."
+                : "ردیف‌های ویزیتور برگشت، اما نام قابل‌نمایشی در منبع نبود.";
         StringBuilder b = new StringBuilder("عملکرد ویزیتورها (۳۰ روز گذشته):");
         for (int i = 0; i < rows.size() && i < 5; i++) {
             Row r = rows.get(i);
-            b.append("\n• ").append(r.s("name")).append(" — ").append(money(r.d("sales")));
+            b.append("\n• ").append(r.s("name")).append(" — ").append(moneyOrUnavailable(r, "sales"));
         }
         return b.toString();
     }
 
-    /** Average daily sales of the 7 days before today, from the 30-day series. */
+    /** Average over the seven prior calendar days; missing dates are zero only after a successful query. */
     static double averageLastWeek(Snap s) {
-        List<Row> rows = s.salesDaily;
-        if (rows == null || rows.isEmpty()) return 0;
-        List<Row> past = new ArrayList<>();
-        for (Row r : rows) {
-            String d = r.s("day");
-            if (d.isEmpty()) continue;
-            if (d.equals(s.day)) continue;
-            past.add(r);
+        if (s == null || unavailable(s, "روند فروش") || s.salesDaily == null || s.day == null
+                || Jalali.parse(s.day) < 0) return 0;
+        for (Row row : s.salesDaily) {
+            Long invalidRows = row == null ? null : row.exactLong("invalidRows");
+            BigDecimal total = row == null ? null : row.bd("total");
+            if (row == null || !row.has("day") || total == null || !Double.isFinite(total.doubleValue())
+                    || row.s("day").isEmpty() || Jalali.parse(row.s("day")) < 0
+                    || invalidRows == null || invalidRows > 0) return 0;
         }
-        int from = Math.max(0, past.size() - 7);
-        double sum = 0;
-        int n = 0;
-        for (int i = from; i < past.size(); i++) {
-            sum += past.get(i).d("total");
-            n++;
-        }
-        return n == 0 ? 0 : sum / n;
+        SalesSnapshot source = SalesSnapshot.fromRows(s.salesDaily, s.day, Jalali.addDays(s.day, -30));
+        double average = source.averageCalendarDaysBefore(s.day, 7);
+        return Double.isFinite(average) ? average : 0;
     }
 
-    private static double sumAmount(List<Row> rows) {
-        double t = 0;
-        for (Row r : rows) t += r.d("amount");
-        return t;
+    private static String sumAmountOrUnavailable(List<Row> rows) {
+        if (rows == null) return "داده در دسترس نیست";
+        BigDecimal total = BigDecimal.ZERO;
+        for (Row row : rows) {
+            BigDecimal amount = row == null ? null : row.bd("amount");
+            if (amount == null) return "داده در دسترس نیست";
+            total = total.add(amount);
+        }
+        if (!Double.isFinite(total.doubleValue())) return "داده در دسترس نیست";
+        return money(total.doubleValue());
     }
 
     private static String joinSuggestions(List<String> items, String title) {

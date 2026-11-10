@@ -8,9 +8,9 @@ import ir.meelano.manager.MainActivity;
 import java.util.ArrayDeque;
 
 /**
- * Reads a streamed answer sentence by sentence, so speech starts as soon as the first sentence
- * is complete instead of after the whole answer. Each sentence is spoken with {@link Speaker};
- * the next one starts when the previous one has finished. All calls run on the main thread.
+ * Reads an answer sentence by sentence. Callers may feed streamed pieces or one complete response;
+ * each sentence is spoken with {@link Speaker}, and the next begins when the previous one finishes.
+ * All calls run on the main thread.
  */
 public final class SpeechQueue {
     private final MainActivity a;

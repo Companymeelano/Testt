@@ -97,8 +97,8 @@ public final class HomeCashWaterfall extends View {
             float bottom = yFor(step.lowRials(), rangeMin, range, chartBottom, chartHeight);
             if (bottom - top < Theme.dp(2)) bottom = top + Theme.dp(2);
             rect.set(x, top, x + barWidth, bottom);
-            int color = i == 1 ? Theme.SECTION_RECEIVE
-                    : i == 2 ? Theme.SECTION_PAY : Theme.SECTION_CLOSEOUT;
+            int color = Theme.luxFamily(i == 1 ? Theme.SECTION_RECEIVE
+                    : i == 2 ? Theme.SECTION_PAY : Theme.SECTION_CLOSEOUT);
             bars.setColor(color);
             canvas.drawRoundRect(rect, Theme.dp(5), Theme.dp(5), bars);
 

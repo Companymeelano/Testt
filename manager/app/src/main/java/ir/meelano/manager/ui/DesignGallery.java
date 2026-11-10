@@ -166,7 +166,7 @@ public final class DesignGallery {
 
         // C13 alert strip
         panel.addView(LuxKit.alertStrip(a, s, "بیش از ۳۰۰ قلم با هشدار موجودی",
-                "بررسی پیشنهادی روزانه", "مشاهده", null), match());
+                "بررسی پیشنهادی روزانه", "نمایش", null), match());
         panel.addView(gap(a, 10));
 
         // C6 command dock

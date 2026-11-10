@@ -577,7 +577,7 @@ public class ChequesScreen extends Screen {
         }
         if (!r.s("ghno").isEmpty() && !"0".equals(r.s("ghno"))) {
             final String ghno = r.s("ghno");
-            footer.addView(a.kit.btn("مشاهده در قبوض", v -> {
+            footer.addView(a.kit.btn("نمایش در قبوض", v -> {
                 dlg.dismiss();
                 String target = inc ? "dar_in" : "dar_out";
                 Screen s = a.screen(target);

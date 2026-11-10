@@ -619,7 +619,7 @@ public final class Kit {
             tile.addView(note, lp(-1, -2));
         }
         if (!dashboardStyle) {
-            TextView more = text(k.action != null ? "مشاهده جزئیات ›" : " ", 9.5f, Theme.PRIMARY, true);
+            TextView more = text(k.action != null ? "نمایش جزئیات ›" : " ", 9.5f, Theme.PRIMARY, true);
             more.setSingleLine(true);
             more.setMinHeight(Theme.dp(20));
             tile.addView(more, lp(-1, -2));
@@ -1209,7 +1209,8 @@ public final class Kit {
         row.addView(space(8));
         TextView caption = text(message == null || message.trim().isEmpty()
                 ? "همه‌چیز مرتب است" : message, 11.5f, Theme.MUTED, false);
-        caption.setMaxLines(2);
+        caption.setMaxLines(1);
+        caption.setEllipsize(TextUtils.TruncateAt.END);
         row.addView(caption, wlp(1f));
         row.setContentDescription(HomeNumberFormatter.localizeText(
                 message == null || message.trim().isEmpty() ? "همه‌چیز مرتب است" : message));
@@ -1290,7 +1291,7 @@ public final class Kit {
         LinearLayout card = card();
         card.setGravity(Gravity.CENTER_HORIZONTAL);
         card.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(16));
-        ImageView symbol = icon(R.drawable.mi_inbox, Theme.MUTED, 24);
+        ImageView symbol = icon(R.drawable.mi_inbox, Theme.PRIMARY, 24);
         LinearLayout.LayoutParams ip = lp(Theme.dp(28), Theme.dp(28));
         ip.gravity = Gravity.CENTER_HORIZONTAL;
         card.addView(symbol, ip);
@@ -1300,8 +1301,11 @@ public final class Kit {
         hp.topMargin = Theme.dp(7);
         card.addView(heading, hp);
         if (body != null && !body.isEmpty()) {
+            // C11: never multi-line gray copy — at most one guidance line, ellipsized.
             TextView caption = text(body, 11.5f, Theme.MUTED, false);
             caption.setGravity(Gravity.CENTER);
+            caption.setSingleLine(true);
+            caption.setEllipsize(TextUtils.TruncateAt.END);
             card.addView(caption, lp(-1, -2));
         }
         return card;
@@ -1311,7 +1315,7 @@ public final class Kit {
     public View unavailable(String msg) {
         LinearLayout card = card();
         card.setGravity(Gravity.CENTER_HORIZONTAL);
-        ImageView symbol = icon(R.drawable.mi_help, Theme.MUTED, 22);
+        ImageView symbol = icon(R.drawable.mi_help, Theme.PRIMARY, 22);
         LinearLayout.LayoutParams ip = lp(Theme.dp(26), Theme.dp(26));
         ip.gravity = Gravity.CENTER_HORIZONTAL;
         card.addView(symbol, ip);
@@ -1320,16 +1324,16 @@ public final class Kit {
         LinearLayout.LayoutParams tp = lp(-1, -2);
         tp.topMargin = Theme.dp(6);
         card.addView(title, tp);
-        TextView body = text(msg == null || msg.isEmpty()
-                ? "ساختار دیتابیس برای این گزارش تأیید نشده است." : msg, 11.5f, Theme.MUTED, false);
+        String bodyText = msg == null || msg.isEmpty()
+                ? "ساختار دیتابیس برای این گزارش تأیید نشده است." : msg;
+        // C11: one visible guidance line; the full explanation stays in the screen-reader text.
+        TextView body = text(bodyText, 11.5f, Theme.MUTED, false);
         body.setGravity(Gravity.CENTER);
+        body.setSingleLine(true);
+        body.setEllipsize(TextUtils.TruncateAt.END);
         card.addView(body, lp(-1, -2));
-        TextView note = text("پس از تأیید ساختار دیتابیس فعال می‌شود؛ اعداد نادرست نمایش داده نمی‌شوند.",
-                11f, Theme.MUTED, false);
-        note.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams np = lp(-1, -2);
-        np.topMargin = Theme.dp(6);
-        card.addView(note, np);
+        card.setContentDescription(HomeNumberFormatter.localizeText(title.getText() + "؛ " + bodyText
+                + "؛ پس از تأیید ساختار دیتابیس فعال می‌شود و اعداد نادرست نمایش داده نمی‌شوند."));
         return card;
     }
 

@@ -62,27 +62,30 @@ public final class Theme {
     public static final int SECTION_QUICK_ACTIONS = DesignTokens.QUICK_ACTIONS;
     public static final int SECTION_SALES_FORECAST = DesignTokens.SALES_FORECAST;
 
-    public static int BG = DesignTokens.APP_DARK_BG;
-    public static int SURFACE = DesignTokens.APP_DARK_SURFACE;
-    public static int SURFACE2 = DesignTokens.APP_DARK_SURFACE_2;
+    public static int BG = DerakhshanTokens.OBSIDIAN_EMERALD;
+    public static int SURFACE = DerakhshanTokens.STONE_DARK[0];
+    public static int SURFACE2 = DerakhshanTokens.STONE_DARK[1];
     /** Compatibility alias used by existing screens; light/dark resolve to emerald, Nuts to gold. */
-    public static int GOLD = DesignTokens.APP_DARK_ACCENT;
-    public static int GOLD_SOFT = DesignTokens.APP_DARK_ACCENT;
-    public static int PRIMARY = DesignTokens.APP_DARK_ACCENT;
-    public static int TEXT = DesignTokens.APP_DARK_TEXT;
-    public static int MUTED = DesignTokens.APP_DARK_MUTED;
-    public static int BORDER = DesignTokens.APP_DARK_BORDER;
-    public static int ACCENT_SOFT = DesignTokens.APP_DARK_ACCENT_SOFT;
+    public static int GOLD = DerakhshanTokens.EMERALD_300;
+    public static int GOLD_SOFT = DerakhshanTokens.EMERALD_300;
+    public static int PRIMARY = DerakhshanTokens.EMERALD_300;
+    public static int TEXT = DerakhshanTokens.DARK.ink;
+    public static int MUTED = DerakhshanTokens.DARK.inkSecondary;
+    public static int BORDER = DerakhshanTokens.blend(DerakhshanTokens.STONE_DARK[0],
+            DerakhshanTokens.DARK.ink, 0.12f);
+    public static int ACCENT_SOFT = DerakhshanTokens.softChip(DerakhshanTokens.EMERALD_300,
+            DerakhshanTokens.STONE_DARK[0]);
     public static int SUCCESS = DesignTokens.textSafeColor(
-            DesignTokens.POSITIVE, DesignTokens.APP_DARK_SURFACE, true);
+            DerakhshanTokens.DARK.successText, DerakhshanTokens.STONE_DARK[0], true);
     public static int DANGER = DesignTokens.textSafeColor(
-            DesignTokens.NEGATIVE, DesignTokens.APP_DARK_SURFACE, true);
+            DerakhshanTokens.DARK.dangerText, DerakhshanTokens.STONE_DARK[0], true);
     public static int WARNING = DesignTokens.textSafeColor(
-            DesignTokens.WARNING, DesignTokens.APP_DARK_SURFACE, true);
+            DerakhshanTokens.DARK.warningText, DerakhshanTokens.STONE_DARK[0], true);
     public static int INFO = DesignTokens.textSafeColor(
-            DesignTokens.INFO, DesignTokens.APP_DARK_SURFACE, true);
+            DerakhshanTokens.DARK.infoText, DerakhshanTokens.STONE_DARK[0], true);
+    /** Legacy «VIOLET» slot: the purple is gone — حواله/Analytics wear the bronze token. */
     public static int VIOLET = DesignTokens.textSafeColor(
-            DesignTokens.RETURNS, DesignTokens.APP_DARK_SURFACE, true);
+            DerakhshanTokens.BRONZE, DerakhshanTokens.STONE_DARK[0], true);
     public static int STEEL = DesignTokens.APP_DARK_STEEL;
     public static final int NEUTRAL = DesignTokens.NEUTRAL;
     /** Legacy aliases; semantic outcome colors are intentionally not section colors. */
@@ -162,38 +165,43 @@ public final class Theme {
         fontScale = zi == 0 ? 0.9f : zi == 2 ? 1.15f : zi == 3 ? 1.3f : 1f;
 
         if (light) {
-            BG = DesignTokens.APP_LIGHT_BG;
-            SURFACE = DesignTokens.APP_LIGHT_SURFACE;
-            SURFACE2 = DesignTokens.APP_LIGHT_SURFACE_2;
-            PRIMARY = nuts ? DesignTokens.EMERALD : DesignTokens.APP_LIGHT_ACCENT;
+            // مخمل کرم — the whole app rides the Derakhshan light surface.
+            BG = DerakhshanTokens.CREAM;
+            SURFACE = DerakhshanTokens.STONE_LIGHT[0];
+            SURFACE2 = DerakhshanTokens.STONE_LIGHT[1];
+            PRIMARY = nuts ? DesignTokens.EMERALD : DerakhshanTokens.EMERALD_500;
             GOLD = nuts ? DesignTokens.GOLD : PRIMARY;
             GOLD_SOFT = nuts ? DesignTokens.GOLD_DARK : PRIMARY;
-            TEXT = DesignTokens.APP_LIGHT_TEXT;
-            MUTED = DesignTokens.APP_LIGHT_MUTED;
-            BORDER = DesignTokens.APP_LIGHT_BORDER;
-            ACCENT_SOFT = nuts ? DesignTokens.PAPER : DesignTokens.APP_LIGHT_ACCENT_SOFT;
-            SUCCESS = DesignTokens.textSafeColor(DesignTokens.POSITIVE, SURFACE, false);
-            DANGER = DesignTokens.textSafeColor(DesignTokens.NEGATIVE, SURFACE, false);
-            WARNING = DesignTokens.textSafeColor(DesignTokens.WARNING, SURFACE, false);
-            INFO = DesignTokens.textSafeColor(DesignTokens.INFO, SURFACE, false);
-            VIOLET = DesignTokens.textSafeColor(DesignTokens.RETURNS, SURFACE, false);
+            TEXT = DerakhshanTokens.LIGHT.ink;
+            MUTED = DerakhshanTokens.LIGHT.inkSecondary;
+            BORDER = DerakhshanTokens.blend(DerakhshanTokens.STONE_LIGHT[0],
+                    DerakhshanTokens.LIGHT.ink, 0.10f);
+            ACCENT_SOFT = nuts ? DesignTokens.PAPER : DerakhshanTokens.softChip(PRIMARY, SURFACE);
+            // Light theme: the darkest stone stop (SURFACE2) is the worst case for dark inks.
+            SUCCESS = DesignTokens.textSafeColor(DerakhshanTokens.LIGHT.successText, SURFACE2, false);
+            DANGER = DesignTokens.textSafeColor(DerakhshanTokens.LIGHT.dangerText, SURFACE2, false);
+            WARNING = DesignTokens.textSafeColor(DerakhshanTokens.LIGHT.warningText, SURFACE2, false);
+            INFO = DesignTokens.textSafeColor(DerakhshanTokens.LIGHT.infoText, SURFACE2, false);
+            VIOLET = DesignTokens.textSafeColor(DerakhshanTokens.BRONZE, SURFACE2, false);
             STEEL = DesignTokens.APP_LIGHT_STEEL;
         } else {
-            BG = DesignTokens.APP_DARK_BG;
-            SURFACE = DesignTokens.APP_DARK_SURFACE;
-            SURFACE2 = DesignTokens.APP_DARK_SURFACE_2;
-            PRIMARY = DesignTokens.APP_DARK_ACCENT;
+            // شب زمرد — obsidian page, deep-emerald stone, lifted semantic inks.
+            BG = DerakhshanTokens.OBSIDIAN_EMERALD;
+            SURFACE = DerakhshanTokens.STONE_DARK[0];
+            SURFACE2 = DerakhshanTokens.STONE_DARK[1];
+            PRIMARY = DerakhshanTokens.EMERALD_300;
             GOLD = PRIMARY;
             GOLD_SOFT = PRIMARY;
-            TEXT = DesignTokens.APP_DARK_TEXT;
-            MUTED = DesignTokens.APP_DARK_MUTED;
-            BORDER = DesignTokens.APP_DARK_BORDER;
-            ACCENT_SOFT = DesignTokens.APP_DARK_ACCENT_SOFT;
-            SUCCESS = DesignTokens.textSafeColor(DesignTokens.POSITIVE, SURFACE, true);
-            DANGER = DesignTokens.textSafeColor(DesignTokens.NEGATIVE, SURFACE, true);
-            WARNING = DesignTokens.textSafeColor(DesignTokens.WARNING, SURFACE, true);
-            INFO = DesignTokens.textSafeColor(DesignTokens.INFO, SURFACE, true);
-            VIOLET = DesignTokens.textSafeColor(DesignTokens.RETURNS, SURFACE, true);
+            TEXT = DerakhshanTokens.DARK.ink;
+            MUTED = DerakhshanTokens.DARK.inkSecondary;
+            BORDER = DerakhshanTokens.blend(DerakhshanTokens.STONE_DARK[0],
+                    DerakhshanTokens.DARK.ink, 0.12f);
+            ACCENT_SOFT = DerakhshanTokens.softChip(PRIMARY, SURFACE);
+            SUCCESS = DesignTokens.textSafeColor(DerakhshanTokens.DARK.successText, SURFACE, true);
+            DANGER = DesignTokens.textSafeColor(DerakhshanTokens.DARK.dangerText, SURFACE, true);
+            WARNING = DesignTokens.textSafeColor(DerakhshanTokens.DARK.warningText, SURFACE, true);
+            INFO = DesignTokens.textSafeColor(DerakhshanTokens.DARK.infoText, SURFACE, true);
+            VIOLET = DesignTokens.textSafeColor(DerakhshanTokens.BRONZE, SURFACE, true);
             STEEL = DesignTokens.APP_DARK_STEEL;
         }
     }
@@ -336,23 +344,18 @@ public final class Theme {
     }
 
     /**
-     * The signature royal surface: a whisper of champagne melting into the card face from the
-     * top edge, closed by a gold-threaded hairline. Cards stay in the same plane; the sheen,
-     * not a shadow, carries the luxury.
+     * The signature card material of the whole app: Derakhshan stone (165° sheen, hairline
+     * edge). Cards stay in the same plane; the material, not a shadow, carries the luxury.
      */
     private static GradientDrawable royalSurface() {
-        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{DesignTokens.mix(SURFACE, GOLD_LIGHT, light ? 0.22f : 0.07f), SURFACE});
-        d.setCornerRadius(dp(CARD_RADIUS_DP));
-        d.setStroke(dp(1), DesignTokens.mix(BORDER, GOLD_METAL, light ? 0.40f : 0.26f));
-        return d;
+        return LuxDrawables.stone(luxSurface());
     }
 
     /** Quiet champagne wash for tiles that have nothing to show yet (empty states). */
     public static GradientDrawable emptyState(int accent) {
-        int hue = accent == 0 ? GOLD_METAL : accent;
+        int hue = luxFamily(accent == 0 ? GOLD_METAL : accent);
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{DesignTokens.mix(SURFACE, hue, light ? 0.05f : 0.09f), SURFACE});
+                new int[]{DerakhshanTokens.softChip(hue, SURFACE), SURFACE});
         d.setCornerRadius(dp(14));
         d.setStroke(dp(1), alpha(hue, light ? 96 : 72));
         return d;
@@ -373,6 +376,17 @@ public final class Theme {
      * the home dashboard cannot render them no matter which section asks.
      */
     public static int luxFamily(int accent) {
+        // 0 historically means "the primary accent"; translucent tints pass through untouched
+        // (progress fills and washes carry meaningful alpha).
+        if (accent == 0) return DerakhshanTokens.EMERALD_500;
+        if ((accent >>> 24) != 0xFF) return accent;
+        // Identity guard: values already inside the Derakhshan palette pass through untouched.
+        if (accent == DerakhshanTokens.EMERALD_500 || accent == DerakhshanTokens.EMERALD_700
+                || accent == DerakhshanTokens.EMERALD_300 || accent == DerakhshanTokens.EMERALD_800
+                || accent == DerakhshanTokens.GOLD_500 || accent == DerakhshanTokens.GOLD_300
+                || accent == DerakhshanTokens.SUCCESS || accent == DerakhshanTokens.WARNING
+                || accent == DerakhshanTokens.DANGER || accent == DerakhshanTokens.INFO
+                || accent == DerakhshanTokens.BRONZE) return accent;
         if (accent == SUCCESS || accent == DesignTokens.POSITIVE || accent == DesignTokens.RECEIVE)
             return DerakhshanTokens.SUCCESS;
         if (accent == DANGER || accent == DesignTokens.NEGATIVE || accent == DesignTokens.PAY
@@ -573,7 +587,7 @@ public final class Theme {
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
                 new int[]{DesignTokens.mix(SURFACE, GOLD_LIGHT, light ? 0.28f : 0.09f), SURFACE});
         d.setCornerRadius(dp(CARD_RADIUS_DP));
-        int hue = accent == 0 ? GOLD_METAL : accent;
+        int hue = luxFamily(accent == 0 ? GOLD_METAL : accent);
         d.setStroke(dp(1), DesignTokens.mix(BORDER, hue, 0.45f));
         return d;
     }
@@ -591,8 +605,8 @@ public final class Theme {
         return d;
     }
 
-    /** Existing expense-category accent; primary CTAs use the approved emerald/champagne palette. */
-    public static final int ROSE = DesignTokens.ROSE;
+    /** Legacy expense-category «rose»: the pink-purple is gone — expenses wear the danger family. */
+    public static final int ROSE = DerakhshanTokens.DANGER;
 
     /** Solid primary action; the foreground is chosen separately for sufficient contrast. */
     public static GradientDrawable startButton() {
@@ -646,22 +660,24 @@ public final class Theme {
     public static GradientDrawable ghostButton(int accent) {
         // Ghost actions keep their quiet surface but gain the royal finish: a faint accent
         // wash from the top and a gold-threaded hairline instead of the plain border.
+        int hue = luxFamily(accent);
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{DesignTokens.mix(SURFACE, accent, light ? 0.07f : 0.13f), SURFACE});
+                new int[]{DesignTokens.mix(SURFACE, hue, light ? 0.07f : 0.13f), SURFACE});
         d.setCornerRadius(dp(12));
         d.setStroke(dp(1), DesignTokens.mix(BORDER, GOLD_METAL, light ? 0.38f : 0.24f));
         return d;
     }
 
     public static GradientDrawable chip(boolean selected, int accent) {
+        int family = luxFamily(accent);
         if (selected) {
             // Metallic state: the accent wears a brushed highlight and settles into shade,
             // closed by a champagne thread; onAccent() text keeps its exact contrast.
             GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                    new int[]{DesignTokens.mix(accent, 0xFFFFFFFF, light ? 0.22f : 0.14f), accent,
-                            DesignTokens.mix(accent, 0xFF000000, 0.13f)});
+                    new int[]{DesignTokens.mix(family, 0xFFFFFFFF, light ? 0.22f : 0.14f), family,
+                            DesignTokens.mix(family, 0xFF000000, 0.13f)});
             d.setCornerRadius(dp(11));
-            d.setStroke(dp(1), alpha(DesignTokens.mix(GOLD_LIGHT, accent, 0.30f), light ? 150 : 100));
+            d.setStroke(dp(1), alpha(DesignTokens.mix(GOLD_LIGHT, family, 0.30f), light ? 150 : 100));
             return d;
         }
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
@@ -672,7 +688,7 @@ public final class Theme {
     }
 
     public static GradientDrawable pill(int color) {
-        return base(alpha(color, light ? 18 : 30), 8, 0, 0);
+        return base(alpha(luxFamily(color), light ? 18 : 30), 8, 0, 0);
     }
 
     public static GradientDrawable searchBar() {
@@ -681,16 +697,17 @@ public final class Theme {
 
     /** Semi-transparent glyph capsule for secondary icons. */
     public static GradientDrawable avatar(int color) {
-        return base(color, 12, 0, 0);
+        return base(luxFamily(color), 12, 0, 0);
     }
 
     /** Opaque, flat accent tile for a selected mark or compact status. */
     public static GradientDrawable accentAvatar(int accent) {
         // The header medallion gets the same brushed-metal treatment as the primary
         // buttons: highlight on top, shade at the bottom, a champagne thread around.
+        int family = luxFamily(accent);
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{DesignTokens.mix(accent, GOLD_LIGHT, light ? 0.36f : 0.18f), accent,
-                        DesignTokens.mix(accent, GOLD_DARK, 0.22f)});
+                new int[]{DesignTokens.mix(family, GOLD_LIGHT, light ? 0.36f : 0.18f), family,
+                        DesignTokens.mix(family, GOLD_DARK, 0.22f)});
         d.setCornerRadius(dp(10));
         d.setStroke(dp(1), alpha(GOLD_LIGHT, light ? 140 : 90));
         return d;

@@ -224,7 +224,7 @@ public final class InvoiceWatch {
             try {
                 b.addAction(new Notification.Action.Builder(
                         android.graphics.drawable.Icon.createWithResource(c, R.mipmap.ic_launcher),
-                        "مشاهده بار", pi).build());
+                        "نمایش بار", pi).build());
             } catch (Exception ignored) { Diag.ignored("InvoiceWatch:action", ignored); }
             try {
                 b.setLargeIcon(loadBadge(c, n));

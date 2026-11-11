@@ -8486,7 +8486,7 @@ public class MainActivity extends Activity {
         addManualRefreshPanel("personnel", "بروزرسانی دستی پرسنل", "آخرین بروزرسانی: " + lastRefreshText("personnel"), () -> loadPersonnel());
         addPersonnelKpiSummary(rows);
         if (canUsePermission("management_access")) addPersonnelAdminPanel();
-        if (rows == null || rows.length() == 0) { addEmptyTo(content, "پرسنلی پیدا نشد؛ جدول visitors یا sys_users داده قابل نمایش ندارد."); return; }
+        if (rows == null || rows.length() == 0) { addEmptyTo(content, "پرسنلی پیدا نشد؛ جدول‌های پرسنل و کاربران دادهٔ قابل نمایش ندارند."); return; }
         for (int i = 0; i < rows.length(); i++) {
             JSONObject r = rows.optJSONObject(i); if (r == null) continue;
             int accent = i % 3 == 0 ? navAccent("personnel") : (i % 3 == 1 ? INFO : GOLD);
@@ -24945,6 +24945,10 @@ public class MainActivity extends Activity {
         TextView t = text(message, 13.0f, TEXT, Typeface.BOLD);
         t.setGravity(Gravity.CENTER);
         t.setLineSpacing(dp(2), 1.04f);
+        // C11 mirrors manager: one line on screen, the whole sentence for TalkBack.
+        t.setMaxLines(1);
+        t.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        t.setContentDescription(message == null ? "" : message);
         LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(-1, -2);
         tp.setMargins(0, dp(6), 0, 0);
         c.addView(t, tp);

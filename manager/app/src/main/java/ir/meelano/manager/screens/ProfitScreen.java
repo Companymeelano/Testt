@@ -236,7 +236,7 @@ public class ProfitScreen extends Screen {
                     ? "دادهٔ لازم برای محاسبهٔ کامل در دسترس نیست؛ سود صفر فرض نشده است."
                     : "بهای خرید یک یا چند ردیف فروش ناموجود یا نامعتبر است؛ سود و حاشیهٔ سود نمایش داده نمی‌شود."),
                     a.kit.lp(-1, -2));
-            Button details = a.kit.btnGhost("جزئیات", Theme.WARNING,
+            Button details = a.kit.btnGhost("نمایش جزئیات", Theme.WARNING,
                     v -> showGrossProfitCoverageDetails(d, queryIncomplete));
             details.setContentDescription("جزئیات وضعیت بهای کالا و ردیف‌های فروش");
             LinearLayout.LayoutParams detailsParams = a.kit.lp(-2, -2);

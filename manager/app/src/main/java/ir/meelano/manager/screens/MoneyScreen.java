@@ -390,7 +390,7 @@ public class MoneyScreen extends Screen {
         if (!head.s("linkNo").isEmpty()) {
             final String linkNo = head.s("linkNo");
             final String target = p == 0 ? "sales" : "buy";
-            body.addView(a.kit.btnGhost("🧾 فاکتور مرتبط " + Money.fa(linkNo), accent(), v -> {
+            body.addView(a.kit.btnGhost("🧾 نمایش فاکتور مرتبط " + Money.fa(linkNo), accent(), v -> {
                 if (dlgHolder[0] != null) dlgHolder[0].dismiss();
                 Screen s = a.screen(target);
                 if (s != null && s.filter() != null) {

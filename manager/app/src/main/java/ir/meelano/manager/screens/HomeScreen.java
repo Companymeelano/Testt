@@ -1713,7 +1713,7 @@ public class HomeScreen extends Screen {
                 .setMessage("فروشِ نمایش‌داده‌شده تا ساعت " + time
                         + " ثبت شده است. برآورد پایان روز تخمین است و به معنی فروش ثبت‌شده نیست؛ "
                         + "اگر سرعت فروش تغییر کند، نتیجه هم فرق می‌کند.")
-                .setPositiveButton("جزئیات محاسبه", (dialog, which) ->
+                .setPositiveButton("نمایش روش محاسبه", (dialog, which) ->
                         new android.app.AlertDialog.Builder(a)
                                 .setTitle("روش محاسبه")
                                 .setMessage("مبلغ ثبت‌شده تا این ساعت در ۱۴۴۰ دقیقهٔ روز ضرب و بر تعداد دقایق سپری‌شده تقسیم می‌شود. مقایسه با میانگین روزهای هم‌نامِ موجود در تاریخچه است. این روش فرض می‌کند سرعت فروش تا پایان روز ثابت بماند و پیش‌بینی قطعی نیست.")
@@ -3211,7 +3211,7 @@ public class HomeScreen extends Screen {
             detailParams.topMargin = Theme.dp(4);
             focus.addView(detail, detailParams);
             if (primary.action != null) {
-                android.widget.Button action = a.kit.btnGhost("بررسی مورد ›", primary.accent,
+                android.widget.Button action = a.kit.btnGhost("نمایش مورد ›", primary.accent,
                         v -> primary.action.run());
                 LinearLayout.LayoutParams actionParams = a.kit.lp(-2, -2);
                 actionParams.topMargin = Theme.dp(8);
@@ -4672,7 +4672,7 @@ public class HomeScreen extends Screen {
                     ProfitScreen.grossProfitCoverageWarningTitle(false),
                     "بهای خرید یک یا چند ردیف فروش ناموجود یا نامعتبر است؛ سود نمایش داده نمی‌شود.",
                     "نیاز به بررسی", Theme.WARNING, Theme.WARNING,
-                    "جزئیات", navAction("profit")), a.kit.lp(-1, -2));
+                    "نمایش جزئیات", navAction("profit")), a.kit.lp(-1, -2));
         } else if (d.grossProfitDaily.isEmpty()) {
             card.addView(a.kit.emptyRow("برای ماه جاری فروش قابل محاسبه‌ای ثبت نشده است."),
                     a.kit.lp(-1, -2));
@@ -5311,7 +5311,7 @@ public class HomeScreen extends Screen {
             LinearLayout actions = a.kit.h();
             actions.setGravity(Gravity.END);
             Button actionButton = dashboardHeaderAction(actionLabel, accent,
-                    actionLabel + "؛ مشاهدهٔ جزئیات", action);
+                    actionLabel + "؛ نمایش جزئیات", action);
             actions.addView(actionButton, a.kit.lp(-2, -2));
             LinearLayout.LayoutParams actionParams = a.kit.lp(-1, -2);
             actionParams.topMargin = Theme.dp(4);
@@ -6564,7 +6564,7 @@ public class HomeScreen extends Screen {
         line.addView(copy, a.kit.wlp(1f));
         String description = heading + "؛ " + text
                 + (badge == null ? "" : "؛ اولویت " + badge)
-                + (action == null ? "" : "؛ لمس برای مشاهدهٔ جزئیات");
+                + (action == null ? "" : "؛ لمس برای نمایش جزئیات");
         line.setContentDescription(description);
         if (action != null) {
             Theme.pressable(line);

@@ -566,7 +566,7 @@ public class ChequesScreen extends Screen {
         LinearLayout footer = a.kit.h();
         if (!r.s("code").isEmpty() && !"0".equals(r.s("code"))) {
             final String custCode = r.s("code");
-            footer.addView(a.kit.btn("حساب مشتری", v -> {
+            footer.addView(a.kit.btn("نمایش حساب مشتری", v -> {
                 dlg.dismiss();
                 // Same order as Home: load the dossier into the Customers screen, then open it.
                 Screen cs = a.screen("customers");

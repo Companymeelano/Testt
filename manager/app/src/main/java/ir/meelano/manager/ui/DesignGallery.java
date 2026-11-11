@@ -47,7 +47,7 @@ public final class DesignGallery {
                         "۴۰ فاکتور • میانگین هم‌نام ۳۳۸٬۰۶۸٬۱۹۸",
                         "۴۹۴٬۰۰۰٬۰۰", "تومان", "+۴۶٫۱٪", DerakhshanTokens.SUCCESS,
                         new double[]{2d, 4d, 3d, 6d, 5d, 8d, 7d, 10d},
-                        "ثبت فاکتور", null, "جزئیات", null),
+                        "ثبت فاکتور", null, "نمایش جزئیات", null),
                 match());
         panel.addView(gap(a, 10));
 

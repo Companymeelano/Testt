@@ -374,7 +374,7 @@ public class CloseoutScreen extends Screen {
                         + " • پرداخت " + snapshotAmount(snap, "paymentsAvailable", "payments");
                 String note = record.optString("note", "").trim();
                 if (!note.isEmpty()) totals += " • " + note;
-                card.addView(a.kit.personRow(action, details, totals, "جزئیات", Theme.INFO,
+                card.addView(a.kit.personRow(action, details, totals, "نمایش جزئیات", Theme.INFO,
                         v -> showHistory(selected)), a.kit.lp(-1, -2));
                 card.addView(a.kit.gap(5));
             }

@@ -1295,23 +1295,25 @@ public class MainActivity extends Activity {
         lastAppliedDark = systemDarkMode();
         readableColorCache.clear();
         if ("pearl_platinum".equals(id)) {
-            NAVY = Color.rgb(245, 247, 251);
+            // «مخمل کرم» — manager's Derakhshan 2.0 light material mirrored into the unified app:
+            // cream page, stone cards, emerald brand, four semantic families; gold only as edge/ink.
+            NAVY = Color.rgb(247, 243, 234);
             SURFACE = Color.rgb(255, 255, 255);
-            SURFACE_2 = Color.rgb(232, 237, 245);
-            GOLD = Color.rgb(168, 122, 44);
-            GOLD_2 = Color.rgb(224, 181, 92);
-            SUCCESS = Color.rgb(20, 135, 108);
-            INFO = Color.rgb(48, 96, 176);
-            WARNING = Color.rgb(188, 116, 42);
-            DANGER = Color.rgb(184, 51, 78);
-            TEXT = Color.rgb(24, 31, 43);
-            MUTED = Color.rgb(86, 98, 118);
-            BORDER = Color.argb(76, 158, 135, 89);
-            HEADER_START = Color.rgb(252, 253, 255);
-            HEADER_END = Color.rgb(231, 237, 247);
-            HERO_START = Color.rgb(255, 251, 241);
-            HERO_END = Color.rgb(236, 243, 253);
-            ON_PRIMARY = Color.rgb(30, 24, 14);
+            SURFACE_2 = Color.rgb(240, 235, 224);
+            GOLD = Color.rgb(27, 122, 80);
+            GOLD_2 = Color.rgb(46, 156, 104);
+            SUCCESS = Color.rgb(46, 125, 91);
+            INFO = Color.rgb(76, 110, 138);
+            WARNING = Color.rgb(201, 138, 46);
+            DANGER = Color.rgb(180, 67, 75);
+            TEXT = Color.rgb(31, 24, 12);
+            MUTED = Color.rgb(78, 66, 44);
+            BORDER = Color.argb(26, 31, 24, 12);
+            HEADER_START = Color.rgb(255, 253, 248);
+            HEADER_END = Color.rgb(239, 230, 214);
+            HERO_START = Color.rgb(27, 122, 80);
+            HERO_END = Color.rgb(10, 58, 44);
+            ON_PRIMARY = Color.WHITE;
         } else if ("rose_quartz_lux".equals(id)) {
             NAVY = Color.rgb(255, 247, 248);
             SURFACE = Color.rgb(255, 255, 255);
@@ -1480,23 +1482,24 @@ public class MainActivity extends Activity {
             HERO_END = Color.rgb(255, 255, 255);
             ON_PRIMARY = Color.WHITE;
         } else if ("noir_aurora".equals(id)) {
-            NAVY = Color.rgb(5, 8, 18);
-            SURFACE = Color.rgb(12, 17, 31);
-            SURFACE_2 = Color.rgb(19, 29, 48);
-            GOLD = Color.rgb(36, 190, 186);
-            GOLD_2 = Color.rgb(113, 103, 229);
-            SUCCESS = Color.rgb(77, 213, 169);
-            INFO = Color.rgb(84, 165, 230);
-            WARNING = Color.rgb(229, 174, 89);
-            DANGER = Color.rgb(230, 86, 124);
-            TEXT = Color.rgb(248, 252, 255);
-            MUTED = Color.rgb(160, 178, 207);
-            BORDER = Color.argb(66, 115, 205, 236);
-            HEADER_START = Color.rgb(4, 7, 17);
-            HEADER_END = Color.rgb(19, 24, 53);
-            HERO_START = Color.rgb(18, 31, 54);
-            HERO_END = Color.rgb(4, 10, 22);
-            ON_PRIMARY = Color.WHITE;
+            // «شب زمرد» — the dark twin: obsidian-emerald page, emerald brand, champagne gold ink.
+            NAVY = Color.rgb(4, 18, 13);
+            SURFACE = Color.rgb(12, 42, 32);
+            SURFACE_2 = Color.rgb(7, 28, 21);
+            GOLD = Color.rgb(46, 156, 104);
+            GOLD_2 = Color.rgb(232, 206, 122);
+            SUCCESS = Color.rgb(87, 179, 137);
+            INFO = Color.rgb(143, 176, 201);
+            WARNING = Color.rgb(224, 169, 78);
+            DANGER = Color.rgb(224, 138, 144);
+            TEXT = Color.rgb(244, 239, 223);
+            MUTED = Color.rgb(207, 198, 174);
+            BORDER = Color.argb(31, 244, 239, 223);
+            HEADER_START = Color.rgb(6, 24, 17);
+            HEADER_END = Color.rgb(12, 42, 32);
+            HERO_START = Color.rgb(27, 122, 80);
+            HERO_END = Color.rgb(10, 58, 44);
+            ON_PRIMARY = Color.rgb(4, 18, 13);
         } else if ("espresso_gold".equals(id)) {
             // «اسپرسو طلایی» (manager, phase 4): the launcher icon's dark espresso + golden halo as a full app palette.
             NAVY = Color.rgb(23, 16, 9);
@@ -8518,7 +8521,7 @@ public class MainActivity extends Activity {
             row.addView(customerMiniMetric("فاکتور", formatNumber(r.opt("docs")), INFO), weightedMiniLp());
             LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, -2); rp.setMargins(0, dp(9), 0, 0); c.addView(row, rp);
 
-            TextView more = pill(withIcon("☷", "مشاهده پرونده، حضور، مرخصی و گردش مالی"), accent, false);
+            TextView more = pill(withIcon("☷", MeelanoDesignKit.reveal("پرونده، حضور، مرخصی و گردش مالی")), accent, false);
             more.setGravity(Gravity.CENTER);
             LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(-1, dp(38)); mp.setMargins(0, dp(9), 0, 0); c.addView(more, mp);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2); lp.setMargins(0, 0, 0, dp(10)); content.addView(c, lp);
@@ -11896,7 +11899,7 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, -2); rp.setMargins(0, dp(10), 0, 0); c.addView(row, rp);
         LinearLayout actions = new LinearLayout(this); actions.setOrientation(LinearLayout.HORIZONTAL);
         Button pick = themedActionButton(visitorCartCustomer == null ? "انتخاب مشتری" : "تغییر مشتری", navAccent("customers"), visitorCartCustomer == null); pick.setTextSize(fs(9.2f)); pick.setOnClickListener(v -> { if (ensurePermission("customer_select", "انتخاب مشتری")) showCartCustomerPicker(""); });
-        Button open = themedActionButton(cartHasItems() ? "مشاهده / ارسال" : "باز کردن سبد", accent, cartHasItems()); open.setTextSize(fs(9.2f)); open.setOnClickListener(v -> showApp("cart"));
+        Button open = themedActionButton(cartHasItems() ? MeelanoDesignKit.reveal("ارسال") : "باز کردن سبد", accent, cartHasItems()); open.setTextSize(fs(9.2f)); open.setOnClickListener(v -> showApp("cart"));
         actions.addView(pick, weightedButtonLp()); actions.addView(open, weightedButtonLp());
         LinearLayout.LayoutParams ap = new LinearLayout.LayoutParams(-1, -2); ap.setMargins(0, dp(10), 0, 0); c.addView(actions, ap);
         LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2); cp.setMargins(0, 0, 0, dp(12)); content.addView(c, cp);
@@ -14174,7 +14177,7 @@ public class MainActivity extends Activity {
                 new VisitorToolSpec("مودیان و صورتحساب", "تنظیمات و ارسال مالیاتی", "▤", navAccent("taxpayers"), () -> showApp("taxpayers"), canOpenPage("taxpayers")),
                 new VisitorToolSpec("دوربین‌ها", "نمایش و کنترل دوربین", "◉", navAccent("cameras"), () -> showApp("cameras"), canOpenPage("cameras")),
                 new VisitorToolSpec("دزدگیر", "وضعیت و فرمان‌ها", "⌑", navAccent("alarm"), () -> showApp("alarm"), canOpenPage("alarm")),
-                new VisitorToolSpec("گزارش روزانه", "مشاهده و اشتراک", "▧", navAccent("visitor_reports"), () -> showApp("visitor_reports"), canOpenPage("visitor_reports"))
+                new VisitorToolSpec("گزارش روزانه", MeelanoDesignKit.reveal("اشتراک"), "▧", navAccent("visitor_reports"), () -> showApp("visitor_reports"), canOpenPage("visitor_reports"))
         });
         addVisitorMoreGroup("هوش مدیریتی", "دریل‌داون واقعی به رکوردهای آتیران", new VisitorToolSpec[]{
                 new VisitorToolSpec("اتاق فروش", "مقایسه بازه + ترکیب کالا و روز", "↗", navAccent("reports"), () -> showApp("mgr_cockpit"), true),
@@ -24948,6 +24951,10 @@ public class MainActivity extends Activity {
         TextView sub = text("فیلتر، جستجو یا تازه‌سازی را تغییر دهید؛ میلو داده را دوباره مرتب و تمیز نمایش می‌دهد.", 10.5f, MUTED, Typeface.NORMAL);
         sub.setGravity(Gravity.CENTER);
         sub.setLineSpacing(dp(2), 1.04f);
+        // C11: one guidance line on screen; the full sentence stays in the content description.
+        sub.setMaxLines(1);
+        sub.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        sub.setContentDescription("فیلتر، جستجو یا تازه‌سازی را تغییر دهید؛ میلو داده را دوباره مرتب و تمیز نمایش می‌دهد.");
         c.addView(sub, new LinearLayout.LayoutParams(-1, -2));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
         lp.setMargins(0, 0, 0, dp(10));

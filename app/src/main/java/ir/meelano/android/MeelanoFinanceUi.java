@@ -310,7 +310,7 @@ final class MeelanoFinanceUi {
         if (checks == null || checks.length() == 0) {
             page.addView(MeelanoUiKit.emptyState(h, "✓", "چکی در سیستم ثبت نشده",
                     "جدول چک‌های دریافتی (getchk) در این نسخهٔ آتیران داده‌ای ندارد یا ستون‌های لازم در دسترس نیست.",
-                    "مشاهدهٔ جدول چک‌ها", new Runnable() { @Override public void run() { h.goTo("checks"); } }), MeelanoUiKit.lp(-1, -2));
+                    MeelanoDesignKit.reveal("جدول چک‌ها"), new Runnable() { @Override public void run() { h.goTo("checks"); } }), MeelanoUiKit.lp(-1, -2));
             return;
         }
         String[][] defs = {{"over", "سررسیدگذشته (فوری)", "danger"}, {"soon", "هفت روز آینده", "warn"}, {"ok", "جاری", "success"}};
@@ -323,7 +323,7 @@ final class MeelanoFinanceUi {
         }
         MeelanoUiKit.kpiGrid(h, page, tiles, 1, 8);
         MeelanoUiKit.gap(h, page, 8);
-        page.addView(MeelanoUiKit.button(h, "▤  مشاهدهٔ جدول کامل چک‌ها", p.accent, false, new Runnable() {
+        page.addView(MeelanoUiKit.button(h, "▤  " + MeelanoDesignKit.reveal("جدول کامل چک‌ها"), p.accent, false, new Runnable() {
             @Override public void run() { h.goTo("checks"); }
         }), MeelanoUiKit.lp(-1, h.dp(44)));
     }

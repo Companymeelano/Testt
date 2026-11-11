@@ -56,6 +56,11 @@ final class MeelanoDesignKit {
         return key == null || key.trim().isEmpty() ? "بخش" : key;
     }
 
+    /** یک فعل نمایش برای کل برنامه: هر اقدامی که داده را باز می‌کند «نمایش …» می‌خواند. */
+    static String reveal(String what) {
+        return what == null || what.trim().isEmpty() ? "نمایش" : "نمایش " + what;
+    }
+
     static String beautyHint(String key) {
         if ("dashboard".equals(key)) return "نمای مدیریتی glass با KPIهای سریع";
         if ("customers".equals(key)) return "کارت مشتری با ریسک، تماس و اولویت وصول";

@@ -48,6 +48,7 @@ final class MeelanoLuxe {
 
     /** سطح شیشه‌ای سه‌لایه با خط مویی — کارت پایهٔ این لایه. */
     static GradientDrawable glass(MeelanoPalette p, int accent, float radius) {
+        accent = p.foldFamily(accent);
         int hero = p.mix(accent, p.accent2, p.light ? 0.14f : 0.20f);
         int top = p.mix(p.surface, hero, p.light ? 0.055f : 0.135f);
         int mid = p.mix(p.surface2, hero, p.light ? 0.10f : 0.20f);
@@ -63,6 +64,7 @@ final class MeelanoLuxe {
 
     /** سطح تودرتو (داخل کارت) — کمی نازک‌تر و روشن‌تر. */
     static GradientDrawable glassInner(MeelanoPalette p, int accent, float radius) {
+        accent = p.foldFamily(accent);
         int soft = p.mix(accent, p.accent2, p.light ? 0.10f : 0.16f);
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{
                 p.alpha(p.mix(p.surface, soft, p.light ? 0.04f : 0.11f), 244),
@@ -74,6 +76,7 @@ final class MeelanoLuxe {
 
     /** قرص طلایی (مدالیون) — پس‌زمینهٔ نشان و آیکون. */
     static GradientDrawable coin(MeelanoPalette p, int accent, float radius) {
+        accent = p.foldFamily(accent);
         int gold = p.mix(accent, p.accent2, 0.55f);
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{
                 p.alpha(p.mix(gold, Color.WHITE, p.light ? 0.10f : 0.22f), 255),
@@ -84,8 +87,18 @@ final class MeelanoLuxe {
         return d;
     }
 
+    /** سنگ آرام — متریال خانهٔ درخشان: رنگ در مدال‌ها و جوهرها زندگی می‌کند، نه دیوارها. */
+    static GradientDrawable stone(MeelanoPalette p, float radius) {
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{p.alpha(p.surface, 255), p.alpha(p.surface2, 255)});
+        d.setCornerRadius(radius);
+        d.setStroke(1, p.border);
+        return d;
+    }
+
     /** نشانهٔ کوچک (بج) — پُر یا خطی. */
     static GradientDrawable badge(MeelanoPalette p, int accent, boolean filled) {
+        accent = p.foldFamily(accent);
         GradientDrawable d = new GradientDrawable();
         d.setShape(GradientDrawable.RECTANGLE);
         d.setColor(filled ? p.alpha(p.mix(accent, p.accent2, 0.22f), p.light ? 34 : 48)

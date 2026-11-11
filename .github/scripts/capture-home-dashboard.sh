@@ -173,15 +173,64 @@ timeout 5 adb shell input keyevent 224 >/dev/null 2>&1 || true
 timeout 5 adb shell wm dismiss-keyguard >/dev/null 2>&1 || true
 timeout 5 adb shell input keyevent 82 >/dev/null 2>&1 || true
 
-instrumentation_log="$(mktemp)"
-set +e
-timeout 900 adb shell am instrument -w -r ir.meelano.manager.debug.test/androidx.test.runner.AndroidJUnitRunner 2>&1 | tee "$instrumentation_log"
-instrumentation_result=${PIPESTATUS[0]}
-set -e
-if [ "$instrumentation_result" -ne 0 ] \
-  || ! grep -Eq 'OK \([1-9][0-9]* tests?\)' "$instrumentation_log" \
-  || ! grep -Eq 'INSTRUMENTATION_CODE: -1' "$instrumentation_log" \
-  || grep -Eq 'INSTRUMENTATION_FAILED|INSTRUMENTATION_STATUS_CODE: -2|FAILURES!!!|Tests run: [0-9]+, Failures: [1-9]' "$instrumentation_log"; then
+# The hosted emulator occasionally wedges: the package service stalls during install, then the
+# System UI process stops answering input and its "isn't responding" dialog lands on top of the
+# capture. That is an environment fault, not a rendering fault, so recover the device and retry —
+# but only for that signature. A genuine assertion failure (contrast floor, 48dp touch target,
+# Persian label, PNG content) is reported on the first attempt and is never retried away.
+wait_for_ui_ready() {
+  local deadline=$((SECONDS + 120))
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    if [ "$(timeout 10 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ] \
+      && timeout 10 adb shell dumpsys window 2>/dev/null | grep -q "mCurrentFocus=.*ir.meelano.manager\|mCurrentFocus=Window{.*Launcher" \
+      && [ -n "$(timeout 10 adb shell pidof com.android.systemui 2>/dev/null | tr -d '\r')" ]; then
+      return 0
+    fi
+    sleep 5
+  done
+  echo "::warning title=Emulator UI not settled::Proceeding anyway; the instrumentation run reports the real state."
+  return 0
+}
+
+recover_emulator_ui() {
+  echo "::warning title=Emulator UI recovery::Clearing the not-responding dialog and restarting System UI before the next attempt."
+  timeout 20 adb shell input keyevent 4 >/dev/null 2>&1 || true
+  timeout 20 adb shell am force-stop ir.meelano.manager.debug >/dev/null 2>&1 || true
+  timeout 20 adb shell am force-stop com.android.systemui >/dev/null 2>&1 || true
+  timeout 60 adb shell 'while [ "$(getprop sys.boot_completed)" != "1" ]; do sleep 1; done' >/dev/null 2>&1 || true
+  sleep 10
+  timeout 5 adb shell input keyevent 224 >/dev/null 2>&1 || true
+  timeout 5 adb shell wm dismiss-keyguard >/dev/null 2>&1 || true
+  timeout 5 adb shell input keyevent 82 >/dev/null 2>&1 || true
+  timeout 30 adb shell am start -n ir.meelano.manager.debug/ir.meelano.manager.MainActivity >/dev/null 2>&1 || true
+  wait_for_ui_ready
+}
+
+instrumentation_ok=0
+for instrumentation_attempt in 1 2; do
+  wait_for_ui_ready
+  instrumentation_log="$(mktemp)"
+  set +e
+  timeout 900 adb shell am instrument -w -r ir.meelano.manager.debug.test/androidx.test.runner.AndroidJUnitRunner 2>&1 | tee "$instrumentation_log"
+  instrumentation_result=${PIPESTATUS[0]}
+  set -e
+  if [ "$instrumentation_result" -eq 0 ] \
+    && grep -Eq 'OK \([1-9][0-9]* tests?\)' "$instrumentation_log" \
+    && grep -Eq 'INSTRUMENTATION_CODE: -1' "$instrumentation_log" \
+    && ! grep -Eq 'INSTRUMENTATION_FAILED|INSTRUMENTATION_STATUS_CODE: -2|FAILURES!!!|Tests run: [0-9]+, Failures: [1-9]' "$instrumentation_log"; then
+    instrumentation_ok=1
+    break
+  fi
+  if [ "$instrumentation_attempt" -lt 2 ] \
+    && grep -Eq "isn.t responding|not responding|keyDispatchingTimedOut|ANR in|System UI" "$instrumentation_log"; then
+    echo "::warning title=Emulator not responding::Attempt $instrumentation_attempt hit an input-dispatch timeout; recovering and re-running the suite."
+    recover_emulator_ui
+    continue
+  fi
+  break
+done
+
+if [ "$instrumentation_ok" -ne 1 ]; then
   grep -E 'INSTRUMENTATION_STATUS|INSTRUMENTATION_RESULT|INSTRUMENTATION_CODE|INSTRUMENTATION_FAILED|FAILURES!!!|Tests run:|OK \(|AssertionError|Exception|Error:' "$instrumentation_log" | tail -n 10 | while IFS= read -r line; do
     safe_line="$(printf '%s' "$line" | sed 's/%/%25/g; s/:/%3A/g')"
     echo "::error title=Home screenshot instrumentation::$safe_line"

@@ -251,7 +251,8 @@ jobs:
     needs: build
     if: ${{ github.event_name != 'workflow_dispatch' || inputs.capture_screenshots }}
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    # Two instrumentation attempts: a wedged emulator costs one extra ~15-minute pass.
+    timeout-minutes: 60
     permissions:
       contents: write
     steps:
@@ -288,7 +289,7 @@ jobs:
         run: gradle :app:assembleDebug :app:assembleDebugAndroidTest -PhomeScreenshotAbi=true -Pandroid.useAndroidX=true --console=plain --no-daemon
 
       - name: Capture the real Home screen and sections at 100% and 130%
-        timeout-minutes: 20
+        timeout-minutes: 45
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 30

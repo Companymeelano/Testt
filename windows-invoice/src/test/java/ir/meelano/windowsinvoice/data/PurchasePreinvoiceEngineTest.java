@@ -14,14 +14,19 @@ public class PurchasePreinvoiceEngineTest {
         return d;
     }
 
+    private static void near(double expected, double actual, double tol) {
+        assertTrue(Math.abs(expected - actual) <= tol,
+                "expected " + expected + " but was " + actual + " (tolerance " + tol + ")");
+    }
+
     @Test
     public void tieredQuantityPicksWinningStep() {
         PurchasePreinvoiceEngine.Draft d = draft(60, 100_000, 0);
         d.lines.get(0).discs.add(new PurchasePreinvoiceEngine.Disc(
                 PurchasePreinvoiceEngine.DiscType.TIERED_QTY, 0, 0, "10:5,50:10"));
         PurchasePreinvoiceEngine.Totals t = PurchasePreinvoiceEngine.compute(d);
-        assertEquals(600_000, t.rowDisc, 0.51);   // ۱۰٪ برد برنده برای ۶۰ عدد
-        assertEquals(5_400_000, t.grand - t.tax - t.duty, 1.01);
+        near(600_000, t.rowDisc, 0.51);   // ۱۰٪ برد برنده برای ۶۰ عدد
+        near(5_400_000, t.grand - t.tax - t.duty, 1.01);
     }
 
     @Test
@@ -32,8 +37,8 @@ public class PurchasePreinvoiceEngineTest {
         l.discs.add(new PurchasePreinvoiceEngine.Disc(PurchasePreinvoiceEngine.DiscType.ROW_PER_UNIT, 20_000, 0, ""));
         PurchasePreinvoiceEngine.Totals t = PurchasePreinvoiceEngine.compute(d);
         // 1,000,000 - 200,000 = 800,000 سپس ۱۰٪ ⇒ 720,000 خالص
-        assertEquals(280_000, t.rowDisc, 0.51);
-        assertEquals(720_000, l.net, 0.51);
+        near(280_000, t.rowDisc, 0.51);
+        near(720_000, l.net, 0.51);
     }
 
     @Test
@@ -41,9 +46,9 @@ public class PurchasePreinvoiceEngineTest {
         PurchasePreinvoiceEngine.Draft d = draft(1, 1_000_000, 0);
         d.lines.get(0).dutyPct = 2;
         PurchasePreinvoiceEngine.Totals t = PurchasePreinvoiceEngine.compute(d);
-        assertEquals(100_000, t.tax, 0.51);
-        assertEquals(20_000, t.duty, 0.51);
-        assertEquals(1_120_000, t.grand, 0.51);
+        near(100_000, t.tax, 0.51);
+        near(20_000, t.duty, 0.51);
+        near(1_120_000, t.grand, 0.51);
     }
 
     @Test
@@ -51,8 +56,8 @@ public class PurchasePreinvoiceEngineTest {
         PurchasePreinvoiceEngine.Draft d = draft(1, 1_100_000, 0);
         d.taxMode = PurchasePreinvoiceEngine.TAX_INCLUSIVE;
         PurchasePreinvoiceEngine.Totals t = PurchasePreinvoiceEngine.compute(d);
-        assertEquals(100_000, t.tax, 0.51);
-        assertEquals(1_100_000, t.grand, 0.51);
+        near(100_000, t.tax, 0.51);
+        near(1_100_000, t.grand, 0.51);
     }
 
     @Test
@@ -62,8 +67,8 @@ public class PurchasePreinvoiceEngineTest {
         d.lines.get(0).discs.add(new PurchasePreinvoiceEngine.Disc(
                 PurchasePreinvoiceEngine.DiscType.INVOICE_PERCENT, 5, 0, ""));
         PurchasePreinvoiceEngine.Totals t = PurchasePreinvoiceEngine.compute(d);
-        assertEquals(50_000, t.invDisc, 0.51);
-        assertEquals(950_000, t.grand, 0.51);
+        near(50_000, t.invDisc, 0.51);
+        near(950_000, t.grand, 0.51);
     }
 
     @Test
@@ -71,15 +76,15 @@ public class PurchasePreinvoiceEngineTest {
         PurchasePreinvoiceEngine.Draft d = draft(3, 333_333.7, 0);
         d.rounding = "thousand";
         PurchasePreinvoiceEngine.Totals t = PurchasePreinvoiceEngine.compute(d);
-        assertEquals(1_000_000, t.goods, 0.01);
+        near(1_000_000, t.goods, 0.01);
     }
 
     @Test
     public void diffAgainstReferenceIsLive() {
         PurchasePreinvoiceEngine.Draft d = draft(3, 120_000, 100_000);
         PurchasePreinvoiceEngine.compute(d);
-        assertEquals(60_000, d.lines.get(0).diffAmt, 0.51);
-        assertEquals(20, d.lines.get(0).diffPct, 0.001);
+        near(60_000, d.lines.get(0).diffAmt, 0.51);
+        near(20, d.lines.get(0).diffPct, 0.001);
     }
 
     @Test
@@ -88,8 +93,8 @@ public class PurchasePreinvoiceEngineTest {
         d.lines.get(0).taxPct = 0;
         d.cashDiscPct = 2.5;
         PurchasePreinvoiceEngine.Totals t = PurchasePreinvoiceEngine.compute(d);
-        assertEquals(25_000, t.cashDisc, 0.51);
-        assertEquals(975_000, t.payable, 0.51);
+        near(25_000, t.cashDisc, 0.51);
+        near(975_000, t.payable, 0.51);
     }
 
     @Test
@@ -115,6 +120,6 @@ public class PurchasePreinvoiceEngineTest {
         d.lines.get(0).discs.add(new PurchasePreinvoiceEngine.Disc(
                 PurchasePreinvoiceEngine.DiscType.PROMO_PERCENT, 50, 2_000_000, "نوروز"));
         PurchasePreinvoiceEngine.Totals t = PurchasePreinvoiceEngine.compute(d);
-        assertEquals(2_000_000, t.rowDisc, 0.51);
+        near(2_000_000, t.rowDisc, 0.51);
     }
 }

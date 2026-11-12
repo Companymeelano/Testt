@@ -1,5 +1,7 @@
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+#endif
 import MeelanoPreinvoice
 
 /// صفحهٔ «پیش‌فاکتور خرید» — آیفونِ رایگان، زبان درخشان ۲.۰، راست‌به‌چپ، دسترس‌پذیری
@@ -491,24 +493,22 @@ struct PreinvoiceView: View {
         syncFromDraft()
         isDirty = false
         FeatureFlags.recordInvoice()
-        // پیام موفقیت با haptic
+#if canImport(UIKit)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
+#endif
     }
 
     func doShare(kind: String) {
         var copy = draft
         let t = PreinvoiceEngine.compute(&copy)
+#if canImport(UIKit)
         let title = "پیش‌فاکتور خرید \(draft.docNo.isEmpty ? "" : draft.docNo)"
         var items: [Any] = []
-        var fileName = "preinvoice"
-        var mime = "text/plain"
-        // شیت iOS بر اساس پسوند/MIME رفتار درست می‌کند
         switch kind {
         case "csv":
             let data = PreinvoiceExport.csv(draft: draft, totals: t)
             let url = FileManager.default.temporaryDirectory.appendingPathComponent("preinvoice.csv")
             try? data.write(to: url); items = [url]
-            fileName = "preinvoice.csv"; mime = "text/csv"
         case "xls":
             let data = PreinvoiceExport.xls(draft: draft, totals: t)
             let url = FileManager.default.temporaryDirectory.appendingPathComponent("preinvoice.xls")
@@ -526,13 +526,17 @@ struct PreinvoiceView: View {
             items = [txt]
         }
         let av = UIActivityViewController(activityItems: items, applicationActivities: nil)
-        // iPad popover
         if let pop = av.popoverPresentationController, let win = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first?.keyWindow {
             pop.sourceView = win; pop.sourceRect = CGRect(x: win.bounds.midX, y: win.bounds.midY, width: 0, height: 0)
         }
         UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first?.keyWindow?.rootViewController?.present(av, animated: true)
         showExportSheet = false
         if !draft.id.isEmpty { draft.status = "sent"; var c = draft; PreinvoiceStore.save(&c) }
+#else
+        // روی macOS (swift test) فقط لاگ — اشتراک iOS فقط روی دستگاه
+        print("Share \(kind) — \(PreinvoiceExport.summary(draft: draft, totals: t))")
+        showExportSheet = false
+#endif
     }
 
     var freeBanner: some View {

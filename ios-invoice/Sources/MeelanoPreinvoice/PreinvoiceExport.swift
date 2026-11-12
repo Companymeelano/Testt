@@ -1,5 +1,7 @@
 import Foundation
+#if canImport(UIKit)
 import UIKit
+#endif
 
 /// خروجی‌های حرفه‌ای پیش‌فاکتور — CSV (BOM)، Excel SpreadsheetML، Word HTML، PDF چندصفحه‌ای
 public enum PreinvoiceExport {
@@ -71,7 +73,8 @@ public enum PreinvoiceExport {
 
     private static func esc(_ s: String) -> String { s.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;").replacingOccurrences(of: ">", with: "&gt;") }
 
-    /// PDF چندصفحه‌ای با جدول، سربرگ، جمع‌بندی و واترمارک
+    /// PDF چندصفحه‌ای با جدول، سربرگ، جمع‌بندی و واترمارک — فقط روی iOS (UIKit)
+#if canImport(UIKit)
     public static func pdf(draft: PreinvoiceEngine.Draft, totals: PreinvoiceEngine.Totals) -> Data {
         let format = UIGraphicsPDFRendererFormat()
         format.documentInfo = [kCGPDFContextTitle as String: "پیش‌فاکتور خرید \(draft.docNo)"]
@@ -80,10 +83,7 @@ public enum PreinvoiceExport {
         return renderer.pdfData { ctx in
             var y: CGFloat = 20
             func newPageIfNeeded(need: CGFloat) {
-                if y + need > 810 {
-                    ctx.beginPage()
-                    y = 20
-                }
+                if y + need > 810 { ctx.beginPage(); y = 20 }
             }
             ctx.beginPage()
             let titleAttrs: [NSAttributedString.Key: Any] = [.font: UIFont.boldSystemFont(ofSize: 16)]
@@ -96,26 +96,17 @@ public enum PreinvoiceExport {
             if !draft.note.isEmpty { "یادداشت: \(draft.note)".draw(at: CGPoint(x: 20, y: y), withAttributes: headAttrs); y += 14 }
             if !draft.supplierAddress.isEmpty { "نشانی: \(draft.supplierAddress)".draw(at: CGPoint(x: 20, y: y), withAttributes: headAttrs); y += 14 }
             y += 6
-            // هدر جدول
             let cols = ["کد کالا", "نام کالا", "تعداد", "واحد", "قیمت واحد", "تخفیف", "مالیات", "جمع قلم", "اختلاف"]
             let widths: [CGFloat] = [60, 120, 45, 40, 70, 60, 60, 70, 60]
             var x: CGFloat = 20
-            for (idx, col) in cols.enumerated() {
-                col.draw(at: CGPoint(x: x + 2, y: y), withAttributes: bodyAttrs)
-                x += widths[idx]
-            }
+            for (idx, col) in cols.enumerated() { col.draw(at: CGPoint(x: x + 2, y: y), withAttributes: bodyAttrs); x += widths[idx] }
             y += 12
-            // خط
             let linePath = UIBezierPath(); linePath.move(to: CGPoint(x: 20, y: y)); linePath.addLine(to: CGPoint(x: 575, y: y)); UIColor.lightGray.setStroke(); linePath.stroke(); y += 6
             for l in draft.lines {
                 newPageIfNeeded(need: 18)
                 let vals = [l.code, l.name, l.qty == Double(Int(l.qty)) ? "\(Int(l.qty))" : String(format: "%.2f", l.qty), l.unit, "\(Int(l.price))", "\(Int(l.rowDisc+l.invDisc))", "\(Int(l.taxAmt+l.dutyAmt))", "\(Int(l.total))", "\(Int(l.diffAmt))"]
                 x = 20
-                for (idx, v) in vals.enumerated() {
-                    let truncated = v.count > 18 ? String(v.prefix(18)) + "…" : v
-                    truncated.draw(at: CGPoint(x: x + 2, y: y), withAttributes: bodyAttrs)
-                    x += widths[idx]
-                }
+                for (idx, v) in vals.enumerated() { let t = v.count > 18 ? String(v.prefix(18)) + "…" : v; t.draw(at: CGPoint(x: x + 2, y: y), withAttributes: bodyAttrs); x += widths[idx] }
                 y += 14
             }
             y += 8
@@ -123,10 +114,13 @@ public enum PreinvoiceExport {
             "جمع اقلام: \(Int(totals.goods))  تخفیفات: \(Int(totals.discSum)) (\(String(format: "%.1f", totals.discPct))٪)  مالیات: \(Int(totals.tax))  عوارض: \(Int(totals.duty))".draw(at: CGPoint(x: 20, y: y), withAttributes: bodyAttrs); y += 14
             "جمع کل: \(Int(totals.grand)) ریال — تخفیف نقدی: \(Int(totals.cashDisc)) — قابل پرداخت: \(Int(totals.payable)) ریال".draw(at: CGPoint(x: 20, y: y), withAttributes: boldAttrs); y += 16
             "اختلاف کل با مرجع: \(Int(totals.diff)) ریال".draw(at: CGPoint(x: 20, y: y), withAttributes: bodyAttrs); y += 16
-            if FeatureFlags.isFree {
-                let wmAttrs: [NSAttributedString.Key: Any] = [.font: UIFont.italicSystemFont(ofSize: 7), .foregroundColor: UIColor.systemGray]
-                FeatureFlags.freeWatermark.draw(at: CGPoint(x: 20, y: y), withAttributes: wmAttrs)
-            }
+            if FeatureFlags.isFree { let wmAttrs: [NSAttributedString.Key: Any] = [.font: UIFont.italicSystemFont(ofSize: 7), .foregroundColor: UIColor.systemGray]; FeatureFlags.freeWatermark.draw(at: CGPoint(x: 20, y: y), withAttributes: wmAttrs) }
         }
     }
+#else
+    public static func pdf(draft: PreinvoiceEngine.Draft, totals: PreinvoiceEngine.Totals) -> Data {
+        // روی macOS (swift test) — PDF واقعی فقط روی iOS؛ برای تست یک بایت خالی برگردان
+        return summary(draft: draft, totals: totals).data(using: .utf8) ?? Data()
+    }
+#endif
 }

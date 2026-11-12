@@ -3614,7 +3614,8 @@ public class MainActivity extends Activity {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) bar.setElevation(dp(8));
         String[][] items = UNIFIED_EDITION ? (isFullAccessUser() ? new String[][]{
                 {"dashboard", "مدیریت", "⌂"}, {"showcase", "کالا", "◈"}, {"cart", "فروش", "⊕"},
-                {"warehouse", "انبار", "▧"}, {"finance", "مالی", "↗"}, {"manager_more", "بیشتر", "☰"}
+                {"warehouse", "انبار", "▧"}, {"finance", "مالی", "↗"},
+                {"preinvoice", "پیش‌فاکتور", "▤"}, {"manager_more", "بیشتر", "☰"}
         } : "warehouse".equals(currentAccessRole()) ? new String[][]{
                 {"warehouse", "انبار", "▧"}, {"products", "کالاها", "◈"}, {"showcase", "موجودی", "▣"}, {"attendance", "حضور", "◷"}
         } : new String[][]{
@@ -3690,7 +3691,7 @@ public class MainActivity extends Activity {
         if (MANAGER_EDITION || UNIFIED_EDITION) {
             if ("login".equals(page)) return "";
             if (UNIFIED_EDITION) {
-                if ("dashboard".equals(page) || "showcase".equals(page) || "cart".equals(page) || "warehouse".equals(page) || "finance".equals(page) || "manager_more".equals(page)) return page;
+                if ("dashboard".equals(page) || "showcase".equals(page) || "cart".equals(page) || "warehouse".equals(page) || "finance".equals(page) || "preinvoice".equals(page) || "manager_more".equals(page)) return page;
                 if ("warehouse".equals(currentAccessRole()) && ("products".equals(page) || "attendance".equals(page))) return page;
                 if ("visitor_dashboard".equals(page) || "visit".equals(page) || "visitor_more".equals(page)) return page;
                 return isFullAccessUser() ? "manager_more" : "visitor_more";
@@ -3904,6 +3905,7 @@ public class MainActivity extends Activity {
             case "mgr_credit": loadManagerCredit(); break;
             case "warehouse": loadManagerWarehouse(); break;
             case "finance": loadManagerFinance(); break;
+            case "preinvoice": loadPreinvoice(); break;
             default: loadDashboard(); break;
         }
     }
@@ -13028,6 +13030,14 @@ public class MainActivity extends Activity {
     }
 
     /** اتاق فرمان مالی: همان متریک‌های مدیریتی + تحلیل مطالبات/قیمت‌گذاری/نقدینگی. */
+    /** صفحهٔ پیش‌فاکتور خرید: دفترچهٔ محلی، محاسبهٔ زنده و خروجی‌های اشتراک. */
+    private void loadPreinvoice() {
+        final LinearLayout page = freshModulePage();
+        MeelanoPreinvoiceUi.build(uiHost, page, new Runnable() {
+            @Override public void run() { runOnUiThread(new Runnable() { @Override public void run() { loadPreinvoice(); } }); }
+        });
+    }
+
     private void loadManagerFinance() {
         MeelanoFinanceUi.vatPercent = parseNumber(prefs == null ? "10" : prefs.getString(KEY_VAT_PERCENT, "10"), 10);
         final LinearLayout page = freshModulePage();

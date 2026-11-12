@@ -20,6 +20,7 @@ import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.Money;
+import ir.meelano.manager.core.PersianNumber;
 import ir.meelano.manager.core.PreinvoiceExport;
 import ir.meelano.manager.core.PurchasePreinvoice;
 import ir.meelano.manager.core.PurchasePreinvoiceStore;
@@ -82,32 +83,104 @@ public class PurchasePreinvoiceScreen extends Screen {
         refreshNumbers();
     }
 
+    private boolean isDirty() {
+        // اگر کاربر چیزی تایپ کرده باشد حتی بدون ذخیره، هشدار بده
+        if (!draft.supplierName.trim().isEmpty() || !draft.supplierCode.trim().isEmpty()
+                || !draft.supplierPhone.trim().isEmpty() || !draft.docNo.trim().isEmpty()) return true;
+        return !draft.lines.isEmpty();
+    }
+
     // --------------------------------------------------------------- سربرگ و دفترچه
     private LinearLayout draftPicker() {
+        LinearLayout wrap = a.kit.v();
+        android.widget.HorizontalScrollView hsv = new android.widget.HorizontalScrollView(a);
+        hsv.setHorizontalScrollBarEnabled(false);
         LinearLayout row = a.kit.h();
         row.addView(a.kit.btnGhost("＋ پیش‌فاکتور تازه", Theme.INFO, v -> {
+            if (isDirty()) { confirmDiscard(() -> { draft = new PurchasePreinvoice.Draft(); render(live); }); return; }
             draft = new PurchasePreinvoice.Draft();
             render(live);
         }), a.kit.lp(-2, -2));
         List<PurchasePreinvoice.Draft> saved = PurchasePreinvoiceStore.load(a);
-        int shown = 0;
         for (final PurchasePreinvoice.Draft d : saved) {
-            if (shown++ >= 5) break;
             String label = (d.docNo.isEmpty() ? "بی‌شماره" : d.docNo) + " • "
                     + (d.supplierName.isEmpty() ? "بی‌فروشنده" : d.supplierName);
             row.addView(a.kit.chip(label, d.id.equals(draft.id), Theme.INFO, v -> {
+                if (d.id.equals(draft.id)) return;
+                if (isDirty()) { confirmDiscard(() -> { draft = d; render(live); }); return; }
                 draft = d;
                 render(live);
             }), a.kit.lp(-2, -2));
         }
-        if (!draft.id.isEmpty()) {
-            row.addView(a.kit.btnGhost("حذف این سند", Theme.DANGER, v -> {
-                PurchasePreinvoiceStore.delete(a, draft.id);
-                draft = new PurchasePreinvoice.Draft();
-                render(live);
-            }), a.kit.lp(-2, -2));
+        // نشانگر ادامه وقتی اسناد زیادند
+        if (saved.size() > 6) row.addView(a.kit.hint("← بکشید برای بقیه (" + Money.fa(String.valueOf(saved.size())) + ")"), a.kit.lp(-2, -2));
+        hsv.addView(row);
+        wrap.addView(hsv, a.kit.lp(-1, -2));
+        // ردیف دوم: جستجو/فهرست کامل + حذف
+        LinearLayout actions = a.kit.h();
+        if (saved.size() > 3) {
+            actions.addView(a.kit.btnGhost("فهرست همهٔ سندها (" + Money.fa(String.valueOf(saved.size())) + ")", Theme.INFO, v -> showAllPicker()), a.kit.lp(-2, -2));
         }
-        return row;
+        if (!draft.id.isEmpty()) {
+            actions.addView(a.kit.btnGhost("حذف این سند", Theme.DANGER, v -> confirmDelete()), a.kit.lp(-2, -2));
+        }
+        if (actions.getChildCount() > 0) wrap.addView(actions, a.kit.lp(-1, -2));
+        return wrap;
+    }
+
+    private void showAllPicker() {
+        List<PurchasePreinvoice.Draft> saved = PurchasePreinvoiceStore.load(a);
+        LinearLayout body = a.kit.v();
+        android.widget.ScrollView sv = new android.widget.ScrollView(a);
+        LinearLayout list = a.kit.v();
+        final android.app.AlertDialog[] holder = new android.app.AlertDialog[1];
+        for (final PurchasePreinvoice.Draft dd : saved) {
+            String label = (dd.docNo.isEmpty() ? "بی‌شماره" : dd.docNo) + " • " + (dd.supplierName.isEmpty() ? "بی‌فروشنده" : dd.supplierName) + " • " + Jalali.dispFa(String.valueOf(dd.dateTs));
+            list.addView(a.kit.btnGhost(label, Theme.INFO, v -> {
+                if (isDirty()) {
+                    if (holder[0]!=null) holder[0].dismiss();
+                    confirmDiscard(() -> { draft = dd; render(live); });
+                    return;
+                }
+                draft = dd; render(live);
+                if (holder[0]!=null) holder[0].dismiss();
+            }), a.kit.lp(-1, -2));
+        }
+        sv.addView(list);
+        body.addView(sv, a.kit.lp(-1, Theme.dp(320)));
+        holder[0] = a.kit.dialog("انتخاب سند — همهٔ سندهای محلی", body, true);
+        holder[0].show();
+    }
+
+    private void confirmDelete() {
+        LinearLayout body = a.kit.v();
+        body.addView(a.kit.text("این سند از دفترچهٔ محلی حذف شود؟ این عمل برگشت‌پذیر نیست.", 12f, Theme.TEXT, false), a.kit.lp(-1, -2));
+        body.addView(a.kit.hint("فقط دفترچهٔ محلی برنامه پاک می‌شود؛ هیچ چیزی از سامانهٔ مرکزی حذف نمی‌شود."), a.kit.lp(-1, -2));
+        LinearLayout row = a.kit.h();
+        final android.app.AlertDialog[] dlg = new android.app.AlertDialog[1];
+        row.addView(a.kit.btnGhost("انصراف", Theme.MUTED, v -> { if (dlg[0]!=null) dlg[0].dismiss(); }), a.kit.lp(-2, -2));
+        row.addView(a.kit.btn("حذف", v -> {
+            PurchasePreinvoiceStore.delete(a, draft.id);
+            draft = new PurchasePreinvoice.Draft();
+            render(live);
+            a.kit.toast("سند از دفترچه حذف شد");
+            if (dlg[0] != null) dlg[0].dismiss();
+        }), a.kit.lp(-2, -2));
+        body.addView(row, a.kit.lp(-1, -2));
+        dlg[0] = a.kit.dialog("تأیید حذف", body, true);
+        dlg[0].show();
+    }
+
+    private void confirmDiscard(Runnable onConfirm) {
+        LinearLayout body = a.kit.v();
+        body.addView(a.kit.text("تغییرات ذخیره‌نشده از دست برود؟", 12f, Theme.TEXT, false), a.kit.lp(-1, -2));
+        body.addView(a.kit.hint("برای نگه‌داشتن تغییرات، ابتدا «ثبت پیش‌فاکتور در سامانه» را بزنید."), a.kit.lp(-1, -2));
+        LinearLayout row = a.kit.h();
+        final android.app.AlertDialog[] dlg = new android.app.AlertDialog[1];
+        row.addView(a.kit.btnGhost("انصراف", Theme.MUTED, v -> { if (dlg[0]!=null) dlg[0].dismiss(); }), a.kit.lp(-2, -2));
+        row.addView(a.kit.btn("ادامه بدون ذخیره", v -> { if (dlg[0]!=null) dlg[0].dismiss(); onConfirm.run(); }), a.kit.lp(-2, -2));
+        body.addView(row, a.kit.lp(-1, -2));
+        dlg[0] = a.kit.dialog("توجه", body, true); dlg[0].show();
     }
 
     private LinearLayout partiesCard() {
@@ -355,13 +428,16 @@ public class PurchasePreinvoiceScreen extends Screen {
 
     private EditText field(String hint, String value, final Set set, boolean numeric) {
         final EditText e = a.kit.edit(hint, value == null ? "" : value);
-        if (numeric) e.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        if (numeric) e.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL | InputType.TYPE_NUMBER_FLAG_SIGNED);
         e.setImeOptions(EditorInfo.IME_ACTION_NEXT);
+        // تاریخ سند با منطقهٔ زمانی دستگاه محاسبه می‌شود (Jalali از timestamp محلی می‌سازد) — برای مرز روز، تقویم دستگاه ملاک است
         e.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) { }
             @Override public void onTextChanged(CharSequence s, int a, int b, int c) { }
             @Override public void afterTextChanged(Editable s) {
-                set.set(s.toString().trim());
+                String raw = s.toString();
+                set.set(raw.trim());
+                if (numeric) showNumError(e, raw);
                 refreshNumbers();
             }
         });
@@ -377,11 +453,13 @@ public class PurchasePreinvoiceScreen extends Screen {
     }
 
     private static double num(String s) {
-        try {
-            return Double.parseDouble(s == null ? "" : s.replace(",", "").trim());
-        } catch (RuntimeException e) {
-            return 0;
-        }
+        return PersianNumber.valueOrZero(s);
+    }
+
+    private static void showNumError(EditText e, String raw) {
+        PersianNumber.Result r = PersianNumber.parse(raw);
+        if (r.error != null) e.setError(r.error);
+        else e.setError(null);
     }
 
     private static String str(double v) {

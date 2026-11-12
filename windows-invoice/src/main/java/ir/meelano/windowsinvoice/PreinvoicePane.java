@@ -137,12 +137,20 @@ public final class PreinvoicePane extends VBox {
     }
 
     private void accelerators() {
-        if (stage == null || stage.getScene() == null) return;
-        stage.getScene().getAccelerators().put(new KeyCodeCombination(KeyCode.F2), this::newDraft);
-        stage.getScene().getAccelerators().put(new KeyCodeCombination(KeyCode.F3), this::addLine);
-        stage.getScene().getAccelerators().put(new KeyCodeCombination(KeyCode.F4), this::save);
-        stage.getScene().getAccelerators().put(new KeyCodeCombination(KeyCode.F5), this::exportMenu);
-        stage.getScene().getAccelerators().put(new KeyCodeCombination(KeyCode.F6), this::print);
+        if (stage == null) return;
+        Runnable bind = () -> {
+            if (stage.getScene() == null) return;
+            // از ثبت تکراری جلوگیری کن
+            stage.getScene().getAccelerators().clear();
+            stage.getScene().getAccelerators().put(new KeyCodeCombination(KeyCode.F2), this::newDraft);
+            stage.getScene().getAccelerators().put(new KeyCodeCombination(KeyCode.F3), this::addLine);
+            stage.getScene().getAccelerators().put(new KeyCodeCombination(KeyCode.F4), this::save);
+            stage.getScene().getAccelerators().put(new KeyCodeCombination(KeyCode.F5), this::exportMenu);
+            stage.getScene().getAccelerators().put(new KeyCodeCombination(KeyCode.F6), this::print);
+        };
+        if (stage.getScene() != null) bind.run();
+        stage.sceneProperty().addListener((o, a, b) -> { if (b != null) bind.run(); });
+        // Tab/Shift+Tab به‌صورت پیش‌فرض JavaFX کار می‌کند؛ focusOrder فقط برای Enter
     }
 
     // --------------------------------------------------------------- فرم سربرگ
@@ -171,13 +179,26 @@ public final class PreinvoicePane extends VBox {
         due.textProperty().addListener((o, a, b) -> draft.dueDays = (int) num(b));
         TextField cash = field("تخفیف نقدی پایانی ٪", str(draft.cashDiscPct));
         cash.textProperty().addListener((o, a, b) -> { draft.cashDiscPct = num(b); recompute(); });
-        TextField taxMode = field("حالت مالیات (add/incl)", draft.taxMode);
-        taxMode.textProperty().addListener((o, a, b) -> {
-            draft.taxMode = "incl".equals(b) ? PurchasePreinvoiceEngine.TAX_INCLUSIVE : PurchasePreinvoiceEngine.TAX_ADD;
+        ComboBox<String> taxBox = new ComboBox<>(FXCollections.observableArrayList("افزوده‌شده", "شامل قیمت"));
+        taxBox.setValue(PurchasePreinvoiceEngine.TAX_INCLUSIVE.equals(draft.taxMode) ? "شامل قیمت" : "افزوده‌شده");
+        taxBox.setOnAction(e -> {
+            draft.taxMode = "شامل قیمت".equals(taxBox.getValue()) ? PurchasePreinvoiceEngine.TAX_INCLUSIVE : PurchasePreinvoiceEngine.TAX_ADD;
             recompute();
         });
-        TextField rounding = field("گردکردن (none/rial/toman/hundred/thousand)", draft.rounding);
-        rounding.textProperty().addListener((o, a, b) -> { draft.rounding = b.trim(); recompute(); });
+        ComboBox<String> roundingBox = new ComboBox<>(FXCollections.observableArrayList("بدون گرد (none)", "ریال (rial)", "تومان (toman)", "صد ریال (hundred)", "هزار ریال (thousand)"));
+        String rv = draft.rounding;
+        String rLabel = "بدون گرد (none)";
+        if ("rial".equals(rv)) rLabel = "ریال (rial)"; else if ("toman".equals(rv)) rLabel = "تومان (toman)"; else if ("hundred".equals(rv)) rLabel = "صد ریال (hundred)"; else if ("thousand".equals(rv)) rLabel = "هزار ریال (thousand)";
+        roundingBox.setValue(rLabel);
+        roundingBox.setOnAction(e -> {
+            String v = roundingBox.getValue();
+            if (v != null && v.contains("rial)")) draft.rounding = "rial";
+            else if (v != null && v.contains("toman")) draft.rounding = "toman";
+            else if (v != null && v.contains("hundred")) draft.rounding = "hundred";
+            else if (v != null && v.contains("thousand")) draft.rounding = "thousand";
+            else draft.rounding = "none";
+            recompute();
+        });
         TextArea note = new TextArea(draft.note);
         note.setPromptText("یادداشت سند");
         note.setPrefRowCount(2);
@@ -192,11 +213,11 @@ public final class PreinvoicePane extends VBox {
         g.add(label("خریدار"), 0, r); g.add(buyer, 1, r); g.add(label("کد خریدار"), 2, r); g.add(buyerCode, 3, r);
         g.add(label("تخفیف نقدی ٪"), 4, r); g.add(cash, 5, r);
         r++;
-        g.add(label("حالت مالیات"), 0, r); g.add(taxMode, 1, r); g.add(label("گردکردن"), 2, r); g.add(rounding, 3, r);
+        g.add(label("حالت مالیات"), 0, r); g.add(taxBox, 1, r); g.add(label("گردکردن"), 2, r); g.add(roundingBox, 3, r);
         g.add(label("نشانی"), 4, r); g.add(addr, 5, r);
         r++;
         g.add(label("یادداشت"), 0, r); g.add(note, 1, r, 5, 1);
-        for (Node n : new Node[]{supplierName, supplierCode, nat, phone, docNo, due, buyer, buyerCode, cash, taxMode, rounding, addr, note}) {
+        for (Node n : new Node[]{supplierName, supplierCode, nat, phone, docNo, due, buyer, buyerCode, cash, taxBox, roundingBox, addr, note}) {
             focusOrder.add(n);
         }
         return g;
@@ -234,47 +255,76 @@ public final class PreinvoicePane extends VBox {
 
     private Node lineNode(final LineRow row, boolean attach) {
         final PurchasePreinvoiceEngine.Line l = row.line;
-        VBox box = new VBox(4);
-        box.setPadding(new Insets(6));
+        VBox box = new VBox(6);
+        box.setPadding(new Insets(8));
         box.getStyleClass().add("customer-details-card");
-        HBox top = new HBox(6);
+        // سطر 1: کد/نام/واحد با wrapping
+        javafx.scene.layout.FlowPane r1 = new javafx.scene.layout.FlowPane(6, 6);
         row.code = field("کد کالا", l.code);
+        row.code.setPrefWidth(110);
         row.code.textProperty().addListener((o, a, b) -> l.code = b);
         row.name = field("نام کالا", l.name);
+        row.name.setPrefWidth(180);
         row.name.textProperty().addListener((o, a, b) -> l.name = b);
         row.unit = field("واحد", l.unit);
+        row.unit.setPrefWidth(80);
         row.unit.textProperty().addListener((o, a, b) -> l.unit = b);
-        row.qty = field("تعداد", str(l.qty));
-        row.qty.textProperty().addListener((o, a, b) -> { l.qty = num(b); recompute(); });
-        row.price = field("قیمت واحد", str(l.price));
-        row.price.textProperty().addListener((o, a, b) -> { l.price = num(b); recompute(); });
-        row.ref = field("قیمت مرجع", str(l.refPrice));
-        row.ref.textProperty().addListener((o, a, b) -> { l.refPrice = num(b); recompute(); });
-        row.tax = field("مالیات ٪", str(l.taxPct));
-        row.tax.textProperty().addListener((o, a, b) -> { l.taxPct = num(b); recompute(); });
-        row.duty = field("عوارض ٪", str(l.dutyPct));
-        row.duty.textProperty().addListener((o, a, b) -> { l.dutyPct = num(b); recompute(); });
-        row.discs = button("تخفیف‌ها (0)", false);
+        r1.getChildren().addAll(row.code, row.name, row.unit);
+        // سطر 2: اعداد در FlowPane تا در پنجره باریک نشکنند
+        javafx.scene.layout.FlowPane r2 = new javafx.scene.layout.FlowPane(6, 6);
+        row.qty = field("تعداد", str(l.qty)); row.qty.setPrefWidth(110);
+        attachNumListener(row.qty, v -> { l.qty = v; recompute(); });
+        row.price = field("قیمت واحد", str(l.price)); row.price.setPrefWidth(140);
+        attachNumListener(row.price, v -> { l.price = v; recompute(); });
+        row.ref = field("قیمت مرجع", str(l.refPrice)); row.ref.setPrefWidth(130);
+        attachNumListener(row.ref, v -> { l.refPrice = v; recompute(); });
+        row.tax = field("مالیات ٪", str(l.taxPct)); row.tax.setPrefWidth(90);
+        attachNumListener(row.tax, v -> { l.taxPct = v; recompute(); });
+        row.duty = field("عوارض ٪", str(l.dutyPct)); row.duty.setPrefWidth(90);
+        attachNumListener(row.duty, v -> { l.dutyPct = v; recompute(); });
+        r2.getChildren().addAll(row.qty, row.price, row.ref, row.tax, row.duty);
+        HBox actions = new HBox(6);
+        row.discs = button("تخفیف‌ها (" + l.discs.size() + ")", false);
         row.discs.setOnAction(e -> discsDialog(row));
-        Button remove = button("حذف", false);
-        remove.setOnAction(e -> {
-            rows.remove(row);
-            draft.lines.remove(l);
-            rowsBox.getChildren().remove(box);
-            focusOrder.removeAll(List.of(row.code, row.name, row.unit, row.qty, row.price, row.ref, row.tax, row.duty));
-            recompute();
-        });
-        top.getChildren().addAll(row.code, row.name, row.unit, row.qty, row.price, row.ref, row.tax, row.duty, row.discs, remove);
+        Button remove = button("حذف قلم", false);
+        remove.setOnAction(e -> confirmRemoveRow(row, box));
+        actions.getChildren().addAll(row.discs, remove);
         row.total = new Label("جمع قلم: —");
         row.total.getStyleClass().add("customer-summary-value");
         row.diff = new Label("اختلاف با مرجع: —");
         row.diff.getStyleClass().add("customer-hint");
-        box.getChildren().addAll(top, row.total, row.diff);
+        row.diff.setWrapText(true);
+        box.getChildren().addAll(r1, r2, actions, row.total, row.diff);
         if (attach) draft.lines.add(l);
         for (Node n : new Node[]{row.code, row.name, row.unit, row.qty, row.price, row.ref, row.tax, row.duty}) {
             focusOrder.add(n);
         }
         return box;
+    }
+
+    private interface NumSetter { void set(double v); }
+    private void attachNumListener(TextField tf, NumSetter setter) {
+        tf.textProperty().addListener((o, a, b) -> {
+            PersianNumber.Result r = PersianNumber.parse(b);
+            if (r.error != null) { tf.setStyle("-fx-border-color: #c0392b; -fx-border-radius: 4;"); status.setText(r.error + " — مقدار قبلی حفظ شد"); return; }
+            tf.setStyle("");
+            setter.set(r.value != null ? r.value : 0);
+            recompute();
+        });
+    }
+    private void confirmRemoveRow(LineRow row, VBox box) {
+        javafx.scene.control.Alert al = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.CONFIRMATION);
+        al.initOwner(stage);
+        al.setTitle("تأیید حذف");
+        al.setHeaderText("این قلم حذف شود؟");
+        al.setContentText("حذف قلم برگشت‌پذیر نیست.");
+        if (al.showAndWait().orElse(javafx.scene.control.ButtonType.CANCEL) == javafx.scene.control.ButtonType.OK) {
+            rows.remove(row);
+            draft.lines.remove(row.line);
+            rowsBox.getChildren().remove(box);
+            focusOrder.removeAll(List.of(row.code, row.name, row.unit, row.qty, row.price, row.ref, row.tax, row.duty));
+            recompute();
+        }
     }
 
     private void discsDialog(final LineRow row) {
@@ -299,19 +349,25 @@ public final class PreinvoicePane extends VBox {
         VBox list = new VBox(4);
         for (int i = 0; i < row.line.discs.size(); i++) {
             final int at = i;
-            Button del = button(row.line.discs.get(i).type.fa + " • حذف", false);
+            Button del = button(row.line.discs.get(i).type.fa + " — " + row.line.discs.get(i).v1 + " • حذف", false);
             del.setOnAction(e -> {
                 row.line.discs.remove(at);
+                row.discs.setText("تخفیف‌ها (" + row.line.discs.size() + ")");
+                // دیالوگ فعلی را ببند و تازه بساز تا فهرست بروز شود
+                Stage cur = (Stage) del.getScene().getWindow();
+                cur.close();
                 discsDialog(row);
                 recompute();
             });
             list.getChildren().add(del);
         }
+        // جلوگیری از بازماندن چند دیالوگ: اگر قبلاً باز است ابتدا ببند
         box.getChildren().addAll(type, v1, v2, spec, add, list);
         Stage dlg = new Stage();
         dlg.initOwner(stage);
-        dlg.setScene(new javafx.scene.Scene(box, 380, 420));
-        dlg.setTitle("تخفیف‌های قلم");
+        dlg.initModality(javafx.stage.Modality.WINDOW_MODAL);
+        dlg.setScene(new javafx.scene.Scene(box, 400, 460));
+        dlg.setTitle("تخفیف‌های قلم — " + (row.line.name.isEmpty() ? "قلم بی‌نام" : row.line.name));
         dlg.show();
     }
 
@@ -340,6 +396,15 @@ public final class PreinvoicePane extends VBox {
         for (int i = 0; i < 8; i++) totals[i].setText(vals[i]);
     }
 
+    private boolean isDirtyWin() { return !draft.lines.isEmpty() || !draft.supplierName.trim().isEmpty() || !draft.docNo.trim().isEmpty(); }
+    private void confirmDiscardWin(Runnable ok) {
+        if (!isDirtyWin()) { ok.run(); return; }
+        javafx.scene.control.Alert a = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.CONFIRMATION);
+        a.initOwner(stage); a.setTitle("توجه"); a.setHeaderText("تغییرات ذخیره‌نشده از دست برود؟");
+        a.setContentText("برای نگه‌داشتن، ابتدا «ثبت در سامانه (F4)» را بزنید.");
+        if (a.showAndWait().orElse(javafx.scene.control.ButtonType.CANCEL) == javafx.scene.control.ButtonType.OK) ok.run();
+    }
+
     private void refreshDrafts() {
         drafts.getItems().clear();
         for (PurchasePreinvoiceEngine.Draft d : PurchasePreinvoiceStoreWin.load()) {
@@ -350,13 +415,11 @@ public final class PreinvoicePane extends VBox {
     private void openDraft(int index) {
         List<PurchasePreinvoiceEngine.Draft> all = PurchasePreinvoiceStoreWin.load();
         if (index < 0 || index >= all.size()) return;
-        draft = all.get(index);
-        rebuild();
+        confirmDiscardWin(() -> { draft = all.get(index); rebuild(); });
     }
 
     private void newDraft() {
-        draft = new PurchasePreinvoiceEngine.Draft();
-        rebuild();
+        confirmDiscardWin(() -> { draft = new PurchasePreinvoiceEngine.Draft(); rebuild(); });
     }
 
     /** فرم را با سند انتخاب‌شده از نو می‌سازد (ریشهٔ صحنه عوض می‌شود). */
@@ -380,13 +443,15 @@ public final class PreinvoicePane extends VBox {
 
     private void deleteDraft() {
         if (draft.id.isEmpty()) { status.setText("سندی انتخاب نشده است."); return; }
+        javafx.scene.control.Alert a = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.CONFIRMATION);
+        a.initOwner(stage); a.setTitle("تأیید حذف"); a.setHeaderText("این سند از دفترچهٔ محلی حذف شود؟"); a.setContentText("فقط دفترچهٔ محلی ویندوز پاک می‌شود.");
+        if (a.showAndWait().orElse(javafx.scene.control.ButtonType.CANCEL) != javafx.scene.control.ButtonType.OK) return;
         try {
             PurchasePreinvoiceStoreWin.delete(draft.id);
             refreshDrafts();
             status.setText("سند از دفترچه حذف شد.");
-        } catch (IOException e) {
-            status.setText("حذف ممکن نشد: " + e.getMessage());
-        }
+            draft = new PurchasePreinvoiceEngine.Draft(); rebuild();
+        } catch (IOException e) { status.setText("حذف ممکن نشد: " + e.getMessage()); }
     }
 
     private void exportMenu() {
@@ -433,10 +498,7 @@ public final class PreinvoicePane extends VBox {
         }
     }
 
-    private static double num(String s) {
-        try { return Double.parseDouble(s == null ? "" : s.replace(",", "").trim()); }
-        catch (RuntimeException e) { return 0; }
-    }
+    private static double num(String s) { return PersianNumber.valueOrZero(s); }
 
     private static String str(double v) {
         return v == Math.rint(v) ? String.valueOf((long) v) : String.format(Locale.US, "%.2f", v);

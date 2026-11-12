@@ -40,30 +40,40 @@ final class MeelanoPreinvoiceUi {
                 "کالاهایی که هنوز فاکتور خریدشان ثبت نشده؛ قیمت، اختلاف، تخفیف پله‌ای، مالیات و عوارض",
                 "▤", p.accent), MeelanoUiKit.lp(-1, -2));
 
+        android.widget.HorizontalScrollView hsv = new android.widget.HorizontalScrollView(h.ctx());
+        hsv.setHorizontalScrollBarEnabled(false);
         LinearLayout pick = MeelanoUiKit.row(h);
         pick.addView(MeelanoUiKit.button(h, "＋ پیش‌فاکتور تازه", p.accent, false, new Runnable() {
             @Override public void run() { draft = new MeelanoPreinvoice.Draft(); rerun.run(); }
         }), MeelanoUiKit.lp(-2, -2));
         List<MeelanoPreinvoice.Draft> saved = MeelanoPreinvoiceStore.load(h.ctx());
-        int shown = 0;
         for (final MeelanoPreinvoice.Draft d : saved) {
-            if (shown++ >= 4) break;
             String label = (d.docNo.isEmpty() ? "بی‌شماره" : d.docNo) + " • "
                     + (d.supplierName.isEmpty() ? "بی‌فروشنده" : d.supplierName);
             pick.addView(MeelanoUiKit.button(h, label, p.accent, d.id.equals(draft.id), new Runnable() {
                 @Override public void run() { draft = d; rerun.run(); }
             }), MeelanoUiKit.lp(-2, -2));
         }
+        hsv.addView(pick);
+        page.addView(hsv, MeelanoUiKit.lp(-1, -2));
+        if (saved.size() > 6) page.addView(MeelanoUiKit.text(h, "← بکشید برای بقیه (" + saved.size() + " سند)", 10f, p.muted, false), MeelanoUiKit.lp(-1, -2));
         if (!draft.id.isEmpty()) {
-            pick.addView(MeelanoUiKit.button(h, "حذف سند", p.danger, false, new Runnable() {
+            LinearLayout delRow = MeelanoUiKit.row(h);
+            delRow.addView(MeelanoUiKit.button(h, "حذف این سند", p.danger, false, new Runnable() {
                 @Override public void run() {
-                    MeelanoPreinvoiceStore.delete(h.ctx(), draft.id);
-                    draft = new MeelanoPreinvoice.Draft();
-                    rerun.run();
+                    confirmDeleteApp(h, rerun);
                 }
             }), MeelanoUiKit.lp(-2, -2));
+            page.addView(delRow, MeelanoUiKit.lp(-1, -2));
         }
-        page.addView(pick, MeelanoUiKit.lp(-1, -2));
+        if (saved.size() > 4) {
+            LinearLayout allRow = MeelanoUiKit.row(h);
+            final List<MeelanoPreinvoice.Draft> all = saved;
+            allRow.addView(MeelanoUiKit.button(h, "فهرست همه (" + all.size() + ")", p.accent, false, new Runnable() {
+                @Override public void run() { showAllPickerApp(h, all, rerun); }
+            }), MeelanoUiKit.lp(-2, -2));
+            page.addView(allRow, MeelanoUiKit.lp(-1, -2));
+        }
         MeelanoUiKit.gap(h, page, 8);
 
         page.addView(parties(h, rerun), MeelanoUiKit.lp(-1, -2));
@@ -366,13 +376,39 @@ final class MeelanoPreinvoiceUi {
     // --------------------------------------------------------------- ابزارها
     private interface Set { void set(String v); }
 
+    private static void confirmDeleteApp(final MeelanoUiHost h, final Runnable rerun) {
+        LinearLayout body = MeelanoUiKit.column(h);
+        body.addView(MeelanoUiKit.text(h, "این سند از دفترچهٔ محلی حذف شود؟", 12f, h.colors().text, false), MeelanoUiKit.lp(-1, -2));
+        LinearLayout row = MeelanoUiKit.row(h);
+        final android.app.AlertDialog[] holder = new android.app.AlertDialog[1];
+        row.addView(MeelanoUiKit.button(h, "انصراف", h.colors().muted, false, new Runnable() { @Override public void run() { if (holder[0]!=null) holder[0].dismiss(); } }), MeelanoUiKit.lp(-2, -2));
+        row.addView(MeelanoUiKit.button(h, "حذف", h.colors().danger, true, new Runnable() { @Override public void run() { MeelanoPreinvoiceStore.delete(h.ctx(), draft.id); draft = new MeelanoPreinvoice.Draft(); if (holder[0]!=null) holder[0].dismiss(); rerun.run(); } }), MeelanoUiKit.lp(-2, -2));
+        body.addView(row, MeelanoUiKit.lp(-1, -2));
+        holder[0] = new AlertDialog.Builder(h.ctx()).setView(body).create(); holder[0].show();
+    }
+    private static void showAllPickerApp(final MeelanoUiHost h, final List<MeelanoPreinvoice.Draft> all, final Runnable rerun) {
+        LinearLayout body = MeelanoUiKit.column(h);
+        ScrollView sv = new ScrollView(h.ctx()); LinearLayout list = MeelanoUiKit.column(h);
+        final android.app.AlertDialog[] holder = new android.app.AlertDialog[1];
+        for (final MeelanoPreinvoice.Draft dd : all) {
+            String label = (dd.docNo.isEmpty() ? "بی‌شماره" : dd.docNo) + " • " + (dd.supplierName.isEmpty() ? "بی‌فروشنده" : dd.supplierName);
+            list.addView(MeelanoUiKit.button(h, label, h.colors().accent, false, new Runnable() { @Override public void run() { draft = dd; if (holder[0]!=null) holder[0].dismiss(); rerun.run(); } }), MeelanoUiKit.lp(-1, -2));
+        }
+        sv.addView(list); body.addView(sv, MeelanoUiKit.lp(-1, h.dp(320)));
+        holder[0] = new AlertDialog.Builder(h.ctx()).setView(body).create(); holder[0].show();
+    }
+
     private static EditText watch(MeelanoUiHost h, EditText e, final Set set) {
         e.setImeOptions(EditorInfo.IME_ACTION_NEXT);
+        // عددی‌ها با PersianNumber اعتبارسنجی می‌شوند؛ خالی=0 برای live compute
+        final boolean isNumeric = (e.getInputType() & android.text.InputType.TYPE_CLASS_NUMBER) != 0;
         e.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) { }
             @Override public void onTextChanged(CharSequence s, int a, int b, int c) { }
             @Override public void afterTextChanged(Editable s) {
-                set.set(s.toString().trim());
+                String raw = s.toString();
+                set.set(raw.trim());
+                if (isNumeric) showNumError(e, raw);
                 if (lastHost != null) refresh(lastHost);
             }
         });
@@ -400,9 +436,10 @@ final class MeelanoPreinvoiceUi {
         return r[0];
     }
 
-    private static double num(String s) {
-        try { return Double.parseDouble(s == null ? "" : s.replace(",", "").trim()); }
-        catch (RuntimeException e) { return 0; }
+    private static double num(String s) { return PersianNumber.valueOrZero(s); }
+    private static void showNumError(EditText e, String raw) {
+        PersianNumber.Result r = PersianNumber.parse(raw);
+        if (r.error != null) e.setError(r.error); else e.setError(null);
     }
 
     private static String str(double v) {

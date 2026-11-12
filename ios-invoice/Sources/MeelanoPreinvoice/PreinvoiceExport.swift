@@ -27,7 +27,7 @@ public enum PreinvoiceExport {
         return d
     }
 
-    /// PDF حرفه‌ای با UIGraphicsPDFRenderer — سربرگ، جدول اقلام، جمع‌بندی
+    /// PDF حرفه‌ای با UIGraphicsPDFRenderer — سربرگ، جدول اقلام، جمع‌بندی + واترمارک رایگان
     public static func pdf(draft: PreinvoiceEngine.Draft, totals: PreinvoiceEngine.Totals) -> Data {
         let meta = UIGraphicsPDFRendererBounds()
         let renderer = UIGraphicsPDFRenderer(bounds: meta, format: UIGraphicsPDFRendererFormat())
@@ -43,6 +43,13 @@ public enum PreinvoiceExport {
             }
             y += 10
             "جمع کل: \(Int(totals.grand)) ریال — قابل پرداخت: \(Int(totals.payable)) ریال".draw(at: CGPoint(x: 20, y: y), withAttributes: bodyAttrs)
+            if FeatureFlags.isFree {
+                let wmAttrs: [NSAttributedString.Key: Any] = [
+                    .font: UIFont.italicSystemFont(ofSize: 8),
+                    .foregroundColor: UIColor.systemGray
+                ]
+                FeatureFlags.freeWatermark.draw(at: CGPoint(x: 20, y: y + 20), withAttributes: wmAttrs)
+            }
         }
     }
 }

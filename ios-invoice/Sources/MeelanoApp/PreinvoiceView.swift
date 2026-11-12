@@ -26,7 +26,8 @@ struct PreinvoiceView: View {
             .padding(12)
         }
         .background(Color.creamVelvet)
-        .navigationTitle("پیش‌فاکتور خرید")
+        .navigationTitle(FeatureFlags.isFree ? "پیش‌فاکتور خرید — رایگان" : "پیش‌فاکتور خرید")
+        .overlay(alignment: .top) { if FeatureFlags.isFree { freeBanner } }
         .toolbar { keyboardToolbar }
         .onChange(of: draft) { recompute() }
         .onAppear { recompute() }
@@ -193,6 +194,11 @@ struct PreinvoiceView: View {
             Spacer()
             Button("تمام") { focusedField = nil }
         }
+        ToolbarItem(placement: .navigationBarTrailing) {
+            Menu("راهنما") {
+                Text("نسخهٔ رایگان: \(FeatureFlags.freeMonthlyLimit) فاکتور/ماه — ارتقا از داخل برنامه")
+            }
+        }
     }
 
     func recompute() {
@@ -202,10 +208,38 @@ struct PreinvoiceView: View {
         draft.lines = copy.lines
     }
 
+    @State private var showLimitAlert = false
+    @State private var limitMessage = ""
+
+    var freeBanner: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "gift.fill").font(.caption2)
+            Text("نسخهٔ رایگان — \(FeatureFlags.freeMonthlyLimit) فاکتور در ماه، PDF با واترمارک")
+                .font(.caption2)
+            Spacer()
+            Text("ارتقا").font(.caption2.bold()).padding(.horizontal, 8).padding(.vertical, 4)
+                .background(Color.white.opacity(0.9)).cornerRadius(6)
+        }
+        .foregroundColor(.white).padding(.horizontal, 12).padding(.vertical, 6)
+        .background(Color.emerald).cornerRadius(8).padding(8)
+    }
+
     func save() {
         guard !draft.supplierName.trimmingCharacters(in: .whitespaces).isEmpty else { return }
         guard !draft.lines.isEmpty else { return }
+        if FeatureFlags.isFree && !FeatureFlags.canCreateInvoice() {
+            limitMessage = "سقف \(FeatureFlags.freeMonthlyLimit) فاکتور رایگان این ماه پر شد."
+            showLimitAlert = true; return
+        }
+        if FeatureFlags.isFree && FeatureFlags.freeLocksTieredDiscount {
+            let hasTiered = draft.lines.contains { $0.discs.contains { $0.type == .tieredQty || $0.type == .tieredAmount } }
+            if hasTiered {
+                limitMessage = "تخفیف پله‌ای فقط در نسخهٔ کامل فعال است."
+                showLimitAlert = true; return
+            }
+        }
         PreinvoiceStore.save(&draft)
+        FeatureFlags.recordInvoice()
     }
 
     func share() {

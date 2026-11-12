@@ -55,7 +55,7 @@ public final class WindowsRoleMenus {
         CATALOG.put(STOCK_LEDGER, new Item(STOCK_LEDGER, "گردش و موجودی انبار", "Ctrl+Shift+4 · انبار"));
         CATALOG.put(CASH, new Item(CASH, "صندوق و دریافتی‌ها", "Ctrl+Shift+5 · صندوق"));
         CATALOG.put(CHEQUES, new Item(CHEQUES, "چک‌های دریافتی و پرداختی", "Ctrl+Shift+6 · چک‌ها"));
-        CATALOG.put(PREINVOICE, new Item(PREINVOICE, "پیش‌فاکتور خرید", "Ctrl+Shift+3 · پیش‌فاکتور"));
+        CATALOG.put(PREINVOICE, new Item(PREINVOICE, "پیش‌فاکتور خرید", "پیش‌فاکتور خرید · ثبت از منو"));
         CATALOG.put(REPORTS, new Item(REPORTS, "گزارش‌های فروش و مالی", "Ctrl+Shift+7 · گزارش"));
         CATALOG.put(PROFIT, new Item(PROFIT, "سود و بهای تمام‌شده", "Ctrl+Shift+8 · سود"));
         CATALOG.put(PRODUCTION, new Item(PRODUCTION, "تولید و شمارش", "Ctrl+Shift+9 · تولید"));
@@ -117,6 +117,7 @@ public final class WindowsRoleMenus {
      */
     public static String sectionForDigit(int digit) {
         switch (digit) {
+            case 3: return PREINVOICE;
             case 4: return STOCK_LEDGER;
             case 5: return CASH;
             case 6: return CHEQUES;

@@ -359,7 +359,7 @@ public final class SectionCatalog {
                         SectionColumn.text("due_state", "وضعیت سررسید", 1.3),
                         SectionColumn.text("approval", "تایید سامانه", 1.1))
                 .derived(Derived.of("due_state", Derivation.CHEQUE_DUE_STATE, "due_date"),
-                        Derived.of("approval", Derivation.APPROVAL_STATE))
+                        Derived.of("approval", Derivation.APPROVAL_STATE, "num", "sayad"))
                 .kpis(Kpi.count("تعداد چک"), Kpi.sum("جمع مبلغ", "amount"),
                         Kpi.matches("برگشتی‌ها", "bounced", "برگشتی"),
                         Kpi.matches("نزد صندوق", "status", "نزد صندوق"),
@@ -381,7 +381,7 @@ public final class SectionCatalog {
                         SectionColumn.text("due_state", "وضعیت سررسید", 1.3),
                         SectionColumn.text("approval", "تایید سامانه", 1.1))
                 .derived(Derived.of("due_state", Derivation.CHEQUE_DUE_STATE, "due_date"),
-                        Derived.of("approval", Derivation.APPROVAL_STATE))
+                        Derived.of("approval", Derivation.APPROVAL_STATE, "num", "sayad"))
                 .kpis(Kpi.count("تعداد چک"), Kpi.sum("جمع مبلغ", "amount"),
                         Kpi.matches("جاری", "status", "جاری"), Kpi.matches("پاس‌شده", "status", "پاس‌شده"),
                         Kpi.matches("تیک خورده", "approval", "تیک خورده"),

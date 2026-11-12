@@ -1227,14 +1227,18 @@ public final class Kit {
         block.setBackground(skeleton);
         block.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         if (Ui.motionOk(a)) {
-            android.animation.ObjectAnimator pulse = android.animation.ObjectAnimator.ofFloat(
-                    block, View.ALPHA, 0.72f, 1f);
-            pulse.setDuration(1250);
-            pulse.setRepeatMode(ValueAnimator.REVERSE);
-            pulse.setRepeatCount(ValueAnimator.INFINITE);
+            // Derakhshan 2.0: one shimmer per session — a single SHIMMER_MS sweep when the
+            // skeleton attaches, never an infinite pulse.
+            block.setAlpha(0.72f);
             block.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
-                @Override public void onViewAttachedToWindow(View v) { pulse.start(); }
-                @Override public void onViewDetachedFromWindow(View v) { pulse.cancel(); }
+                @Override public void onViewAttachedToWindow(View v) {
+                    android.animation.ObjectAnimator sweep = android.animation.ObjectAnimator.ofFloat(
+                            v, View.ALPHA, 0.72f, 1f);
+                    sweep.setDuration(DerakhshanTokens.SHIMMER_MS);
+                    sweep.setRepeatCount(0);
+                    sweep.start();
+                }
+                @Override public void onViewDetachedFromWindow(View v) { }
             });
         }
         float width = Math.max(0.1f, Math.min(1f, widthFraction));

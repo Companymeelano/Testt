@@ -160,7 +160,7 @@ public final class AiSettings {
         }
         card.addView(a.kit.gap(8));
 
-        card.addView(a.kit.btnGold("✦ ذخیرهٔ رضایت و تنظیمات گفتار", v -> {
+        card.addView(a.kit.btnGhost("✦ ذخیرهٔ رضایت و تنظیمات گفتار", Theme.GOLD, v -> {
             p.edit().putBoolean("consent", consent.isChecked())
                     .putInt("consent_version", CONSENT_VERSION)
                     .apply();

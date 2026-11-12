@@ -354,7 +354,7 @@ public class PickWaveScreen extends Screen {
         card.addView(a.kit.sectionHead("فهرست تجمیعی بارگیری", null, null), a.kit.lp(-1, -2));
         card.addView(a.kit.hint("هر اسکن یک قلم کالا را برای این موج علامت می‌زند؛ اگر بارکد به کد کالا نگاشت نشده باشد، می‌توانید ردیف را دستی تأیید کنید."),
                 a.kit.lp(-1, -2));
-        card.addView(a.kit.btnGold("▦ اسکن کالا هنگام بارگیری", v -> scan()), a.kit.lp(-1, -2));
+        card.addView(a.kit.btnGhost("▦ اسکن کالا هنگام بارگیری", Theme.GOLD, v -> scan()), a.kit.lp(-1, -2));
         int done = 0;
         for (PickLine line : pickLines) if (line.picked) done++;
         card.addView(a.kit.kv("پیشرفت", Money.fa(String.valueOf(done)) + " از "

@@ -2101,6 +2101,7 @@ public class HomeScreen extends Screen {
 
     private void build(LinearLayout content, Data d, SyncState syncState, String syncTime) {
         content.removeAllViews();
+        entranceIndex = 0;
         View.OnClickListener retry = syncState == SyncState.STALE || syncState == SyncState.OFFLINE
                 || syncState == SyncState.ERROR ? v -> render(content) : null;
         View status = syncStatus(syncTime, syncState, null, retry);
@@ -2732,8 +2733,24 @@ public class HomeScreen extends Screen {
     }
 
     /** Home-only flat card factory; section hue is carried by restrained surface tint and borders. */
+    /** Entrance index of the current render; reset in build() so each pass staggers from zero. */
+    private int entranceIndex;
+
     private LinearLayout homeCard(int accent) {
         LinearLayout card = a.kit.card(accent);
+        if (Ui.motionOk(a)) {
+            // Card entrance: 420ms rise+fade, delays capped so the last card lands <=700ms.
+            final int idx = entranceIndex++;
+            card.setAlpha(0f);
+            card.setTranslationY(Theme.dp(14));
+            card.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
+                @Override public void onViewAttachedToWindow(View v) {
+                    v.animate().alpha(1f).translationY(0f)
+                            .setStartDelay(Math.min(280, idx * 60L)).setDuration(420).start();
+                }
+                @Override public void onViewDetachedFromWindow(View v) { }
+            });
+        }
         card.setBackground(Theme.dashboardCard(accent));
         card.setPadding(Theme.dp(Theme.CARD_PADDING_HORIZONTAL_DP),
                 Theme.dp(Theme.CARD_PADDING_VERTICAL_DP),

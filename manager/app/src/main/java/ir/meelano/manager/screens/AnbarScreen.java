@@ -206,7 +206,7 @@ public class AnbarScreen extends Screen {
                         card.addView(a.kit.kv(r.s("name"), detail, Theme.WARNING), a.kit.lp(-1, -2));
                     }
                     card.addView(a.kit.gap(8));
-                    card.addView(a.kit.btnGold("🧾 ساخت پیش‌نویس خرید از کسری‌ها",
+                    card.addView(a.kit.btnGhost("🧾 ساخت پیش‌نویس خرید از کسری‌ها", Theme.GOLD,
                             v -> autoBuyDraft()), a.kit.lp(-1, -2));
                 }
                 a.kit.addCard(box, card);

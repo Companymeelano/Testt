@@ -459,7 +459,7 @@ public final class VisitorDeskScreen extends Screen {
         c.addView(a.kit.text("پیش‌فاکتور جدید",16,Theme.TEXT,true),a.kit.lp(-1,-2));
         if(selectedCustomer==null){
             c.addView(a.kit.hint("ابتدا مشتری را از مسیر ویزیت خود انتخاب کنید."),a.kit.lp(-1,-2));
-            c.addView(a.kit.btnGold("انتخاب مشتری",v->{customerPickerReturnPage=ORDER;loadCustomers(pageBodyRef,true);}),a.kit.lp(-1,-2));
+            c.addView(a.kit.btnGhost("انتخاب مشتری",Theme.GOLD,v->{customerPickerReturnPage=ORDER;loadCustomers(pageBodyRef,true);}),a.kit.lp(-1,-2));
         }else{
             c.addView(a.kit.personRow(selectedCustomer.name,"کد "+Money.fa(String.valueOf(selectedCustomer.code)),"مشتری پیش‌فاکتور","تغییر",Theme.INFO,v->chooseCustomerForOrder()),a.kit.lp(-1,-2));
             c.addView(a.kit.gap(8));
@@ -733,7 +733,7 @@ public final class VisitorDeskScreen extends Screen {
     private void renderReceipt(LinearLayout c){
         c.addView(a.kit.text("ثبت دریافت وجه / پیش‌دریافت",16,Theme.TEXT,true),a.kit.lp(-1,-2));
         c.addView(a.kit.hint("رسید در دفتر رسمی آتیران با Daryaft و شناسهٔ کاربر واقعی ویزیتور ثبت می‌شود؛ ارسال تکراری با شناسهٔ یکتا قبض دوم نمی‌سازد."),a.kit.lp(-1,-2));
-        if(receiptCustomer==null)c.addView(a.kit.btnGold("انتخاب مشتری از مسیر من",v->{customerPickerReturnPage=RECEIPT;loadCustomers(pageBodyRef,true);}),a.kit.lp(-1,-2));
+        if(receiptCustomer==null)c.addView(a.kit.btnGhost("انتخاب مشتری از مسیر من",Theme.GOLD,v->{customerPickerReturnPage=RECEIPT;loadCustomers(pageBodyRef,true);}),a.kit.lp(-1,-2));
         else c.addView(a.kit.personRow(receiptCustomer.name,"کد "+Money.fa(String.valueOf(receiptCustomer.code)),receiptCustomer.phone,"تغییر مشتری",Theme.INFO,v->{receiptCustomer=null;render(contentRef);}),a.kit.lp(-1,-2));
         EditText amount=a.kit.edit("مبلغ دریافت به ریال",receiptAmount);amount.setInputType(InputType.TYPE_CLASS_NUMBER|InputType.TYPE_NUMBER_FLAG_DECIMAL);amount.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int st,int count,int after){}public void onTextChanged(CharSequence s,int st,int before,int count){receiptAmount=s.toString();}public void afterTextChanged(android.text.Editable e){}});c.addView(amount,a.kit.lp(-1,-2));
         c.addView(a.kit.chips(new String[]{"نقدی","کارت‌خوان","حواله","چک"},"cash".equals(receiptMethod)?0:"pos".equals(receiptMethod)?1:"transfer".equals(receiptMethod)?2:3,i->{receiptMethod=i==0?"cash":i==1?"pos":i==2?"transfer":"cheque";render(contentRef);}),a.kit.lp(-1,-2));

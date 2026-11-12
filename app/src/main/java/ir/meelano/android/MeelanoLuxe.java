@@ -851,15 +851,18 @@ final class MeelanoLuxe {
         private final Paint brush = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final ValueAnimator anim;
         private float phase = -0.45f;
+        private boolean swept;
 
         Shine(Context ctx, MeelanoPalette pal) {
             super(ctx);
             this.pal = pal;
             setLayerType(LAYER_TYPE_SOFTWARE, null);
+            // Derakhshan 2.0: the shimmer is a once-per-session guest — a single 900ms sweep,
+            // then the light band fades and removes itself. No infinite looping decoration.
             anim = ValueAnimator.ofFloat(-0.45f, 1.50f);
-            anim.setDuration(5200);
-            anim.setRepeatCount(ValueAnimator.INFINITE);
-            anim.setStartDelay(1100);
+            anim.setDuration(900);
+            anim.setRepeatCount(0);
+            anim.setStartDelay(220);
             anim.setInterpolator(new LinearInterpolator());
             anim.addUpdateListener(animation -> {
                 if (!isAttachedToWindow()) return;      // جلوگیری از کار بی‌فایده پس از ترک صفحه
@@ -869,12 +872,23 @@ final class MeelanoLuxe {
                 phase = v;
                 invalidate();
             });
+            anim.addListener(new android.animation.AnimatorListenerAdapter() {
+                @Override public void onAnimationEnd(android.animation.Animator a) {
+                    swept = true;
+                    animate().alpha(0f).setDuration(220).withEndAction(new Runnable() {
+                        @Override public void run() {
+                            if (getParent() != null) ((android.view.ViewGroup) getParent()).removeView(Shine.this);
+                        }
+                    }).start();
+                }
+            });
             anim.start();
+            swept = false;
         }
 
         @Override protected void onAttachedToWindow() {
             super.onAttachedToWindow();
-            if (anim != null && !anim.isStarted()) anim.start();
+            if (anim != null && !swept && !anim.isStarted()) anim.start();
         }
 
         @Override protected void onDetachedFromWindow() {

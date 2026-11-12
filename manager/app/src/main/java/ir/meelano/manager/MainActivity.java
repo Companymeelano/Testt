@@ -44,6 +44,7 @@ import ir.meelano.manager.screens.ManagerAlertsScreen;
 import ir.meelano.manager.screens.PickWaveScreen;
 import ir.meelano.manager.screens.SyncQueueScreen;
 import ir.meelano.manager.screens.ChequesScreen;
+import ir.meelano.manager.screens.PurchasePreinvoiceScreen;
 import ir.meelano.manager.screens.CustomersScreen;
 import ir.meelano.manager.screens.DuesScreen;
 import ir.meelano.manager.screens.HomeScreen;
@@ -830,6 +831,7 @@ public class MainActivity extends Activity {
         reg(new MoneyScreen(this, 0));
         reg(new MoneyScreen(this, 1));
         reg(new ChequesScreen(this));
+        reg(new PurchasePreinvoiceScreen(this));
         reg(new CashScreen(this));
         reg(new ProductsScreen(this));
         reg(new ProductFileScreen(this));

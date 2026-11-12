@@ -83,6 +83,7 @@ public final class CommandRoom {
                             e("production", "فرمول، تولید مدیرمحور و بهای تمام‌شده در انبار آتیران", "mi_warehouse"),
                             e("sales", "فاکتورهای فروش و پیگیری‌ها", "mi_point_of_sale"),
                             e("buy", "فاکتورهای خرید و طرف‌حساب‌ها", "mi_shopping_cart"),
+                            e("preinvoice", "پیش‌فاکتور خرید کالای نو", "mi_shopping_cart"),
                             e("customers", "پرونده و گردش حساب مشتریان", "mi_group"),
                             e("visitors", "عملکرد و وصول ویزیتورها", "mi_person"),
                             e("visitor_work", "مسیر و بازدید، پیش‌فاکتور، گفتگوی ثبت کالا و دریافت وجه", "mi_directions_car"),

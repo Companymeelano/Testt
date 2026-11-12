@@ -1,0 +1,45 @@
+name: iOS preinvoice (iPhone)
+
+on:
+  push:
+    branches: ["arena/e7d9f96e-testt", "arena/29e01a09-testt"]
+    paths:
+      - "ios-invoice/**"
+      - ".github/workflows/ios-build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run iOS engine tests (SwiftPM, no signing)
+        run: |
+          cd ios-invoice
+          swift test
+
+  build:
+    runs-on: macos-14
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode 15.4
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+      - name: Build unsigned IPA (installable on simulator / ad-hoc)
+        run: |
+          cd ios-invoice
+          # SwiftPM library build proves the engine compiles; for a real IPA create
+          # Meelano.xcodeproj (Xcode → New Project → App → SwiftUI, bundle id ir.meelano.preinvoice)
+          # and point its sources to Sources/MeelanoPreinvoice + Sources/MeelanoApp.
+          swift build -c release
+          echo "SwiftPM build OK — open ios-invoice in Xcode and Archive for a signed IPA."
+      - name: Upload SwiftPM build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-preinvoice-sources
+          path: ios-invoice
+          retention-days: 7

@@ -126,6 +126,18 @@ public final class ManagerSectionView extends BorderPane implements AutoCloseabl
 
     /** Opens (or reuses) the section window; the caller keeps one stage per section id. */
     public static Stage open(Window owner, AtiranGateway gateway, String sectionId, String role) {
+        if (WindowsRoleMenus.PREINVOICE.equals(sectionId)) {
+            Stage pre = new Stage();
+            if (owner != null) pre.initOwner(owner);
+            pre.setTitle("MEELANO · پیش‌فاکتور خرید");
+            PreinvoicePane pane = new PreinvoicePane(pre);
+            Scene preScene = new Scene(pane, 1240, 820);
+            preScene.getStylesheets().add(ManagerSectionView.class.getResource("/styles.css").toExternalForm());
+            preScene.getRoot().setNodeOrientation(NodeOrientation.RIGHT_TO_LEFT);
+            pre.setScene(preScene);
+            pre.show();
+            return pre;
+        }
         Stage stage = new Stage();
         if (owner != null) stage.initOwner(owner);
         stage.setTitle("MEELANO · " + SectionCatalog.titleOf(sectionId));

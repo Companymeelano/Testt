@@ -23,6 +23,7 @@ public final class WindowsRoleMenus {
     public static final String STOCK_LEDGER = "stock_ledger";
     public static final String CASH = "cash";
     public static final String CHEQUES = "cheques";
+    public static final String PREINVOICE = "preinvoice";
     public static final String REPORTS = "reports";
     public static final String PROFIT = "profit";
     public static final String PRODUCTION = "production";
@@ -54,6 +55,7 @@ public final class WindowsRoleMenus {
         CATALOG.put(STOCK_LEDGER, new Item(STOCK_LEDGER, "گردش و موجودی انبار", "Ctrl+Shift+4 · انبار"));
         CATALOG.put(CASH, new Item(CASH, "صندوق و دریافتی‌ها", "Ctrl+Shift+5 · صندوق"));
         CATALOG.put(CHEQUES, new Item(CHEQUES, "چک‌های دریافتی و پرداختی", "Ctrl+Shift+6 · چک‌ها"));
+        CATALOG.put(PREINVOICE, new Item(PREINVOICE, "پیش‌فاکتور خرید", "Ctrl+Shift+3 · پیش‌فاکتور"));
         CATALOG.put(REPORTS, new Item(REPORTS, "گزارش‌های فروش و مالی", "Ctrl+Shift+7 · گزارش"));
         CATALOG.put(PROFIT, new Item(PROFIT, "سود و بهای تمام‌شده", "Ctrl+Shift+8 · سود"));
         CATALOG.put(PRODUCTION, new Item(PRODUCTION, "تولید و شمارش", "Ctrl+Shift+9 · تولید"));
@@ -77,13 +79,13 @@ public final class WindowsRoleMenus {
             out.addAll(allIds());
         } else if (AtiranRoles.SALES_MANAGER.equals(effective)) {
             Collections.addAll(out, INVOICE, CUSTOMERS, CUSTOMER_CENTER, PRODUCTS,
-                    REPORTS, PROFIT, PERSONNEL, HANDOFF, CONNECTION);
+                    REPORTS, PROFIT, PERSONNEL, PREINVOICE, HANDOFF, CONNECTION);
         } else if (AtiranRoles.ACCOUNTANT.equals(effective)) {
             Collections.addAll(out, CUSTOMERS, CUSTOMER_CENTER, CASH, CHEQUES,
-                    REPORTS, PROFIT, HANDOFF, CONNECTION);
+                    REPORTS, PROFIT, PREINVOICE, HANDOFF, CONNECTION);
         } else if (AtiranRoles.WAREHOUSE.equals(effective)) {
             Collections.addAll(out, PRODUCTS, STOCK_LEDGER, PRODUCTION, REPORTS,
-                    HANDOFF, CONNECTION);
+                    PREINVOICE, HANDOFF, CONNECTION);
         } else if (AtiranRoles.VISITOR.equals(effective)) {
             Collections.addAll(out, INVOICE, CUSTOMERS, CUSTOMER_CENTER, PRODUCTS,
                     REPORTS, HANDOFF, CONNECTION);
@@ -115,6 +117,7 @@ public final class WindowsRoleMenus {
      */
     public static String sectionForDigit(int digit) {
         switch (digit) {
+            case 3: return PREINVOICE;
             case 4: return STOCK_LEDGER;
             case 5: return CASH;
             case 6: return CHEQUES;

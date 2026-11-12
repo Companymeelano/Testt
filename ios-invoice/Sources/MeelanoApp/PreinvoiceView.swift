@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import MeelanoPreinvoice
 
 /// صفحهٔ «پیش‌فاکتور خرید» — آیفونِ رایگان، زبان درخشان ۲.۰، راست‌به‌چپ، دسترس‌پذیری

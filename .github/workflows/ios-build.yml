@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   test:
-    runs-on: macos-14
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - name: Run iOS engine tests (SwiftPM, no signing)
@@ -23,12 +23,12 @@ jobs:
           swift test
 
   build:
-    runs-on: macos-14
+    runs-on: macos-latest
     needs: test
     steps:
       - uses: actions/checkout@v4
-      - name: Select Xcode 15.4
-        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app || sudo xcode-select -s /Applications/Xcode_15.4.app || true
       - name: Build unsigned IPA (installable on simulator / ad-hoc)
         run: |
           cd ios-invoice

@@ -3,7 +3,7 @@ package ir.meelano.windowsinvoice.data;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /** محاسبهٔ پیش‌فاکتور خرید: پله‌ها، ترتیب تخفیف‌ها، مالیات دوحالتی، گردکردن و بسته‌بندی. */
 public class PurchasePreinvoiceEngineTest {

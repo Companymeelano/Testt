@@ -7,7 +7,10 @@ import ir.meelano.manager.core.CacheStore;
 import android.widget.ScrollView;
 
 import ir.meelano.manager.MainActivity;
+import ir.meelano.manager.core.AtiranAuth;
 import ir.meelano.manager.core.AtiranSchema;
+import ir.meelano.manager.core.ChequeApprovalPlan;
+import ir.meelano.manager.core.ChequeRegistry;
 import ir.meelano.manager.core.Filter;
 import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Jalali;
@@ -16,6 +19,7 @@ import ir.meelano.manager.core.MoneyQueries;
 import ir.meelano.manager.data.Meta;
 import ir.meelano.manager.data.Repo;
 import ir.meelano.manager.data.Row;
+import ir.meelano.manager.core.ReportCatalog;
 import ir.meelano.manager.ui.FilterSheet;
 import ir.meelano.manager.ui.Kit;
 import ir.meelano.manager.ui.Theme;
@@ -30,6 +34,8 @@ public class ChequesScreen extends Screen {
     private boolean incoming = true;
     private String bucket = "";
     private boolean calMode;
+    private boolean pendingOnly;
+    private LinearLayout live;
     private int calY;
     private int calM;
     private final Filter filter = new Filter();
@@ -114,6 +120,7 @@ public class ChequesScreen extends Screen {
 
     @Override
     public void render(final LinearLayout content) {
+        live = content;
         content.removeAllViews();
         content.addView(heroCard(), a.kit.lp(-1, -2));
         content.addView(a.kit.hint(dateHint(incoming, bucket, calMode)), a.kit.lp(-1, -2));
@@ -277,6 +284,10 @@ public class ChequesScreen extends Screen {
         }), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
 
+        final ChequeApprovalPlan.Plan plan = approvalPlan(d.list, myIn);
+        content.addView(approvalCard(content, plan, myIn), a.kit.lp(-1, -2));
+        content.addView(a.kit.gap(10));
+
         if (!"due".equals(myBucket)) {
             Agg g = myBucket.isEmpty() ? all : byBucket.get(myBucket);
             if (g != null && g.count > 0) {
@@ -309,7 +320,9 @@ public class ChequesScreen extends Screen {
                     rowDate = eventText;
                     if (!dueText.isEmpty()) rowDate += (rowDate.isEmpty() ? "" : "\n") + dueText;
                 }
-                String pill = rowLabel(myIn, row);
+                String pill = rowLabel(myIn, row)
+                        + (plan.isConfirmed(rowKey(row, myIn)) ? " • تیک سامانه ✓" : " • تیک نخورده");
+                if (pendingOnly && plan.isConfirmed(rowKey(row, myIn))) continue;
                 View v = chequeCard(row, myIn, rowDate, pill);
                 LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
                 p.setMargins(0, 0, 0, Theme.dp(10));
@@ -551,6 +564,12 @@ public class ChequesScreen extends Screen {
         if (!r.s("branch").isEmpty()) body.addView(a.kit.kv(inc ? "شعبه" : "گیرنده", r.s("branch"), Theme.TEXT), a.kit.lp(-1, -2));
         body.addView(a.kit.kv("وضعیت", rowLabel(inc, r), Theme.TEXT), a.kit.lp(-1, -2));
         if (!r.s("sayad").isEmpty()) body.addView(a.kit.kv("شناسه صیادی", Money.fa(r.s("sayad")), Theme.TEXT), a.kit.lp(-1, -2));
+        final String approvalKey = rowKey(r, inc);
+        final ChequeApprovalPlan.Entry[] approval = {ChequeRegistry.load(a).get(approvalKey)};
+        body.addView(a.kit.kv("تایید سامانه", approval[0] == null ? "تیک نخورده — ثبت نشده"
+                        : "تیک خورده" + (approval[0].user.isEmpty() ? "" : " توسط " + approval[0].user)
+                          + " در " + jalaliOfMillis(approval[0].ts),
+                approval[0] == null ? Theme.WARNING : Theme.SUCCESS), a.kit.lp(-1, -2));
         if (!r.s("getdate").isEmpty())
             body.addView(a.kit.kv(incoming ? "تاریخ دریافت" : "تاریخ صدور",
                     HomeNumberFormatter.dateTime(r.s("getdate")), Theme.TEXT), a.kit.lp(-1, -2));
@@ -591,11 +610,190 @@ public class ChequesScreen extends Screen {
             }), a.kit.wlp(1f));
             footer.addView(a.kit.space(8));
         }
+        footer.addView(a.kit.btn(approval[0] == null ? "ثبت تایید در سامانه" : "لغو تایید سامانه", v -> {
+            if (approval[0] == null) {
+                ChequeRegistry.confirm(a, approvalKey, AtiranAuth.sessionUser(a), "");
+                a.kit.toast("تایید چک در سامانه ثبت شد");
+            } else {
+                ChequeRegistry.revoke(a, approvalKey);
+                a.kit.toast("تایید چک لغو شد");
+            }
+            dlg.dismiss();
+            if (live != null) render(live);
+        }), a.kit.wlp(1f));
+        footer.addView(a.kit.space(8));
         footer.addView(a.kit.btn("بستن", v -> dlg.dismiss()), a.kit.wlp(1f));
         body.addView(a.kit.gap(8));
         body.addView(footer, a.kit.lp(-1, -2));
         body.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(16));
         dlg.show();
+    }
+
+    /** کلید یکتای رجیستری برای یک ردیف چک نمایش‌داده‌شده. */
+    private static String rowKey(Row r, boolean inc) {
+        return ChequeApprovalPlan.keyOf(inc, r.s("num"), r.s("sayad"));
+    }
+
+    private ChequeApprovalPlan.Plan approvalPlan(List<Row> list, boolean inc) {
+        List<ChequeApprovalPlan.Row> rows = new ArrayList<>();
+        if (list != null) {
+            for (Row r : list) {
+                rows.add(new ChequeApprovalPlan.Row(inc, r.s("num"), r.s("sayad"), r.s("customer"),
+                        r.d("amount"), r.s("sardate"), r.s("statusLabel")));
+            }
+        }
+        return ChequeApprovalPlan.plan(rows, ChequeRegistry.load(a), Jalali.today());
+    }
+
+    /** مهر زمان ثبت را به تاریخ جلالی نمایشی می‌برد. */
+    private static String jalaliOfMillis(long ts) {
+        java.util.Calendar cal = java.util.Calendar.getInstance();
+        cal.setTimeInMillis(ts);
+        int jdn = Jalali.gregorianDay(cal.get(java.util.Calendar.YEAR),
+                cal.get(java.util.Calendar.MONTH) + 1, cal.get(java.util.Calendar.DAY_OF_MONTH));
+        int[] j = Jalali.fromDay(jdn);
+        return Jalali.format(j[0] * 10000 + j[1] * 100 + j[2]);
+    }
+
+    /** کارت خلاصهٔ تایید سامانه: دو کاسهٔ تیک‌خورده/تیک‌نخورده + هوشمندی سررسیدها. */
+    private View approvalCard(final LinearLayout content, final ChequeApprovalPlan.Plan plan, final boolean inc) {
+        LinearLayout c = a.kit.card(accent());
+        c.addView(a.kit.text("تایید سامانهٔ چک‌ها", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        c.addView(a.kit.hint(inc ? "چک‌های دریافتی: ثبت تایید صیادی/سامانه داخل برنامه، بدون نوشتن روی دیتابیس میدان."
+                        : "چک‌های پرداختی: ثبت تایید صیادی/سامانه داخل برنامه، بدون نوشتن روی دیتابیس میدان."),
+                a.kit.lp(-1, -2));
+        c.addView(a.kit.kv("تیک خورده", Money.fa(String.valueOf(plan.confirmedCount())) + " فقره • "
+                + Money.compactRial(plan.confirmedSum), Theme.SUCCESS), a.kit.lp(-1, -2));
+        c.addView(a.kit.kv("تیک نخورده", Money.fa(String.valueOf(plan.pendingCount())) + " فقره • "
+                + Money.compactRial(plan.pendingSum), Theme.WARNING), a.kit.lp(-1, -2));
+        c.addView(a.kit.kv("نرخ تایید", Money.fa(String.valueOf(plan.ratePercent())) + "٪", Theme.TEXT), a.kit.lp(-1, -2));
+        if (plan.pendingOverdue > 0) {
+            c.addView(a.kit.kv("معوق تیک‌نخورده", Money.fa(String.valueOf(plan.pendingOverdue)) + " فقره",
+                    Theme.DANGER), a.kit.lp(-1, -2));
+        } else if (plan.pendingDueSoon > 0) {
+            c.addView(a.kit.kv("سررسید نزدیک تیک‌نخورده", Money.fa(String.valueOf(plan.pendingDueSoon)) + " فقره (۷ روز)",
+                    Theme.WARNING), a.kit.lp(-1, -2));
+        }
+        if (plan.nearestPending != null) {
+            int days = plan.nearestPendingDays;
+            String t = days < 0 ? "گذشته " + Money.fa(String.valueOf(-days)) + " روز"
+                    : (days == 0 ? "امروز" : Money.fa(String.valueOf(days)) + " روز مانده");
+            c.addView(a.kit.kv("نزدیک‌ترین سررسید باز",
+                    (plan.nearestPending.customer.isEmpty() ? "چک " + plan.nearestPending.num : plan.nearestPending.customer)
+                            + " • " + t, Theme.TEXT), a.kit.lp(-1, -2));
+        }
+        if (!plan.topPending.isEmpty()) {
+            c.addView(a.kit.hint("بیشترین تیک‌نخورده: " + String.join("، ", plan.topPending)), a.kit.lp(-1, -2));
+        }
+        LinearLayout actions = a.kit.h();
+        actions.addView(a.kit.btnGhost("گزارش تایید چک‌ها", Theme.GOLD, v -> showApprovalReport(plan, inc)), a.kit.wlp(1f));
+        actions.addView(a.kit.space(8));
+        actions.addView(a.kit.btnGhost(pendingOnly ? "نمایش همه" : "فقط تیک‌نخورده", Theme.MUTED, v -> {
+            pendingOnly = !pendingOnly;
+            render(content);
+        }), a.kit.wlp(1f));
+        c.addView(a.kit.gap(8));
+        c.addView(actions, a.kit.lp(-1, -2));
+        return c;
+    }
+
+    /** گزارش حرفه‌ای تایید: دو بخش تیک‌خورده/تیک‌نخورده روی صفحه + خروجی PDF برای چاپ. */
+    private void showApprovalReport(final ChequeApprovalPlan.Plan plan, final boolean inc) {
+        LinearLayout body = a.kit.v();
+        body.addView(a.kit.text("گزارش تایید سامانهٔ چک‌ها", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        body.addView(a.kit.hint((inc ? "چک‌های دریافتی" : "چک‌های پرداختی") + " • " + Jalali.dispFa(Jalali.todayStr())
+                + " • تیک خورده " + Money.fa(String.valueOf(plan.confirmedCount()))
+                + " / تیک نخورده " + Money.fa(String.valueOf(plan.pendingCount()))
+                + " • نرخ تایید " + Money.fa(String.valueOf(plan.ratePercent())) + "٪"), a.kit.lp(-1, -2));
+        body.addView(a.kit.gap(10));
+        addApprovalSection(body, "تیک خورده (تایید سامانه شده)", plan.confirmed, plan, true);
+        body.addView(a.kit.gap(10));
+        addApprovalSection(body, "تیک نخورده (در انتظار ثبت)", plan.pending, plan, false);
+        ScrollView sv = new ScrollView(a);
+        sv.addView(body);
+        AlertDialog dlg = new AlertDialog.Builder(a, android.R.style.Theme_Material_Dialog_NoActionBar)
+                .setView(sv).create();
+        if (dlg.getWindow() != null) dlg.getWindow().setBackgroundDrawable(Theme.dialogBg());
+        LinearLayout footer = a.kit.h();
+        footer.addView(a.kit.btn("PDF چاپ", v -> {
+            dlg.dismiss();
+            a.sharePdf("گزارش تایید سامانهٔ چک‌ها",
+                    (inc ? "دریافتی" : "پرداختی") + " • " + Jalali.dispFa(Jalali.todayStr())
+                            + " • تیک خورده " + plan.confirmedCount() + " / تیک نخورده " + plan.pendingCount(),
+                    approvalCols(), approvalPdfRows(plan, inc));
+        }), a.kit.wlp(1f));
+        footer.addView(a.kit.space(8));
+        footer.addView(a.kit.btn("بستن", v -> dlg.dismiss()), a.kit.wlp(1f));
+        body.addView(a.kit.gap(10));
+        body.addView(footer, a.kit.lp(-1, -2));
+        body.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(16));
+        dlg.show();
+    }
+
+    private void addApprovalSection(LinearLayout body, String title, List<ChequeApprovalPlan.Row> rows,
+                                    ChequeApprovalPlan.Plan plan, boolean confirmed) {
+        LinearLayout c = a.kit.card(confirmed ? Theme.SUCCESS : Theme.WARNING);
+        c.addView(a.kit.text(title, 12.5f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        double sum = confirmed ? plan.confirmedSum : plan.pendingSum;
+        c.addView(a.kit.kv("جمع", Money.fa(String.valueOf(rows.size())) + " فقره • "
+                + Money.compactRial(sum), confirmed ? Theme.SUCCESS : Theme.WARNING), a.kit.lp(-1, -2));
+        if (rows.isEmpty()) {
+            c.addView(a.kit.hint("موردی در این بخش نیست"), a.kit.lp(-1, -2));
+        } else {
+            int shown = Math.min(rows.size(), 40);
+            for (int i = 0; i < shown; i++) {
+                ChequeApprovalPlan.Row r = rows.get(i);
+                ChequeApprovalPlan.Entry e = plan.entryOf(r.key());
+                String line = (r.num.isEmpty() ? "—" : Money.fa(r.num))
+                        + " • " + (r.customer.isEmpty() ? "بدون طرف حساب" : r.customer)
+                        + " • " + Money.compactRial(r.amount)
+                        + (r.due.isEmpty() ? "" : " • سررسید " + Jalali.dispFa(r.due));
+                if (confirmed && e != null) {
+                    line += " • ثبت " + jalaliOfMillis(e.ts) + (e.user.isEmpty() ? "" : " توسط " + e.user);
+                }
+                c.addView(a.kit.text(line, 10.8f, Theme.TEXT, false), a.kit.lp(-1, -2));
+            }
+            if (rows.size() > shown) {
+                c.addView(a.kit.hint("و " + Money.fa(String.valueOf(rows.size() - shown)) + " مورد دیگر در خروجی PDF"),
+                        a.kit.lp(-1, -2));
+            }
+        }
+        body.addView(c, a.kit.lp(-1, -2));
+    }
+
+    private ReportCatalog.Col[] approvalCols() {
+        return new ReportCatalog.Col[]{
+                new ReportCatalog.Col("dir", "جهت", ReportCatalog.T_TEXT),
+                new ReportCatalog.Col("num", "شماره چک", ReportCatalog.T_TEXT),
+                new ReportCatalog.Col("sayad", "شناسه صیادی", ReportCatalog.T_TEXT),
+                new ReportCatalog.Col("customer", "طرف حساب", ReportCatalog.T_TEXT),
+                new ReportCatalog.Col("amount", "مبلغ (ریال)", ReportCatalog.T_MONEY),
+                new ReportCatalog.Col("due", "سررسید", ReportCatalog.T_DATE),
+                new ReportCatalog.Col("state", "تایید سامانه", ReportCatalog.T_TEXT),
+                new ReportCatalog.Col("reg", "ثبت در برنامه", ReportCatalog.T_TEXT)};
+    }
+
+    private List<Row> approvalPdfRows(ChequeApprovalPlan.Plan plan, boolean inc) {
+        List<Row> out = new ArrayList<>();
+        String dir = inc ? "دریافتی" : "پرداختی";
+        for (boolean confirmed : new boolean[]{true, false}) {
+            List<ChequeApprovalPlan.Row> src = confirmed ? plan.confirmed : plan.pending;
+            for (ChequeApprovalPlan.Row r : src) {
+                Row row = new Row();
+                row.put("dir", dir);
+                row.put("num", r.num);
+                row.put("sayad", r.sayad);
+                row.put("customer", r.customer);
+                row.put("amount", r.amount);
+                row.put("due", Jalali.dispFa(r.due));
+                row.put("state", confirmed ? "تیک خورده" : "تیک نخورده");
+                ChequeApprovalPlan.Entry e = plan.entryOf(r.key());
+                row.put("reg", confirmed && e != null
+                        ? jalaliOfMillis(e.ts) + (e.user.isEmpty() ? "" : " • " + e.user) : "—");
+                out.add(row);
+            }
+        }
+        return out;
     }
 
     private int daysUntil(String due) {

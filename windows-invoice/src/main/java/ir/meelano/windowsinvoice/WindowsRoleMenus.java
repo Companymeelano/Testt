@@ -117,7 +117,6 @@ public final class WindowsRoleMenus {
      */
     public static String sectionForDigit(int digit) {
         switch (digit) {
-            case 3: return PREINVOICE;
             case 4: return STOCK_LEDGER;
             case 5: return CASH;
             case 6: return CHEQUES;

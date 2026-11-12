@@ -173,7 +173,20 @@ public final class ManagerSectionView extends BorderPane implements AutoCloseabl
         export.setOnAction(event -> exportCsv());
         Button close = button("بستن", false);
         close.setOnAction(event -> stage.close());
-        row.getChildren().addAll(titleBlock, modeLabel, test, refresh, export, close);
+        row.getChildren().addAll(titleBlock, modeLabel, test, refresh, export);
+        if (WindowsRoleMenus.CHEQUES.equals(sectionId)) {
+            Button approve = button("ثبت تایید سامانه", false);
+            approve.setTooltip(new Tooltip("تایید ثبت صیادی/سامانهٔ چک انتخاب‌شده در دفترچهٔ محلی برنامه؛ هیچ نوشتنی به SQL Server نمی‌رود."));
+            approve.setOnAction(event -> approveSelected(true));
+            Button unapprove = button("لغو تایید", false);
+            unapprove.setTooltip(new Tooltip("حذف تایید ثبت‌شدهٔ چک انتخاب‌شده از دفترچهٔ محلی."));
+            unapprove.setOnAction(event -> approveSelected(false));
+            Button printApproval = button("چاپ گزارش تایید", true);
+            printApproval.setTooltip(new Tooltip("گزارش دومرحله‌ای تیک‌خورده/تیک‌نخورده با جمع ریالی و نرخ تایید، آمادهٔ چاپ."));
+            printApproval.setOnAction(event -> printApprovalReport());
+            row.getChildren().addAll(approve, unapprove, printApproval);
+        }
+        row.getChildren().add(close);
         header.getChildren().addAll(row, new Separator());
         return header;
     }
@@ -367,6 +380,143 @@ public final class ManagerSectionView extends BorderPane implements AutoCloseabl
         int days = parseDays(daysField.getText());
         return new SectionFilter(searchField.getText(), contextField.getText(), fromField.getText(),
                 toField.getText(), threshold, days, page, PAGE_SIZE);
+    }
+
+    /** Index of a column key in the active variant, or -1 when the variant lacks it. */
+    private static int colIndex(VariantSpec spec, String key) {
+        java.util.List<SectionColumn> cols = spec.columns();
+        for (int i = 0; i < cols.size(); i++) {
+            if (key.equals(cols.get(i).key())) return i;
+        }
+        return -1;
+    }
+
+    /** num/sayad of the selected table row, for the local approval ledger. */
+    private String[] selectedChequeIds() {
+        VariantSpec spec = variantCombo.getValue();
+        SectionRow selected = table.getSelectionModel().getSelectedItem();
+        if (spec == null || selected == null) return null;
+        int numIdx = colIndex(spec, "num");
+        if (numIdx < 0) return null;
+        int sayadIdx = colIndex(spec, "sayad");
+        return new String[]{selected.textAt(numIdx), sayadIdx >= 0 ? selected.textAt(sayadIdx) : ""};
+    }
+
+    private void approveSelected(boolean confirm) {
+        String[] ids = selectedChequeIds();
+        if (ids == null) {
+            messageLabel.setText("ابتدا یک ردیف چک را از جدول انتخاب کنید.");
+            return;
+        }
+        String key = ir.meelano.windowsinvoice.data.ChequeApprovalRegistry.keyOf(ids[0], ids[1]);
+        if (confirm) {
+            ir.meelano.windowsinvoice.data.ChequeApprovalRegistry.confirm(key, System.getProperty("user.name", ""));
+            messageLabel.setText("تایید چک در دفترچهٔ سامانه ثبت شد.");
+        } else {
+            ir.meelano.windowsinvoice.data.ChequeApprovalRegistry.revoke(key);
+            messageLabel.setText("تایید چک از دفترچهٔ سامانه حذف شد.");
+        }
+        reload(pageIndex);
+    }
+
+    /** Two-bowl approval report (ticked / unticked) paged for the JavaFX print pipeline. */
+    private void printApprovalReport() {
+        VariantSpec spec = variantCombo.getValue();
+        if (spec == null || rows.isEmpty()) {
+            messageLabel.setText("داده‌ای برای چاپ گزارش تایید نیست؛ ابتدا گزارش چک‌ها را بار کنید.");
+            return;
+        }
+        int numIdx = colIndex(spec, "num");
+        int sayadIdx = colIndex(spec, "sayad");
+        int partyIdx = colIndex(spec, "party");
+        int amountIdx = colIndex(spec, "amount");
+        int dueIdx = colIndex(spec, "due_date");
+        int approvalIdx = colIndex(spec, "approval");
+        java.util.List<String> confirmed = new java.util.ArrayList<>();
+        java.util.List<String> pending = new java.util.ArrayList<>();
+        double confirmedSum = 0;
+        double pendingSum = 0;
+        for (SectionRow r : rows) {
+            String amountText = amountIdx >= 0 ? r.textAt(amountIdx) : "";
+            java.math.BigDecimal amount = amountIdx >= 0 && r.at(amountIdx).number() != null
+                    ? r.at(amountIdx).number() : java.math.BigDecimal.ZERO;
+            String line = "چک " + r.textAt(numIdx)
+                    + (sayadIdx >= 0 && !r.textAt(sayadIdx).isEmpty() ? " · صیاد " + r.textAt(sayadIdx) : "")
+                    + (partyIdx >= 0 && !r.textAt(partyIdx).isEmpty() ? " · " + r.textAt(partyIdx) : "")
+                    + " · " + amountText
+                    + " · سررسید " + (dueIdx >= 0 && !r.textAt(dueIdx).isEmpty() ? r.textAt(dueIdx) : "—");
+            boolean done = approvalIdx >= 0 && "تیک خورده".equals(r.textAt(approvalIdx));
+            if (done) {
+                confirmed.add(line);
+                confirmedSum += amount.doubleValue();
+            } else {
+                pending.add(line);
+                pendingSum += amount.doubleValue();
+            }
+        }
+        int total = confirmed.size() + pending.size();
+        int rate = total == 0 ? 0 : (int) Math.round(100d * confirmed.size() / total);
+        java.util.List<Node> pages = new java.util.ArrayList<>();
+        String[] head = {"گزارش تایید سامانهٔ چک‌ها — " + spec.label(),
+                "تاریخ گزارش: " + PersianDate.today()
+                        + " · تیک خورده " + confirmed.size() + " فقره (" + String.format(java.util.Locale.US, "%.0f", confirmedSum) + " ریال)"
+                        + " · تیک نخورده " + pending.size() + " فقره (" + String.format(java.util.Locale.US, "%.0f", pendingSum) + " ریال)"
+                        + " · نرخ تایید " + rate + "٪"};
+        pages.addAll(reportPages(head, "بخش یکم — تیک خورده (تایید سامانه شده)", confirmed,
+                "بخش دوم — تیک نخورده (در انتظار ثبت)", pending));
+        javafx.print.PrinterJob job = javafx.print.PrinterJob.createPrinterJob();
+        if (job == null) {
+            messageLabel.setText("چاپخانه‌ای روی این ویندوز تعریف نشده است.");
+            return;
+        }
+        if (!job.showPrintDialog(stage)) {
+            messageLabel.setText("چاپ گزارش لغو شد.");
+            return;
+        }
+        boolean ok = true;
+        for (Node page : pages) ok &= job.printPage(page);
+        if (ok && job.endJob()) {
+            messageLabel.setText("گزارش تایید با " + pages.size() + " صفحه به چاپ ارسال شد.");
+        } else {
+            messageLabel.setText("چاپ گزارش کامل نشد؛ دوباره تلاش کنید.");
+        }
+    }
+
+    /** Builds printable A4 pages: header on every page, 36 lines per page, two bowls in order. */
+    private java.util.List<Node> reportPages(String[] head, String firstTitle, java.util.List<String> first,
+                                             String secondTitle, java.util.List<String> second) {
+        java.util.List<Node> pages = new java.util.ArrayList<>();
+        java.util.List<String[]> blocks = new java.util.ArrayList<>();
+        blocks.add(new String[]{"§", firstTitle});
+        for (String line : first) blocks.add(new String[]{"L", line});
+        blocks.add(new String[]{"§", secondTitle});
+        for (String line : second) blocks.add(new String[]{"L", line});
+        if (first.isEmpty()) blocks.add(1, new String[]{"L", "موردی در این بخش نیست."});
+        if (second.isEmpty()) blocks.add(blocks.size(), new String[]{"L", "همهٔ چک‌ها تایید سامانه شده‌اند."});
+        int perPage = 36;
+        for (int start = 0; start < blocks.size(); start += perPage) {
+            VBox page = new VBox(4);
+            page.setNodeOrientation(NodeOrientation.RIGHT_TO_LEFT);
+            page.setPadding(new Insets(28, 30, 28, 30));
+            for (String h : head) {
+                Label label = new Label(h);
+                label.setStyle("-fx-font-size: 12px; -fx-font-weight: bold;");
+                label.setWrapText(true);
+                page.getChildren().add(label);
+            }
+            page.getChildren().add(new Separator());
+            for (int i = start; i < Math.min(blocks.size(), start + perPage); i++) {
+                String[] b = blocks.get(i);
+                Label label = new Label("§".equals(b[0]) ? b[1] : "   " + b[1]);
+                label.setStyle("§".equals(b[0])
+                        ? "-fx-font-size: 11.5px; -fx-font-weight: bold; -fx-padding: 6 0 2 0;"
+                        : "-fx-font-size: 10.5px;");
+                label.setWrapText(true);
+                page.getChildren().add(label);
+            }
+            pages.add(page);
+        }
+        return pages;
     }
 
     private void reload(int page) {

@@ -33,7 +33,7 @@ public final class SectionCatalog {
     /** How a derived column is computed from other columns of the same row. */
     public enum Derivation {
         NONE, AGEING_BUCKET, CHEQUE_DUE_STATE, MARGIN_PERCENT, NET_AMOUNT, STOCK_STATE,
-        RATE_PERCENT, DAYS_AGO, DESKTOP_ROLE, MENU_COUNT, MENU_SCOPE
+        RATE_PERCENT, DAYS_AGO, DESKTOP_ROLE, MENU_COUNT, MENU_SCOPE, APPROVAL_STATE
     }
 
     public enum KpiOp {
@@ -356,11 +356,15 @@ public final class SectionCatalog {
                         SectionColumn.date("due_date", "سررسید", 0.9),
                         SectionColumn.status("status", "وضعیت", 1.0, "cheque_in"),
                         SectionColumn.status("bounced", "برگشتی", 0.8, "bounced"),
-                        SectionColumn.text("due_state", "وضعیت سررسید", 1.3))
-                .derived(Derived.of("due_state", Derivation.CHEQUE_DUE_STATE, "due_date"))
+                        SectionColumn.text("due_state", "وضعیت سررسید", 1.3),
+                        SectionColumn.text("approval", "تایید سامانه", 1.1))
+                .derived(Derived.of("due_state", Derivation.CHEQUE_DUE_STATE, "due_date"),
+                        Derived.of("approval", Derivation.APPROVAL_STATE))
                 .kpis(Kpi.count("تعداد چک"), Kpi.sum("جمع مبلغ", "amount"),
                         Kpi.matches("برگشتی‌ها", "bounced", "برگشتی"),
-                        Kpi.matches("نزد صندوق", "status", "نزد صندوق"))
+                        Kpi.matches("نزد صندوق", "status", "نزد صندوق"),
+                        Kpi.matches("تیک خورده", "approval", "تیک خورده"),
+                        Kpi.matches("تیک نخورده", "approval", "تیک نخورده"))
                 .dateKey("issue_date").sort("due_date", false).maxRows(2000)
                 .query("شمارهٔ چک، شناسهٔ صیاد، بانک یا طرف حساب…")
                 .build());
@@ -374,10 +378,14 @@ public final class SectionCatalog {
                         SectionColumn.date("issue_date", "تاریخ صدور", 0.9),
                         SectionColumn.date("due_date", "سررسید", 0.9),
                         SectionColumn.status("status", "وضعیت", 1.0, "cheque_out"),
-                        SectionColumn.text("due_state", "وضعیت سررسید", 1.3))
-                .derived(Derived.of("due_state", Derivation.CHEQUE_DUE_STATE, "due_date"))
+                        SectionColumn.text("due_state", "وضعیت سررسید", 1.3),
+                        SectionColumn.text("approval", "تایید سامانه", 1.1))
+                .derived(Derived.of("due_state", Derivation.CHEQUE_DUE_STATE, "due_date"),
+                        Derived.of("approval", Derivation.APPROVAL_STATE))
                 .kpis(Kpi.count("تعداد چک"), Kpi.sum("جمع مبلغ", "amount"),
-                        Kpi.matches("جاری", "status", "جاری"), Kpi.matches("پاس‌شده", "status", "پاس‌شده"))
+                        Kpi.matches("جاری", "status", "جاری"), Kpi.matches("پاس‌شده", "status", "پاس‌شده"),
+                        Kpi.matches("تیک خورده", "approval", "تیک خورده"),
+                        Kpi.matches("تیک نخورده", "approval", "تیک نخورده"))
                 .dateKey("issue_date").sort("due_date", false).maxRows(2000)
                 .query("شمارهٔ چک، شناسهٔ صیاد یا طرف حساب…")
                 .build());

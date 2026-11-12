@@ -315,6 +315,16 @@ public final class SectionMath {
                 return ageingBucket(key(row, sources, 0), todayJalali);
             case CHEQUE_DUE_STATE:
                 return dueState(key(row, sources, 0), todayJalali);
+            case APPROVAL_STATE: {
+                // The registry is the program's own ledger; the SQL Server stays read-only.
+                SectionValue num = row.get("num");
+                SectionValue sayad = row.get("sayad");
+                boolean done = ir.meelano.windowsinvoice.data.ChequeApprovalRegistry.load()
+                        .containsKey(ir.meelano.windowsinvoice.data.ChequeApprovalRegistry.keyOf(
+                                num == null ? "" : num.text(), sayad == null ? "" : sayad.text()));
+                return new SectionValue(done ? "تیک خورده" : "تیک نخورده",
+                        done ? "تیک خورده" : "تیک نخورده", null);
+            }
             case MARGIN_PERCENT:
                 return marginValue(amount(row, sources, 0), amount(row, sources, 1));
             case NET_AMOUNT:

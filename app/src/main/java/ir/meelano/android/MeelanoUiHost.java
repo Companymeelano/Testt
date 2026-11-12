@@ -67,6 +67,9 @@ interface MeelanoUiHost {
     /** ذخیره/خواندن تنظیمات کوچک ماژول‌ها در SharedPreferences خود برنامه. */
     String setting(String key, String fallback);
 
+    /** نام کاربری که ثبت‌های دفتری (مثل تایید سامانهٔ چک‌ها) به نام او مهر می‌خورد. */
+    default String registryUser() { return ""; }
+
     void putSetting(String key, String value);
 
     /** کار پس‌زمینه که رشته برمی‌گرداند. */

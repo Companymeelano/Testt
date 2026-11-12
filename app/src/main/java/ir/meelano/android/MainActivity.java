@@ -12954,6 +12954,8 @@ public class MainActivity extends Activity {
             return prefs == null || key == null ? fallback : prefs.getString(key, fallback);
         }
 
+        @Override public String registryUser() { return currentAccountName(); }
+
         @Override public void putSetting(String key, String value) {
             if (prefs != null && key != null) prefs.edit().putString(key, value).apply();
         }

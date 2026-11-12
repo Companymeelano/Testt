@@ -1,7 +1,9 @@
 package ir.meelano.android;
 
+import android.app.AlertDialog;
 import android.view.View;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -63,7 +65,7 @@ final class MeelanoFinanceUi {
         JSONObject totals = warehouseAnalysis == null ? null : warehouseAnalysis.optJSONObject("totals");
 
         if ("collect".equals(tab)) { renderCollect(h, page, metrics, receivables); return; }
-        if ("checks".equals(tab)) { renderChecks(h, page, checks); return; }
+        if ("checks".equals(tab)) { renderChecks(h, page, checks, metrics.optJSONArray("checkRows")); return; }
         if ("pricing".equals(tab)) { renderPricing(h, page, products); return; }
         if ("cash".equals(tab)) { renderCash(h, page, metrics, receivables, sales, purchases); return; }
         if ("pnl".equals(tab)) { renderPnl(h, page, warehouseAnalysis, products, sales); return; }
@@ -301,7 +303,7 @@ final class MeelanoFinanceUi {
     }
 
     // ---------------- چک‌ها
-    private static void renderChecks(final MeelanoUiHost h, LinearLayout page, JSONObject checks) {
+    private static void renderChecks(final MeelanoUiHost h, LinearLayout page, JSONObject checks, JSONArray checkRows) {
         MeelanoPalette p = h.colors();
         page.addView(MeelanoUiKit.sectionHeader(h, "چک‌ها و سررسیدها",
                 "چک سررسیدگذشته، چک‌های هفت روز آینده و چک‌های جاری — با جمع ریالی هر دسته",
@@ -323,9 +325,183 @@ final class MeelanoFinanceUi {
         }
         MeelanoUiKit.kpiGrid(h, page, tiles, 1, 8);
         MeelanoUiKit.gap(h, page, 8);
+        page.addView(approvalCard(h, approvalPlan(h, checkRows)), MeelanoUiKit.lp(-1, -2));
+        MeelanoUiKit.gap(h, page, 8);
         page.addView(MeelanoUiKit.button(h, "▤  " + MeelanoDesignKit.reveal("جدول کامل چک‌ها"), p.accent, false, new Runnable() {
             @Override public void run() { h.goTo("checks"); }
         }), MeelanoUiKit.lp(-1, h.dp(44)));
+    }
+
+    // ---------------- تایید سامانهٔ چک‌ها
+
+    /** ردیف‌های چک دریافتی + دفترچهٔ محلی → برنامهٔ گزارش تیک‌خورده/تیک‌نخورده. */
+    private static MeelanoChequePlan.Plan approvalPlan(MeelanoUiHost h, JSONArray checkRows) {
+        List<MeelanoChequePlan.Row> rows = new ArrayList<>();
+        if (checkRows != null) {
+            for (int i = 0; i < checkRows.length(); i++) {
+                JSONObject o = checkRows.optJSONObject(i);
+                if (o == null) continue;
+                rows.add(new MeelanoChequePlan.Row(true, o.optString("num"), o.optString("sayad"),
+                        o.optString("customer"), o.optDouble("amount"),
+                        MeelanoChequePlan.normalizeDue(o.optString("due"))));
+            }
+        }
+        return MeelanoChequePlan.plan(rows, MeelanoChequeRegistry.load(h), MeelanoJalali.today());
+    }
+
+    /** کارت خلاصهٔ تایید: دو کاسه، نرخ، معوق‌ها و نزدیک‌ترین سررسید باز. */
+    private static View approvalCard(final MeelanoUiHost h, final MeelanoChequePlan.Plan plan) {
+        MeelanoPalette p = h.colors();
+        LinearLayout c = MeelanoUiKit.card(h, p.success);
+        c.addView(MeelanoUiKit.text(h, "تایید سامانهٔ چک‌ها", 12.6f, p.text, true), MeelanoUiKit.lp(-1, -2));
+        c.addView(MeelanoUiKit.text(h, "ثبت تایید صیادی/سامانه داخل برنامه؛ بدون نوشتن روی دیتابیس میدان.",
+                9.6f, p.muted, false), MeelanoUiKit.lp(-1, -2));
+        c.addView(MeelanoUiKit.text(h, "تیک خورده: " + h.fa(String.valueOf(plan.confirmedCount())) + " فقره • "
+                + h.money(plan.confirmedSum), 10.6f, p.sectionInk(p.success), true), MeelanoUiKit.lp(-1, -2));
+        c.addView(MeelanoUiKit.text(h, "تیک نخورده: " + h.fa(String.valueOf(plan.pendingCount())) + " فقره • "
+                + h.money(plan.pendingSum), 10.6f, p.sectionInk(p.warning), true), MeelanoUiKit.lp(-1, -2));
+        c.addView(MeelanoUiKit.text(h, "نرخ تایید: " + h.fa(String.valueOf(plan.ratePercent())) + "٪"
+                + (plan.pendingOverdue > 0 ? " • معوق تیک‌نخورده: " + h.fa(String.valueOf(plan.pendingOverdue)) + " فقره"
+                   : plan.pendingDueSoon > 0 ? " • سررسید نزدیک تیک‌نخورده: " + h.fa(String.valueOf(plan.pendingDueSoon)) + " فقره" : ""),
+                10.2f, p.text, false), MeelanoUiKit.lp(-1, -2));
+        if (plan.nearestPending != null) {
+            int days = plan.nearestPendingDays;
+            String t = days < 0 ? "گذشته " + h.fa(String.valueOf(-days)) + " روز"
+                    : (days == 0 ? "امروز" : h.fa(String.valueOf(days)) + " روز مانده");
+            c.addView(MeelanoUiKit.text(h, "نزدیک‌ترین سررسید باز: "
+                    + (plan.nearestPending.customer.isEmpty() ? "چک " + plan.nearestPending.num : plan.nearestPending.customer)
+                    + " • " + t, 10.2f, p.text, false), MeelanoUiKit.lp(-1, -2));
+        }
+        if (!plan.topPending.isEmpty()) {
+            c.addView(MeelanoUiKit.text(h, "بیشترین تیک‌نخورده: " + String.join("، ", plan.topPending),
+                    9.6f, p.muted, false), MeelanoUiKit.lp(-1, -2));
+        }
+        MeelanoUiKit.gap(h, c, 8);
+        c.addView(MeelanoUiKit.button(h, "گزارش تایید چک‌ها", p.accent, false, new Runnable() {
+            @Override public void run() { showApprovalReport(h, plan); }
+        }), MeelanoUiKit.lp(-1, h.dp(44)));
+        return c;
+    }
+
+    /** گزارش حرفه‌ای دو بخشی روی صفحه + ثبت/لغو تایید هر چک + خروجی PDF برای چاپ. */
+    private static void showApprovalReport(final MeelanoUiHost h, final MeelanoChequePlan.Plan plan) {
+        final MeelanoPalette p = h.colors();
+        LinearLayout body = MeelanoUiKit.column(h);
+        body.setPadding(h.dp(16), h.dp(16), h.dp(16), h.dp(16));
+        body.addView(MeelanoUiKit.text(h, "گزارش تایید سامانهٔ چک‌ها", 13.4f, p.text, true), MeelanoUiKit.lp(-1, -2));
+        body.addView(MeelanoUiKit.text(h, "چک‌های دریافتی • " + MeelanoJalali.format(MeelanoJalali.today())
+                + " • تیک خورده " + h.fa(String.valueOf(plan.confirmedCount()))
+                + " / تیک نخورده " + h.fa(String.valueOf(plan.pendingCount()))
+                + " • نرخ تایید " + h.fa(String.valueOf(plan.ratePercent())) + "٪",
+                9.8f, p.muted, false), MeelanoUiKit.lp(-1, -2));
+        MeelanoUiKit.gap(h, body, 10);
+        approvalSection(h, body, "تیک خورده (تایید سامانه شده)", plan.confirmed, plan, true);
+        MeelanoUiKit.gap(h, body, 10);
+        approvalSection(h, body, "تیک نخورده (در انتظار ثبت)", plan.pending, plan, false);
+        MeelanoUiKit.gap(h, body, 10);
+        LinearLayout footer = MeelanoUiKit.row(h);
+        footer.addView(MeelanoUiKit.button(h, "PDF چاپ", p.accent, false, new Runnable() {
+            @Override public void run() { shareApprovalPdf(h, plan); }
+        }), MeelanoUiKit.lp(0, h.dp(44), 1f));
+        footer.addView(MeelanoUiKit.button(h, "بستن", p.muted, false, null), MeelanoUiKit.lp(0, h.dp(44), 1f));
+        body.addView(footer, MeelanoUiKit.lp(-1, -2));
+        ScrollView sv = new ScrollView(h.ctx());
+        sv.addView(body);
+        AlertDialog dlg = new AlertDialog.Builder(h.ctx()).setView(sv).create();
+        footer.getChildAt(1).setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { dlg.dismiss(); }
+        });
+        dlg.show();
+    }
+
+    private static void approvalSection(MeelanoUiHost h, LinearLayout body, String title,
+                                        List<MeelanoChequePlan.Row> rows, MeelanoChequePlan.Plan plan,
+                                        final boolean confirmed) {
+        MeelanoPalette p = h.colors();
+        LinearLayout c = MeelanoUiKit.card(h, confirmed ? p.success : p.warning);
+        c.addView(MeelanoUiKit.text(h, title, 11.6f, p.text, true), MeelanoUiKit.lp(-1, -2));
+        c.addView(MeelanoUiKit.text(h, h.fa(String.valueOf(rows.size())) + " فقره • "
+                + h.money(confirmed ? plan.confirmedSum : plan.pendingSum),
+                10.2f, p.sectionInk(confirmed ? p.success : p.warning), true), MeelanoUiKit.lp(-1, -2));
+        if (rows.isEmpty()) {
+            c.addView(MeelanoUiKit.text(h, "موردی در این بخش نیست", 9.6f, p.muted, false), MeelanoUiKit.lp(-1, -2));
+        }
+        int shown = Math.min(rows.size(), 40);
+        for (int i = 0; i < shown; i++) {
+            final MeelanoChequePlan.Row r = rows.get(i);
+            LinearLayout line = MeelanoUiKit.row(h);
+            LinearLayout txt = MeelanoUiKit.column(h);
+            String main = (r.num.isEmpty() ? "—" : h.fa(r.num)) + " • "
+                    + (r.customer.isEmpty() ? "بدون طرف حساب" : r.customer) + " • " + h.money(r.amount)
+                    + (r.due.isEmpty() ? "" : " • سررسید " + h.fa(r.due.replace("/", "/")));
+            txt.addView(MeelanoUiKit.text(h, main, 10f, p.text, false), MeelanoUiKit.lp(-1, -2));
+            if (confirmed) {
+                MeelanoChequePlan.Entry e = plan.entryOf(r.key());
+                if (e != null) {
+                    int[] j = MeelanoJalali.fromDay((int) (e.ts / 86400000L) + 2440588);
+                    txt.addView(MeelanoUiKit.text(h, "ثبت " + MeelanoJalali.format(j[0] * 10000 + j[1] * 100 + j[2])
+                            + (e.user.isEmpty() ? "" : " توسط " + e.user), 9.2f, p.muted, false), MeelanoUiKit.lp(-1, -2));
+                }
+            }
+            line.addView(txt, MeelanoUiKit.lp(0, -2, 1f));
+            line.addView(MeelanoUiKit.button(h, confirmed ? "لغو تایید" : "ثبت تایید",
+                    confirmed ? p.warning : p.success, false, new Runnable() {
+                @Override public void run() {
+                    if (confirmed) MeelanoChequeRegistry.revoke(h, r.key());
+                    else MeelanoChequeRegistry.confirm(h, r.key(), h.registryUser(), "");
+                    h.notify(confirmed ? "تایید چک لغو شد" : "تایید چک در سامانه ثبت شد");
+                    h.goTo("finance");
+                }
+            }), MeelanoUiKit.lp(-2, h.dp(44)));
+            c.addView(line, MeelanoUiKit.lp(-1, -2));
+        }
+        if (rows.size() > shown) {
+            c.addView(MeelanoUiKit.text(h, "و " + h.fa(String.valueOf(rows.size() - shown)) + " مورد دیگر در خروجی PDF",
+                    9.2f, p.muted, false), MeelanoUiKit.lp(-1, -2));
+        }
+        body.addView(c, MeelanoUiKit.lp(-1, -2));
+    }
+
+    /** خروجی PDF حرفه‌ای گزارش تایید با همان موتور چاپ داخلی اپ. */
+    private static void shareApprovalPdf(final MeelanoUiHost h, final MeelanoChequePlan.Plan plan) {
+        h.notify("در حال ساخت PDF…");
+        h.runDb(new MeelanoUiHost.MeelanoTask() {
+            @Override public String run() throws Exception {
+                MeelanoDailyReportPdf.Data d = new MeelanoDailyReportPdf.Data();
+                d.title = "گزارش تایید سامانهٔ چک‌ها";
+                d.date = MeelanoJalali.format(MeelanoJalali.today());
+                d.managerBrand = true;
+                d.summary.add(new String[]{"تیک خورده", h.fa(String.valueOf(plan.confirmedCount())) + " فقره"});
+                d.summary.add(new String[]{"تیک نخورده", h.fa(String.valueOf(plan.pendingCount())) + " فقره"});
+                d.summary.add(new String[]{"نرخ تایید", h.fa(String.valueOf(plan.ratePercent())) + "٪"});
+                d.summary.add(new String[]{"جمع تیک‌نخورده", h.money(plan.pendingSum)});
+                d.preTitle = "تیک خورده (تایید سامانه شده)";
+                d.preHead = new String[]{"شماره", "طرف حساب", "مبلغ", "ثبت در برنامه"};
+                d.preEmpty = "چکی با تایید سامانه ثبت نشده است.";
+                d.visTitle = "تیک نخورده (در انتظار ثبت)";
+                d.visHead = new String[]{"شماره", "طرف حساب", "سررسید"};
+                d.visEmpty = "همهٔ چک‌ها تایید سامانه شده‌اند.";
+                for (MeelanoChequePlan.Row r : plan.confirmed) {
+                    MeelanoChequePlan.Entry e = plan.entryOf(r.key());
+                    String reg = e == null ? "—" : (e.user.isEmpty() ? "ثبت‌شده" : e.user);
+                    d.prefactors.add(new String[]{r.num, r.customer, h.money(r.amount), reg});
+                }
+                for (MeelanoChequePlan.Row r : plan.pending) {
+                    d.visits.add(new String[]{r.num, r.customer, r.due.isEmpty() ? "—" : r.due});
+                }
+                d.note = plan.pendingOverdue > 0
+                        ? "هشدار: " + plan.pendingOverdue + " چک تیک‌نخورده سررسید گذشته دارد."
+                        : "همهٔ سررسیدهای تیک‌نخورده پیشِ رو هستند.";
+                java.io.File out = new java.io.File(h.ctx().getCacheDir(), "cheque-approval-report.pdf");
+                MeelanoDailyReportPdf.write(h.ctx(), d, h.font(false), h.font(true), out);
+                byte[] bytes = java.nio.file.Files.readAllBytes(out.toPath());
+                h.shareGeneratedFile("cheque-approval-report.pdf", "application/pdf", bytes, "گزارش تایید سامانهٔ چک‌ها");
+                return "ok";
+            }
+        }, new MeelanoUiHost.MeelanoResult() {
+            @Override public void ok(String body) { }
+            @Override public void fail(Exception e) { h.notify("ساخت PDF ممکن نشد: " + e.getMessage(), true); }
+        });
     }
 
     // ---------------- قیمت‌گذاری و سود

@@ -8,9 +8,9 @@ public enum PersianNumber {
         for ch in raw {
             let v = ch.unicodeScalars.first!.value
             if v >= 0x06F0 && v <= 0x06F9 { // ۰-۹ فارسی
-                s.append(String(v - 0x06F0))
+                s += "\(v - 0x06F0)"
             } else if v >= 0x0660 && v <= 0x0669 { // ٠-٩ عربی
-                s.append(String(v - 0x0660))
+                s += "\(v - 0x0660)"
             } else if ch == "٫" { s.append(".") } // اعشار فارسی
             else if ch == "٬" || ch == "،" { s.append(",") } // هزارگان
             else { s.append(ch) }

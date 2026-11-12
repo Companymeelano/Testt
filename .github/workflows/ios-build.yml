@@ -6,6 +6,7 @@ on:
     paths:
       - "ios-invoice/**"
       - ".github/workflows/ios-build.yml"
+      - "dist/**"
   workflow_dispatch:
 
 permissions:

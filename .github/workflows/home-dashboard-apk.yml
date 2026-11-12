@@ -250,7 +250,10 @@ jobs:
     name: Capture Home sections at 100% and 130%
     needs: build
     if: ${{ github.event_name != 'workflow_dispatch' || inputs.capture_screenshots }}
-    runs-on: ubuntu-latest
+    # Pinned: every green capture run booted the emulator on the 24.04 image; since
+    # ubuntu-latest started resolving to Ubuntu 26 the package service stalls at install
+    # and System UI/app input dispatch times out. The retry below stays as a safety net.
+    runs-on: ubuntu-24.04
     # Two instrumentation attempts: a wedged emulator costs one extra ~15-minute pass.
     timeout-minutes: 60
     permissions:

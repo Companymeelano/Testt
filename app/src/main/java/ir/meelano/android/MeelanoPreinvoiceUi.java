@@ -12,7 +12,6 @@ import android.widget.Spinner;
 import android.widget.TextView;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -293,9 +292,9 @@ final class MeelanoPreinvoiceUi {
                 File out = new File(h.ctx().getCacheDir(), "cheque-preinvoice-report.pdf");
                 FileOutputStream fos = new FileOutputStream(out);
                 MeelanoDailyReportPdf.write(h.ctx(), MeelanoPreinvoiceExport.pdfData(draft, t),
-                        h.font(false), h.font(true), fos);
-                fos.close();
-                byte[] bytes = java.nio.file.Files.readAllBytes(out.toPath());
+                        h.font(false), h.font(true), out);
+                byte[] bytes = new byte[(int) out.length()];
+                try (java.io.FileInputStream fis = new java.io.FileInputStream(out)) { fis.read(bytes); }
                 h.shareGeneratedFile("preinvoice-" + draft.docNo + ".pdf", "application/pdf", bytes, title);
                 markSent(h, rerun);
             } catch (Exception e) {
@@ -306,7 +305,9 @@ final class MeelanoPreinvoiceUi {
         if ("png".equals(kind)) {
             try {
                 File png = renderPng(h, t);
-                byte[] bytes = java.nio.file.Files.readAllBytes(png.toPath());
+                byte[] bb = new byte[(int) png.length()];
+                try (java.io.FileInputStream ff = new java.io.FileInputStream(png)) { ff.read(bb); }
+                byte[] bytes = bb;
                 h.shareGeneratedFile("preinvoice-" + draft.docNo + ".png", "image/png", bytes, title);
                 markSent(h, rerun);
             } catch (Exception e) {

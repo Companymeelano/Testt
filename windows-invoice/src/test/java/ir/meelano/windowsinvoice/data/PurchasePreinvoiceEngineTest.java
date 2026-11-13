@@ -122,4 +122,42 @@ public class PurchasePreinvoiceEngineTest {
         PurchasePreinvoiceEngine.Totals t = PurchasePreinvoiceEngine.compute(d);
         near(2_000_000, t.rowDisc, 0.51);
     }
+
+    @Test public void fractionalQuantity() {
+        PurchasePreinvoiceEngine.Draft d = draft(2.5, 100_000, 0);
+        d.lines.get(0).taxPct = 0;
+        near(250_000, PurchasePreinvoiceEngine.compute(d).goods, 0.01);
+    }
+    @Test public void zeroQuantity() {
+        PurchasePreinvoiceEngine.Draft d = draft(0, 0, 100_000);
+        near(0, PurchasePreinvoiceEngine.compute(d).goods, 0.01);
+    }
+    @Test public void veryLargeAmount() {
+        PurchasePreinvoiceEngine.Draft d = draft(1000, 1_000_000_000, 0);
+        d.lines.get(0).taxPct = 0;
+        near(1_000_000_000_000.0, PurchasePreinvoiceEngine.compute(d).goods, 1.0);
+    }
+    @Test public void discountOver100Capped() {
+        PurchasePreinvoiceEngine.Draft d = draft(1, 100_000, 0);
+        d.lines.get(0).discs.add(new PurchasePreinvoiceEngine.Disc(PurchasePreinvoiceEngine.DiscType.ROW_PERCENT, 150, 0, ""));
+        d.lines.get(0).taxPct = 0;
+        near(100_000, PurchasePreinvoiceEngine.compute(d).rowDisc, 0.01);
+    }
+    @Test public void multipleLines() {
+        PurchasePreinvoiceEngine.Draft d = new PurchasePreinvoiceEngine.Draft();
+        d.lines.add(new PurchasePreinvoiceEngine.Line("A", "کالا A", "عدد", 2, 500_000, 0));
+        d.lines.add(new PurchasePreinvoiceEngine.Line("B", "کالا B", "عدد", 3, 200_000, 0));
+        d.lines.get(0).discs.add(new PurchasePreinvoiceEngine.Disc(PurchasePreinvoiceEngine.DiscType.ROW_PERCENT, 10, 0, ""));
+        d.lines.get(1).discs.add(new PurchasePreinvoiceEngine.Disc(PurchasePreinvoiceEngine.DiscType.ROW_PER_UNIT, 10_000, 0, ""));
+        d.lines.get(0).taxPct = 10; d.lines.get(1).taxPct = 10;
+        near(1_617_000, PurchasePreinvoiceEngine.compute(d).grand, 1.0);
+    }
+    @Test public void allRoundingModes() {
+        PurchasePreinvoiceEngine.Draft d = draft(1, 123_456.7, 0);
+        d.lines.get(0).taxPct = 0;
+        d.rounding = "rial"; near(123457, PurchasePreinvoiceEngine.compute(d).goods, 0.5);
+        d.rounding = "toman"; near(123460, PurchasePreinvoiceEngine.compute(d).goods, 0.5);
+        d.rounding = "hundred"; near(123500, PurchasePreinvoiceEngine.compute(d).goods, 0.5);
+        d.rounding = "thousand"; near(123000, PurchasePreinvoiceEngine.compute(d).goods, 0.5);
+    }
 }

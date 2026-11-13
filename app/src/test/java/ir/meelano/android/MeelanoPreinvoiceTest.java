@@ -117,4 +117,47 @@ public class MeelanoPreinvoiceTest {
         MeelanoPreinvoice.Totals t = MeelanoPreinvoice.compute(d);
         assertEquals(2_000_000, t.rowDisc, 0.51);
     }
+
+    @Test public void fractionalQuantity() {
+        MeelanoPreinvoice.Draft d = draft(2.5, 100_000, 0);
+        d.lines.get(0).taxPct = 0;
+        MeelanoPreinvoice.Totals t = MeelanoPreinvoice.compute(d);
+        assertEquals(250_000, t.goods, 0.01);
+    }
+    @Test public void zeroQuantity() {
+        MeelanoPreinvoice.Draft d = draft(0, 0, 100_000);
+        MeelanoPreinvoice.Totals t = MeelanoPreinvoice.compute(d);
+        assertEquals(0, t.goods, 0.01);
+        assertEquals(0, d.lines.get(0).diffAmt, 0.01);
+    }
+    @Test public void veryLargeAmount() {
+        MeelanoPreinvoice.Draft d = draft(1000, 1_000_000_000, 0);
+        d.lines.get(0).taxPct = 0;
+        assertEquals(1_000_000_000_000.0, MeelanoPreinvoice.compute(d).goods, 1.0);
+    }
+    @Test public void discountOver100Capped() {
+        MeelanoPreinvoice.Draft d = draft(1, 100_000, 0);
+        d.lines.get(0).discs.add(new MeelanoPreinvoice.Disc(MeelanoPreinvoice.DiscType.ROW_PERCENT, 150, 0, ""));
+        d.lines.get(0).taxPct = 0;
+        MeelanoPreinvoice.Totals t = MeelanoPreinvoice.compute(d);
+        assertEquals(100_000, t.rowDisc, 0.01);
+        assertEquals(0, d.lines.get(0).net, 0.01);
+    }
+    @Test public void multipleLines() {
+        MeelanoPreinvoice.Draft d = new MeelanoPreinvoice.Draft();
+        d.lines.add(new MeelanoPreinvoice.Line("A", "کالا A", "عدد", 2, 500_000, 0));
+        d.lines.add(new MeelanoPreinvoice.Line("B", "کالا B", "عدد", 3, 200_000, 0));
+        d.lines.get(0).discs.add(new MeelanoPreinvoice.Disc(MeelanoPreinvoice.DiscType.ROW_PERCENT, 10, 0, ""));
+        d.lines.get(1).discs.add(new MeelanoPreinvoice.Disc(MeelanoPreinvoice.DiscType.ROW_PER_UNIT, 10_000, 0, ""));
+        d.lines.get(0).taxPct = 10; d.lines.get(1).taxPct = 10;
+        assertEquals(1_617_000, MeelanoPreinvoice.compute(d).grand, 1.0);
+    }
+    @Test public void allRoundingModes() {
+        MeelanoPreinvoice.Draft d = draft(1, 123_456.7, 0);
+        d.lines.get(0).taxPct = 0;
+        d.rounding = "rial"; assertEquals(123457, MeelanoPreinvoice.compute(d).goods, 0.5);
+        d.rounding = "toman"; assertEquals(123460, MeelanoPreinvoice.compute(d).goods, 0.5);
+        d.rounding = "hundred"; assertEquals(123500, MeelanoPreinvoice.compute(d).goods, 0.5);
+        d.rounding = "thousand"; assertEquals(123000, MeelanoPreinvoice.compute(d).goods, 0.5);
+    }
 }

@@ -63,4 +63,37 @@ final class PreinvoiceEngineTests: XCTestCase {
         let packed = PreinvoiceEngine.Disc(type: .tieredAmount, v1: 0, v2: 0, spec: "500000:3,1000000:6").pack()
         XCTAssertEqual(PreinvoiceEngine.Disc.unpack(packed)?.spec, "500000:3,1000000:6")
     }
+    func testFractionalQty() {
+        var d = makeDraft(qty: 2.5, price: 100_000); d.lines[0].taxPct = 0
+        XCTAssertEqual(PreinvoiceEngine.compute(&d).goods, 250_000, accuracy: 0.01)
+    }
+    func testZeroQty() {
+        var d = makeDraft(qty: 0, price: 0, ref: 100_000)
+        XCTAssertEqual(PreinvoiceEngine.compute(&d).goods, 0, accuracy: 0.01)
+    }
+    func testLargeAmount() {
+        var d = makeDraft(qty: 1000, price: 1_000_000_000); d.lines[0].taxPct = 0
+        XCTAssertEqual(PreinvoiceEngine.compute(&d).goods, 1_000_000_000_000, accuracy: 1.0)
+    }
+    func testDiscountOver100Capped() {
+        var d = makeDraft(qty: 1, price: 100_000)
+        d.lines[0].discs.append(.init(type: .rowPercent, v1: 150, v2: 0, spec: "")); d.lines[0].taxPct = 0
+        XCTAssertEqual(PreinvoiceEngine.compute(&d).rowDisc, 100_000, accuracy: 0.01)
+    }
+    func testMultipleLines() {
+        var d = PreinvoiceEngine.Draft()
+        d.lines.append(.init(code: "A", name: "کالا A", unit: "عدد", qty: 2, price: 500_000, refPrice: 0))
+        d.lines.append(.init(code: "B", name: "کالا B", unit: "عدد", qty: 3, price: 200_000, refPrice: 0))
+        d.lines[0].discs.append(.init(type: .rowPercent, v1: 10, v2: 0, spec: ""))
+        d.lines[1].discs.append(.init(type: .rowPerUnit, v1: 10_000, v2: 0, spec: ""))
+        d.lines[0].taxPct = 10; d.lines[1].taxPct = 10
+        XCTAssertEqual(PreinvoiceEngine.compute(&d).grand, 1_617_000, accuracy: 1.0)
+    }
+    func testAllRoundings() {
+        var d = makeDraft(qty: 1, price: 123_456.7); d.lines[0].taxPct = 0
+        d.rounding = "rial"; XCTAssertEqual(PreinvoiceEngine.compute(&d).goods, 123457, accuracy: 0.5)
+        d.rounding = "toman"; XCTAssertEqual(PreinvoiceEngine.compute(&d).goods, 123460, accuracy: 0.5)
+        d.rounding = "hundred"; XCTAssertEqual(PreinvoiceEngine.compute(&d).goods, 123500, accuracy: 0.5)
+        d.rounding = "thousand"; XCTAssertEqual(PreinvoiceEngine.compute(&d).goods, 123000, accuracy: 0.5)
+    }
 }

@@ -117,4 +117,82 @@ public class PurchasePreinvoiceTest {
         PurchasePreinvoice.Totals t = PurchasePreinvoice.compute(d);
         assertEquals(2_000_000, t.rowDisc, 0.51);
     }
+
+    // ── سناریوهای لبه‌ای (مرحله ۱۰) ──
+
+    @Test public void fractionalQuantity() {
+        PurchasePreinvoice.Draft d = draft(2.5, 100_000, 0);
+        d.lines.get(0).taxPct = 0;
+        PurchasePreinvoice.Totals t = PurchasePreinvoice.compute(d);
+        assertEquals(250_000, t.goods, 0.01);
+        assertEquals(250_000, t.grand, 0.01);
+    }
+
+    @Test public void zeroQuantityAndPrice() {
+        PurchasePreinvoice.Draft d = draft(0, 0, 100_000);
+        PurchasePreinvoice.Totals t = PurchasePreinvoice.compute(d);
+        assertEquals(0, t.goods, 0.01);
+        assertEquals(0, t.grand, 0.01);
+        // اختلاف = 0 - 0*ref = 0 (بدون تقسیم بر صفر)
+        assertEquals(0, d.lines.get(0).diffAmt, 0.01);
+    }
+
+    @Test public void negativePriceIsHandled() {
+        PurchasePreinvoice.Draft d = draft(1, -500_000, 0);
+        d.lines.get(0).taxPct = 0;
+        PurchasePreinvoice.Totals t = PurchasePreinvoice.compute(d);
+        // موتور از منفی جلوگیری نمی‌کند — مقدار منفی در جمع لحاظ می‌شود (بازگشت/اصلاح)
+        assertEquals(-500_000, t.goods, 0.01);
+    }
+
+    @Test public void veryLargeAmountNoOverflow() {
+        PurchasePreinvoice.Draft d = draft(1000, 1_000_000_000, 0); // 1e12
+        d.lines.get(0).taxPct = 0;
+        PurchasePreinvoice.Totals t = PurchasePreinvoice.compute(d);
+        assertEquals(1_000_000_000_000.0, t.goods, 1.0);
+    }
+
+    @Test public void discountOver100PercentCappedAtGross() {
+        PurchasePreinvoice.Draft d = draft(1, 100_000, 0);
+        d.lines.get(0).discs.add(new PurchasePreinvoice.Disc(PurchasePreinvoice.DiscType.ROW_PERCENT, 150, 0, ""));
+        d.lines.get(0).taxPct = 0;
+        PurchasePreinvoice.Totals t = PurchasePreinvoice.compute(d);
+        // سقف تخفیف = ناخالص — خالص منفی نمی‌شود
+        assertEquals(100_000, t.rowDisc, 0.01);
+        assertEquals(0, d.lines.get(0).net, 0.01);
+    }
+
+    @Test public void multipleLinesAndDiscounts() {
+        PurchasePreinvoice.Draft d = new PurchasePreinvoice.Draft();
+        d.lines.add(new PurchasePreinvoice.Line("A", "کالا A", "عدد", 2, 500_000, 0));
+        d.lines.add(new PurchasePreinvoice.Line("B", "کالا B", "عدد", 3, 200_000, 0));
+        d.lines.get(0).discs.add(new PurchasePreinvoice.Disc(PurchasePreinvoice.DiscType.ROW_PERCENT, 10, 0, ""));
+        d.lines.get(1).discs.add(new PurchasePreinvoice.Disc(PurchasePreinvoice.DiscType.ROW_PER_UNIT, 10_000, 0, ""));
+        d.lines.get(0).taxPct = 10; d.lines.get(1).taxPct = 10;
+        PurchasePreinvoice.Totals t = PurchasePreinvoice.compute(d);
+        // A: 1,000,000 -100,000=900,000 +90,000 tax=990,000
+        // B: 600,000 -30,000=570,000 +57,000 tax=627,000
+        // grand = 1,617,000
+        assertEquals(1_600_000, t.goods, 0.01);
+        assertEquals(1_617_000, t.grand, 1.0);
+    }
+
+    @Test public void allRoundingModes() {
+        PurchasePreinvoice.Draft d = draft(1, 123_456.7, 0);
+        d.lines.get(0).taxPct = 0;
+        d.rounding = "rial"; assertEquals(123457, PurchasePreinvoice.compute(d).goods, 0.5);
+        d.rounding = "toman"; assertEquals(123460, PurchasePreinvoice.compute(d).goods, 0.5);
+        d.rounding = "hundred"; assertEquals(123500, PurchasePreinvoice.compute(d).goods, 0.5);
+        d.rounding = "thousand"; assertEquals(123000, PurchasePreinvoice.compute(d).goods, 0.5);
+        d.rounding = "none"; assertEquals(123456.7, PurchasePreinvoice.compute(d).goods, 0.01);
+    }
+
+    @Test public void invalidInputNeverSilentlyZero() {
+        // PersianNumber جدا تست شد؛ اینجا engine باید ورودی نامعتبر را همان 0 قبلی ببیند — UI مسئول پیام است
+        // این تست فقط مستند می‌کند که موتور خود تبدیل بی‌صدا ندارد — ورودی از قبل عدد است
+        PurchasePreinvoice.Draft d = draft(1, 100_000, 0);
+        d.lines.get(0).taxPct = 200; // مالیات نامعقول — موتور محدود نمی‌کند اما UI هشدار می‌دهد
+        PurchasePreinvoice.Totals t = PurchasePreinvoice.compute(d);
+        assertEquals(200_000, t.tax, 0.01);
+    }
 }

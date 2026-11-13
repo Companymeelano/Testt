@@ -146,7 +146,9 @@ final class MeelanoPreinvoiceUi {
         c.addView(MeelanoUiKit.text(h, "اقلام کالا", 12.5f, p.text, true), MeelanoUiKit.lp(-1, -2));
         if (draft.lines.isEmpty()) {
             c.addView(MeelanoUiKit.emptyState(h, "▤", "هنوز قلمی ثبت نشده",
-                    "با «افزودن قلم» اولین کالا را وارد کنید.", null, null), MeelanoUiKit.lp(-1, -2));
+                    "با «نمایش» جزئیات را ببینید و قلم تازه بیفزایید.", "نمایش", new Runnable() {
+                        @Override public void run() { draft.lines.add(new MeelanoPreinvoice.Line()); rerun.run(); }
+                    }), MeelanoUiKit.lp(-1, -2));
         }
         for (int i = 0; i < draft.lines.size(); i++) c.addView(lineBlock(h, i, rerun), MeelanoUiKit.lp(-1, -2));
         c.addView(MeelanoUiKit.button(h, "＋ افزودن قلم", p.accent, false, new Runnable() {

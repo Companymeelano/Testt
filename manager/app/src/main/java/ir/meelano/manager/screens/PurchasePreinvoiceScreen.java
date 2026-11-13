@@ -232,7 +232,10 @@ public class PurchasePreinvoiceScreen extends Screen {
         LinearLayout c = a.kit.card(Theme.INFO);
         c.addView(a.kit.text("اقلام کالا", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
         if (draft.lines.isEmpty()) {
-            c.addView(a.kit.empty("هنوز قلمی ثبت نشده", "با «افزودن قلم» اولین کالا را وارد کنید."), a.kit.lp(-1, -2));
+            c.addView(a.kit.emptyWithAction("هنوز قلمی ثبت نشده", "با «نمایش» جزئیات را ببینید و قلم تازه بیفزایید.", "نمایش", v -> {
+                draft.lines.add(new PurchasePreinvoice.Line());
+                render(live);
+            }), a.kit.lp(-1, -2));
         }
         for (int i = 0; i < draft.lines.size(); i++) c.addView(lineBlock(i), a.kit.lp(-1, -2));
         c.addView(a.kit.gap(6));

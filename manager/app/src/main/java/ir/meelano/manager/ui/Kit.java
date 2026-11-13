@@ -1290,6 +1290,39 @@ public final class Kit {
         return card;
     }
 
+    /** Empty state with golden CTA — one-line guidance, one gold action (C11, unified «نمایش»). */
+    public View emptyWithAction(String title, String body, String actionLabel, View.OnClickListener action) {
+        LinearLayout card = card();
+        card.setGravity(Gravity.CENTER_HORIZONTAL);
+        card.setPadding(Theme.dp(16), Theme.dp(16), Theme.dp(16), Theme.dp(16));
+        ImageView symbol = icon(R.drawable.mi_inbox, Theme.PRIMARY, 24);
+        LinearLayout.LayoutParams ip = lp(Theme.dp(28), Theme.dp(28));
+        ip.gravity = Gravity.CENTER_HORIZONTAL;
+        card.addView(symbol, ip);
+        TextView heading = text(title, 14f, Theme.TEXT, true);
+        heading.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams hp = lp(-1, -2);
+        hp.topMargin = Theme.dp(7);
+        card.addView(heading, hp);
+        if (body != null && !body.isEmpty()) {
+            TextView caption = text(body, 11.5f, Theme.MUTED, false);
+            caption.setGravity(Gravity.CENTER);
+            caption.setSingleLine(true);
+            caption.setEllipsize(TextUtils.TruncateAt.END);
+            card.addView(caption, lp(-1, -2));
+        }
+        // واحد برچسب دکمهٔ اقدام همیشه «نمایش» (الزام اسپک) — اگر متن دیگری آمد، به «نمایش» نگاشت می‌شود
+        String label = actionLabel == null || actionLabel.trim().isEmpty() ? "نمایش" : "نمایش";
+        if (action != null) {
+            Button btn = btnGold(label, action);
+            LinearLayout.LayoutParams bp = lp(-2, -2);
+            bp.topMargin = Theme.dp(12);
+            bp.gravity = Gravity.CENTER_HORIZONTAL;
+            card.addView(btn, bp);
+        }
+        return card;
+    }
+
     /** Empty state: a small gold illustration, a title and a one-line guidance text. */
     public View empty(String title, String body) {
         LinearLayout card = card();

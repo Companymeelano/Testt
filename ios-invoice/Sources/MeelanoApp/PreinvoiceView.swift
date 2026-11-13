@@ -191,8 +191,12 @@ struct PreinvoiceView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("اقلام کالا").font(.subheadline.bold()).accessibilityAddTraits(.isHeader)
                 if draft.lines.isEmpty {
-                    EmptyState(icon: "shippingbox", title: "هنوز قلمی ثبت نشده", subtitle: "با «افزودن قلم» اولین کالا را وارد کنید.")
-                        .accessibilityElement(children: .combine)
+                    EmptyState(icon: "shippingbox", title: "هنوز قلمی ثبت نشده", subtitle: "با «نمایش» جزئیات را ببینید و قلم تازه بیفزایید.", action: {
+                        draft.lines.append(PreinvoiceEngine.Line())
+                        rawLines.append(RawLine())
+                        isDirty = true
+                    })
+                    .accessibilityElement(children: .combine)
                 }
                 ForEach(Array(draft.lines.enumerated()), id: \.offset) { idx, _ in
                     lineRow(idx)
@@ -654,11 +658,20 @@ struct StoneCardInner<Content: View>: View {
 }
 struct EmptyState: View {
     var icon, title, subtitle: String
+    var action: (() -> Void)? = nil
     var body: some View {
-        VStack(spacing: 4) {
-            Image(systemName: icon).font(.title2).foregroundColor(.muted)
+        VStack(spacing: 8) {
+            // طلایی ملایم — تنها عنصر طلایی غالب صفحه (مطابق اسپک: یک طلایی غالب)
+            ZStack {
+                Circle().fill(Color(red: 0.76, green: 0.65, blue: 0.22).opacity(0.14)).frame(width: 44, height: 44)
+                Image(systemName: icon).font(.title3).foregroundColor(Color(red: 0.65, green: 0.53, blue: 0.16))
+            }
             Text(title).font(.caption.bold()).foregroundColor(.ink)
-            Text(subtitle).font(.caption2).foregroundColor(.muted).multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
+            // C11: حداکثر یک خط توضیح، ellipsize
+            Text(subtitle).font(.caption2).foregroundColor(.muted).lineLimit(1).truncationMode(.tail).multilineTextAlignment(.center)
+            if let act = action {
+                Button("نمایش", action: act).buttonStyle(PrimaryButtonStyle()).frame(maxWidth: 160)
+            }
         }.frame(maxWidth: .infinity).padding(16)
         .accessibilityElement(children: .combine)
     }

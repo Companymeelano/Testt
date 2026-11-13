@@ -14,18 +14,23 @@ permissions:
 
 jobs:
   test:
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Run iOS engine tests (SwiftPM, no signing)
+      - name: Install Swift
+        uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "5.10"
+      - name: Run iOS engine tests (SwiftPM, no signing — pure logic only)
         run: |
           set -o pipefail
           cd ios-invoice
           swift --version
-          swift test --verbose 2>&1 | tee /tmp/ios-test.log | cat
+          # Only the pure engine target is built on Linux; MeelanoApp (SwiftUI/UIKit)
+          # is iOS-only and deliberately excluded here — it is verified by `swift build`
+          # on macOS in the `build` job.
+          swift test --filter MeelanoPreinvoiceTests --verbose 2>&1 | tee /tmp/ios-test.log | cat
           echo "=== swift test exit: $PIPESTATUS ==="
-          # Also try building the app target to catch UIKit errors
-          swift build --target MeelanoApp 2>&1 | tee /tmp/ios-build-app.log | cat || true
 
   build:
     runs-on: macos-latest

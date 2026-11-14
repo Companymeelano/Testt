@@ -3255,9 +3255,15 @@ public class HomeScreen extends Screen {
                 card.addView(more, moreParams);
             }
         }
-        if (!unavailable.isEmpty())
-            card.addView(a.kit.hint("بررسی ناقص بخش‌های: " + joinAlertSources(unavailable)), a.kit.lp(-1, -2));
-        a.kit.addCard(content, card);
+        if (!unavailable.isEmpty()) {
+            View hint = a.kit.hint("بررسی ناقص بخش‌های: " + joinAlertSources(unavailable));
+            if (hint.getParent() == null) card.addView(hint, a.kit.lp(-1, -2));
+        }
+        try {
+            a.kit.addCard(content, card);
+        } catch (Exception e) {
+            android.util.Log.e("MEELANO", "secAlerts addCard failed", e);
+        }
     }
 
     private String attentionLabel(int priority) {

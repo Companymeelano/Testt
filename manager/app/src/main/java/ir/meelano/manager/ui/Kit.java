@@ -126,9 +126,16 @@ public final class Kit {
     public LinearLayout card(int accent) { return luxCard(accent); }
 
     public void addCard(LinearLayout parent, View card) {
+        if (card != null && card.getParent() instanceof LinearLayout) {
+            ((LinearLayout) card.getParent()).removeView(card);
+        }
         LinearLayout.LayoutParams p = lp(-1, -2);
         p.setMargins(0, 0, 0, Theme.dp(12));
-        parent.addView(card, p);
+        try {
+            parent.addView(card, p);
+        } catch (IllegalStateException e) {
+            android.util.Log.w("MEELANO", "addCard: view already has parent", e);
+        }
     }
 
     // ---------------- hero & sections ----------------

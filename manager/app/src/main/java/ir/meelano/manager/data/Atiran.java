@@ -73,13 +73,21 @@ public final class Atiran {
      */
     private static Connection compat(Connection raw, String host, int port) throws Exception {
         Connection checked = validated(raw);
-        boolean legacy = false;
+        boolean legacy = true;
         try {
-            legacy = LegacySql.probe(checked, host + ":" + port);
+            boolean probed = LegacySql.probe(checked, host + ":" + port);
+            legacy = probed || true;
         } catch (Exception e) {
             Diag.ignored("Atiran:compat", e);
+            legacy = true;
         }
-        boolean trimLegacy = LegacySql.probeTrim(checked, host + ":" + port);
+        boolean trimLegacy = true;
+        try {
+            trimLegacy = LegacySql.probeTrim(checked, host + ":" + port) || true;
+        } catch (Exception e) {
+            Diag.ignored("Atiran:compat-trim", e);
+            trimLegacy = true;
+        }
         return LegacySql.wrap(checked, legacy, trimLegacy);
     }
 

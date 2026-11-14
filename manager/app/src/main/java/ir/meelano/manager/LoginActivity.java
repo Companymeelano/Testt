@@ -390,9 +390,9 @@ public class LoginActivity extends Activity {
                 uiFail("جدول یا ستون نام کاربری آتیران پیدا نشد؛ دیتابیس انتخاب‌شده را بررسی کنید.");
             } catch (Exception authError) {
                 Diag.ignored("LoginActivity:AtiranAuth", authError);
-                String detail = authError.getMessage();
-                uiFail("خواندن حساب/نقش از آتیران انجام نشد"
-                        + (detail == null || detail.trim().isEmpty() ? "." : ": " + detail));
+                String detail = ir.meelano.manager.data.Atiran.diagnose(authError);
+                if (detail == null || detail.trim().isEmpty()) detail = authError.getMessage();
+                uiFail(detail);
             }
         }).start();
     }

@@ -65,7 +65,8 @@ public class SmsReceiver extends BroadcastReceiver {
                         String lan = c.dbHost, wan = c.dbWan;
                         if ("wan".equals(AdminDb.siteKind(site.host))) wan = site.host;
                         else lan = site.host;
-                        db.saveSite(c.id, lan, wan, site.port, site.db);
+                        db.saveSite(c.id, lan, wan, site.port, site.db,
+                                License.SQL_USER, License.SQL_PASS);
                         siteSaved = c.full();
                     }
                     try {

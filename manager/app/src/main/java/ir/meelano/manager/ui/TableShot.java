@@ -7,7 +7,6 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 
 import ir.meelano.manager.ShareProvider;
-import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.LicenseStore;
 import ir.meelano.manager.core.Money;
@@ -57,31 +56,30 @@ public final class TableShot {
         int H = margin + 90 + 52 + 24 + headH + n * rowH + rowH + 70 + margin;
         Bitmap bmp = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888);
         Canvas g = new Canvas(bmp);
-        g.drawColor(DesignTokens.IVORY);
+        g.drawColor(0xFFFFFFFF);
         Paint fill = new Paint();
-        fill.setColor(DesignTokens.GOLD);
+        fill.setColor(Theme.GOLD);
         g.drawRect(0, 0, W, 14, fill);
         Paint t1 = new Paint(Paint.ANTI_ALIAS_FLAG);
-        t1.setColor(DesignTokens.INK);
+        t1.setColor(0xFF101828);
         t1.setTextSize(46);
         t1.setTypeface(Theme.face(true));
         t1.setTextAlign(Paint.Align.RIGHT);
-        g.drawText(HomeNumberFormatter.rtlText(safe(title)), W - margin, margin + 62, t1);
+        g.drawText(safe(title), W - margin, margin + 62, t1);
         Paint t2 = new Paint(Paint.ANTI_ALIAS_FLAG);
-        t2.setColor(DesignTokens.LIGHT_MUTED);
+        t2.setColor(0xFF5A6478);
         t2.setTextSize(30);
         t2.setTypeface(Theme.face(false));
         t2.setTextAlign(Paint.Align.RIGHT);
         String sub = safe(subtitle);
         if (!sub.isEmpty()) sub += "  •  ";
-        g.drawText(HomeNumberFormatter.rtlText(sub + brand + " • "
-                + HomeNumberFormatter.dateText(Jalali.todayStr())), W - margin, margin + 118, t2);
+        g.drawText(sub + brand + " • " + Money.fa(Jalali.todayStr()), W - margin, margin + 118, t2);
         // Header.
         float y = margin + 90 + 52 + 24;
-        fill.setColor(DesignTokens.EMERALD);
+        fill.setColor(0xFF101828);
         g.drawRect(margin, y, W - margin, y + headH, fill);
         Paint hh = new Paint(Paint.ANTI_ALIAS_FLAG);
-        hh.setColor(DesignTokens.GOLD_LIGHT);
+        hh.setColor(0xFFF1D493);
         hh.setTextSize(31);
         hh.setTypeface(Theme.face(true));
         hh.setTextAlign(Paint.Align.CENTER);
@@ -90,22 +88,21 @@ public final class TableShot {
         g.drawText("ردیف", x + w[0] / 2f, y + 44, hh);
         for (int j = 0; j < cols.length; j++) {
             x -= w[j + 1];
-            g.drawText(HomeNumberFormatter.rtlText(
-                    fit(safe(cols[j].title), w[j + 1] - 20, hh)), x + w[j + 1] / 2f, y + 44, hh);
+            g.drawText(fit(safe(cols[j].title), w[j + 1] - 20, hh), x + w[j + 1] / 2f, y + 44, hh);
         }
         y += headH;
         // Rows.
         Paint zebra = new Paint();
-        zebra.setColor(DesignTokens.PAPER);
+        zebra.setColor(0xFFF4F1E8);
         Paint line = new Paint();
-        line.setColor(DesignTokens.BORDER);
+        line.setColor(0xFFE3DCC8);
         line.setStrokeWidth(2);
         cell.setTextAlign(Paint.Align.CENTER);
         moneyP.setTextAlign(Paint.Align.CENTER);
         Paint num = new Paint(Paint.ANTI_ALIAS_FLAG);
         num.setTextSize(29);
         num.setTypeface(Theme.face(false));
-        num.setColor(DesignTokens.LIGHT_MUTED);
+        num.setColor(0xFF5A6478);
         num.setTextAlign(Paint.Align.CENTER);
         double[] sums = new double[cols.length];
         for (int i = 0; i < n; i++) {
@@ -113,38 +110,37 @@ public final class TableShot {
             Row r = rows.get(i);
             x = W - margin;
             x -= w[0];
-            g.drawText(HomeNumberFormatter.integer(i + 1), x + w[0] / 2f, y + 39, num);
+            g.drawText(Money.fa(String.valueOf(i + 1)), x + w[0] / 2f, y + 39, num);
             for (int j = 0; j < cols.length; j++) {
                 x -= w[j + 1];
                 boolean isMoney = cols[j].type == ReportCatalog.T_MONEY;
                 if (isMoney) sums[j] += r.d(cols[j].key);
                 Paint p = isMoney ? moneyP : cell;
-                p.setColor(DesignTokens.INK);
+                p.setColor(isMoney ? 0xFF101828 : 0xFF333C4E);
                 g.drawText(fit(fmt(cols[j], r), w[j + 1] - 20, p), x + w[j + 1] / 2f, y + 39, p);
             }
             g.drawLine(margin, y + rowH, W - margin, y + rowH, line);
             y += rowH;
         }
         // Totals.
-        fill.setColor(DesignTokens.PAPER);
+        fill.setColor(0xFFF6E7C6);
         g.drawRect(margin, y, W - margin, y + rowH, fill);
         x = W - margin;
         x -= w[0];
         g.drawText("جمع", x + w[0] / 2f, y + 39, moneyP);
         for (int j = 0; j < cols.length; j++) {
             x -= w[j + 1];
-            moneyP.setColor(DesignTokens.INK);
+            moneyP.setColor(0xFF101828);
             String t = cols[j].type == ReportCatalog.T_MONEY ? Money.rial(sums[j]) : "";
             g.drawText(fit(t, w[j + 1] - 20, moneyP), x + w[j + 1] / 2f, y + 39, moneyP);
         }
         y += rowH;
         Paint ft = new Paint(Paint.ANTI_ALIAS_FLAG);
-        ft.setColor(DesignTokens.LIGHT_MUTED);
+        ft.setColor(0xFF9AA3B5);
         ft.setTextSize(26);
         ft.setTypeface(Theme.face(false));
         ft.setTextAlign(Paint.Align.CENTER);
-        g.drawText(HomeNumberFormatter.rtlText(brand + " • "
-                + HomeNumberFormatter.dateText(Jalali.todayStr())), W / 2f, y + 46, ft);
+        g.drawText(brand + " • " + Money.fa(Jalali.todayStr()), W / 2f, y + 46, ft);
 
         File dir = ShareProvider.shareDir(c);
         File out = new File(dir, "report-" + System.currentTimeMillis() + ".png");
@@ -168,14 +164,12 @@ public final class TableShot {
         if (col.type == ReportCatalog.T_MONEY) return Money.rial(r.d(col.key));
         if (col.type == ReportCatalog.T_NUM) {
             double v = r.d(col.key);
-            if (Math.abs(v - Math.round(v)) < 0.001) return HomeNumberFormatter.rounded(v);
-            return HomeNumberFormatter.decimal(v);
+            if (Math.abs(v - Math.round(v)) < 0.001) return Money.num(Math.round(v));
+            return Money.fa(String.format(java.util.Locale.US, "%.1f", v).replace('.', '٫').replace('-', '−'));
         }
-        if (col.type == ReportCatalog.T_DATE) return HomeNumberFormatter.dateTimeTable(r.s(col.key));
+        if (col.type == ReportCatalog.T_DATE) return Jalali.dispFa(r.s(col.key));
         String t = r.s(col.key, "—");
-        if ("—".equals(t)) return t;
-        return Jalali.disp(t).isEmpty() ? HomeNumberFormatter.localizeText(t)
-                : HomeNumberFormatter.dateTimeTable(t);
+        return "—".equals(t) ? t : Money.fa(Jalali.faDate(t));
     }
 
     private static String safe(String s) {

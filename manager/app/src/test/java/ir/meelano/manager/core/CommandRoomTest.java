@@ -19,7 +19,7 @@ public class CommandRoomTest {
             "products", "product_file", "customers", "visitors", "visitor_work", "visitor_orders",
             "users", "profit", "production", "dues", "reports", "analytics", "settings", "search",
             "voice", "anbar", "tahvil", "resid", "takmil", "shomarsh", "score", "closeout",
-            "manager_alerts", "sync_queue", "pick_wave", "preinvoice"};
+            "manager_alerts", "sync_queue", "pick_wave"};
 
     /** The tv display is not a screen of the app, it is an action of the command room. */
     private static final String TV = "tv";

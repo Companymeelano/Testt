@@ -1,7 +1,6 @@
 package ir.meelano.manager.ui;
 
 import ir.meelano.manager.core.Diag;
-import android.animation.ValueAnimator;
 import android.content.Context;
 import android.provider.Settings;
 import android.util.DisplayMetrics;
@@ -24,30 +23,14 @@ public final class Ui {
         return 360;
     }
 
-    /**
-     * False when the user disabled system animations or enabled a zero animation scale.
-     * Read the framework animator flag as well as all three system scales so view transitions,
-     * property animators and window motion use one consistent reduced-motion policy.
-     */
+    /** False when the user turned system animations off: decorative loops must freeze. */
     public static boolean motionOk(Context c) {
-        boolean frameworkEnabled;
         try {
-            frameworkEnabled = ValueAnimator.areAnimatorsEnabled();
-        } catch (Exception ignored) {
-            frameworkEnabled = true;
-        }
-        if (!frameworkEnabled) return false;
-        if (c == null) return true;
-        try {
-            android.content.ContentResolver resolver = c.getContentResolver();
-            return MotionPolicy.animationsEnabled(frameworkEnabled,
-                    Settings.Global.getFloat(resolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f),
-                    Settings.Global.getFloat(resolver, Settings.Global.TRANSITION_ANIMATION_SCALE, 1f),
-                    Settings.Global.getFloat(resolver, Settings.Global.WINDOW_ANIMATION_SCALE, 1f));
-        } catch (Exception ignored) {
-            // The framework flag still respects Animator duration scale if a vendor blocks
-            // direct Settings reads. Fail open only for values that are inaccessible.
-            return frameworkEnabled;
+            float s = Settings.Global.getFloat(c.getContentResolver(),
+                    Settings.Global.ANIMATOR_DURATION_SCALE, 1f);
+            return s != 0f;
+        } catch (Exception e) {
+            return true;
         }
     }
 

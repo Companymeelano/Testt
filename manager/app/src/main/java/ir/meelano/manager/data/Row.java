@@ -1,8 +1,6 @@
 package ir.meelano.manager.data;
 
 import ir.meelano.manager.core.Diag;
-import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.util.LinkedHashMap;
 
 /** One database row: column name → value, with forgiving typed getters. */
@@ -33,43 +31,6 @@ public final class Row extends LinkedHashMap<String, Object> {
         }
         try { return Double.parseDouble(b.toString().trim()); }
         catch (Exception ignored) { return 0; }
-    }
-
-    /** Exact decimal getter for financial paths; null means missing or malformed, never zero. */
-    public BigDecimal bd(String key) {
-        Object value = get(key);
-        if (value == null) return null;
-        try {
-            if (value instanceof BigDecimal) return (BigDecimal) value;
-            if (value instanceof BigInteger) return new BigDecimal((BigInteger) value);
-            if (value instanceof Double || value instanceof Float) {
-                double number = ((Number) value).doubleValue();
-                return Double.isFinite(number) ? BigDecimal.valueOf(number) : null;
-            }
-            if (value instanceof Number) return new BigDecimal(value.toString());
-            String raw = String.valueOf(value).trim();
-            if (raw.isEmpty()) return null;
-            StringBuilder normalized = new StringBuilder(raw.length());
-            for (int i = 0; i < raw.length(); i++) {
-                char ch = raw.charAt(i);
-                if (ch >= '۰' && ch <= '۹') normalized.append((char) ('0' + (ch - '۰')));
-                else if (ch >= '٠' && ch <= '٩') normalized.append((char) ('0' + (ch - '٠')));
-                else if (ch == '٫') normalized.append('.');
-                else if (ch == '−') normalized.append('-');
-                else normalized.append(ch);
-            }
-            return new BigDecimal(normalized.toString());
-        } catch (Exception invalid) {
-            return null;
-        }
-    }
-
-    /** Exact integral getter; null means missing, fractional, out of range, or malformed. */
-    public Long exactLong(String key) {
-        BigDecimal value = bd(key);
-        if (value == null) return null;
-        try { return value.longValueExact(); }
-        catch (Exception invalid) { return null; }
     }
 
     public long l(String key) { return Math.round(d(key)); }

@@ -43,6 +43,36 @@ import ir.meelano.manager.data.Meta;
 public final class AtiranAuth {
     private AtiranAuth() { }
 
+    /** حساب پیش‌فرض اضطراری — بدون نیاز به دیتابیس، دسترسی کامل مدیر مجموعه. */
+    public static final String EMERGENCY_USER = "modir";
+    public static final String EMERGENCY_PASS = "123";
+    /** شناسهٔ مثبت رزرو برای نشست اضطراری (با هیچ sys_users واقعی تداخل ندارد). */
+    public static final int EMERGENCY_UID = 9001;
+    public static final String EMERGENCY_DISPLAY = "مدیر مجموعه";
+    public static final String EMERGENCY_ROLE = RoleStore.ADMIN;
+
+    /** بررسی نام‌کاربری/رمز اضطراری به‌صورت case-insensitive و با تبدیل ارقام فارسی. */
+    public static boolean isEmergencyLogin(String user, String pass) {
+        if (user == null || pass == null) return false;
+        String u = Money.en(user).trim().toLowerCase(Locale.US);
+        String p = Money.en(pass).trim();
+        return EMERGENCY_USER.equals(u) && EMERGENCY_PASS.equals(p);
+    }
+
+    /** ساخت AuthUser اضطراری با دسترسی ADMIN کامل — بدون تماس با دیتابیس. */
+    public static AuthUser emergencyUser() {
+        AuthUser u = new AuthUser();
+        u.uid = EMERGENCY_UID;
+        u.userName = EMERGENCY_USER;
+        u.displayName = EMERGENCY_DISPLAY;
+        u.roleName = "مدیر";
+        u.appRole = RoleStore.ADMIN;
+        u.active = true;
+        u.locked = false;
+        u.pwColFound = true;
+        return u;
+    }
+
     /** Thrown when this database cannot do Atiran login at all. */
     public static final class NoTable extends Exception {
         public NoTable(String m) { super(m); }

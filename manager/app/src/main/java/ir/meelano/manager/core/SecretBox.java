@@ -12,8 +12,8 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
 
 /**
- * Encrypts small app secrets (such as the AI proxy session token) with an AES-GCM key
- * that lives in Android Keystore. Plain-text values never touch SharedPreferences.
+ * Encrypts small secrets (the AI API key) with an AES-GCM key that lives in the
+ * Android Keystore. Plain-text values never touch SharedPreferences.
  */
 public final class SecretBox {
     private SecretBox() { }

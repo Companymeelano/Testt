@@ -205,16 +205,10 @@ public final class AssistantEngine {
     }
 
     private static String salesYesterday(Assistant.Snap s) {
-        if (Assistant.unavailable(s, "فروش دیروز") || !Assistant.hasMoney(s.salesYesterday, "total")) {
-            return "دادهٔ فروش دیروز در دسترس نیست؛ مقدار صفر فرض نمی‌شود.";
-        }
-        StringBuilder b = new StringBuilder("فروش دیروز: ").append(Assistant.moneyField(s.salesYesterday, "total"));
-        if (Assistant.hasCount(s.salesYesterday, "docs")) {
-            b.append("\nتعداد فاکتور: ").append(Assistant.countField(s.salesYesterday, "docs"));
-        } else {
-            b.append("\nتعداد فاکتور در منبع موجود نیست.");
-        }
-        return b.toString();
+        double total = s.salesYesterday.d("total");
+        long docs = s.salesYesterday.l("docs");
+        return "فروش دیروز: " + Money.compactRial(total)
+                + "\nتعداد فاکتور: " + Money.fa(String.valueOf(docs));
     }
 
     /** Adds the snapshot's age so a user never mistakes old data for live data. */

@@ -1,6 +1,7 @@
 package ir.meelano.manager.data;
 
 import ir.meelano.manager.core.Diag;
+import ir.meelano.manager.core.LegacySql;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.sql.Connection;
@@ -9,30 +10,12 @@ import java.util.Properties;
 
 /**
  * Direct jTDS connection to the Atiran SQL Server.
- * Defaults match the previous app; every value can be overridden in Settings.
+ * Server, database, and credentials are provisioned locally; no SQL credential or endpoint is compiled into the APK.
  */
 public final class Atiran {
     private Atiran() { }
 
-    private static final int KEY = 91;
-    private static final int[] O_HOST = {104, 108, 117, 106, 111, 104, 117, 106, 111, 108, 117, 106, 98};
-    private static final int[] O_USER = {26, 63, 54, 50, 53, 26, 53};
-    private static final int[] O_PASS = {8, 47, 27, 9, 105, 107, 105, 105, 127};
-    private static final int[] O_DB = {26, 47, 50, 41, 58, 53, 105};
     public static final int DEFAULT_PORT = 1433;
-
-    private static String de(int[] d) {
-        char[] o = new char[d.length];
-        for (int i = 0; i < d.length; i++) o[i] = (char) (d[i] ^ KEY);
-        return new String(o);
-    }
-
-    public static String defaultHost() { return de(O_HOST); }
-    /** One SQL login for every database (the same account the smart backup uses). */
-    public static String defaultUser() { return "AdminAn"; }
-    public static String defaultPass() { return "St@R2022$"; }
-    /** Database name on the Atiran server. */
-    public static String defaultDb() { return "sac"; }
 
     /** Open a validated connection (TCP preflight + one automatic retry). */
     public static Connection open(String host, int port, String db, String user, String pass) throws Exception {
@@ -40,11 +23,17 @@ public final class Atiran {
     }
 
     /**
-     * Same, with tunable speed: the smart link uses a fast profile
-     * (no retry — failover to the other profile IS the retry).
+     * Same, with tunable network timeouts and retry policy selected by the smart-link caller.
      */
     public static Connection open(String host, int port, String db, String user, String pass,
                                   int tcpMs, int loginSec, boolean retry) throws Exception {
+        host = host == null ? "" : host.trim();
+        db = db == null ? "" : db.trim();
+        user = user == null ? "" : user.trim();
+        if (host.isEmpty() || db.isEmpty() || user.isEmpty() || pass == null || pass.isEmpty())
+            throw new IllegalArgumentException("تنظیم سرور، پایگاه داده و ورود SQL کامل نیست.");
+        if (port < 1 || port > 65535)
+            throw new IllegalArgumentException("پورت SQL باید بین ۱ تا ۶۵۵۳۵ باشد.");
         Class.forName("net.sourceforge.jtds.jdbc.Driver");
         String url = "jdbc:jtds:sqlserver://" + host + ":" + port + "/" + db
                 + ";loginTimeout=" + Math.max(2, loginSec) + ";socketTimeout=75;appName=MEELANO-Manager7;";
@@ -61,7 +50,7 @@ public final class Atiran {
             throw new Exception(diagnose(e));
         }
         try {
-            return validated(DriverManager.getConnection(url, p));
+            return compat(DriverManager.getConnection(url, p), host, port);
         } catch (Exception first) {
             // A wrong password will not succeed on retry; do not hammer the login.
             String fm = String.valueOf(first.getMessage()).toLowerCase(java.util.Locale.US);
@@ -70,11 +59,36 @@ public final class Atiran {
             }
             Thread.sleep(700);
             try {
-                return validated(DriverManager.getConnection(url, p));
+                return compat(DriverManager.getConnection(url, p), host, port);
             } catch (Exception second) {
                 throw new Exception(diagnose(second));
             }
         }
+    }
+
+    /**
+     * Validates the raw connection and then selects the SQL dialect of the server.
+     * Field servers on SQL Server 2008 R2 cannot parse TRY_CONVERT/TRY_CAST; the wrapper
+     * rewrites every statement so reports keep working there (see {@link LegacySql}).
+     */
+    private static Connection compat(Connection raw, String host, int port) throws Exception {
+        Connection checked = validated(raw);
+        boolean legacy = true;
+        try {
+            boolean probed = LegacySql.probe(checked, host + ":" + port);
+            legacy = probed || true;
+        } catch (Exception e) {
+            Diag.ignored("Atiran:compat", e);
+            legacy = true;
+        }
+        boolean trimLegacy = true;
+        try {
+            trimLegacy = LegacySql.probeTrim(checked, host + ":" + port) || true;
+        } catch (Exception e) {
+            Diag.ignored("Atiran:compat-trim", e);
+            trimLegacy = true;
+        }
+        return LegacySql.wrap(checked, legacy, trimLegacy);
     }
 
     private static Connection validated(Connection c) throws Exception {
@@ -96,10 +110,6 @@ public final class Atiran {
         if (l.contains("lock timeout"))
             return "پایگاه‌دادهٔ آتیران مشغول است؛ چند لحظه بعد دوباره تلاش کنید";
         if (l.contains("timeout") || l.contains("timed out")) return "سرور پاسخ نداد؛ اینترنت و آدرس سرور را بررسی کنید";
-        // TLS first: jTDS reports a failed encrypted handshake as "Network error ... SSL handshake aborted".
-        // That is not a routing problem, so it must not fall into the network branch below.
-        if (l.contains("ssl") || l.contains("tls") || l.contains("handshake") || l.contains("secure connection"))
-            return "اتصال رمزنگاری‌شده (TLS) با سرور برقرار نشد؛ نسخه TLS سرور با درایور برنامه سازگار نیست";
         if (l.contains("refused") || l.contains("unreachable") || l.contains("no route"))
             return "مسیر شبکه به سرور در دسترس نیست";
         if (l.contains("login failed") || l.contains("logon failed")) return "نام کاربری یا رمز دیتابیس اشتباه است";
@@ -123,6 +133,12 @@ public final class Atiran {
         }
         if (l.contains("incorrect syntax")) {
             return "ساختار این گزارش با دیتابیس سازگار نیست؛ به پشتیبانی اطلاع دهید";
+        }
+        if (l.contains("is not a recognized built-in function name")) {
+            // Pre-2012 SQL Server parses TRY_CONVERT's type argument as a call, so the message
+            // names «nvarchar»/«decimal» instead of the function. The compatibility wrapper
+            // normally prevents reaching here; if it does, say what to check in plain Persian.
+            return "نسخهٔ SQL Server سرور قدیمی‌تر از پشتیبانی این گزارش است؛ به پشتیبانی اطلاع دهید تا حالت سازگاری بررسی شود";
         }
         if (l.contains("aggregate function") || l.contains("group by") || l.contains("subquery")) {
             // SQL Server rejects this report's calculation shape. Keep the raw text out of the UI.

@@ -694,7 +694,7 @@ public class ProductsScreen extends Screen {
         for (Row r : d.dead) stuck += r.d("buyValue");
         LinearLayout c = a.kit.card(Theme.WARNING);
         c.addView(a.kit.kv("اقلام راکد (۹۰ روز بدون فروش)", Money.fa(String.valueOf(d.dead.size())) + " قلم", Theme.TEXT), a.kit.lp(-1, -2));
-        c.addView(a.kit.kv("سرمایه خوابیده ≈", Money.rial(stuck), Theme.WARNING), a.kit.lp(-1, -2));
+        c.addView(a.kit.kv("سرمایه خوابیده ≈", Money.compactRial(stuck), Theme.WARNING), a.kit.lp(-1, -2));
         a.kit.addCard(content, c);
         int cap = Math.min(d.dead.size(), 120);
         for (int i = 0; i < cap; i++) {
@@ -702,7 +702,7 @@ public class ProductsScreen extends Screen {
             final String shka = r.s("shka");
             String last = r.s("lastSale");
             String sub = "کد " + Money.fa(shka) + " • موجودی " + Money.qty(r.d("vah"))
-                    + (last.isEmpty() ? " • هرگز فروش نرفته" : " • آخرین فروش " + Jalali.shortLabel(last));
+                    + (last.isEmpty() ? " • هرگز فروش نرفته" : " • آخرین فروش " + Jalali.dispFa(last));
             View v = a.kit.alertRow(r.s("label"), sub, last.isEmpty() ? Theme.DANGER : Theme.WARNING, v2 -> openProduct(shka));
             LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
             p.setMargins(0, 0, 0, Theme.dp(10));

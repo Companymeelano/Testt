@@ -165,8 +165,7 @@ public final class InvoiceWatch {
         try {
             Notify.whChannel(c);
             int n = fresh.size();
-            String now = Money.fa(new java.text.SimpleDateFormat("HH:mm", java.util.Locale.US)
-                    .format(new java.util.Date()));
+            String now = HomeNumberFormatter.time(System.currentTimeMillis());
             int hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY);
             double sum = 0;
             List<String> lines = new ArrayList<>();
@@ -216,7 +215,7 @@ public final class InvoiceWatch {
                     .setShowWhen(true)
                     .setCategory(Notification.CATEGORY_REMINDER)
                     .setSmallIcon(R.mipmap.ic_launcher)
-                    .setColor(0xFFE8C77A)
+                    .setColor(0xFF176149)
                     .setGroup("meelano_warehouse")
                     .setContentIntent(pi)
                     .setAutoCancel(true)
@@ -225,7 +224,7 @@ public final class InvoiceWatch {
             try {
                 b.addAction(new Notification.Action.Builder(
                         android.graphics.drawable.Icon.createWithResource(c, R.mipmap.ic_launcher),
-                        "مشاهده بار", pi).build());
+                        "نمایش بار", pi).build());
             } catch (Exception ignored) { Diag.ignored("InvoiceWatch:action", ignored); }
             try {
                 b.setLargeIcon(loadBadge(c, n));
@@ -235,7 +234,7 @@ public final class InvoiceWatch {
         } catch (Exception ignored) { Diag.ignored("InvoiceWatch:180", ignored); }
     }
 
-    /** Black-and-gold badge with the number of loads, used as the notification's large icon. */
+    /** Flat emerald badge with the real number of loads, used as the notification's large icon. */
     private static android.graphics.Bitmap loadBadge(Context c, int count) {
         int size = 256;
         android.graphics.Bitmap bmp = android.graphics.Bitmap.createBitmap(size, size,
@@ -243,16 +242,15 @@ public final class InvoiceWatch {
         android.graphics.Canvas cv = new android.graphics.Canvas(bmp);
         android.graphics.Paint p = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
         float cx = size / 2f, cy = size / 2f, r = size / 2f - 8;
-        p.setShader(new android.graphics.RadialGradient(cx - 30, cy - 40, r * 1.6f,
-                new int[]{0xFF2A2A2E, 0xFF0B0B0D}, null, android.graphics.Shader.TileMode.CLAMP));
-        cv.drawCircle(cx, cy, r, p);
-        p.setShader(null);
-        p.setStyle(android.graphics.Paint.Style.STROKE);
-        p.setStrokeWidth(10);
-        p.setColor(0xFFE8C77A);
-        cv.drawCircle(cx, cy, r - 12, p);
         p.setStyle(android.graphics.Paint.Style.FILL);
-        p.setColor(0xFFF2F2F4);
+        p.setColor(0xFF176149);
+        cv.drawCircle(cx, cy, r, p);
+        p.setStyle(android.graphics.Paint.Style.STROKE);
+        p.setStrokeWidth(4);
+        p.setColor(0xFFE1E6E1);
+        cv.drawCircle(cx, cy, r - 6, p);
+        p.setStyle(android.graphics.Paint.Style.FILL);
+        p.setColor(0xFFFFFFFF);
         p.setTextAlign(android.graphics.Paint.Align.CENTER);
         p.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.BOLD));
         p.setTextSize(count > 9 ? 84 : 104);

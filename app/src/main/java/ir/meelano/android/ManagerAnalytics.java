@@ -442,6 +442,42 @@ final class ManagerAnalytics {
         return o;
     }
 
+    /**
+     * Row-level received cheques for the system-approval report: number, Sayad id,
+     * counterparty, amount and due date — every column optional except amount+date.
+     */
+    static JSONArray checkRows(Connection c) throws Exception {
+        JSONArray arr = new JSONArray();
+        Set<String> cols = columns(c, "getchk");
+        String amount = resolve(cols, "getchkmab", "mablagh", "amount");
+        String dateCol = resolve(cols, "sarresid", "getchkdate", "chkdate", "date", "t_date");
+        if (amount == null || dateCol == null) return arr;
+        String num = resolve(cols, "getchkno", "chkno", "no", "num");
+        String sayad = resolve(cols, "ShenaseSayad", "shenasesayad", "sayad");
+        String cust = resolve(cols, "getchkrahbar", "rahbar", "sharikh", "customer", "name");
+        String dd = "TRY_CONVERT(date,TRY_CONVERT(nvarchar(30),[" + dateCol + "]))";
+        StringBuilder sb = new StringBuilder("SELECT TOP (300) ");
+        sb.append(num == null ? "N'—'" : "ISNULL(TRY_CONVERT(nvarchar(60),[" + num + "]),N'—')");
+        sb.append(", ").append(sayad == null ? "N''" : "ISNULL(TRY_CONVERT(nvarchar(60),[" + sayad + "]),N'')");
+        sb.append(", ").append(cust == null ? "N''" : "ISNULL(TRY_CONVERT(nvarchar(200),[" + cust + "]),N'')");
+        sb.append(", ISNULL(TRY_CONVERT(decimal(19,2),[" + amount + "]),0)");
+        sb.append(", CONVERT(nvarchar(10), ").append(dd).append(", 121)");
+        sb.append(" FROM dbo.[getchk] WHERE ").append(dd).append(" IS NOT NULL ORDER BY ").append(dd).append(" DESC");
+        try (PreparedStatement ps = c.prepareStatement(sb.toString());
+             ResultSet r = ps.executeQuery()) {
+            while (r.next()) {
+                JSONObject o = new JSONObject();
+                o.put("num", r.getString(1));
+                o.put("sayad", r.getString(2));
+                o.put("customer", r.getString(3));
+                o.put("amount", r.getDouble(4));
+                o.put("due", r.getString(5));
+                arr.put(o);
+            }
+        }
+        return arr;
+    }
+
     /** Check maturity buckets over getchk — sarresid/date vs today. */
     static JSONObject checkBuckets(Connection c) throws Exception {
         JSONObject o = new JSONObject();
@@ -910,6 +946,7 @@ final class ManagerAnalytics {
         if (!c.isClosed()) try { out.put("visitors", visitorGoals(c, range)); } catch (Exception e) { errors.put("visitors: " + String.valueOf(e.getMessage())); }
         if (!c.isClosed()) try { out.put("products", products(c, range)); } catch (Exception e) { errors.put("products: " + String.valueOf(e.getMessage())); }
         if (!c.isClosed()) try { out.put("checkBuckets", checkBuckets(c)); } catch (Exception e) { errors.put("checkBuckets: " + String.valueOf(e.getMessage())); }
+        if (!c.isClosed()) try { out.put("checkRows", checkRows(c)); } catch (Exception e) { errors.put("checkRows: " + String.valueOf(e.getMessage())); }
         if (!c.isClosed()) try { out.put("aging", collection(c)); } catch (Exception e) { errors.put("aging: " + String.valueOf(e.getMessage())); }
         if (!c.isClosed()) try { out.put("credit", creditRisk(c)); } catch (Exception e) { errors.put("credit: " + String.valueOf(e.getMessage())); }
         if (!c.isClosed()) try { out.put("debtorAging", debtorAging(c, 60)); } catch (Exception e) { errors.put("debtorAging: " + String.valueOf(e.getMessage())); }

@@ -28,6 +28,7 @@ import ir.meelano.manager.data.Settings;
 import ir.meelano.manager.ui.Charts;
 import ir.meelano.manager.ui.Kit;
 import ir.meelano.manager.ui.Theme;
+import ir.meelano.manager.ui.Ui;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -159,9 +160,10 @@ public class TvActivity extends Activity {
         if (!alive) return;
         try {
             java.util.Calendar c = java.util.Calendar.getInstance();
-            String hm = String.format(java.util.Locale.US, "%02d:%02d",
+            String hm = ir.meelano.manager.core.HomeNumberFormatter.time(
                     c.get(java.util.Calendar.HOUR_OF_DAY), c.get(java.util.Calendar.MINUTE));
-            clock.setText(Money.fa(hm) + " • " + kit.todayLine());
+            clock.setText(ir.meelano.manager.core.HomeNumberFormatter.rtlText(
+                    hm + " • " + kit.todayLine()));
         } catch (Exception ignored) { Diag.ignored("TvActivity:164", ignored); }
         handler.postDelayed(() -> tickClock(), 20000);
     }
@@ -232,12 +234,14 @@ public class TvActivity extends Activity {
             slideBox.addView(kit.loading("در حال دریافت داده…"), kit.lp(-1, -2));
             return;
         }
-        slideBox.setAlpha(0f);
-        slideBox.animate().alpha(1f).setDuration(400).start();
+        boolean motion = Ui.motionOk(this);
+        slideBox.setAlpha(motion ? 0f : 1f);
+        if (motion) slideBox.animate().alpha(1f).setDuration(240).start();
         if (progress != null) {
             progress.animate().cancel();
+            progress.setVisibility(motion ? View.VISIBLE : View.INVISIBLE);
             progress.setScaleX(0f);
-            progress.animate().scaleX(1f).setDuration(SLIDE_MS)
+            if (motion) progress.animate().scaleX(1f).setDuration(SLIDE_MS)
                     .setInterpolator(new android.view.animation.LinearInterpolator()).start();
         }
         if (slide == 0) slideSales();
@@ -259,7 +263,8 @@ public class TvActivity extends Activity {
     }
 
     private void slideSales() {
-        slideBox.addView(big("فروش امروز", Money.rial(data.salesDay.d("total")),
+        slideBox.addView(big("فروش امروز", Money.compactRial(data.salesDay.d("total")),
+
                 Money.fa(String.valueOf(data.salesDay.l("docs"))) + " فاکتور • دریافت امروز " + Money.compactRial(data.inDay.d("total")),
                 Theme.GOLD), kit.lp(-1, -2));
         slideBox.addView(kit.gap(10));
@@ -269,7 +274,9 @@ public class TvActivity extends Activity {
             Charts.Area ch = new Charts.Area(this);
             List<Charts.Point> pts = new ArrayList<>();
             for (Row r : data.daily)
-                pts.add(new Charts.Point(Jalali.shortLabel(r.s("day")), r.d("total")));
+                pts.add(new Charts.Point(
+                        ir.meelano.manager.core.HomeNumberFormatter.dateShortLabel(r.s("day")),
+                        r.d("total")));
             ch.setData(pts, Theme.GOLD, Charts.COMPACT);
             c.addView(ch, new LinearLayout.LayoutParams(-1, Theme.dp(220)));
             slideBox.addView(c, kit.lp(-1, -2));
@@ -303,7 +310,7 @@ public class TvActivity extends Activity {
         }
         for (Row r : data.debtors) {
             View v = kit.personRow(r.s("party"), "کد " + Money.fa(r.s("code")),
-                    Money.rial(r.d("amount")), "مانده بدهی", Theme.DANGER, null);
+                    Money.compactRial(r.d("amount")), "مانده بدهی", Theme.DANGER, null);
             LinearLayout.LayoutParams p = kit.lp(-1, -2);
             p.setMargins(0, 0, 0, Theme.dp(8));
             slideBox.addView(v, p);

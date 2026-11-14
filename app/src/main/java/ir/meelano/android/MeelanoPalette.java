@@ -74,6 +74,54 @@ final class MeelanoPalette {
         return contrastWhite >= contrastBlack ? Color.WHITE : Color.rgb(16, 16, 16);
     }
 
+    /** برنز — تنها گرمِ خنثی باقی‌مانده پس از بازنشستگی بنفش و قهوه‌ای. */
+    static final int BRONZE = 0xFFB08968;
+
+    /**
+     * هر رنگ بخشِ میراثی را به خانواده‌های خانه تا می‌کند: برند + چهار رنگ معنایی + برنز.
+     * بنفش/ارغوانی و قهوه‌ای دیگر به سطح نمی‌رسند؛ رنگ‌های نیمه‌شفاف و مقادیر خودِ پالت دست‌نخور می‌مانند.
+     */
+    int foldFamily(int accent) {
+        if (accent == 0) return this.accent;
+        if (((accent >>> 24) & 0xFF) != 0xFF) return accent;
+        if (accent == this.accent || accent == accent2 || accent == success || accent == info
+                || accent == warning || accent == danger || accent == text || accent == muted
+                || accent == BRONZE) return accent;
+        float[] hsv = new float[3];
+        Color.colorToHSV(accent, hsv);
+        float h = hsv[0], s = hsv[1];
+        if (s < 0.14f) return muted;
+        if (h >= 235f && h < 340f) return BRONZE;   // violet/purple/magenta retired
+        if (h >= 340f || h < 12f) return danger;
+        if (h < 45f) return s < 0.55f ? BRONZE : warning;
+        if (h < 75f) return accent2;
+        if (h < 170f) return success;
+        return info;
+    }
+
+    /** جوهر رنگی که روی تیره‌ترین سطح کارت تم فعال ≥4.5:1 می‌دهد. */
+    int sectionInk(int family) {
+        int f = foldFamily(family);
+        int ink = light ? mix(f, Color.rgb(16, 14, 8), 0.42f) : mix(f, Color.rgb(255, 252, 240), 0.50f);
+        return textSafe(ink, surface2, 4.5);
+    }
+
+    /** واش ۱۴٪ خانواده برای چیپ‌ها و سطرهای آرام. */
+    int softChip(int family) { return mix(surface, foldFamily(family), light ? 0.14f : 0.16f); }
+
+    /** تا رسیدن به کف کنتراست به سمت قطب جوهر تم مخلوط می‌کند (آینهٔ موتور manager). */
+    int textSafe(int preferred, int background, double target) {
+        int pole = light ? Color.rgb(8, 10, 14) : Color.WHITE;
+        int result = preferred;
+        for (int i = 0; i < 24 && contrastRatio(result, background) < target; i++) result = mix(result, pole, 0.08f);
+        return contrastRatio(result, background) < target ? pole : result;
+    }
+
+    double contrastRatio(int a, int b) {
+        double la = relativeLuminance(a), lb = relativeLuminance(b);
+        return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+    }
+
     static double relativeLuminance(int color) {
         double r = channel(Color.red(color)), g = channel(Color.green(color)), b = channel(Color.blue(color));
         return 0.2126 * r + 0.7152 * g + 0.0722 * b;

@@ -2,4 +2,5 @@
 <resources>
     <string name="app_name">میلانو</string>
     <string name="app_subtitle">داشبورد مدیریتی آتیران</string>
+    <string name="backup_progress">در حال ذخیره %1$s (%2$s)</string>
 </resources>

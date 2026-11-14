@@ -9,7 +9,6 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.content.res.ColorStateList;
 import android.graphics.drawable.ColorDrawable;
-import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -118,31 +117,26 @@ public final class WhatsNew {
         LinearLayout root = new LinearLayout(a);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        root.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{Theme.SURFACE, Theme.BG}));
+        root.setBackgroundColor(Theme.BG);
 
-        // Gold glow rule under the top edge.
+        // A quiet palette border separates the update header from the system bars.
         View glow = new View(a);
-        glow.setBackground(new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
-                new int[]{0x00000000, Theme.GOLD, 0x00000000}));
-        root.addView(glow, new LinearLayout.LayoutParams(-1, Theme.dp(3)));
+        glow.setBackgroundColor(Theme.BORDER);
+        root.addView(glow, new LinearLayout.LayoutParams(-1, Theme.dp(1)));
 
         ScrollView sv = new ScrollView(a);
         LinearLayout content = kit.v();
         content.setPadding(Theme.dp(20), Theme.dp(16), Theme.dp(20), Theme.dp(16));
 
-        // ---- hero: gold medallion, version chip and a count of changes ----
+        // ---- compact header: version chip and a count of changes ----
         LinearLayout hero = kit.v();
         hero.setGravity(Gravity.CENTER);
         hero.setBackground(Theme.hero(Theme.GOLD));
-        hero.setPadding(Theme.dp(18), Theme.dp(22), Theme.dp(18), Theme.dp(18));
-        TextView badge = kit.text("✦", 34, Theme.onAccent(Theme.GOLD), true);
+        hero.setPadding(Theme.dp(14), Theme.dp(14), Theme.dp(14), Theme.dp(14));
+        TextView badge = kit.text("✦", 22, Theme.PRIMARY, true);
         badge.setGravity(Gravity.CENTER);
-        badge.setBackground(Theme.accentAvatar(Theme.GOLD));
-        try {
-            badge.setElevation(Theme.dp(12));
-        } catch (Exception ignored) { Diag.ignored("WhatsNew:131", ignored); }
-        LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(Theme.dp(84), Theme.dp(84));
+        badge.setBackground(Theme.avatar(Theme.ACCENT_SOFT));
+        LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(Theme.dp(48), Theme.dp(48));
         bp.gravity = Gravity.CENTER;
         hero.addView(badge, bp);
         hero.addView(kit.gap(12));
@@ -168,7 +162,7 @@ public final class WhatsNew {
         content.addView(hero, kit.lp(-1, -2));
         content.addView(kit.gap(14));
 
-        // ---- version sections + 3D item cards ----
+        // ---- version sections and compact update items ----
         List<View> cards = new ArrayList<>();
         for (Changelog.Ver v : vers) {
             LinearLayout secHead = kit.h();
@@ -185,9 +179,6 @@ public final class WhatsNew {
             content.addView(kit.gap(8));
             for (Changelog.Item it : v.items) {
                 LinearLayout card = kit.card(Changelog.kindColor(it.kind));
-                try {
-                    card.setElevation(Theme.dp(6));
-                } catch (Exception ignored) { Diag.ignored("WhatsNew:177", ignored); }
                 LinearLayout row = kit.h();
                 row.setGravity(Gravity.CENTER_VERTICAL);
                 TextView g = kit.text(it.glyph, 21, Changelog.kindColor(it.kind), true);
@@ -263,6 +254,16 @@ public final class WhatsNew {
                         ViewGroup.LayoutParams.MATCH_PARENT);
         } catch (Exception ignored) { Diag.ignored("WhatsNew:251", ignored); }
         // Staged entrance: badge pops, cards rise one by one.
+        if (!Ui.motionOk(a)) {
+            badge.setScaleX(1f);
+            badge.setScaleY(1f);
+            badge.setAlpha(1f);
+            for (View card : cards) {
+                card.setAlpha(1f);
+                card.setTranslationY(0f);
+            }
+            return;
+        }
         try {
             badge.setScaleX(0.5f);
             badge.setScaleY(0.5f);

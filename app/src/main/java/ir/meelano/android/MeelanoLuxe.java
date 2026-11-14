@@ -48,6 +48,7 @@ final class MeelanoLuxe {
 
     /** سطح شیشه‌ای سه‌لایه با خط مویی — کارت پایهٔ این لایه. */
     static GradientDrawable glass(MeelanoPalette p, int accent, float radius) {
+        accent = p.foldFamily(accent);
         int hero = p.mix(accent, p.accent2, p.light ? 0.14f : 0.20f);
         int top = p.mix(p.surface, hero, p.light ? 0.055f : 0.135f);
         int mid = p.mix(p.surface2, hero, p.light ? 0.10f : 0.20f);
@@ -63,6 +64,7 @@ final class MeelanoLuxe {
 
     /** سطح تودرتو (داخل کارت) — کمی نازک‌تر و روشن‌تر. */
     static GradientDrawable glassInner(MeelanoPalette p, int accent, float radius) {
+        accent = p.foldFamily(accent);
         int soft = p.mix(accent, p.accent2, p.light ? 0.10f : 0.16f);
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{
                 p.alpha(p.mix(p.surface, soft, p.light ? 0.04f : 0.11f), 244),
@@ -74,6 +76,7 @@ final class MeelanoLuxe {
 
     /** قرص طلایی (مدالیون) — پس‌زمینهٔ نشان و آیکون. */
     static GradientDrawable coin(MeelanoPalette p, int accent, float radius) {
+        accent = p.foldFamily(accent);
         int gold = p.mix(accent, p.accent2, 0.55f);
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{
                 p.alpha(p.mix(gold, Color.WHITE, p.light ? 0.10f : 0.22f), 255),
@@ -84,8 +87,18 @@ final class MeelanoLuxe {
         return d;
     }
 
+    /** سنگ آرام — متریال خانهٔ درخشان: رنگ در مدال‌ها و جوهرها زندگی می‌کند، نه دیوارها. */
+    static GradientDrawable stone(MeelanoPalette p, float radius) {
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{p.alpha(p.surface, 255), p.alpha(p.surface2, 255)});
+        d.setCornerRadius(radius);
+        d.setStroke(1, p.border);
+        return d;
+    }
+
     /** نشانهٔ کوچک (بج) — پُر یا خطی. */
     static GradientDrawable badge(MeelanoPalette p, int accent, boolean filled) {
+        accent = p.foldFamily(accent);
         GradientDrawable d = new GradientDrawable();
         d.setShape(GradientDrawable.RECTANGLE);
         d.setColor(filled ? p.alpha(p.mix(accent, p.accent2, 0.22f), p.light ? 34 : 48)
@@ -838,15 +851,18 @@ final class MeelanoLuxe {
         private final Paint brush = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final ValueAnimator anim;
         private float phase = -0.45f;
+        private boolean swept;
 
         Shine(Context ctx, MeelanoPalette pal) {
             super(ctx);
             this.pal = pal;
             setLayerType(LAYER_TYPE_SOFTWARE, null);
+            // Derakhshan 2.0: the shimmer is a once-per-session guest — a single 900ms sweep,
+            // then the light band fades and removes itself. No infinite looping decoration.
             anim = ValueAnimator.ofFloat(-0.45f, 1.50f);
-            anim.setDuration(5200);
-            anim.setRepeatCount(ValueAnimator.INFINITE);
-            anim.setStartDelay(1100);
+            anim.setDuration(900);
+            anim.setRepeatCount(0);
+            anim.setStartDelay(220);
             anim.setInterpolator(new LinearInterpolator());
             anim.addUpdateListener(animation -> {
                 if (!isAttachedToWindow()) return;      // جلوگیری از کار بی‌فایده پس از ترک صفحه
@@ -856,12 +872,23 @@ final class MeelanoLuxe {
                 phase = v;
                 invalidate();
             });
+            anim.addListener(new android.animation.AnimatorListenerAdapter() {
+                @Override public void onAnimationEnd(android.animation.Animator a) {
+                    swept = true;
+                    animate().alpha(0f).setDuration(220).withEndAction(new Runnable() {
+                        @Override public void run() {
+                            if (getParent() != null) ((android.view.ViewGroup) getParent()).removeView(Shine.this);
+                        }
+                    }).start();
+                }
+            });
             anim.start();
+            swept = false;
         }
 
         @Override protected void onAttachedToWindow() {
             super.onAttachedToWindow();
-            if (anim != null && !anim.isStarted()) anim.start();
+            if (anim != null && !swept && !anim.isStarted()) anim.start();
         }
 
         @Override protected void onDetachedFromWindow() {

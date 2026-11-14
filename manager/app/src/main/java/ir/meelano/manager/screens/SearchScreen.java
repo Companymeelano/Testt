@@ -7,6 +7,7 @@ import ir.meelano.manager.core.CacheStore;
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.core.AtiranSchema;
 import ir.meelano.manager.core.Filter;
+import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.Money;
@@ -155,7 +156,7 @@ public class SearchScreen extends Screen {
                 double bal = r.d("balance");
                 int col = bal > 0.5 ? Theme.DANGER : (bal < -0.5 ? Theme.SUCCESS : Theme.MUTED);
                 View v = a.kit.personRow(r.s("name"), "کد " + Money.fa(code),
-                        Math.abs(bal) > 0.5 ? Money.rial(Math.abs(bal)) : "تسویه",
+                        Math.abs(bal) > 0.5 ? Money.compactRial(Math.abs(bal)) : "تسویه",
                         bal > 0.5 ? "بدهکار" : (bal < -0.5 ? "بستانکار" : "مانده"), col,
                         v2 -> {
                             Screen s = a.screen("customers");
@@ -176,7 +177,8 @@ public class SearchScreen extends Screen {
                 String code = r.s("code");
                 if (code.isEmpty()) code = shka;
                 View v = a.kit.invRow(r.s("naka"), "کد " + Money.fa(code), r.s("groupName"),
-                        "موجودی " + Money.qty(r.d("vah")), Money.rial(r.d("sale")),
+                        "موجودی " + Money.qty(r.d("vah")), Money.compactRial(r.d("sale")),
+
                         v2 -> {
                             Screen s = a.screen("products");
                             if (s instanceof ProductsScreen) ((ProductsScreen) s).openProduct(shka);
@@ -196,7 +198,7 @@ public class SearchScreen extends Screen {
                 boolean settled = Math.abs(r.d("remain")) <= AtiranSchema.SETTLE_TOLERANCE
                         || "t".equalsIgnoreCase(r.s("tasvieh").trim());
                 View v = a.kit.invoiceRow("فاکتور " + Money.fa(no), r.s("customer"),
-                        Jalali.shortLabel(r.s("date")), Money.rial(r.d("total")),
+                        HomeNumberFormatter.dateTime(r.s("date")), Money.compactRial(r.d("total")),
                         settled ? "settled" : "unsettled", v2 -> gotoFiltered("sales", no));
                 LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
                 p.setMargins(0, 0, 0, Theme.dp(10));
@@ -210,8 +212,8 @@ public class SearchScreen extends Screen {
             for (Row r : d.chq) {
                 final String num = r.s("num");
                 View v = a.kit.docRow("چک " + Money.fa(num), r.s("customer"),
-                        Jalali.shortLabel(r.s("sardate")), Money.rial(r.d("amount")),
-                        "سررسید " + Jalali.shortLabel(r.s("sardate")), v2 -> gotoFiltered("cheques", num));
+                        Jalali.dispFa(r.s("sardate")), Money.compactRial(r.d("amount")),
+                        "سررسید " + Jalali.dispFa(r.s("sardate")), v2 -> gotoFiltered("cheques", num));
                 LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
                 p.setMargins(0, 0, 0, Theme.dp(10));
                 content.addView(v, p);

@@ -373,16 +373,12 @@ public final class License {
         }
     }
 
-    // ---------------- fixed SQL login + mini connection line ----------------
+    // ---------------- connection line ----------------
     /**
-     * Fixed SQL Server login shared by every customer (SQL Server 2014).
-     * Per-customer connection data is therefore only host + port + db name,
-     * carried by the short {@code MILANO-NET1} line below. The legacy AES
-     * {@code MILANO-DB1} card keeps parsing for cards minted earlier.
+     * Connection cards contain only the endpoint. SQL credentials are entered once
+     * on the destination device and are never compiled into, or transmitted by, a card.
+     * The legacy encrypted MILANO-DB1 format remains parseable for migration only.
      */
-    public static final String SQL_USER = "AdminAn";
-    public static final String SQL_PASS = "St@R2022$";
-
     public static final String NET_PREFIX = "MILANO-NET1";
 
     public static final class NetProfile {
@@ -394,14 +390,12 @@ public final class License {
             return !host.isEmpty() && !port.isEmpty() && !db.isEmpty();
         }
 
-        /** Full profile with the fixed SQL login filled in. */
-        public DbProfile withFixedLogin() {
+        /** Endpoint only. Credentials are provisioned separately on the destination device. */
+        public DbProfile asEndpointProfile() {
             DbProfile p = new DbProfile();
             p.host = host;
             p.port = port;
             p.db = db;
-            p.user = SQL_USER;
-            p.pass = SQL_PASS;
             return p;
         }
     }
@@ -456,7 +450,7 @@ public final class License {
      */
     public static DbProfile parseAnyCard(String text, String expectDevice8) {
         NetProfile n = parseNetLine(text, expectDevice8);
-        if (n != null) return n.withFixedLogin();
+        if (n != null) return n.asEndpointProfile();
         return parseDbCard(text, expectDevice8);
     }
 
@@ -749,7 +743,7 @@ public final class License {
             String net = netLine(dev, np);
             DbProfile nb = parseAnyCard("x\n" + net + "\ny", dev);
             if (nb == null || !"192.168.1.10".equals(nb.host) || !"AtiranDb".equals(nb.db)
-                    || !SQL_USER.equals(nb.user) || !SQL_PASS.equals(nb.pass)) return false;
+                    || !nb.user.isEmpty() || !nb.pass.isEmpty()) return false;
             if (parseAnyCard(net, "ZZZZZZZZ") != null) return false;
             char last = net.charAt(net.length() - 1);
             String cut = net.substring(0, net.length() - 1) + (last == '0' ? '1' : '0');

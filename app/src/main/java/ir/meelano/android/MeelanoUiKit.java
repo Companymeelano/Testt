@@ -44,14 +44,9 @@ final class MeelanoUiKit {
     // ================================================================ پایه‌ها
     /** رنگ شیشه‌ای/سطح کارت با گرادیان ملایم و حاشیهٔ مویی. */
     static GradientDrawable cardBg(MeelanoPalette p, int accent, float radius) {
-        int soft = p.mix(accent, p.accent2, p.light ? 0.16f : 0.20f);
-        int top = p.light ? p.mix(p.surface, soft, 0.035f) : p.mix(p.surface, soft, 0.10f);
-        int bottom = p.light ? p.mix(p.surface2, soft, 0.07f) : p.mix(p.surface2, soft, 0.15f);
-        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{
-                p.alpha(top, 253), p.alpha(bottom, 250)});
-        d.setCornerRadius(radius);
-        d.setStroke(1, p.alpha(p.mix(soft, Color.WHITE, p.light ? 0.35f : 0.22f), p.light ? 112 : 88));
-        return d;
+        // Derakhshan 2.0: every wall is the same calm stone; the folded family only tints
+        // medals, chips and inks — so no section can paint its own purple/brown card again.
+        return MeelanoLuxe.stone(p, radius);
     }
 
     static GradientDrawable solid(int color, float radius) {
@@ -137,12 +132,12 @@ final class MeelanoUiKit {
         float radius = h.dp(20);
         c.setBackground(cardBg(h.colors(), accent, radius));
         c.setPadding(h.dp(12), h.dp(11), h.dp(12), h.dp(11));
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) c.setElevation(h.dp(4));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) c.setElevation(0);
         return c;
     }
 
     static TextView pill(MeelanoUiHost h, String label, int accent, boolean filled) {
-        TextView chip = text(h, label, 9.4f, filled ? h.colors().onColorFor(accent) : accent, true);
+        TextView chip = text(h, label, 9.4f, filled ? h.colors().onColorFor(h.colors().foldFamily(accent)) : h.colors().sectionInk(accent), true);
         chip.setGravity(Gravity.CENTER);
         chip.setSingleLine(true);
         chip.setPadding(h.dp(9), h.dp(4), h.dp(9), h.dp(4));
@@ -212,11 +207,11 @@ final class MeelanoUiKit {
         b.setAllCaps(false);
         b.setTextSize(10.6f);
         b.setTypeface(h.font(true));
-        b.setTextColor(primary ? p.onColorFor(accent) : accent);
+        b.setTextColor(primary ? p.onColorFor(p.foldFamily(accent)) : p.sectionInk(accent));
         b.setPadding(h.dp(12), h.dp(6), h.dp(12), h.dp(6));
         b.setBackground(primary ? solid(accent, h.dp(14)) : stroke(p.alpha(accent, p.light ? 26 : 44), h.dp(14), p.alpha(accent, 110)));
-        b.setMinHeight(0);
-        b.setMinimumHeight(0);
+        b.setMinHeight(h.dp(44));
+        b.setMinimumHeight(h.dp(44));
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) b.setStateListAnimator(null);
         if (onClick != null) {
             b.setOnClickListener(new View.OnClickListener() { @Override public void onClick(View v) { onClick.run(); } });
@@ -230,7 +225,7 @@ final class MeelanoUiKit {
         LinearLayout r = row(h);
         for (int i = 0; i < items.length; i++) {
             Button b = button(h, items[i][1], accents[Math.min(i, accents.length - 1)], primary[Math.min(i, primary.length - 1)], actions[Math.min(i, actions.length - 1)]);
-            LinearLayout.LayoutParams l = lp(0, h.dp(42), 1f);
+            LinearLayout.LayoutParams l = lp(0, h.dp(44), 1f);
             if (i > 0) l.leftMargin = h.dp(6);
             r.addView(b, l);
         }
@@ -310,12 +305,17 @@ final class MeelanoUiKit {
         iconWrap.addView(icon, lp(h.dp(52), h.dp(52)));
         c.addView(iconWrap, lp(-1, -2));
         c.addView(text(h, title, 12.4f, p.text, true), lp(-1, -2));
+        // C11: an empty state never paints a multi-line grey paragraph — one guidance line,
+        // ellipsized, with the full sentence kept for TalkBack.
         TextView sub = text(h, text2 == null ? "" : text2, 9.6f, p.muted, false);
         sub.setGravity(Gravity.CENTER);
+        sub.setMaxLines(1);
+        sub.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        sub.setContentDescription(text2 == null ? "" : text2);
         c.addView(sub, lp(-1, -2));
         if (actionLabel != null && action != null) {
             gap(h, c, 8);
-            c.addView(button(h, actionLabel, p.accent, true, action), lp(-1, h.dp(42)));
+            c.addView(button(h, actionLabel, p.accent, true, action), lp(-1, h.dp(44)));
         }
         return c;
     }
@@ -486,7 +486,7 @@ final class MeelanoUiKit {
         LinearLayout box = column(h);
         box.addView(text(h, label, 9.6f, h.colors().muted, true), lp(-1, -2));
         gap(h, box, 4);
-        box.addView(input, lp(-1, h.dp(42)));
+        box.addView(input, lp(-1, h.dp(44)));
         return box;
     }
 

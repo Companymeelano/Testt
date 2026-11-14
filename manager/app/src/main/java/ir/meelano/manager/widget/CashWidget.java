@@ -10,6 +10,7 @@ import android.widget.RemoteViews;
 
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.R;
+import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.data.Settings;
@@ -29,8 +30,8 @@ public class CashWidget extends AppWidgetProvider {
             v.setTextViewText(R.id.w_in, Money.compactRial(num(sec(s, "in"), "total")));
             v.setTextViewText(R.id.w_out, Money.compactRial(num(sec(s, "out"), "total")));
             String ts = unesc(sec(s, "ts"));
-            v.setTextViewText(R.id.w_ts, ts.isEmpty() ? "—" : Money.fa(ts));
-            v.setTextViewText(R.id.w_date, Jalali.shortLabel(Jalali.todayStr()));
+            v.setTextViewText(R.id.w_ts, ts.isEmpty() ? "—" : HomeNumberFormatter.rtlText(ts));
+            v.setTextViewText(R.id.w_date, HomeNumberFormatter.dateText(Jalali.todayStr()));
         } catch (Exception ignored) { Diag.ignored("CashWidget:33", ignored); }
         try {
             Intent i = new Intent(ctx, MainActivity.class);

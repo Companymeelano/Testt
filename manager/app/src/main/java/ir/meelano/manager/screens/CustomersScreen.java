@@ -12,6 +12,7 @@ import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.core.AtiranSchema;
 import ir.meelano.manager.core.Filter;
 import ir.meelano.manager.core.FollowUps;
+import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.Money;
@@ -85,6 +86,36 @@ public class CustomersScreen extends Screen {
                 new FilterSheet.Opt("balance_asc", "کمترین مانده"),
         };
         return c;
+    }
+
+    /** Columns of the shared customer list; mirrors the cards on screen. */
+    private static final ReportCatalog.Col[] CUSTOMER_COLS = new ReportCatalog.Col[]{
+            new ReportCatalog.Col("code", "کد", ReportCatalog.T_TEXT),
+            new ReportCatalog.Col("name", "مشتری", ReportCatalog.T_TEXT),
+            new ReportCatalog.Col("cell", "همراه", ReportCatalog.T_TEXT),
+            new ReportCatalog.Col("visitor", "ویزیتور", ReportCatalog.T_TEXT),
+            new ReportCatalog.Col("balance", "مانده", ReportCatalog.T_MONEY),
+    };
+
+    private String bucketLabel() {
+        String st = filter == null || filter.status == null ? "" : filter.status;
+        for (String[] b : BUCKETS) if (b[0].equals(st)) return b[1];
+        return BUCKETS[0][1];
+    }
+
+    private String sortLabel() {
+        String so = filter == null || filter.sort == null ? "" : filter.sort;
+        if ("top".equals(so)) return "بیشترین خرید";
+        if ("debt".equals(so)) return "بیشترین بدهی";
+        if ("balance_asc".equals(so)) return "کمترین مانده";
+        return "نام";
+    }
+
+    private String shareSubtitle() {
+        String sub = "بخش: " + bucketLabel() + " • مرتب: " + sortLabel();
+        if (filter != null && filter.search != null && !filter.search.trim().isEmpty())
+            sub += " • جستجو: " + filter.search.trim();
+        return sub;
     }
 
     private static final ReportCatalog.Col[] LEDGER_COLS = new ReportCatalog.Col[]{
@@ -188,7 +219,8 @@ public class CustomersScreen extends Screen {
         LinearLayout amt = a.kit.v();
         amt.addView(a.kit.text(bal > 0.5 ? "مانده بدهی" : (bal < -0.5 ? "مانده بستانکاری" : "وضعیت حساب"),
                 10.5f, Theme.MUTED, false), a.kit.lp(-1, -2));
-        String amount = bal > 0.5 ? Money.rial(bal) : (bal < -0.5 ? Money.rial(-bal) : "تسویه");
+        String amount = bal > 0.5 ? Money.compactRial(bal)
+                : (bal < -0.5 ? Money.compactRial(-bal) : "تسویه");
         amt.addView(a.kit.text(amount, 15f, col, true), a.kit.lp(-1, -2));
         bottom.addView(amt, a.kit.wlp(1f));
         String pillText = bal > 0.5 ? "بدهکار" : (bal < -0.5 ? "بستانکار" : "تسویه");
@@ -286,6 +318,24 @@ public class CustomersScreen extends Screen {
             render(content);
         }), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
+
+        // Sharing follows exactly what the manager sees right now: active bucket chip,
+        // search text and sort from the filter sheet all land in the exported rows.
+        if (d.list != null && !d.list.isEmpty()) {
+            final List<Row> shared = d.list;
+            final String sub = shareSubtitle();
+            LinearLayout shareRow = a.kit.h();
+            shareRow.addView(a.kit.btnGhost("اشتراک PDF", accent(),
+                    v -> a.sharePdf("مشتریان", sub, CUSTOMER_COLS, shared)), a.kit.wlp(1f));
+            shareRow.addView(a.kit.space(8));
+            shareRow.addView(a.kit.btnGhost("تصویر", accent(),
+                    v -> a.sharePng("مشتریان", sub, CUSTOMER_COLS, shared)), a.kit.wlp(1f));
+            shareRow.addView(a.kit.space(8));
+            shareRow.addView(a.kit.btnGhost("اکسل", accent(),
+                    v -> a.shareXlsx("مشتریان", sub, CUSTOMER_COLS, shared)), a.kit.wlp(1f));
+            content.addView(shareRow, a.kit.lp(-1, -2));
+            content.addView(a.kit.gap(10));
+        }
 
         // While a search is active the query ignores paging and returns every
         // match, so a pager here would promise pages that cannot exist.
@@ -707,18 +757,18 @@ public class CustomersScreen extends Screen {
         nb.setPadding(Theme.dp(4), Theme.dp(4), Theme.dp(4), Theme.dp(4));
         // Facts sit in one card so the sheet reads as a single record.
         LinearLayout facts = a.kit.card(Theme.GOLD);
-        facts.addView(a.kit.kv("تاریخ", Jalali.dispFa(r.s("date")), Theme.TEXT), a.kit.lp(-1, -2));
+        facts.addView(a.kit.kv("تاریخ", HomeNumberFormatter.dateTime(r.s("date")), Theme.TEXT), a.kit.lp(-1, -2));
         facts.addView(a.kit.kv("عملیات", r.s("opLabel").isEmpty() ? r.s("op") : r.s("opLabel"), Theme.TEXT), a.kit.lp(-1, -2));
         if (r.d("bed") > 0) facts.addView(a.kit.kv("بدهکار", Money.rial(r.d("bed")), Theme.DANGER), a.kit.lp(-1, -2));
         if (r.d("bes") > 0) facts.addView(a.kit.kv("بستانکار", Money.rial(r.d("bes")), Theme.SUCCESS), a.kit.lp(-1, -2));
         if (!r.s("ghno").isEmpty()) facts.addView(a.kit.kv("شماره سند", Money.fa(r.s("ghno")), Theme.TEXT), a.kit.lp(-1, -2));
         if (!r.s("descrip").isEmpty()) facts.addView(a.kit.kv("شرح", r.s("descrip"), Theme.MUTED), a.kit.lp(-1, -2));
-        if (!r.s("doneDate").isEmpty()) facts.addView(a.kit.kv("تاریخ ثبت", Jalali.dispFa(r.s("doneDate")), Theme.MUTED), a.kit.lp(-1, -2));
+        if (!r.s("doneDate").isEmpty()) facts.addView(a.kit.kv("تاریخ ثبت", HomeNumberFormatter.dateTime(r.s("doneDate")), Theme.MUTED), a.kit.lp(-1, -2));
         nb.addView(facts, a.kit.lp(-1, -2));
         nb.addView(a.kit.gap(12));
         nb.addView(a.kit.text("خروجی این سند", 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
         nb.addView(a.kit.gap(6));
-        nb.addView(a.exportBar("سند گردش حساب", Jalali.dispFa(r.s("date")), LEDGER_COLS,
+        nb.addView(a.exportBar("سند گردش حساب", HomeNumberFormatter.dateTime(r.s("date")), LEDGER_COLS,
                 java.util.Collections.singletonList(r)), a.kit.lp(-1, -2));
         nb.addView(a.kit.gap(14));
         final AlertDialog[] box = new AlertDialog[1];
@@ -774,7 +824,7 @@ public class CustomersScreen extends Screen {
         LinearLayout body = a.kit.v();
         body.setPadding(Theme.dp(16), Theme.dp(8), Theme.dp(16), Theme.dp(8));
         body.addView(a.kit.kv("شماره", Money.fa(head.s("no")), Theme.TEXT), a.kit.lp(-1, -2));
-        body.addView(a.kit.kv("تاریخ", Jalali.dispFa(head.s("date")), Theme.TEXT), a.kit.lp(-1, -2));
+        body.addView(a.kit.kv("تاریخ", HomeNumberFormatter.dateTime(head.s("date")), Theme.TEXT), a.kit.lp(-1, -2));
         body.addView(a.kit.kv("مشتری", head.s("customer"), Theme.TEXT), a.kit.lp(-1, -2));
         if (!head.s("visitor").isEmpty() && !"بدون ویزیتور".equals(head.s("visitor")))
             body.addView(a.kit.kv("ویزیتور", head.s("visitor"), Theme.TEXT), a.kit.lp(-1, -2));
@@ -822,7 +872,7 @@ public class CustomersScreen extends Screen {
         }
         final String fNo = head.s("no");
         final String fParty = head.s("customer");
-        final String fDate = Jalali.dispFa(head.s("date"));
+        final String fDate = HomeNumberFormatter.dateTime(head.s("date"));
         final List<Row> fLines = dt.lines;
         final Row fHead = head;
         body.addView(a.kit.gap(8));
@@ -890,7 +940,7 @@ public class CustomersScreen extends Screen {
         LinearLayout body = a.kit.v();
         body.setPadding(Theme.dp(16), Theme.dp(8), Theme.dp(16), Theme.dp(8));
         body.addView(a.kit.kv("شماره قبض", Money.fa(head.s("ghno")), Theme.TEXT), a.kit.lp(-1, -2));
-        body.addView(a.kit.kv("تاریخ", Jalali.dispFa(head.s("date")), Theme.TEXT), a.kit.lp(-1, -2));
+        body.addView(a.kit.kv("تاریخ", HomeNumberFormatter.dateTime(head.s("date")), Theme.TEXT), a.kit.lp(-1, -2));
         if (!head.s("customer").isEmpty()) body.addView(a.kit.kv("طرف‌حساب", head.s("customer"), Theme.TEXT), a.kit.lp(-1, -2));
         if (!head.s("kind").isEmpty()) body.addView(a.kit.kv("نوع", head.s("kind"), Theme.TEXT), a.kit.lp(-1, -2));
         // ---- separated type breakdown (cash / card / havaleh / cheque) ----
@@ -938,7 +988,7 @@ public class CustomersScreen extends Screen {
             };
             body.addView(a.kit.dataTable(cols, dt.invs, r -> openInvoiceDetail(r.s("no"))), a.kit.lp(-1, -2));
             body.addView(a.kit.gap(4));
-            body.addView(a.exportBar("تسویه‌های قبض " + head.s("ghno"), Jalali.dispFa(head.s("date")), cols, dt.invs), a.kit.lp(-1, -2));
+            body.addView(a.exportBar("تسویه‌های قبض " + head.s("ghno"), HomeNumberFormatter.dateTime(head.s("date")), cols, dt.invs), a.kit.lp(-1, -2));
         } else if (!dt.pos.isEmpty()) {
             ReportCatalog.Col[] cols = new ReportCatalog.Col[]{
                     new ReportCatalog.Col("bank", "بانک", ReportCatalog.T_TEXT),
@@ -946,7 +996,7 @@ public class CustomersScreen extends Screen {
                     new ReportCatalog.Col("tracking", "پیگیری", ReportCatalog.T_TEXT),
             };
             body.addView(a.kit.gap(4));
-            body.addView(a.exportBar("قبض " + head.s("ghno"), Jalali.dispFa(head.s("date")), cols, dt.pos), a.kit.lp(-1, -2));
+            body.addView(a.exportBar("قبض " + head.s("ghno"), HomeNumberFormatter.dateTime(head.s("date")), cols, dt.pos), a.kit.lp(-1, -2));
         }
         body.addView(a.kit.gap(8));
         final AlertDialog[] box = new AlertDialog[1];

@@ -4,11 +4,9 @@ import ir.meelano.manager.core.Diag;
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
-import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RectF;
-import android.graphics.Shader;
 import android.text.TextUtils;
 import android.view.MotionEvent;
 import android.view.View;
@@ -66,18 +64,35 @@ public final class Charts {
     }
 
     private static final int[] PALETTE = {
-            0xFFD9AE5A, 0xFF4FA3FF, 0xFF35C26E, 0xFF9A7BFF, 0xFFF5A524,
-            0xFFE5484D, 0xFF3ED6C5, 0xFFF27BB5, 0xFF8BC34A, 0xFF7C8DA6
+            DesignTokens.accessibleAccent(DesignTokens.GOLD_LIGHT, true),
+            DesignTokens.accessibleAccent(DesignTokens.NIGHT_EMERALD, true),
+            DesignTokens.accessibleAccent(DesignTokens.POSITIVE, true),
+            DesignTokens.accessibleAccent(DerakhshanTokens.BRONZE, true),
+            DesignTokens.accessibleAccent(DesignTokens.WARNING, true),
+            DesignTokens.accessibleAccent(DesignTokens.NEGATIVE, true),
+            DesignTokens.accessibleAccent(DesignTokens.INFO, true),
+            DesignTokens.accessibleAccent(DesignTokens.SALES_FORECAST, true),
+            DesignTokens.accessibleAccent(DesignTokens.WAREHOUSE, true),
+            DesignTokens.accessibleAccent(DesignTokens.NEUTRAL, true)
     };
-    /** Deeper jewel tones for the light theme (contrast on white paper). */
+    /** Executive jewel tones resolved for contrast on the Royal Ivory raised surface. */
     private static final int[] PALETTE_LIGHT = {
-            0xFFB07A1E, 0xFF2B7FFF, 0xFF1E9E57, 0xFF7C5CFC, 0xFFE08A00,
-            0xFFD92D20, 0xFF0E9384, 0xFFD6508B, 0xFF669F2A, 0xFF667085
+            DesignTokens.accessibleAccent(DesignTokens.GOLD, false),
+            DesignTokens.accessibleAccent(DesignTokens.PURCHASE, false),
+            DesignTokens.accessibleAccent(DesignTokens.POSITIVE, false),
+            DesignTokens.accessibleAccent(DerakhshanTokens.BRONZE, false),
+            DesignTokens.accessibleAccent(DesignTokens.WARNING, false),
+            DesignTokens.accessibleAccent(DesignTokens.NEGATIVE, false),
+            DesignTokens.accessibleAccent(DesignTokens.INFO, false),
+            DesignTokens.accessibleAccent(DesignTokens.SALES_FORECAST, false),
+            DesignTokens.accessibleAccent(DesignTokens.WAREHOUSE, false),
+            DesignTokens.accessibleAccent(DesignTokens.NEUTRAL, false)
     };
 
     /** Gold tones for accounting/chart-of-accounts charts: deep gold, light gold, bronze, champagne. */
     public static int goldTone(int i) {
-        int[] t = {Theme.GOLD, Theme.GOLD_SOFT, mix(Theme.GOLD, 0xFF000000, 0.28f), mix(Theme.GOLD, 0xFFFFFFFF, 0.30f)};
+        int metal = Theme.isLight() ? Theme.GOLD_DARK : Theme.GOLD;
+        int[] t = {metal, Theme.GOLD_SOFT, mix(metal, 0xFF000000, 0.18f), mix(metal, 0xFFFFFFFF, 0.18f)};
         return t[Math.abs(i) % t.length];
     }
 
@@ -99,30 +114,12 @@ public final class Charts {
     }
 
 
-    /** Pseudo-3D block: front face with gradient, lighter top face, darker side face (light from upper-left). */
+    /** Flat chart bar retained under its legacy name for source compatibility. */
     static void drawBar3D(Canvas g, RectF r, int col, float radius) {
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        float d = Theme.dp(5);
-        Path side = new Path();
-        side.moveTo(r.right, r.top + radius);
-        side.lineTo(r.right + d, r.top + radius - d);
-        side.lineTo(r.right + d, r.bottom - d);
-        side.lineTo(r.right, r.bottom);
-        side.close();
         paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Theme.shade(col, -0.38f));
-        g.drawPath(side, paint);
-        Path top = new Path();
-        top.moveTo(r.left + radius, r.top);
-        top.lineTo(r.left + radius + d, r.top - d);
-        top.lineTo(r.right + d - radius, r.top - d);
-        top.lineTo(r.right - radius, r.top);
-        top.close();
-        paint.setColor(Theme.shade(col, 0.28f));
-        g.drawPath(top, paint);
-        paint.setShader(new LinearGradient(0, r.top, 0, r.bottom, Theme.shade(col, 0.08f), Theme.shade(col, -0.22f), Shader.TileMode.CLAMP));
+        paint.setColor(col);
         g.drawRoundRect(r, radius, radius, paint);
-        paint.setShader(null);
     }
 
     // ================= base =================
@@ -183,7 +180,19 @@ public final class Charts {
             } catch (Exception ignored) { Diag.ignored("Charts:133", ignored); }
         }
 
+        boolean hasActivity() {
+            for (Point point : data)
+                if (point != null && !Double.isNaN(point.value) && !Double.isInfinite(point.value)
+                        && Math.abs(point.value) >= 0.005d) return true;
+            return false;
+        }
+
         void animateIn() {
+            if (!hasActivity() || !Ui.motionOk(getContext())) {
+                progress = 1f;
+                invalidate();
+                return;
+            }
             ValueAnimator v = ValueAnimator.ofFloat(0f, 1f);
             v.setDuration(750);
             v.setInterpolator(new DecelerateInterpolator());
@@ -271,7 +280,7 @@ public final class Charts {
         public void setData(List<Point> pts, int accentColor, Formatter f) {
             data.clear();
             if (pts != null) data.addAll(pts);
-            if (accentColor != 0) accent = accentColor;
+            if (accentColor != 0) accent = DesignTokens.accessibleAccent(accentColor, Theme.DARK);
             if (f != null) fmt = f;
             selected = -1;
             animateIn();
@@ -288,6 +297,13 @@ public final class Charts {
                 paint.setTextSize(chartTextPx(11));
                 paint.setTextAlign(Paint.Align.CENTER);
                 g.drawText("داده‌ای برای نمایش نیست", w / 2f, h / 2f, paint);
+                return;
+            }
+            if (!hasActivity()) {
+                paint.setColor(Theme.MUTED);
+                paint.setTextSize(chartTextPx(11));
+                paint.setTextAlign(Paint.Align.CENTER);
+                g.drawText("در این بازه فعالیتی ثبت نشده است", w / 2f, h / 2f, paint);
                 return;
             }
             double mx = Math.max(0, max());
@@ -330,10 +346,8 @@ public final class Charts {
             area.lineTo(xs[n - 1], zeroY);
             area.close();
             paint.setStyle(Paint.Style.FILL);
-            paint.setShader(new LinearGradient(0, plot.top, 0, plot.bottom,
-                    Theme.alpha(accent, 120), Theme.alpha(accent, 8), Shader.TileMode.CLAMP));
+            paint.setColor(Theme.alpha(accent, Theme.isLight() ? 24 : 32));
             g.drawPath(area, paint);
-            paint.setShader(null);
             // line
             Path line = new Path();
             line.moveTo(xs[0], ys[0]);
@@ -373,20 +387,20 @@ public final class Charts {
         @Override
         public boolean onTouchEvent(MotionEvent e) {
             int act = e.getAction();
-            if (act == MotionEvent.ACTION_DOWN && !data.isEmpty()) {
+            if (act == MotionEvent.ACTION_DOWN && !data.isEmpty() && hasActivity()) {
                 downX = e.getX();
                 downY = e.getY();
                 tracking = true;
                 return true;
             }
-            if (act == MotionEvent.ACTION_MOVE && tracking && !data.isEmpty()) {
+            if (act == MotionEvent.ACTION_MOVE && tracking && !data.isEmpty() && hasActivity()) {
                 if (scrubbing(e.getX(), e.getY())) {
                     holdParent();
                     selectNear(e.getX());
                 }
                 return true;
             }
-            if (act == MotionEvent.ACTION_UP && tracking && !data.isEmpty() && tapped(e.getX(), e.getY())) {
+            if (act == MotionEvent.ACTION_UP && tracking && !data.isEmpty() && hasActivity() && tapped(e.getX(), e.getY())) {
                 selectNear(e.getX());
             }
             if (act == MotionEvent.ACTION_UP || act == MotionEvent.ACTION_CANCEL) tracking = false;
@@ -438,6 +452,13 @@ public final class Charts {
                 paint.setTextSize(chartTextPx(11));
                 paint.setTextAlign(Paint.Align.CENTER);
                 g.drawText("داده‌ای برای نمایش نیست", w / 2f, h / 2f, paint);
+                return;
+            }
+            if (!hasActivity()) {
+                paint.setColor(Theme.MUTED);
+                paint.setTextSize(chartTextPx(11));
+                paint.setTextAlign(Paint.Align.CENTER);
+                g.drawText("در این بازه فعالیتی ثبت نشده است", w / 2f, h / 2f, paint);
                 return;
             }
             double mx = Math.max(0, max());
@@ -499,20 +520,20 @@ public final class Charts {
         @Override
         public boolean onTouchEvent(MotionEvent e) {
             int act = e.getAction();
-            if (act == MotionEvent.ACTION_DOWN && !data.isEmpty()) {
+            if (act == MotionEvent.ACTION_DOWN && !data.isEmpty() && hasActivity()) {
                 downX = e.getX();
                 downY = e.getY();
                 tracking = true;
                 return true;
             }
-            if (act == MotionEvent.ACTION_MOVE && tracking && !data.isEmpty()) {
+            if (act == MotionEvent.ACTION_MOVE && tracking && !data.isEmpty() && hasActivity()) {
                 if (scrubbing(e.getX(), e.getY())) {
                     holdParent();
                     selectSlot(e.getX());
                 }
                 return true;
             }
-            if (act == MotionEvent.ACTION_UP && tracking && !data.isEmpty() && tapped(e.getX(), e.getY())) {
+            if (act == MotionEvent.ACTION_UP && tracking && !data.isEmpty() && hasActivity() && tapped(e.getX(), e.getY())) {
                 selectSlot(e.getX());
             }
             if (act == MotionEvent.ACTION_UP || act == MotionEvent.ACTION_CANCEL) tracking = false;
@@ -793,9 +814,8 @@ public final class Charts {
                     fr = Math.min(track.right, mid + Theme.dp(4));
                 }
                 RectF fill = new RectF(fl, bTop, fr, bTop + barH);
-                paint.setShader(new LinearGradient(track.right, 0, track.left, 0, col, Theme.alpha(col, 140), Shader.TileMode.CLAMP));
+                paint.setColor(col);
                 g.drawRoundRect(fill, Theme.dp(7), Theme.dp(7), paint);
-                paint.setShader(null);
             }
         }
 

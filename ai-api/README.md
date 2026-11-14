@@ -1,0 +1,64 @@
+# Meelano AI proxy (AvalAI-only application path)
+
+This is a separately deployed PHP service. It is **not** the Atiran business server and has no SQL connection. The Android app runs its existing, fixed, read-only report queries locally, checks the active app role, removes contact/authentication columns, and sends only selected report facts plus a bounded recent chat when the user has opted in. The model never receives SQL access and cannot write business records.
+
+The proxy keeps the AvalAI credential only in the hosting environment/secret manager and defaults to a strict AvalAI-only route. It calls AvalAI's OpenAI-compatible Chat Completions API and does not fall back to another provider when AvalAI is unavailable. It authenticates the app with a short-lived HS256 JWT, applies request limits, does not persist prompts/responses locally, and never returns upstream diagnostics. The sample has one environment-configured login for controlled testing; it is **not** a production multi-tenant identity or role service and must not be treated as a substitute for Atiran authentication.
+
+## Requirements and deployment
+
+- PHP 8.1 or later with the cURL extension.
+- A public HTTPS virtual host. Put this directory under a path such as `ai-api/`; the app setting should point to the full URL ending in `api.php`.
+- Configure every secret in the hosting provider's private environment/secret manager. Do not put `.env`, keys, passwords, JWT secrets, or tokens in Git, the Android project, APK, CI logs, or chat.
+- The web-server process must be able to create and write the rate-limit file. Prefer a private persistent path outside the public web root and set `AI_RATE_LIMIT_FILE` to it.
+- Allow a 100-second PHP/FPM request budget. The PHP request itself is bounded to 95 seconds; configured provider attempts share a 90-second total upstream budget (a single-provider request can wait up to 90 seconds). The Android proxy client allows 100 seconds for the complete response.
+- Before any organization-wide production use, replace the sample shared login with a reviewed, user-aware authentication/deployment design, set quotas and monitoring, and review AvalAI's data-retention terms.
+
+Required server environment:
+
+| Variable | Purpose |
+| --- | --- |
+| `AI_LOGIN_USER` | One controlled-test login name for this template |
+| `AI_LOGIN_PASSWORD_HASH` | Output of PHP `password_hash`; the raw password is not configured in the service |
+| `AI_JWT_SECRET` | Random secret, at least 32 bytes, used only to sign access tokens |
+| Provider credentials | For the supported application path, configure all three `AVALAI_API_KEY`, `AVALAI_BASE_URL`, and `AVALAI_MODEL` values in the host secret manager. With the default strict pin, absence or failure of AvalAI fails closed; no other provider is used. |
+
+Provider environment variables:
+
+| Variable | Purpose |
+| --- | --- |
+| `AVALAI_API_KEY` | AvalAI bearer key; server-side only |
+| `AVALAI_BASE_URL` | AvalAI HTTPS API base, such as the provider's `/v1` base; the proxy appends `/chat/completions`. HTTPS is required; do not include credentials, query strings, fragments, or the endpoint path. |
+| `AVALAI_MODEL` | Exact model identifier supported by the configured AvalAI account |
+| `OPENAI_API_KEY`, `GEMINI_API_KEY`, `GROQ_API_KEY` | Not used by this AvalAI-only application. Leave unset. |
+
+Optional environment:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `AI_PROVIDER_ONLY` | `avalai` | Only `avalai` is accepted by this app. Any other value fails closed; no provider fallback is permitted. |
+| `AI_TOKEN_TTL` | 43200 seconds | JWT lifetime; accepted range is 600–86400 seconds |
+| `AI_JWT_ISSUER` | `meelano-ai-api` | JWT issuer |
+| `AI_RATE_LIMIT_FILE` | private system temp directory | Lock-protected rate-limit data file |
+| `AI_TRUST_PROXY_TLS` | `0` | Set to `1` only when a trusted reverse proxy terminates TLS and controls `X-Forwarded-Proto` |
+
+The application pins every proxy request to AvalAI. If AvalAI is not configured or its call fails, the request fails; the prompt and Atiran facts are never sent to another provider. `AI_PROVIDER_ONLY=avalai` may be set explicitly for clarity; a different value is rejected. AvalAI uses the configured model, OpenAI-compatible `/chat/completions`, temperature `0.2`, and a bounded response size. No client request can select a provider or send a provider key.
+
+Generate the password hash and JWT secret directly on a trusted host or administrator machine, then transfer their results only through the host's secret-management channel. Never paste their values into this repository or the conversation. Configure TLS before enabling the endpoint. If the application server terminates TLS, leave `AI_TRUST_PROXY_TLS` unset; do not trust arbitrary forwarded headers.
+
+## API contract
+
+All POST endpoints require HTTPS and `Content-Type: application/json`.
+
+- `GET api.php?action=health` returns a non-sensitive liveness response.
+- `POST api.php` with `{"action":"login","user":"…","password":"…"}` returns a short-lived `token` and `expiresIn`. The Android app stores the token encrypted with Android Keystore; it does not save the password.
+- The backwards-compatible chat form is `{"action":"chat","task":"fast","system":"…","message":"…"}` with `Authorization: Bearer <token>`.
+- The current Android proxy sends `context` separately and a list of at most 20 role-labeled `messages`, for example `[{"role":"user","content":"…"},{"role":"assistant","content":"…"},{"role":"user","content":"…"}]`, with `currentMessage` identifying the last user turn. Only `user` and `assistant` roles are accepted, the final message must match the current user question, and the server-owned system instructions cannot be replaced. The legacy `message` field remains a bounded, flattened fallback for already-deployed older proxy versions. The extracted accounting context is bounded and explicitly treated as data, not instructions. The server returns `{"ok":true,"reply":"…"}`.
+- `task` accepts `analysis`, `fast`, `writing`, or `general` (omitted means `general`). It is validated as a request classification only; it cannot select a provider or credential. The app sends a strict Persian response/planner instruction as `system`; server safety instructions are always added. Request bodies are capped at 192 KiB and conversation history is bounded; errors never include upstream diagnostics or request contents.
+
+Rate limits are applied to login attempts and authenticated chat calls. Failed or unavailable rate-limit storage fails closed. The service has no browser CORS access and does not follow redirects to another host.
+
+## Test and lint
+
+Run `php -l ai-api/lib.php`, `php -l ai-api/providers.php`, `php -l ai-api/api.php`, and `php ai-api/tests/run.php` with PHP 8.1+.
+
+This repository contains a deployment template, **not a live endpoint**. The Android app has no direct provider-key route. It cannot connect until the service is deployed to HTTPS, AvalAI and login secrets are configured on the host, and the `api.php` URL is entered in the app. Never put provider keys in the APK or ask end users to enter them.

@@ -9,7 +9,7 @@ import android.widget.ScrollView;
 
 import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.core.AtiranAuth;
-import ir.meelano.manager.core.Jalali;
+import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.ReportCatalog;
@@ -111,8 +111,9 @@ public class UsersScreen extends Screen {
         int activeToday = 0;
         if (d.users != null) for (Row r : d.users) if (r.l("todayN") > 0) activeToday++;
         List<Kit.Kpi> kpis = new ArrayList<>();
-        kpis.add(new Kit.Kpi("کاربران", Money.fa(String.valueOf(d.users == null ? 0 : d.users.size())), "نفر", Theme.GOLD));
-        kpis.add(new Kit.Kpi("فعال امروز", Money.fa(String.valueOf(activeToday)), "نفر", Theme.SUCCESS));
+        kpis.add(new Kit.Kpi("کاربران", HomeNumberFormatter.integer(d.users == null ? 0 : d.users.size()),
+                "نفر", Theme.GOLD));
+        kpis.add(new Kit.Kpi("فعال امروز", HomeNumberFormatter.integer(activeToday), "نفر", Theme.SUCCESS));
         content.addView(a.kit.kpiGrid(kpis, 2), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(12));
 
@@ -124,9 +125,10 @@ public class UsersScreen extends Screen {
             final Row row = r;
             boolean on = isOn(row.s("active"));
             String sub = row.s("role");
-            if (!row.s("lastLogin").isEmpty()) sub += (sub.isEmpty() ? "" : " • ") + "آخرین ورود " + Money.fa(Jalali.faDate(row.s("lastLogin")));
+            if (!row.s("lastLogin").isEmpty()) sub += (sub.isEmpty() ? "" : " • ") + "آخرین ورود " + HomeNumberFormatter.dateTime(row.s("lastLogin"));
             View v = a.kit.personRow(row.s("name"), sub.isEmpty() ? "—" : sub,
-                    row.l("todayN") > 0 ? Money.fa(String.valueOf(row.l("todayN"))) + " اقدام امروز" : "—",
+                    row.l("todayN") > 0 ? HomeNumberFormatter.integer(row.l("todayN"))
+                            + " اقدام امروز" : "—",
                     on ? "فعال" : "غیرفعال", on ? Theme.SUCCESS : Theme.MUTED,
                     v2 -> openLogins(row));
             LinearLayout.LayoutParams p = a.kit.lp(-1, -2);
@@ -157,7 +159,9 @@ public class UsersScreen extends Screen {
                 LinearLayout body = a.kit.v();
                 body.addView(a.kit.kv("کاربر", user.s("name"), Theme.TEXT), a.kit.lp(-1, -2));
                 if (!user.s("role").isEmpty()) body.addView(a.kit.kv("نقش", user.s("role"), Theme.TEXT), a.kit.lp(-1, -2));
-                if (!user.s("phone").isEmpty()) body.addView(a.kit.kv("تلفن", Money.fa(user.s("phone")), Theme.TEXT), a.kit.lp(-1, -2));
+                if (!user.s("phone").isEmpty()) body.addView(a.kit.kv("تلفن",
+                        HomeNumberFormatter.isolateLtr(HomeNumberFormatter.persianDigits(user.s("phone"))),
+                        Theme.TEXT), a.kit.lp(-1, -2));
                 addLoginMgmt(body, user);
                 if (rows.isEmpty()) {
                     body.addView(a.kit.hint("سابقه ورودی ثبت نشده است"), a.kit.lp(-1, -2));

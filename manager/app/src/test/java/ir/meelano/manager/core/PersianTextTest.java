@@ -37,6 +37,17 @@ public class PersianTextTest {
     @Test public void damagedNamesAreRejectedForSafeHeaderFallback() {
         assertTrue(PersianText.isUsablePersonName("نام کاربر"));
         assertFalse(PersianText.isUsablePersonName("◆?"));
+        assertFalse(PersianText.isUsablePersonName("علی◆?"));
+        assertFalse(PersianText.isUsablePersonName("علی?"));
         assertFalse(PersianText.isUsablePersonName("علی\uFFFD"));
+    }
+
+    @Test public void truncationKeepsCombiningMarksAndJoinerSequencesTogether() {
+        assertEquals("اَ…", PersianText.truncateGraphemes("اَب", 1));
+        assertEquals("👩‍💻…", PersianText.truncateGraphemes("👩‍💻نام", 1));
+        assertEquals("👍🏽…", PersianText.truncateGraphemes("👍🏽نام", 1));
+        assertEquals("🇪🇪…", PersianText.truncateGraphemes("🇪🇪نام", 1));
+        assertEquals("ا\u200Cب…", PersianText.truncateGraphemes("ا\u200Cبج", 1));
+        assertEquals("نام", PersianText.truncateGraphemes("نام", 10));
     }
 }

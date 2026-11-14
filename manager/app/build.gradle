@@ -1,5 +1,10 @@
 plugins { id 'com.android.application' }
 
+// The regular APK omits emulator-only ABIs to stay compact. The screenshot CI job
+// opts into x86_64 so it can render real Android Views on a hosted emulator.
+def managerAbis = ['arm64-v8a', 'armeabi-v7a']
+if (rootProject.hasProperty('homeScreenshotAbi')) managerAbis.add('x86_64')
+
 // ---- Optional release signing ----
 // Copy manager/keystore.properties.template → manager/keystore.properties (git-ignored)
 // and point it at your release keystore. Env vars override the file.
@@ -19,8 +24,9 @@ android {
         targetSdk 34
         versionCode 76
         versionName '36.43.0'
-        // Built-in Persian voice (sherpa-onnx) ships for phones; the emulator-only x86 ABIs are dropped to keep the APK small.
-        ndk { abiFilters 'arm64-v8a', 'armeabi-v7a' }
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+        // Built-in Persian voice (sherpa-onnx) ships for phones; CI may opt into x86_64 for UI screenshots.
+        ndk { abiFilters(*managerAbis) }
     }
 
     signingConfigs {
@@ -64,4 +70,7 @@ dependencies {
 
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.json:json:20240303'
+
+    androidTestImplementation 'androidx.test:runner:1.6.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
 }

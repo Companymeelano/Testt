@@ -11,6 +11,7 @@ import ir.meelano.manager.MainActivity;
 import ir.meelano.manager.R;
 import ir.meelano.manager.ShareProvider;
 import ir.meelano.manager.core.AtiranAuth;
+import ir.meelano.manager.core.HomeNumberFormatter;
 import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.Money;
@@ -92,7 +93,7 @@ public class TahvilScreen extends Screen {
         }), new LinearLayout.LayoutParams(Theme.dp(46), -2));
         row.addView(a.kit.space(6));
         boolean isToday = Jalali.todayStr().equals(day);
-        TextView lbl = a.kit.text(Jalali.disp(day) + (isToday ? " (امروز)" : ""),
+        TextView lbl = a.kit.text(Jalali.dispFa(day) + (isToday ? " (امروز)" : ""),
                 13f, Theme.GOLD_SOFT, true);
         lbl.setGravity(android.view.Gravity.CENTER);
         row.addView(lbl, a.kit.lp(-2, -2));
@@ -158,7 +159,7 @@ public class TahvilScreen extends Screen {
                     boolean handed = d.handed.contains(no);
                     String sub = row.s("cust");
                     if (!row.s("visitor").isEmpty()) sub += " \u2022 " + row.s("visitor");
-                    sub += " \u2022 " + Money.fa(Jalali.disp(row.s("dt")));
+                    sub += " \u2022 " + HomeNumberFormatter.dateTime(row.s("dt"));
                     View v = a.kit.personRow("فاکتور " + Money.fa(no),
                             sub.isEmpty() ? "\u2014" : sub,
                             Money.compactMoney(row.d("amount")),
@@ -295,9 +296,8 @@ public class TahvilScreen extends Screen {
         android.graphics.drawable.GradientDrawable g = new android.graphics.drawable.GradientDrawable();
         g.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
         g.setCornerRadius(Theme.dp(12));
-        g.setStroke(Math.max(1, Theme.dp(on ? 1.6f : 1f)), on ? Theme.SUCCESS : Theme.MUTED);
-        // رنگِ پرکننده از خودِ Theme مشتق می‌شود تا با تغییرِ پوست هماهنگ بماند
-        g.setColor(on ? ((Theme.SUCCESS & 0x00FFFFFF) | 0x1A000000) : 0x00000000);
+        g.setStroke(Math.max(1, Theme.dp(on ? 1.5f : 1f)), on ? Theme.PRIMARY : Theme.BORDER);
+        g.setColor(on ? Theme.ACCENT_SOFT : Theme.SURFACE);
         return g;
     }
 
@@ -340,8 +340,9 @@ if (!items.isEmpty()) {
                 }
                 int n = 0;
                 for (boolean bb : marked) if (bb) n++;
-                tally.setText(Money.fa(String.valueOf(n)) + " از "
-                        + Money.fa(String.valueOf(items.size())));
+                tally.setText(ir.meelano.manager.core.HomeNumberFormatter.rtlText(
+                        Money.fa(String.valueOf(n)) + " از "
+                                + Money.fa(String.valueOf(items.size()))));
                 // رنگِ شمارنده وضعیت را می‌گوید: کامل، ناقص، یا خالی
                 tally.setTextColor(n == 0 ? Theme.WARNING
                         : (n == items.size() ? Theme.SUCCESS : Theme.INFO));
@@ -554,7 +555,7 @@ if (!items.isEmpty()) {
             });
             String sub = "مشتری: " + f.s("cust") + "  •  " + receiver
                     + (workerName.isEmpty() ? "" : "  •  کارگر: " + workerName)
-                    + "  •  تحویل‌دهنده: " + keeper + "  •  تاریخ: " + Money.fa(handoverDay)
+                    + "  •  تحویل‌دهنده: " + keeper + "  •  تاریخ: " + Jalali.dispFa(handoverDay)
                     + "  •  مبلغ: " + Money.compactMoney(f.d("amount"));
             ReportCatalog.Col[] cols = new ReportCatalog.Col[]{
                     new ReportCatalog.Col("name", "کالا", ReportCatalog.T_TEXT),

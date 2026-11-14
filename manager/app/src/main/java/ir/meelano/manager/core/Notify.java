@@ -6,12 +6,12 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
-import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
 
 import ir.meelano.manager.MainActivity;
+import ir.meelano.manager.screens.ManagerAlertsScreen;
 import ir.meelano.manager.R;
 import ir.meelano.manager.data.Meta;
 import ir.meelano.manager.data.Repo;
@@ -43,7 +43,7 @@ public final class Notify {
     private static final int WEEKLY_NOTIF_ID = 7006;
     static final String ACT_EOD = "ir.meelano.manager.EOD";
     private static final int EOD_REQ = 7007;
-    private static final int EOD_NOTIF_ID = 7008;
+    static final int EOD_NOTIF_ID = 7008;
     static final String ACT_GUARD = "ir.meelano.manager.GUARD";
     private static final int GUARD_REQ = 7009;
     static final int GUARD_NOTIF_ID = 7010;
@@ -52,10 +52,24 @@ public final class Notify {
     static final int NEWINV_NOTIF_ID = 7012;
     private static boolean launched = false;
 
+    private static final class DailyCheck {
+        final long[] values;
+        final List<AlertEngine.Alert> alerts;
+        final boolean morningSummaryAvailable;
+        DailyCheck(long[] values, List<AlertEngine.Alert> alerts, boolean morningSummaryAvailable) {
+            this.values = values;
+            this.alerts = alerts == null ? java.util.Collections.<AlertEngine.Alert>emptyList() : alerts;
+            this.morningSummaryAvailable = morningSummaryAvailable;
+        }
+    }
+
     /** Create channel, schedule the daily alarm, ask permission, run one launch check. */
     public static void boot(Activity a) {
         try {
             Settings s = new Settings(a);
+            // Auto-backup is an independent preference: its AlarmManager entry must survive
+            // reboot and app startup even when Home's smart-notification master switch is off.
+            AutoBackup.reschedule(a.getApplicationContext());
             if (!s.notifOn()) return;
             channel(a);
             scheduleDaily(a);
@@ -467,34 +481,43 @@ public final class Notify {
         try {
             Settings s = new Settings(c);
             if (!s.notifOn()) return;
+            final boolean dueAlertsOn = s.homeDueAlertsOn();
             final Repo repo = new Repo(c, s);
             repo.run(conn -> {
                 Meta m = new Meta(conn);
                 long inN = 0, outN = 0, odN = 0;
                 double inSum = 0, outSum = 0, odSum = 0;
-                try {
-                    List<Row> in = Repo.exec(conn, MoneyQueries.chequeDue(m, true, 3));
-                    inN = in.size();
-                    for (Row r : in) inSum += r.d("amount");
-                } catch (Exception ignored) { Diag.ignored("Notify:445", ignored); }
-                try {
-                    List<Row> out = Repo.exec(conn, MoneyQueries.chequeDue(m, false, 3));
-                    outN = out.size();
-                    for (Row r : out) outSum += r.d("amount");
-                } catch (Exception ignored) { Diag.ignored("Notify:450", ignored); }
-                try {
-                    List<Row> od = Repo.exec(conn, Queries.overdueInvoices(m, 200));
-                    odN = od.size();
-                    for (Row r : od) odSum += r.d("amount");
-                } catch (Exception ignored) { Diag.ignored("Notify:455", ignored); }
+                List<Row> incoming = null;
+                List<Row> outgoing = null;
+                if (dueAlertsOn) {
+                    try {
+                        incoming = Repo.exec(conn, MoneyQueries.chequeDue(m, true, 3));
+                        inN = incoming.size();
+                        for (Row r : incoming) inSum += r.d("amount");
+                    } catch (Exception ignored) { Diag.ignored("Notify:445", ignored); }
+                    try {
+                        outgoing = Repo.exec(conn, MoneyQueries.chequeDue(m, false, 3));
+                        outN = outgoing.size();
+                        for (Row r : outgoing) outSum += r.d("amount");
+                    } catch (Exception ignored) { Diag.ignored("Notify:450", ignored); }
+                    try {
+                        List<Row> od = Repo.exec(conn, Queries.overdueInvoices(m, 200));
+                        odN = od.size();
+                        for (Row r : od) odSum += r.d("amount");
+                    } catch (Exception ignored) { Diag.ignored("Notify:455", ignored); }
+                }
+                String yesterday = Jalali.addDays(Jalali.todayStr(), -1);
                 double ySales = 0, yIn = 0;
+                boolean ySalesAvailable = false, yInAvailable = false;
                 try {
-                    Row ys = Repo.one(conn, Queries.salesOn(m, true, Jalali.addDays(Jalali.todayStr(), -1)));
+                    Row ys = Repo.one(conn, Queries.salesOn(m, true, yesterday));
                     ySales = ys.d("total");
+                    ySalesAvailable = true;
                 } catch (Exception ignored) { Diag.ignored("Notify:460", ignored); }
                 try {
-                    Row yi = Repo.one(conn, MoneyQueries.darOn(m, 0, Jalali.addDays(Jalali.todayStr(), -1)));
+                    Row yi = Repo.one(conn, MoneyQueries.darOn(m, 0, yesterday));
                     yIn = yi.d("total");
+                    yInAvailable = true;
                 } catch (Exception ignored) { Diag.ignored("Notify:464", ignored); }
                 long bN = 0;
                 double bSum = 0;
@@ -509,24 +532,56 @@ public final class Notify {
                     lowN = ps.l("low");
                     zeroN = ps.l("out");
                 } catch (Exception ignored) { Diag.ignored("Notify:477", ignored); }
-                return new long[]{(long) inSum, (long) outSum, (long) odSum, inN, outN, odN,
-                        (long) ySales, (long) yIn, bN, (long) bSum, lowN, zeroN};
-            }, new Repo.Cb<long[]>() {
+                List<AlertEngine.Alert> alerts = evaluateDailyHomeAlerts(c, conn, m, yesterday, incoming, outgoing);
+                return new DailyCheck(new long[]{(long) inSum, (long) outSum, (long) odSum, inN, outN, odN,
+                        (long) ySales, (long) yIn, bN, (long) bSum, lowN, zeroN}, alerts,
+                        ySalesAvailable && yInAvailable);
+            }, new Repo.Cb<DailyCheck>() {
                 @Override
-                public void ok(long[] v) {
+                public void ok(DailyCheck result) {
                     try {
                         repo.close();
                     } catch (Exception ignored) { Diag.ignored("Notify:485", ignored); }
                     finishCb(onDone);
-                    if (v == null || v.length < 12) return;
+                    if (result == null || result.values == null || result.values.length < 12) return;
+                    long[] v = result.values;
                     Settings s2 = new Settings(c);
+                    boolean dueAlertsOn = s2.homeDueAlertsOn();
+                    Calendar now = Calendar.getInstance();
+                    int minute = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE);
+                    boolean quietNow = HomeNotificationPolicy.isQuietTime(s2.homeQuietHoursOn(),
+                            s2.homeQuietStartMinute(), s2.homeQuietEndMinute(), minute);
+                    List<AlertEngine.Alert> homeAlerts = result.alerts;
+                    if (!dueAlertsOn || quietNow) {
+                        v = v.clone();
+                        v[0] = v[1] = v[2] = v[3] = v[4] = v[5] = 0;
+                    }
+                    if (homeAlerts != null) {
+                        List<AlertEngine.Alert> visibleAlerts = new java.util.ArrayList<>();
+                        for (AlertEngine.Alert alert : homeAlerts) {
+                            if (alert != null && HomeNotificationPolicy.shouldShowAlert(
+                                    alert.code, dueAlertsOn, quietNow)) visibleAlerts.add(alert);
+                        }
+                        homeAlerts = visibleAlerts;
+                    }
                     long lastB = s2.lastBouncedN();
                     long bNew = lastB < 0 ? 0 : Math.max(0, v[8] - lastB);
                     s2.setLastBouncedN(v[8]);
-                    boolean morning = s2.morningOn() && (v[6] > 0 || v[7] > 0);
-                    boolean showStock = s2.stockOn() && v[10] + v[11] > 0;
-                    if (v[3] == 0 && v[4] == 0 && v[5] == 0 && bNew == 0 && !morning && !showStock) return;
-                    show(c, v, bNew, morning);
+                    boolean morning = !quietNow && s2.morningOn() && result.morningSummaryAvailable
+                            && RoleStore.allowed(c, "sales");
+                    boolean showStock = s2.stockOn() && RoleStore.allowed(c, "products")
+                            && v[10] + v[11] > 0;
+                    boolean canCheques = RoleStore.allowed(c, "cheques");
+                    boolean showDue = !quietNow && dueAlertsOn && canCheques && (v[3] > 0 || v[4] > 0);
+                    boolean showOverdue = !quietNow && dueAlertsOn && RoleStore.allowed(c, "sales") && v[5] > 0;
+                    boolean showBounced = canCheques && bNew > 0;
+                    boolean hasHomeAlert = homeAlerts != null && !homeAlerts.isEmpty();
+                    if (!showDue && !showOverdue && !showBounced && !morning
+                            && !showStock && !hasHomeAlert) {
+                        cancelSmartNotification(c);
+                        return;
+                    }
+                    show(c, v, bNew, morning, homeAlerts);
                 }
 
                 @Override
@@ -540,42 +595,110 @@ public final class Notify {
         } catch (Exception ignored) { Diag.ignored("Notify:506", ignored); }
     }
 
+    private static List<AlertEngine.Alert> evaluateDailyHomeAlerts(Context context,
+                                                                    java.sql.Connection connection,
+                                                                    Meta meta, String yesterday,
+                                                                    List<Row> incoming,
+                                                                    List<Row> outgoing) {
+        SalesComparison.DayResult sales = null;
+        String historyStart = Jalali.addDays(yesterday, -7 * SalesComparison.DEFAULT_COMPARABLE_WEEKS);
+        try {
+            List<Row> history = Repo.exec(connection, Queries.factorDaily(meta,
+                    true, historyStart, yesterday));
+            SalesSnapshot snapshot = SalesSnapshot.fromRows(history, yesterday, historyStart);
+            sales = SalesComparison.evaluate(snapshot, yesterday, SalesComparison.MINUTES_PER_DAY,
+                    SalesComparison.DEFAULT_COMPARABLE_WEEKS);
+        } catch (Exception ignored) { Diag.ignored("Notify:homeSales", ignored); }
+        List<AlertEngine.DueItem> due = new java.util.ArrayList<>();
+        String today = Jalali.todayStr();
+        addAlertDue(due, incoming, true, today);
+        addAlertDue(due, outgoing, false, today);
+        List<AlertEngine.Alert> evaluated = AlertEngine.evaluate(null, null, sales,
+                ManagerAlertsScreen.salesDropThreshold(context), due);
+        List<AlertEngine.Alert> visible = new java.util.ArrayList<>();
+        for (AlertEngine.Alert alert : evaluated) {
+            String screen = HomeNotificationPolicy.screenFor(alert.action);
+            if (!screen.isEmpty() && RoleStore.allowed(context, screen)) visible.add(alert);
+        }
+        return visible;
+    }
+
+    private static void addAlertDue(List<AlertEngine.DueItem> target, List<Row> rows,
+                                    boolean incoming, String today) {
+        if (target == null || rows == null) return;
+        for (Row row : rows) {
+            if (row == null) continue;
+            String date = Jalali.disp(row.s("sardate"));
+            if (date.isEmpty()) continue;
+            target.add(new AlertEngine.DueItem(incoming, Jalali.diffDays(today, date), row.d("amount")));
+        }
+    }
+
     private static void finishCb(Runnable r) {
         try {
             if (r != null) r.run();
         } catch (Exception ignored) { Diag.ignored("Notify:512", ignored); }
     }
 
-    private static void show(Context c, long[] v, long bNew, boolean morning) {
+    private static void cancelSmartNotification(Context context) {
+        try {
+            NotificationManager manager = (NotificationManager)
+                    context.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (manager != null) manager.cancel(NOTIF_ID);
+        } catch (Exception ignored) { Diag.ignored("Notify:smartCancel", ignored); }
+    }
+
+    private static void show(Context c, long[] v, long bNew, boolean morning,
+                             List<AlertEngine.Alert> homeAlerts) {
         try {
             channel(c);
             long inN = v[3], outN = v[4], odN = v[5];
+            boolean canSales = RoleStore.allowed(c, "sales");
+            boolean canCheques = RoleStore.allowed(c, "cheques");
+            boolean canProducts = RoleStore.allowed(c, "products");
             java.util.List<String> parts = new java.util.ArrayList<>();
-            if (morning)
+            if (morning && canSales)
                 parts.add("فروش دیروز: " + Money.compactRial(v[6]) + " • دریافت دیروز: " + Money.compactRial(v[7]));
-            if (inN > 0)
+            boolean engineIncoming = hasAlertCode(homeAlerts, "cheque_in_due");
+            boolean engineOutgoing = hasAlertCode(homeAlerts, "cheque_out_due");
+            if (homeAlerts != null) for (AlertEngine.Alert alert : homeAlerts) {
+                String line = notificationLine(alert);
+                if (!line.isEmpty()) parts.add(line);
+            }
+            if (canCheques && inN > 0 && !engineIncoming)
                 parts.add("چک دریافتی: " + Money.fa(String.valueOf(inN)) + " فقره • " + Money.compactRial(v[0]));
-            if (outN > 0)
+            if (canCheques && outN > 0 && !engineOutgoing)
                 parts.add("چک پرداختی: " + Money.fa(String.valueOf(outN)) + " فقره • " + Money.compactRial(v[1]));
-            if (odN > 0)
+            if (canSales && odN > 0)
                 parts.add("فاکتور معوق: " + Money.fa(String.valueOf(odN)) + " فاکتور • " + Money.compactRial(v[2]));
-            if (bNew > 0)
+            if (canCheques && bNew > 0)
                 parts.add("چک برگشتی تازه: " + Money.fa(String.valueOf(bNew)) + " فقره");
             boolean stockOn = true;
             try { stockOn = new Settings(c).stockOn(); } catch (Exception ignored) { Diag.ignored("Notify:531", ignored); }
-            if (stockOn && v.length >= 12 && v[10] + v[11] > 0)
+            boolean stockAlert = stockOn && canProducts && v.length >= 12 && v[10] + v[11] > 0;
+            if (stockAlert)
                 parts.add("کالای کم‌موجود یا ناموجود: " + Money.fa(String.valueOf(v[10] + v[11])) + " قلم");
             boolean onlyMorning = morning && parts.size() == 1;
+            String destination = firstAlertScreen(homeAlerts);
+            if (destination.isEmpty()) {
+                if (canCheques && (inN > 0 || outN > 0 || bNew > 0)) destination = "cheques";
+                else if (canSales && (morning || odN > 0)) destination = "sales";
+                else if (stockAlert) destination = "products";
+                else destination = "home";
+            }
+            if (!RoleStore.allowed(c, destination)) destination = "home";
             Notification.InboxStyle inbox = new Notification.InboxStyle();
             for (String p : parts) inbox.addLine(p);
-            inbox.setBigContentTitle(onlyMorning ? "☀ گزارش صبحگاهی میلانو" : "⚠ هشدار سررسید میلانو");
+            String title = onlyMorning ? "☀ گزارش صبحگاهی میلانو" : "⚠ هشدار هوشمند میلانو";
+            inbox.setBigContentTitle(title);
             inbox.setSummaryText(Money.fa(String.valueOf(parts.size())) + " مورد نیازمند توجه • برای جزئیات لمس کنید");
             Intent open = new Intent(c, MainActivity.class);
+            open.putExtra(MainActivity.EXTRA_SCREEN, destination);
             open.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
             PendingIntent pi = PendingIntent.getActivity(c, NOTIF_ID, open,
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             Notification n = new Notification.Builder(c, CH)
-                    .setContentTitle(onlyMorning ? "☀ گزارش صبحگاهی میلانو" : "⚠ هشدار سررسید میلانو")
+                    .setContentTitle(title)
                     .setContentText(parts.isEmpty() ? "" : parts.get(0))
                     .setStyle(inbox)
                     .setSmallIcon(R.mipmap.ic_launcher)
@@ -586,6 +709,39 @@ public final class Notify {
             NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
             if (nm != null) nm.notify(NOTIF_ID, n);
         } catch (Exception ignored) { Diag.ignored("Notify:556", ignored); }
+    }
+
+    private static boolean hasAlertCode(List<AlertEngine.Alert> alerts, String code) {
+        if (alerts == null) return false;
+        for (AlertEngine.Alert alert : alerts) if (alert != null && code.equals(alert.code)) return true;
+        return false;
+    }
+
+    private static String firstAlertScreen(List<AlertEngine.Alert> alerts) {
+        if (alerts == null) return "";
+        for (AlertEngine.Alert alert : alerts) {
+            if (alert == null) continue;
+            String screen = HomeNotificationPolicy.screenFor(alert.action);
+            if (!screen.isEmpty()) return screen;
+        }
+        return "";
+    }
+
+    private static String notificationLine(AlertEngine.Alert alert) {
+        if (alert == null) return "";
+        if ("sales_drop".equals(alert.code))
+            return "افت فروش دیروز " + HomeNumberFormatter.percentMagnitude(alert.changePercent)
+                    + " کمتر از روزهای مشابه • فروش " + Money.compactRial((long) alert.value)
+                    + " در برابر " + Money.compactRial((long) alert.referenceValue);
+        if ("cheque_in_due".equals(alert.code) || "cheque_out_due".equals(alert.code)) {
+            String kind = "cheque_in_due".equals(alert.code) ? "دریافتی" : "پرداختی";
+            String nearest = alert.daysUntilDue <= 0 ? "امروز"
+                    : alert.daysUntilDue == 1 ? "فردا"
+                    : "تا " + HomeNumberFormatter.integer(alert.daysUntilDue) + " روز";
+            return "چک " + kind + " نزدیک سررسید: " + HomeNumberFormatter.integer(alert.count)
+                    + " فقره • " + Money.compactRial((long) alert.value) + " • نزدیک‌ترین " + nearest;
+        }
+        return "";
     }
 
     /** Weekly backup reminder (no database access needed). */
@@ -609,78 +765,5 @@ public final class Notify {
             NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
             if (nm != null) nm.notify(BACKUP_NOTIF_ID, n);
         } catch (Exception ignored) { Diag.ignored("Notify:579", ignored); }
-    }
-}
-
-/** AlarmManager + boot receiver: reschedule + run the due check. Top-level so the manifest can see it. */
-final class NotifyReceiver extends BroadcastReceiver {
-    @Override
-    public void onReceive(Context c, Intent intent) {
-        final PendingResult pr;
-        try {
-            pr = goAsync();
-        } catch (Exception e) {
-            return;
-        }
-        try {
-            Settings s = new Settings(c);
-            String act = intent == null || intent.getAction() == null ? "" : intent.getAction();
-            if (Notify.ACT_BACKUP.equals(act)) {
-                if (s.backupOn()) {
-                    Notify.scheduleWeekly(c);
-                    Notify.showBackup(c);
-                }
-                finishPr(pr);
-                return;
-            }
-            if (Notify.ACT_WEEKLY.equals(act)) {
-                if (s.weeklyOn()) {
-                    Notify.scheduleWeeklyReport(c);
-                    Notify.weekNow(c, () -> finishPr(pr));
-                } else finishPr(pr);
-                return;
-            }
-            if (Notify.ACT_EOD.equals(act)) {
-                if (s.eodOn()) {
-                    Notify.scheduleEod(c);
-                    Notify.eodNow(c, () -> finishPr(pr));
-                } else finishPr(pr);
-                return;
-            }
-            if (Notify.ACT_GUARD.equals(act)) {
-                if (s.guardOn()) {
-                    Notify.scheduleGuard(c);
-                    Guard.checkNow(c, () -> finishPr(pr));
-                } else finishPr(pr);
-                return;
-            }
-            if (Notify.ACT_NEWINV.equals(act)) {
-                if (s.whNewOn()) {
-                    Notify.scheduleNewInv(c);
-                    InvoiceWatch.checkNow(c, () -> finishPr(pr));
-                } else finishPr(pr);
-                return;
-            }
-            if (!s.notifOn()) {
-                finishPr(pr);
-                return;
-            }
-            Notify.scheduleDaily(c);
-            if (s.backupOn()) Notify.scheduleWeekly(c);
-            if (s.weeklyOn()) Notify.scheduleWeeklyReport(c);
-            if (s.eodOn()) Notify.scheduleEod(c);
-            if (s.guardOn()) Notify.scheduleGuard(c);
-            if (s.whNewOn()) Notify.scheduleNewInv(c);
-            AutoBackup.reschedule(c);
-            Notify.checkNow(c, () -> finishPr(pr));
-        } catch (Exception ignored) {
-            finishPr(pr);
-        }
-    }
-
-    private void finishPr(PendingResult pr) {
-        try {
-            pr.finish();
-        } catch (Exception ignored) { Diag.ignored("Notify:652", ignored); }
     }
 }

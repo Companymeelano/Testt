@@ -778,7 +778,13 @@ def check_unified_app():
 
 
 def check_nut_visual_assets():
-    """Check the nut-theme selector icon and every bundled product-photo key/file pair."""
+    """Check the nut-theme selector icon and every bundled product-photo key/file pair.
+
+    The flat redesign keeps the same guarantees in a new shape: the theme selector is a
+    segmented control with the three skins (dark emerald, royal ivory, nut), it applies
+    instantly, the nut skin maps to the emerald design tokens, and the segments stay
+    48dp tall, expose their selected state and describe themselves for screen readers.
+    """
     import struct
 
     photos_src = os.path.join(ROOT, 'app/src/main/java/ir/meelano/android/MeelanoProductPhotos.java')
@@ -812,23 +818,24 @@ def check_nut_visual_assets():
                 if width != 128 or height != 128 or data[25] != 6:
                     bad_icons.append(icon_name + ' must be 128px RGBA')
         required_ui = (
-            'chipsWithIcons(' in settings,
-            'R.drawable.icon3d_dark_theme' in settings and 'R.drawable.icon3d_theme' in settings
-            and 'R.drawable.icon3d_nut_theme' in settings,
+            'segmentedControl(' in settings,
+            'R.drawable.mi_dark_mode' in settings and 'R.drawable.mi_light_mode' in settings
+            and 'R.drawable.mi_storefront' in settings,
             '"آجیل و خشکبار"' in settings,
-            'برای دیدن همهٔ قالب‌ها' in settings,
-            'res == R.drawable.icon3d_nut_theme' in theme
-            and 'res == R.drawable.icon3d_dark_theme' in theme and 'res == R.drawable.icon3d_theme' in theme,
-            'R.drawable.icon3d_nut_products' not in theme and 'R.drawable.icon3d_nut_inventory' not in theme,
-            'if (icons != null) ch.setMinimumHeight(Theme.dp(48));' in kit,
-            'c.setSelected(selected);' in kit,
-            'ImageView artwork = icon(iconRes, ink, 26);' in kit,
+            'setThemeMode(' in settings and 'a.refreshTheme()' in settings,
+            'PRIMARY = nuts ? DesignTokens.EMERALD' in theme,
+            'public static boolean isNuts()' in theme,
+            'segment.setMinimumHeight(Theme.dp(48));' in kit,
+            'segment.setSelected(chosen);' in kit,
+            'segment.setContentDescription(HomeNumberFormatter.localizeText(label));' in kit,
         )
         absent_ui = [name for name, present in zip(
-            ('theme selector uses matched image chips', 'all three theme choices use their 3D icons',
-             'theme selector labels the nut option', 'horizontal overflow is explained', 'nut icon remains untinted',
-             'nut icon is not mapped to catalog or inventory pages', 'theme choices meet a 48dp touch target',
-             'selected state is exposed for accessibility', 'icons use a consistent 26dp size'), required_ui) if not present]
+            ('theme selector is a segmented control', 'all three theme choices carry their icons',
+             'theme selector labels the nut option', 'the chosen skin applies instantly',
+             'nut skin maps to the emerald design tokens', 'nut state is exposed for the whole UI',
+             'theme choices meet a 48dp touch target',
+             'selected state is exposed for accessibility',
+             'segments describe themselves for screen readers'), required_ui) if not present]
         ok = bool(keys) and not missing and not unreferenced and not bad_jpegs and not bad_icons and not absent_ui
         details = []
         if missing: details.append('عکس‌های مفقود: ' + ', '.join(missing))
@@ -837,73 +844,54 @@ def check_nut_visual_assets():
         if bad_icons: details.append('آیکن ۳بعدی نامعتبر: ' + ', '.join(bad_icons))
         if absent_ui: details.append('اتصال چیپ انتخاب تم ناقص است: ' + ', '.join(absent_ui))
         report('پوشش آیکن‌ها و تصاویر آجیل و خشکبار', ok,
-               ('%d کلید عکس، هرکدام دارای JPEG؛ تصویر آجیل شفاف ۱۲۸×۱۲۸ و سه گزینهٔ انتخاب تم با آیکن‌های ۳بعدی و هدف لمسی ۴۸dp' % len(keys))
+               'انتخابگر قالب سه‌تکه با آیکن و برچسب فارسی است، پوستهٔ آجیل به توکن‌های زمردی '
+               'نگاشت می‌شود، هدف لمسی ۴۸dp و وضعیت انتخاب دسترس‌پذیر است؛ همهٔ کلیدهای عکس '
+               'محصول فایل JPEG سالم دارند'
                if ok else '؛ '.join(details))
     except Exception as e:
         report('پوشش آیکن‌ها و تصاویر آجیل و خشکبار', False, 'ممیزی ناموفق: %s' % e)
 
 
+
 def check_section_art():
-    """Every section of the index must have 3D artwork, and the nut theme must be able to
-    show its emerald twin: a section that keeps the small gold medallion looks tiny next to
-    the emerald pictures and breaks the look of the skin the user picked."""
+    """Every section icon of the index and the visitor workspace must resolve.
+
+    The flat redesign draws the sections with vector icons instead of the 3D medallion
+    set: each mi_* icon referenced by the command room and the visitor desk needs its
+    vector drawable, and the nut skin keeps its identity through the emerald design
+    tokens that Theme applies.
+    """
     theme_src = os.path.join(ROOT, 'manager/app/src/main/java/ir/meelano/manager/ui/Theme.java')
     room_src = os.path.join(ROOT, 'manager/app/src/main/java/ir/meelano/manager/core/CommandRoom.java')
-    art_src = os.path.join(ROOT, 'manager/app/src/main/java/ir/meelano/manager/core/IconArt.java')
     desk_src = os.path.join(ROOT, 'manager/app/src/main/java/ir/meelano/manager/screens/VisitorDeskScreen.java')
-    drawable_dir = os.path.join(ROOT, 'manager/app/src/main/res/drawable-nodpi')
+    tokens_src = os.path.join(ROOT, 'manager/app/src/main/java/ir/meelano/manager/ui/DesignTokens.java')
+    drawable_dir = os.path.join(ROOT, 'manager/app/src/main/res/drawable')
     try:
         theme = open(theme_src, encoding='utf-8').read()
         room = open(room_src, encoding='utf-8').read()
-        art = open(art_src, encoding='utf-8').read()
         desk = open(desk_src, encoding='utf-8').read()
-        files = {os.path.splitext(n)[0] for n in os.listdir(drawable_dir) if n.lower().endswith('.png')}
-        # The mapping of Theme.icon3d(). The dark-skin rules are skipped: the nut look is light.
-        light_theme = re.sub(r'if \(!light\) \{.*?\n        \}', '', theme, flags=re.S)
-        mapping = {}
-        for m in re.finditer(r'if \(([^)]*)\) return ([^;]+);', light_theme):
-            res = re.search(r'R\.drawable\.(\w+)', m.group(2))
-            if not res:
-                continue
-            for vec in re.findall(r'R\.drawable\.(\w+)', m.group(1)):
-                mapping[vec] = res.group(1)
+        vectors = {os.path.splitext(n)[0] for n in os.listdir(drawable_dir) if n.lower().endswith('.xml')}
         problems = []
         arts = sorted(set(re.findall(r'"(mi_\w+)"', room)))
         for name in arts:
-            base = mapping.get(name)
-            if base is None:
-                problems.append('%s has no 3D artwork' % name)
-            elif base not in files:
-                problems.append('%s -> %s.png is missing' % (name, base))
-        # The workspace tiles of the visitor use their own artwork; they must be 3D as well.
-        for name in sorted(set(re.findall(r'R\.drawable\.(mi_\w+)', desk))):
-            base = mapping.get(name)
-            if base is None:
-                problems.append('workspace tile %s has no 3D artwork' % name)
-            elif base not in files:
-                problems.append('workspace tile %s -> %s.png is missing' % (name, base))
-        # Every medallion of the gold set needs its emerald twin, or the nut theme keeps the
-        # small gold medallion. icon3d_medal_alert has no emerald picture (the alert keeps the
-        # gold medallion on purpose) and icon3d_medal_goldbar is unused (mi_diamond maps to
-        # icon3d_gold, which has an emerald twin).
-        exceptions = {'icon3d_medal_alert', 'icon3d_medal_goldbar'}
-        for base in sorted(files):
-            if not base.startswith('icon3d_medal_') or base in exceptions:
-                continue
-            twin = 'icon3d_emerald_' + base[len('icon3d_medal_'):]
-            if twin not in files:
-                problems.append('%s has no emerald twin (%s)' % (base, twin))
-        if 'IconArt.emeraldName(n)' not in theme:
-            problems.append('Theme.chrome3d does not use the shared naming rule')
-        if 'icon3d_medal_' not in art or 'icon3d_emerald_' not in art:
-            problems.append('IconArt does not know the naming rule of the artwork')
-        ok = bool(arts) and not problems
+            if name not in vectors:
+                problems.append('%s has no vector drawable' % name)
+        tiles = sorted(set(re.findall(r'R\.drawable\.(mi_\w+)', desk)))
+        for name in tiles:
+            if name not in vectors:
+                problems.append('workspace tile %s has no vector drawable' % name)
+        if 'nuts = "nuts".equals(tm)' not in theme or 'PRIMARY = nuts ? DesignTokens.EMERALD' not in theme:
+            problems.append('the nut skin does not map to the emerald design tokens')
+        if not os.path.isfile(tokens_src):
+            problems.append('DesignTokens.java is missing')
+        ok = bool(arts) and bool(tiles) and not problems
         report('هنر سه‌بعدی بخش‌های ایندکس', ok,
-               ('%d بخش ایندکس و %d آیکن فضای کاری؛ هر بخش تصویر سه‌بعدی دارد و هر مدال طلایی'
-                ' نسخهٔ زمردی دارد' % (len(arts), len(set(re.findall(r'R\.drawable\.(mi_\w+)', desk)))))
+               ('%d بخش ایندکس و %d آیکن فضای کاری؛ هر آیکن بردار دارد و پوستهٔ آجیل به '
+                'توکن‌های زمردی نگاشت می‌شود' % (len(arts), len(tiles)))
                if ok else '؛ '.join(problems))
     except Exception as e:
         report('هنر سه‌بعدی بخش‌های ایندکس', False, 'ممیزی ناموفق: %s' % e)
+
 
 
 def check_header_room():
@@ -911,36 +899,35 @@ def check_header_room():
 
     The mark sits at the start of the header row (the right in Persian). When the name
     column is measured with a weight it can become wider than the row, and a long shop
-    name then runs under the mark and loses its last letters. The column therefore has to
-    get a computed width, the label a maximum width, and the chips a share of that room.
+    name then runs under the mark and loses its last letters. The header therefore
+    computes the room that is left of the mark (headerTitleWidthDp), gives the column
+    exactly that width, bounds the name and the licence chip, and keeps the account
+    actions in the header menu instead of crowding the brand row.
     """
     src = os.path.join(ROOT, 'manager/app/src/main/java/ir/meelano/manager/MainActivity.java')
     try:
         code = open(src, encoding='utf-8').read()
         problems = []
-        if 'int nameRoomDp' not in code:
+        if 'titleExpandedWidthDp = headerTitleWidthDp(' not in code:
             problems.append('the header has no computed room for the name column')
-        add = re.search(r'brand\.addView\(titleCol,\s*([^)]*)\)', code)
-        if not add:
-            problems.append('the name column is not added to the brand row')
-        else:
-            params = add.group(1)
-            if 'wlp(' in params:
-                problems.append('the name column is weighted, so it can grow under the brand mark')
-            if 'nameRoomDp' not in params:
-                problems.append('the name column does not use the computed room')
+        if 'brandRow.addView(titleCol, new LinearLayout.LayoutParams(Theme.dp(titleExpandedWidthDp), -2));' not in code:
+            problems.append('the name column is not added to the brand row with the computed room')
+        if 'addView(titleCol, kit.wlp' in code:
+            problems.append('the name column is weighted, so it can grow under the brand mark')
         if 'companyName.setMaxWidth' not in code:
             problems.append('the company name has no maximum width')
-        if 'userChip.setMaxWidth' not in code or 'nameRoomDp' not in code:
-            problems.append('the account chip is not bounded by the room of the header')
         if 'licChip.setMaxWidth' not in code:
             problems.append('the licence chip has no maximum width')
+        if 'showHeaderMenu()' not in code or '"ابزارها، تنظیمات و حساب کاربری"' not in code:
+            problems.append('the account actions are not reachable from the header menu')
         ok = not problems
         report('جای نام و چیپ‌های سربرگ', ok,
-               'ستون نام با عرض محاسبه‌شده ساخته می‌شود؛ نام و چیپ‌های سربرگ زیر نشان برند نمی‌روند'
+               'ستون نام با عرض محاسبه‌شده ساخته می‌شود؛ نام و چیپ مجوز کران دارند و کنش‌های '
+               'حساب از منوی سربرگ در دسترس‌اند'
                if ok else '؛ '.join(problems))
     except Exception as e:
         report('جای نام و چیپ‌های سربرگ', False, 'ممیزی ناموفق: %s' % e)
+
 
 
 def check_visitor_art_agrees():

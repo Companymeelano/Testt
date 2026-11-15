@@ -95,7 +95,7 @@ public final class HomeSalesChart {
             return size * density * Theme.fontScale() * Theme.typeScale();
         }
 
-        private int chartAccent() { return Theme.PRIMARY; }
+        private int chartAccent() { return Theme.GOLD; }
 
         public void setData(List<SalesSnapshot.Day> values, double averageRials) {
             setData(values, averageRials, "۱۴ روزه");
@@ -241,9 +241,9 @@ public final class HomeSalesChart {
             }
             linePaint.setStrokeWidth(Theme.dp(2));
             linePaint.setShader(null);
-            linePaint.setColor(Theme.PRIMARY);
+            linePaint.setColor(Theme.GOLD);
             fillPaint.setShader(null);
-            fillPaint.setColor(Theme.alpha(Theme.PRIMARY, Theme.isLight() ? 20 : 28));
+            fillPaint.setColor(Theme.alpha(Theme.GOLD, Theme.isLight() ? 20 : 28));
             gridPaint.setColor(Theme.alpha(Theme.MUTED, Theme.isLight() ? 44 : 52));
             gridPaint.setStrokeWidth(Theme.dp(0.7f));
         }
@@ -345,19 +345,19 @@ public final class HomeSalesChart {
             if (n < 2 || spacing <= 0) return;
             float half = spacing * 0.43f;
             fillPaint.setShader(null);
-            fillPaint.setColor(Theme.alpha(Theme.PRIMARY, Theme.isLight() ? 12 : 20));
+            fillPaint.setColor(Theme.alpha(Theme.GOLD, Theme.isLight() ? 12 : 20));
             for (int i = 0; i < n; i++) {
                 if (!SalesComparison.isWeeklyHoliday(days.get(i).date)) continue;
                 float x = plotRight - spacing * i;
                 canvas.drawRect(Math.max(plotLeft, x - half), plotTop,
                         Math.min(plotRight, x + half), plotBottom, fillPaint);
             }
-            fillPaint.setColor(Theme.alpha(Theme.PRIMARY, Theme.isLight() ? 20 : 28));
+            fillPaint.setColor(Theme.alpha(Theme.GOLD, Theme.isLight() ? 20 : 28));
         }
 
         private void drawSinglePoint(Canvas canvas) {
             if (pointX.length == 0) return;
-            markerPaint.setColor(Theme.PRIMARY);
+            markerPaint.setColor(Theme.GOLD);
             canvas.drawCircle(pointX[0], pointY[0], Theme.dp(3), markerPaint);
         }
 
@@ -367,11 +367,11 @@ public final class HomeSalesChart {
             float todayX = plotLeft;
             float todayY = pointY[0];
             if (Jalali.todayStr().equals(days.get(latest).date)) {
-                markerPaint.setColor(Theme.alpha(Theme.PRIMARY, Theme.isLight() ? 26 : 38));
+                markerPaint.setColor(Theme.alpha(Theme.GOLD, Theme.isLight() ? 26 : 38));
                 canvas.drawCircle(todayX, todayY, Theme.dp(9.5f), markerPaint);
                 markerPaint.setStyle(Paint.Style.STROKE);
                 markerPaint.setStrokeWidth(Theme.dp(1.5f));
-                markerPaint.setColor(Theme.PRIMARY);
+                markerPaint.setColor(Theme.GOLD);
                 canvas.drawCircle(todayX, todayY, Theme.dp(5), markerPaint);
                 markerPaint.setStyle(Paint.Style.FILL);
                 markerPaint.setColor(chartAccent());
@@ -392,7 +392,7 @@ public final class HomeSalesChart {
                 canvas.drawCircle(x, y, Theme.dp(5), markerPaint);
                 markerPaint.setStyle(Paint.Style.STROKE);
                 markerPaint.setStrokeWidth(Theme.dp(2));
-                markerPaint.setColor(Theme.PRIMARY);
+                markerPaint.setColor(Theme.GOLD);
                 canvas.drawCircle(x, y, Theme.dp(5), markerPaint);
                 markerPaint.setStyle(Paint.Style.FILL);
             }
@@ -434,7 +434,7 @@ public final class HomeSalesChart {
             canvas.drawRoundRect(bubble, Theme.dp(12), Theme.dp(12), bubblePaint);
             bubblePaint.setStyle(Paint.Style.STROKE);
             bubblePaint.setStrokeWidth(Theme.dp(1));
-            bubblePaint.setColor(Theme.alpha(Theme.PRIMARY, Theme.isLight() ? 110 : 140));
+            bubblePaint.setColor(Theme.alpha(Theme.GOLD, Theme.isLight() ? 110 : 140));
             canvas.drawRoundRect(bubble, Theme.dp(12), Theme.dp(12), bubblePaint);
             bubblePaint.setStyle(Paint.Style.FILL);
             bubbleText.setColor(Theme.TEXT);

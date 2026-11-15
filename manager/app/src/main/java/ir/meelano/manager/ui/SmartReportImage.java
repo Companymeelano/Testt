@@ -71,7 +71,7 @@ public final class SmartReportImage {
         String brand = LicenseStore.brandName(context);
         canvas.drawText(HomeNumberFormatter.localizeText("گزارش هوشمند امروز"),
                 width - margin - 8, 116, heading);
-        heading.setColor(Theme.isLight() ? Theme.GOLD_DARK : Theme.GOLD);
+        heading.setColor(Theme.isLight() ? DesignTokens.GOLD_DARK : Theme.GOLD);
         heading.setTextSize(27f * Theme.fontScale());
         canvas.drawText(HomeNumberFormatter.localizeText(brand == null || brand.trim().isEmpty()
                         ? "میلانو" : brand.trim()), width - margin - 8, 163, heading);
@@ -85,7 +85,7 @@ public final class SmartReportImage {
             Drawable logo = context.getDrawable(Theme.logoRes());
             if (logo != null) {
                 logo = logo.mutate();
-                logo.setTint(Theme.isNuts() ? Theme.GOLD_DARK : Theme.PRIMARY);
+                logo.setTint(Theme.isNuts() ? DesignTokens.GOLD_DARK : Theme.GOLD);
                 logo.setBounds(margin + 20, 74, margin + 150, 204);
                 logo.draw(canvas);
             }

@@ -57,7 +57,7 @@ public final class HomeTrendChart {
         private float[] displayY = new float[0];
         private double plotLeft, plotRight, plotTop, plotBottom, spacing;
         private double axisMinimum, axisMaximum = 1d, axisStep = 1d, axisScale = 1d;
-        private int accent = Theme.SECTION_SALES;
+        private int accent = Theme.GOLD;
         private int selectedIndex = -1;
         private int touchSlop;
         private float downX, downY;

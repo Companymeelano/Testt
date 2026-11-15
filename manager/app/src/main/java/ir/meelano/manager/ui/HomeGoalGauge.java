@@ -12,7 +12,7 @@ public final class HomeGoalGauge extends View {
     private final Paint progressPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final RectF arc = new RectF();
     private float progress;
-    private int accent = Theme.SECTION_SALES;
+    private int accent = Theme.GOLD;
 
     public HomeGoalGauge(Context context) {
         super(context);
@@ -39,7 +39,7 @@ public final class HomeGoalGauge extends View {
         progressPaint.setStrokeWidth(stroke);
         trackPaint.setColor(Theme.isLight()
                 ? Theme.alpha(Theme.TEXT, 18) : Theme.alpha(Theme.TEXT, 28));
-        progressPaint.setColor(Theme.sectionText(accent));
+        progressPaint.setColor(DesignTokens.textSafeColor(accent, Theme.SURFACE, Theme.DARK));
         canvas.drawArc(arc, -90f, 360f, false, trackPaint);
         float sweep = progress >= 100f ? 360f : 360f * progress / 100f;
         if (sweep > 0f) canvas.drawArc(arc, -90f, sweep, false, progressPaint);

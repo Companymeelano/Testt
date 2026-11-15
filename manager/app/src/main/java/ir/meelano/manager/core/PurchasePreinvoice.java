@@ -2,7 +2,6 @@ package ir.meelano.manager.core;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 /**
  * موتور خالص «پیش‌فاکتور خرید» — بدون Android، بدون شبکه.
@@ -277,7 +276,11 @@ public final class PurchasePreinvoice {
         return s == null ? "" : s.replace('|', '/').replace(';', ',').replace('\n', ' ').replace('\r', ' ');
     }
 
-    static String num(double v) { return String.format(Locale.US, "%.2f", v); }
+    /** Store the full decimal representation instead of rounding quantities and rates to two places. */
+    static String num(double v) {
+        if (Double.isNaN(v) || Double.isInfinite(v)) return String.valueOf(v);
+        return java.math.BigDecimal.valueOf(v).stripTrailingZeros().toPlainString();
+    }
 
     static double dbl(String s) {
         try { return Double.parseDouble(s); } catch (RuntimeException e) { return 0; }

@@ -20,6 +20,22 @@ public class PurchasePreinvoiceEngineTest {
     }
 
     @Test
+    public void packingPreservesFractionalQuantitiesAndRates() {
+        PurchasePreinvoiceEngine.Draft d = draft(1.2345, 12345.6789, 9876.54321);
+        d.cashDiscPct = 2.125;
+        d.lines.get(0).taxPct = 9.875;
+        d.lines.get(0).discs.add(new PurchasePreinvoiceEngine.Disc(
+                PurchasePreinvoiceEngine.DiscType.ROW_PERCENT, 1.2345, 0, ""));
+        PurchasePreinvoiceEngine.Draft back = PurchasePreinvoiceEngine.unpack(PurchasePreinvoiceEngine.pack(d));
+        assertEquals(1.2345, back.lines.get(0).qty, 0d);
+        assertEquals(12345.6789, back.lines.get(0).price, 0d);
+        assertEquals(9876.54321, back.lines.get(0).refPrice, 0d);
+        assertEquals(9.875, back.lines.get(0).taxPct, 0d);
+        assertEquals(2.125, back.cashDiscPct, 0d);
+        assertEquals(1.2345, back.lines.get(0).discs.get(0).v1, 0d);
+    }
+
+    @Test
     public void tieredQuantityPicksWinningStep() {
         PurchasePreinvoiceEngine.Draft d = draft(60, 100_000, 0);
         d.lines.get(0).discs.add(new PurchasePreinvoiceEngine.Disc(

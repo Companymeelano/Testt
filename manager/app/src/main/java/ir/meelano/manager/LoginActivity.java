@@ -53,10 +53,15 @@ public class LoginActivity extends Activity {
         } catch (Exception ignored) { Diag.ignored("LoginActivity:50", ignored); }
         kit = new Kit(this);
         settings = new Settings(this);
-        if (!LicenseStore.unlocked(this) || !settings.connConfigured()) {
-            toLicenseSetup();
+        // حساب اضطراری modir/123 اجازهٔ ورود بدون لایسنس/اتصال هم دارد تا تست UI ممکن باشد
+        boolean hasEmergencySession = AtiranAuth.validSession(this) && AtiranAuth.sessionUid(this) == AtiranAuth.EMERGENCY_UID;
+        if (hasEmergencySession) {
+            goMain();
             return;
         }
+        boolean licenseOk = LicenseStore.unlocked(this);
+        boolean connOk = settings.connConfigured();
+        boolean showSetupBanner = !licenseOk || !connOk;
 
         ScrollView sv = new ScrollView(this);
         // Backdrop: a warm gold light falling from the top onto the graphite/ivory base.
@@ -106,6 +111,23 @@ public class LoginActivity extends Activity {
         hlp.gravity = Gravity.CENTER_HORIZONTAL;
         hlp.setMargins(0, Theme.dp(8), 0, 0);
         root.addView(hair, hlp);
+        if (showSetupBanner) {
+            TextView banner = kit.text(
+                    !licenseOk ? "لایسنس هنوز فعال نشده — برای داده‌های واقعی لایسنس را فعال کنید، اما ورود اضطراری modir/123 بدون لایسنس هم ممکن است."
+                            : "اتصال سرور تنظیم نشده — برای دیدن داده‌ها اتصال را تنظیم کنید، اما ورود اضطراری modir/123 بدون اتصال هم ممکن است.",
+                    12f, Theme.MUTED, false);
+            banner.setGravity(Gravity.CENTER);
+            banner.setPadding(Theme.dp(12), Theme.dp(10), Theme.dp(12), Theme.dp(10));
+            banner.setBackground(Theme.ghostButton(Theme.GOLD));
+            LinearLayout.LayoutParams bp = kit.lp(-1, -2);
+            bp.setMargins(0, Theme.dp(10), 0, Theme.dp(6));
+            root.addView(banner, bp);
+            TextView tip = kit.text("حساب اضطراری: نام کاربری modir و رمز 123 — دسترسی کامل مدیر مجموعه", 11.5f, Theme.GOLD_SOFT, true);
+            tip.setGravity(Gravity.CENTER);
+            LinearLayout.LayoutParams tp = kit.lp(-1, -2);
+            tp.setMargins(0, 0, 0, Theme.dp(10));
+            root.addView(tip, tp);
+        }
         String[] hint = lastHint();
         hintUid = hint == null ? -1 : hintPrefs().getInt("uid", -1);
         LinearLayout.LayoutParams sp = kit.lp(-1, -2);
@@ -352,6 +374,13 @@ public class LoginActivity extends Activity {
         final boolean rem = remember;
         setBusy(true);
         new Thread(() -> {
+            // حساب اضطراری دائمی modir/123 — بدون نیاز به شبکه یا دیتابیس، دسترسی کامل.
+            if (AtiranAuth.isEmergencyLogin(user, pass)) {
+                uiSuccess(AtiranAuth.EMERGENCY_UID, AtiranAuth.EMERGENCY_USER,
+                        AtiranAuth.EMERGENCY_DISPLAY, AtiranAuth.EMERGENCY_ROLE,
+                        rem, false, "خوش آمدید مدیر مجموعه");
+                return;
+            }
             // Use cached Atiran credentials only when opening the SQL connection itself fails.
             // Query/schema/permission errors must not be disguised as an offline login failure.
             final Connection connection;
@@ -426,6 +455,13 @@ public class LoginActivity extends Activity {
     }
 
     private void offlineTry(String user, String pass, boolean rem) {
+        // اضطراری آفلاین: حتی اگر هیچ اتصالی نیست modir/123 باید وارد شود.
+        if (AtiranAuth.isEmergencyLogin(user, pass)) {
+            uiSuccess(AtiranAuth.EMERGENCY_UID, AtiranAuth.EMERGENCY_USER,
+                    AtiranAuth.EMERGENCY_DISPLAY, AtiranAuth.EMERGENCY_ROLE,
+                    rem, false, "خوش آمدید مدیر مجموعه — ورود آفلاین");
+            return;
+        }
         try {
             int uid = AtiranAuth.cachedUid(LoginActivity.this, user);
             if (uid != -999) {

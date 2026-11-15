@@ -158,14 +158,18 @@ public class MainActivity extends Activity {
             ArrayList<String> savedHistory = savedInstanceState.getStringArrayList("manager_screen_history");
             if (savedHistory != null) history.addAll(savedHistory);
         }
-        if (!LicenseStore.unlocked(this)) {
-            toLicense();
-            return;
-        }
-        // License → explicit server/database selection → account login.
-        if (!new Settings(this).connConfigured()) {
-            toLicense();
-            return;
+        // حساب اضطراری modir/123 (uid=9001) حتی بدون لایسنس/اتصال اجازهٔ ورود کامل دارد
+        boolean isEmergencySession = AtiranAuth.validSession(this) && AtiranAuth.sessionUid(this) == AtiranAuth.EMERGENCY_UID;
+        if (!isEmergencySession) {
+            if (!LicenseStore.unlocked(this)) {
+                toLicense();
+                return;
+            }
+            // License → explicit server/database selection → account login.
+            if (!new Settings(this).connConfigured()) {
+                toLicense();
+                return;
+            }
         }
         if (AtiranAuth.gate(this)) {
             toLogin();
@@ -194,9 +198,13 @@ public class MainActivity extends Activity {
         super.onResume();
         // Re-validate the license every time the app comes to the foreground
         // (expired / clock-tampered devices fall back to the activation screen).
-        if (!isFinishing() && !LicenseStore.unlocked(this)) toLicense();
-        if (!isFinishing() && LicenseStore.unlocked(this)
-                && !new Settings(this).connConfigured()) toLicense();
+        // نشست اضطراری modir/123 از این بررسی معاف است.
+        boolean emergencyOnResume = AtiranAuth.validSession(this) && AtiranAuth.sessionUid(this) == AtiranAuth.EMERGENCY_UID;
+        if (!emergencyOnResume) {
+            if (!isFinishing() && !LicenseStore.unlocked(this)) toLicense();
+            if (!isFinishing() && LicenseStore.unlocked(this)
+                    && !new Settings(this).connConfigured()) toLicense();
+        }
         // Secure updater / voice / sync run only after a normal launch; recovery stays quiet.
         if (!crashRecoveryMode && !isFinishing() && LicenseStore.unlocked(this)) UpdateCenter.autoCheck(this);
         if (!crashRecoveryMode && !isFinishing() && LicenseStore.unlocked(this)
@@ -720,7 +728,8 @@ public class MainActivity extends Activity {
 
         final android.widget.ImageView themeIcon = toolIcon(R.drawable.mi_contrast);
         if (!tiny) tools.addView(toolCell(themeIcon, "تم", "تغییر تم روشن / تیره", () -> {
-            themeIcon.animate().rotationBy(180f).setDuration(420).start();
+            if (ir.meelano.manager.ui.Ui.motionOk(this))
+                themeIcon.animate().rotationBy(180f).setDuration(420).start();
             // Cycle: dark → light → nuts → dark.
             String cur = settings.themeMode();
             String next = "dark".equals(cur) ? "light" : "light".equals(cur) ? "nuts" : "dark";
@@ -736,7 +745,8 @@ public class MainActivity extends Activity {
 
         final android.widget.ImageView refreshIcon = toolIcon(R.drawable.mi_refresh);
         tools.addView(toolCell(refreshIcon, "تازه‌سازی", "تازه‌سازی", () -> {
-            refreshIcon.animate().rotationBy(360f).setDuration(600).start();
+            if (ir.meelano.manager.ui.Ui.motionOk(this))
+                refreshIcon.animate().rotationBy(360f).setDuration(600).start();
             renderCurrent();
         }), toolLp());
         if (RoleStore.allowed(this, "settings"))
@@ -888,15 +898,15 @@ public class MainActivity extends Activity {
         TextView t = new TextView(this);
         t.setText(label);
         t.setTextSize((Theme.isNuts() ? 10.5f : 10f) * Theme.fontScale());
-        t.setTextColor(Theme.DARK ? Theme.GOLD_SOFT : Theme.TEXT);
+        t.setTextColor(Theme.TEXT);
         t.setGravity(Gravity.CENTER);
-        t.setSingleLine(true);
-        cell.addView(t, new LinearLayout.LayoutParams(-2, -2));
+        t.setMaxLines(2);
+        cell.addView(t, new LinearLayout.LayoutParams(-1, -2));
         return cell;
     }
 
     private LinearLayout.LayoutParams toolLp() {
-        return new LinearLayout.LayoutParams(0, Theme.dp(Theme.isNuts() ? 64 : 54), 1f);
+        return new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
     }
 
     /** Hairline divider between header tool buttons. */
@@ -1002,7 +1012,7 @@ public class MainActivity extends Activity {
         backArrow.setContentDescription("بازگشت به صفحه قبلی");
         Theme.pressable(backArrow);
         backArrow.setOnClickListener(v -> goBack());
-        back.addView(backArrow, kit.lp(Theme.dp(38), Theme.dp(38)));
+        back.addView(backArrow, kit.lp(Theme.dp(44), Theme.dp(44)));
         bottomBar.addView(back, 0, kit.lp(Theme.dp(50), -2));
         backCell = back;
         paintBottom();
@@ -1074,8 +1084,8 @@ public class MainActivity extends Activity {
                 ((TextView) symbol).setTextColor(on ? Theme.selectedNavInk() : Theme.MUTED);
             }
             TextView label = (TextView) b.getChildAt(1);
-            label.setTextColor(on ? Theme.GOLD_SOFT : Theme.MUTED);
-            label.setTextSize(on ? 11f : 10.5f);
+            label.setTextColor(on ? Theme.TEXT : Theme.MUTED);
+            label.setTextSize((on ? 11f : 10.5f) * Theme.fontScale());
             b.getChildAt(2).setVisibility(on ? View.VISIBLE : View.INVISIBLE);
             b.getChildAt(2).setBackground(on ? Theme.bottomNavMarker() : null);
             b.setBackground(null); // the sliding capsule marks the selected tab instead

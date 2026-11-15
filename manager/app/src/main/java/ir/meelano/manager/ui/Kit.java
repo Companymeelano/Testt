@@ -146,9 +146,16 @@ public final class Kit {
     }
 
     public void addCard(LinearLayout parent, View card) {
+        if (card != null && card.getParent() instanceof LinearLayout) {
+            try { ((LinearLayout) card.getParent()).removeView(card); } catch (Exception ignored) { }
+        }
         LinearLayout.LayoutParams p = lp(-1, -2);
         p.setMargins(0, 0, 0, Theme.dp(12));
-        parent.addView(card, p);
+        try {
+            parent.addView(card, p);
+        } catch (IllegalStateException e) {
+            android.util.Log.w("MEELANO", "addCard: view already has parent", e);
+        }
     }
 
     // ---------------- hero & sections ----------------
@@ -258,6 +265,13 @@ public final class Kit {
     }
 
     // ---------------- KPI ----------------
+    static String compactDashboardDelta(String detail) {
+        if (detail == null) return "";
+        String compact = detail.trim();
+        int basis = compact.indexOf('·');
+        return basis >= 0 ? compact.substring(0, basis).trim() : compact;
+    }
+
     public static final class Kpi {
         public final String label;
         public final String value;
@@ -341,9 +355,9 @@ public final class Kit {
             sp.setMargins(0, Theme.dp(4), 0, Theme.dp(2));
             t.addView(new Sparkline(a, k.spark, k.accent), sp);
         }
-        if (!Double.isNaN(k.countTo)) {
+        if (!Double.isNaN(k.countTo) && Ui.motionOk(a)) {
             ValueAnimator va = ValueAnimator.ofFloat(0f, 1f);
-            va.setDuration(900);
+            va.setDuration(650);
             va.setInterpolator(new android.view.animation.DecelerateInterpolator());
             va.addUpdateListener(an -> v.setText(Money.fa(Money.compact(k.countTo * (float) an.getAnimatedValue()))));
             va.addListener(new android.animation.AnimatorListenerAdapter() {
@@ -367,7 +381,7 @@ public final class Kit {
         s.setSingleLine(true);
         s.setEllipsize(TextUtils.TruncateAt.END);
         t.addView(s, lp(-1, -2));
-        TextView more = text(k.action != null ? "مشاهده جزئیات ›" : " ", 9.5f, Theme.MUTED, true);
+        TextView more = text(k.action != null ? "نمایش" : " ", 10.5f, Theme.TEXT, true);
         more.setGravity(Gravity.CENTER_HORIZONTAL);
         more.setSingleLine(true);
         t.addView(more, lp(-1, -2));
@@ -682,11 +696,67 @@ public final class Kit {
         return b;
     }
 
+    /** Secondary action with an untinted, theme-specific layered illustration. */
+    public Button btnIllustrated(String text, String action, View.OnClickListener onClick) {
+        Button button = btnGhost(text, Theme.TEXT, onClick);
+        int res;
+        if ("analytics".equals(action)) {
+            res = Theme.isLight() ? R.drawable.lux_action_analytics_light : R.drawable.lux_action_analytics_dark;
+        } else if ("sales".equals(action)) {
+            res = Theme.isLight() ? R.drawable.lux_action_sales_light : R.drawable.lux_action_sales_dark;
+        } else if ("purchase".equals(action)) {
+            res = Theme.isLight() ? R.drawable.lux_action_purchase_light : R.drawable.lux_action_purchase_dark;
+        } else if ("production".equals(action)) {
+            res = Theme.isLight() ? R.drawable.lux_action_production_light : R.drawable.lux_action_production_dark;
+        } else {
+            return button;
+        }
+        android.graphics.drawable.Drawable icon = a.getDrawable(res);
+        if (icon != null) {
+            icon = icon.mutate();
+            icon.setBounds(0, 0, Theme.dp(24), Theme.dp(24));
+            button.setCompoundDrawableTintList(null);
+            button.setCompoundDrawablesRelative(icon, null, null, null);
+            button.setCompoundDrawablePadding(Theme.dp(6));
+        }
+        return button;
+    }
+
+    /** Theme-specific, layered vector for the icon-only search controls. */
+    public void searchActionIcon(Button button, String action, String description) {
+        int res;
+        if ("voice".equals(action)) {
+            res = Theme.isLight() ? R.drawable.lux_action_voice_light : R.drawable.lux_action_voice_dark;
+        } else if ("scan".equals(action)) {
+            res = Theme.isLight() ? R.drawable.lux_action_scan_light : R.drawable.lux_action_scan_dark;
+        } else if ("search".equals(action)) {
+            res = Theme.isLight() ? R.drawable.lux_action_search_primary_light : R.drawable.lux_action_search_primary_dark;
+        } else {
+            return;
+        }
+        android.graphics.drawable.Drawable icon = a.getDrawable(res);
+        if (icon == null) return;
+        icon = icon.mutate();
+        icon.setBounds(0, 0, Theme.dp(26), Theme.dp(26));
+        button.setText("");
+        button.setCompoundDrawableTintList(null);
+        button.setCompoundDrawables(icon, null, null, null);
+        button.setCompoundDrawablePadding(0);
+        button.setContentDescription(description);
+        button.setPadding(Theme.dp(8), Theme.dp(8), Theme.dp(8), Theme.dp(8));
+        button.setMinWidth(Theme.dp(48));
+        button.setMinimumWidth(Theme.dp(48));
+        button.setGravity(Gravity.CENTER);
+    }
+
     public TextView chip(String t, boolean selected, int accent, View.OnClickListener onClick) {
         TextView c = text(t, 11.5f, selected ? Theme.onAccent(accent) : accent, true);
         c.setBackground(Theme.chip(selected, selected ? accent : Theme.alpha(accent, 255)));
         c.setPadding(Theme.dp(14), Theme.dp(8), Theme.dp(14), Theme.dp(8));
         c.setSingleLine(true);
+        c.setGravity(Gravity.CENTER);
+        c.setMinHeight(Theme.dp(44));
+        c.setSelected(selected);
         Theme.pressable(c);
         c.setOnClickListener(onClick);
         return c;
@@ -786,12 +856,14 @@ public final class Kit {
                 });
             } catch (Exception ignored) { Diag.ignored("Kit:579", ignored); }
         });
+        searchActionIcon(mic, "voice", "جست‌وجوی صوتی");
         r.addView(mic, new LinearLayout.LayoutParams(Theme.dp(52), Theme.dp(50)));
         r.addView(space(8));
         Button go = btnGold("⌕", v -> {
             hideKeyboard(e);
             l.onGo(e.getText().toString());
         });
+        searchActionIcon(go, "search", "اجرای جست‌وجو");
         r.addView(go, new LinearLayout.LayoutParams(Theme.dp(52), Theme.dp(50)));
         e.setOnEditorActionListener((v, actionId, event) -> {
             if (actionId == EditorInfo.IME_ACTION_SEARCH) {
@@ -817,8 +889,14 @@ public final class Kit {
         r.setGravity(Gravity.CENTER_VERTICAL);
         r.setBackground(active ? Theme.cardAccent(Theme.GOLD) : Theme.card());
         r.setPadding(Theme.dp(12), Theme.dp(9), Theme.dp(12), Theme.dp(9));
-        TextView ic = text("◈", 17, active ? Theme.GOLD : Theme.MUTED, true);
-        r.addView(ic, lp(-2, -2));
+        r.setMinimumHeight(Theme.dp(48));
+        r.setContentDescription("فیلترها" + (active ? "، فعال" : "") + "، "
+                + (summary == null || summary.isEmpty() ? "همه" : summary));
+        ImageView ic = new ImageView(a);
+        ic.setImageResource(Theme.isLight() ? R.drawable.lux_action_filter_light : R.drawable.lux_action_filter_dark);
+        ic.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        ic.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        r.addView(ic, lp(Theme.dp(26), Theme.dp(26)));
         r.addView(space(8));
         LinearLayout copy = v();
         copy.addView(text("فیلترها" + (active ? " • فعال" : ""), 10f, active ? Theme.GOLD_SOFT : Theme.MUTED, true), lp(-1, -2));
@@ -851,9 +929,8 @@ public final class Kit {
     }
 
     /**
-     * Loading state: a skeleton that matches the real cards (title line, two text lines
-     * and a figure block) with a slow pulse, plus the status text. Replaces the spinner
-     * so the layout does not jump when content arrives.
+     * Loading state: a quiet skeleton matching the real cards, plus the status text.
+     * Static placeholders avoid repeated animation while data is loading.
      */
     public View loading(String msg) {
         LinearLayout c = card();
@@ -872,14 +949,10 @@ public final class Kit {
                 line.addView(new View(a), new LinearLayout.LayoutParams(0, 1, 1f - widths[i]));
                 c.addView(line, lp(-1, -2));
             } else {
-                c.addView(bar, p);
+                LinearLayout.LayoutParams full = lp(-1, Theme.dp(heights[i]));
+                full.setMargins(0, Theme.dp(8), 0, 0);
+                c.addView(bar, full);
             }
-            android.animation.ObjectAnimator pulse = android.animation.ObjectAnimator.ofFloat(bar, View.ALPHA, 0.35f, 1f);
-            pulse.setDuration(900);
-            pulse.setStartDelay(i * 140L);
-            pulse.setRepeatMode(ValueAnimator.REVERSE);
-            pulse.setRepeatCount(ValueAnimator.INFINITE);
-            pulse.start();
         }
         return c;
     }
@@ -899,7 +972,22 @@ public final class Kit {
         if (body != null && !body.isEmpty()) {
             TextView b = text(body, 11.5f, Theme.MUTED, false);
             b.setGravity(Gravity.CENTER);
+            b.setMaxLines(1);
+            b.setEllipsize(TextUtils.TruncateAt.END);
             c.addView(b, lp(-1, -2));
+        }
+        return c;
+    }
+
+    /** Empty state with an optional action, preserving the single-line description. */
+    public View emptyWithAction(String title, String body, String actionLabel, View.OnClickListener action) {
+        LinearLayout c = (LinearLayout) empty(title, body);
+        if (action != null) {
+            Button button = btnGold("نمایش", action);
+            LinearLayout.LayoutParams p = lp(-2, -2);
+            p.topMargin = Theme.dp(12);
+            p.gravity = Gravity.CENTER_HORIZONTAL;
+            c.addView(button, p);
         }
         return c;
     }
@@ -1404,15 +1492,12 @@ public final class Kit {
         return invRowTone(name, code, extra, qty, price, null, 0, onClick);
     }
 
-    /** Neon status chip (موجود / کم‌موجود / ناموجود) in the given tone. */
+    /** Compact status label; colour supplements the text rather than adding a glow. */
     public TextView stockChip(String label, int tone) {
         TextView t = text(label, 10f, tone, true);
         t.setSingleLine(true);
         t.setPadding(Theme.dp(8), Theme.dp(2), Theme.dp(8), Theme.dp(2));
         t.setBackground(Theme.pill(tone));
-        try {
-            t.setShadowLayer(Theme.dp(4), 0, 0, Theme.alpha(tone, 150));
-        } catch (Exception ignored) { Diag.ignored("Kit:chipGlow", ignored); }
         return t;
     }
 
@@ -1450,6 +1535,7 @@ public final class Kit {
             copy.addView(s, lp(-1, -2));
         }
         head.addView(copy, wlp(1f));
+        head.addView(space(8));
         LinearLayout side = v();
         side.setGravity(Gravity.END);
         if (status != null && !status.isEmpty() && tone != 0) {
@@ -1462,6 +1548,7 @@ public final class Kit {
         c.addView(head, lp(-1, -2));
         StringBuilder spoken = new StringBuilder(name == null ? "" : name);
         if (code != null && !code.isEmpty()) spoken.append(". ").append(code);
+        if (extra != null && !extra.isEmpty()) spoken.append(". ").append(extra);
         if (qty != null && !qty.isEmpty()) spoken.append(". ").append(qty);
         if (price != null && !price.isEmpty()) spoken.append(". ").append(price);
         if (status != null && !status.isEmpty()) spoken.append(". ").append(status);

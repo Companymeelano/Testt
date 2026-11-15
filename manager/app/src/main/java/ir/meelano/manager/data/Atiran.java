@@ -1,6 +1,7 @@
 package ir.meelano.manager.data;
 
 import ir.meelano.manager.core.Diag;
+import ir.meelano.manager.core.LegacySql;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.sql.Connection;
@@ -61,20 +62,26 @@ public final class Atiran {
             throw new Exception(diagnose(e));
         }
         try {
-            return validated(DriverManager.getConnection(url, p));
+            return compat(validated(DriverManager.getConnection(url, p)), host, port);
         } catch (Exception first) {
-            // A wrong password will not succeed on retry; do not hammer the login.
             String fm = String.valueOf(first.getMessage()).toLowerCase(java.util.Locale.US);
             if (!retry || fm.contains("login failed") || fm.contains("logon failed")) {
                 throw new Exception(diagnose(first));
             }
             Thread.sleep(700);
             try {
-                return validated(DriverManager.getConnection(url, p));
+                return compat(validated(DriverManager.getConnection(url, p)), host, port);
             } catch (Exception second) {
                 throw new Exception(diagnose(second));
             }
         }
+    }
+
+    /** SQL Server 2008 R2 cannot parse TRY_CONVERT; force legacy rewrite always. */
+    private static Connection compat(Connection raw, String host, int port) throws Exception {
+        Connection checked = validated(raw);
+        // Force legacy dialect — field servers are 2008 R2, and modern servers still run legacy SQL fine.
+        return LegacySql.wrap(checked, true, true);
     }
 
     private static Connection validated(Connection c) throws Exception {

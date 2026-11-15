@@ -205,15 +205,25 @@ public final class Settings {
         } catch (Exception ignored) { Diag.ignored("Settings:127", ignored); }
     }
 
-    /** Smart-link mode: "auto" (default), "lan" or "wan". */
-    public String linkMode() {
-        String m = p.getString("link_mode", "auto");
-        if ("lan".equals(m) || "wan".equals(m)) return m;
+    /** A pinned route without a configured endpoint cannot be used. */
+    public static String normalizeLinkMode(String mode, boolean hasLan, boolean hasWan) {
+        if ("lan".equals(mode)) return hasLan ? "lan" : "auto";
+        if ("wan".equals(mode)) return hasWan ? "wan" : "auto";
         return "auto";
     }
 
+    /** Smart-link mode: "auto" (default), "lan" or "wan". */
+    public String linkMode() {
+        String stored = p.getString("link_mode", "auto");
+        String normalized = normalizeLinkMode(stored, !lan().isEmpty(), !wan().isEmpty());
+        if (!normalized.equals(stored)) p.edit().putString("link_mode", normalized).apply();
+        return normalized;
+    }
+
     public void setLinkMode(String mode) {
-        p.edit().putString("link_mode", "lan".equals(mode) || "wan".equals(mode) ? mode : "auto").apply();
+        if (lan().isEmpty() && wan().isEmpty() && !host().isEmpty()) migrateLegacyHost();
+        String normalized = normalizeLinkMode(mode, !lan().isEmpty(), !wan().isEmpty());
+        p.edit().putString("link_mode", normalized).apply();
     }
 
     /** Profile that worked last ("lan" / "wan" / ""). */

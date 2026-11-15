@@ -73,10 +73,16 @@ public class MoreScreen extends Screen {
             for (int i = 0; i < SEG_LABELS.length; i++) {
                 final int idx = i;
                 boolean on = seg == i;
-                segRow.addView(a.kit.chip(SEG_LABELS[i], on, Theme.GOLD, v -> {
+                TextView segment = a.kit.chip(SEG_LABELS[i], on, Theme.GOLD, v -> {
                     seg = idx;
                     render(contentRef);
-                }), a.kit.wlp(1f));
+                });
+                segment.setGravity(Gravity.CENTER);
+                segment.setMinHeight(Theme.dp(48));
+                segment.setSelected(on);
+                segment.setContentDescription(SEG_LABELS[i] + (on ? "، انتخاب‌شده" : ""));
+                if (i > 0) segRow.addView(a.kit.space(8));
+                segRow.addView(segment, a.kit.wlp(1f));
             }
             content.addView(segRow, a.kit.lp(-1, -2));
             content.addView(a.kit.gap(10));
@@ -113,7 +119,7 @@ public class MoreScreen extends Screen {
         c.addView(a.kit.btnGold("▤ همهٔ گزارش‌ها", v -> a.nav("reports")), a.kit.lp(-1, -2));
         if (ProductionScreen.managerAllowed(a)) {
             c.addView(a.kit.gap(8));
-            c.addView(a.kit.btnGold("⚙ تولید محصول", v -> a.nav("production")), a.kit.lp(-1, -2));
+            c.addView(a.kit.btnIllustrated("تولید محصول", "production", v -> a.nav("production")), a.kit.lp(-1, -2));
         }
     }
 
@@ -121,6 +127,8 @@ public class MoreScreen extends Screen {
     private View groupTile(final String[] group) {
         int accent = groupColor(group[0]);
         LinearLayout tile = a.kit.card(accent);
+        // Categories are navigation, not status: use the same surface in every theme.
+        tile.setBackground(Theme.card());
         // A row: badge on the start side, the label beside it. (The card is vertical by default.)
         tile.setOrientation(LinearLayout.HORIZONTAL);
         tile.setGravity(Gravity.CENTER_VERTICAL);
@@ -233,6 +241,7 @@ public class MoreScreen extends Screen {
         final boolean searching = !q.isEmpty();
         final boolean open = searching || group.id.equals(expandedGroup);
         LinearLayout panel = a.kit.card(accent);
+        panel.setBackground(Theme.card());
         LinearLayout header = a.kit.h();
         header.setGravity(Gravity.CENTER_VERTICAL);
         header.setMinimumHeight(Theme.dp(56));
@@ -259,9 +268,12 @@ public class MoreScreen extends Screen {
                 a.kit.lp(-2, -2));
         header.addView(a.kit.space(6));
         ImageView toggle = new ImageView(a);
-        toggle.setImageResource(open ? ir.meelano.manager.R.drawable.mi_remove
-                : ir.meelano.manager.R.drawable.mi_add);
-        toggle.setColorFilter(accent);
+        toggle.setImageResource(open
+                ? (Theme.isLight() ? ir.meelano.manager.R.drawable.lux_action_collapse_light
+                                   : ir.meelano.manager.R.drawable.lux_action_collapse_dark)
+                : (Theme.isLight() ? ir.meelano.manager.R.drawable.lux_action_expand_light
+                                   : ir.meelano.manager.R.drawable.lux_action_expand_dark));
+        toggle.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         toggle.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         header.addView(toggle, new LinearLayout.LayoutParams(Theme.dp(32), Theme.dp(40)));
         Theme.pressable(header);
@@ -324,6 +336,7 @@ public class MoreScreen extends Screen {
             art = artRes(entry.art);
         }
         LinearLayout tile = a.kit.card(accent);
+        tile.setBackground(Theme.card());
         tile.setGravity(Gravity.CENTER);
         tile.setMinimumHeight(Theme.dp(122));
         tile.setPadding(Theme.dp(10), Theme.dp(12), Theme.dp(10), Theme.dp(10));

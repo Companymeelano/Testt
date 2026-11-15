@@ -207,11 +207,11 @@ public class ProductsScreen extends Screen {
         row.addView(a.kit.space(6));
 
         Button search = a.kit.btn("⌕", v -> applyProductSearch(input, content));
-        search.setContentDescription("اجرای جست‌وجوی کالا");
+        a.kit.searchActionIcon(search, "search", "اجرای جست‌وجوی کالا");
         row.addView(search, a.kit.lp(-2, -2));
         row.addView(a.kit.space(6));
 
-        Button scan = a.kit.btnGhost("▦", Theme.VIOLET, v -> {
+        Button scan = a.kit.btnGhost("▦", Theme.TEXT, v -> {
             a.kit.hideKeyboard(input);
             a.startScan(code -> {
                 if (code == null || !id().equals(a.currentScreenId())) return;
@@ -221,7 +221,7 @@ public class ProductsScreen extends Screen {
                 render(content);
             });
         });
-        scan.setContentDescription("اسکن بارکد کالا");
+        a.kit.searchActionIcon(scan, "scan", "اسکن بارکد کالا");
         row.addView(scan, a.kit.lp(-2, -2));
 
         input.addTextChangedListener(new TextWatcher() {
@@ -403,11 +403,11 @@ public class ProductsScreen extends Screen {
         boolean reorderKnown = s.i("reorderKnown") != 0;
         List<Kit.Kpi> kpis = new ArrayList<>();
         kpis.add(new Kit.Kpi(activeKnown ? "کالای فعال" : "اقلام",
-                Money.num(activeKnown ? s.l("active") : s.l("count")), "نمایش فهرست",
+                Money.num(activeKnown ? s.l("active") : s.l("count")), "",
                 accent(), activeKnown ? () -> showListStatus(content, "active") : null));
         if (activeKnown) {
             long inactive = Math.max(0, s.l("count") - s.l("active"));
-            kpis.add(new Kit.Kpi("کالای غیرفعال", Money.num(inactive), "نمایش فهرست",
+            kpis.add(new Kit.Kpi("کالای غیرفعال", Money.num(inactive), "",
                     Theme.MUTED, () -> showListStatus(content, "inactive")));
         }
         Kit.Kpi stockValue = new Kit.Kpi("ارزش موجودی", Money.compactRial(s.d("value")), "به قیمت خرید", Theme.GOLD);
@@ -509,7 +509,7 @@ public class ProductsScreen extends Screen {
                 price = r.d("sale") < 0 ? "قیمت فروش نامعتبر" : "قیمت فروش ثبت نشده";
             else price = Money.rialText(r.d("sale"));
             int priceTone = r.has("sale") && r.d("sale") < 0 ? Theme.DANGER
-                    : priceWarning ? Theme.WARNING : Theme.GOLD_SOFT;
+                    : priceWarning ? Theme.WARNING : Theme.TEXT;
 
             View v = a.kit.invRowTone(name, "کد کالا " + Money.ltrIsolate(Money.fa(code)), extra, stock,
                     price, status, tone, priceTone, true, v2 -> openProduct(shka));

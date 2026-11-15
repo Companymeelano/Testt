@@ -23,6 +23,12 @@ import ir.meelano.manager.data.Settings;
 public final class Theme {
     private Theme() { }
 
+    /** Round optional layout gaps to the shared four-dp rhythm. */
+    public static int snapSpacingDp(int requestedDp) {
+        if (requestedDp <= 0) return 0;
+        return Math.max(4, Math.round(requestedDp / 4f) * 4);
+    }
+
     // ---------------- dynamic palette (set by apply) ----------------
     public static int BG = 0xFF0C1220;
     public static int SURFACE = 0xFF151D31;

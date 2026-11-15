@@ -265,6 +265,13 @@ public final class Kit {
     }
 
     // ---------------- KPI ----------------
+    static String compactDashboardDelta(String detail) {
+        if (detail == null) return "";
+        String compact = detail.trim();
+        int basis = compact.indexOf('·');
+        return basis >= 0 ? compact.substring(0, basis).trim() : compact;
+    }
+
     public static final class Kpi {
         public final String label;
         public final String value;

@@ -16,6 +16,21 @@ public final class PreinvoiceExport {
 
     private PreinvoiceExport() { }
 
+    /** Preserve fractional quantities in exported documents without rounding to an integer. */
+    private static String quantity(double value) {
+        if (Double.isNaN(value) || Double.isInfinite(value)) return String.valueOf(value);
+        return java.math.BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
+    }
+
+    /** Format the stored timestamp as the corresponding local Jalali calendar date. */
+    public static String dateText(long timestamp) {
+        java.util.Calendar c = java.util.Calendar.getInstance();
+        c.setTimeInMillis(timestamp);
+        int day = Jalali.gregorianDay(c.get(java.util.Calendar.YEAR),
+                c.get(java.util.Calendar.MONTH) + 1, c.get(java.util.Calendar.DAY_OF_MONTH));
+        return Jalali.dispFa(Jalali.format(day));
+    }
+
     public static ReportCatalog.Col[] cols() {
         return new ReportCatalog.Col[]{
                 new ReportCatalog.Col("code", "کد کالا", ReportCatalog.T_TEXT),
@@ -48,7 +63,7 @@ public final class PreinvoiceExport {
     }
 
     public static String subtitle(PurchasePreinvoice.Draft d, PurchasePreinvoice.Totals t) {
-        return "سند " + (d.docNo.isEmpty() ? "—" : d.docNo) + " • " + Jalali.dispFa(String.valueOf(d.dateTs))
+        return "سند " + (d.docNo.isEmpty() ? "—" : d.docNo) + " • " + dateText(d.dateTs)
                 + " • فروشنده: " + (d.supplierName.isEmpty() ? "—" : d.supplierName)
                 + " • جمع کل " + Money.fa(String.valueOf(Math.round(t.grand)))
                 + " • قابل پرداخت " + Money.fa(String.valueOf(Math.round(t.payable))) + " ریال"
@@ -60,10 +75,10 @@ public final class PreinvoiceExport {
         sb.append("پیش‌فاکتور خرید ").append(d.docNo).append('\n');
         sb.append("فروشنده: ").append(d.supplierName).append(" کد ").append(d.supplierCode).append('\n');
         sb.append("خریدار: ").append(d.buyerName).append(" کد ").append(d.buyerCode).append('\n');
-        sb.append("تاریخ: ").append(Jalali.dispFa(String.valueOf(d.dateTs)))
+        sb.append("تاریخ: ").append(dateText(d.dateTs))
           .append(" • سررسید: ").append(d.dueDays).append(" روز\n");
         for (PurchasePreinvoice.Line l : d.lines) {
-            sb.append("• ").append(l.name).append(" — ").append(Money.fa(String.valueOf((long) l.qty)))
+            sb.append("• ").append(l.name).append(" — ").append(Money.fa(quantity(l.qty)))
               .append(' ').append(l.unit).append(" × ").append(Money.fa(String.valueOf(Math.round(l.price))))
               .append(" = ").append(Money.fa(String.valueOf(Math.round(l.total)))).append(" ریال");
             if (l.diffAmt != 0) sb.append(" (اختلاف ").append(Money.fa(String.valueOf(Math.round(l.diffAmt))))
@@ -84,7 +99,7 @@ public final class PreinvoiceExport {
         sb.append("کد کالا;نام کالا;واحد;تعداد;قیمت واحد;تخفیف ردیف;تخفیف کل;مالیات;عوارض;جمع قلم;اختلاف با مرجع\n");
         for (PurchasePreinvoice.Line l : d.lines) {
             sb.append(l.code).append(';').append(l.name).append(';').append(l.unit).append(';')
-              .append((long) l.qty).append(';').append(Math.round(l.price)).append(';')
+              .append(quantity(l.qty)).append(';').append(Math.round(l.price)).append(';')
               .append(Math.round(l.rowDisc)).append(';').append(Math.round(l.invDisc)).append(';')
               .append(Math.round(l.taxAmt)).append(';').append(Math.round(l.dutyAmt)).append(';')
               .append(Math.round(l.total)).append(';').append(Math.round(l.diffAmt)).append('\n');
@@ -110,7 +125,7 @@ public final class PreinvoiceExport {
           .append("<th>تخفیف ردیف</th><th>تخفیف کل</th><th>مالیات</th><th>عوارض</th><th>جمع قلم</th><th>اختلاف</th></tr>");
         for (PurchasePreinvoice.Line l : d.lines) {
             sb.append("<tr><td>").append(esc(l.code)).append("</td><td>").append(esc(l.name))
-              .append("</td><td>").append(esc(l.unit)).append("</td><td>").append((long) l.qty)
+              .append("</td><td>").append(esc(l.unit)).append("</td><td>").append(quantity(l.qty))
               .append("</td><td>").append(Math.round(l.price)).append("</td><td>").append(Math.round(l.rowDisc))
               .append("</td><td>").append(Math.round(l.invDisc)).append("</td><td>").append(Math.round(l.taxAmt))
               .append("</td><td>").append(Math.round(l.dutyAmt)).append("</td><td>").append(Math.round(l.total))
@@ -128,7 +143,7 @@ public final class PreinvoiceExport {
                 + "<p>فروشنده: " + esc(d.supplierName) + " • کد ملی: " + esc(d.supplierNatId)
                 + " • تلفن: " + esc(d.supplierPhone) + "<br>نشانی: " + esc(d.supplierAddress) + "</p>"
                 + "<p>خریدار: " + esc(d.buyerName) + " • کد: " + esc(d.buyerCode)
-                + " • تاریخ: " + Jalali.dispFa(String.valueOf(d.dateTs))
+                + " • تاریخ: " + dateText(d.dateTs)
                 + " • سررسید: " + d.dueDays + " روز • یادداشت: " + esc(d.note) + "</p>"
                 + tableHtml(d, t) + "</body></html>";
         return html.getBytes(Charset.forName("UTF-8"));
@@ -145,7 +160,7 @@ public final class PreinvoiceExport {
           .append("</Data></Cell></Row>\n");
         sb.append("<Row><Cell><Data ss:Type=\"String\">فروشنده: ").append(esc(d.supplierName))
           .append(" • خریدار: ").append(esc(d.buyerName))
-          .append(" • تاریخ: ").append(Jalali.dispFa(String.valueOf(d.dateTs)))
+          .append(" • تاریخ: ").append(dateText(d.dateTs))
           .append("</Data></Cell></Row>\n");
         String[] head = {"کد کالا", "نام کالا", "واحد", "تعداد", "قیمت واحد", "تخفیف ردیف",
                 "تخفیف کل", "مالیات", "عوارض", "جمع قلم", "اختلاف"};

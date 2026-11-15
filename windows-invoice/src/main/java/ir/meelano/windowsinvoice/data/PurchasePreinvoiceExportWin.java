@@ -9,8 +9,18 @@ public final class PurchasePreinvoiceExportWin {
     private PurchasePreinvoiceExportWin() { }
 
     public static String faNum(long v) {
+        return faDigits(String.valueOf(v));
+    }
+
+    private static String quantity(double value) {
+        if (Double.isNaN(value) || Double.isInfinite(value)) return String.valueOf(value);
+        return java.math.BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
+    }
+
+    private static String faDigits(String value) {
         StringBuilder sb = new StringBuilder();
-        for (char c : String.valueOf(v).toCharArray()) sb.append((char) ('۰' + (c - '0')));
+        for (char c : value.toCharArray())
+            sb.append(c >= '0' && c <= '9' ? (char) ('۰' + (c - '0')) : c);
         return sb.toString();
     }
 
@@ -21,7 +31,7 @@ public final class PurchasePreinvoiceExportWin {
         sb.append("خریدار: ").append(d.buyerName).append(" کد ").append(d.buyerCode).append('\n');
         sb.append("سررسید: ").append(faNum(d.dueDays)).append(" روز\n");
         for (PurchasePreinvoiceEngine.Line l : d.lines) {
-            sb.append("• ").append(l.name).append(" — ").append(faNum(Math.round(l.qty))).append(' ').append(l.unit)
+            sb.append("• ").append(l.name).append(" — ").append(faDigits(quantity(l.qty))).append(' ').append(l.unit)
               .append(" × ").append(faNum(Math.round(l.price))).append(" = ").append(faNum(Math.round(l.total)))
               .append(" ریال");
             if (l.refPrice > 0) sb.append(" (اختلاف ").append(faNum(Math.round(l.diffAmt))).append(" ریال)");
@@ -40,7 +50,7 @@ public final class PurchasePreinvoiceExportWin {
         sb.append("کد کالا;نام کالا;واحد;تعداد;قیمت واحد;تخفیف ردیف;تخفیف کل;مالیات;عوارض;جمع قلم;اختلاف با مرجع\n");
         for (PurchasePreinvoiceEngine.Line l : d.lines) {
             sb.append(l.code).append(';').append(l.name).append(';').append(l.unit).append(';')
-              .append(Math.round(l.qty)).append(';').append(Math.round(l.price)).append(';')
+              .append(quantity(l.qty)).append(';').append(Math.round(l.price)).append(';')
               .append(Math.round(l.rowDisc)).append(';').append(Math.round(l.invDisc)).append(';')
               .append(Math.round(l.taxAmt)).append(';').append(Math.round(l.dutyAmt)).append(';')
               .append(Math.round(l.total)).append(';').append(Math.round(l.diffAmt)).append('\n');
@@ -64,7 +74,7 @@ public final class PurchasePreinvoiceExportWin {
         sb.append("<tr><th>کد کالا</th><th>نام کالا</th><th>واحد</th><th>تعداد</th><th>قیمت واحد</th><th>تخفیف ردیف</th><th>تخفیف کل</th><th>مالیات</th><th>عوارض</th><th>جمع قلم</th><th>اختلاف</th></tr>");
         for (PurchasePreinvoiceEngine.Line l : d.lines) {
             sb.append("<tr><td>").append(esc(l.code)).append("</td><td>").append(esc(l.name)).append("</td><td>")
-              .append(esc(l.unit)).append("</td><td>").append(Math.round(l.qty)).append("</td><td>")
+              .append(esc(l.unit)).append("</td><td>").append(quantity(l.qty)).append("</td><td>")
               .append(Math.round(l.price)).append("</td><td>").append(Math.round(l.rowDisc)).append("</td><td>")
               .append(Math.round(l.invDisc)).append("</td><td>").append(Math.round(l.taxAmt)).append("</td><td>")
               .append(Math.round(l.dutyAmt)).append("</td><td>").append(Math.round(l.total)).append("</td><td>")

@@ -135,7 +135,7 @@ public class PurchasePreinvoiceScreen extends Screen {
         LinearLayout list = a.kit.v();
         final android.app.AlertDialog[] holder = new android.app.AlertDialog[1];
         for (final PurchasePreinvoice.Draft dd : saved) {
-            String label = (dd.docNo.isEmpty() ? "بی‌شماره" : dd.docNo) + " • " + (dd.supplierName.isEmpty() ? "بی‌فروشنده" : dd.supplierName) + " • " + Jalali.dispFa(String.valueOf(dd.dateTs));
+            String label = (dd.docNo.isEmpty() ? "بی‌شماره" : dd.docNo) + " • " + (dd.supplierName.isEmpty() ? "بی‌فروشنده" : dd.supplierName) + " • " + PreinvoiceExport.dateText(dd.dateTs);
             list.addView(a.kit.btnGhost(label, Theme.INFO, v -> {
                 if (isDirty()) {
                     if (holder[0]!=null) holder[0].dismiss();
@@ -209,7 +209,7 @@ public class PurchasePreinvoiceScreen extends Screen {
             render(live);
         }), a.kit.lp(-2, -2));
         c.addView(modes, a.kit.lp(-1, -2));
-        c.addView(a.kit.hint("تاریخ سند: " + Jalali.dispFa(String.valueOf(draft.dateTs))), a.kit.lp(-1, -2));
+        c.addView(a.kit.hint("تاریخ سند: " + PreinvoiceExport.dateText(draft.dateTs)), a.kit.lp(-1, -2));
         return c;
     }
 
@@ -355,7 +355,7 @@ public class PurchasePreinvoiceScreen extends Screen {
         for (final String[] o : opts) {
             body.addView(a.kit.btn(o[0], v -> share(o[1], t)), a.kit.lp(-1, -2));
         }
-        body.addView(a.kit.hint("شیت اشتراک اندروید باز می‌شود: شبکه‌های اجتماعی نصب‌شده، بلوتوث، ایمیل و همهٔ گزینه‌های دستگاه در دسترس‌اند."),
+        body.addView(a.kit.hint("انتخاب برنامه برای اشتراک به‌معنی تأیید ارسال نیست."),
                 a.kit.lp(-1, -2));
         a.kit.dialog("خروجی و اشتراک پیش‌فاکتور", body, true).show();
     }
@@ -363,8 +363,8 @@ public class PurchasePreinvoiceScreen extends Screen {
     private void share(final String kind, final PurchasePreinvoice.Totals t) {
         final String title = "پیش‌فاکتور خرید " + draft.docNo;
         final String subtitle = PreinvoiceExport.subtitle(draft, t);
-        if ("pdf".equals(kind)) { a.sharePdf(title, subtitle, PreinvoiceExport.cols(), PreinvoiceExport.rows(draft)); markSent(); return; }
-        if ("png".equals(kind)) { a.sharePng(title, subtitle, PreinvoiceExport.cols(), PreinvoiceExport.rows(draft)); markSent(); return; }
+        if ("pdf".equals(kind)) { a.sharePdf(title, subtitle, PreinvoiceExport.cols(), PreinvoiceExport.rows(draft)); return; }
+        if ("png".equals(kind)) { a.sharePng(title, subtitle, PreinvoiceExport.cols(), PreinvoiceExport.rows(draft)); return; }
         new Thread(() -> {
             try {
                 byte[] data; String name; String mime;
@@ -379,7 +379,6 @@ public class PurchasePreinvoiceScreen extends Screen {
                 a.runOnUiThread(() -> {
                     try {
                         ShareProvider.share(a, f, mime, title);
-                        markSent();
                     } catch (Exception e) {
                         a.kit.toast("اشتراک ممکن نشد");
                     }
@@ -388,13 +387,6 @@ public class PurchasePreinvoiceScreen extends Screen {
                 a.runOnUiThread(() -> a.kit.toast("ساخت فایل ممکن نشد"));
             }
         }).start();
-    }
-
-    private void markSent() {
-        if (!draft.id.isEmpty()) {
-            draft.status = "sent";
-            PurchasePreinvoiceStore.save(a, draft);
-        }
     }
 
     // --------------------------------------------------------------- به‌روزرسانی زنده

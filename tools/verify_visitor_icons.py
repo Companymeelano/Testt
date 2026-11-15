@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 ANDROID = '{http://schemas.android.com/apk/res/android}'
 SVG = '{http://www.w3.org/2000/svg}'
 
-for name in ('visit', 'refresh', 'call', 'route', 'next'):
+for name in ('visit', 'refresh', 'call', 'route', 'next', 'customer', 'product', 'cart', 'result', 'toolbox'):
     svg = ET.parse(ROOT / 'design/icons/visitor' / f'{name}.svg').getroot()
     vector = ET.parse(ROOT / 'app/src/main/res/drawable' / f'visitor_action_{name}.xml').getroot()
     source = [(p.attrib['d'], p.attrib['opacity']) for p in svg.findall(SVG + 'path')]

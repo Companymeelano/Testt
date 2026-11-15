@@ -10845,10 +10845,10 @@ public class MainActivity extends Activity {
             c.addView(track, new LinearLayout.LayoutParams(-1, dp(7)));
         }
         LinearLayout actions = new LinearLayout(this); actions.setOrientation(LinearLayout.HORIZONTAL);
-        Button visit = themedActionButton("ثبت ویزیت", navAccent("visitor_dashboard"), false); visit.setOnClickListener(v -> loadVisitRoutePage(r.optString("کد", "")));
-        Button showcase = themedActionButton("فروش", navAccent("showcase"), true); showcase.setContentDescription("شروع فروش به " + r.optString("نام", "این مشتری"));
+        Button visit = themedActionButton("ثبت ویزیت", navAccent("visitor_dashboard"), false); setVisitorActionIcon(visit, R.drawable.visitor_action_visit); visit.setOnClickListener(v -> loadVisitRoutePage(r.optString("کد", "")));
+        Button showcase = themedActionButton("فروش", navAccent("showcase"), true); setVisitorActionIcon(showcase, R.drawable.visitor_action_product); showcase.setContentDescription("شروع فروش به " + r.optString("نام", "این مشتری"));
         showcase.setOnClickListener(v -> { JSONObject cust = cartCustomerFromRow(r); visitorCartCustomer = cust; if (visitorCartAddress.trim().isEmpty()) visitorCartAddress = cust.optString("address", ""); autosaveCart(false); showNotice("مشتری سبد: " + cust.optString("name", ""), false); showApp("showcase"); });
-        Button call = themedActionButton("تماس", SUCCESS, false); call.setOnClickListener(v -> { if (ensurePermission("customer_call", "تماس مشتری")) openPhoneDialer(firstPhone(r)); });
+        Button call = themedActionButton("تماس", SUCCESS, false); setVisitorActionIcon(call, R.drawable.visitor_action_call); call.setOnClickListener(v -> { if (ensurePermission("customer_call", "تماس مشتری")) openPhoneDialer(firstPhone(r)); });
         actions.addView(visit, weightedButtonLp()); actions.addView(showcase, weightedButtonLp()); actions.addView(call, weightedButtonLp());
         LinearLayout.LayoutParams ap = new LinearLayout.LayoutParams(-1, -2); ap.setMargins(0, dp(9), 0, 0); c.addView(actions, ap);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2); lp.setMargins(0, 0, 0, dp(11)); parent.addView(c, lp);
@@ -11942,8 +11942,8 @@ public class MainActivity extends Activity {
         row.addView(visitorMetricBox("مبلغ", cartHasItems() ? money(cartTotal()) : "۰", GOLD_2), weightedMiniLp());
         LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, -2); rp.setMargins(0, dp(10), 0, 0); c.addView(row, rp);
         LinearLayout actions = new LinearLayout(this); actions.setOrientation(LinearLayout.HORIZONTAL);
-        Button pick = themedActionButton(visitorCartCustomer == null ? "انتخاب مشتری" : "تغییر مشتری", navAccent("customers"), visitorCartCustomer == null); pick.setTextSize(fs(9.2f)); pick.setOnClickListener(v -> { if (ensurePermission("customer_select", "انتخاب مشتری")) showCartCustomerPicker(""); });
-        Button open = themedActionButton(cartHasItems() ? "مشاهده / ارسال" : "باز کردن سبد", accent, cartHasItems()); open.setTextSize(fs(9.2f)); open.setOnClickListener(v -> showApp("cart"));
+        Button pick = themedActionButton(visitorCartCustomer == null ? "انتخاب مشتری" : "تغییر مشتری", navAccent("customers"), visitorCartCustomer == null); pick.setTextSize(fs(9.2f)); setVisitorActionIcon(pick, R.drawable.visitor_action_customer); pick.setOnClickListener(v -> { if (ensurePermission("customer_select", "انتخاب مشتری")) showCartCustomerPicker(""); });
+        Button open = themedActionButton(cartHasItems() ? "نمایش / ارسال" : "باز کردن سبد", accent, cartHasItems()); open.setTextSize(fs(9.2f)); setVisitorActionIcon(open, R.drawable.visitor_action_cart); open.setOnClickListener(v -> showApp("cart"));
         actions.addView(pick, weightedButtonLp()); actions.addView(open, weightedButtonLp());
         LinearLayout.LayoutParams ap = new LinearLayout.LayoutParams(-1, -2); ap.setMargins(0, dp(10), 0, 0); c.addView(actions, ap);
         LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2); cp.setMargins(0, 0, 0, dp(12)); content.addView(c, cp);
@@ -11976,7 +11976,7 @@ public class MainActivity extends Activity {
         LinearLayout c = card(); c.setBackground(themedSectionBg("visitor_more", 30));
         c.addView(visitorSectionTitle("امکانات بیشتر", "☰", accent), new LinearLayout.LayoutParams(-1, -2));
         c.addView(text("گزارش‌ها، مشتریان، پیش‌نویس‌ها و ابزارهای دیگر.", 10.3f, MUTED, Typeface.BOLD), new LinearLayout.LayoutParams(-1, -2));
-        Button more = themedActionButton("ورود به جعبه ابزار ویزیتور", accent, true); more.setOnClickListener(v -> showApp("visitor_more"));
+        Button more = themedActionButton("ورود به جعبه ابزار ویزیتور", accent, true); setVisitorActionIcon(more, R.drawable.visitor_action_toolbox); more.setOnClickListener(v -> showApp("visitor_more"));
         LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(-1, dp(50)); mp.setMargins(0, dp(11), 0, 0); c.addView(more, mp);
         LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2); cp.setMargins(0, 0, 0, dp(12)); content.addView(c, cp);
     }
@@ -11987,7 +11987,7 @@ public class MainActivity extends Activity {
         LinearLayout hero = card(); hero.setBackground(themedSectionBg("visit", 32));
         hero.addView(visitorSectionTitle("ویزیت سریع", "✦", accent), new LinearLayout.LayoutParams(-1, -2));
         hero.addView(text("مشتری را انتخاب کنید، کالاها را به سبد اضافه کنید و پیش‌فاکتور را بفرستید.", 10.6f, MUTED, Typeface.BOLD), new LinearLayout.LayoutParams(-1, -2));
-        Button start = themedActionButton("شروع ویزیت / انتخاب مشتری", accent, true); start.setTextSize(fs(14.2f)); start.setOnClickListener(v -> openVisitorStartAction());
+        Button start = themedActionButton("شروع ویزیت / انتخاب مشتری", accent, true); start.setTextSize(fs(14.2f)); setVisitorActionIcon(start, R.drawable.visitor_action_visit); start.setOnClickListener(v -> openVisitorStartAction());
         LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-1, dp(56)); sp.setMargins(0, dp(12), 0, 0); hero.addView(start, sp);
         LinearLayout.LayoutParams hp = new LinearLayout.LayoutParams(-1, -2); hp.setMargins(0, dp(14), 0, dp(12)); content.addView(hero, hp);
 
@@ -12003,27 +12003,27 @@ public class MainActivity extends Activity {
         LinearLayout grid = card(); grid.setBackground(themedSectionBg("visitor_dashboard", 28));
         grid.addView(text("ابزار فروش سریع", 15.4f, TEXT, Typeface.BOLD), new LinearLayout.LayoutParams(-1, -2));
         LinearLayout r1 = new LinearLayout(this); r1.setOrientation(LinearLayout.HORIZONTAL);
-        addVisitorVisitTile(r1, "انتخاب مشتری", "جستجو و اتصال به سبد", "♙", navAccent("customers"), () -> { if (ensurePermission("customer_select", "انتخاب مشتری")) showCartCustomerPicker(""); });
-        addVisitorVisitTile(r1, "کالا", priceTierLabel(1) + " و " + priceTierLabel(2), "◈", navAccent("showcase"), () -> showApp("showcase"));
+        addVisitorVisitTile(r1, "انتخاب مشتری", "جستجو و اتصال به سبد", R.drawable.visitor_action_customer, navAccent("customers"), () -> { if (ensurePermission("customer_select", "انتخاب مشتری")) showCartCustomerPicker(""); });
+        addVisitorVisitTile(r1, "کالا", priceTierLabel(1) + " و " + priceTierLabel(2), R.drawable.visitor_action_product, navAccent("showcase"), () -> showApp("showcase"));
         LinearLayout.LayoutParams r1p = new LinearLayout.LayoutParams(-1, -2); r1p.setMargins(0, dp(9), 0, 0); grid.addView(r1, r1p);
         LinearLayout r2 = new LinearLayout(this); r2.setOrientation(LinearLayout.HORIZONTAL);
-        addVisitorVisitTile(r2, "سبد", "فقط پیش‌فاکتور", "🛒", navAccent("cart"), () -> showApp("cart"));
-        addVisitorVisitTile(r2, "ثبت نتیجه", "یادداشت بازدید اختیاری", "✓", navAccent("visitor_more"), () -> { if (visitorCartCustomer != null) showVisitResultDialog(visitorCartCustomer); else showNotice("اول مشتری را انتخاب کن.", false); });
+        addVisitorVisitTile(r2, "سبد", "فقط پیش‌فاکتور", R.drawable.visitor_action_cart, navAccent("cart"), () -> showApp("cart"));
+        addVisitorVisitTile(r2, "ثبت نتیجه", "یادداشت بازدید اختیاری", R.drawable.visitor_action_result, navAccent("visitor_more"), () -> { if (visitorCartCustomer != null) showVisitResultDialog(visitorCartCustomer); else showNotice("اول مشتری را انتخاب کن.", false); });
         LinearLayout.LayoutParams r2p = new LinearLayout.LayoutParams(-1, -2); r2p.setMargins(0, dp(7), 0, 0); grid.addView(r2, r2p);
         LinearLayout.LayoutParams gp = new LinearLayout.LayoutParams(-1, -2); gp.setMargins(0, 0, 0, dp(12)); content.addView(grid, gp);
         addTodayRouteCard();
         maybeAskVisitLocationPermission();
     }
 
-    private void addVisitorVisitTile(LinearLayout parent, String title, String sub, String glyph, int accent, final Runnable action) {
+    private void addVisitorVisitTile(LinearLayout parent, String title, String sub, int iconResource, int accent, final Runnable action) {
         LinearLayout tile = new LinearLayout(this); tile.setOrientation(LinearLayout.VERTICAL); tile.setGravity(Gravity.CENTER); tile.setPadding(dp(8), dp(9), dp(8), dp(9));
-        tile.setClickable(true); tile.setFocusable(true); tile.setBackground(gradient(new int[]{alpha(accent, isLightTheme() ? 24 : 38), alpha(SURFACE_2, 246)}, GradientDrawable.Orientation.TL_BR, 24));
+        tile.setClickable(true); tile.setFocusable(true); tile.setMinimumHeight(dp(116)); tile.setContentDescription(title + "، " + sub); tile.setBackground(gradient(new int[]{alpha(accent, isLightTheme() ? 24 : 38), alpha(SURFACE_2, 246)}, GradientDrawable.Orientation.TL_BR, 24));
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) tile.setElevation(dp(3));
         applyTouchFeedback(tile); tile.setOnClickListener(v -> { if (action != null) action.run(); });
-        TextView icon = text(glyph, 18, onColorFor(accent), Typeface.BOLD); icon.setGravity(Gravity.CENTER); icon.setBackground(luxuryButtonBg(accent, true, 999)); tile.addView(icon, new LinearLayout.LayoutParams(dp(46), dp(46)));
-        TextView tt = text(title, 12.5f, TEXT, Typeface.BOLD); tt.setGravity(Gravity.CENTER); tt.setSingleLine(true); LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(-1, -2); tp.setMargins(0, dp(6), 0, 0); tile.addView(tt, tp);
-        TextView ss = text(sub, 9.0f, MUTED, Typeface.BOLD); ss.setGravity(Gravity.CENTER); ss.setSingleLine(true); tile.addView(ss, new LinearLayout.LayoutParams(-1, -2));
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(116), 1f); lp.setMargins(dp(4), 0, dp(4), 0); parent.addView(tile, lp);
+        android.widget.ImageView icon = new android.widget.ImageView(this); icon.setPadding(dp(10), dp(10), dp(10), dp(10)); icon.setImageResource(iconResource); icon.setImageTintList(android.content.res.ColorStateList.valueOf(onColorFor(accent))); icon.setBackground(luxuryButtonBg(accent, true, 999)); icon.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO); tile.addView(icon, new LinearLayout.LayoutParams(dp(46), dp(46)));
+        TextView tt = text(title, 12.5f, TEXT, Typeface.BOLD); tt.setGravity(Gravity.CENTER); LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(-1, -2); tp.setMargins(0, dp(6), 0, 0); tile.addView(tt, tp);
+        TextView ss = text(sub, 9.0f, MUTED, Typeface.BOLD); ss.setGravity(Gravity.CENTER); tile.addView(ss, new LinearLayout.LayoutParams(-1, -2));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -2, 1f); lp.setMargins(dp(4), 0, dp(4), 0); parent.addView(tile, lp);
     }
 
     // =============================== on-device connection diagnostics (round 13) ===============================

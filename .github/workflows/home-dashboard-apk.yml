@@ -234,6 +234,15 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Upload Gradle diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: manager-home-build-log-${{ github.sha }}
+          path: manager-home-build.log
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Upload installable debug APK
         if: always()
         uses: actions/upload-artifact@v4

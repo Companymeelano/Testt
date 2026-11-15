@@ -972,6 +972,19 @@ public final class Kit {
         return c;
     }
 
+    /** Empty state with an optional action, preserving the single-line description. */
+    public View emptyWithAction(String title, String body, String actionLabel, View.OnClickListener action) {
+        LinearLayout c = (LinearLayout) empty(title, body);
+        if (action != null) {
+            Button button = btnGold("نمایش", action);
+            LinearLayout.LayoutParams p = lp(-2, -2);
+            p.topMargin = Theme.dp(12);
+            p.gravity = Gravity.CENTER_HORIZONTAL;
+            c.addView(button, p);
+        }
+        return c;
+    }
+
     /** Calm card for reports whose data source is not confirmed in this database (not a crash). */
     public View unavailable(String msg) {
         LinearLayout c = card(Theme.GOLD);

@@ -1,0 +1,37 @@
+name: Visitor Android verification
+
+on:
+  push:
+    branches: ["arena/7c541236-testt"]
+    paths: ["app/**", "design/icons/visitor/**", "tools/verify_visitor_icons.py", ".github/workflows/visitor-preview.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  visitor-debug:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Verify local visitor icon assets
+        run: python3 tools/verify_visitor_icons.py
+      - name: Test and build visitor debug APK
+        run: gradle -PmeelanoCompileSdk=35 testVisitorDebugUnitTest assembleVisitorDebug --no-daemon --stacktrace
+      - uses: actions/upload-artifact@v4
+        with:
+          name: visitor-debug-apk
+          path: app/build/outputs/apk/visitor/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14

@@ -11723,6 +11723,18 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams hp = new LinearLayout.LayoutParams(-1, -2); hp.setMargins(0, dp(14), 0, dp(12)); content.addView(hero, hp);
     }
 
+    /** Theme-aware, local vector artwork; the button label remains accessible to screen readers. */
+    private void setVisitorActionIcon(Button button, int resource) {
+        Drawable icon = getDrawable(resource);
+        if (icon == null) return;
+        icon = icon.mutate();
+        icon.setTintList(button.getTextColors());
+        icon.setBounds(0, 0, dp(18), dp(18));
+        button.setCompoundDrawablesRelative(icon, null, null, null);
+        button.setCompoundDrawablePadding(dp(5));
+        button.setMinHeight(dp(44));
+    }
+
     private void addVisitorTodayOverview(JSONObject data) {
         int accent = navAccent("visitor_dashboard");
         double amount = visitorTodayPrefactorAmount(data);
@@ -11737,6 +11749,7 @@ public class MainActivity extends Activity {
         TextView hint = text("خلاصهٔ کار امروز شما • بروزرسانی: " + lastRefreshText("visitor_dashboard"), 10.3f, MUTED, Typeface.BOLD);
         hint.setMaxLines(2); hintRow.addView(hint, new LinearLayout.LayoutParams(0, -2, 1f));
         Button refresh = themedActionButton("بروزرسانی", accent, false); refresh.setTextSize(fs(8.8f)); refresh.setContentDescription("بروزرسانی اطلاعات امروز");
+        setVisitorActionIcon(refresh, R.drawable.visitor_action_refresh);
         refresh.setOnClickListener(v -> loadVisitorDashboard(true));
         hintRow.addView(refresh, new LinearLayout.LayoutParams(dp(96), dp(44)));
         c.addView(hintRow, new LinearLayout.LayoutParams(-1, -2));
@@ -17476,16 +17489,20 @@ public class MainActivity extends Activity {
             LinearLayout.LayoutParams ap = new LinearLayout.LayoutParams(-1, -2); ap.setMargins(0, dp(6), 0, 0); c.addView(a, ap);
         }
         Button start = themedActionButton("شروع ویزیت این مشتری", accent, true);
+        setVisitorActionIcon(start, R.drawable.visitor_action_visit);
         start.setOnClickListener(v -> { visitorCartCustomer = cust; if (visitorCartAddress.trim().isEmpty()) visitorCartAddress = addr; autosaveCart(false); showNotice("مشتری سبد: " + cust.optString("name", ""), false); showApp("showcase"); });
         LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-1, dp(50)); sp.setMargins(0, dp(10), 0, 0); c.addView(start, sp);
         LinearLayout row = new LinearLayout(this); row.setOrientation(LinearLayout.HORIZONTAL);
         Button call = themedActionButton("تماس", SUCCESS, false); call.setContentDescription("تماس با " + cust.optString("name", "مشتری"));
+        setVisitorActionIcon(call, R.drawable.visitor_action_call);
         call.setEnabled(!cust.optString("phone", "").trim().isEmpty() && !"—".equals(cust.optString("phone", ""))); call.setAlpha(call.isEnabled() ? 1f : .45f);
         call.setOnClickListener(v -> openPhoneDialer(cust.optString("phone", "")));
         Button route = themedActionButton("مسیریابی", INFO, false); route.setContentDescription("مسیریابی تا " + cust.optString("name", "مشتری"));
+        setVisitorActionIcon(route, R.drawable.visitor_action_route);
         route.setEnabled(!addr.isEmpty()); route.setAlpha(addr.isEmpty() ? .45f : 1f);
         route.setOnClickListener(v -> openAddressInMap(addr));
         Button skip = themedActionButton("بعدی", MUTED, false); skip.setContentDescription("پیشنهاد مشتری بعدی");
+        setVisitorActionIcon(skip, R.drawable.visitor_action_next);
         skip.setOnClickListener(v -> { skippedNextCustomers.add(cust.optString("code", "")); loadVisitorDashboard(false); });
         row.addView(call, weightedButtonLp()); row.addView(route, weightedButtonLp()); row.addView(skip, weightedButtonLp());
         LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, -2); rp.setMargins(0, dp(8), 0, 0); c.addView(row, rp);

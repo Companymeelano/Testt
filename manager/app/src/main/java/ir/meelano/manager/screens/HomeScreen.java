@@ -27,6 +27,7 @@ import ir.meelano.manager.core.Jalali;
 import ir.meelano.manager.core.MasterQueries;
 import ir.meelano.manager.core.Money;
 import ir.meelano.manager.core.RoleStore;
+import ir.meelano.manager.core.SalesSnapshot;
 import ir.meelano.manager.core.MoneyQueries;
 import ir.meelano.manager.R;
 import ir.meelano.manager.core.Queries;
@@ -48,6 +49,30 @@ import java.util.Map;
 
 /** Executive dashboard: greeting, daily cash flow, operational alerts and compact sales analysis. */
 public class HomeScreen extends Screen {
+    /** Helpers shared with the sales-history checks; preserve missing versus zero data. */
+    static String latestSalesChartDate(List<SalesSnapshot.Day> series) {
+        if (series == null) return "";
+        for (int i = series.size() - 1; i >= 0; i--) {
+            SalesSnapshot.Day day = series.get(i);
+            if (day != null && day.date != null && !day.date.isEmpty()) return day.date;
+        }
+        return "";
+    }
+
+    static boolean salesSeriesHasActivity(List<SalesSnapshot.Day> series) {
+        if (series == null) return false;
+        for (SalesSnapshot.Day day : series)
+            if (day != null && (Math.abs(day.salesRials) >= 0.005d || day.documents > 0)) return true;
+        return false;
+    }
+
+    static String salesChartEmptyState(List<SalesSnapshot.Day> series, String window) {
+        if (series == null || series.isEmpty()) return "تاریخچهٔ فروش برای این بازه در دسترس نیست";
+        if (salesSeriesHasActivity(series)) return "";
+        String label = window == null || window.trim().isEmpty() ? "" : " · " + window.trim();
+        return "در این بازه فاکتوری ثبت نشده است" + label;
+    }
+
     public HomeScreen(ir.meelano.manager.MainActivity a) {
         super(a);
     }

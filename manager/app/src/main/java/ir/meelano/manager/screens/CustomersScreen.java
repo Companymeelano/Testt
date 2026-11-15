@@ -122,7 +122,7 @@ public class CustomersScreen extends Screen {
         copy.addView(a.kit.text(title(), 21f, Theme.TEXT, true), a.kit.lp(-1, -2));
         String sub = subtitle();
         if (sub != null && !sub.isEmpty())
-            copy.addView(a.kit.text(sub, 12f, Theme.GOLD_SOFT, false), a.kit.lp(-1, -2));
+            copy.addView(a.kit.text(sub, 12f, Theme.TEXT, false), a.kit.lp(-1, -2));
         hero.addView(copy, a.kit.wlp(1f));
         w.addView(hero, a.kit.lp(-1, -2));
         if (filterConfig() != null && filter() != null) {
@@ -151,7 +151,8 @@ public class CustomersScreen extends Screen {
         final int col = bal > 0.5 ? Theme.DANGER : (bal < -0.5 ? Theme.SUCCESS : Theme.GOLD);
         final String name = r.s("name").isEmpty() ? "—" : r.s("name");
         LinearLayout card = a.kit.v();
-        card.setBackground(Theme.cardAccent(col));
+        // Balance state stays visible on the avatar and label without tinting the entire card.
+        card.setBackground(Theme.card());
         card.setPadding(Theme.dp(14), Theme.dp(12), Theme.dp(14), Theme.dp(12));
 
         LinearLayout top = a.kit.h();
@@ -161,16 +162,16 @@ public class CustomersScreen extends Screen {
         top.addView(a.kit.space(12));
         LinearLayout copy = a.kit.v();
         android.widget.TextView n = a.kit.text(name, 15f, Theme.TEXT, true);
-        n.setSingleLine(true);
+        n.setMaxLines(2);
         n.setEllipsize(android.text.TextUtils.TruncateAt.END);
         copy.addView(n, a.kit.lp(-1, -2));
         LinearLayout meta = a.kit.h();
         meta.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        meta.addView(tag("کد " + Money.fa(code), Theme.GOLD_SOFT));
+        meta.addView(tag("کد " + Money.fa(code), Theme.TEXT));
         String route = r.s("route");
         if (!route.isEmpty()) {
             meta.addView(a.kit.space(6));
-            meta.addView(tag(route, Theme.GOLD));
+            meta.addView(tag(route, Theme.TEXT));
         }
         LinearLayout.LayoutParams mp = a.kit.lp(-1, -2);
         mp.setMargins(0, Theme.dp(5), 0, 0);
@@ -189,12 +190,19 @@ public class CustomersScreen extends Screen {
         amt.addView(a.kit.text(bal > 0.5 ? "مانده بدهی" : (bal < -0.5 ? "مانده بستانکاری" : "وضعیت حساب"),
                 10.5f, Theme.MUTED, false), a.kit.lp(-1, -2));
         String amount = bal > 0.5 ? Money.rial(bal) : (bal < -0.5 ? Money.rial(-bal) : "تسویه");
-        amt.addView(a.kit.text(amount, 15f, col, true), a.kit.lp(-1, -2));
+        amt.addView(a.kit.text(amount, 15f, Theme.TEXT, true), a.kit.lp(-1, -2));
         bottom.addView(amt, a.kit.wlp(1f));
         String pillText = bal > 0.5 ? "بدهکار" : (bal < -0.5 ? "بستانکار" : "تسویه");
         bottom.addView(a.kit.pill(pillText, col), a.kit.lp(-2, -2));
         card.addView(bottom, a.kit.lp(-1, -2));
 
+        // Announce the full name and balance even if the visual name is truncated.
+        StringBuilder description = new StringBuilder(name).append("، کد ").append(Money.fa(code));
+        if (!route.isEmpty()) description.append("، ").append(route);
+        description.append("، ").append(pillText);
+        if (bal > 0.5 || bal < -0.5) description.append("، ").append(amount);
+        description.append("، نمایش پرونده");
+        card.setContentDescription(description.toString());
         Theme.pressable(card);
         card.setOnClickListener(v2 -> openDossier(code));
         return card;
@@ -440,7 +448,8 @@ public class CustomersScreen extends Screen {
         final String folCode = dz.code;
         final String folName = h.s("name");
         List<FollowUps.Note> folNotes = FollowUps.list(a, folCode);
-        LinearLayout fc = a.kit.card(Theme.VIOLET);
+        LinearLayout fc = a.kit.card(Theme.TEXT);
+        fc.setBackground(Theme.card());
         fc.addView(a.kit.text("یادداشت پیگیری", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
         if (folNotes.isEmpty()) {
             fc.addView(a.kit.hint("یادداشتی ثبت نشده است"), a.kit.lp(-1, -2));
@@ -458,7 +467,7 @@ public class CustomersScreen extends Screen {
                 fc.addView(nr, a.kit.lp(-1, -2));
             }
         }
-        fc.addView(a.kit.btnGhost("+ یادداشت جدید", Theme.VIOLET, v -> noteDialog(folCode, folName, dlgH)), a.kit.lp(-1, -2));
+        fc.addView(a.kit.btnGhost("+ یادداشت جدید", Theme.TEXT, v -> noteDialog(folCode, folName, dlgH)), a.kit.lp(-1, -2));
         body.addView(fc, a.kit.lp(-1, -2));
         body.addView(a.kit.gap(6));
 
@@ -677,7 +686,7 @@ public class CustomersScreen extends Screen {
         final String[] date = {Jalali.todayStr()};
         final android.widget.TextView dl = a.kit.text("یادآوری: " + Jalali.dispFa(date[0]), 12.5f, Theme.TEXT, true);
         nb.addView(dl, a.kit.lp(-1, -2));
-        nb.addView(a.kit.btnGhost("انتخاب تاریخ یادآوری", Theme.VIOLET, v ->
+        nb.addView(a.kit.btnGhost("انتخاب تاریخ یادآوری", Theme.TEXT, v ->
                 a.kit.dateDialog("تاریخ یادآوری", date[0], picked -> {
                     date[0] = picked;
                     dl.setText("یادآوری: " + Jalali.dispFa(picked));

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+<title>collapse</title>
+<path fill="#0B4938" d="M16 2 A14 14 0 1 1 16 30 A14 14 0 1 1 16 2 Z"/>
+<path fill="#D7EEE3" d="M16 4 A12 12 0 1 1 16 28 A12 12 0 1 1 16 4 Z"/>
+<path fill="#FFFFFF" d="M7 13 A10 10 0 0 1 23 7 L22 8 A9 9 0 0 0 8 13 Z"/>
+<path fill="#0B4938" d="M9 14.5 H23 V17.5 H9 Z"/>
+</svg>

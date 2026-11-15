@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+<title>search</title>
+<path fill="#746026" d="M 19 17 L 28 26 Q 30 28 28 30 Q 26 31 24 29 L 16 20 Z"/>
+<path fill="#17211B" d="M 13 3 A 10 10 0 1 0 13 23 A 10 10 0 1 0 13 3 Z"/>
+<path fill="#FFD45C" d="M 13 6 A 7 7 0 1 0 13 20 A 7 7 0 1 0 13 6 Z"/>
+<path fill="#57613F" d="M 7.3 12 Q 8 7.3 12.8 7 L 12.8 8.4 Q 9.2 8.8 8.8 12 Z"/>
+</svg>

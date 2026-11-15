@@ -221,14 +221,14 @@ public class ReportsScreen extends Screen {
                 accent()), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
         if (RoleStore.allowed(a, "analytics"))
-            content.addView(a.kit.btnGhost("📈  داشبورد تحلیلی فروش", Theme.VIOLET,
+            content.addView(a.kit.btnIllustrated("داشبورد تحلیلی فروش", "analytics",
                     v -> a.nav("analytics")), a.kit.lp(-1, -2));
         content.addView(a.kit.gap(8));
         LinearLayout tr = a.kit.h();
-        tr.addView(a.kit.btnGhost("🧾  فاکتورهای فروش", Theme.SALES_HUE, v -> a.nav("sales")), a.kit.wlp(1f));
+        tr.addView(a.kit.btnIllustrated("فاکتورهای فروش", "sales", v -> a.nav("sales")), a.kit.wlp(1f));
         if (RoleStore.allowed(a, "buy")) {
             tr.addView(a.kit.space(8));
-            tr.addView(a.kit.btnGhost("🧺  فاکتورهای خرید", Theme.BUY_HUE, v -> a.nav("buy")), a.kit.wlp(1f));
+            tr.addView(a.kit.btnIllustrated("فاکتورهای خرید", "purchase", v -> a.nav("buy")), a.kit.wlp(1f));
         }
         content.addView(tr, a.kit.lp(-1, -2));
         content.addView(a.kit.gap(10));
@@ -509,6 +509,8 @@ public class ReportsScreen extends Screen {
 
     private View catCard(final String section, int count) {
         LinearLayout c = a.kit.card(sectionAccent(section));
+        // Category colours are not statuses: keep the cards calm and theme-aware.
+        c.setBackground(Theme.card());
         c.setGravity(Gravity.CENTER_HORIZONTAL);
         c.setMinimumHeight(Theme.dp(122));
         ImageView iv = new ImageView(a);

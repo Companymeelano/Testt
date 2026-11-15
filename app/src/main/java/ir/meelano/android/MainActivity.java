@@ -14235,21 +14235,21 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams hp = new LinearLayout.LayoutParams(-1, -2); hp.setMargins(0, dp(14), 0, dp(12)); content.addView(hero, hp);
 
         addVisitorMoreGroup("گزارش‌ها و پیش‌فاکتور", "گزارش روزانه و پیش‌فاکتورهای شما", new VisitorToolSpec[]{
-                new VisitorToolSpec("گزارش‌ها", "امروز/هفته/ماه", "↗", navAccent("visitor_reports"), () -> showApp("visitor_reports"), canOpenPage("visitor_reports")),
-                new VisitorToolSpec("پیش‌فاکتورهای من", "لیست و وضعیت", "▤", navAccent("cart"), () -> loadMyPrefactors(), canUsePermission("prefactor_list")),
-                new VisitorToolSpec("پایان روز", "جمع‌بندی اختیاری", "◎", navAccent("visitor_more"), () -> showEndOfDayReportDialog(), canUsePermission("day_report")),
-                new VisitorToolSpec("گزارش PDF", "امروز • اشتراک", "⎙", navAccent("visitor_reports"), () -> generateDailyReportPdf(), canUsePermission("day_report") || canOpenPage("visitor_reports")),
-                new VisitorToolSpec("مسیر امروز", "روی نقشه", "⌖", navAccent("visit"), () -> openTodayRouteMap(), true),
-                new VisitorToolSpec("صف آفلاین", formatNumber(offlineQueue().length()) + " مورد", "⇅", offlineQueue().length() > 0 ? DANGER : navAccent("visitor_more"), () -> trySendOfflineQueue(), canUsePermission("offline_queue"))
+                new VisitorToolSpec("گزارش‌ها", "امروز/هفته/ماه", R.drawable.visitor_action_report, navAccent("visitor_reports"), () -> showApp("visitor_reports"), canOpenPage("visitor_reports")),
+                new VisitorToolSpec("پیش‌فاکتورهای من", "لیست و وضعیت", R.drawable.visitor_action_invoice, navAccent("cart"), () -> loadMyPrefactors(), canUsePermission("prefactor_list")),
+                new VisitorToolSpec("پایان روز", "جمع‌بندی اختیاری", R.drawable.visitor_action_day, navAccent("visitor_more"), () -> showEndOfDayReportDialog(), canUsePermission("day_report")),
+                new VisitorToolSpec("گزارش پی‌دی‌اف", "امروز • اشتراک", R.drawable.visitor_action_document, navAccent("visitor_reports"), () -> generateDailyReportPdf(), canUsePermission("day_report") || canOpenPage("visitor_reports")),
+                new VisitorToolSpec("مسیر امروز", "روی نقشه", R.drawable.visitor_action_route, navAccent("visit"), () -> openTodayRouteMap(), true),
+                new VisitorToolSpec("صف آفلاین", formatNumber(offlineQueue().length()) + " مورد", R.drawable.visitor_action_queue, offlineQueue().length() > 0 ? DANGER : navAccent("visitor_more"), () -> trySendOfflineQueue(), canUsePermission("offline_queue"))
         });
         addVisitorMoreGroup("دریافت و وصول", "ثبت قبض رسمی آتیران برای مشتریان مجاز", new VisitorToolSpec[]{
-                new VisitorToolSpec("دریافت وجه / پیش‌دریافت", "نقد، کارت‌خوان، انتقال بانکی یا چک", "☷", SUCCESS, () -> openStoreReceipt(null), canUsePermission("visitor_receipt"))
+                new VisitorToolSpec("دریافت وجه / پیش‌دریافت", "نقد، کارت‌خوان، انتقال بانکی یا چک", R.drawable.visitor_action_receipt, SUCCESS, () -> openStoreReceipt(null), canUsePermission("visitor_receipt"))
         });
         addVisitorMoreGroup("مشتری و کالا", "ابزارهای فروش سریع", new VisitorToolSpec[]{
-                new VisitorToolSpec("مشتریان", "جستجو و پیگیری", "♙", navAccent("customers"), () -> showApp("customers"), canOpenPage("customers")),
-                new VisitorToolSpec("انتخاب مشتری", "برای سبد فعلی", "+", navAccent("customers"), () -> showCartCustomerPicker(""), canUsePermission("customer_select")),
-                new VisitorToolSpec("کالا", priceTierLabel(1) + " و " + priceTierLabel(2), "◈", navAccent("showcase"), () -> showApp("showcase"), canOpenPage("showcase")),
-                new VisitorToolSpec("کدخوان", "جستجوی کالا", "⌕", navAccent("visitor_more"), () -> showBarcodeSearchDialog(), canOpenPage("showcase"))
+                new VisitorToolSpec("مشتریان", "جستجو و پیگیری", R.drawable.visitor_action_customer, navAccent("customers"), () -> showApp("customers"), canOpenPage("customers")),
+                new VisitorToolSpec("انتخاب مشتری", "برای سبد فعلی", R.drawable.visitor_action_add_customer, navAccent("customers"), () -> showCartCustomerPicker(""), canUsePermission("customer_select")),
+                new VisitorToolSpec("کالا", priceTierLabel(1) + " و " + priceTierLabel(2), R.drawable.visitor_action_product, navAccent("showcase"), () -> showApp("showcase"), canOpenPage("showcase")),
+                new VisitorToolSpec("کدخوان", "جستجوی کالا", R.drawable.visitor_action_barcode, navAccent("visitor_more"), () -> showBarcodeSearchDialog(), canOpenPage("showcase"))
         });
         if (UNIFIED_EDITION) addVisitorMoreGroup("مدیریت و بخش‌های سازمانی", "فقط بخش‌های مجاز حساب کاربری شما", new VisitorToolSpec[]{
                 new VisitorToolSpec("داشبورد مدیریت", "نبض کسب‌وکار و میز فرمان", "♛", navAccent("dashboard"), () -> showApp("dashboard"), canOpenPage("dashboard")),
@@ -14262,11 +14262,11 @@ public class MainActivity extends Activity {
                 new VisitorToolSpec("تأییدها", "درخواست‌های منتظر تصمیم", "✓", navAccent("manager_approvals"), () -> showApp("manager_approvals"), canOpenPage("manager_approvals"))
         });
         addVisitorMoreGroup("ابزارهای کمکی", "پیش‌نویس، حضور، پیام و تنظیمات", new VisitorToolSpec[]{
-                new VisitorToolSpec("پیش‌نویس‌ها", formatNumber(localDrafts().length()) + " ذخیره", "✎", navAccent("visitor_more"), () -> showSavedDraftsDialog(), canUsePermission("cart_draft")),
-                new VisitorToolSpec("حضور", "ورود و خروج", "◷", navAccent("visitor_more"), () -> showApp("attendance"), canOpenPage("attendance")),
-                new VisitorToolSpec("گفتگو", "پیام‌ها", "✉", navAccent("visitor_more"), () -> showApp("chat"), canOpenPage("chat")),
-                new VisitorToolSpec("تنظیمات", "تم و دسترسی", "⚙", accent, () -> showApp("settings"), canOpenPage("settings")),
-                new VisitorToolSpec("تحویل بار", "وضعیت ارسال فاکتورهای فروشگاه", "🚚", navAccent("visitor_more"), () -> showApp("delivery_admin"), canOpenPage("delivery_admin"))
+                new VisitorToolSpec("پیش‌نویس‌ها", formatNumber(localDrafts().length()) + " ذخیره", R.drawable.visitor_action_draft, navAccent("visitor_more"), () -> showSavedDraftsDialog(), canUsePermission("cart_draft")),
+                new VisitorToolSpec("حضور", "ورود و خروج", R.drawable.visitor_action_attendance, navAccent("visitor_more"), () -> showApp("attendance"), canOpenPage("attendance")),
+                new VisitorToolSpec("گفتگو", "پیام‌ها", R.drawable.visitor_action_chat, navAccent("visitor_more"), () -> showApp("chat"), canOpenPage("chat")),
+                new VisitorToolSpec("تنظیمات", "تم و دسترسی", R.drawable.visitor_action_settings, accent, () -> showApp("settings"), canOpenPage("settings")),
+                new VisitorToolSpec("تحویل بار", "وضعیت ارسال فاکتورهای فروشگاه", R.drawable.visitor_action_delivery, navAccent("visitor_more"), () -> showApp("delivery_admin"), canOpenPage("delivery_admin"))
         });
         addDeveloperCredit(content);
     }
@@ -14283,11 +14283,14 @@ public class MainActivity extends Activity {
 
     private class VisitorToolSpec {
         final String title, sub, glyph;
-        final int accent;
+        final int accent, iconResource;
         final Runnable action;
         final boolean visible;
         VisitorToolSpec(String title, String sub, String glyph, int accent, Runnable action, boolean visible) {
-            this.title = title; this.sub = sub; this.glyph = glyph; this.accent = accent; this.action = action; this.visible = visible;
+            this.title = title; this.sub = sub; this.glyph = glyph; this.iconResource = 0; this.accent = accent; this.action = action; this.visible = visible;
+        }
+        VisitorToolSpec(String title, String sub, int iconResource, int accent, Runnable action, boolean visible) {
+            this.title = title; this.sub = sub; this.glyph = ""; this.iconResource = iconResource; this.accent = accent; this.action = action; this.visible = visible;
         }
     }
 
@@ -14312,14 +14315,18 @@ public class MainActivity extends Activity {
 
     private void addVisitorMoreTile(LinearLayout parent, VisitorToolSpec tool) {
         LinearLayout tile = new LinearLayout(this); tile.setOrientation(LinearLayout.HORIZONTAL); tile.setGravity(Gravity.CENTER_VERTICAL); tile.setPadding(dp(8), dp(7), dp(8), dp(7));
-        tile.setClickable(true); tile.setFocusable(true); tile.setBackground(roundedStroke(alpha(tool.accent, isLightTheme() ? 16 : 26), 20, alpha(tool.accent, 62))); applyTouchFeedback(tile);
+        tile.setClickable(true); tile.setFocusable(true); tile.setMinimumHeight(dp(58)); tile.setContentDescription(tool.title + "، " + tool.sub); tile.setBackground(roundedStroke(alpha(tool.accent, isLightTheme() ? 16 : 26), 20, alpha(tool.accent, 62))); applyTouchFeedback(tile);
         tile.setOnClickListener(v -> { if (tool.action != null) tool.action.run(); });
-        TextView icon = text(tool.glyph, 14, onColorFor(tool.accent), Typeface.BOLD); icon.setGravity(Gravity.CENTER); icon.setBackground(luxuryButtonBg(tool.accent, true, 999)); tile.addView(icon, new LinearLayout.LayoutParams(dp(38), dp(38)));
+        if (tool.iconResource != 0) {
+            android.widget.ImageView icon = new android.widget.ImageView(this); icon.setPadding(dp(8), dp(8), dp(8), dp(8)); icon.setImageResource(tool.iconResource); icon.setImageTintList(android.content.res.ColorStateList.valueOf(onColorFor(tool.accent))); icon.setBackground(luxuryButtonBg(tool.accent, true, 999)); icon.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO); tile.addView(icon, new LinearLayout.LayoutParams(dp(38), dp(38)));
+        } else {
+            TextView icon = text(tool.glyph, 14, onColorFor(tool.accent), Typeface.BOLD); icon.setGravity(Gravity.CENTER); icon.setBackground(luxuryButtonBg(tool.accent, true, 999)); tile.addView(icon, new LinearLayout.LayoutParams(dp(38), dp(38)));
+        }
         LinearLayout copy = new LinearLayout(this); copy.setOrientation(LinearLayout.VERTICAL); copy.setPadding(dp(7), 0, dp(4), 0);
-        TextView tt = text(tool.title, 10.9f, TEXT, Typeface.BOLD); tt.setSingleLine(true); copy.addView(tt, new LinearLayout.LayoutParams(-1, -2));
-        TextView ss = text(tool.sub, 8.7f, MUTED, Typeface.BOLD); ss.setSingleLine(true); copy.addView(ss, new LinearLayout.LayoutParams(-1, -2));
+        TextView tt = text(tool.title, 10.9f, TEXT, Typeface.BOLD); copy.addView(tt, new LinearLayout.LayoutParams(-1, -2));
+        TextView ss = text(tool.sub, 8.7f, MUTED, Typeface.BOLD); copy.addView(ss, new LinearLayout.LayoutParams(-1, -2));
         tile.addView(copy, new LinearLayout.LayoutParams(0, -2, 1f));
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(58), 1f); lp.setMargins(dp(4), 0, dp(4), 0); parent.addView(tile, lp);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -2, 1f); lp.setMargins(dp(4), 0, dp(4), 0); parent.addView(tile, lp);
     }
 
     private void addVisitorAtiranHeader(JSONObject data) {

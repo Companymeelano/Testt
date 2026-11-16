@@ -16689,16 +16689,16 @@ public class MainActivity extends Activity {
         LinearLayout summary = card();
         summary.setBackground(visitorPanel(navAccent("visitor_reports"), 30));
         summary.addView(visitorSectionTitle(offline ? "گزارش سریع محلی" : "گزارشات ضروری ویزیتور", "↗", navAccent("visitor_reports")), new LinearLayout.LayoutParams(-1, -2));
-        summary.addView(text(offline ? "اتصال گزارش آنلاین برقرار نشد؛ اطلاعات سبد، صف و پیش‌نویس‌های گوشی نمایش داده می‌شود." : "خلاصهٔ پیش‌فاکتورها، کالاها، ویزیت‌ها و فروش شما.", 10.4f, MUTED, Typeface.BOLD), new LinearLayout.LayoutParams(-1, -2));
+        summary.addView(text(offline ? "اطلاعات سرور در دسترس نیست؛ خط تیره یعنی داده دریافت نشده است." : "پیش‌فاکتورها و فروش قطعی جدا نمایش داده می‌شوند؛ خط تیره یعنی داده دریافت نشده است.", 10.4f, MUTED, Typeface.BOLD), new LinearLayout.LayoutParams(-1, -2));
         LinearLayout row = new LinearLayout(this); row.setOrientation(LinearLayout.HORIZONTAL);
-        row.addView(visitorMetricBox("امروز", formatNumber(today == null ? localDraftsTodayCount() : today.optLong("count", 0)), navAccent("cart")), weightedMiniLp());
-        row.addView(visitorMetricBox("مبلغ امروز", money(today == null ? cartTotal() : today.optDouble("amount", 0)), GOLD_2), weightedMiniLp());
-        row.addView(visitorMetricBox("ویزیت", formatNumber((visitsToday == null ? localVisitsTodayCount() : visitsToday.optLong("count", 0)) + localVisitsTodayCount()), navAccent("visitor_dashboard")), weightedMiniLp());
+        row.addView(visitorMetricBox("پیش‌فاکتور امروز", reportCount(today, "count"), navAccent("cart")), weightedMiniLp());
+        row.addView(visitorMetricBox("مبلغ پیش‌فاکتور", reportAmount(today, "amount"), GOLD_2), weightedMiniLp());
+        row.addView(visitorMetricBox("ویزیت ثبت‌شده", reportCount(visitsToday, "count"), navAccent("visitor_dashboard")), weightedMiniLp());
         summary.addView(row, new LinearLayout.LayoutParams(-1, -2));
         LinearLayout row2 = new LinearLayout(this); row2.setOrientation(LinearLayout.HORIZONTAL);
-        row2.addView(visitorMetricBox("قیمت ۲", formatNumber(price2Today == null ? 0 : price2Today.optLong("items", 0)) + " قلم", WARNING), weightedMiniLp());
-        row2.addView(visitorMetricBox("هفته", money(week == null ? 0 : week.optDouble("amount", 0)), SUCCESS), weightedMiniLp());
-        row2.addView(visitorMetricBox("فروش ثبت‌شده", money(sales == null ? 0 : sales.optDouble("amount", 0)), INFO), weightedMiniLp());
+        row2.addView(visitorMetricBox("ویزیت محلی", formatNumber(localVisitsTodayCount()), WARNING), weightedMiniLp());
+        row2.addView(visitorMetricBox("پیش‌فاکتور ۷ روز", reportAmount(week, "amount"), SUCCESS), weightedMiniLp());
+        row2.addView(visitorMetricBox("فروش ثبت‌شده", reportAmount(sales, "amount"), INFO), weightedMiniLp());
         LinearLayout.LayoutParams r2p = new LinearLayout.LayoutParams(-1, -2); r2p.setMargins(0, dp(7), 0, 0); summary.addView(row2, r2p);
         LinearLayout actions = new LinearLayout(this); actions.setOrientation(LinearLayout.HORIZONTAL);
         Button pref = themedActionButton("پیش‌فاکتورهای من", navAccent("visitor_reports"), true); setVisitorActionIcon(pref, R.drawable.visitor_action_invoice); pref.setOnClickListener(v -> loadMyPrefactors());
@@ -16714,22 +16714,40 @@ public class MainActivity extends Activity {
         content.addView(summary, new LinearLayout.LayoutParams(-1, -2));
 
         addVisitorReportPerformanceCard(today, week, month, visitsWeek, price2Today, data.optJSONObject("price2Month"), sales);
-        addVisitorReportStatusCard(data.optJSONArray("status"));
-        addVisitorReportTopProducts(data.optJSONArray("topProducts"));
-        addVisitorReportTopCustomers(data.optJSONArray("topCustomers"));
+        if (data.optJSONArray("status") != null) addVisitorReportStatusCard(data.optJSONArray("status"));
+        if (data.optJSONArray("topProducts") != null) addVisitorReportTopProducts(data.optJSONArray("topProducts"));
+        if (data.optJSONArray("topCustomers") != null) addVisitorReportTopCustomers(data.optJSONArray("topCustomers"));
         addVisitorReportSyncCard();
+    }
+
+    private String reportCount(JSONObject row, String key) {
+        Long value = VisitorReportData.count(row, key);
+        return value == null ? "—" : formatNumber(value);
+    }
+
+    private String reportAmount(JSONObject row, String key) {
+        Double value = VisitorReportData.amount(row, key);
+        return value == null ? "—" : money(value);
+    }
+
+    private void addVisitorReportFact(LinearLayout parent, String title, String detail, int accent) {
+        LinearLayout row = new LinearLayout(this); row.setOrientation(LinearLayout.VERTICAL); row.setPadding(dp(12), dp(10), dp(12), dp(10));
+        row.setBackground(roundedStroke(alpha(accent, isLightTheme() ? 12 : 22), 16, alpha(accent, 55)));
+        row.addView(text(title, 12.2f, TEXT, Typeface.BOLD), new LinearLayout.LayoutParams(-1, -2));
+        row.addView(text(detail, 10.2f, MUTED, Typeface.NORMAL), new LinearLayout.LayoutParams(-1, -2));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2); lp.setMargins(0, dp(7), 0, 0); parent.addView(row, lp);
     }
 
     private void addVisitorReportPerformanceCard(JSONObject today, JSONObject week, JSONObject month, JSONObject visitsWeek, JSONObject price2Today, JSONObject price2Month, JSONObject sales) {
         LinearLayout c = card(); c.setBackground(themedSectionBg("visitor_reports", 28));
-        c.addView(visitorSectionTitle("عملکرد و هدف فروش", "◎", navAccent("visitor_reports")), new LinearLayout.LayoutParams(-1, -2));
-        addVisitorProgressLine(c, "پیش‌فاکتور امروز", money(today == null ? 0 : today.optDouble("amount", 0)) + " • " + formatNumber(today == null ? 0 : today.optLong("count", 0)) + " عدد", Math.min(1d, (today == null ? 0 : today.optDouble("amount", 0)) / Math.max(1d, visitorGoalTarget(new JSONObject()))), GOLD_2);
-        addVisitorProgressLine(c, "پوشش هفتگی", formatNumber(visitsWeek == null ? 0 : visitsWeek.optLong("count", 0)) + " بازدید • " + money(week == null ? 0 : week.optDouble("amount", 0)), Math.min(1d, (visitsWeek == null ? 0 : visitsWeek.optLong("count", 0)) / 35d), SUCCESS);
-        addVisitorProgressLine(c, "اقلام قیمت ۲", formatNumber(price2Month == null ? 0 : price2Month.optLong("items", 0)) + " قلم در ۳۰ روز", Math.min(1d, (price2Month == null ? 0 : price2Month.optLong("items", 0)) / 40d), WARNING);
+        c.addView(visitorSectionTitle("خلاصهٔ عملکرد", "◎", navAccent("visitor_reports")), new LinearLayout.LayoutParams(-1, -2));
+        addVisitorReportFact(c, "پیش‌فاکتور امروز", reportAmount(today, "amount") + " • تعداد: " + reportCount(today, "count"), GOLD_2);
+        addVisitorReportFact(c, "۷ روز اخیر", "ویزیت ثبت‌شده: " + reportCount(visitsWeek, "count") + " • مبلغ پیش‌فاکتور: " + reportAmount(week, "amount"), SUCCESS);
+        addVisitorReportFact(c, "اقلام قیمت ۲", reportCount(price2Month, "items") + " قلم در ۳۰ روز", WARNING);
         LinearLayout row = new LinearLayout(this); row.setOrientation(LinearLayout.HORIZONTAL);
-        row.addView(visitorMetricBox("۳۰ روز", money(month == null ? 0 : month.optDouble("amount", 0)), GOLD), weightedMiniLp());
-        row.addView(visitorMetricBox("تایید", formatNumber(month == null ? 0 : month.optLong("approved", 0)), SUCCESS), weightedMiniLp());
-        row.addView(visitorMetricBox("آخرین فروش", stringOr(sales == null ? "" : sales.optString("date", ""), "—"), INFO), weightedMiniLp());
+        row.addView(visitorMetricBox("پیش‌فاکتور ۳۰ روز", reportAmount(month, "amount"), GOLD), weightedMiniLp());
+        row.addView(visitorMetricBox("تأیید یا تبدیل", reportCount(month, "approved"), SUCCESS), weightedMiniLp());
+        row.addView(visitorMetricBox("آخرین روز فروش", faDigits(stringOr(sales == null ? "" : sales.optString("date", ""), "—")), INFO), weightedMiniLp());
         LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, -2); rp.setMargins(0, dp(8), 0, 0); c.addView(row, rp);
         LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2); cp.setMargins(0, dp(12), 0, dp(12)); content.addView(c, cp);
     }
@@ -16741,7 +16759,7 @@ public class MainActivity extends Activity {
         for (int i = 0; rows != null && i < rows.length(); i++) {
             JSONObject r = rows.optJSONObject(i); if (r == null) continue;
             int accent = prefactorStatusAccent(r.optString("status", ""));
-            addVisitorProgressLine(c, prefactorStatusFa(r.optString("status", "")), money(r.optDouble("amount", 0)) + " • " + formatNumber(r.optLong("count", 0)) + " عدد", Math.min(1d, r.optLong("count", 0) / 12d), accent);
+            addVisitorReportFact(c, prefactorStatusFa(r.optString("status", "")), reportAmount(r, "amount") + " • تعداد: " + reportCount(r, "count"), accent);
         }
         LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2); cp.setMargins(0, 0, 0, dp(12)); content.addView(c, cp);
     }
@@ -16784,7 +16802,7 @@ public class MainActivity extends Activity {
         LinearLayout offline = card();
         offline.setBackground(themedSectionBg("cart", 28));
         offline.addView(visitorSectionTitle("همگام‌سازی و ارسال", "▣", navAccent("cart")), new LinearLayout.LayoutParams(-1, -2));
-        offline.addView(text(offlineQueue().length() > 0 ? "چند پیش‌فاکتور در صف آفلاین منتظر ارسال هستند." : "صف آفلاین خالی است؛ همه سفارش‌های ثبت‌شده آماده/ارسال شده‌اند.", 11.0f, MUTED, Typeface.BOLD), new LinearLayout.LayoutParams(-1, -2));
+        offline.addView(text(offlineQueue().length() > 0 ? "پیش‌فاکتورهایی در صف آفلاین گوشی هستند." : "صف آفلاین گوشی خالی است.", 11.0f, MUTED, Typeface.BOLD), new LinearLayout.LayoutParams(-1, -2));
         LinearLayout r1 = new LinearLayout(this); r1.setOrientation(LinearLayout.HORIZONTAL);
         Button sync = themedActionButton(offlineQueue().length() > 0 ? "ارسال صف آفلاین" : "بررسی اتصال و صف", offlineQueue().length() > 0 ? DANGER : SUCCESS, true); sync.setOnClickListener(v -> trySendOfflineQueue());
         Button route = themedActionButton("مسیر ویزیت", navAccent("visitor_dashboard"), false); route.setOnClickListener(v -> loadVisitRoutePage(""));

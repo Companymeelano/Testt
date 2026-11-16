@@ -17689,7 +17689,7 @@ public class MainActivity extends Activity {
             String phone = resolveFlexible(cols, "cell", "mobile", "Mobile", "tell1", "tel1", "phone", "Phone", "تلفن", "موبایل");
             String credit = resolveFlexible(cols, "cred", "credit", "Credit", "credit_limit", "Limit", "etebar", "Etebar", "سقف_اعتبار");
             String blackList = resolveFlexible(cols, "black_list");
-            String address = resolveFlexible(cols, "address", "Address", "addr", "Adress", "آدرس", "نشانی");
+            String address = resolveFlexible(cols, "address", "Address", "addr", "Adress", "آدرس", "نشانی", "addre");
             String blocked = resolveFlexible(cols, "blocked", "blacklist", "lock", "is_blocked", "active", "Active");
             String route = resolveFlexible(cols, "route", "Route", "masir", "Masir", "مسیر", "مسير", "day", "Day", "visit_day", "VisitDay", "rooz", "Rooz", "روز");
             if (shmo == null) return "[]";
@@ -19648,13 +19648,55 @@ public class MainActivity extends Activity {
 
     private void loadVisitRoutePage(String search){
         if (!canUsePermission("visit_route")) { redirectToAllowedPage("visit_route"); return; }
-        content.removeAllViews(); addHero("مسیر بازدید امروز","مشتریان قابل پیگیری، شروع سریع پیش‌فاکتور و ثبت نتیجه بازدید"); addSearchBox("جستجوی مشتری مسیر…", search, q -> loadVisitRoutePage(q)); LinearLayout list=new LinearLayout(this); list.setOrientation(LinearLayout.VERTICAL); content.addView(list,new LinearLayout.LayoutParams(-1,-2)); addLoading(list,"در حال آماده‌سازی مسیر…");
+        content.removeAllViews(); addHero("پیگیری مشتریان", "جستجوی مشتری و ثبت نتیجهٔ بازدید"); addSearchBox("جستجوی نام، کد یا شماره…", search, q -> loadVisitRoutePage(q)); LinearLayout list=new LinearLayout(this); list.setOrientation(LinearLayout.VERTICAL); content.addView(list,new LinearLayout.LayoutParams(-1,-2)); addLoading(list,"در حال دریافت مشتریان…");
         runDb(() -> queryCartCustomers(search), new DbCallback(){ @Override public void ok(String body){ try{ renderVisitRoute(new JSONArray(body), search); }catch(Exception e){ showPageError("مسیر بازدید",e,()->loadVisitRoutePage(search)); }} @Override public void fail(Exception e){ showPageError("مسیر بازدید",e,()->loadVisitRoutePage(search)); }});
     }
 
-    private void renderVisitRoute(JSONArray rows,String search){
-        content.removeAllViews(); addHero("مسیر بازدید امروز","نتیجه هر بازدید را ثبت کنید یا مستقیم برای مشتری پیش‌فاکتور بسازید"); addSearchBox("جستجوی مشتری مسیر…", search, q -> loadVisitRoutePage(q)); LinearLayout list=new LinearLayout(this); list.setOrientation(LinearLayout.VERTICAL); content.addView(list,new LinearLayout.LayoutParams(-1,-2)); if(rows==null||rows.length()==0){ addEmptyTo(list,"مشتری برای مسیر امروز پیدا نشد."); return; }
-        for(int i=0;i<rows.length();i++){ JSONObject r=rows.optJSONObject(i); if(r==null)continue; LinearLayout c=card(); int accent=r.optDouble("balance",0)>0?WARNING:SUCCESS; c.setBackground(roundedStroke(alpha(accent,16),22,alpha(accent,68))); c.addView(text(r.optString("name","مشتری")+" • کد "+r.optString("code",""),13,TEXT,Typeface.BOLD),new LinearLayout.LayoutParams(-1,-2)); c.addView(text("مانده: "+money(r.optDouble("balance",0))+" • آخرین خرید: "+stringOr(r.optString("lastSale"),"—")+" • تلفن: "+stringOr(r.optString("phone"),"—"),10.2f,MUTED,Typeface.NORMAL),new LinearLayout.LayoutParams(-1,-2)); LinearLayout row=new LinearLayout(this); row.setOrientation(LinearLayout.HORIZONTAL); Button order=primaryButton("شروع پیش‌فاکتور"); order.setTextSize(fs(8.6f)); order.setOnClickListener(v->{ visitorCartCustomer=r; if(visitorCartAddress.trim().isEmpty())visitorCartAddress=r.optString("address",""); showApp("cart"); }); Button result=secondaryButton("ثبت نتیجه بازدید"); result.setTextSize(fs(8.6f)); result.setOnClickListener(v->showVisitResultDialog(r)); row.addView(order,weightedButtonLp()); row.addView(result,weightedButtonLp()); LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(-1,-2); rp.setMargins(0,dp(8),0,0); c.addView(row,rp); LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2); cp.setMargins(0,0,0,dp(10)); list.addView(c,cp); }
+    private void renderVisitRoute(JSONArray rows, String search) {
+        content.removeAllViews();
+        addHero("پیگیری مشتریان", "برای انتخاب مشتری دیگر نام، کد یا شماره را جستجو کنید.");
+        addSearchBox("جستجوی نام، کد یا شماره…", search, q -> loadVisitRoutePage(q));
+        LinearLayout list = new LinearLayout(this); list.setOrientation(LinearLayout.VERTICAL);
+        content.addView(list, new LinearLayout.LayoutParams(-1, -2));
+        if (rows == null || rows.length() == 0) { addEmptyTo(list, "مشتری یافت نشد."); return; }
+        if (!STORE_EDITION) {
+            TextView limit = text("حداکثر پنج نتیجه نمایش داده می‌شود؛ این فهرست برنامهٔ مسیر امروز نیست.", 10.5f, MUTED, Typeface.BOLD);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2); lp.setMargins(dp(4), 0, dp(4), dp(10)); list.addView(limit, lp);
+        }
+        for (int i = 0; i < rows.length(); i++) {
+            JSONObject customer = rows.optJSONObject(i);
+            if (customer != null) addVisitFollowupCard(list, customer);
+        }
+    }
+
+    /** Uses the existing scoped lookup; no visit or order is submitted by opening this card. */
+    private void addVisitFollowupCard(LinearLayout list, JSONObject customer) {
+        int accent = navAccent("visit");
+        LinearLayout c = card(); c.setPadding(dp(14), dp(12), dp(14), dp(12)); c.setBackground(themedSectionBg("visit", 24));
+        String name = stringOr(customer.optString("name", ""), "مشتری");
+        String phone = customer.optString("phone", "").trim();
+        String address = customer.optString("address", "").trim();
+        c.addView(text(name, 15.5f, TEXT, Typeface.BOLD), new LinearLayout.LayoutParams(-1, -2));
+        c.addView(text("کد " + faDigits(stringOr(customer.optString("code", ""), "—")) + " • مانده: " + money(customer.optDouble("balance", 0)), 10.8f, MUTED, Typeface.NORMAL), new LinearLayout.LayoutParams(-1, -2));
+        if (!phone.isEmpty() && !"—".equals(phone)) c.addView(text("تلفن: " + faDigits(phone), 10.6f, TEXT, Typeface.NORMAL), new LinearLayout.LayoutParams(-1, -2));
+        if (!address.isEmpty() && !"—".equals(address)) c.addView(text("نشانی: " + address, 10.6f, TEXT, Typeface.NORMAL), new LinearLayout.LayoutParams(-1, -2));
+
+        LinearLayout actions = new LinearLayout(this); actions.setOrientation(LinearLayout.HORIZONTAL);
+        Button order = themedActionButton("پیش‌فاکتور", accent, false); setVisitorActionIcon(order, R.drawable.visitor_action_invoice);
+        order.setOnClickListener(v -> { visitorCartCustomer = customer; if (visitorCartAddress.trim().isEmpty()) visitorCartAddress = customer.optString("address", ""); showApp("cart"); });
+        Button result = themedActionButton("ثبت نتیجه", accent, false); setVisitorActionIcon(result, R.drawable.visitor_action_result); result.setOnClickListener(v -> showVisitResultDialog(customer));
+        actions.addView(order, weightedButtonLp()); actions.addView(result, weightedButtonLp());
+        LinearLayout.LayoutParams ap = new LinearLayout.LayoutParams(-1, -2); ap.setMargins(0, dp(10), 0, 0); c.addView(actions, ap);
+
+        LinearLayout contact = new LinearLayout(this); contact.setOrientation(LinearLayout.HORIZONTAL);
+        if (!phone.isEmpty() && !"—".equals(phone) && canUsePermission("customer_call")) {
+            Button call = themedActionButton("تماس", accent, false); setVisitorActionIcon(call, R.drawable.visitor_action_call); call.setContentDescription("تماس با " + name); call.setOnClickListener(v -> { if (ensurePermission("customer_call", "تماس مشتری")) openPhoneDialer(phone); }); contact.addView(call, weightedButtonLp());
+        }
+        if (!address.isEmpty() && !"—".equals(address)) {
+            Button map = themedActionButton("مسیریابی", accent, false); setVisitorActionIcon(map, R.drawable.visitor_action_route); map.setContentDescription("مسیریابی تا " + name); map.setOnClickListener(v -> openAddressInMap(address)); contact.addView(map, weightedButtonLp());
+        }
+        if (contact.getChildCount() > 0) { LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2); cp.setMargins(0, dp(6), 0, 0); c.addView(contact, cp); }
+        LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(-1, -2); cardLp.setMargins(0, 0, 0, dp(10)); list.addView(c, cardLp);
     }
 
     private void showVisitResultDialog(JSONObject customer){

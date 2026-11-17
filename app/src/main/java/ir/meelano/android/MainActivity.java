@@ -10847,7 +10847,7 @@ public class MainActivity extends Activity {
         LinearLayout actions = new LinearLayout(this); actions.setOrientation(LinearLayout.HORIZONTAL);
         Button visit = themedActionButton("ثبت ویزیت", navAccent("visitor_dashboard"), false); setVisitorActionIcon(visit, R.drawable.visitor_action_visit); visit.setOnClickListener(v -> loadVisitRoutePage(r.optString("کد", "")));
         Button showcase = themedActionButton("فروش", navAccent("showcase"), true); setVisitorActionIcon(showcase, R.drawable.visitor_action_product); showcase.setContentDescription("شروع فروش به " + r.optString("نام", "این مشتری"));
-        showcase.setOnClickListener(v -> { JSONObject cust = cartCustomerFromRow(r); visitorCartCustomer = cust; if (visitorCartAddress.trim().isEmpty()) visitorCartAddress = cust.optString("address", ""); autosaveCart(false); showNotice("مشتری سبد: " + cust.optString("name", ""), false); showApp("showcase"); });
+        showcase.setOnClickListener(v -> openVisitorCustomerWithAddressReview(cartCustomerFromRow(r), "showcase", true));
         Button call = themedActionButton("تماس", SUCCESS, false); setVisitorActionIcon(call, R.drawable.visitor_action_call); call.setOnClickListener(v -> { if (ensurePermission("customer_call", "تماس مشتری")) openPhoneDialer(firstPhone(r)); });
         actions.addView(visit, weightedButtonLp()); actions.addView(showcase, weightedButtonLp()); actions.addView(call, weightedButtonLp());
         LinearLayout.LayoutParams ap = new LinearLayout.LayoutParams(-1, -2); ap.setMargins(0, dp(9), 0, 0); c.addView(actions, ap);
@@ -17512,6 +17512,38 @@ public class MainActivity extends Activity {
         return b.toString();
     }
 
+    /** Review a potentially stale delivery address before changing the cart's customer. */
+    private void openVisitorCustomerWithAddressReview(JSONObject customer, String destination, boolean saveDraft) {
+        if (customer == null) return;
+        String previousCode = visitorCartCustomer == null ? "" : visitorCartCustomer.optString("code", "");
+        String nextCode = customer.optString("code", "");
+        String existingAddress = visitorCartAddress == null ? "" : visitorCartAddress;
+        String nextAddress = customer.optString("address", "");
+        Runnable keep = () -> {
+            visitorCartCustomer = customer;
+            if (visitorCartAddress == null || visitorCartAddress.trim().isEmpty()) visitorCartAddress = nextAddress;
+            if (saveDraft) autosaveCart(false);
+            showApp(destination);
+        };
+        if (!VisitorAddressReview.required(previousCode, nextCode, existingAddress)) { keep.run(); return; }
+        Runnable replace = () -> {
+            visitorCartAddress = nextAddress;
+            visitorCartCustomer = customer;
+            if (saveDraft) autosaveCart(false);
+            showApp(destination);
+        };
+        String proposed = nextAddress.trim().isEmpty() ? "برای مشتری جدید نشانی ثبت نشده است." : "نشانی مشتری جدید: " + nextAddress;
+        AlertDialog dialog = new MeelanoDialogBuilder()
+                .setTitle("بررسی نشانی سبد")
+                .setMessage("با تغییر مشتری، نشانی فعلی سبد ممکن است متعلق به مشتری قبلی باشد.\n\nنشانی فعلی: " + existingAddress + "\n\n" + proposed)
+                .setNegativeButton("انصراف", null)
+                .setNeutralButton(nextAddress.trim().isEmpty() ? "پاک کردن نشانی" : "نشانی مشتری جدید", (d, w) -> replace.run())
+                .setPositiveButton("حفظ نشانی فعلی", (d, w) -> keep.run())
+                .create();
+        styleMeelanoDialog(dialog, navAccent("visit"));
+        dialog.show();
+    }
+
     /** Home card: the next customer with «شروع ویزیت», call, route and skip. */
     private void addVisitorNextCustomerCard() {
         JSONObject r = nextCustomerSuggestion();
@@ -17537,7 +17569,7 @@ public class MainActivity extends Activity {
         }
         Button start = themedActionButton("شروع ویزیت این مشتری", accent, false);
         setVisitorActionIcon(start, R.drawable.visitor_action_visit);
-        start.setOnClickListener(v -> { visitorCartCustomer = cust; if (visitorCartAddress.trim().isEmpty()) visitorCartAddress = addr; autosaveCart(false); showNotice("مشتری سبد: " + cust.optString("name", ""), false); showApp("showcase"); });
+        start.setOnClickListener(v -> openVisitorCustomerWithAddressReview(cust, "showcase", true));
         LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-1, dp(50)); sp.setMargins(0, dp(10), 0, 0); c.addView(start, sp);
         LinearLayout row = new LinearLayout(this); row.setOrientation(LinearLayout.HORIZONTAL);
         Button call = themedActionButton("تماس", SUCCESS, false); call.setContentDescription("تماس با " + cust.optString("name", "مشتری"));
@@ -19701,7 +19733,7 @@ public class MainActivity extends Activity {
 
         LinearLayout actions = new LinearLayout(this); actions.setOrientation(LinearLayout.HORIZONTAL);
         Button order = themedActionButton("پیش‌فاکتور", accent, false); setVisitorActionIcon(order, R.drawable.visitor_action_invoice);
-        order.setOnClickListener(v -> { visitorCartCustomer = customer; if (visitorCartAddress.trim().isEmpty()) visitorCartAddress = customer.optString("address", ""); showApp("cart"); });
+        order.setOnClickListener(v -> openVisitorCustomerWithAddressReview(customer, "cart", false));
         Button result = themedActionButton("ثبت نتیجه", accent, false); setVisitorActionIcon(result, R.drawable.visitor_action_result); result.setOnClickListener(v -> showVisitResultDialog(customer));
         actions.addView(order, weightedButtonLp()); actions.addView(result, weightedButtonLp());
         LinearLayout.LayoutParams ap = new LinearLayout.LayoutParams(-1, -2); ap.setMargins(0, dp(10), 0, 0); c.addView(actions, ap);

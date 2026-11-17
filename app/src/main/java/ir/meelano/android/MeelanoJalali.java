@@ -104,6 +104,19 @@ final class MeelanoJalali {
         return g2d(c.get(Calendar.YEAR), c.get(Calendar.MONTH) + 1, c.get(Calendar.DAY_OF_MONTH));
     }
 
+    /** Format the app's stored Gregorian refresh timestamp without changing the stored value. */
+    static String displayGregorianTimestamp(String value) {
+        if (value == null || !value.matches("\\d{4}/\\d{2}/\\d{2} \\d{2}:\\d{2}")) return value;
+        try {
+            java.text.SimpleDateFormat parser = new java.text.SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.US);
+            parser.setLenient(false);
+            Calendar calendar = Calendar.getInstance();
+            calendar.setTime(parser.parse(value));
+            int day = gregorianDay(calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH) + 1, calendar.get(Calendar.DAY_OF_MONTH));
+            return format(day) + value.substring(10);
+        } catch (Exception ignored) { return value; }
+    }
+
     static String addDays(String date, int days) {
         int d = parse(date);
         return d < 0 ? date : format(d + days);

@@ -11762,7 +11762,7 @@ public class MainActivity extends Activity {
 
         c.addView(visitorSectionTitle("امروز در یک نگاه", "◆", accent), new LinearLayout.LayoutParams(-1, -2));
         LinearLayout hintRow = new LinearLayout(this); hintRow.setOrientation(LinearLayout.HORIZONTAL); hintRow.setGravity(Gravity.CENTER_VERTICAL);
-        TextView hint = text("خلاصهٔ کار امروز شما • بروزرسانی: " + lastRefreshText("visitor_dashboard"), 10.3f, MUTED, Typeface.BOLD);
+        TextView hint = text("آخرین بروزرسانی: " + faDigits(MeelanoJalali.displayGregorianTimestamp(lastRefreshText("visitor_dashboard"))), 10.3f, MUTED, Typeface.BOLD);
         hint.setMaxLines(2); hintRow.addView(hint, new LinearLayout.LayoutParams(0, -2, 1f));
         Button refresh = themedActionButton("بروزرسانی", accent, false); refresh.setTextSize(fs(8.8f)); refresh.setContentDescription("بروزرسانی اطلاعات امروز");
         setVisitorActionIcon(refresh, R.drawable.visitor_action_refresh);
@@ -11823,12 +11823,12 @@ public class MainActivity extends Activity {
         if (target <= 0) progress = conversion;
         String pct = formatNumber(Math.round(progress * 100)) + "٪";
         VisitorGoalRingView ring = new VisitorGoalRingView(this, progress, pct, target > 0 ? "هدف" : "تبدیل");
-        panel.addView(ring, new LinearLayout.LayoutParams(dp(132), dp(132)));
+        panel.addView(ring, new LinearLayout.LayoutParams(dp(104), dp(104)));
         LinearLayout right = new LinearLayout(this);
         right.setOrientation(LinearLayout.VERTICAL);
         right.setPadding(dp(9), 0, dp(4), 0);
         right.addView(text("نبض امروز", 13.2f, TEXT, Typeface.BOLD), new LinearLayout.LayoutParams(-1, -2));
-        right.addView(text(target > 0 ? ("مانده هدف: " + money(remain)) : "هدف ثبت نشده؛ عملکرد لحظه‌ای نمایش داده می‌شود.", 9.4f, MUTED, Typeface.BOLD), new LinearLayout.LayoutParams(-1, -2));
+        right.addView(text(target > 0 ? ("مانده هدف: " + money(remain)) : "هدف فروش ثبت نشده است.", 9.4f, MUTED, Typeface.BOLD), new LinearLayout.LayoutParams(-1, -2));
         // Counts and money used to share one bar scale, which flattened the count bars to zero.
         // Show the two counts as chips and a visit→pre-invoice conversion bar instead.
         LinearLayout chips = new LinearLayout(this);
@@ -11851,7 +11851,7 @@ public class MainActivity extends Activity {
             LinearLayout.LayoutParams convLp = new LinearLayout.LayoutParams(-1, -2); convLp.setMargins(0, dp(8), 0, dp(3));
             right.addView(convRow, convLp);
             right.addView(overviewMeter(conv, SUCCESS), new LinearLayout.LayoutParams(-1, dp(8)));
-        } else {
+        } else if (visits == 0) {
             TextView none = text("هنوز ویزیتی برای امروز ثبت نشده است.", 10.5f, MUTED, Typeface.NORMAL);
             LinearLayout.LayoutParams nlp = new LinearLayout.LayoutParams(-1, -2); nlp.setMargins(0, dp(8), 0, 0);
             right.addView(none, nlp);
@@ -11863,8 +11863,8 @@ public class MainActivity extends Activity {
     private void addVisitorHomeCharts(JSONObject data) {
         LinearLayout c = card();
         c.setBackground(themedSectionBg("visitor_dashboard", 30));
-        c.addView(visitorSectionTitle("روند فروش", "◈", navAccent("visitor_dashboard")), new LinearLayout.LayoutParams(-1, -2));
-        c.addView(text("فروش هفت روز اخیر.", 10.1f, MUTED, Typeface.BOLD), new LinearLayout.LayoutParams(-1, -2));
+        c.addView(visitorSectionTitle("روند پیش‌فاکتورها", "◈", navAccent("visitor_dashboard")), new LinearLayout.LayoutParams(-1, -2));
+        c.addView(text("مبلغ پیش‌فاکتورهای هفت روز اخیر.", 10.1f, MUTED, Typeface.BOLD), new LinearLayout.LayoutParams(-1, -2));
 
         LinearLayout trendPanel = visitorChartPanel("روند ۷ روزه پیش‌فاکتور", "جمع مبلغ ثبت‌شده هر روز", navAccent("visit"));
         JSONArray trend = data == null ? null : data.optJSONArray("weekTrend");
@@ -11968,18 +11968,17 @@ public class MainActivity extends Activity {
     private void addVisitorQuietOpportunitiesCard(JSONObject data) {
         int accent = mix(navAccent("visit"), INFO, 0.25f);
         LinearLayout c = card(); c.setBackground(themedSectionBg("visit", 28));
-        c.addView(visitorSectionTitle("فرصت‌های آرام امروز", "✦", accent), new LinearLayout.LayoutParams(-1, -2));
-        c.addView(text("پیشنهادهایی برای قدم بعدی.", 10.1f, MUTED, Typeface.BOLD), new LinearLayout.LayoutParams(-1, -2));
+        c.addView(visitorSectionTitle("پیگیری‌های پیشنهادی", "✦", accent), new LinearLayout.LayoutParams(-1, -2));
         addVisitorSoftOpportunity(c, "پیش‌نویس آماده", formatNumber(localDrafts().length()) + " مورد", localDrafts().length() > 0 ? WARNING : SUCCESS, () -> showSavedDraftsDialog());
         addVisitorSoftOpportunity(c, "صف ارسال", formatNumber(offlineQueue().length()) + " مورد", offlineQueue().length() > 0 ? DANGER : SUCCESS, () -> trySendOfflineQueue());
         JSONArray inactive = data == null ? null : data.optJSONArray("inactiveCustomers");
-        addVisitorSoftOpportunity(c, "مشتری قابل پیگیری", formatNumber(inactive == null ? 0 : inactive.length()) + " مورد", INFO, () -> showApp("customers"));
+        addVisitorSoftOpportunity(c, "مشتری قابل پیگیری", inactive == null ? "—" : formatNumber(inactive.length()) + " مورد", INFO, () -> showApp("customers"));
         LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2); cp.setMargins(0, 0, 0, dp(12)); content.addView(c, cp);
     }
 
     private void addVisitorSoftOpportunity(LinearLayout parent, String title, String value, int accent, final Runnable action) {
         LinearLayout row = new LinearLayout(this); row.setOrientation(LinearLayout.HORIZONTAL); row.setGravity(Gravity.CENTER_VERTICAL); row.setPadding(dp(9), dp(8), dp(9), dp(8));
-        row.setClickable(true); row.setFocusable(true); row.setBackground(roundedStroke(alpha(accent, isLightTheme() ? 14 : 24), 18, alpha(accent, 62))); applyTouchFeedback(row);
+        row.setClickable(true); row.setFocusable(true); row.setMinimumHeight(dp(44)); row.setContentDescription(title + "، " + value); row.setBackground(roundedStroke(alpha(accent, isLightTheme() ? 14 : 24), 18, alpha(accent, 62))); applyTouchFeedback(row);
         row.setOnClickListener(v -> { if (action != null) action.run(); });
         TextView v = text(value, 10.2f, tc(accent), Typeface.BOLD); v.setGravity(Gravity.CENTER); v.setSingleLine(true); row.addView(v, new LinearLayout.LayoutParams(dp(92), dp(32)));
         TextView t = text(title, 11.4f, TEXT, Typeface.BOLD); t.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL); row.addView(t, new LinearLayout.LayoutParams(0, dp(32), 1f));
@@ -12032,13 +12031,14 @@ public class MainActivity extends Activity {
     }
 
     private void addVisitorVisitTile(LinearLayout parent, String title, String sub, int iconResource, int accent, final Runnable action) {
-        LinearLayout tile = new LinearLayout(this); tile.setOrientation(LinearLayout.VERTICAL); tile.setGravity(Gravity.CENTER); tile.setPadding(dp(8), dp(9), dp(8), dp(9));
-        tile.setClickable(true); tile.setFocusable(true); tile.setMinimumHeight(dp(116)); tile.setContentDescription(title + "، " + sub); tile.setBackground(gradient(new int[]{alpha(accent, isLightTheme() ? 24 : 38), alpha(SURFACE_2, 246)}, GradientDrawable.Orientation.TL_BR, 24));
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) tile.setElevation(dp(3));
+        LinearLayout tile = new LinearLayout(this); tile.setOrientation(LinearLayout.HORIZONTAL); tile.setGravity(Gravity.CENTER_VERTICAL); tile.setPadding(dp(8), dp(9), dp(8), dp(9));
+        tile.setClickable(true); tile.setFocusable(true); tile.setMinimumHeight(dp(76)); tile.setContentDescription(title + "، " + sub); tile.setBackground(roundedStroke(alpha(accent, isLightTheme() ? 13 : 24), 18, alpha(accent, isLightTheme() ? 45 : 64)));
         applyTouchFeedback(tile); tile.setOnClickListener(v -> { if (action != null) action.run(); });
-        android.widget.ImageView icon = new android.widget.ImageView(this); icon.setPadding(dp(10), dp(10), dp(10), dp(10)); icon.setImageResource(iconResource); icon.setImageTintList(android.content.res.ColorStateList.valueOf(onColorFor(accent))); icon.setBackground(luxuryButtonBg(accent, true, 999)); icon.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO); tile.addView(icon, new LinearLayout.LayoutParams(dp(46), dp(46)));
-        TextView tt = text(title, 12.5f, TEXT, Typeface.BOLD); tt.setGravity(Gravity.CENTER); LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(-1, -2); tp.setMargins(0, dp(6), 0, 0); tile.addView(tt, tp);
-        TextView ss = text(sub, 9.0f, MUTED, Typeface.BOLD); ss.setGravity(Gravity.CENTER); tile.addView(ss, new LinearLayout.LayoutParams(-1, -2));
+        android.widget.ImageView icon = new android.widget.ImageView(this); icon.setPadding(dp(9), dp(9), dp(9), dp(9)); icon.setImageResource(iconResource); icon.setImageTintList(android.content.res.ColorStateList.valueOf(onColorFor(accent))); icon.setBackground(luxuryButtonBg(accent, true, 999)); icon.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO); tile.addView(icon, new LinearLayout.LayoutParams(dp(42), dp(42)));
+        LinearLayout copy = new LinearLayout(this); copy.setOrientation(LinearLayout.VERTICAL); copy.setPaddingRelative(dp(7), 0, 0, 0);
+        TextView tt = text(title, 11.5f, TEXT, Typeface.BOLD); tt.setGravity(Gravity.START); copy.addView(tt, new LinearLayout.LayoutParams(-1, -2));
+        TextView ss = text(sub, 9.0f, MUTED, Typeface.BOLD); ss.setGravity(Gravity.START); copy.addView(ss, new LinearLayout.LayoutParams(-1, -2));
+        tile.addView(copy, new LinearLayout.LayoutParams(0, -2, 1f));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -2, 1f); lp.setMargins(dp(4), 0, dp(4), 0); parent.addView(tile, lp);
     }
 
@@ -17558,7 +17558,7 @@ public class MainActivity extends Activity {
         String last = cust.optString("lastSale", "").trim();
         double bal = cust.optDouble("balance", 0);
         LinearLayout chips = new LinearLayout(this); chips.setOrientation(LinearLayout.HORIZONTAL);
-        chips.addView(pill(last.isEmpty() ? "هنوز خرید نداشته" : "آخرین خرید: " + faDigits(last), INFO, false), new LinearLayout.LayoutParams(-2, -2));
+        chips.addView(pill(last.isEmpty() ? "تاریخ خرید نامشخص" : "آخرین خرید: " + faDigits(last), INFO, false), new LinearLayout.LayoutParams(-2, -2));
         TextView balPill = pill(bal > 0 ? "بدهکار: " + money(bal) : "بدون بدهی", bal > 0 ? WARNING : SUCCESS, false);
         LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(-2, -2); bp.setMargins(dp(6), 0, 0, 0); chips.addView(balPill, bp);
         LinearLayout.LayoutParams chp = new LinearLayout.LayoutParams(-1, -2); chp.setMargins(0, dp(6), 0, 0); c.addView(chips, chp);
@@ -19870,8 +19870,8 @@ public class MainActivity extends Activity {
         JSONArray today = todayVisitLog();
         int accent = navAccent("visit");
         LinearLayout c = card(); c.setBackground(themedSectionBg("visit", 26));
-        c.addView(visitorSectionTitle("مسیر امروز", "⌖", accent), new LinearLayout.LayoutParams(-1, -2));
-        c.addView(text(today.length() == 0 ? "هنوز ویزیتی ثبت نشده است." : faDigits(String.valueOf(today.length())) + " ویزیت ثبت شده است.", 10.6f, MUTED, Typeface.BOLD), new LinearLayout.LayoutParams(-1, -2));
+        c.addView(visitorSectionTitle("بازدیدهای امروز", "⌖", accent), new LinearLayout.LayoutParams(-1, -2));
+        c.addView(text(today.length() == 0 ? "هنوز بازدیدی در این گوشی ثبت نشده است." : faDigits(String.valueOf(today.length())) + " بازدید در این گوشی ثبت شده است.", 10.6f, MUTED, Typeface.BOLD), new LinearLayout.LayoutParams(-1, -2));
         for (int i = Math.max(0, today.length() - 6); i < today.length(); i++) {
             JSONObject o = today.optJSONObject(i); if (o == null) continue;
             String t = o.optString("time", ""); int sp = t.indexOf(' ');
@@ -19880,7 +19880,8 @@ public class MainActivity extends Activity {
             row.setSingleLine(true); row.setEllipsize(TextUtils.TruncateAt.END);
             LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, -2); rp.setMargins(0, dp(5), 0, 0); c.addView(row, rp);
         }
-        Button map = themedActionButton("مسیر امروز روی نقشه", accent, false);
+        Button map = themedActionButton("نمایش بازدیدها روی نقشه", accent, false);
+        setVisitorActionIcon(map, R.drawable.visitor_action_route);
         map.setOnClickListener(v -> openTodayRouteMap());
         LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(-1, dp(48)); mp.setMargins(0, dp(9), 0, 0); c.addView(map, mp);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2); lp.setMargins(0, 0, 0, dp(12)); content.addView(c, lp);

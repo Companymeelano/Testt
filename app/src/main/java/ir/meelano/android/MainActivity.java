@@ -2555,6 +2555,25 @@ public class MainActivity extends Activity {
             b.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(alpha(GOLD, 70)), roundedStroke(alpha(SURFACE, isLightTheme() ? 240 : 46), BUTTON_RADIUS, alpha(mix(GOLD, TEXT, 0.25f), 150)), rounded(Color.WHITE, BUTTON_RADIUS)));
             b.setTextColor(tc(mix(GOLD, TEXT, 0.30f)));
         }
+        if (VISITOR_EDITION && tone != DANGER) {
+            // Keep the selected theme hue, but use quiet surfaces for secondary actions and
+            // a contrast-checked solid fill for the primary action.
+            int background;
+            int foreground;
+            if (primary) {
+                foreground = VisitorPalette.foreground(tone);
+                background = VisitorPalette.ensureContrast(tone, foreground, 7.0);
+            } else {
+                background = VisitorPalette.blend(SURFACE, tone, isLightTheme() ? 0.06 : 0.14);
+                foreground = VisitorPalette.ensureContrast(TEXT, background, 7.0);
+            }
+            GradientDrawable shape = roundedStroke(background, BUTTON_RADIUS,
+                    primary ? background : VisitorPalette.blend(background, foreground, 0.18));
+            b.setBackground(new android.graphics.drawable.RippleDrawable(
+                    android.content.res.ColorStateList.valueOf(alpha(foreground, 45)), shape,
+                    rounded(Color.WHITE, BUTTON_RADIUS)));
+            b.setTextColor(foreground);
+        }
         b.setTextDirection(View.TEXT_DIRECTION_FIRST_STRONG_RTL);
         b.setGravity(Gravity.CENTER);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -2597,6 +2616,10 @@ public class MainActivity extends Activity {
     }
 
     private GradientDrawable themedSectionBg(String page, float radius) {
+        if (VISITOR_EDITION) {
+            int base = mix(SURFACE, TEXT, isLightTheme() ? 0.015f : 0.035f);
+            return roundedStroke(base, radius, mix(base, TEXT, isLightTheme() ? 0.12f : 0.18f));
+        }
         int accent = navAccent(page);
         int glow = mix(accent, GOLD_2, isLightTheme() ? 0.12f : 0.18f);
         GradientDrawable d = gradient(new int[]{
@@ -2609,6 +2632,7 @@ public class MainActivity extends Activity {
     }
 
     private GradientDrawable visitorPanel(int accent, float radius) {
+        if (VISITOR_EDITION) return themedSectionBg("visitor_dashboard", radius);
         int hero = mix(accent, GOLD_2, isLightTheme() ? 0.10f : 0.16f);
         int companion = mix(hero, navAccent("showcase"), 0.12f);
         GradientDrawable d = gradient(new int[]{
@@ -11132,7 +11156,8 @@ public class MainActivity extends Activity {
     }
 
     private LinearLayout.LayoutParams weightedButtonLp() {
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(48), 1f);
+        // Let visitor actions grow with system font scale while preserving the 48dp minimum.
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, VISITOR_EDITION ? -2 : dp(48), 1f);
         lp.setMargins(dp(3), 0, dp(3), 0);
         return lp;
     }
@@ -12034,7 +12059,8 @@ public class MainActivity extends Activity {
         LinearLayout tile = new LinearLayout(this); tile.setOrientation(LinearLayout.HORIZONTAL); tile.setGravity(Gravity.CENTER_VERTICAL); tile.setPadding(dp(8), dp(9), dp(8), dp(9));
         tile.setClickable(true); tile.setFocusable(true); tile.setMinimumHeight(dp(76)); tile.setContentDescription(title + "، " + sub); tile.setBackground(roundedStroke(alpha(accent, isLightTheme() ? 13 : 24), 18, alpha(accent, isLightTheme() ? 45 : 64)));
         applyTouchFeedback(tile); tile.setOnClickListener(v -> { if (action != null) action.run(); });
-        android.widget.ImageView icon = new android.widget.ImageView(this); icon.setPadding(dp(9), dp(9), dp(9), dp(9)); icon.setImageResource(iconResource); icon.setImageTintList(android.content.res.ColorStateList.valueOf(onColorFor(accent))); icon.setBackground(luxuryButtonBg(accent, true, 999)); icon.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO); tile.addView(icon, new LinearLayout.LayoutParams(dp(42), dp(42)));
+        int iconInk = VisitorPalette.foreground(accent); int iconFill = VisitorPalette.ensureContrast(accent, iconInk, 4.5);
+        android.widget.ImageView icon = new android.widget.ImageView(this); icon.setPadding(dp(9), dp(9), dp(9), dp(9)); icon.setImageResource(iconResource); icon.setImageTintList(android.content.res.ColorStateList.valueOf(iconInk)); icon.setBackground(rounded(iconFill, 999)); icon.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO); tile.addView(icon, new LinearLayout.LayoutParams(dp(42), dp(42)));
         LinearLayout copy = new LinearLayout(this); copy.setOrientation(LinearLayout.VERTICAL); copy.setPaddingRelative(dp(7), 0, 0, 0);
         TextView tt = text(title, 11.5f, TEXT, Typeface.BOLD); tt.setGravity(Gravity.START); copy.addView(tt, new LinearLayout.LayoutParams(-1, -2));
         TextView ss = text(sub, 9.0f, MUTED, Typeface.BOLD); ss.setGravity(Gravity.START); copy.addView(ss, new LinearLayout.LayoutParams(-1, -2));
@@ -14334,7 +14360,8 @@ public class MainActivity extends Activity {
         tile.setClickable(true); tile.setFocusable(true); tile.setMinimumHeight(dp(58)); tile.setContentDescription(tool.title + "، " + tool.sub); tile.setBackground(roundedStroke(alpha(tool.accent, isLightTheme() ? 16 : 26), 20, alpha(tool.accent, 62))); applyTouchFeedback(tile);
         tile.setOnClickListener(v -> { if (tool.action != null) tool.action.run(); });
         if (tool.iconResource != 0) {
-            android.widget.ImageView icon = new android.widget.ImageView(this); icon.setPadding(dp(8), dp(8), dp(8), dp(8)); icon.setImageResource(tool.iconResource); icon.setImageTintList(android.content.res.ColorStateList.valueOf(onColorFor(tool.accent))); icon.setBackground(luxuryButtonBg(tool.accent, true, 999)); icon.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO); tile.addView(icon, new LinearLayout.LayoutParams(dp(38), dp(38)));
+            int ink = VisitorPalette.foreground(tool.accent); int fill = VisitorPalette.ensureContrast(tool.accent, ink, 4.5);
+            android.widget.ImageView icon = new android.widget.ImageView(this); icon.setPadding(dp(8), dp(8), dp(8), dp(8)); icon.setImageResource(tool.iconResource); icon.setImageTintList(android.content.res.ColorStateList.valueOf(ink)); icon.setBackground(rounded(fill, 999)); icon.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO); tile.addView(icon, new LinearLayout.LayoutParams(dp(38), dp(38)));
         } else {
             TextView icon = text(tool.glyph, 14, onColorFor(tool.accent), Typeface.BOLD); icon.setGravity(Gravity.CENTER); icon.setBackground(luxuryButtonBg(tool.accent, true, 999)); tile.addView(icon, new LinearLayout.LayoutParams(dp(38), dp(38)));
         }

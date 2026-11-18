@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   visitor-debug:
@@ -37,3 +37,24 @@ jobs:
           path: app/build/outputs/apk/visitor/debug/*.apk
           if-no-files-found: error
           retention-days: 14
+      # The artifact download requires a GitHub login. This repository already keeps APKs in
+      # dist/; publish the verified debug build there for a direct, public download as well.
+      - name: Publish visitor debug APK to this branch
+        if: github.event_name == 'push' && github.ref == 'refs/heads/arena/7c541236-testt'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "$GITHUB_REF_NAME"
+          if [ "$(git rev-parse FETCH_HEAD)" != "$GITHUB_SHA" ]; then
+            echo "Branch changed during the build; refusing to publish a stale APK." >&2
+            exit 1
+          fi
+          mkdir -p dist
+          cp app/build/outputs/apk/visitor/debug/app-visitor-debug.apk dist/visitor-preview-debug.apk
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -f dist/visitor-preview-debug.apk
+          if ! git diff --cached --quiet; then
+            git commit -m 'Publish visitor debug preview APK'
+            git push origin "HEAD:$GITHUB_REF_NAME"
+          fi

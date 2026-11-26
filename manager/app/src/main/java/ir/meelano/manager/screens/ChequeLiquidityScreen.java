@@ -346,13 +346,16 @@ public class ChequeLiquidityScreen extends Screen {
         long netAll = totalBalanceAll + totalPosAll - totalChecksAll;
 
         List<Kit.Kpi> kpis = new ArrayList<>();
-        kpis.add(new Kit.Kpi("جمع چک‌های جاری", RialFormatter.formatGrouped(totalChecksAll) + " ریال", bankSummaries.size() + " بانک • " + cheques.size() + " فقره", Theme.DANGER));
-        kpis.add(new Kit.Kpi("پوز در انتظار فردا", RialFormatter.formatGrouped(totalPosAll) + " ریال", posIncludeYesterday ? "امروز+دیروز (قبل ۴ صبح)" : "امروز", Theme.INFO));
-        kpis.add(new Kit.Kpi("موجودی ثبت‌شده", RialFormatter.formatGrouped(totalBalanceAll) + " ریال", manualBalances.isEmpty() ? "ثبت نشده" : manualBalances.size() + " بانک", Theme.SUCCESS));
+        Kit.Kpi k1 = new Kit.Kpi("جمع چک‌های جاری", RialFormatter.formatGrouped(totalChecksAll) + " ریال", bankSummaries.size() + " بانک • " + cheques.size() + " فقره", Theme.DANGER);
+        k1.icon = ir.meelano.manager.R.drawable.mi_cheque; kpis.add(k1);
+        Kit.Kpi k2 = new Kit.Kpi("پوز در انتظار فردا", RialFormatter.formatGrouped(totalPosAll) + " ریال", posIncludeYesterday ? "امروز+دیروز (قبل ۴ صبح)" : "امروز", Theme.INFO);
+        k2.icon = ir.meelano.manager.R.drawable.mi_credit_card; kpis.add(k2);
+        Kit.Kpi k3 = new Kit.Kpi("موجودی ثبت‌شده", RialFormatter.formatGrouped(totalBalanceAll) + " ریال", manualBalances.isEmpty() ? "ثبت نشده" : manualBalances.size() + " بانک", Theme.SUCCESS);
+        k3.icon = ir.meelano.manager.R.drawable.mi_account_balance_wallet; kpis.add(k3);
         String netLabel = netAll >= 0 ? "مازاد" : "کسری";
         int netColor = netAll >= 0 ? Theme.SUCCESS : Theme.DANGER;
-        kpis.add(new Kit.Kpi(netLabel + " کل", RialFormatter.formatGrouped(Math.abs(netAll)) + " ریال", netAll >= 0 ? "پوشش کامل ✓" : "نیاز به تامین", netColor));
-        // Mark colors
+        Kit.Kpi k4 = new Kit.Kpi(netLabel + " کل", RialFormatter.formatGrouped(Math.abs(netAll)) + " ریال", netAll >= 0 ? "پوشش کامل ✓" : "نیاز به تامین", netColor);
+        k4.icon = netAll >= 0 ? ir.meelano.manager.R.drawable.mi_trending_up : ir.meelano.manager.R.drawable.mi_trending_down; kpis.add(k4);
         kpis.get(0).subColor = Theme.DANGER;
         kpis.get(3).subColor = netColor;
 
@@ -386,7 +389,9 @@ public class ChequeLiquidityScreen extends Screen {
         int selIdx = 0;
         for (int i = 0; i < rdfIds.size(); i++) if (rdfIds.get(i).equals(selectedBankRdf)) { selIdx = i; break; }
 
-        content.addView(a.kit.chips(names.toArray(new String[0]), selIdx, idx -> {
+        int[] bankIcons = new int[names.size()];
+        for (int i = 0; i < bankIcons.length; i++) bankIcons[i] = i == 0 ? ir.meelano.manager.R.drawable.mi_widgets : ir.meelano.manager.R.drawable.mi_account_balance;
+        content.addView(a.kit.chipsWithIcons(names.toArray(new String[0]), selIdx, bankIcons, Theme.GOLD, idx -> {
             selectedBankRdf = rdfIds.get(idx);
             selectedBankName = names.get(idx);
             render(content);
@@ -397,9 +402,10 @@ public class ChequeLiquidityScreen extends Screen {
     private void addDueWindowChips(LinearLayout content) {
         String[] labels = new String[]{"همه سررسیدها", "۷ روز آینده", "۱۵ روز آینده", "۳۰ روز آینده", "۶۰ روز آینده"};
         int[] days = new int[]{0, 7, 15, 30, 60};
+        int[] dueIcons = new int[]{ir.meelano.manager.R.drawable.mi_calendar_month, ir.meelano.manager.R.drawable.mi_calendar_month, ir.meelano.manager.R.drawable.mi_calendar_month, ir.meelano.manager.R.drawable.mi_calendar_month, ir.meelano.manager.R.drawable.mi_calendar_month};
         int sel = 0;
         for (int i = 0; i < days.length; i++) if (days[i] == dueWindowDays) sel = i;
-        content.addView(a.kit.chips(labels, sel, idx -> {
+        content.addView(a.kit.chipsWithIcons(labels, sel, dueIcons, Theme.GOLD, idx -> {
             dueWindowDays = days[idx];
             render(content);
         }), a.kit.lp(-1, -2));
@@ -418,9 +424,8 @@ public class ChequeLiquidityScreen extends Screen {
     }
 
     private void buildAllBanksView(LinearLayout content) {
-        // Summary cards per bank
         LinearLayout bankGrid = a.kit.card(Theme.GOLD);
-        bankGrid.addView(a.kit.text("چک‌های جاری به تفکیک بانک", 14f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        bankGrid.addView(a.kit.sectionHead("چک‌های جاری به تفکیک بانک", null, null), a.kit.lp(-1, -2));
         bankGrid.addView(a.kit.gap(6));
         for (Row s : bankSummaries) {
             String rdf = s.s("bankRdf");
@@ -435,9 +440,13 @@ public class ChequeLiquidityScreen extends Screen {
 
             LinearLayout row = a.kit.h();
             row.setGravity(Gravity.CENTER_VERTICAL);
-            row.setPadding(Theme.dp(8), Theme.dp(8), Theme.dp(8), Theme.dp(8));
+            row.setPadding(Theme.dp(10), Theme.dp(10), Theme.dp(10), Theme.dp(10));
             row.setBackground(Theme.cardAccent(netColor));
-            // Bank name
+            View badge = a.kit.icon(ir.meelano.manager.R.drawable.mi_account_balance, netColor, 22);
+            badge.setBackground(Theme.avatar(Theme.alpha(netColor, 32)));
+            badge.setPadding(Theme.dp(6), Theme.dp(6), Theme.dp(6), Theme.dp(6));
+            row.addView(badge, new LinearLayout.LayoutParams(Theme.dp(38), Theme.dp(38)));
+            row.addView(a.kit.space(8));
             LinearLayout copy = a.kit.v();
             TextView bn = a.kit.text(bank, 13f, Theme.TEXT, true);
             bn.setSingleLine(true);
@@ -447,7 +456,6 @@ public class ChequeLiquidityScreen extends Screen {
             TextView netTv = a.kit.text((net >= 0 ? "مازاد " : "کسری ") + RialFormatter.formatRial(Math.abs(net)), 11f, netColor, true);
             copy.addView(netTv, a.kit.lp(-1, -2));
             row.addView(copy, a.kit.wlp(1f));
-            // Amount
             LinearLayout side = a.kit.v();
             side.setGravity(Gravity.END);
             side.addView(a.kit.text(RialFormatter.formatRial(total), 13f, Theme.GOLD_SOFT, true), a.kit.lp(-2, -2));
@@ -520,21 +528,20 @@ public class ChequeLiquidityScreen extends Screen {
         long includedChecks = calc.includedTotal;
         long excludedChecks = calc.excludedTotal;
 
-        // Balance input card
+        // Balance input card — لوکس با هدر طلایی و فیلد لاکچری
         LinearLayout balCard = a.kit.card(Theme.SUCCESS);
-        balCard.addView(a.kit.text("موجودی لحظه‌ای بانک: " + selectedBankName, 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
-        balCard.addView(a.kit.hint("مبلغ را به ریال وارد کنید — ۳ رقم ۳ رقم جدا می‌شود (هم در تایپ و هم در نمایش)"), a.kit.lp(-1, -2));
+        LinearLayout balHead = a.kit.h(); balHead.setGravity(Gravity.CENTER_VERTICAL);
+        balHead.addView(a.kit.icon(ir.meelano.manager.R.drawable.mi_account_balance_wallet, Theme.SUCCESS, 24), a.kit.lp(Theme.dp(28), Theme.dp(28)));
+        balHead.addView(a.kit.space(8));
+        LinearLayout balCopy = a.kit.v();
+        balCopy.addView(a.kit.text("موجودی لحظه‌ای: " + selectedBankName, 13f, Theme.TEXT, true), a.kit.lp(-1, -2));
+        balCopy.addView(a.kit.hint("ریال • ۳ رقم جدا در تایپ و نمایش — ذخیره خودکار روی دستگاه"), a.kit.lp(-1, -2));
+        balHead.addView(balCopy, a.kit.wlp(1f));
+        balCard.addView(balHead, a.kit.lp(-1, -2));
         balCard.addView(a.kit.gap(8));
         long currentBal = manualBalances.getOrDefault(selectedBankRdf, BankBalanceStore.getBalanceRial(a, selectedBankRdf));
-        final EditText balInput = new EditText(a);
-        balInput.setHint("مثلاً ۱٬۲۵۰٬۰۰۰٬۰۰۰ ریال");
+        final EditText balInput = a.kit.editLux("مثلاً ۱٬۲۵۰٬۰۰۰٬۰۰۰ ریال", currentBal > 0 ? RialFormatter.formatGrouped(currentBal) : "");
         balInput.setInputType(InputType.TYPE_CLASS_NUMBER);
-        balInput.setTextDirection(View.TEXT_DIRECTION_RTL);
-        balInput.setTextSize(14f * Theme.fontScale());
-        balInput.setTextColor(Theme.TEXT);
-        balInput.setHintTextColor(Theme.MUTED);
-        balInput.setBackground(Theme.fieldBg());
-        balInput.setPadding(Theme.dp(14), Theme.dp(12), Theme.dp(14), Theme.dp(12));
         if (currentBal > 0) balInput.setText(RialFormatter.formatGrouped(currentBal));
         balInput.setTag(false); // prevent recursive watcher
         balInput.addTextChangedListener(new TextWatcher() {
@@ -651,28 +658,36 @@ public class ChequeLiquidityScreen extends Screen {
         boolean surplus = net >= 0;
         int color = surplus ? Theme.SUCCESS : Theme.DANGER;
         LinearLayout card = a.kit.card(color);
-        card.addView(a.kit.text(surplus ? "✓ موجودی کافی است — مازاد" : "⚠ کسری موجودی — نیاز به تامین", 14f, color, true), a.kit.lp(-1, -2));
+        LinearLayout hHead = a.kit.h(); hHead.setGravity(Gravity.CENTER_VERTICAL);
+        hHead.addView(a.kit.icon(surplus ? ir.meelano.manager.R.drawable.mi_trending_up : ir.meelano.manager.R.drawable.mi_warning, color, 26), a.kit.lp(Theme.dp(30), Theme.dp(30)));
+        hHead.addView(a.kit.space(8));
+        hHead.addView(a.kit.text(surplus ? "✓ موجودی کافی است — مازاد" : "⚠ کسری موجودی — نیاز به تامین", 14f, color, true), a.kit.wlp(1f));
+        hHead.addView(a.kit.pill(surplus ? "تامین OK" : "نیاز فوری", color), a.kit.lp(-2, -2));
+        card.addView(hHead, a.kit.lp(-1, -2));
         card.addView(a.kit.gap(8));
-        // Formula visualization
         LinearLayout formula = a.kit.v();
         formula.setBackground(Theme.card());
-        formula.setPadding(Theme.dp(12), Theme.dp(10), Theme.dp(12), Theme.dp(10));
+        Theme.lift(formula, Theme.cardElevation());
+        formula.setPadding(Theme.dp(14), Theme.dp(12), Theme.dp(14), Theme.dp(12));
         formula.addView(a.kit.kv("موجودی لحظه‌ای", RialFormatter.formatRial(balance), Theme.SUCCESS), a.kit.lp(-1, -2));
-        formula.addView(a.kit.text("+", 14f, Theme.MUTED, true), a.kit.lp(-1, -2));
+        TextView plus = a.kit.text("+", 18f, Theme.GOLD, true); plus.setGravity(Gravity.CENTER); formula.addView(plus, a.kit.lp(-1, -2));
         formula.addView(a.kit.kv("پوز در انتظار (۴ صبح فردا)", RialFormatter.formatRial(pos), Theme.INFO), a.kit.lp(-1, -2));
         formula.addView(a.kit.divider(), a.kit.lp(-1, Theme.dp(1)));
         formula.addView(a.kit.kv("منابع در دسترس", RialFormatter.formatRial(available), Theme.TEXT), a.kit.lp(-1, -2));
-        formula.addView(a.kit.text("−", 14f, Theme.MUTED, true), a.kit.lp(-1, -2));
+        TextView minus = a.kit.text("−", 18f, Theme.DANGER, true); minus.setGravity(Gravity.CENTER); formula.addView(minus, a.kit.lp(-1, -2));
         formula.addView(a.kit.kv("چک‌های انتخاب‌شده", RialFormatter.formatRial(checks), Theme.DANGER), a.kit.lp(-1, -2));
         formula.addView(a.kit.divider(), a.kit.lp(-1, Theme.dp(1)));
-        TextView netTv = a.kit.text((surplus ? "مازاد: " : "کسری: ") + RialFormatter.formatRial(Math.abs(net)), 15f, color, true);
+        TextView netTv = a.kit.text((surplus ? "مازاد: " : "کسری: ") + RialFormatter.formatRial(Math.abs(net)), 16f, color, true);
         netTv.setGravity(Gravity.CENTER);
-        netTv.setPadding(Theme.dp(4), Theme.dp(6), Theme.dp(4), Theme.dp(6));
+        netTv.setPadding(Theme.dp(8), Theme.dp(10), Theme.dp(8), Theme.dp(10));
         netTv.setBackground(Theme.pill(color));
         formula.addView(netTv, a.kit.lp(-1, -2));
         String pct = checks > 0 ? Money.fa(String.format(java.util.Locale.US, "%.1f", Math.abs(net) * 100.0 / checks).replace('.', '٫')) + "٪ از چک‌ها" : "";
         if (!pct.isEmpty()) formula.addView(a.kit.hint(surplus ? "مازاد " + pct : "کسری " + pct), a.kit.lp(-1, -2));
         card.addView(formula, a.kit.lp(-1, -2));
+        double cov = checks > 0 ? Math.min(1.0, (double) available / checks) : 1.0;
+        card.addView(a.kit.gap(6));
+        card.addView(a.kit.progressLine("پوشش چک‌ها", Money.fa(String.valueOf((int)(cov*100))) + "٪", cov, color), a.kit.lp(-1, -2));
         card.setTag("calc_" + bankRdf);
         a.kit.addCard(parent, card);
     }

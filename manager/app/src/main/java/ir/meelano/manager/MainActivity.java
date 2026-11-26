@@ -38,6 +38,7 @@ import ir.meelano.manager.data.Settings;
 import ir.meelano.manager.screens.AnbarScreen;
 import ir.meelano.manager.screens.AssistantScreen;
 import ir.meelano.manager.screens.CashScreen;
+import ir.meelano.manager.screens.ChequeLiquidityScreen;
 import ir.meelano.manager.screens.CloseoutScreen;
 import ir.meelano.manager.screens.ManagerAlertsScreen;
 import ir.meelano.manager.screens.PickWaveScreen;
@@ -820,6 +821,7 @@ public class MainActivity extends Activity {
         reg(new MoneyScreen(this, 0));
         reg(new MoneyScreen(this, 1));
         reg(new ChequesScreen(this));
+        reg(new ChequeLiquidityScreen(this));
         reg(new CashScreen(this));
         reg(new ProductsScreen(this));
         reg(new ProductFileScreen(this));

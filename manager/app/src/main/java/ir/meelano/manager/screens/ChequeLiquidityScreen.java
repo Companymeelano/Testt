@@ -406,7 +406,7 @@ public class ChequeLiquidityScreen extends Screen {
         content.addView(a.kit.gap(8));
     }
 
-    private void addSearchRow(LinearLayout parent) {
+    protected void addSearchRow(LinearLayout parent) {
         String hint = "جست‌وجوی چک، بانک، طرف‌حساب…";
         String init = filter.search == null ? "" : filter.search;
         parent.addView(a.kit.searchBar(hint, init, q -> {

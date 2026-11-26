@@ -59,7 +59,7 @@
 sandbox فاقد JDK/Android SDK است (بدون root؛ CDN دارایی‌های GitHub مسدود). بنابراین کامپایل
 واقعی، تست واحد و ساخت APK در **GitHub Actions** اجرا شد — همان مسیر موجود پروژه.
 
-- **CI run:** `45856540231` روی شاخهٔ `arena/da395aa9-testt` — **کاملاً سبز (success)**.
+- **CI run:** `45858002329` روی شاخهٔ `arena/da395aa9-testt` — **کاملاً سبز (success)**.
 - **تست واحد:** `:app:testDebugUnitTest` موفق. مجموعهٔ آزمون: **۷۲ کلاس تست، ۳۷۷ متد `@Test`** —
   همگی اجرا و پاس شدند (build سبز = هیچ failure). تست‌های جدید:
   `AiProvidersTest` (رجیستری/Gemini بومی/GapGPT اصلی)، `AiRouterLogicTest` (ترتیب/cooldown)،
@@ -70,7 +70,7 @@ sandbox فاقد JDK/Android SDK است (بدون root؛ CDN دارایی‌ها
   `apksigner verify` موفق، `libonnxruntime.so` برای هر دو ABI موجود (موتور صدای آفلاین).
 - **APK نهایی:** `dist/meelano-manager-v36-debug-26.apk`
   - حجم: ۶۹٬۵۸۱۳۵ بایت (~۶۶٫۴ MB)
-  - SHA-256: `e766ef58894026a76934570779f612098675d12dae156a7b24f92e02dacdf23a`
+  - SHA-256: `f4b7d58ade6e9edc2e9c7def97717f7dbbc3f366542f173ebe3772d5b70a30c7`
   - integrity: `unzip -t` سالم.
 - **ابزار توصیفگر به‌روزرسانی:** round-trip MAC موفق (بدون انتشار).
 

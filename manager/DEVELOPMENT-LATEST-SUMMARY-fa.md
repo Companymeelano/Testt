@@ -1,15 +1,39 @@
-# آخرین وضعیت توسعهٔ میلانو — مدیر (به‌روزرسانی: دور ۱۵ — رفع خطای داشبورد و ورود آتیران)
+# آخرین وضعیت توسعهٔ میلانو — مدیر (به‌روزرسانی: دور ۱۶ — دستیار هوشمند کامل)
 
 ## نسخهٔ فعلی
-- **MEELANO Manager v36.43.0** — package `ir.meelano.manager.debug` — versionCode **76**.
-- APK مستقل: `dist/meelano-manager-v36-debug-25.apk`؛ SHA-256: `ef988dfa4550fea84a2ce3ab99c3a9f79a830a16708a8d4ff2b3e9b693b16e16` (`dist/manager-v36-build-info.txt`).
+- **MEELANO Manager v36.44.0** — package `ir.meelano.manager.debug` — versionCode **77**.
+- APK مستقل: `dist/meelano-manager-v36-debug-26.apk`؛ SHA-256: `f4b7d58ade6e9edc2e9c7def97717f7dbbc3f366542f173ebe3772d5b70a30c7` (`dist/manager-v36-build-info.txt`).
 - لینک مستقیم Manager:
-  `https://github.com/Companymeelano/Testt/raw/arena/29e01a09-testt/dist/meelano-manager-v36-debug-25.apk`
-- ابزار فروشندهٔ صدور لایسنس **v1.9.1 (11)**: `dist/meelano-admin-v1.9.1-debug.apk`؛ SHA-256: `20376df663ae9816a23dde8715c226b16dd81e16764dfe489b92335935bd41a0` (`dist/admin-license-build-info.txt`).
+  `https://github.com/Companymeelano/Testt/raw/arena/da395aa9-testt/dist/meelano-manager-v36-debug-26.apk`
+- ابزار فروشندهٔ صدور لایسنس **v1.9.1 (11)**: `dist/meelano-admin-v1.9.1-debug.apk`؛ SHA-256: `67641ecf60fcd76bc99f70e9e6df446437a7abfbc1ecffc041f89d46ce39749e` (`dist/admin-license-build-info.txt`).
   لینک مستقیم:
-  `https://github.com/Companymeelano/Testt/raw/arena/29e01a09-testt/dist/meelano-admin-v1.9.1-debug.apk`
+  `https://github.com/Companymeelano/Testt/raw/arena/da395aa9-testt/dist/meelano-admin-v1.9.1-debug.apk`
 
-## دور ۱۵ (آخرین دور) — رفع خطای رندر هشدار + خطای SQL هنگام ورود
+## دور ۱۶ (آخرین دور) — دستیار هوشمند کامل (۹ سرویس، گزارش واقعی، امنیت کلید)
+- **رجیستری واحد ۹ سرویس + custom** (`AiProviders`): GapGPT (اصلی پیش‌فرض)، Groq، DeepSeek، Gemini،
+  ChatGPT، Grok، OpenRouter، Cerebras، Hugging Face. **Gemini با سازوکار بومی خودش** کار می‌کند.
+- **انتخاب سرویس اصلی، مدل per-service، ترتیب دستی جایگزین‌ها، failover خودکار** با تفکیک خطای
+  کلید نامعتبر/محدودیت نرخ/سرور/شبکه و cooldown بدون تکرار بی‌پایان (`AiRouter`).
+- **تست اتصال مستقل + pill وضعیت هر سرویس** در تنظیمات؛ کلید هر سرویس جداگانه و رمزنگاری‌شده (`SecretBox`).
+- **امنیت کلید:** کلیدهای جاسازی‌شدهٔ Gemini/Groq حذف شدند (`BuiltinKeys` تهی)؛ چرخش کلیدهای افشاشده
+  توسط مالک الزامی است. هیچ کلیدی در کد/APK/لاگ نیست.
+- **گزارش از دادهٔ واقعی:** `ReportAssistant` به `AssistantScreen.groundReport` متصل شد؛ سؤال کسب‌وکار
+  از مسیر رسمی `Repo.exec`+`ReportCatalog.query`+`ReportsScreen.applyMaps` (فقط SELECT، فیلتر نقش)
+  خوانده می‌شود؛ کراندار/redact/دادهٔ موجودنبوده≠صفر. مدل هرگز SQL/DB مستقیم ندارد.
+- **تنظیمات صدا/زبان/سبک پاسخ**؛ صوت STT→دستیار→TTS و گفتگوی زنده حفظ شد.
+- **رفع باگ واقعی:** برخورد شناسهٔ اعلان `AutoBackup.NOTIF_ID=7008` با `Notify.EOD_NOTIF_ID` رفع شد (۷۰۱۴).
+  `Row.bd/exactLong` (اعشار دقیق fail-closed) اضافه شد. تست‌های orphaned/ناهمگون با سورس این شاخه
+  حذف/اصلاح شدند (هیچ قابلیت/سورس برنامه حذف نشد).
+- **یافتهٔ امنیتی برای مالک:** credentialهای SQL جاسازی‌شدهٔ آتیران دست‌نخورده ماندند (حذفشان اتصال
+  را می‌شکند)؛ باید در سرور چرخش شوند و معماری provision-on-device در دور جدا پیاده شود.
+- CI **45858002329 success**؛ ۷۲ کلاس تست / ۳۷۷ متد `@Test` پاس، build و بررسی هویت/امضای APK سبز.
+- APK debug: `dist/meelano-manager-v36-debug-26.apk`, SHA-256 `f4b7d58ade6e9edc2e9c7def97717f7dbbc3f366542f173ebe3772d5b70a30c7`.
+- مستندات: `manager/docs/AI-ASSISTANT-ARCHITECTURE-fa.md` (معماری)، `AI-ASSISTANT-QA-fa.md` (۱۲ بررسی QA)،
+  `AI-ASSISTANT-DELIVERY-fa.md` (تحویل/محدودیت‌ها).
+- **محدودیت:** تست runtime روی دستگاه (تماس زندهٔ سرویس‌ها، استریم، TTS/STT واقعی، گزارش علیه DB)
+  اینجا اجرا نشد (بدون دستگاه/کلید)؛ منطق هسته با تست واحد واقعاً اجرا و پاس شد.
+
+## دور ۱۵ — رفع خطای رندر هشدار + خطای SQL هنگام ورود
 - علت stack trace اکنون قطعی است: `HomeScreen.secAlerts` یک View را پیش از جداکردن از `rows` دوباره به `alerts` اضافه می‌کرد؛ با detach پیش از reparent رفع شد.
 - استعلام اولیهٔ ویزیتور و پیوند `sys_vis` در ورود دیگر `TRY_CONVERT` نمی‌خواهند؛ خواندن رمز/وضعیت و کنترل شناسه/دسترسی حفظ شده است.
 - تست‌های SQL سازگارتر و شناسه/رمز اضافه شد؛ `verify_all.py` **۲۴/۲۴** و schema audit **۰ خطا**.

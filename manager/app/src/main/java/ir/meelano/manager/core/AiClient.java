@@ -39,16 +39,13 @@ public final class AiClient {
     public static final String CUSTOM = "custom";
 
     /**
-     * The three services the app uses, each for what it does best:
-     * Gemini (natural Persian speech, daily answers), DeepSeek (analysis), Groq (quick answers).
+     * Every selectable service, in registry order (GapGPT first = default primary).
+     * Backed by {@link AiProviders} so adding a service is a single registry entry.
      */
-    public static final String[][] NAMES = {
-            {GEMINI, "Gemini"}, {DEEPSEEK, "DeepSeek"}, {GROQ, "Groq"}, {OPENAI, "ChatGPT"}
-    };
+    public static final String[][] NAMES = AiProviders.names();
 
     public static String nameOf(String provider) {
-        for (String[] n : NAMES) if (n[0].equals(provider)) return n[1];
-        return provider == null ? "" : provider;
+        return AiProviders.nameOf(provider);
     }
 
     /** An HTTP failure from the provider, carrying the status code so routing can react. */
@@ -61,43 +58,58 @@ public final class AiClient {
         }
     }
 
+    /** Error kinds used by routing and the settings status pill. */
+    public static final String KIND_AUTH = "auth";
+    public static final String KIND_RATE = "rate";
+    public static final String KIND_SERVER = "server";
+    public static final String KIND_CLIENT = "client";
+    public static final String KIND_NET = "net";
+    public static final String KIND_OK = "ok";
+
+    /**
+     * Classifies an HTTP status so an invalid key (auth) is never confused with a transient
+     * network/server problem. Pure and unit-tested.
+     */
+    public static String classify(int code) {
+        if (code == 401 || code == 403) return KIND_AUTH;
+        if (code == 429) return KIND_RATE;
+        if (code >= 500 && code <= 599) return KIND_SERVER;
+        if (code >= 400) return KIND_CLIENT;
+        return KIND_OK;
+    }
+
+    /** A short, non-secret Persian label for a status kind (for the settings pill). */
+    public static String kindLabel(String kind) {
+        if (KIND_OK.equals(kind)) return "اتصال برقرار است";
+        if (KIND_AUTH.equals(kind)) return "کلید یا دسترسی نامعتبر";
+        if (KIND_RATE.equals(kind)) return "محدودیت نرخ درخواست";
+        if (KIND_SERVER.equals(kind)) return "خطای موقت سرور";
+        if (KIND_NET.equals(kind)) return "خطای شبکه/اتصال";
+        if (KIND_CLIENT.equals(kind)) return "درخواست نامعتبر (مدل/تنظیمات)";
+        return "تست نشده";
+    }
+
     /** Recommended default model per preset (the user may change it in settings). */
     /** Text-to-speech model for providers that offer natural speech; empty when none. */
     public static String defaultTtsModel(String provider) {
-        if (GEMINI.equals(provider)) return "gemini-2.5-flash-preview-tts";
-        return "";
+        return AiProviders.ttsModel(provider);
     }
 
     /** True when the provider has a natural-speech API in this app. */
     public static boolean hasSpeech(String provider) {
-        return !defaultTtsModel(provider).isEmpty();
+        return AiProviders.hasSpeech(provider);
     }
 
     /**
      * Model for a task. Analysis uses the stronger model where one exists; quick answers and
-     * writing use the fast one. Other providers keep their default model.
+     * writing use the fast one. The user may override the model per service in settings.
      */
     public static String modelFor(String provider, String task) {
-        if (GEMINI.equals(provider)) {
-            if ("analysis".equals(task)) return "gemini-2.5-pro";
-            if ("fast".equals(task) || "writing".equals(task)) return "gemini-2.5-flash";
-        }
-        if (OPENAI.equals(provider) && "analysis".equals(task)) return "gpt-4o";
-        if (DEEPSEEK.equals(provider) && "analysis".equals(task)) return "deepseek-v4-pro";
-        return defaultModel(provider);
+        return AiProviders.modelFor(provider, task);
     }
 
     public static String defaultModel(String provider) {
-        if (GEMINI.equals(provider)) return "gemini-2.5-flash";
-        if (OPENAI.equals(provider)) return "gpt-4o-mini";
-        if (GROK.equals(provider)) return "grok-3-mini";
-        if (CEREBRAS.equals(provider)) return "llama-3.3-70b";
-        if (HUGGINGFACE.equals(provider)) return "meta-llama/Llama-3.3-70B-Instruct";
-        if (GROQ.equals(provider)) return "llama-3.3-70b-versatile";
-        if (DEEPSEEK.equals(provider)) return "deepseek-flash";
-        if (OPENROUTER.equals(provider)) return "openai/gpt-4o-mini";
-        if (GAPGPT.equals(provider)) return "gpt-4o-mini";
-        return "";
+        return AiProviders.defaultModel(provider);
     }
 
     public static final int TIMEOUT_MS = 45_000;
@@ -105,16 +117,12 @@ public final class AiClient {
 
     /** Base URL for the provider (custom uses the value the user typed). */
     public static String baseUrl(String provider, String custom) {
-        if (GEMINI.equals(provider)) return "https://generativelanguage.googleapis.com/v1beta";
-        if (OPENAI.equals(provider)) return "https://api.openai.com/v1";
-        if (GROK.equals(provider)) return "https://api.x.ai/v1";
-        if (GROQ.equals(provider)) return "https://api.groq.com/openai/v1";
-        if (DEEPSEEK.equals(provider)) return "https://api.deepseek.com/v1";
-        if (OPENROUTER.equals(provider)) return "https://openrouter.ai/api/v1";
-        if (GAPGPT.equals(provider)) return "https://api.gapgpt.app/v1";
-        if (CEREBRAS.equals(provider)) return "https://api.cerebras.ai/v1";
-        if (HUGGINGFACE.equals(provider)) return "https://router.huggingface.co/v1";
-        return custom == null ? "" : custom.trim();
+        return AiProviders.baseUrl(provider, custom);
+    }
+
+    /** True when the provider uses Google's native Gemini wire format (not OpenAI-compatible). */
+    public static boolean isGemini(String provider) {
+        return AiProviders.WIRE_GEMINI.equals(AiProviders.wire(provider));
     }
 
     /** Receives each piece of an answer as soon as the service sends it. */

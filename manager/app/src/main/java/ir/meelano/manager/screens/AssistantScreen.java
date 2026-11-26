@@ -22,6 +22,7 @@ import ir.meelano.manager.core.AiClient;
 import ir.meelano.manager.core.AiRouter;
 import ir.meelano.manager.core.Assistant;
 import ir.meelano.manager.core.AssistantEngine;
+import ir.meelano.manager.core.AssistantPrompt;
 import ir.meelano.manager.core.RoleStore;
 import ir.meelano.manager.core.Diag;
 import ir.meelano.manager.core.Money;
@@ -289,8 +290,25 @@ public final class AssistantScreen extends Screen {
     private SpeechQueue currentSpeech;
     private TextView liveBody;
 
+    /** Builds the system prompt, applying the user's reply language and style preferences. */
+    private String systemPrompt() {
+        android.content.SharedPreferences p = a.getSharedPreferences("meelano_ai", Context.MODE_PRIVATE);
+        StringBuilder b = new StringBuilder(SYSTEM_PROMPT);
+        if ("en".equals(p.getString("reply_lang", "fa"))) {
+            b.append(" Respond in English unless the user writes in Persian.");
+        }
+        if ("short".equals(p.getString("reply_style", "full"))) {
+            b.append(" پاسخ‌ها را بسیار کوتاه و گفتاری نگه دار (حداکثر دو جمله).");
+        }
+        return b.toString();
+    }
+
     private void askAi(final String q, final String rule) {
         final String ctx = Assistant.contextBlock(snap);
+        // Bounded, redacted prompt: only this session's recent turns + the extracted facts, with
+        // any accidental credentials stripped before anything leaves the device.
+        final String prompt = AssistantPrompt.build(ctx, msgs, q);
+        final String sys = systemPrompt();
         aiBusy = true;
         final String[] slot = {"ai", "…"};
         liveSlot = slot;
@@ -308,8 +326,7 @@ public final class AssistantScreen extends Screen {
             String err = null;
             String reply = null;
             try {
-                AiRouter.Result r = AiRouter.completeStream(a, AiRouter.taskFor(q), SYSTEM_PROMPT,
-                        "داده‌های فروشگاه (امروز):\n" + ctx + "\nسؤال مدیر: " + q, piece -> {
+                AiRouter.Result r = AiRouter.completeStream(a, AiRouter.taskFor(q), sys, prompt, piece -> {
                             acc.append(piece);
                             long now = System.currentTimeMillis();
                             if (now - lastShown[0] < 70) return;

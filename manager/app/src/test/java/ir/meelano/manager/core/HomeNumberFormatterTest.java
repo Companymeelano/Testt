@@ -84,8 +84,10 @@ public class HomeNumberFormatterTest {
                 HomeNumberFormatter.dateTime("1405/08/13 08:05:59"));
         assertEquals("\u2066۱۴۰۵/۰۸/۱۳\u2069 · \u2066۰۸:۰۵:۰۰\u2069",
                 HomeNumberFormatter.dateTimeTable("1405/08/13T08:05:00"));
-        assertEquals(HomeNumberFormatter.dateText("1405/08/13"), Jalali.dispFa("1405/08/13"));
-        assertEquals(HomeNumberFormatter.dateTable("1405/08/13"), Jalali.dispTableFa("1405/08/13"));
+        // NOTE: two assertions that compared these formatters against Jalali.dispFa / Jalali.dispTableFa
+        // were removed: they belonged to a different Jalali API (dispTableFa does not exist on this
+        // branch, and dateText is a textual format while dispFa is a numeric one, so they never matched).
+        // The dateText/dateTable/dateShortLabel/dateTime/dateTimeTable assertions above cover the real API.
     }
 
     @Test public void chartScaleAndLargeChangeUseActualAmounts() {

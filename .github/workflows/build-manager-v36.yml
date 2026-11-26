@@ -79,6 +79,22 @@ jobs:
         run: |
           python3 - <<'PY' || true
           import glob, os, re, html
+          # Compact compile-error report (distinct files + first lines), so a truncated
+          # Gradle log never hides which files fail to compile.
+          try:
+              log = open("manager-build.log", encoding="utf-8", errors="replace").read()
+              errs = re.findall(r'([^\s]+\.java:\d+: error:[^\n]*)', log)
+              if errs:
+                  files = sorted({e.split(':')[0] for e in errs})
+                  block = "### Compile errors (distinct files)\n```text\n" + "\n".join(files) + "\n```\n"
+                  block += "### First compile errors\n```text\n" + "\n".join(errs[:40]) + "\n```\n"
+                  with open(os.environ.get("GITHUB_STEP_SUMMARY", "/dev/null"), "a") as fh:
+                      fh.write(block)
+                  print("COMPILE-ERROR-FILES:")
+                  for fp in files:
+                      print("  " + fp)
+          except Exception as ce:
+              print("compile-error report skipped:", ce)
           out = []
           for f in glob.glob("manager/app/build/test-results/testDebugUnitTest/*.xml"):
               src = open(f, encoding="utf-8").read()

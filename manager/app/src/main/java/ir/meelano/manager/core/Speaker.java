@@ -64,25 +64,22 @@ public final class Speaker {
     }
 
     /**
-     * Called on every resume. The first time the app opens without a Persian voice it shows the
-     * setup step. When the user returns from the store, it probes the engines again and closes
-     * the step by itself once Persian works.
+     * Called on every resume — اکنون کاملاً غیرمزاحم: هرگز دیالوگ نصب را خودکار نشان نمی‌دهد.
+     * برای مکالمه آنلاین با صدای طبیعی (Gemini/OpenAI) اصلاً نیازی به eSpeak نیست؛
+     * موتور آفلاین sherpa-onnx یا صدای ابری کافی است. بررسی فقط در پس‌زمینه انجام می‌شود.
      */
     public static void onResume(final MainActivity a) {
-        if (OfflineVoice.installed(a)) return; // built-in Persian voice is ready: no setup step
+        if (OfflineVoice.installed(a)) { closeSetup(); return; }
         if (state == UNINIT) {
-            probe(a, () -> {
-                if (state == NO_PERSIAN) showSetup(a);
-            });
+            probe(a, null);
             return;
         }
         if (state == NO_PERSIAN) {
             probe(a, () -> {
                 if (state == READY) {
                     closeSetup();
-                    a.kit.toast("صدای فارسی آماده است (" + engineName + ")");
-                } else if (setupDialog == null || !setupDialog.isShowing()) {
-                    showSetup(a);
+                    // فقط یک بار اطلاع کوتاه، بدون دیالوگ مزاحم
+                    // a.kit.toast("صدای فارسی آماده است (" + engineName + ")");
                 }
             });
         }
@@ -141,8 +138,8 @@ public final class Speaker {
                 tts.speak(clean, TextToSpeech.QUEUE_FLUSH, null, id);
             } else {
                 post(onDone);
-                if (!setupShown) showSetup(a);
-                else a.kit.toast("صدای فارسی روی گوشی نیست؛ صدای طبیعی را در تنظیمات هوش مصنوعی فعال کنید");
+                // دیگر دیالوگ مزاحم نصب نشان داده نمی‌شود؛ فقط راهنمایی کوتاه
+                a.kit.toast("صدای آفلاین فارسی آماده نیست؛ برای مکالمه آنلاین صدای طبیعی Gemini را در تنظیمات فعال کنید");
             }
         });
     }

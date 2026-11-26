@@ -23,6 +23,9 @@ import ir.meelano.manager.core.AiRouter;
 import ir.meelano.manager.core.Assistant;
 import ir.meelano.manager.core.AssistantEngine;
 import ir.meelano.manager.core.AssistantPrompt;
+import ir.meelano.manager.core.Filter;
+import ir.meelano.manager.core.ReportAssistant;
+import ir.meelano.manager.core.ReportCatalog;
 import ir.meelano.manager.core.RoleStore;
 import ir.meelano.manager.core.Diag;
 import ir.meelano.manager.core.Money;
@@ -32,7 +35,9 @@ import ir.meelano.manager.core.SecretBox;
 import ir.meelano.manager.core.SpeechQueue;
 import ir.meelano.manager.core.Speaker;
 import ir.meelano.manager.core.WarehouseSync;
+import ir.meelano.manager.data.Meta;
 import ir.meelano.manager.data.Repo;
+import ir.meelano.manager.data.Row;
 import ir.meelano.manager.ui.Card3D;
 import ir.meelano.manager.ui.Theme;
 
@@ -83,6 +88,8 @@ public final class AssistantScreen extends Screen {
     private String draft = "";
     /** Short-term context of this screen only (last few turns, bounded). */
     private final AssistantEngine.Session session = new AssistantEngine.Session();
+    /** Last validated report plan, so a short period follow-up ("دیروز") reuses the same report. */
+    private ReportAssistant.Plan lastPlan;
 
     // live conversation
     private boolean liveOn = false;
@@ -303,11 +310,58 @@ public final class AssistantScreen extends Screen {
         return b.toString();
     }
 
+    /**
+     * Grounds a business question with a real, role-filtered report before the model answers.
+     * The model only picks a report id + date preset (never SQL or filter values); the rows are
+     * read through the exact official path used by ReportsScreen (SELECT-only, role-filtered).
+     * Returns "" when no report applies or anything fails — the live snapshot still answers, and
+     * a failed read is reported honestly as "data unavailable", never as zero. Runs off the UI thread.
+     */
+    private String groundReport(String q) {
+        try {
+            ReportAssistant.Plan plan = ReportAssistant.followUp(q, lastPlan);
+            if (plan == null && !ReportAssistant.couldBeBusinessQuestion(q)) return "";
+            String role = RoleStore.current(a);
+            List<ReportCatalog.Spec> allowed = ReportAssistant.visibleReports(role);
+            if (allowed.isEmpty()) return "";
+            if (plan == null) {
+                // Planner: a tiny JSON choice from the allowed catalog; fails closed to "no report".
+                AiRouter.Result pr = AiRouter.complete(a, ReportAssistant.plannerSystem(),
+                        ReportAssistant.plannerUser(q, allowed));
+                plan = ReportAssistant.parsePlan(pr.text, allowed);
+            }
+            if (plan == null) return "";
+            lastPlan = plan;
+            final ReportAssistant.Plan fp = plan;
+            final Filter f = ReportAssistant.filter(fp);
+            final Object[] box = new Object[1];
+            final String[] errBox = new String[1];
+            final java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(1);
+            a.repo.run(c -> {
+                Meta m = new Meta(c);
+                return ReportsScreen.applyMaps(m, fp.report.id,
+                        Repo.exec(c, ReportCatalog.query(m, fp.report.id, f)), f);
+            }, new Repo.Cb<List<Row>>() {
+                @Override public void ok(List<Row> v) { box[0] = v; done.countDown(); }
+                @Override public void fail(String faError) { errBox[0] = faError; done.countDown(); }
+            });
+            if (!done.await(20, java.util.concurrent.TimeUnit.SECONDS)) {
+                return ReportAssistant.formatFacts(fp, null);
+            }
+            if (errBox[0] != null) {
+                Diag.warn("AssistantScreen:report", new RuntimeException(errBox[0]));
+                return ReportAssistant.formatFacts(fp, null);
+            }
+            @SuppressWarnings("unchecked")
+            List<Row> rows = (List<Row>) box[0];
+            return ReportAssistant.formatFacts(fp, rows);
+        } catch (Exception e) {
+            Diag.ignored("AssistantScreen:ground", e);
+            return "";
+        }
+    }
+
     private void askAi(final String q, final String rule) {
-        final String ctx = Assistant.contextBlock(snap);
-        // Bounded, redacted prompt: only this session's recent turns + the extracted facts, with
-        // any accidental credentials stripped before anything leaves the device.
-        final String prompt = AssistantPrompt.build(ctx, msgs, q);
         final String sys = systemPrompt();
         aiBusy = true;
         final String[] slot = {"ai", "…"};
@@ -321,6 +375,13 @@ public final class AssistantScreen extends Screen {
         final SpeechQueue[] speech = {speakIt ? new SpeechQueue(a, liveOn ? this::listenOnce : null) : null};
         currentSpeech = speech[0];
         new Thread(() -> {
+            // Ground business questions with a real report first (official read path, role-filtered).
+            final String facts = groundReport(q);
+            String ctx = snap == null ? "" : Assistant.contextBlock(snap);
+            if (!facts.isEmpty()) ctx = facts + "\n\n" + ctx;
+            // Bounded, redacted prompt: recent turns + extracted facts, credentials stripped before
+            // anything leaves the device.
+            final String prompt = AssistantPrompt.build(ctx, msgs, q);
             final StringBuilder acc = new StringBuilder();
             final long[] lastShown = {0};
             String err = null;

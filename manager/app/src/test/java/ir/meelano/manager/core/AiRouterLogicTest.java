@@ -47,8 +47,10 @@ public class AiRouterLogicTest {
     public void unknownIdsAreIgnored() {
         List<String> order = AiRouter.mergeOrder("not-a-provider",
                 Arrays.asList("also-fake", AiClient.GROQ));
-        assertEquals(AiClient.GAPGPT, order.get(0)); // registry default fills first
-        assertTrue(order.contains(AiClient.GROQ));
+        // The unknown primary and unknown configured id are dropped; the valid configured
+        // service (Groq) comes first, then the registry fills the rest (GapGPT included).
+        assertEquals(AiClient.GROQ, order.get(0));
+        assertTrue(order.contains(AiClient.GAPGPT));
         assertTrue(!order.contains("not-a-provider"));
         assertTrue(!order.contains("also-fake"));
     }

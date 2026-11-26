@@ -272,7 +272,7 @@ public final class Settings {
     }
 
     // ---------------- luxury theme ----------------
-    /** "dark" (Midnight Gold), "light" (Ivory Royal), or "nuts" (Nut & Dry Fruit). */
+    /** "dark" (Midnight Gold), "light" (Ivory Royal), یا "luxury" (Imperial Velvet جهانی — جایگزین آجیل). */
     public String themeMode() {
         // Mark the older migration as complete without replacing an explicit user selection.
         // The previous v39 migration wrote "nuts" unconditionally and overwrote a saved dark/light choice.
@@ -288,7 +288,8 @@ public final class Settings {
 
     /** Pure, fail-safe theme normalization; exposed for regression tests. */
     public static String normalizeThemeMode(String mode) {
-        return "light".equals(mode) ? "light" : "dark".equals(mode) ? "dark" : "nuts";
+        if ("luxury".equals(mode) || "velvet".equals(mode) || "royal".equals(mode) || "nuts".equals(mode)) return "luxury";
+        return "light".equals(mode) ? "light" : "dark".equals(mode) ? "dark" : "luxury";
     }
 
     public void setThemeMode(String mode) {

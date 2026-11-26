@@ -50,12 +50,14 @@ public final class Theme {
     public static final int BUY_HUE = 0xFFFF5FA2;
 
     private static boolean light = false;
-    /** «آجیل و خشکبار»: the light skin plus nut artwork and nut icons. */
+    /** تم لاکچری جهانی «Imperial Velvet» — جایگزین تم آجیل: مخمل سلطنتی، طلای سه‌بعدی، قابل استفاده در هر پخش. */
     private static boolean nuts = false;
     public static boolean isNuts() { return nuts; }
+    /** نام جدید برای تم لاکچری (سازگار با «nuts» قدیمی). */
+    public static boolean isLuxury() { return nuts; }
 
-    /** MEELANO crest: gold on emerald in the nut theme, the classic black-and-gold badge otherwise. */
-    public static int logoRes() { return nuts ? R.drawable.meelano_nuts : R.drawable.meelano_3d; }
+    /** MEELANO crest: در تم لاکچری از نشان کلاسیک سه‌بعدی طلایی استفاده می‌شود (جهانی). */
+    public static int logoRes() { return R.drawable.meelano_3d; }
     /** Application context, used only to load the light skin artwork. */
     private static Context appCtx;
     /** Mirror of !light for call sites (charts, tables). */
@@ -82,10 +84,7 @@ public final class Theme {
      * Rendered 3D gold icons replace the flat vector glyphs in both skins. Returns the drawable to
      * show for a vector glyph id.
      */
-    /**
-     * Nut theme icons: false = the gold 3D set from the approved reference (plain gold on the
-     * ivory and emerald surfaces). true = the emerald medallion set. One flag switches back.
-     */
+    /** تم لاکچری همیشه از ست طلای سه‌بعدی جهانی استفاده می‌کند (نه زمردی اختصاصی آجیل). */
     public static final boolean NUT_MEDALLIONS = false;
 
     /** Nut-theme medallion icons (emerald medallion, gold rim) for the main sections; 0 = none. */
@@ -110,43 +109,11 @@ public final class Theme {
         return 0;
     }
 
-    /**
-     * Header toolbar and bottom nav icons. In the nut theme they use the emerald set, pulled from
-     * the emerald of the MEELANO nut crest, so the chrome and the logo read as one colour family.
-     * Content icons keep the gold set. Falls back to the gold icon if no emerald twin exists.
-     */
-    public static int chrome3d(int vector) {
-        int base = icon3d(vector);
-        if (!nuts || NUT_MEDALLIONS || appCtx == null || !isIcon3d(base)) return base;
-        try {
-            String n = appCtx.getResources().getResourceEntryName(base);
-            // The medallions of the gold set have their own name; the emerald twin is the same
-            // subject in the emerald set (icon3d_medal_sales -> icon3d_emerald_sales).
-            String twin = ir.meelano.manager.core.IconArt.emeraldName(n);
-            if (twin.isEmpty()) return base;
-            int e = appCtx.getResources().getIdentifier(twin, "drawable", appCtx.getPackageName());
-            return e != 0 ? e : base;
-        } catch (Exception ignored) { return base; }
-    }
+    /** تم لاکچری جهانی: همیشه ست طلای سه‌بعدی — بدون تبدیل زمردی. */
+    public static int chrome3d(int vector) { return icon3d(vector); }
 
-    /**
-     * The 3D icon of the manager's board in the nut theme: the emerald twin of the
-     * section's icon, so the board, the header and the tab bar read as one family.
-     * The medallion names are folded to their plain twin (medal_sales -> sales).
-     * The other skins keep the gold set, and a section without a twin keeps its icon.
-     */
-    public static int emerald3d(int vector) {
-        int base = icon3d(vector);
-        if (!nuts || NUT_MEDALLIONS || appCtx == null || !isIcon3d(base)) return base;
-        try {
-            String n = appCtx.getResources().getResourceEntryName(base);
-            if (!n.startsWith("icon3d_")) return base;
-            String key = n.substring(7);
-            if (key.startsWith("medal_")) key = key.substring(6);
-            int e = appCtx.getResources().getIdentifier("icon3d_emerald_" + key, "drawable", appCtx.getPackageName());
-            return e != 0 ? e : base;
-        } catch (Exception ignored) { return base; }
-    }
+    /** برای سازگاری: در تم لاکچری همان آیکون طلایی برگردانده می‌شود. */
+    public static int emerald3d(int vector) { return icon3d(vector); }
 
     public static int icon3d(int vector) {
         if (NUT_MEDALLIONS && nuts) {
@@ -305,8 +272,8 @@ public final class Theme {
         appCtx = c.getApplicationContext();
         Settings s = new Settings(c);
         String tm = s.themeMode();
-        nuts = "nuts".equals(tm);
-        light = "light".equals(tm) || nuts;
+        nuts = "nuts".equals(tm) || "luxury".equals(tm) || "velvet".equals(tm) || "royal".equals(tm);
+        light = "light".equals(tm);
         DARK = !light;
         int zi = 1;
         try {
@@ -314,24 +281,36 @@ public final class Theme {
             if (s.bigFont()) zi = 3;
         } catch (Exception ignored) { Diag.ignored("Theme:154", ignored); }
         fontScale = zi == 0 ? 0.9f : zi == 2 ? 1.15f : zi == 3 ? 1.3f : 1f;
-        // Three fixed looks share two palette families: obsidian/gold and ivory/emerald;
-        // the nut-shop look adds its own surfaces and artwork to the ivory/emerald palette.
-        if (light) {
-            // «ایوری و زمرد»: ivory base, deep emerald accent, antique-gold ornaments.
-            // Both light and nut looks use this palette; nuts adds its separate visual treatment.
-            // Reference mockup: ivory silk, emerald panels, gold rims. Text pairs stay ≥4.5:1.
+        // سه تم جهانی: Imperial Velvet (لاکچری مخمل سلطنتی — جایگزین آجیل)، Ivory Royal، Midnight Gold
+        if (nuts) {
+            // Imperial Velvet — مخمل سلطنتی جهانی: سرمه‌ای-بادمجانی عمیق با طلای سه‌بعدی، قابل استفاده در هر پخش
+            BG = 0xFF0B0B14;
+            SURFACE = 0xFF15121E;
+            SURFACE2 = 0xFF1E1A2E;
+            GOLD = 0xFFFFD45C; // طلای درخشان جهانی
+            GOLD_SOFT = 0xFFFFEDB0; // شامپاین
+            TEXT = 0xFFF8F3E6;
+            MUTED = 0xFFB8A9C6;
+            SUCCESS = 0xFF4ADE80;
+            DANGER = 0xFFFB7185;
+            WARNING = 0xFFFBBF24;
+            INFO = 0xFF7DD3FC;
+            VIOLET = 0xFFC4B5FD;
+            STEEL = 0xFF9AA3B5;
+        } else if (light) {
+            // «ایوری رویال»: صدفی لوکس با طلای کلاسیک — جهانی
             BG = 0xFFFBF6EA;
             SURFACE = 0xFFFFFFFF;
             SURFACE2 = 0xFFF4ECD6;
-            GOLD = 0xFF0F5B45;
-            GOLD_SOFT = 0xFF8A6418;
-            TEXT = 0xFF0E1F1A;
-            MUTED = 0xFF5B6B66;
+            GOLD = 0xFF8A6418;
+            GOLD_SOFT = 0xFFC9A24A;
+            TEXT = 0xFF1A1207;
+            MUTED = 0xFF6B5D3A;
             SUCCESS = 0xFF15803D;
             DANGER = 0xFFB3261E;
             WARNING = 0xFF9A5B00;
             INFO = 0xFF2D6A5A;
-            VIOLET = 0xFF8A6418;
+            VIOLET = 0xFF7C3AED;
             STEEL = 0xFF546177;
         } else {
             // «ابسیدین و طلا»: near-black obsidian surfaces, glass cards and a bright polished gold.
@@ -353,16 +332,15 @@ public final class Theme {
     }
 
     /**
-     * Shared page backdrop for the licence and login screens. Dark: a cool platinum light
-     * falling onto graphite black. Light: a warm gold glow over the ivory pearl base.
+     * Shared page backdrop: هر سه تم جهانی با گرادیان لوکس اختصاصی
      */
     public static GradientDrawable backdrop() {
         if (nuts) {
-            // Nut theme: opaque ivory with a soft gold glow at the top (no dark window showing through).
+            // Imperial Velvet: مخمل سلطنتی — طلای تابان از بالا + ته‌رنگ بادمجانی عمیق
             return new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                    new int[]{0xFFF3E6BE, 0xFFF9F3E0, BG});
+                    new int[]{0xFF2A1E3A, 0xFF1A1230, BG});
         }
-        int glow = light ? (nuts ? alpha(0xFFC9A24A, 70) : alpha(GOLD, 52)) : alpha(GOLD, 40);
+        int glow = light ? alpha(GOLD, 52) : alpha(GOLD, 40);
         return new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
                 new int[]{glow, BG});
     }
@@ -488,22 +466,45 @@ public final class Theme {
      * faint, repeating linen grain (a few percent alpha), so large cream areas feel like
      * paper instead of a flat digital fill. The grain tile is generated once and cached.
      */
-    /** Screen background. Light skin adds soft gold light in the top-right and bottom-left corners. */
+    /** بک‌گراند لاکچری جهانی: هر تم افکت نوری هماهنگ خود را دارد — بدون وابستگی به آجیل. */
     public static android.graphics.drawable.Drawable background() {
         android.graphics.drawable.Drawable base = backgroundBase();
-        if (!nuts || appCtx == null) return base;
+        if (!nuts) return base;
+        // Imperial Velvet: دو هاله لاکچری — طلای بالا-چپ + بادمجانی پایین-راست
         try {
-            android.graphics.drawable.Drawable art = appCtx.getResources()
-                    .getDrawable(ir.meelano.manager.R.drawable.nut_bg);
-            return new android.graphics.drawable.LayerDrawable(
-                    new android.graphics.drawable.Drawable[]{base, art});
-        } catch (Exception e) {
-            return base;
-        }
+            android.graphics.drawable.Drawable luxe = luxuryGlow();
+            return new android.graphics.drawable.LayerDrawable(new android.graphics.drawable.Drawable[]{base, luxe});
+        } catch (Exception e) { return base; }
+    }
+
+    private static android.graphics.drawable.Drawable luxuryGlow() {
+        try {
+            GradientDrawable gold = new GradientDrawable();
+            gold.setGradientType(GradientDrawable.RADIAL_GRADIENT);
+            gold.setColors(new int[]{alpha(GOLD, 38), alpha(GOLD, 0)});
+            gold.setGradientCenter(0.08f, 0.06f);
+            gold.setGradientRadius(dp(520));
+            GradientDrawable plum = new GradientDrawable();
+            plum.setGradientType(GradientDrawable.RADIAL_GRADIENT);
+            plum.setColors(new int[]{alpha(0xFF6D28D9, 22), alpha(0xFF6D28D9, 0)});
+            plum.setGradientCenter(0.92f, 0.94f);
+            plum.setGradientRadius(dp(480));
+            return new android.graphics.drawable.LayerDrawable(new android.graphics.drawable.Drawable[]{gold, plum});
+        } catch (Exception e) { return new android.graphics.drawable.ColorDrawable(0x00000000); }
     }
 
     private static android.graphics.drawable.Drawable backgroundBase() {
         android.graphics.drawable.ColorDrawable base = new android.graphics.drawable.ColorDrawable(BG);
+        if (nuts) {
+            try {
+                GradientDrawable glow = new GradientDrawable();
+                glow.setGradientType(GradientDrawable.RADIAL_GRADIENT);
+                glow.setColors(new int[]{alpha(GOLD, 32), alpha(0xFF6D28D9, 10), alpha(GOLD, 0)});
+                glow.setGradientCenter(0.5f, 0.0f);
+                glow.setGradientRadius(dp(600));
+                return new android.graphics.drawable.LayerDrawable(new android.graphics.drawable.Drawable[]{base, glow});
+            } catch (Exception e) { return base; }
+        }
         if (!light) {
             // Obsidian screen with a soft gold light from the top-left corner, as in the reference.
             try {
@@ -543,8 +544,8 @@ public final class Theme {
 
     public static android.graphics.drawable.Drawable card() {
         if (nuts) {
-            // Nut theme: near-solid cards so the nut artwork stays behind the content, not through it.
-            return glass(0xFFFFFFFF, 0xFFF9F3E0, 22, 230);
+            // Imperial Velvet: مخمل نیمه‌شیشه‌ای لوکس با لبه طلایی ظریف — جهانی
+            return glass(alpha(SURFACE, 235), alpha(SURFACE, 210), 22, 110);
         }
         if (light) {
             // Reference light cards: white panels with a clearer metallic gold edge.
@@ -571,15 +572,15 @@ public final class Theme {
         return d;
     }
 
-    /** Executive dashboard hero: layered midnight/champagne glass with a quiet metallic edge. */
+    /** Executive dashboard hero: لاکچری جهانی با هاله مخملی */
     public static android.graphics.drawable.Drawable executiveHero() {
         int accent = GOLD;
+        if (nuts) {
+            return glass(alpha(SURFACE, 245), alpha(0xFF1E1A2E, 250), 28, 140);
+        }
         if (light) {
-            // Champagne-gold hero: a clearly golden sheen fading into ivory, with a brighter bronze rim.
-            // Reference header: ivory card with a bright gold frame, fading to champagne.
             return glass(0xFFFFFFFF, 0xFFF4E7C8, 28, 220);
         }
-        // Obsidian hero with a soft gold light falling from the top-left corner.
         return glass(alpha(accent, 44), alpha(SURFACE, 250), 28, 150);
     }
 
@@ -640,12 +641,11 @@ public final class Theme {
     /** Controlled rose-gold for the primary start CTA (v34). */
     public static final int ROSE = 0xFFC2527E;
 
-    /** Primary start button: gold-to-rose sheen, both stops matched to the active ink. */
+    /** Primary start button: طلایی لوکس جهانی */
     public static GradientDrawable startButton() {
         if (nuts) {
-            // Nut theme: emerald to antique gold, the same as the main action buttons (no rose).
             GradientDrawable n = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                    new int[]{0xFF1F6F55, 0xFF0B5C44, 0xFF9C7A1A});
+                    new int[]{0xFFFFD45C, 0xFFFFC94A, 0xFFB08D2A});
             n.setCornerRadius(dp(18));
             n.setStroke(dp(1), alpha(ACCENT_PAPER, 110));
             return n;
@@ -755,12 +755,12 @@ public final class Theme {
         return d;
     }
 
-    /** Nut theme: a floating ivory dock with a gold hairline, like the reference bottom bar. */
+    /** تم لاکچری: داک شناور مخمل سلطنتی با لبه طلایی لوکس */
     public static GradientDrawable navDock() {
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{0xFFFFFFFF, 0xFFF4ECD6});
+                new int[]{0xFF1E1A2E, 0xFF15121E});
         d.setCornerRadius(dp(28));
-        d.setStroke(dp(1), 0xFFC9A24A);
+        d.setStroke(dp(1), alpha(GOLD, 140));
         return d;
     }
 
@@ -782,21 +782,21 @@ public final class Theme {
         return d;
     }
 
-    /** Nut theme: ivory panel framed in gold, the frame of every data table. */
+    /** پنل لاکچری جهانی: مخمل سلطنتی با لبه طلایی */
     public static GradientDrawable nutPanel() {
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{0xFFFFFFFF, 0xFFF7F0DC});
+                new int[]{0xFF1E1A2E, 0xFF15121E});
         d.setCornerRadius(dp(20));
-        d.setStroke(dp(1), 0xFFC9A24A);
+        d.setStroke(dp(1), alpha(GOLD, 120));
         return d;
     }
 
-    /** Nut theme: deep emerald header band with a gold hairline, like the dashboard banner. */
+    /** هدر جدول لاکچری: سرمه‌ای-بادمجانی لوکس با لبه طلایی */
     public static GradientDrawable nutTableHeader() {
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
-                new int[]{0xFF0A3B2E, 0xFF17684F, 0xFF0A3B2E});
+                new int[]{0xFF1A1030, 0xFF2A1E4A, 0xFF1A1030});
         d.setCornerRadius(dp(14));
-        d.setStroke(dp(1), alpha(0xFFC9A24A, 170));
+        d.setStroke(dp(1), alpha(GOLD, 140));
         return d;
     }
 

@@ -305,14 +305,14 @@ public class SettingsScreen extends Screen {
         LinearLayout th = a.kit.card(Theme.GOLD);
         th.addView(a.kit.text("قالب", 12f, Theme.MUTED, true), a.kit.lp(-1, -2));
         final boolean isLight = "light".equals(a.settings.themeMode());
-        final boolean isNuts = "nuts".equals(a.settings.themeMode());
+        final boolean isNuts = "luxury".equals(a.settings.themeMode()) || "nuts".equals(a.settings.themeMode());
         final int themeIdx = isNuts ? 2 : isLight ? 1 : 0;
         th.addView(a.kit.chipsWithIcons(
-                new String[]{"تیره • ابسیدین طلایی", "روشن • عاج سلطنتی", "آجیل و خشکبار"},
+                new String[]{"تیره • ابسیدین طلایی", "روشن • عاج سلطنتی", "لاکچری • مخمل سلطنتی ✨"},
                 themeIdx,
-                new int[]{R.drawable.icon3d_dark_theme, R.drawable.icon3d_theme, R.drawable.icon3d_nut_theme},
+                new int[]{R.drawable.icon3d_dark_theme, R.drawable.icon3d_theme, R.drawable.icon3d_dark_theme},
                 Theme.GOLD, idx -> {
-                    a.settings.setThemeMode(idx == 2 ? "nuts" : idx == 1 ? "light" : "dark");
+                    a.settings.setThemeMode(idx == 2 ? "luxury" : idx == 1 ? "light" : "dark");
                     a.refreshTheme();
                 }), a.kit.lp(-1, -2));
         th.addView(a.kit.gap(8));

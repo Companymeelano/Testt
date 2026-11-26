@@ -731,11 +731,11 @@ public class MainActivity extends Activity {
         if (!tiny) tools.addView(toolCell(themeIcon, "تم", "تغییر تم روشن / تیره", () -> {
             if (ir.meelano.manager.ui.Ui.motionOk(this))
                 themeIcon.animate().rotationBy(180f).setDuration(420).start();
-            // Cycle: dark → light → nuts → dark.
+            // Cycle: dark → light → luxury → dark — جهانی
             String cur = settings.themeMode();
-            String next = "dark".equals(cur) ? "light" : "light".equals(cur) ? "nuts" : "dark";
+            String next = "dark".equals(cur) ? "light" : "light".equals(cur) ? "luxury" : "dark";
             settings.setThemeMode(next);
-            kit.toast("nuts".equals(next) ? "تم آجیل و خشکبار فعال شد" : "light".equals(next) ? "تم روشن فعال شد" : "تم تیره فعال شد");
+            kit.toast("luxury".equals(next) ? "تم لاکچری مخمل سلطنتی فعال شد ✨" : "light".equals(next) ? "تم روشن فعال شد" : "تم تیره فعال شد");
             refreshTheme();
         }), toolLp());
 

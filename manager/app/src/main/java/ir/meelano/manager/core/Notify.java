@@ -43,7 +43,8 @@ public final class Notify {
     private static final int WEEKLY_NOTIF_ID = 7006;
     static final String ACT_EOD = "ir.meelano.manager.EOD";
     private static final int EOD_REQ = 7007;
-    private static final int EOD_NOTIF_ID = 7008;
+    // Package-private so NotificationIdentityTest can verify it stays distinct from AutoBackup.NOTIF_ID.
+    static final int EOD_NOTIF_ID = 7008;
     static final String ACT_GUARD = "ir.meelano.manager.GUARD";
     private static final int GUARD_REQ = 7009;
     static final int GUARD_NOTIF_ID = 7010;

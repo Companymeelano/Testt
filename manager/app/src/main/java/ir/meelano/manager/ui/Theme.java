@@ -602,8 +602,7 @@ public final class Theme {
     public static android.graphics.drawable.Drawable executiveHero() {
         int accent = GOLD;
         if (nuts) {
-            // شیشه مخملی دو لایه با هاله طلائی داخلی
-            GradientDrawable base = (GradientDrawable) glass(alpha(SURFACE, 248), alpha(0xFF120E22, 255), 28, 150);
+            android.graphics.drawable.Drawable base = glass(alpha(SURFACE, 248), alpha(0xFF120E22, 255), 28, 150);
             try {
                 GradientDrawable inner = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
                         new int[]{alpha(GOLD, 18), alpha(GOLD, 0)});

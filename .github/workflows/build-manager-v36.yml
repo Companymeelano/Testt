@@ -239,7 +239,7 @@ jobs:
           cp manager/app/build/outputs/apk/debug/app-debug.apk dist/meelano-manager-v36-debug-26.apk
           cp manager/admin/build/outputs/apk/debug/admin-debug.apk dist/meelano-admin-v1.9.1-debug.apk
           {
-            echo "MEELANO Manager v36.49.0 (versionCode 81)"
+            echo "MEELANO Manager v36.49.0 (versionCode 82)"
             echo "Package: ir.meelano.manager.debug"
             echo "Build run: ${GITHUB_RUN_ID}"
             echo "Commit: ${SOURCE_COMMIT}"

@@ -1,5 +1,5 @@
-MEELANO Manager v36.48.0 (versionCode 81)
+MEELANO Manager v36.49.0 (versionCode 81)
 Package: ir.meelano.manager.debug
-Build run: 46004627964
-Commit: 9a494bd
-SHA-256: 02403189a04043e769aa2431e40d1d90f451940ff6a16beccf83c35209689323
+Build run: 46007335102
+Commit: 0517f93
+SHA-256: c7639ceab1327bc2ef0d518d8e589c03b5ad98a9a0065dc46d1be5bd97ae338a

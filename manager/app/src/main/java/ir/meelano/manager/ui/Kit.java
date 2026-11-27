@@ -66,7 +66,9 @@ public final class Kit {
         t.setTextColor(color);
         t.setTypeface(Theme.face(bold));
         t.setFontFeatureSettings("tnum");
-        t.setLineSpacing(Theme.dp(1.5f), 1.0f);
+        // لاکچری 2.0: فاصله حروف و ارتفاع خط بهینه برای خوانایی لوکس
+        t.setLetterSpacing(bold ? 0.01f : 0.015f);
+        t.setLineSpacing(Theme.dp(bold ? 2f : 1.8f), 1.0f);
         // Lock the paragraph direction to RTL: a pure-digit value («۱۴۰۵/۰۸/۰۳», «۹٫۸»)
         // has no strong directional character, so first-strong heuristics fall back to
         // LTR and the value would slide to the left edge - visible inside dialogs where
@@ -132,7 +134,7 @@ public final class Kit {
     public LinearLayout card() {
         LinearLayout c = v();
         c.setBackground(Theme.card());
-        c.setPadding(Theme.dp(14), Theme.dp(13), Theme.dp(14), Theme.dp(13));
+        c.setPadding(Theme.dp(16), Theme.dp(14), Theme.dp(16), Theme.dp(14));
         Theme.lift(c, Theme.cardElevation());
         return c;
     }
@@ -140,7 +142,7 @@ public final class Kit {
     public LinearLayout card(int accent) {
         LinearLayout c = v();
         c.setBackground(Theme.cardAccent(accent));
-        c.setPadding(Theme.dp(14), Theme.dp(13), Theme.dp(14), Theme.dp(13));
+        c.setPadding(Theme.dp(16), Theme.dp(14), Theme.dp(16), Theme.dp(14));
         Theme.lift(c, Theme.cardElevation());
         return c;
     }
@@ -194,20 +196,22 @@ public final class Kit {
         final int accent = sectionAccent(title);
         LinearLayout r = h();
         r.setGravity(Gravity.CENTER_VERTICAL);
-        r.setPadding(Theme.dp(3), Theme.dp(4), Theme.dp(3), Theme.dp(7));
+        r.setPadding(Theme.dp(4), Theme.dp(6), Theme.dp(4), Theme.dp(8));
 
         int sectionGlyph = sectionIcon(title);
         boolean useLarge3d = Theme.isIcon3d(Theme.icon3d(sectionGlyph));
         FrameLayout badge = new FrameLayout(a);
-        badge.setBackground(Theme.avatar(Theme.alpha(accent, Theme.isLight() ? 38 : 48)));
-        ImageView symbol = icon(sectionGlyph, accent, useLarge3d ? 28 : 17);
-        int symbolSize = useLarge3d ? 30 : 20;
+        // لاکچری 2.0: آواتار براق با هاله طلائی و سایه
+        badge.setBackground(Theme.avatar(Theme.alpha(accent, Theme.isLight() ? 42 : 52)));
+        try { badge.setElevation(Theme.dp(3)); } catch (Exception ignored) {}
+        ImageView symbol = icon(sectionGlyph, accent, useLarge3d ? 30 : 18);
+        int symbolSize = useLarge3d ? 32 : 22;
         FrameLayout.LayoutParams sp = new FrameLayout.LayoutParams(
                 Theme.dp(symbolSize), Theme.dp(symbolSize), Gravity.CENTER);
         badge.addView(symbol, sp);
-        int badgeSize = useLarge3d ? 42 : 34;
+        int badgeSize = useLarge3d ? 44 : 36;
         r.addView(badge, new LinearLayout.LayoutParams(Theme.dp(badgeSize), Theme.dp(badgeSize)));
-        r.addView(space(8));
+        r.addView(space(10));
 
         TextView t = text(title, 14f, accent, true);
         t.setMaxLines(2);

@@ -281,22 +281,21 @@ public final class Theme {
             if (s.bigFont()) zi = 3;
         } catch (Exception ignored) { Diag.ignored("Theme:154", ignored); }
         fontScale = zi == 0 ? 0.9f : zi == 2 ? 1.15f : zi == 3 ? 1.3f : 1f;
-        // سه تم جهانی: Imperial Velvet (لاکچری مخمل سلطنتی — جایگزین آجیل)، Ivory Royal، Midnight Gold
+        // سه تم جهانی: Imperial Velvet 2.0 — مخمل سلطنتی فوق لاکچری، طلای 4K، قابل استفاده در هر پخش
         if (nuts) {
-            // Imperial Velvet — مخمل سلطنتی جهانی: سرمه‌ای-بادمجانی عمیق با طلای سه‌بعدی، قابل استفاده در هر پخش
-            BG = 0xFF0B0B14;
-            SURFACE = 0xFF15121E;
-            SURFACE2 = 0xFF1E1A2E;
-            GOLD = 0xFFFFD45C; // طلای درخشان جهانی
-            GOLD_SOFT = 0xFFFFEDB0; // شامپاین
-            TEXT = 0xFFF8F3E6;
-            MUTED = 0xFFB8A9C6;
-            SUCCESS = 0xFF4ADE80;
-            DANGER = 0xFFFB7185;
-            WARNING = 0xFFFBBF24;
-            INFO = 0xFF7DD3FC;
-            VIOLET = 0xFFC4B5FD;
-            STEEL = 0xFF9AA3B5;
+            BG = 0xFF060714; // عمیق‌تر و لوکس‌تر
+            SURFACE = 0xFF13101F; // شیشه مخملی
+            SURFACE2 = 0xFF1C1830; // لایه دوم
+            GOLD = 0xFFFFD86B; // طلای براق 4K با درخشش بیشتر
+            GOLD_SOFT = 0xFFFFE8A8; // شامپاین ابریشمی
+            TEXT = 0xFFFFFBF0; // صدفی لوکس
+            MUTED = 0xFFB7A9CC; // یاسی مخملی
+            SUCCESS = 0xFF46E48A;
+            DANGER = 0xFFFF6B8A;
+            WARNING = 0xFFFFC94D;
+            INFO = 0xFF7CCFFF;
+            VIOLET = 0xFFB8A5FF;
+            STEEL = 0xFF8B9AB3;
         } else if (light) {
             // «ایوری رویال»: صدفی لوکس با طلای کلاسیک — جهانی
             BG = 0xFFFBF6EA;
@@ -425,7 +424,7 @@ public final class Theme {
 
     /** Elevation for cards: deeper in dark mode, where the gold glow carries the depth. */
     public static float cardElevation() {
-        return dp(light ? 4 : 10);
+        return dp(light ? 5 : 14);
     }
 
     /**
@@ -443,21 +442,25 @@ public final class Theme {
     }
 
     /**
-     * Glass surface: a translucent body with a bright top sheen fading out and a fine gold
-     * edge. Used by every card, so the whole app shares one material.
+     * Glass surface — لاکچری 2.0: شیشه کریستالی با هایلایت ابریشمی و لبه طلای براق
      */
     public static android.graphics.drawable.Drawable glass(int top, int bottom, float radiusDp, int edgeAlpha) {
         GradientDrawable body = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
                 new int[]{top, bottom});
         body.setCornerRadius(dp(radiusDp));
-        body.setStroke(dp(1), alpha(GOLD, edgeAlpha));
+        body.setStroke(dp(1.2f), alpha(GOLD, edgeAlpha));
         GradientDrawable sheen = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{alpha(0xFFFFFFFF, light ? 150 : 22), 0x00FFFFFF});
+                new int[]{alpha(0xFFFFFFFF, light ? 160 : 28), alpha(0xFFFFFFFF, light ? 40 : 8), 0x00FFFFFF});
         sheen.setCornerRadius(dp(radiusDp));
+        GradientDrawable rim = new GradientDrawable();
+        rim.setCornerRadius(dp(radiusDp));
+        rim.setStroke(dp(0.6f), alpha(GOLD, Math.min(255, edgeAlpha + 25)));
         return new android.graphics.drawable.LayerDrawable(
-                new android.graphics.drawable.Drawable[]{body, sheen});
+                new android.graphics.drawable.Drawable[]{body, sheen, rim});
     }
 
+    /** Ultra luxury micro-texture overlay for velvet depth */
+    private static android.graphics.Bitmap velvetGrain;
     /** Standard glass card: translucent navy (or ivory) body with a top sheen and gold edge. */
     private static android.graphics.Bitmap paperGrain;
 
@@ -470,10 +473,10 @@ public final class Theme {
     public static android.graphics.drawable.Drawable background() {
         android.graphics.drawable.Drawable base = backgroundBase();
         if (!nuts) return base;
-        // Imperial Velvet: دو هاله لاکچری — طلای بالا-چپ + بادمجانی پایین-راست
         try {
             android.graphics.drawable.Drawable luxe = luxuryGlow();
-            return new android.graphics.drawable.LayerDrawable(new android.graphics.drawable.Drawable[]{base, luxe});
+            android.graphics.drawable.Drawable grain = velvetTexture();
+            return new android.graphics.drawable.LayerDrawable(new android.graphics.drawable.Drawable[]{base, luxe, grain});
         } catch (Exception e) { return base; }
     }
 
@@ -481,15 +484,39 @@ public final class Theme {
         try {
             GradientDrawable gold = new GradientDrawable();
             gold.setGradientType(GradientDrawable.RADIAL_GRADIENT);
-            gold.setColors(new int[]{alpha(GOLD, 38), alpha(GOLD, 0)});
-            gold.setGradientCenter(0.08f, 0.06f);
-            gold.setGradientRadius(dp(520));
+            gold.setColors(new int[]{alpha(GOLD, 42), alpha(0xFFC9A44A, 14), alpha(GOLD, 0)});
+            gold.setGradientCenter(0.12f, 0.04f);
+            gold.setGradientRadius(dp(620));
             GradientDrawable plum = new GradientDrawable();
             plum.setGradientType(GradientDrawable.RADIAL_GRADIENT);
-            plum.setColors(new int[]{alpha(0xFF6D28D9, 22), alpha(0xFF6D28D9, 0)});
-            plum.setGradientCenter(0.92f, 0.94f);
-            plum.setGradientRadius(dp(480));
-            return new android.graphics.drawable.LayerDrawable(new android.graphics.drawable.Drawable[]{gold, plum});
+            plum.setColors(new int[]{alpha(0xFF7C3AED, 28), alpha(0xFF4C1D95, 12), alpha(0xFF7C3AED, 0)});
+            plum.setGradientCenter(0.88f, 0.92f);
+            plum.setGradientRadius(dp(560));
+            GradientDrawable center = new GradientDrawable();
+            center.setGradientType(GradientDrawable.RADIAL_GRADIENT);
+            center.setColors(new int[]{alpha(0xFF1A1030, 50), alpha(0xFF060714, 0)});
+            center.setGradientCenter(0.5f, 0.5f);
+            center.setGradientRadius(dp(900));
+            return new android.graphics.drawable.LayerDrawable(new android.graphics.drawable.Drawable[]{center, gold, plum});
+        } catch (Exception e) { return new android.graphics.drawable.ColorDrawable(0x00000000); }
+    }
+
+    private static android.graphics.drawable.Drawable velvetTexture() {
+        try {
+            if (velvetGrain == null) {
+                int s = 120;
+                velvetGrain = android.graphics.Bitmap.createBitmap(s, s, android.graphics.Bitmap.Config.ARGB_8888);
+                java.util.Random rnd = new java.util.Random(42);
+                for (int y = 0; y < s; y++) for (int x = 0; x < s; x++) {
+                    int a = rnd.nextInt(7);
+                    if (x % 5 == 0 && y % 3 == 0) a += 3;
+                    velvetGrain.setPixel(x, y, (Math.min(10, a) << 24) | 0xC9A44A);
+                }
+            }
+            android.graphics.drawable.BitmapDrawable td = new android.graphics.drawable.BitmapDrawable(null, velvetGrain);
+            td.setTileModeXY(android.graphics.Shader.TileMode.REPEAT, android.graphics.Shader.TileMode.REPEAT);
+            td.setAlpha(18);
+            return td;
         } catch (Exception e) { return new android.graphics.drawable.ColorDrawable(0x00000000); }
     }
 
@@ -544,44 +571,50 @@ public final class Theme {
 
     public static android.graphics.drawable.Drawable card() {
         if (nuts) {
-            // Imperial Velvet: مخمل نیمه‌شیشه‌ای لوکس با لبه طلایی ظریف — جهانی
-            return glass(alpha(SURFACE, 235), alpha(SURFACE, 210), 22, 110);
+            // Imperial Velvet 2.0: شیشه مخمل فوق براق — هاله ابریشمی + لبه طلای 4K
+            return glass(alpha(SURFACE, 242), alpha(0xFF0E0C1A, 225), 24, 135);
         }
         if (light) {
-            // Reference light cards: white panels with a clearer metallic gold edge.
-            return glass(0xFFFFFFFF, 0xFFFBF5E6, 22, 130);
+            return glass(0xFFFFFFFF, 0xFFFBF5E6, 24, 140);
         }
-        return glass(alpha(SURFACE, 242), alpha(SURFACE, 214), 22, 92);
+        return glass(alpha(SURFACE, 245), alpha(SURFACE, 220), 24, 100);
     }
 
-    /** Card with an accent glow edge. */
+    /** Card with an accent glow edge — لاکچری برجسته با گرادیان طلائی */
     public static GradientDrawable cardAccent(int accent) {
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{alpha(accent, light ? 30 : 46), alpha(accent, light ? 10 : 14), SURFACE});
-        d.setCornerRadius(dp(20));
-        d.setStroke(dp(1), alpha(accent, light ? 70 : 90));
+                new int[]{alpha(accent, light ? 38 : 52), alpha(accent, light ? 14 : 18), alpha(SURFACE, 250)});
+        d.setCornerRadius(dp(22));
+        d.setStroke(dp(1), alpha(accent, light ? 85 : 110));
         return d;
     }
 
-    /** Hero header background. */
+    /** Hero header background — لاکچری با گرادیان 3-stop و حاشیه درخشان */
     public static GradientDrawable hero(int accent) {
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TR_BL,
-                new int[]{alpha(accent, light ? 44 : 70), alpha(accent, light ? 16 : 22), alpha(SURFACE, 255)});
-        d.setCornerRadius(dp(24));
-        d.setStroke(dp(1), alpha(accent, light ? 90 : 110));
+                new int[]{alpha(accent, light ? 52 : 78), alpha(accent, light ? 20 : 28), alpha(SURFACE, 255)});
+        d.setCornerRadius(dp(26));
+        d.setStroke(dp(1), alpha(GOLD, light ? 110 : 135));
         return d;
     }
 
-    /** Executive dashboard hero: لاکچری جهانی با هاله مخملی */
+    /** Executive dashboard hero: لاکچری جهانی با هاله مخملی و درخشش سه‌بعدی */
     public static android.graphics.drawable.Drawable executiveHero() {
         int accent = GOLD;
         if (nuts) {
-            return glass(alpha(SURFACE, 245), alpha(0xFF1E1A2E, 250), 28, 140);
+            // شیشه مخملی دو لایه با هاله طلائی داخلی
+            GradientDrawable base = (GradientDrawable) glass(alpha(SURFACE, 248), alpha(0xFF120E22, 255), 28, 150);
+            try {
+                GradientDrawable inner = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                        new int[]{alpha(GOLD, 18), alpha(GOLD, 0)});
+                inner.setCornerRadius(dp(28));
+                return new android.graphics.drawable.LayerDrawable(new android.graphics.drawable.Drawable[]{base, inner});
+            } catch (Exception e) { return base; }
         }
         if (light) {
             return glass(0xFFFFFFFF, 0xFFF4E7C8, 28, 220);
         }
-        return glass(alpha(accent, 44), alpha(SURFACE, 250), 28, 150);
+        return glass(alpha(accent, 48), alpha(SURFACE, 250), 28, 155);
     }
 
     /** Selected destination on the premium bottom navigation rail. */
@@ -615,39 +648,39 @@ public final class Theme {
         return d;
     }
 
-    /** KPI tile background. */
+    /** KPI tile background — Imperial Velvet 2.0: شیشه‌ای براق با گرادیان سه‌بعدی */
     public static GradientDrawable kpi(int accent) {
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                light ? new int[]{alpha(accent, 34), alpha(SURFACE, 255)}
-                        : new int[]{alpha(accent, 44), alpha(SURFACE, 255), shade(SURFACE, -0.06f)});
-        d.setCornerRadius(dp(20));
-        d.setStroke(dp(1), alpha(accent, light ? 70 : 84));
+                light ? new int[]{alpha(accent, 40), alpha(SURFACE, 255)}
+                        : new int[]{alpha(accent, 52), alpha(SURFACE, 255), shade(SURFACE, -0.08f)});
+        d.setCornerRadius(dp(22));
+        d.setStroke(dp(1), alpha(accent, light ? 75 : 95));
         return d;
     }
 
-    /** Primary button gradient, toned toward a high-contrast ink/paper foreground. */
+    /** Primary button gradient — طلای 4K با درخشش سه‌بعدی */
     public static GradientDrawable goldButton() {
         boolean darkInk = darkAccentInk(GOLD);
         float direction = darkInk ? 1f : -1f;
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{shade(GOLD, direction * 0.14f),
-                        shade(GOLD, direction * 0.02f),
-                        shade(GOLD, direction * -0.08f)});
-        d.setCornerRadius(dp(18));
-        d.setStroke(dp(1), alpha(ACCENT_PAPER, 110));
+                new int[]{shade(GOLD, direction * 0.20f),
+                        GOLD,
+                        shade(GOLD, direction * -0.14f)});
+        d.setCornerRadius(dp(20));
+        d.setStroke(dp(1), alpha(ACCENT_PAPER, 130));
         return d;
     }
 
     /** Controlled rose-gold for the primary start CTA (v34). */
     public static final int ROSE = 0xFFC2527E;
 
-    /** Primary start button: طلایی لوکس جهانی */
+    /** Primary start button: طلای 4K مخملی با هایلایت ابریشمی */
     public static GradientDrawable startButton() {
         if (nuts) {
             GradientDrawable n = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                    new int[]{0xFFFFD45C, 0xFFFFC94A, 0xFFB08D2A});
-            n.setCornerRadius(dp(18));
-            n.setStroke(dp(1), alpha(ACCENT_PAPER, 110));
+                    new int[]{0xFFFFE8A8, 0xFFFFD86B, 0xFFC9A44A, 0xFF9C7A28});
+            n.setCornerRadius(dp(20));
+            n.setStroke(dp(1), alpha(ACCENT_PAPER, 140));
             return n;
         }
         boolean darkInk = darkAccentInk(GOLD);
@@ -776,9 +809,9 @@ public final class Theme {
 
     public static GradientDrawable dialogBg() {
         GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{shade(SURFACE, light ? 0.02f : 0.08f), SURFACE});
-        d.setCornerRadius(dp(26));
-        d.setStroke(dp(1), alpha(GOLD, 90));
+                new int[]{shade(SURFACE, light ? 0.04f : 0.10f), SURFACE});
+        d.setCornerRadius(dp(28));
+        d.setStroke(dp(1.2f), alpha(GOLD, 115));
         return d;
     }
 

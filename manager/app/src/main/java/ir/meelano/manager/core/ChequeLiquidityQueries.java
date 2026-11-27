@@ -286,6 +286,53 @@ public final class ChequeLiquidityQueries {
         return new Queries.Q(sql, binds);
     }
 
+    /**
+     * تجمیع POS برای همه بانک‌ها در یک کوئری (جلوگیری از N+1 و لگ).
+     * برمی‌گرداند: bankRdf, total, count
+     */
+    public static Queries.Q posPendingGroupedByBank(Meta m, String todayJalali, boolean includeYesterday) throws Queries.Missing {
+        if (!m.table("PosDetails")) throw new Queries.Missing("«جزئیات کارت/حواله» در دیتابیس پیدا نشد");
+        String amount = m.must("PosDetails", "مبلغ", "MabPos", "mabPos", "mablagh");
+        String bankRef = m.must("PosDetails", "بانک", "PosBankRdf", "BankRdf", "bankrdf");
+        String gh = m.col("PosDetails", "ghno", "GHNO");
+        String pp = m.col("PosDetails", "p");
+        String hav = m.col("PosDetails", "IsHavaleh", "isHavaleh");
+        String darDate = m.col("dar", "date", "DATE");
+        String darGh = m.col("dar", "ghno", "GHNO");
+        String darP = m.col("dar", "p");
+        String darRdf = m.col("dar", "Rdf_");
+        if (gh == null || pp == null || darDate == null || darGh == null || darP == null)
+            throw new Queries.Missing("ارتباط پوز با قبض قابل تشخیص نیست");
+        java.util.List<Object> binds = new java.util.ArrayList<>();
+        java.util.List<String> conds = new java.util.ArrayList<>();
+        if (hav != null) {
+            String flag = "UPPER(LTRIM(RTRIM(COALESCE(TRY_CONVERT(nvarchar(10),d.[" + hav + "]),N''))))";
+            conds.add("(" + flag + " IN (N'0',N'F',N'FALSE',N'N',N'NO') OR " + flag + " = N'')");
+        }
+        String rdf = m.col("PosDetails", "Rdf_", "rdf_");
+        if (rdf != null && gh != null && pp != null && hav != null) {
+            String flagVal = "UPPER(LTRIM(RTRIM(COALESCE(TRY_CONVERT(nvarchar(20),d.[" + hav + "]),N''))))";
+            String flagVal2 = "UPPER(LTRIM(RTRIM(COALESCE(TRY_CONVERT(nvarchar(20),pd2.[" + hav + "]),N''))))";
+            String latest = "TRY_CONVERT(bigint,d.[" + rdf + "])=(SELECT MAX(TRY_CONVERT(bigint,pd2.[" + rdf + "])) FROM dbo.PosDetails pd2 WHERE TRY_CONVERT(nvarchar(60),pd2.[" + gh + "])=TRY_CONVERT(nvarchar(60),d.[" + gh + "]) AND TRY_CONVERT(int,pd2.[" + pp + "])=TRY_CONVERT(int,d.[" + pp + "]) AND " + flagVal2 + "=" + flagVal + ")";
+            conds.add(latest);
+        }
+        String orderByRdf = darRdf == null ? "(SELECT NULL)" : "TRY_CONVERT(bigint,dh.[" + darRdf + "]) DESC";
+        String darApply = " OUTER APPLY (SELECT TOP (1) dh.[" + darDate + "] AS vdate FROM dbo.dar dh"
+                + " WHERE TRY_CONVERT(nvarchar(60),dh.[" + darGh + "])=TRY_CONVERT(nvarchar(60),d.[" + gh + "])"
+                + " AND TRY_CONVERT(int,dh.[" + darP + "])=TRY_CONVERT(int,d.[" + pp + "])"
+                + " ORDER BY " + orderByRdf + ") dv";
+        String dateExpr = Sql.date10("dv", "vdate");
+        if (includeYesterday) {
+            String yesterday = Jalali.addDays(todayJalali, -1);
+            binds.add(todayJalali); binds.add(yesterday);
+            conds.add("(" + Sql.dateKey(dateExpr) + "=? OR " + Sql.dateKey(dateExpr) + "=?)");
+        } else { binds.add(todayJalali); conds.add(Sql.dateKey(dateExpr) + "=?"); }
+        String where = conds.isEmpty() ? "" : " WHERE " + Sql.join(conds, " AND ");
+        return new Queries.Q("SELECT TRY_CONVERT(nvarchar(60),d.[" + bankRef + "]) AS bankRdf, ISNULL(SUM(" + Sql.num("d", amount) + "),0) AS total, COUNT_BIG(1) AS count"
+                + " FROM dbo.PosDetails d" + darApply + where
+                + " GROUP BY TRY_CONVERT(nvarchar(60),d.[" + bankRef + "])", binds);
+    }
+
     // ---------------------------------------------------------------
     // Overdue customers — for collection suggestions
     // ---------------------------------------------------------------
